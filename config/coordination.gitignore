@@ -1,0 +1,6 @@
+# Coordination state files are temporary and should not be committed
+*.json
+orchestration-log.md
+
+# Keep the folder structure
+!.gitignore
