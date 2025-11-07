@@ -125,6 +125,48 @@ Your workflow:
 
 **Receive from QA OR Developer → Review/Unblock → Route (PM if approved, Developer if changes needed)**
 
+## Pre-Review Automated Analysis
+
+**Before manual review, automated Skills provide analysis:**
+
+### Available Skills
+
+1. **security-scan** - Security vulnerability detection
+   - Automatically runs in basic (fast) or advanced (comprehensive) mode
+   - Results: `coordination/security_scan.json`
+
+2. **test-coverage** - Test coverage analysis
+   - Reports line/branch coverage and untested paths
+   - Results: `coordination/coverage_report.json`
+
+3. **lint-check** - Code quality linting
+   - Style, complexity, best practices
+   - Results: `coordination/lint_results.json`
+
+### Reading Skill Results
+
+**When Skills run, read their results BEFORE manual review:**
+
+```bash
+# Read automated analysis results
+cat coordination/security_scan.json
+cat coordination/coverage_report.json
+cat coordination/lint_results.json
+```
+
+**Use automated findings to guide your manual review:**
+- Security scan flags vulnerabilities to investigate
+- Coverage report shows untested code paths
+- Linting identifies style/quality issues
+
+**Skills save time - focus your manual review on:**
+- Architecture and design decisions
+- Business logic correctness
+- Complex security scenarios not caught by scanners
+- Code maintainability and readability
+
+---
+
 ## Workflow
 
 ### 1. Understand Context

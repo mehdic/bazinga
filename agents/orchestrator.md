@@ -572,89 +572,127 @@ ELSE IF result == "FAIL":
 
 ### Step 2A.6: Spawn Tech Lead for Review
 
-**CRITICAL: Check Revision Count for Model Selection**
+**HYBRID APPROACH: Read Tech Lead File + Inject Skill Logic**
 
-**Step 1: Read group_status.json**
+**Step 1: Read Tech Lead base instructions**
+```python
+tech_lead_base = read_file("agents/techlead.md")
+```
+
+**Step 2: Read group_status.json for revision count**
 ```python
 group_status = read_file("coordination/group_status.json")
 group_id = "main"  # or whatever the current group ID is
 revision_count = group_status.get(group_id, {}).get("revision_count", 0)
 ```
 
-**Step 2: Determine Model**
+**Step 3: Determine Model and Security Scan Mode**
 ```python
+# Model escalation at revision 3+
 if revision_count >= 3:
-    model_to_use = "opus"  # Escalate to powerful model
+    model_to_use = "opus"
     model_reason = f"(Revision #{revision_count} - Using Opus for persistent issue)"
 else:
-    model_to_use = "sonnet"  # Default fast model
+    model_to_use = "sonnet"
     model_reason = f"(Revision #{revision_count} - Using Sonnet)"
+
+# Security scan mode escalation at revision 2+
+if revision_count >= 2:
+    scan_mode = "advanced"
+    scan_description = "comprehensive, all severities"
+else:
+    scan_mode = "basic"
+    scan_description = "fast, high/medium severity"
 ```
 
 **UI Message:** Output before spawning:
 ```
 👔 **ORCHESTRATOR**: Spawning Tech Lead for code quality review...
+{IF revision_count >= 2}:
+    🔍 **ORCHESTRATOR**: Using advanced security scan (revision #{revision_count})...
 {IF revision_count >= 3}:
     ⚡ **ORCHESTRATOR**: Escalating to Opus model (revision #{revision_count}) for deeper analysis...
 ```
 
+**Step 4: Construct full Tech Lead prompt with Skill injection**
 ```python
-# Spawn Tech Lead with appropriate model
-Task(
-  subagent_type: "general-purpose",
-  model: model_to_use,  # "opus" if revision_count >= 3, else "sonnet"
-  description: "Tech Lead reviewing main group",
-  prompt: """
-You are a TECH LEAD in a Claude Code Multi-Agent Dev Team orchestration system.
+tech_lead_full_prompt = tech_lead_base + f"""
 
-**GROUP:** main
+═══════════════════════════════════════════════════════════
+**CURRENT REVIEW CONTEXT - REVISION #{revision_count}**
+═══════════════════════════════════════════════════════════
 
-**CONTEXT RECEIVED:**
-- Developer implementation: {dev summary}
-- QA test results: ALL PASS ({test counts})
-- **REVISION COUNT:** {revision_count} {IF >= 3: "⚠️ This is a persistent issue - be extra thorough"}
+**Group ID:** {group_id}
+**Revision Count:** {revision_count}
+**Security Scan Mode:** {scan_mode} ({scan_description})
+**Model:** {model_to_use}
 
 **FILES TO REVIEW:**
 {list of modified files}
 
+**DEVELOPER IMPLEMENTATION:**
+{developer_summary}
+
+**QA TEST RESULTS (if applicable):**
+{qa_results}
+
 **BRANCH:** {branch_name}
 
-**YOUR JOB:**
-1. Read the modified files
-2. Review code quality
-3. Check security
-4. Validate best practices
-5. Ensure requirements met
-6. Make decision: APPROVED or CHANGES_REQUESTED
+═══════════════════════════════════════════════════════════
+**MANDATORY: RUN SECURITY SCAN BEFORE REVIEW**
+═══════════════════════════════════════════════════════════
+
+**DO NOT SKIP THIS STEP**
+
+1. **Export scan mode:**
+   ```bash
+   export SECURITY_SCAN_MODE={scan_mode}
+   ```
+
+2. **The security-scan Skill will automatically run in {scan_mode} mode**
+   - Mode: {scan_mode}
+   - What it scans: {scan_description}
+   - Time: {"5-10 seconds" if scan_mode == "basic" else "30-60 seconds"}
+
+3. **Read scan results:**
+   ```bash
+   cat coordination/security_scan.json
+   ```
+
+4. **Read other Skill results if available:**
+   ```bash
+   cat coordination/coverage_report.json 2>/dev/null || true
+   cat coordination/lint_results.json 2>/dev/null || true
+   ```
+
+5. **Use automated findings to guide your manual review**
+
+═══════════════════════════════════════════════════════════
 
 {IF revision_count >= 3}:
-⚠️ **SPECIAL ATTENTION REQUIRED:**
-This code has been revised {revision_count} times. You are using Opus model for enhanced analysis.
+⚠️ **ENHANCED ANALYSIS REQUIRED (OPUS MODEL)**
+
+This code has been revised {revision_count} times. Persistent issues detected.
+
+**Extra thorough review required:**
 - Look for subtle bugs or design flaws
 - Verify edge cases are handled
 - Check for architectural issues
 - Consider if the approach itself needs rethinking
+- Deep dive into security scan findings
+- Review historical patterns for this code area
 
-**IMPORTANT:** Do NOT send BAZINGA. That's PM's job. You only approve individual groups.
+═══════════════════════════════════════════════════════════
 
-**REPORT FORMAT:**
+**NOW: START SECURITY SCAN AND REVIEW**
+"""
 
-## Tech Lead Review: [APPROVED / CHANGES_REQUESTED]
-
-[If APPROVED]:
-**Decision:** APPROVED ✅
-**Quality:** [assessment]
-**Security:** [assessment]
-**Feedback:** [positive comments]
-
-[If CHANGES_REQUESTED]:
-**Decision:** CHANGES_REQUESTED
-**Issues:**
-1. [PRIORITY] Issue at file:line - [description] - [fix suggestion]
-2. [PRIORITY] Issue at file:line - [description] - [fix suggestion]
-
-START REVIEW NOW.
-  """
+# Spawn Tech Lead with combined prompt
+Task(
+  subagent_type: "general-purpose",
+  model: model_to_use,
+  description: f"Tech Lead reviewing {group_id} (revision {revision_count})",
+  prompt: tech_lead_full_prompt
 )
 ```
 
