@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 console = Console()
 app = typer.Typer(
@@ -204,6 +204,7 @@ class BazingaSetup:
         for path in possible_locations:
             if path.exists():
                 existing_config_path = path
+                console.print(f"  [dim]Found existing config: {path.name}[/dim]")
                 break
 
         if existing_config_path:
