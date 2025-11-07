@@ -19,6 +19,18 @@ bazinga init my-project
 
 This system implements adaptive parallelism, intelligent workflow routing, and comprehensive role drift prevention to ensure high-quality software delivery through autonomous agent coordination.
 
+### Built on Claude Code Skills
+
+BAZINGA leverages **Claude Code Skills** - a powerful feature that allows Claude to invoke specialized tools and capabilities during orchestration. By implementing capabilities as Skills, BAZINGA gains several key advantages:
+
+- **Model-Invocable Tools**: Agents can invoke Skills like `/security-scan`, `/lint-check`, or `/codebase-analysis` as needed during their workflow
+- **Structured Output**: Skills return JSON results that agents can parse and act upon programmatically
+- **Reusable Across Sessions**: Skills are persistent and available to all agents across different orchestration sessions
+- **Background Execution**: Time-consuming analysis (security scans, coverage reports) runs efficiently without blocking agent execution
+- **Modular Architecture**: Each Skill is self-contained, making the system easy to extend with new capabilities
+
+This Skills-based architecture is what enables BAZINGA's advanced features like automated security scanning, progressive analysis escalation, and the Developer Superpowers mode. Instead of requiring manual tool invocation or external scripts, agents autonomously invoke Skills when they need specialized analysis or validation.
+
 ## Features
 
 - **🆕 Developer Superpowers Mode**: Keyword-activated enhanced capabilities (codebase analysis, test patterns, build checks)
