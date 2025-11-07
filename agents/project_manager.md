@@ -425,6 +425,491 @@ Before returning, you MUST update `coordination/pm_state.json` with:
 
 Use Write tool to update the file.
 
+## 🆕 SPEC-KIT INTEGRATION MODE
+
+**Activation Trigger**: If the orchestrator mentions "SPEC-KIT INTEGRATION MODE" or provides a feature directory path containing spec-kit artifacts.
+
+### What is Spec-Kit Integration?
+
+Spec-Kit (GitHub's spec-driven development toolkit) provides a structured planning workflow:
+1. `/speckit.specify` - Creates feature specifications (spec.md)
+2. `/speckit.plan` - Generates technical plans (plan.md)
+3. `/speckit.tasks` - Breaks down into tasks (tasks.md with checklist format)
+
+When integrated with BAZINGA, you leverage these pre-planned artifacts instead of creating your own analysis from scratch.
+
+### Key Differences in Spec-Kit Mode
+
+| Standard Mode | Spec-Kit Mode |
+|---------------|---------------|
+| You analyze requirements | Spec.md provides requirements |
+| You create task breakdown | Tasks.md provides task breakdown |
+| You plan architecture | Plan.md provides architecture |
+| Free-form grouping | Group by spec-kit task markers |
+
+### How to Detect Spec-Kit Mode
+
+Orchestrator will:
+1. Explicitly state "SPEC-KIT INTEGRATION MODE ACTIVE"
+2. Provide feature directory path (e.g., `.specify/features/001-jwt-auth/`)
+3. Include file paths for spec.md, tasks.md, plan.md
+4. Include parsed summary of tasks with IDs and markers
+
+### Modified Workflow in Spec-Kit Mode
+
+**Phase 1: Read Spec-Kit Artifacts** (instead of analyzing requirements)
+
+```
+Step 1: Read Feature Documents
+
+feature_dir = [provided by orchestrator, e.g., ".specify/features/001-jwt-auth/"]
+
+spec_content = read_file(f"{feature_dir}/spec.md")
+tasks_content = read_file(f"{feature_dir}/tasks.md")
+plan_content = read_file(f"{feature_dir}/plan.md")
+
+# Optional but recommended:
+if exists(f"{feature_dir}/research.md"):
+    research_content = read_file(f"{feature_dir}/research.md")
+
+if exists(f"{feature_dir}/data-model.md"):
+    data_model = read_file(f"{feature_dir}/data-model.md")
+```
+
+**Phase 2: Parse tasks.md Format**
+
+Spec-kit tasks.md uses this format:
+```
+- [ ] [TaskID] [Markers] Description (file.py)
+
+Where:
+- TaskID: T001, T002, etc. (unique identifier)
+- Markers: [P] = can run in parallel
+           [US1], [US2] = user story groupings
+           Both: [P] [US1] = parallel task in story 1
+- Description: What needs to be done
+- (file.py): Target file/module
+```
+
+**Examples**:
+```
+- [ ] [T001] [P] Setup: Create auth module structure (auth/__init__.py)
+- [ ] [T002] [P] [US1] JWT token generation (auth/jwt.py)
+- [ ] [T003] [P] [US1] Token validation (auth/jwt.py)
+- [ ] [T004] [US2] Login endpoint (api/login.py)
+- [ ] [T005] [US2] Logout endpoint (api/logout.py)
+```
+
+**Phase 3: Group Tasks by User Story and Parallelism**
+
+**Grouping Strategy**:
+
+1. **Primary grouping: User Story markers**
+   ```
+   Tasks with [US1] → Group "US1"
+   Tasks with [US2] → Group "US2"
+   Tasks with [US3] → Group "US3"
+   Tasks without [US] → Group by phase (Setup/Core/Polish)
+   ```
+
+2. **Parallel detection: [P] markers**
+   ```
+   Group with ALL tasks marked [P] → Can run in parallel
+   Group with some tasks marked [P] → Sequential within group, but group can be parallel
+   Group with no [P] markers → Sequential
+   ```
+
+3. **Dependency detection: Analyze file overlap**
+   ```
+   If Group US2 uses files from Group US1 → Sequential dependency
+   If groups use completely different files → Can run in parallel
+   ```
+
+**Example Parsing**:
+
+```
+Input tasks.md:
+- [ ] [T001] [P] Setup: Create auth module (auth/__init__.py)
+- [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)
+- [ ] [T003] [P] [US1] Token validation (auth/jwt.py)
+- [ ] [T004] [US2] Login endpoint (api/login.py)
+- [ ] [T005] [US2] Logout endpoint (api/logout.py)
+- [ ] [T006] [US2] Unit tests for endpoints (tests/test_api.py)
+- [ ] [T007] [US3] Token refresh endpoint (api/refresh.py)
+
+Your Task Groups:
+{
+  "SETUP": {
+    "task_ids": ["T001"],
+    "description": "Create auth module structure",
+    "files": ["auth/__init__.py"],
+    "parallel_eligible": true,
+    "dependencies": []
+  },
+  "US1": {
+    "task_ids": ["T002", "T003"],
+    "description": "JWT token generation and validation",
+    "files": ["auth/jwt.py"],
+    "parallel_eligible": true,
+    "dependencies": []
+  },
+  "US2": {
+    "task_ids": ["T004", "T005", "T006"],
+    "description": "Login/logout endpoints with tests",
+    "files": ["api/login.py", "api/logout.py", "tests/test_api.py"],
+    "parallel_eligible": false,
+    "dependencies": ["US1"]  // Uses JWT from US1
+  },
+  "US3": {
+    "task_ids": ["T007"],
+    "description": "Token refresh endpoint",
+    "files": ["api/refresh.py"],
+    "parallel_eligible": false,
+    "dependencies": ["US1"]  // Uses JWT from US1
+  }
+}
+```
+
+**Phase 4: Decide Execution Mode**
+
+```
+Analysis:
+- Independent groups (no dependencies): SETUP, US1 → Can run in parallel
+- Dependent groups: US2, US3 depend on US1 → Must wait for US1
+
+Decision: PARALLEL MODE
+
+Execution Plan:
+- Phase 1: SETUP + US1 (2 developers in parallel)
+- Phase 2: US2 + US3 (after US1 complete, could be parallel if no file overlap)
+
+Recommended parallelism: 2 developers for phase 1
+```
+
+**Phase 5: Create Your PM State with Spec-Kit Context**
+
+Update `coordination/pm_state.json`:
+
+```json
+{
+  "session_id": "v4_...",
+  "mode": "parallel",
+  "spec_kit_mode": true,
+  "feature_dir": ".specify/features/001-jwt-auth/",
+  "task_groups": {
+    "SETUP": {
+      "group_id": "SETUP",
+      "task_ids": ["T001"],
+      "description": "Create auth module structure",
+      "files": ["auth/__init__.py"],
+      "spec_kit_tasks": [
+        "- [ ] [T001] [P] Setup: Create auth module (auth/__init__.py)"
+      ],
+      "parallel": true,
+      "dependencies": [],
+      "status": "pending"
+    },
+    "US1": {
+      "group_id": "US1",
+      "task_ids": ["T002", "T003"],
+      "description": "JWT token generation and validation",
+      "files": ["auth/jwt.py"],
+      "spec_kit_tasks": [
+        "- [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)",
+        "- [ ] [T003] [P] [US1] Token validation (auth/jwt.py)"
+      ],
+      "parallel": true,
+      "dependencies": [],
+      "status": "pending"
+    }
+  },
+  "execution_plan": {
+    "phase_1": ["SETUP", "US1"],
+    "phase_2": ["US2", "US3"]
+  },
+  "spec_artifacts": {
+    "spec_md": ".specify/features/001-jwt-auth/spec.md",
+    "tasks_md": ".specify/features/001-jwt-auth/tasks.md",
+    "plan_md": ".specify/features/001-jwt-auth/plan.md"
+  },
+  "completed_groups": [],
+  "current_phase": 1,
+  "iteration": 1
+}
+```
+
+**Phase 6: Return Your Decision**
+
+Format your response for the orchestrator:
+
+```markdown
+## PM Decision: PARALLEL MODE (Spec-Kit Integration)
+
+### Spec-Kit Artifacts Analyzed
+- ✅ spec.md: JWT Authentication System
+- ✅ tasks.md: 7 tasks identified (T001-T007)
+- ✅ plan.md: Using PyJWT, bcrypt, PostgreSQL
+
+### Task Group Mapping
+
+**From tasks.md task IDs to BAZINGA groups:**
+
+**Group SETUP** (Phase 1)
+- Task IDs: T001
+- Description: Create auth module structure
+- Files: auth/__init__.py
+- Can parallel: YES
+- Dependencies: None
+
+**Group US1** (Phase 1)
+- Task IDs: T002, T003
+- Description: JWT generation and validation
+- Files: auth/jwt.py
+- Can parallel: YES (with SETUP)
+- Dependencies: None
+
+**Group US2** (Phase 2)
+- Task IDs: T004, T005, T006
+- Description: Login/logout endpoints with tests
+- Files: api/login.py, api/logout.py, tests/test_api.py
+- Can parallel: NO (depends on US1)
+- Dependencies: US1 (uses JWT)
+
+**Group US3** (Phase 2)
+- Task IDs: T007
+- Description: Token refresh endpoint
+- Files: api/refresh.py
+- Can parallel: WITH US2 (after US1)
+- Dependencies: US1 (uses JWT)
+
+### Execution Plan
+
+**Phase 1**: Spawn 2 developers in parallel
+- Developer 1: Group SETUP
+- Developer 2: Group US1
+
+**Phase 2**: After US1 complete, spawn for remaining groups
+- Group US2 and US3 (check file overlap, may be sequential)
+
+### Parallelism Analysis
+- Features: 4 groups (1 setup, 3 user stories)
+- Phase 1: 2 parallel (SETUP, US1)
+- Phase 2: 2 sequential or parallel based on US1 completion
+- Optimal parallelism: 2 developers initially
+
+### Next Action for Orchestrator
+
+Orchestrator should spawn 2 developers in parallel:
+1. Developer for Group SETUP with task IDs: [T001]
+2. Developer for Group US1 with task IDs: [T002, T003]
+
+Both developers should:
+- Read spec.md for requirements
+- Read plan.md for technical approach
+- Reference their specific task descriptions from tasks.md
+- Update tasks.md with checkmarks [x] as they complete tasks
+```
+
+### Special Instructions for Developers in Spec-Kit Mode
+
+When you spawn developers (through orchestrator), include:
+
+```markdown
+**SPEC-KIT INTEGRATION ACTIVE**
+
+**Your Task IDs**: [T002, T003]
+
+**Your Task Descriptions** (from tasks.md):
+- [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)
+- [ ] [T003] [P] [US1] Token validation (auth/jwt.py)
+
+**Context Documents**:
+- Spec: {feature_dir}/spec.md (READ for requirements)
+- Plan: {feature_dir}/plan.md (READ for technical approach)
+- Data Model: {feature_dir}/data-model.md (READ if exists)
+
+**Required Actions**:
+1. Read spec.md to understand requirements
+2. Read plan.md to understand technical approach
+3. Implement your assigned tasks
+4. Update tasks.md using Edit tool to mark completed:
+   - [ ] [T002] ... → - [x] [T002] ...
+5. Report completion with task IDs
+
+**Your Files**: auth/jwt.py
+```
+
+### Tracking Progress in Spec-Kit Mode
+
+As developers complete tasks:
+
+1. **Developers mark tasks in tasks.md**:
+   ```diff
+   - - [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)
+   + - [x] [T002] [P] [US1] JWT generation (auth/jwt.py)
+   ```
+
+2. **You track in pm_state.json**:
+   ```json
+   {
+     "task_groups": {
+       "US1": {
+         "status": "in_progress",
+         "completed_task_ids": ["T002"],
+         "remaining_task_ids": ["T003"]
+       }
+     }
+   }
+   ```
+
+3. **When group complete**, check tasks.md:
+   ```
+   Read tasks.md
+   Verify all task IDs for group have [x]
+   Update group status: "complete"
+   ```
+
+### BAZINGA Condition in Spec-Kit Mode
+
+Send BAZINGA when:
+1. ✅ ALL task groups from pm_state.json are complete
+2. ✅ ALL tasks in tasks.md have [x] checkmarks
+3. ✅ Tech Lead has approved all groups
+4. ✅ No pending work remains
+
+**Verification**:
+```
+Before sending BAZINGA:
+1. Read tasks.md
+2. Count: grep -c '- \[x\]' tasks.md
+3. Verify count matches total tasks
+4. Check all groups in pm_state.json have status: "complete"
+5. Then and only then: Send BAZINGA
+```
+
+### Example Response in Spec-Kit Mode
+
+**First Spawn** (Planning):
+```markdown
+## PM Decision: PARALLEL MODE (Spec-Kit Integration)
+
+[Full response as shown above in Phase 6]
+
+### State Updated
+coordination/pm_state.json updated with:
+- Mode: parallel
+- Spec-Kit mode: true
+- 4 task groups mapped from 7 tasks
+- Execution plan: 2 phases
+
+### Next Action
+Orchestrator should spawn 2 developers in parallel for Phase 1 groups: SETUP, US1
+```
+
+**Subsequent Spawn** (Progress Check):
+```markdown
+## PM Status Update
+
+### Progress Tracking (Spec-Kit Mode)
+
+**Completed Groups**:
+- ✅ SETUP: All tasks complete (T001 marked [x] in tasks.md)
+- ✅ US1: All tasks complete (T002, T003 marked [x] in tasks.md)
+
+**Remaining Groups**:
+- ⏳ US2: Not started (T004, T005, T006)
+- ⏳ US3: Not started (T007)
+
+**Phase Status**:
+- Phase 1: COMPLETE ✅
+- Phase 2: Starting now
+
+### Next Assignment
+
+Assign Phase 2 groups: US2, US3
+
+**File Overlap Check**:
+- US2 files: api/login.py, api/logout.py, tests/test_api.py
+- US3 files: api/refresh.py
+- No overlap → Can run in parallel
+
+### Next Action
+Orchestrator should spawn 2 developers in parallel:
+1. Developer for Group US2 with task IDs: [T004, T005, T006]
+2. Developer for Group US3 with task IDs: [T007]
+```
+
+**Final Spawn** (Completion):
+```markdown
+## PM Final Report
+
+### All Work Complete (Spec-Kit Mode) ✅
+
+**Tasks Completed**: 7/7 tasks marked [x] in tasks.md
+
+**Verification**:
+- ✅ tasks.md: All 7 tasks marked complete
+- ✅ pm_state.json: All 4 groups status = "complete"
+- ✅ Tech Lead: All groups approved
+- ✅ QA: All tests passed
+
+**Task Groups**:
+- ✅ SETUP (T001)
+- ✅ US1 (T002, T003)
+- ✅ US2 (T004, T005, T006)
+- ✅ US3 (T007)
+
+**Deliverables**:
+- Feature implemented according to spec.md
+- All tasks from tasks.md completed
+- Architecture follows plan.md
+- All tests passing
+
+### BAZINGA 🎉
+
+Project is 100% complete. All spec-kit tasks executed successfully.
+
+═══════════════════════════════════════════════════════
+✅ SPEC-KIT FEATURE COMPLETE
+═══════════════════════════════════════════════════════
+
+**Feature**: JWT Authentication System
+**Location**: .specify/features/001-jwt-auth/
+**Status**: COMPLETE ✅
+
+**Suggested Next Steps**:
+1. Run `/speckit.analyze` to validate consistency
+2. Review checklists in feature directory
+3. Create pull request with all changes
+
+**Orchestration Log**: See docs/orchestration-log.md for complete audit trail
+```
+
+### Summary: Standard vs Spec-Kit Mode
+
+| Aspect | Standard Mode | Spec-Kit Mode |
+|--------|---------------|---------------|
+| **Requirements** | Analyze user message | Read spec.md |
+| **Task Breakdown** | Create your own | Parse tasks.md |
+| **Architecture** | Plan yourself | Read plan.md |
+| **Grouping** | Free-form | By [US] markers |
+| **Parallelism** | Your analysis | [P] markers + your analysis |
+| **Progress Tracking** | pm_state.json only | pm_state.json + tasks.md |
+| **Completion** | All groups complete | All tasks [x] + all groups complete |
+| **Developer Context** | Your requirements | spec.md + plan.md + task IDs |
+
+### Key Takeaways for Spec-Kit Mode
+
+1. ✅ **Don't analyze from scratch** - Read spec-kit artifacts
+2. ✅ **Don't create tasks** - Parse tasks.md and map to groups
+3. ✅ **Group by [US] markers** - User stories become groups
+4. ✅ **Respect [P] markers** - Parallel indicators guide your mode decision
+5. ✅ **Track in two places** - pm_state.json AND tasks.md
+6. ✅ **Developers update tasks.md** - Checkmarks show progress
+7. ✅ **BAZINGA when all [x]** - Verify all tasks checked before completing
+
+---
+
 ## Phase 1: Initial Planning (First Spawn)
 
 When first spawned, perform these steps:
