@@ -1,6 +1,6 @@
 ---
 name: lint-check
-description: "Run code quality linters when reviewing code. Checks style, complexity, and best practices. Supports Python (ruff), JavaScript (eslint), Go (golangci-lint), Ruby (rubocop). Use when reviewing any code changes for quality issues."
+description: "Run code quality linters when reviewing code. Checks style, complexity, and best practices. Supports Python (ruff), JavaScript (eslint), Go (golangci-lint), Ruby (rubocop), Java (Checkstyle/PMD). Use when reviewing any code changes for quality issues."
 allowed-tools: [Bash, Read]
 ---
 
@@ -41,6 +41,12 @@ Automated code quality and style checking for code reviews. This Skill runs appr
 - **Tool:** rubocop
 - **Checks:** Ruby style guide, best practices
 - **Speed:** Moderate (5-10s)
+
+### Java
+- **Tool:** Checkstyle (style) + PMD (code quality)
+- **Checks:** Code style, complexity, best practices, bug patterns
+- **Speed:** Moderate (10-15s)
+- **Integration:** Via Maven/Gradle plugins
 
 ---
 
@@ -130,6 +136,46 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 ```bash
 gem install rubocop
+```
+
+### Java Projects
+
+**Maven** (`pom.xml`):
+```xml
+<!-- Checkstyle for style checking -->
+<plugin>
+  <groupId>org.apache.maven.plugins</groupId>
+  <artifactId>maven-checkstyle-plugin</artifactId>
+  <version>3.3.1</version>
+  <configuration>
+    <configLocation>google_checks.xml</configLocation>
+  </configuration>
+</plugin>
+
+<!-- PMD for code quality -->
+<plugin>
+  <groupId>org.apache.maven.plugins</groupId>
+  <artifactId>maven-pmd-plugin</artifactId>
+  <version>3.21.2</version>
+</plugin>
+```
+
+**Gradle** (`build.gradle`):
+```gradle
+plugins {
+  id 'checkstyle'
+  id 'pmd'
+}
+
+checkstyle {
+  toolVersion = '10.12.5'
+  configFile = file('config/checkstyle/google_checks.xml')
+}
+
+pmd {
+  toolVersion = '6.55.0'
+  ruleSets = ['category/java/bestpractices.xml', 'category/java/errorprone.xml']
+}
 ```
 
 ---
@@ -250,3 +296,5 @@ This Skill uses industry-standard linting tools:
 - **eslint**: JavaScript/TypeScript linter (OpenJS Foundation)
 - **golangci-lint**: Go linters aggregator
 - **rubocop**: Ruby static analyzer (RuboCop)
+- **Checkstyle**: Java style checker (Checkstyle)
+- **PMD**: Java code quality analyzer (PMD)

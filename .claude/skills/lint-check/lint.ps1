@@ -22,6 +22,8 @@ if (Test-Path "pyproject.toml") -or (Test-Path "setup.py") -or (Test-Path "requi
     $LANG = "go"
 } elseif (Test-Path "Gemfile") -or (Get-ChildItem -Filter "*.gemspec" -ErrorAction SilentlyContinue) {
     $LANG = "ruby"
+} elseif (Test-Path "pom.xml") -or (Test-Path "build.gradle") -or (Test-Path "build.gradle.kts") {
+    $LANG = "java"
 }
 
 Write-Host "📋 Detected language: $LANG" -ForegroundColor Cyan
@@ -101,6 +103,57 @@ switch ($LANG) {
         } else {
             Write-Host "⚠️  rubocop not found. Install: gem install rubocop" -ForegroundColor Yellow
             '{"files":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+        }
+    }
+
+    "java" {
+        # Check for Maven or Gradle
+        if (Test-Path "pom.xml") {
+            if (Test-CommandExists "mvn") {
+                $TOOL = "checkstyle+pmd-maven"
+                Write-Host "  Running Checkstyle via Maven..." -ForegroundColor Gray
+                mvn checkstyle:check 2>$null | Out-Null
+
+                Write-Host "  Running PMD via Maven..." -ForegroundColor Gray
+                mvn pmd:check 2>$null | Out-Null
+
+                # Consolidate results (Checkstyle XML + PMD XML)
+                if ((Test-Path "target\checkstyle-result.xml") -or (Test-Path "target\pmd.xml")) {
+                    '{"tool":"checkstyle+pmd","checkstyle":"target/checkstyle-result.xml","pmd":"target/pmd.xml"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                } else {
+                    '{"issues":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                }
+            } else {
+                Write-Host "❌ Maven not found for Java project" -ForegroundColor Red
+                $TOOL = "none"
+                '{"error":"Maven not found"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            }
+        } elseif ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts")) {
+            $GRADLE_CMD = if (Test-Path ".\gradlew.bat") { ".\gradlew.bat" } elseif (Test-CommandExists "gradle") { "gradle" } else { $null }
+
+            if ($GRADLE_CMD) {
+                $TOOL = "checkstyle+pmd-gradle"
+                Write-Host "  Running Checkstyle via Gradle..." -ForegroundColor Gray
+                & $GRADLE_CMD checkstyleMain 2>$null | Out-Null
+
+                Write-Host "  Running PMD via Gradle..." -ForegroundColor Gray
+                & $GRADLE_CMD pmdMain 2>$null | Out-Null
+
+                # Consolidate results (Checkstyle XML + PMD XML)
+                if ((Test-Path "build\reports\checkstyle\main.xml") -or (Test-Path "build\reports\pmd\main.xml")) {
+                    '{"tool":"checkstyle+pmd","checkstyle":"build/reports/checkstyle/main.xml","pmd":"build/reports/pmd/main.xml"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                } else {
+                    '{"issues":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                }
+            } else {
+                Write-Host "❌ Gradle not found for Java project" -ForegroundColor Red
+                $TOOL = "none"
+                '{"error":"Gradle not found"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            }
+        } else {
+            Write-Host "❌ No Maven or Gradle build file found" -ForegroundColor Red
+            $TOOL = "none"
+            '{"error":"No build file"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
         }
     }
 

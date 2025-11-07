@@ -21,6 +21,8 @@ elif [ -f "go.mod" ]; then
     LANG="go"
 elif [ -f "Gemfile" ] || [ -f "*.gemspec" ]; then
     LANG="ruby"
+elif [ -f "pom.xml" ] || [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+    LANG="java"
 else
     LANG="unknown"
 fi
@@ -87,6 +89,58 @@ case $LANG in
             echo "⚠️  rubocop not found. Install: gem install rubocop"
             TOOL="none"
             echo '{"files":[]}' > coordination/lint_results_raw.json
+        fi
+        ;;
+
+    java)
+        # Check for Maven or Gradle
+        if [ -f "pom.xml" ]; then
+            if command_exists "mvn"; then
+                TOOL="checkstyle+pmd-maven"
+                echo "  Running Checkstyle via Maven..."
+                mvn checkstyle:check 2>/dev/null || true
+
+                echo "  Running PMD via Maven..."
+                mvn pmd:check 2>/dev/null || true
+
+                # Consolidate results (Checkstyle XML + PMD XML)
+                if [ -f "target/checkstyle-result.xml" ] || [ -f "target/pmd.xml" ]; then
+                    echo '{"tool":"checkstyle+pmd","checkstyle":"target/checkstyle-result.xml","pmd":"target/pmd.xml"}' > coordination/lint_results_raw.json
+                else
+                    echo '{"issues":[]}' > coordination/lint_results_raw.json
+                fi
+            else
+                echo "❌ Maven not found for Java project"
+                TOOL="none"
+                echo '{"error":"Maven not found"}' > coordination/lint_results_raw.json
+            fi
+        elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+            GRADLE_CMD="gradle"
+            [ -f "./gradlew" ] && GRADLE_CMD="./gradlew"
+
+            if command_exists "gradle" || [ -f "./gradlew" ]; then
+                TOOL="checkstyle+pmd-gradle"
+                echo "  Running Checkstyle via Gradle..."
+                $GRADLE_CMD checkstyleMain 2>/dev/null || true
+
+                echo "  Running PMD via Gradle..."
+                $GRADLE_CMD pmdMain 2>/dev/null || true
+
+                # Consolidate results (Checkstyle XML + PMD XML)
+                if [ -f "build/reports/checkstyle/main.xml" ] || [ -f "build/reports/pmd/main.xml" ]; then
+                    echo '{"tool":"checkstyle+pmd","checkstyle":"build/reports/checkstyle/main.xml","pmd":"build/reports/pmd/main.xml"}' > coordination/lint_results_raw.json
+                else
+                    echo '{"issues":[]}' > coordination/lint_results_raw.json
+                fi
+            else
+                echo "❌ Gradle not found for Java project"
+                TOOL="none"
+                echo '{"error":"Gradle not found"}' > coordination/lint_results_raw.json
+            fi
+        else
+            echo "❌ No Maven or Gradle build file found"
+            TOOL="none"
+            echo '{"error":"No build file"}' > coordination/lint_results_raw.json
         fi
         ;;
 
