@@ -355,7 +355,16 @@ BAZINGA integration allows you to:
 
 ### How It Works
 
-The `/orchestrate-from-spec` command:
+The `/orchestrate-from-spec` command uses the **full BAZINGA multi-agent team**:
+
+**Team Members Involved**:
+- 🎯 **Orchestrator** - Routes messages between all agents
+- 📋 **Project Manager (PM)** - Coordinates execution, tracks progress
+- 👨‍💻 **Developers** (1-4) - Implement code based on spec-kit tasks
+- 🧪 **QA Expert** - Tests integration/contract/E2E tests (if tests exist)
+- 👔 **Tech Lead** - Reviews code quality and security
+
+**Workflow**:
 
 1. **Loads spec-kit artifacts**:
    ```
@@ -383,6 +392,7 @@ The `/orchestrate-from-spec` command:
    - Tasks with [US1] → Group US1
    - Tasks with [US2] → Group US2
    - Uses [P] markers to determine parallelism
+   - Spawns 1-4 developers based on analysis
    ```
 
 4. **Developers implement with context**:
@@ -392,12 +402,29 @@ The `/orchestrate-from-spec` command:
    - spec.md for requirements
    - plan.md for technical approach
    - tasks.md for full context
+
+   Updates tasks.md with checkmarks as they complete each task
    ```
 
-5. **Real-time progress tracking**:
+5. **QA Expert tests** (conditional):
    ```
-   Developers mark tasks complete:
-   - [ ] [T002] JWT generation → - [x] [T002] JWT generation
+   If developer created/fixed integration/contract/E2E tests:
+   - Runs all test suites
+   - Reports PASS/FAIL to Tech Lead
+   - Developer fixes if FAIL, loops back to QA
+   ```
+
+6. **Tech Lead reviews**:
+   ```
+   Reviews code quality, security, best practices
+   - Decision: APPROVED → forwards to PM
+   - Decision: CHANGES_REQUESTED → back to Developer
+   ```
+
+7. **PM tracks completion**:
+   ```
+   Verifies all tasks marked [x] in tasks.md
+   When all groups approved: sends BAZINGA 🎉
    ```
 
 ### Example: JWT Authentication
@@ -432,25 +459,73 @@ The `/orchestrate-from-spec` command:
 # Step 4: Execute with BAZINGA
 /orchestrate-from-spec
 
-# BAZINGA orchestration:
-# PM analyzes: 3 user stories, 2 can run in parallel
-# PM decision: PARALLEL MODE
+# BAZINGA orchestration (FULL TEAM):
 #
-# Phase 1 (parallel):
-#   Developer 1 → Group SETUP + US1 (T001, T002, T003)
-#   Developer 2 → Group US2 (T004, T005)
+# 📋 PM analyzes tasks.md:
+#    - 3 user stories identified (US1, US2, US3)
+#    - Tasks T001-T003 can run in parallel ([P] markers)
+#    - US2 depends on US1, US3 depends on US1
+#    - Decision: PARALLEL MODE
 #
-# Phase 2 (after US1):
-#   Developer 3 → Group US3 (T006)
+# Phase 1 (2 developers in parallel):
 #
-# Each developer:
-# - Reads spec.md for requirements
-# - Reads plan.md for technical approach
-# - Implements assigned tasks
-# - Updates tasks.md with checkmarks [x]
-# - Routes through QA → Tech Lead → PM
+#   👨‍💻 Developer 1 → Group SETUP + US1 (T001, T002, T003)
+#      - Reads spec.md for JWT requirements
+#      - Reads plan.md for PyJWT library approach
+#      - Implements JWT generation + validation
+#      - Creates integration tests
+#      - Updates tasks.md: [x] T001, [x] T002, [x] T003
+#      - Status: READY_FOR_QA
 #
-# Result: All tasks completed, BAZINGA received
+#   🧪 QA Expert tests Developer 1's work:
+#      - Runs integration tests (JWT flow)
+#      - All tests passing
+#      - Status: PASS → forwards to Tech Lead
+#
+#   👔 Tech Lead reviews Developer 1's work:
+#      - Code quality: Good (clean, documented)
+#      - Security: Good (HS256, secrets in env)
+#      - Decision: APPROVED → forwards to PM
+#
+#   👨‍💻 Developer 2 → Group US2 (T004, T005)
+#      - Implements login/logout endpoints
+#      - Creates integration tests
+#      - Updates tasks.md: [x] T004, [x] T005
+#      - Status: READY_FOR_QA
+#
+#   🧪 QA Expert tests Developer 2's work:
+#      - Runs endpoint integration tests
+#      - All tests passing
+#      - Status: PASS → forwards to Tech Lead
+#
+#   👔 Tech Lead reviews Developer 2's work:
+#      - Code quality: Good
+#      - Uses JWT from US1 correctly
+#      - Decision: APPROVED → forwards to PM
+#
+# 📋 PM checks progress:
+#    - US1: APPROVED ✓
+#    - US2: APPROVED ✓
+#    - US3: Still pending
+#    - Spawns next phase...
+#
+# Phase 2 (after US1 complete):
+#
+#   👨‍💻 Developer 3 → Group US3 (T006)
+#      - Implements token refresh endpoint
+#      - Creates integration tests
+#      - Updates tasks.md: [x] T006
+#      - Status: READY_FOR_QA
+#
+#   🧪 QA Expert → PASS
+#   👔 Tech Lead → APPROVED
+#
+# 📋 PM final check:
+#    - All tasks in tasks.md marked [x]
+#    - All groups approved by Tech Lead
+#    - Result: BAZINGA 🎉
+#
+# ✅ Feature complete with full quality gates!
 ```
 
 ### Benefits of Integration
