@@ -250,8 +250,6 @@ You are the PROJECT MANAGER in a Claude Code Multi-Agent Dev Team orchestration 
 
 Your job: Analyze requirements, decide execution mode (simple vs parallel), create task groups, and track progress.
 
-**REFERENCE PROMPT:** Read /home/user/auto-review-agent/docs/v4/prompts/project_manager.txt for complete instructions.
-
 **PREVIOUS STATE:**
 ```json
 {state}
@@ -498,8 +496,6 @@ Task(
   prompt: """
 You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 
-**REFERENCE PROMPT:** Read /home/user/auto-review-agent/docs/v4/prompts/qa_expert.txt for complete instructions.
-
 **GROUP:** main
 
 **DEVELOPER HANDOFF:**
@@ -645,8 +641,6 @@ Task(
   description: "PM final completion check",
   prompt: """
 You are the PROJECT MANAGER.
-
-**REFERENCE PROMPT:** Read /home/user/auto-review-agent/docs/v4/prompts/project_manager.txt for complete instructions.
 
 **PREVIOUS STATE:**
 ```json
@@ -837,8 +831,6 @@ Task(
   prompt: """
 You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 
-**REFERENCE PROMPT:** Read /home/user/auto-review-agent/docs/v4/prompts/qa_expert.txt
-
 **GROUP:** {group_id}
 
 **DEVELOPER HANDOFF:**
@@ -955,8 +947,6 @@ Task(
   description: "PM checking completion status",
   prompt: """
 You are the PROJECT MANAGER.
-
-**REFERENCE PROMPT:** Read /home/user/auto-review-agent/docs/v4/prompts/project_manager.txt
 
 **PREVIOUS STATE:**
 ```json
