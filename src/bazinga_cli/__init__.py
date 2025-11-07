@@ -178,19 +178,33 @@ class BazingaSetup:
                     console.print(f"  ✓ Copied {skill_dir.name}/SKILL.md")
                     copied_count += 1
 
-                # Copy appropriate script file
+                # Copy appropriate script file (.sh/.ps1) or Python files (.py)
                 for script_file in skill_dir.glob("*"):
-                    if script_file.suffix in [".sh", ".ps1"]:
-                        if script_file.suffix == script_extension:
+                    if script_file.is_file():
+                        # Copy Python files (for Python-based Skills)
+                        if script_file.suffix == ".py":
                             dest = dest_skill_dir / script_file.name
                             shutil.copy2(script_file, dest)
 
-                            # Make shell scripts executable on Unix-like systems
-                            if script_file.suffix == ".sh" and os.name != 'nt':
+                            # Make Python scripts executable on Unix-like systems
+                            if os.name != 'nt':
                                 dest.chmod(0o755)
 
                             console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
                             copied_count += 1
+
+                        # Copy shell/PowerShell scripts (for shell-based Skills)
+                        elif script_file.suffix in [".sh", ".ps1"]:
+                            if script_file.suffix == script_extension:
+                                dest = dest_skill_dir / script_file.name
+                                shutil.copy2(script_file, dest)
+
+                                # Make shell scripts executable on Unix-like systems
+                                if script_file.suffix == ".sh" and os.name != 'nt':
+                                    dest.chmod(0o755)
+
+                                console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
+                                copied_count += 1
 
         return copied_count > 0
 

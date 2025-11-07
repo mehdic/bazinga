@@ -593,6 +593,18 @@ You have access to advanced capabilities:
    ```
    Returns: Test framework, fixtures, patterns, suggestions
 
+3. **API Contract Validation Skill**: Run BEFORE committing API changes
+   ```
+   /api-contract-validation
+   ```
+   Returns: Breaking changes, safe changes, recommendations
+
+4. **DB Migration Check Skill**: Run BEFORE committing migrations
+   ```
+   /db-migration-check
+   ```
+   Returns: Dangerous operations, safe alternatives, impact analysis
+
 USE THESE SKILLS for better implementation quality!
 ═══════════════════════════════════════════
 {END IF}
@@ -613,10 +625,12 @@ BEFORE Reporting READY_FOR_QA:
 7. Run /lint-check - Fix all issues
 8. Run build check - MUST succeed
 9. {IF superpowers}: Run app startup check - MUST start
+10. {IF superpowers AND API changes}: Run /api-contract-validation
+11. {IF superpowers AND migration changes}: Run /db-migration-check
 
 ONLY THEN:
-10. Commit to branch: {branch_name}
-11. Report: READY_FOR_QA
+12. Commit to branch: {branch_name}
+13. Report: READY_FOR_QA
 
 **YOUR JOB:**
 1. Follow mandatory workflow above
@@ -1135,6 +1149,14 @@ Available Skills:
    - Analyzes test framework, fixtures, naming patterns
    - Outputs: coordination/test_patterns.json
 
+3. API Contract Validation: /api-contract-validation
+   - Detects breaking changes in API contracts
+   - Outputs: coordination/api_contract_validation.json
+
+4. DB Migration Check: /db-migration-check
+   - Detects dangerous database operations
+   - Outputs: coordination/db_migration_check.json
+
 {ELSE}:
 📋 STANDARD MODE
 
@@ -1162,10 +1184,12 @@ BEFORE Reporting READY_FOR_QA:
 8. Run /lint-check - Fix all issues
 9. Run build check - MUST succeed
 10. {IF superpowers}: Run app startup check - MUST start
+11. {IF superpowers AND API changes}: Run /api-contract-validation
+12. {IF superpowers AND migration changes}: Run /db-migration-check
 
 ONLY THEN:
-11. Commit to YOUR branch: {branch_name}
-12. Report: READY_FOR_QA
+13. Commit to YOUR branch: {branch_name}
+14. Report: READY_FOR_QA
 
 **IMPORTANT:**
 - Work ONLY on your assigned files

@@ -212,20 +212,36 @@ Simply include "superpowers" in your orchestration request:
 - Suggests test cases based on similar tests
 - Output: `coordination/test_patterns.json`
 
-**3. Code Context Injection**
+**3. API Contract Validation Skill** (5-15 seconds)
+- Detects breaking changes in OpenAPI/Swagger specifications
+- Compares current spec against baseline
+- Identifies removed endpoints, changed response types, removed fields
+- Suggests safe migration strategies (API versioning)
+- Supports FastAPI, Flask, Django, Express auto-generation
+- Output: `coordination/api_contract_validation.json`
+
+**4. Database Migration Check Skill** (5-20 seconds)
+- Analyzes database migrations for dangerous operations
+- Supports PostgreSQL, MySQL, MongoDB, SQLite, Oracle
+- Detects table locks, rewrites, data loss risks
+- Suggests zero-downtime alternatives
+- Works with Alembic, Django, Flyway, Liquibase, Mongoose, ActiveRecord
+- Output: `coordination/db_migration_check.json`
+
+**5. Code Context Injection**
 - Orchestrator finds similar code before spawning Developer
 - Injects relevant examples and utilities into Developer prompt
 - Zero runtime cost (happens during spawn)
 
-**4. Baseline Health Checks**
+**6. Baseline Health Checks**
 - Build check: Compiles project before/after development
 - App startup check (superpowers only): Verifies app starts successfully
 - Catches regressions immediately
 
-**5. Mandatory Workflow**
+**7. Mandatory Workflow**
 - Pre-implementation: Review codebase context, run analysis Skills
 - During implementation: Follow existing patterns
-- Pre-commit: Run all unit tests (100% pass), lint-check, build verification
+- Pre-commit: Run all unit tests (100% pass), lint-check, build verification, API/migration checks
 - Only report READY_FOR_QA when all checks pass
 
 #### Benefits
@@ -280,7 +296,9 @@ bazinga/
 │       ├── test-coverage/      # Test coverage analysis
 │       ├── lint-check/         # Code quality linting
 │       ├── codebase-analysis/  # 🆕 Codebase pattern analysis (superpowers)
-│       └── test-pattern-analysis/ # 🆕 Test pattern extraction (superpowers)
+│       ├── test-pattern-analysis/ # 🆕 Test pattern extraction (superpowers)
+│       ├── api-contract-validation/ # 🆕 API breaking change detection (superpowers)
+│       └── db-migration-check/ # 🆕 Database migration safety (superpowers)
 ├── config/                      # Configuration files
 │   ├── claude.md               # Global constraints (.claude.md)
 │   └── coordination.gitignore  # Gitignore for coordination folder
