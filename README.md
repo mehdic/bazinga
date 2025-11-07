@@ -21,6 +21,7 @@ This system implements adaptive parallelism, intelligent workflow routing, and c
 
 ## Features
 
+- **🆕 Spec-Kit Integration**: Seamless integration with GitHub's spec-kit for spec-driven development (planning + execution)
 - **Adaptive Parallelism**: PM dynamically spawns 1-4 developers based on task complexity
 - **Conditional Workflow**: Intelligent routing based on whether tests exist (Dev→QA→TechLead vs Dev→TechLead)
 - **Role Drift Prevention**: 6-layer defense system preventing agents from forgetting their roles
@@ -317,6 +318,192 @@ Developers explicitly tell orchestrator where to route:
 **Status:** READY_FOR_REVIEW
 **Next Step:** Orchestrator, please forward to Tech Lead for code review
 ```
+
+## 🆕 Spec-Kit Integration
+
+**NEW**: BAZINGA now integrates seamlessly with GitHub's [spec-kit](https://github.com/github/spec-kit) for spec-driven development! This combines spec-kit's rigorous planning with BAZINGA's powerful execution.
+
+### What is Spec-Kit Integration?
+
+Spec-kit provides a structured planning workflow:
+1. `/speckit.constitution` - Define project principles
+2. `/speckit.specify` - Create feature specifications
+3. `/speckit.plan` - Generate technical plans
+4. `/speckit.tasks` - Break down into executable tasks
+
+BAZINGA integration allows you to:
+- ✅ Use spec-kit for planning (specification, architecture, task breakdown)
+- ✅ Use BAZINGA for execution (adaptive parallelism, multi-agent coordination)
+- ✅ Maintain traceability from spec to code
+- ✅ Track progress in real-time with tasks.md checkmarks
+
+### Complete Workflow
+
+```bash
+# Phase 1: Planning with Spec-Kit
+/speckit.constitution                    # First time only
+/speckit.specify Add JWT authentication  # Create spec.md
+/speckit.plan                            # Create plan.md, research.md
+/speckit.tasks                           # Create tasks.md with task breakdown
+
+# Phase 2: Execution with BAZINGA
+/orchestrate-from-spec                   # Execute using BAZINGA orchestration
+
+# Phase 3: Validation
+/speckit.analyze                         # Validate consistency (optional)
+```
+
+### How It Works
+
+The `/orchestrate-from-spec` command:
+
+1. **Loads spec-kit artifacts**:
+   ```
+   ✅ spec.md - Feature requirements
+   ✅ tasks.md - Task breakdown with IDs (T001, T002, T003...)
+   ✅ plan.md - Technical approach
+   ✅ research.md - Research findings (optional)
+   ✅ data-model.md - Data structures (optional)
+   ```
+
+2. **PM reads and parses tasks.md**:
+   ```
+   Task format: - [ ] [T001] [P] [US1] Description (file.py)
+
+   Where:
+   - T001 = Task ID
+   - [P] = Parallel execution marker
+   - [US1] = User story grouping
+   - file.py = Target file
+   ```
+
+3. **PM creates BAZINGA groups**:
+   ```
+   Groups tasks by [US] markers:
+   - Tasks with [US1] → Group US1
+   - Tasks with [US2] → Group US2
+   - Uses [P] markers to determine parallelism
+   ```
+
+4. **Developers implement with context**:
+   ```
+   Each developer receives:
+   - Assigned task IDs (e.g., T002, T003)
+   - spec.md for requirements
+   - plan.md for technical approach
+   - tasks.md for full context
+   ```
+
+5. **Real-time progress tracking**:
+   ```
+   Developers mark tasks complete:
+   - [ ] [T002] JWT generation → - [x] [T002] JWT generation
+   ```
+
+### Example: JWT Authentication
+
+```bash
+# Step 1: Specify feature
+/speckit.specify Implement JWT authentication with access and refresh tokens
+
+# Spec-kit creates:
+# - .specify/features/001-jwt-auth/spec.md
+# - Feature requirements and acceptance criteria
+
+# Step 2: Generate plan
+/speckit.plan
+
+# Spec-kit creates:
+# - .specify/features/001-jwt-auth/plan.md (technical approach)
+# - .specify/features/001-jwt-auth/research.md (unknowns resolved)
+# - .specify/features/001-jwt-auth/data-model.md (token structure)
+
+# Step 3: Break down into tasks
+/speckit.tasks
+
+# Spec-kit creates tasks.md:
+# - [ ] [T001] [P] Setup: Create auth module (auth/__init__.py)
+# - [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)
+# - [ ] [T003] [P] [US1] Token validation (auth/jwt.py)
+# - [ ] [T004] [US2] Login endpoint (api/login.py)
+# - [ ] [T005] [US2] Logout endpoint (api/logout.py)
+# - [ ] [T006] [US3] Token refresh endpoint (api/refresh.py)
+
+# Step 4: Execute with BAZINGA
+/orchestrate-from-spec
+
+# BAZINGA orchestration:
+# PM analyzes: 3 user stories, 2 can run in parallel
+# PM decision: PARALLEL MODE
+#
+# Phase 1 (parallel):
+#   Developer 1 → Group SETUP + US1 (T001, T002, T003)
+#   Developer 2 → Group US2 (T004, T005)
+#
+# Phase 2 (after US1):
+#   Developer 3 → Group US3 (T006)
+#
+# Each developer:
+# - Reads spec.md for requirements
+# - Reads plan.md for technical approach
+# - Implements assigned tasks
+# - Updates tasks.md with checkmarks [x]
+# - Routes through QA → Tech Lead → PM
+#
+# Result: All tasks completed, BAZINGA received
+```
+
+### Benefits of Integration
+
+| Aspect | Spec-Kit Only | BAZINGA Only | **Integrated** |
+|--------|--------------|--------------|----------------|
+| **Planning** | ✅ Structured | ⚠️ Basic | ✅ Structured |
+| **Execution** | ⚠️ Manual | ✅ Automated | ✅ Automated |
+| **Parallelism** | ❌ No | ✅ Yes | ✅ Yes (spec-guided) |
+| **Progress Tracking** | ✅ tasks.md | ⚠️ Logs only | ✅ Both |
+| **Quality Gates** | ✅ Analyze | ✅ QA/Tech Lead | ✅ Both |
+| **Traceability** | ✅ Task IDs | ❌ No | ✅ Full |
+
+### Helper Script
+
+Analyze spec-kit tasks.md:
+
+```bash
+# Bash
+bash .claude/scripts/parse-speckit-tasks.sh .specify/features/001-auth/tasks.md
+
+# PowerShell
+pwsh .claude/scripts/parse-speckit-tasks.ps1 .specify/features/001-auth/tasks.md
+
+# Output:
+# ═══════════════════════════════════════════
+# SPEC-KIT TASKS ANALYSIS
+# ═══════════════════════════════════════════
+# 📋 Total Tasks: 6
+# ✅ Completed: 3
+# ⏳ Pending: 3
+# 📊 Progress: 50%
+#
+# 🔀 Tasks marked [P]: 3
+# [User stories breakdown...]
+# [JSON summary...]
+```
+
+### Requirements
+
+- BAZINGA v1.0+ (this version)
+- Spec-kit installed and initialized (`/speckit.constitution`)
+- Feature planned with spec-kit (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`)
+
+### Documentation
+
+See:
+- [`commands/orchestrate-from-spec.md`](commands/orchestrate-from-spec.md) - Full command documentation
+- [`agents/project_manager.md`](agents/project_manager.md) - PM spec-kit mode section
+- [`agents/developer.md`](agents/developer.md) - Developer spec-kit mode section
+- [`scripts/parse-speckit-tasks.sh`](scripts/parse-speckit-tasks.sh) - Task parser utility
+
+---
 
 ## Key Principles
 
