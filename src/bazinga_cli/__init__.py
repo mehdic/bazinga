@@ -7,6 +7,7 @@ development teams including Project Manager, Developers, QA Expert, and Tech Lea
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -107,15 +108,19 @@ class BazingaSetup:
 
         return True
 
-    def setup_config(self, target_dir: Path) -> bool:
+    def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:
         """
         Setup global configuration, merging with existing .claude.md if present.
 
         Strategy:
         1. Check if .claude.md or .claude/.claude.md exists in target
-        2. If exists, read it and check if BAZINGA config is already present
-        3. If not present, append BAZINGA config (intelligently or at bottom)
+        2. If exists and is_update=True, replace old BAZINGA section with new one
+        3. If exists and is_update=False, append if not present
         4. If doesn't exist, create new .claude.md with our content
+
+        Args:
+            target_dir: Target directory for installation
+            is_update: If True, replaces existing BAZINGA config with new version
         """
         source_config = self.source_dir / "config" / "claude.md"
         if not source_config.exists():
@@ -124,6 +129,20 @@ class BazingaSetup:
         # Read BAZINGA configuration
         with open(source_config, 'r') as f:
             bazinga_config = f.read()
+
+        # Extract BAZINGA-specific content
+        bazinga_lines = bazinga_config.split('\n')
+        bazinga_config_section = None
+        for i, line in enumerate(bazinga_lines):
+            if "⚠️ CRITICAL" in line or "Orchestrator Role Enforcement" in line:
+                # Include separator line before this section
+                start_idx = max(0, i - 2)  # Include the --- separator
+                bazinga_config_section = '\n'.join(bazinga_lines[start_idx:])
+                break
+
+        if not bazinga_config_section:
+            # Fallback: use everything after line 7
+            bazinga_config_section = '\n'.join(bazinga_lines[7:])
 
         # Check for existing .claude.md in project root or .claude/ directory
         possible_locations = [
@@ -143,51 +162,103 @@ class BazingaSetup:
                 existing_content = f.read()
 
             # Check if BAZINGA configuration is already present
-            if "BAZINGA" in existing_content or "Orchestrator Role Enforcement" in existing_content:
+            has_bazinga = "BAZINGA" in existing_content or "Orchestrator Role Enforcement" in existing_content
+
+            if has_bazinga and is_update:
+                # Update mode: Replace old BAZINGA section with new one
+                try:
+                    # Try to intelligently replace the BAZINGA section
+                    updated_content = self._replace_bazinga_section(
+                        existing_content,
+                        bazinga_config_section
+                    )
+
+                    if updated_content is None:
+                        # Couldn't automatically update - save to separate file
+                        update_file = existing_config_path.parent / f"{existing_config_path.name}.bazinga-update"
+                        with open(update_file, 'w') as f:
+                            f.write(bazinga_config_section)
+
+                        console.print(
+                            f"  ⚠️  Could not automatically update {existing_config_path.name}\n"
+                            f"      New BAZINGA config saved to: {update_file.name}\n"
+                            f"      Please manually merge the changes."
+                        )
+                        return True
+
+                    # Successfully created updated content
+                    with open(existing_config_path, 'w') as f:
+                        f.write(updated_content)
+
+                    console.print(f"  ✓ Updated BAZINGA config in {existing_config_path.name}")
+                    return True
+
+                except Exception as e:
+                    # Error during update - save to separate file
+                    update_file = existing_config_path.parent / f"{existing_config_path.name}.bazinga-update"
+                    with open(update_file, 'w') as f:
+                        f.write(bazinga_config_section)
+
+                    console.print(
+                        f"  ⚠️  Error updating {existing_config_path.name}: {e}\n"
+                        f"      New BAZINGA config saved to: {update_file.name}\n"
+                        f"      Please manually merge the changes."
+                    )
+                    return True
+
+            elif has_bazinga and not is_update:
+                # Init mode: Already has BAZINGA, skip
                 console.print(f"  ℹ️  BAZINGA config already present in {existing_config_path.name}")
                 return True
 
-            # Extract BAZINGA-specific content (everything after the first header section)
-            # BAZINGA config starts with the critical orchestrator enforcement section
-            bazinga_lines = bazinga_config.split('\n')
+            else:
+                # No BAZINGA section - append it
+                merged_content = existing_content.rstrip() + '\n\n' + bazinga_config_section
 
-            # Find where BAZINGA-specific config starts (after initial project context)
-            bazinga_start_markers = [
-                "## ⚠️ CRITICAL: Orchestrator Role Enforcement",
-                "---",
-            ]
+                with open(existing_config_path, 'w') as f:
+                    f.write(merged_content)
 
-            bazinga_config_section = None
-            for i, line in enumerate(bazinga_lines):
-                if "⚠️ CRITICAL" in line or "Orchestrator Role Enforcement" in line:
-                    # Include separator line before this section
-                    start_idx = max(0, i - 2)  # Include the --- separator
-                    bazinga_config_section = '\n'.join(bazinga_lines[start_idx:])
-                    break
-
-            if not bazinga_config_section:
-                # Fallback: use everything after line 7
-                bazinga_config_section = '\n'.join(bazinga_lines[7:])
-
-            # Merge: Add BAZINGA config to existing file
-            # Try to insert after initial project description (first 4-5 lines)
-            existing_lines = existing_content.split('\n')
-
-            # Simple strategy: append to bottom with clear separator
-            merged_content = existing_content.rstrip() + '\n\n' + bazinga_config_section
-
-            # Write merged configuration
-            with open(existing_config_path, 'w') as f:
-                f.write(merged_content)
-
-            console.print(f"  ✓ Merged BAZINGA config into existing {existing_config_path.name}")
-            return True
+                console.print(f"  ✓ Merged BAZINGA config into existing {existing_config_path.name}")
+                return True
         else:
             # No existing config, create new one
             dest_config = target_dir / ".claude.md"
             shutil.copy2(source_config, dest_config)
             console.print(f"  ✓ Created .claude.md with BAZINGA config")
             return True
+
+    def _replace_bazinga_section(self, content: str, new_bazinga_section: str) -> Optional[str]:
+        """
+        Replace the BAZINGA section in the content with a new version.
+
+        Returns:
+            Updated content with new BAZINGA section, or None if couldn't safely replace
+        """
+        # Try to find BAZINGA section boundaries
+        # Look for the start marker
+        start_patterns = [
+            r'^---\s*$\s*^## ⚠️ CRITICAL: Orchestrator Role Enforcement',
+            r'^## ⚠️ CRITICAL: Orchestrator Role Enforcement',
+        ]
+
+        content_before_bazinga = None
+
+        for pattern in start_patterns:
+            match = re.search(pattern, content, re.MULTILINE)
+            if match:
+                # Found the start of BAZINGA section
+                content_before_bazinga = content[:match.start()].rstrip()
+                break
+
+        if content_before_bazinga is None:
+            # Couldn't find BAZINGA section start
+            return None
+
+        # BAZINGA section goes to the end of file (it's the last section)
+        # So we just take everything before it and append the new section
+        updated_content = content_before_bazinga + '\n\n' + new_bazinga_section
+
+        return updated_content
 
     def run_init_script(self, target_dir: Path) -> bool:
         """Run the initialization script to set up coordination files."""
@@ -522,9 +593,9 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
 
-    # Update configuration (merge if needed)
+    # Update configuration (replace old BAZINGA section with new)
     console.print("\n[bold cyan]4. Updating configuration[/bold cyan]")
-    setup.setup_config(target_dir)
+    setup.setup_config(target_dir, is_update=True)
 
     # Success message
     console.print(
