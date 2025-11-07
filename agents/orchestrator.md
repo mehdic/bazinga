@@ -137,12 +137,29 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**FIRST ACTION - Run Initialization Script:**
+**FIRST ACTION - Detect Superpowers Mode:**
+
+```python
+# Check user requirements for "superpowers" keyword
+user_requirements = {user_message}
+superpowers_mode = "superpowers" in user_requirements.lower()
+
+if superpowers_mode:
+    Output: "⚡ **ORCHESTRATOR**: SUPERPOWERS MODE ACTIVATED - Running advanced capabilities"
+    Output: "   - Codebase analysis before implementation"
+    Output: "   - Test pattern analysis"
+    Output: "   - App startup health checks"
+    Output: "   - Extended build validation"
+else:
+    Output: "🔄 **ORCHESTRATOR**: Running in default mode (fast, essential checks)"
+```
+
+**SECOND ACTION - Run Initialization Script:**
 
 ```bash
 # This script creates all required coordination files if they don't exist
 # Safe to run multiple times (idempotent)
-bash .claude/scripts/init-orchestration.sh
+bash scripts/init-orchestration.sh
 ```
 
 The script will:
@@ -152,7 +169,101 @@ The script will:
 - Initialize orchestration log
 - Skip files that already exist (idempotent)
 
-**After script completes:**
+**THIRD ACTION - Store Mode in Orchestrator State:**
+
+```python
+# Update orchestrator_state.json with superpowers mode
+orch_state = read_json("coordination/orchestrator_state.json")
+orch_state["superpowers_mode"] = superpowers_mode
+write_json("coordination/orchestrator_state.json", orch_state)
+```
+
+**FOURTH ACTION - Run Build Baseline Check (always):**
+
+```bash
+# Detect project language and run appropriate build
+Output: "🔨 **ORCHESTRATOR**: Running baseline build check..."
+
+# Language detection (check for marker files)
+if [ -f "package.json" ]; then
+    LANG="javascript"
+    BUILD_CMD="npm run build"
+elif [ -f "tsconfig.json" ]; then
+    LANG="typescript"
+    BUILD_CMD="tsc --noEmit && npm run build"
+elif [ -f "go.mod" ]; then
+    LANG="go"
+    BUILD_CMD="go build ./..."
+elif [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
+    LANG="java"
+    BUILD_CMD="mvn compile || gradle compileJava"
+elif [ -f "requirements.txt" ] || [ -f "setup.py" ]; then
+    LANG="python"
+    BUILD_CMD="python -m compileall . && mypy . || true"
+elif [ -f "Gemfile" ]; then
+    LANG="ruby"
+    BUILD_CMD="bundle exec rubocop --parallel"
+else
+    LANG="unknown"
+    BUILD_CMD=""
+fi
+
+# Run build if language detected
+if [ -n "$BUILD_CMD" ]; then
+    $BUILD_CMD > coordination/build_baseline.log 2>&1
+    echo $? > coordination/build_baseline_status.txt
+
+    BUILD_STATUS=$(cat coordination/build_baseline_status.txt)
+    if [ $BUILD_STATUS -eq 0 ]; then
+        Output: "✅ **ORCHESTRATOR**: Baseline build successful"
+    else:
+        Output: "⚠️ **ORCHESTRATOR**: Baseline build has errors (see coordination/build_baseline.log)"
+        Output: "   This is OK - we'll track if Developer introduces NEW errors"
+    fi
+else
+    Output: "ℹ️ **ORCHESTRATOR**: Could not detect build system, skipping build check"
+fi
+```
+
+**FIFTH ACTION - Run App Startup Check (superpowers mode only):**
+
+```bash
+if [ "$superpowers_mode" = true ]; then
+    Output: "⚡ **ORCHESTRATOR**: Running baseline app startup check..."
+
+    # Detect start command
+    if [ -f "package.json" ] && grep -q '"start"' package.json; then
+        START_CMD="npm start"
+    elif [ -f "go.mod" ]; then
+        START_CMD="go run ."
+    elif [ -f "manage.py" ]; then
+        START_CMD="python manage.py runserver"
+    else
+        START_CMD=""
+    fi
+
+    if [ -n "$START_CMD" ]; then
+        # Try to start app with timeout
+        timeout 30s $START_CMD > coordination/app_baseline.log 2>&1 &
+        APP_PID=$!
+        sleep 5
+
+        # Check if still running
+        if kill -0 $APP_PID 2>/dev/null; then
+            echo "success" > coordination/app_baseline_status.txt
+            kill $APP_PID
+            Output: "✅ **ORCHESTRATOR**: App starts successfully (baseline)"
+        else
+            echo "failed" > coordination/app_baseline_status.txt
+            Output: "⚠️ **ORCHESTRATOR**: App failed to start (baseline recorded)"
+        fi
+    else
+        Output: "ℹ️ **ORCHESTRATOR**: Could not detect start command, skipping app check"
+    fi
+fi
+```
+
+**After initialization completes:**
 ```
 1. If script created new files:
    Output: "📁 **ORCHESTRATOR**: Coordination environment initialized"
@@ -161,6 +272,8 @@ The script will:
    Output: "📂 **ORCHESTRATOR**: Found existing session, loading state..."
    Read existing session state from coordination/pm_state.json
    Continue from previous state
+
+3. Output: "🚀 **ORCHESTRATOR**: Ready to begin orchestration"
 ```
 
 **Expected Folder Structure (created by script):**
@@ -386,6 +499,56 @@ ELSE IF PM chose "parallel":
 🚀 **ORCHESTRATOR**: Phase 2A - Starting simple mode execution
 ```
 
+### Step 2A.0: Prepare Code Context (Before Spawning Developer)
+
+**UI Message:**
+```
+🔍 **ORCHESTRATOR**: Analyzing codebase for similar patterns and utilities...
+```
+
+**Extract keywords from task:**
+```python
+task_description = PM's task group details
+keywords = extract_keywords(task_description)
+# Example: "Implement password reset" → ["password", "reset", "endpoint", "email"]
+```
+
+**Find similar files (simple heuristic):**
+```python
+similar_files = []
+for file in list_files("."):
+    if any(keyword in file.lower() for keyword in keywords):
+        similar_files.append(file)
+
+# Limit to top 3 most relevant
+similar_files = similar_files[:3]
+```
+
+**Build context section:**
+```python
+code_context = f"""
+
+═══════════════════════════════════════════
+📚 CODEBASE CONTEXT (Similar Code & Utilities)
+═══════════════════════════════════════════
+
+"""
+
+# Add similar files
+for file in similar_files:
+    content = read_first_50_lines(file)
+    code_context += f"**Similar code: {file}**\n```\n{content}\n```\n\n"
+
+# Add common utilities (if they exist)
+common_utils = ["utils/", "helpers/", "lib/", "services/"]
+for util_dir in common_utils:
+    if exists(util_dir):
+        code_context += f"**Available utilities in {util_dir}/**\n"
+        code_context += list_files(util_dir) + "\n\n"
+
+code_context += "═══════════════════════════════════════════\n\n"
+```
+
 ### Step 2A.1: Spawn Single Developer
 
 **UI Message:** Output before spawning:
@@ -403,17 +566,62 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 **GROUP:** main
 **MODE:** Simple (you're the only developer)
 
+{code_context}
+
 **REQUIREMENTS:**
 {PM's task group details}
 {User's original requirements}
 
+**CAPABILITIES MODE**: {standard OR superpowers}
+
+{IF superpowers_mode}:
+═══════════════════════════════════════════
+⚡ SUPERPOWERS MODE ACTIVE
+═══════════════════════════════════════════
+
+You have access to advanced capabilities:
+
+1. **Codebase Analysis Skill**: Run BEFORE coding
+   ```
+   /codebase-analysis "your task description"
+   ```
+   Returns: Similar features, utilities, architectural patterns
+
+2. **Test Pattern Analysis Skill**: Run BEFORE writing tests
+   ```
+   /test-pattern-analysis tests/
+   ```
+   Returns: Test framework, fixtures, patterns, suggestions
+
+USE THESE SKILLS for better implementation quality!
+═══════════════════════════════════════════
+{END IF}
+
+**MANDATORY WORKFLOW** (all modes):
+
+BEFORE Implementing:
+1. Review codebase context above
+2. {IF superpowers}: Run /codebase-analysis for patterns
+
+During Implementation:
+3. Implement the COMPLETE solution
+4. Write unit tests
+5. {IF superpowers}: Run /test-pattern-analysis before testing
+
+BEFORE Reporting READY_FOR_QA:
+6. Run ALL unit tests - MUST pass 100%
+7. Run /lint-check - Fix all issues
+8. Run build check - MUST succeed
+9. {IF superpowers}: Run app startup check - MUST start
+
+ONLY THEN:
+10. Commit to branch: {branch_name}
+11. Report: READY_FOR_QA
+
 **YOUR JOB:**
-1. Read relevant files to understand architecture
-2. Implement the COMPLETE solution
-3. Write unit tests
-4. Run unit tests (must ALL pass)
-5. Commit to branch: {branch_name}
-6. Report results
+1. Follow mandatory workflow above
+2. Implement complete solution
+3. Ensure ALL checks pass before reporting
 
 **REPORT FORMAT:**
 ## Implementation Complete
@@ -800,6 +1008,63 @@ ELSE IF PM assigns more work:
 🚀 **ORCHESTRATOR**: Phase 2B - Starting parallel mode execution with [N] developers
 ```
 
+### Step 2B.0: Prepare Code Context for Each Group
+
+**Before spawning parallel developers, prepare code context for EACH group.**
+
+**For each group in groups_to_spawn:**
+
+```python
+# Extract keywords from task description
+group = PM.task_groups[group_id]
+task_description = group["description"] + " " + group["requirements"]
+keywords = extract_keywords(task_description)
+
+# Find similar files
+similar_files = []
+for file in list_files("."):
+    if any(keyword in file.lower() for keyword in keywords):
+        similar_files.append(file)
+
+# Limit to top 3 most relevant
+similar_files = similar_files[:3]
+
+# Read common utility directories
+utility_dirs = ["utils/", "lib/", "helpers/", "services/", "common/"]
+utility_files = []
+for dir in utility_dirs:
+    if exists(dir):
+        utility_files.extend(list_files(dir))
+
+# Build code context for this group
+group_code_context = """
+═══════════════════════════════════════════
+📚 CODEBASE CONTEXT (Similar Code & Utilities)
+═══════════════════════════════════════════
+
+## Similar Features
+"""
+
+for file in similar_files:
+    content_snippet = read_file_snippet(file, lines=30)
+    group_code_context += f"""
+**File: {file}**
+```
+{content_snippet}
+```
+"""
+
+group_code_context += """
+## Available Utilities
+
+"""
+for util_file in utility_files:
+    group_code_context += f"- {util_file}\n"
+
+# Store for this group
+code_contexts[group_id] = group_code_context
+```
+
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
 **UI Message:** Output before spawning (show count):
@@ -820,19 +1085,19 @@ groups_to_spawn = PM.execution_plan.phase_1  // e.g., ["A", "B", "C"]
 Task(
   subagent_type: "general-purpose",
   description: "Developer implementing Group A",
-  prompt: [Developer prompt for Group A]
+  prompt: [Developer prompt for Group A with code context]
 )
 
 Task(
   subagent_type: "general-purpose",
   description: "Developer implementing Group B",
-  prompt: [Developer prompt for Group B]
+  prompt: [Developer prompt for Group B with code context]
 )
 
 Task(
   subagent_type: "general-purpose",
   description: "Developer implementing Group C",
-  prompt: [Developer prompt for Group C]
+  prompt: [Developer prompt for Group C with code context]
 )
 
 // Up to 4 developers max
@@ -845,11 +1110,62 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 
 **GROUP:** {group_id}
 **MODE:** Parallel (working alongside {N-1} other developers)
+**CAPABILITIES MODE:** {standard OR superpowers}
 
 **YOUR GROUP:**
 {PM's task group details for this group}
 
 **YOUR BRANCH:** feature/group-{group_id}-{name}
+
+{code_contexts[group_id]}
+
+═══════════════════════════════════════════
+⚡ CAPABILITIES
+═══════════════════════════════════════════
+
+{IF superpowers_mode}:
+⚡ SUPERPOWERS MODE ACTIVE
+
+Available Skills:
+1. Codebase Analysis Skill: /codebase-analysis "task description"
+   - Finds similar features, reusable utilities, architectural patterns
+   - Outputs: coordination/codebase_analysis.json
+
+2. Test Pattern Analysis Skill: /test-pattern-analysis tests/
+   - Analyzes test framework, fixtures, naming patterns
+   - Outputs: coordination/test_patterns.json
+
+{ELSE}:
+📋 STANDARD MODE
+
+Available Skills:
+1. Lint Check: /lint-check (pre-commit validation)
+
+{END IF}
+
+═══════════════════════════════════════════
+
+**MANDATORY WORKFLOW** (all modes):
+
+BEFORE Implementing:
+1. Review codebase context above
+2. {IF superpowers}: Run /codebase-analysis for patterns
+
+During Implementation:
+3. Create branch: git checkout -b {branch_name}
+4. Implement COMPLETE solution for your group
+5. Write unit tests
+6. {IF superpowers}: Run /test-pattern-analysis before testing
+
+BEFORE Reporting READY_FOR_QA:
+7. Run ALL unit tests - MUST pass 100%
+8. Run /lint-check - Fix all issues
+9. Run build check - MUST succeed
+10. {IF superpowers}: Run app startup check - MUST start
+
+ONLY THEN:
+11. Commit to YOUR branch: {branch_name}
+12. Report: READY_FOR_QA
 
 **IMPORTANT:**
 - Work ONLY on your assigned files
@@ -857,23 +1173,33 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 - Commit to YOUR branch only
 
 **YOUR JOB:**
-1. Create branch: git checkout -b {branch_name}
-2. Implement your group's tasks
-3. Write unit tests
-4. Run unit tests (must ALL pass)
-5. Commit to your branch
-6. Report results
+1. Follow mandatory workflow above
+2. Implement complete solution for Group {group_id}
+3. Ensure ALL checks pass before reporting
 
 **REPORT FORMAT:**
 ## Implementation Complete - Group {group_id}
 
 **Group:** {group_id}
 **Summary:** [One sentence]
-**Files Modified:** [list]
+
+**Files Modified:**
+- file1.py (created/modified)
+- file2.py (created/modified)
+
 **Branch:** {branch_name}
-**Commits:** [list]
-**Unit Tests:** X/X passing
+
+**Commits:**
+- abc123: Description
+
+**Unit Tests:**
+- Total: X
+- Passing: X
+- Failing: 0
+
 **Status:** READY_FOR_QA
+
+[If blocked or incomplete, use Status: BLOCKED or INCOMPLETE and explain]
 
 START IMPLEMENTING NOW.
 ```
@@ -1388,6 +1714,15 @@ security_scan = safe_read_json("coordination/security_scan.json")
 coverage_report = safe_read_json("coordination/coverage_report.json")
 lint_results = safe_read_json("coordination/lint_results.json")
 
+# Read baseline health checks
+build_baseline_status = safe_read_file("coordination/build_baseline_status.txt")
+build_final_status = safe_read_file("coordination/build_final_status.txt")
+app_baseline_status = safe_read_file("coordination/app_baseline_status.txt")
+app_final_status = safe_read_file("coordination/app_final_status.txt")
+
+# Determine superpowers mode
+superpowers_mode = orch_state.get("superpowers_mode", False)
+
 # Calculate metrics
 end_time = current_timestamp()
 start_time = orch_state["start_time"]
@@ -1421,6 +1756,26 @@ groups_escalated_scan = count_groups_with_revision(groups_data, 2, ">=")
 token_usage = orch_state.get("token_usage", {})
 total_tokens = token_usage.get("total_estimated", 0)
 estimated_cost = estimate_cost(total_tokens, groups_escalated_opus)
+
+# Build health metrics
+build_baseline_passed = build_baseline_status and build_baseline_status.strip() == "0"
+build_final_passed = build_final_status and build_final_status.strip() == "0"
+build_health = {
+    "baseline": "✅ Pass" if build_baseline_passed else "❌ Fail",
+    "final": "✅ Pass" if build_final_passed else "❌ Fail",
+    "regression": not build_baseline_passed and build_final_passed  # Fixed during development
+}
+
+# App startup metrics (superpowers only)
+app_health = None
+if superpowers_mode:
+    app_baseline_passed = app_baseline_status and app_baseline_status.strip() == "success"
+    app_final_passed = app_final_status and app_final_status.strip() == "success"
+    app_health = {
+        "baseline": "✅ Started" if app_baseline_passed else "❌ Failed",
+        "final": "✅ Started" if app_final_passed else "❌ Failed",
+        "regression": app_baseline_passed and not app_final_passed  # Broke during development
+    }
 ```
 
 ### Step 2: Detect Anomalies
@@ -1461,6 +1816,32 @@ if security_scan:
             "high": high,
             "message": f"Security: {critical} critical, {high} high severity issues"
         })
+
+# Build health regressions
+if build_health["regression"]:
+    anomalies.append({
+        "type": "build_regression",
+        "message": "Build was failing at baseline but is now passing",
+        "details": f"Baseline: {build_health['baseline']}, Final: {build_health['final']}",
+        "recommendation": "Verify build fixes were intentional"
+    })
+
+if not build_final_passed and build_baseline_passed:
+    anomalies.append({
+        "type": "build_broken",
+        "message": "Build was passing but is now broken",
+        "details": f"Baseline: {build_health['baseline']}, Final: {build_health['final']}",
+        "recommendation": "CRITICAL: Fix build before deployment"
+    })
+
+# App startup regressions (superpowers only)
+if app_health and app_health["regression"]:
+    anomalies.append({
+        "type": "app_regression",
+        "message": "App was starting at baseline but fails now",
+        "details": f"Baseline: {app_health['baseline']}, Final: {app_health['final']}",
+        "recommendation": "CRITICAL: Fix startup issue before deployment"
+    })
 ```
 
 ### Step 3: Generate Detailed Report (Tier 2)
@@ -1474,6 +1855,7 @@ report_filename = f"coordination/reports/session_{datetime.now().strftime('%Y%m%
 detailed_report = generate_detailed_report({
     "session_id": orch_state["session_id"],
     "mode": pm_state["mode"],
+    "superpowers_mode": superpowers_mode,
     "duration_minutes": duration_minutes,
     "start_time": start_time,
     "end_time": end_time,
@@ -1481,6 +1863,8 @@ detailed_report = generate_detailed_report({
     "security": security_issues,
     "coverage": coverage_avg,
     "lint": lint_issues,
+    "build_health": build_health,
+    "app_health": app_health,
     "token_usage": token_usage,
     "efficiency": {
         "approval_rate": approval_rate,
@@ -1528,7 +1912,7 @@ Output to user (keep under 30 lines):
 
 ## Summary
 
-**Mode**: {mode} ({num_developers} developer(s))
+**Mode**: {mode} ({num_developers} developer(s)){IF superpowers_mode}: ⚡ SUPERPOWERS
 **Duration**: {duration_minutes} minutes
 **Groups**: {total_groups}/{total_groups} completed ✅
 **Token Usage**: ~{total_tokens/1000}K tokens (~${estimated_cost})
@@ -1538,6 +1922,9 @@ Output to user (keep under 30 lines):
 **Security**: {security_status} ({security_summary})
 **Coverage**: {coverage_status} {coverage_avg}% average (target: 80%)
 **Lint**: {lint_status} ({lint_summary})
+**Build**: {build_health["final"]}
+{IF superpowers_mode}:
+**App Startup**: {app_health["final"]}
 
 ## Efficiency
 
