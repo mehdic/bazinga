@@ -564,15 +564,49 @@ pwsh .claude/scripts/parse-speckit-tasks.ps1 .specify/features/001-auth/tasks.md
 # [JSON summary...]
 ```
 
+### Automatic Agent Selection
+
+BAZINGA intelligently chooses the right orchestrator based on context:
+
+**🤖 Automatic Detection:**
+
+| Your Request | Context | Agent Used | Workflow |
+|--------------|---------|------------|----------|
+| "Implement JWT auth" | No tasks.md | `@orchestrator` | Standard BAZINGA |
+| "Execute JWT feature" | tasks.md exists | `@orchestrator_speckit` | Spec-kit integration |
+| "Build API endpoints" | No tasks.md | `@orchestrator` | Standard BAZINGA |
+| "Run the auth spec" | tasks.md exists | `@orchestrator_speckit` | Spec-kit integration |
+
+**How It Works:**
+- Claude automatically detects if `.specify/features/*/tasks.md` exists
+- If tasks.md found → Uses spec-kit orchestrator (reads artifacts)
+- If no tasks.md → Uses regular orchestrator (PM creates breakdown)
+- No manual agent selection needed!
+
+**Explicit Invocation (Optional):**
+```bash
+# Force standard orchestrator
+@orchestrator implement feature X
+
+# Force spec-kit orchestrator
+@orchestrator_speckit execute feature
+
+# Or use commands
+/orchestrate implement feature X
+/orchestrate-from-spec
+```
+
 ### Requirements
 
 - BAZINGA v1.0+ (this version)
-- Spec-kit installed and initialized (`/speckit.constitution`)
-- Feature planned with spec-kit (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`)
+- Spec-kit installed and initialized (`/speckit.constitution`) - for spec-kit mode only
+- Feature planned with spec-kit (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`) - for spec-kit mode only
 
 ### Documentation
 
 See:
+- [`agents/orchestrator.md`](agents/orchestrator.md) - Standard orchestrator (proactive)
+- [`agents/orchestrator_speckit.md`](agents/orchestrator_speckit.md) - Spec-kit orchestrator (proactive when tasks.md exists)
 - [`commands/orchestrate-from-spec.md`](commands/orchestrate-from-spec.md) - Full command documentation
 - [`agents/project_manager.md`](agents/project_manager.md) - PM spec-kit mode section
 - [`agents/developer.md`](agents/developer.md) - Developer spec-kit mode section
