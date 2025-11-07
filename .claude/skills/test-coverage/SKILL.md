@@ -1,6 +1,6 @@
 ---
 name: test-coverage
-description: "Generate comprehensive test coverage reports when reviewing code. Identifies untested code paths and low-coverage areas. Supports Python (pytest-cov), JavaScript (jest), Go (go test -cover). Use when reviewing tests or before approving code changes."
+description: "Generate comprehensive test coverage reports when reviewing code. Identifies untested code paths and low-coverage areas. Supports Python (pytest-cov), JavaScript (jest), Go (go test -cover), Java (JaCoCo). Use when reviewing tests or before approving code changes."
 allowed-tools: [Bash, Read, Write]
 ---
 
@@ -36,6 +36,12 @@ Automated test coverage analysis for code reviews. This Skill runs appropriate c
 - **Tool:** go test -cover
 - **Coverage types:** Package and function coverage
 - **Output:** Coverage percentage per package
+
+### Java
+- **Tool:** JaCoCo via Maven/Gradle
+- **Coverage types:** Line, branch, method, class coverage
+- **Output:** XML/HTML reports with per-package breakdown
+- **Integration:** Seamlessly integrates with Maven Surefire and Gradle test tasks
 
 ---
 
@@ -116,6 +122,53 @@ npm install --save-dev @jest/globals
 ### Go Projects
 
 No additional installation needed (built-in to go test).
+
+### Java Projects
+
+**Maven** (`pom.xml`):
+```xml
+<plugin>
+  <groupId>org.jacoco</groupId>
+  <artifactId>jacoco-maven-plugin</artifactId>
+  <version>0.8.11</version>
+  <executions>
+    <execution>
+      <goals>
+        <goal>prepare-agent</goal>
+      </goals>
+    </execution>
+    <execution>
+      <id>report</id>
+      <phase>test</phase>
+      <goals>
+        <goal>report</goal>
+      </goals>
+    </execution>
+  </executions>
+</plugin>
+```
+
+**Gradle** (`build.gradle`):
+```gradle
+plugins {
+  id 'jacoco'
+}
+
+jacoco {
+  toolVersion = '0.8.11'
+}
+
+jacocoTestReport {
+  reports {
+    xml.required = true
+    html.required = true
+  }
+}
+
+test {
+  finalizedBy jacocoTestReport
+}
+```
 
 ---
 
@@ -207,3 +260,4 @@ This Skill uses standard coverage tools:
 - **pytest-cov**: Python coverage (pytest-dev)
 - **Jest**: JavaScript testing framework (Facebook)
 - **go test -cover**: Go built-in coverage
+- **JaCoCo**: Java Code Coverage (EclEmma)

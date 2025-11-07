@@ -20,6 +20,8 @@ if (Test-Path "pyproject.toml") -or (Test-Path "setup.py") -or (Test-Path "requi
     $LANG = "javascript"
 } elseif (Test-Path "go.mod") {
     $LANG = "go"
+} elseif (Test-Path "pom.xml") -or (Test-Path "build.gradle") -or (Test-Path "build.gradle.kts") {
+    $LANG = "java"
 }
 
 Write-Host "📋 Detected language: $LANG" -ForegroundColor Cyan
@@ -37,7 +39,7 @@ switch ($LANG) {
         # Check for pytest and pytest-cov
         if (-not (Test-CommandExists "pytest")) {
             Write-Host "⚙️  Installing pytest..." -ForegroundColor Yellow
-            pip install pytest pytest-cov --quiet
+            pip install pytest pytest-cov --quiet 2>$null
         }
 
         Write-Host "  Running pytest with coverage..." -ForegroundColor Gray
@@ -89,11 +91,81 @@ switch ($LANG) {
             # Parse go coverage output
             $coverageOutput = go tool cover -func=coordination\coverage.out | Select-String "total"
             if ($coverageOutput) {
-                $COVERAGE = ($coverageOutput -split '\s+')[2] -replace '%',''
+                $COVERAGE = ($coverageOutput -replace '.*\s(\d+\.\d+)%.*','$1')
                 "{`"coverage`":$COVERAGE}" | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+            } else {
+                '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
             }
         } elseif (-not (Test-Path "coordination\coverage_report_raw.json")) {
             '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+        }
+    }
+
+    "java" {
+        # Run JaCoCo via Maven or Gradle
+        if (Test-Path "pom.xml") {
+            if (Test-CommandExists "mvn") {
+                Write-Host "  Running Maven tests with JaCoCo coverage..." -ForegroundColor Gray
+                mvn test jacoco:report 2>$null
+                if (-not $?) {
+                    Write-Host "⚠️  Tests failed or no tests found" -ForegroundColor Yellow
+                    '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                }
+
+                # JaCoCo XML report location (Maven)
+                if (Test-Path "target\site\jacoco\jacoco.xml") {
+                    # Parse JaCoCo XML for coverage percentage
+                    [xml]$jacocoXml = Get-Content "target\site\jacoco\jacoco.xml"
+                    $lineCovered = ($jacocoXml.report.counter | Where-Object { $_.type -eq 'LINE' } | Measure-Object -Property covered -Sum).Sum
+                    $lineMissed = ($jacocoXml.report.counter | Where-Object { $_.type -eq 'LINE' } | Measure-Object -Property missed -Sum).Sum
+                    $total = $lineCovered + $lineMissed
+                    if ($total -gt 0) {
+                        $coverage = [math]::Round(($lineCovered / $total) * 100, 2)
+                        "{`"coverage`":$coverage,`"source`":`"target/site/jacoco/jacoco.xml`"}" | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                    } else {
+                        '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                    }
+                } elseif (-not (Test-Path "coordination\coverage_report_raw.json")) {
+                    '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                }
+            } else {
+                Write-Host "❌ Maven not found for Java project" -ForegroundColor Red
+                '{"error":"Maven not found"}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+            }
+        } elseif ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts")) {
+            $GRADLE_CMD = if (Test-Path ".\gradlew.bat") { ".\gradlew.bat" } elseif (Test-CommandExists "gradle") { "gradle" } else { $null }
+
+            if ($GRADLE_CMD) {
+                Write-Host "  Running Gradle tests with JaCoCo coverage..." -ForegroundColor Gray
+                & $GRADLE_CMD test jacocoTestReport 2>$null
+                if (-not $?) {
+                    Write-Host "⚠️  Tests failed or no tests found" -ForegroundColor Yellow
+                    '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                }
+
+                # JaCoCo XML report location (Gradle)
+                if (Test-Path "build\reports\jacoco\test\jacocoTestReport.xml") {
+                    # Parse JaCoCo XML for coverage percentage
+                    [xml]$jacocoXml = Get-Content "build\reports\jacoco\test\jacocoTestReport.xml"
+                    $lineCovered = ($jacocoXml.report.counter | Where-Object { $_.type -eq 'LINE' } | Measure-Object -Property covered -Sum).Sum
+                    $lineMissed = ($jacocoXml.report.counter | Where-Object { $_.type -eq 'LINE' } | Measure-Object -Property missed -Sum).Sum
+                    $total = $lineCovered + $lineMissed
+                    if ($total -gt 0) {
+                        $coverage = [math]::Round(($lineCovered / $total) * 100, 2)
+                        "{`"coverage`":$coverage,`"source`":`"build/reports/jacoco/test/jacocoTestReport.xml`"}" | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                    } else {
+                        '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                    }
+                } elseif (-not (Test-Path "coordination\coverage_report_raw.json")) {
+                    '{"coverage":0}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+                }
+            } else {
+                Write-Host "❌ Gradle not found for Java project" -ForegroundColor Red
+                '{"error":"Gradle not found"}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
+            }
+        } else {
+            Write-Host "❌ No Maven or Gradle build file found" -ForegroundColor Red
+            '{"error":"No build file"}' | Out-File -FilePath "coordination\coverage_report_raw.json" -Encoding UTF8
         }
     }
 
@@ -106,17 +178,21 @@ switch ($LANG) {
 # Add metadata
 $TIMESTAMP = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
-# Read raw results
-$rawResults = Get-Content "coordination\coverage_report_raw.json" -Raw
+# Read raw results and add metadata
+$rawData = Get-Content "coordination\coverage_report_raw.json" -Raw | ConvertFrom-Json
 
 # Create final report with metadata
-@"
-{
-  "timestamp": "$TIMESTAMP",
-  "language": "$LANG",
-  "raw_results": $rawResults
+$finalReport = @{
+    timestamp = $TIMESTAMP
+    language = $LANG
 }
-"@ | Out-File -FilePath "coordination\coverage_report.json" -Encoding UTF8
+
+# Merge with raw results
+$rawData.PSObject.Properties | ForEach-Object {
+    $finalReport[$_.Name] = $_.Value
+}
+
+$finalReport | ConvertTo-Json -Depth 10 | Out-File -FilePath "coordination\coverage_report.json" -Encoding UTF8
 
 # Clean up
 Remove-Item "coordination\coverage_report_raw.json" -ErrorAction SilentlyContinue
@@ -124,3 +200,13 @@ Remove-Item "coordination\jest-results.json" -ErrorAction SilentlyContinue
 
 Write-Host "✅ Coverage analysis complete" -ForegroundColor Green
 Write-Host "📁 Results saved to: coordination\coverage_report.json" -ForegroundColor Cyan
+
+# Display summary
+$reportData = Get-Content "coordination\coverage_report.json" -Raw | ConvertFrom-Json
+if ($LANG -eq "python" -and $reportData.totals) {
+    $coverage = $reportData.totals.percent_covered
+    Write-Host "📊 Overall coverage: $coverage%" -ForegroundColor Cyan
+} elseif (($LANG -eq "go" -or $LANG -eq "java") -and $reportData.coverage) {
+    $coverage = $reportData.coverage
+    Write-Host "📊 Overall coverage: $coverage%" -ForegroundColor Cyan
+}

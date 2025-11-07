@@ -19,6 +19,8 @@ elif [ -f "package.json" ]; then
     LANG="javascript"
 elif [ -f "go.mod" ]; then
     LANG="go"
+elif [ -f "pom.xml" ] || [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+    LANG="java"
 else
     LANG="unknown"
 fi
@@ -93,6 +95,81 @@ case $LANG in
         fi
         ;;
 
+    java)
+        # Run JaCoCo via Maven or Gradle
+        if [ -f "pom.xml" ]; then
+            if command_exists "mvn"; then
+                echo "  Running Maven tests with JaCoCo coverage..."
+                mvn test jacoco:report 2>/dev/null || {
+                    echo "⚠️  Tests failed or no tests found"
+                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                }
+
+                # JaCoCo XML report location (Maven)
+                if [ -f "target/site/jacoco/jacoco.xml" ]; then
+                    # Parse JaCoCo XML for coverage percentage
+                    if command_exists "xmllint"; then
+                        LINE_COVERED=$(xmllint --xpath "sum(//counter[@type='LINE']/@covered)" target/site/jacoco/jacoco.xml)
+                        LINE_MISSED=$(xmllint --xpath "sum(//counter[@type='LINE']/@missed)" target/site/jacoco/jacoco.xml)
+                        TOTAL=$((LINE_COVERED + LINE_MISSED))
+                        if [ $TOTAL -gt 0 ]; then
+                            COVERAGE=$(echo "scale=2; $LINE_COVERED * 100 / $TOTAL" | bc)
+                            echo "{\"coverage\":$COVERAGE,\"source\":\"target/site/jacoco/jacoco.xml\"}" > coordination/coverage_report_raw.json
+                        else
+                            echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                        fi
+                    else
+                        # Fallback without xmllint
+                        echo '{"coverage":"see target/site/jacoco/index.html","source":"target/site/jacoco/jacoco.xml"}' > coordination/coverage_report_raw.json
+                    fi
+                elif [ ! -f "coordination/coverage_report_raw.json" ]; then
+                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                fi
+            else
+                echo "❌ Maven not found for Java project"
+                echo '{"error":"Maven not found"}' > coordination/coverage_report_raw.json
+            fi
+        elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+            GRADLE_CMD="gradle"
+            [ -f "./gradlew" ] && GRADLE_CMD="./gradlew"
+
+            if command_exists "gradle" || [ -f "./gradlew" ]; then
+                echo "  Running Gradle tests with JaCoCo coverage..."
+                $GRADLE_CMD test jacocoTestReport 2>/dev/null || {
+                    echo "⚠️  Tests failed or no tests found"
+                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                }
+
+                # JaCoCo XML report location (Gradle)
+                if [ -f "build/reports/jacoco/test/jacocoTestReport.xml" ]; then
+                    # Parse JaCoCo XML for coverage percentage
+                    if command_exists "xmllint"; then
+                        LINE_COVERED=$(xmllint --xpath "sum(//counter[@type='LINE']/@covered)" build/reports/jacoco/test/jacocoTestReport.xml)
+                        LINE_MISSED=$(xmllint --xpath "sum(//counter[@type='LINE']/@missed)" build/reports/jacoco/test/jacocoTestReport.xml)
+                        TOTAL=$((LINE_COVERED + LINE_MISSED))
+                        if [ $TOTAL -gt 0 ]; then
+                            COVERAGE=$(echo "scale=2; $LINE_COVERED * 100 / $TOTAL" | bc)
+                            echo "{\"coverage\":$COVERAGE,\"source\":\"build/reports/jacoco/test/jacocoTestReport.xml\"}" > coordination/coverage_report_raw.json
+                        else
+                            echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                        fi
+                    else
+                        # Fallback without xmllint
+                        echo '{"coverage":"see build/reports/jacoco/test/html/index.html","source":"build/reports/jacoco/test/jacocoTestReport.xml"}' > coordination/coverage_report_raw.json
+                    fi
+                elif [ ! -f "coordination/coverage_report_raw.json" ]; then
+                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                fi
+            else
+                echo "❌ Gradle not found for Java project"
+                echo '{"error":"Gradle not found"}' > coordination/coverage_report_raw.json
+            fi
+        else
+            echo "❌ No Maven or Gradle build file found"
+            echo '{"error":"No build file"}' > coordination/coverage_report_raw.json
+        fi
+        ;;
+
     *)
         echo "❌ Unknown language. Cannot run coverage analysis."
         echo '{"error":"Unknown language"}' > coordination/coverage_report_raw.json
@@ -128,7 +205,7 @@ if command_exists "jq"; then
     if [ "$LANG" = "python" ]; then
         COVERAGE=$(jq -r '.totals.percent_covered // 0' coordination/coverage_report.json 2>/dev/null || echo "0")
         echo "📊 Overall coverage: $COVERAGE%"
-    elif [ "$LANG" = "go" ]; then
+    elif [ "$LANG" = "go" ] || [ "$LANG" = "java" ]; then
         COVERAGE=$(jq -r '.coverage // 0' coordination/coverage_report.json 2>/dev/null || echo "0")
         echo "📊 Overall coverage: $COVERAGE%"
     fi
