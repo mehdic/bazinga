@@ -23,6 +23,9 @@ This system implements adaptive parallelism, intelligent workflow routing, and c
 
 - **🆕 Spec-Kit Integration**: Seamless integration with GitHub's spec-kit for spec-driven development (planning + execution)
 - **🆕 Intelligent Model Escalation**: Automatically escalates Tech Lead to Opus after 3 failed revisions for deeper analysis
+- **🆕 Claude Code Skills**: Automated security scanning, test coverage, and linting with dual-mode analysis (basic/advanced)
+- **🆕 Multi-Language Support**: Full support for Python, JavaScript, Go, Java, and Ruby projects
+- **🆕 Automated Tool Installation**: CLI automatically detects and offers to install analysis tools for your project
 - **Adaptive Parallelism**: PM dynamically spawns 1-4 developers based on task complexity
 - **Conditional Workflow**: Intelligent routing based on whether tests exist (Dev→QA→TechLead vs Dev→TechLead)
 - **Role Drift Prevention**: 6-layer defense system preventing agents from forgetting their roles
@@ -99,6 +102,62 @@ Third review: Tech Lead (Opus) → "Architectural issue: authentication flow nee
 
 This ensures cost-effective reviews for routine issues while providing deeper analysis when problems persist.
 
+### Automated Code Analysis with Skills
+
+BAZINGA includes three Claude Code Skills that provide automated security scanning, test coverage analysis, and code linting:
+
+#### Progressive Analysis Strategy
+
+Skills use **dual-mode analysis** that escalates alongside model escalation:
+
+| Revision Count | Security Scan Mode | Tech Lead Model |
+|----------------|-------------------|-----------------|
+| **0-1 revisions** | Basic (5-10s, high/medium severity) | Sonnet 4.5 |
+| **2 revisions** | Advanced (30-60s, all severities) | Sonnet 4.5 |
+| **3+ revisions** | Advanced (comprehensive) | Opus |
+
+#### Available Skills
+
+1. **security-scan** - Security vulnerability detection
+   - Basic: Fast scan for critical/high severity issues
+   - Advanced: Deep analysis with multiple tools (bandit, semgrep, gosec, SpotBugs, etc.)
+   - Results: `coordination/security_scan.json`
+
+2. **test-coverage** - Test coverage analysis
+   - Generates line/branch coverage reports
+   - Identifies untested code paths
+   - Results: `coordination/coverage_report.json`
+
+3. **lint-check** - Code quality linting
+   - Style, complexity, best practices
+   - Language-specific linters (ruff, eslint, golangci-lint, Checkstyle, etc.)
+   - Results: `coordination/lint_results.json`
+
+#### Language Support
+
+| Language | Security | Coverage | Linting |
+|----------|----------|----------|---------|
+| **Python** | bandit + semgrep | pytest-cov | ruff/pylint |
+| **JavaScript** | npm audit + eslint | jest | eslint |
+| **Go** | gosec | go test -cover | golangci-lint |
+| **Java** | SpotBugs + OWASP | JaCoCo | Checkstyle + PMD |
+| **Ruby** | brakeman | - | rubocop |
+
+#### Error Handling
+
+Skills include comprehensive error tracking with explicit status reporting:
+
+```json
+{
+  "status": "success|partial|error",
+  "tool": "bandit+semgrep",
+  "error": "Semgrep scan failed",
+  "results": [...]
+}
+```
+
+This prevents false confidence from empty results - the Tech Lead always knows if a scan actually succeeded.
+
 ## Project Structure
 
 ```
@@ -121,6 +180,11 @@ bazinga/
 │   ├── init-orchestration.sh   # Initialization script (bash)
 │   ├── init-orchestration.ps1  # Initialization script (PowerShell)
 │   └── README.md                # Scripts documentation
+├── .claude/                     # Claude Code configuration (copied to projects)
+│   └── skills/                 # Automated analysis Skills
+│       ├── security-scan/      # Security vulnerability scanning
+│       ├── test-coverage/      # Test coverage analysis
+│       └── lint-check/         # Code quality linting
 ├── config/                      # Configuration files
 │   ├── claude.md               # Global constraints (.claude.md)
 │   └── coordination.gitignore  # Gitignore for coordination folder
