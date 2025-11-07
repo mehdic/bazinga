@@ -22,6 +22,7 @@ This system implements adaptive parallelism, intelligent workflow routing, and c
 ## Features
 
 - **🆕 Spec-Kit Integration**: Seamless integration with GitHub's spec-kit for spec-driven development (planning + execution)
+- **🆕 Intelligent Model Escalation**: Automatically escalates Tech Lead to Opus after 3 failed revisions for deeper analysis
 - **Adaptive Parallelism**: PM dynamically spawns 1-4 developers based on task complexity
 - **Conditional Workflow**: Intelligent routing based on whether tests exist (Dev→QA→TechLead vs Dev→TechLead)
 - **Role Drift Prevention**: 6-layer defense system preventing agents from forgetting their roles
@@ -67,6 +68,36 @@ Developer → Tech Lead → PM
 | **Developer** | Implementer | Writes code, creates/fixes tests, fixes bugs |
 | **QA Expert** | Testing Specialist | Runs integration/contract/E2E tests (conditional) |
 | **Tech Lead** | Quality Reviewer | Reviews code quality, unblocks developers, approves work |
+
+### Intelligent Model Escalation
+
+BAZINGA automatically escalates the Tech Lead to use more powerful models when code revisions persist:
+
+| Revision Count | Model Used | Strategy |
+|----------------|------------|----------|
+| **1-2 revisions** | Sonnet 4.5 | Fast, cost-effective reviews for typical issues |
+| **3+ revisions** | Opus | Deep analysis for persistent, complex problems |
+
+**How it works:**
+
+1. **PM tracks revisions** - Updates `coordination/group_status.json` with revision count each time Tech Lead requests changes
+2. **Orchestrator checks count** - Reads revision count before spawning Tech Lead
+3. **Automatic escalation** - Uses `model: "opus"` parameter when revision_count >= 3
+4. **Enhanced prompt** - Tech Lead receives special instructions for persistent issues:
+   - Look for subtle bugs or design flaws
+   - Verify edge cases are handled
+   - Check for architectural issues
+   - Consider if the approach itself needs rethinking
+
+**Example:**
+
+```
+First review: Tech Lead (Sonnet) → "Add error handling"
+Second review: Tech Lead (Sonnet) → "Fix edge case in validation"
+Third review: Tech Lead (Opus) → "Architectural issue: authentication flow needs redesign"
+```
+
+This ensures cost-effective reviews for routine issues while providing deeper analysis when problems persist.
 
 ## Project Structure
 

@@ -54,7 +54,16 @@ fi
 if [ ! -f "coordination/group_status.json" ]; then
     echo "📝 Creating group_status.json..."
     cat > coordination/group_status.json <<EOF
-{}
+{
+  "_comment": "Tracks per-group status including revision counts for opus escalation",
+  "_format": {
+    "group_id": {
+      "status": "pending|in_progress|completed",
+      "revision_count": 0,
+      "last_review_status": "APPROVED|CHANGES_REQUESTED|null"
+    }
+  }
+}
 EOF
 else
     echo "✓ group_status.json already exists"

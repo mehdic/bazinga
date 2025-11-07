@@ -1232,6 +1232,29 @@ Work continues until all tests pass.
 
 **Situation:** Tech Lead reports code quality issues
 
+**CRITICAL: Track Revision Count**
+
+**Step 1: Update group_status.json**
+
+```python
+# Read current group status
+group_status = read_file("coordination/group_status.json")
+
+# Increment revision_count for this group
+if "group_id" not in group_status:
+    group_status["group_id"] = {"revision_count": 0, "status": "in_progress"}
+
+group_status["group_id"]["revision_count"] += 1
+group_status["group_id"]["last_review_status"] = "CHANGES_REQUESTED"
+
+# Write updated status
+write_file("coordination/group_status.json", group_status)
+```
+
+**IMPORTANT:** This revision count determines model selection for Tech Lead:
+- Revisions 1-2: Tech Lead uses **Sonnet** (default, fast)
+- Revisions 3+: Tech Lead uses **Opus** (powerful, for persistent issues)
+
 **WRONG Response:**
 ```
 Tech Lead found some issues. Do you want me to fix them?
@@ -1243,8 +1266,10 @@ Tech Lead found some issues. Do you want me to fix them?
 
 ### Issue Detected
 Group B requires changes: Security vulnerability in auth middleware
+**Revision Count:** 2 (next Tech Lead review will use Opus if this fails again)
 
 ### Action Taken
+Updating group_status.json with revision_count = 2
 Assigning Group B back to developer with Tech Lead feedback.
 
 ### Next Assignment

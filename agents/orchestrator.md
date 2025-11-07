@@ -572,14 +572,37 @@ ELSE IF result == "FAIL":
 
 ### Step 2A.6: Spawn Tech Lead for Review
 
+**CRITICAL: Check Revision Count for Model Selection**
+
+**Step 1: Read group_status.json**
+```python
+group_status = read_file("coordination/group_status.json")
+group_id = "main"  # or whatever the current group ID is
+revision_count = group_status.get(group_id, {}).get("revision_count", 0)
+```
+
+**Step 2: Determine Model**
+```python
+if revision_count >= 3:
+    model_to_use = "opus"  # Escalate to powerful model
+    model_reason = f"(Revision #{revision_count} - Using Opus for persistent issue)"
+else:
+    model_to_use = "sonnet"  # Default fast model
+    model_reason = f"(Revision #{revision_count} - Using Sonnet)"
+```
+
 **UI Message:** Output before spawning:
 ```
 👔 **ORCHESTRATOR**: Spawning Tech Lead for code quality review...
+{IF revision_count >= 3}:
+    ⚡ **ORCHESTRATOR**: Escalating to Opus model (revision #{revision_count}) for deeper analysis...
 ```
 
-```
+```python
+# Spawn Tech Lead with appropriate model
 Task(
   subagent_type: "general-purpose",
+  model: model_to_use,  # "opus" if revision_count >= 3, else "sonnet"
   description: "Tech Lead reviewing main group",
   prompt: """
 You are a TECH LEAD in a Claude Code Multi-Agent Dev Team orchestration system.
@@ -589,6 +612,7 @@ You are a TECH LEAD in a Claude Code Multi-Agent Dev Team orchestration system.
 **CONTEXT RECEIVED:**
 - Developer implementation: {dev summary}
 - QA test results: ALL PASS ({test counts})
+- **REVISION COUNT:** {revision_count} {IF >= 3: "⚠️ This is a persistent issue - be extra thorough"}
 
 **FILES TO REVIEW:**
 {list of modified files}
@@ -602,6 +626,14 @@ You are a TECH LEAD in a Claude Code Multi-Agent Dev Team orchestration system.
 4. Validate best practices
 5. Ensure requirements met
 6. Make decision: APPROVED or CHANGES_REQUESTED
+
+{IF revision_count >= 3}:
+⚠️ **SPECIAL ATTENTION REQUIRED:**
+This code has been revised {revision_count} times. You are using Opus model for enhanced analysis.
+- Look for subtle bugs or design flaws
+- Verify edge cases are handled
+- Check for architectural issues
+- Consider if the approach itself needs rethinking
 
 **IMPORTANT:** Do NOT send BAZINGA. That's PM's job. You only approve individual groups.
 
