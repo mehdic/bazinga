@@ -283,7 +283,81 @@ def estimate_tokens(text):
 
 ## Proposed Enhanced Final Report
 
-### Full Report Format
+### Two-Tier Approach
+
+**Tier 1: Concise Display** (shown to user immediately)
+- Headlines and key metrics only
+- Highlight anomalies and issues requiring attention
+- Link to detailed report for deep-dive
+
+**Tier 2: Detailed Report File** (saved to `coordination/reports/`)
+- Complete metrics and data
+- Properly formatted for analysis
+- Timestamped for audit trail
+- Referenced by direct link from display
+
+---
+
+## Tier 1: Concise Display Format
+
+What the user sees immediately after BAZINGA:
+
+```markdown
+═══════════════════════════════════════════════════════════
+✅ BAZINGA - Orchestration Complete!
+═══════════════════════════════════════════════════════════
+
+## Summary
+
+**Mode**: Parallel (3 developers)
+**Duration**: 45 minutes
+**Groups**: 3/3 completed ✅
+**Token Usage**: ~125K tokens (~$0.75)
+
+## Quality Overview
+
+**Security**: ✅ All issues addressed (3 found → 3 fixed)
+**Coverage**: ✅ 85.7% average (target: 80%)
+**Lint**: ✅ All issues fixed (42 found → 42 fixed)
+
+## Efficiency
+
+**First-time approval**: 33% (1/3 groups)
+**Model escalations**: 1 group (Group C → Opus at revision 3)
+**Scan escalations**: 1 group (Group C → advanced at revision 2)
+
+## Attention Required
+
+⚠️ **Group C (Password Reset)**: Required 3 revisions
+   - Root cause: Complex edge cases not initially considered
+   - Outcome: Architectural improvements applied
+
+⚠️ **Coverage gaps** in Group C:
+   - password_reset.py: 72% coverage
+   - validators.py: 75% coverage
+   - Recommendation: Add edge case tests in follow-up
+
+## Detailed Report
+
+📊 **Full metrics and analysis**: `coordination/reports/session_20251107_151523.md`
+
+═══════════════════════════════════════════════════════════
+```
+
+**Key principles for Tier 1**:
+- ✅ Show overview metrics (security, coverage, lint status)
+- ✅ Highlight anomalies only (Group C struggled, coverage gaps)
+- ✅ Keep it scannable (< 30 lines)
+- ✅ Provide actionable insights (recommendations)
+- ✅ Link to detailed report for deep-dive
+- ❌ Don't show tables with per-group breakdowns (save for detailed report)
+- ❌ Don't show full Skills results (save for detailed report)
+
+---
+
+## Tier 2: Full Report Format
+
+Saved to: `coordination/reports/session_YYYYMMDD_HHMMSS.md`
 
 ```markdown
 ═══════════════════════════════════════════════════════════
@@ -594,21 +668,36 @@ def estimate_tokens(text):
 
 ## Implementation Plan
 
-### Phase 1: Data Aggregation (Required)
+### Phase 1: Data Aggregation & Reporting (Required)
 
-1. **Add report generation function to orchestrator**:
+1. **Create reports directory structure**:
+   - Add `coordination/reports/` to init script
+   - Add to `.gitignore` (reports are ephemeral)
+   - Create naming convention: `session_YYYYMMDD_HHMMSS.md`
+
+2. **Add report generation function to orchestrator**:
    - Read all state files
    - Read all Skills results
    - Aggregate metrics
+   - Generate both Tier 1 (display) and Tier 2 (file)
 
-2. **Add token tracking**:
+3. **Add token tracking**:
    - Track prompt/response character counts
    - Estimate tokens (chars / 4)
    - Store in `orchestrator_state.json`
+   - Include in both report tiers
 
-3. **Display enhanced report on BAZINGA**:
-   - Replace simple message with full report
-   - Include all sections above
+4. **Display concise report on BAZINGA**:
+   - Show Tier 1: Headlines + anomalies only
+   - Write Tier 2: Full detailed report to file
+   - Provide clickable link to detailed report
+   - Keep display under 30 lines
+
+5. **Anomaly detection logic**:
+   - Identify groups with high revision counts (>= 3)
+   - Flag coverage below threshold
+   - Highlight security issues found
+   - Surface model/scan escalations
 
 ### Phase 2: Metrics Refinement (Optional)
 
@@ -628,11 +717,13 @@ def estimate_tokens(text):
 
 ### For Users
 
-✅ **Visibility**: See quality, not just completion
-✅ **Cost awareness**: Understand token consumption
-✅ **Learning**: Identify which groups struggled and why
-✅ **Decision-making**: Data for future planning
-✅ **Compliance**: Audit trail for security/quality
+✅ **Quick scan**: Tier 1 shows status at a glance (< 30 lines)
+✅ **Actionable insights**: Anomalies highlighted immediately
+✅ **Deep-dive available**: Tier 2 for full analysis when needed
+✅ **Cost awareness**: Token usage and estimates shown
+✅ **Clean output**: No overwhelming walls of text
+✅ **Audit trail**: Detailed reports saved with timestamps
+✅ **Clickable access**: Direct link to detailed report
 
 ### For System Improvement
 
@@ -643,10 +734,12 @@ def estimate_tokens(text):
 
 ## Open Questions
 
-1. **Report verbosity**: Is full report too long? Should we have summary + detailed versions?
-2. **Export formats**: Should we generate JSON/CSV for tooling?
-3. **Real-time updates**: Should report be updated during execution?
+1. ✅ **Report verbosity**: RESOLVED - Two-tier approach (concise display + detailed file)
+2. **Export formats**: Should we also generate JSON/CSV for tooling integration?
+3. **Real-time updates**: Should detailed report be updated during execution or only at end?
 4. **Comparison**: Should we compare to previous sessions automatically?
+5. **Report retention**: How many reports to keep? Auto-cleanup old reports?
+6. **Report linking**: Should reports link to previous reports for trend analysis?
 
 ## Related Files
 
@@ -654,6 +747,37 @@ def estimate_tokens(text):
 - `commands/orchestrate.md` - Update completion message
 - `commands/orchestrate-from-spec.md` - Update completion message
 - `coordination/orchestrator_state.json` - Add token tracking fields
+- `coordination/reports/` - NEW: Directory for detailed reports
+- `.claude/scripts/init-orchestration.sh` - Add reports directory creation
+- `coordination/.gitignore` - Add reports/ to gitignore
+
+## Folder Structure
+
+```
+coordination/
+├── pm_state.json
+├── group_status.json
+├── orchestrator_state.json
+├── security_scan.json
+├── coverage_report.json
+├── lint_results.json
+├── .gitignore
+├── messages/
+│   └── ...
+└── reports/                           # NEW
+    ├── session_20251107_143000.md    # Detailed report 1
+    ├── session_20251107_151523.md    # Detailed report 2
+    └── session_20251107_164512.md    # Detailed report 3
+```
+
+## Report File Format
+
+**Filename**: `session_YYYYMMDD_HHMMSS.md`
+- YYYYMMDD: Date (20251107 = Nov 7, 2025)
+- HHMMSS: Time in 24h format (151523 = 3:15:23 PM)
+- Example: `session_20251107_151523.md`
+
+**Content**: Full detailed report with all sections from Tier 2 format above
 
 ---
 
