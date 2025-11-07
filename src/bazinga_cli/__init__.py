@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 console = Console()
 app = typer.Typer(
@@ -184,10 +184,21 @@ class BazingaSetup:
             bazinga_config_section = '\n'.join(bazinga_lines[7:])
 
         # Check for existing .claude.md in project root or .claude/ directory
-        possible_locations = [
-            target_dir / ".claude.md",
-            target_dir / ".claude" / ".claude.md",
+        # Check multiple variations (case-insensitive)
+        possible_filenames = [
+            ".claude.md",    # Recommended format
+            "claude.md",     # Without dot
+            "CLAUDE.md",     # Uppercase without dot
+            ".CLAUDE.md",    # Uppercase with dot
         ]
+
+        possible_locations = []
+        # Check in project root
+        for filename in possible_filenames:
+            possible_locations.append(target_dir / filename)
+        # Check in .claude/ directory
+        for filename in possible_filenames:
+            possible_locations.append(target_dir / ".claude" / filename)
 
         existing_config_path = None
         for path in possible_locations:
