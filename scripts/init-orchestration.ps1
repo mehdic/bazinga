@@ -52,7 +52,16 @@ if (-not (Test-Path "coordination\pm_state.json")) {
 if (-not (Test-Path "coordination\group_status.json")) {
     Write-Host "📝 Creating group_status.json..." -ForegroundColor Yellow
     @"
-{}
+{
+  "_comment": "Tracks per-group status including revision counts for opus escalation",
+  "_format": {
+    "group_id": {
+      "status": "pending|in_progress|completed",
+      "revision_count": 0,
+      "last_review_status": "APPROVED|CHANGES_REQUESTED|null"
+    }
+  }
+}
 "@ | Out-File -FilePath "coordination\group_status.json" -Encoding UTF8
 } else {
     Write-Host "✓ group_status.json already exists" -ForegroundColor Gray
