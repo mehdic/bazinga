@@ -28,6 +28,8 @@ This system implements adaptive parallelism, intelligent workflow routing, and c
 - **Full Autonomy**: Agents work until 100% complete without asking user questions
 - **Quality Gates**: QA Expert validates tests, Tech Lead reviews code quality
 - **Project Completion**: PM is the only agent that sends BAZINGA signal
+- **Cross-Platform Scripts**: Choose between bash or PowerShell scripts during installation
+- **Modern CLI**: Easy installation via `uvx` or `uv tool install`
 
 ## Architecture
 
@@ -84,8 +86,9 @@ bazinga/
 ├── commands/                    # Slash commands
 │   └── orchestrate.md          # /orchestrate command version
 ├── scripts/                     # Utility scripts
-│   ├── init-orchestration.sh  # Initialization script
-│   └── README.md               # Scripts documentation
+│   ├── init-orchestration.sh   # Initialization script (bash)
+│   ├── init-orchestration.ps1  # Initialization script (PowerShell)
+│   └── README.md                # Scripts documentation
 ├── config/                      # Configuration files
 │   ├── claude.md               # Global constraints (.claude.md)
 │   └── coordination.gitignore  # Gitignore for coordination folder
@@ -126,6 +129,18 @@ uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
 # Or initialize in current directory
 uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
 ```
+
+**During initialization, you'll be prompted to choose your script type:**
+```
+Select script type:
+  1. POSIX Shell (bash/zsh) - Linux/macOS
+  2. PowerShell - Windows/Cross-platform
+
+Default for your platform: POSIX Shell (bash/zsh) - Linux/macOS
+Enter choice (1 or 2, or press Enter for default):
+```
+
+Choose the script type that matches your environment and workflow preferences.
 
 **Option 2: Install CLI Tool**
 
@@ -177,7 +192,7 @@ bazinga update --force
 
 This updates:
 - Agent definitions (`.claude/agents/`)
-- Scripts (`.claude/scripts/`)
+- Scripts (`.claude/scripts/`) - preserves your script type choice
 - Commands (`.claude/commands/`)
 - Configuration (`.claude.md` - merged if needed)
 
@@ -185,6 +200,7 @@ This updates:
 - Coordination state files (`coordination/`)
 - Your ongoing orchestration sessions
 - Custom project configuration in `.claude.md`
+- Your script type preference (bash or PowerShell)
 
 **Check system requirements:**
 ```bash
@@ -212,8 +228,9 @@ your-project/
 │   │   └── techlead.md        # Quality reviewer
 │   ├── commands/              # Slash commands
 │   │   └── orchestrate.md     # /orchestrate command
-│   └── scripts/               # Utility scripts
-│       └── init-orchestration.sh
+│   └── scripts/               # Utility scripts (your choice)
+│       └── init-orchestration.sh   # (if you chose bash)
+│       └── init-orchestration.ps1  # (if you chose PowerShell)
 ├── coordination/              # State files (auto-generated)
 │   ├── pm_state.json
 │   ├── group_status.json
@@ -222,6 +239,12 @@ your-project/
 ├── .claude.md                 # Global configuration
 └── .git/                      # Git repository (optional)
 ```
+
+**Script Type Selection:**
+- **POSIX Shell (bash/zsh)** - Best for Linux/macOS environments
+- **PowerShell** - Best for Windows or cross-platform teams using PowerShell Core (pwsh)
+- Only the scripts for your selected type are installed (not both)
+- Your choice is preserved during updates
 
 ### Manual Installation (Alternative)
 
