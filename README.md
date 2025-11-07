@@ -166,6 +166,26 @@ bazinga init my-project --no-git
 bazinga init my-project --force
 ```
 
+**Update to latest version:**
+```bash
+# Update BAZINGA components in current project
+bazinga update
+
+# Skip confirmation prompt
+bazinga update --force
+```
+
+This updates:
+- Agent definitions (`.claude/agents/`)
+- Scripts (`.claude/scripts/`)
+- Commands (`.claude/commands/`)
+- Configuration (`.claude.md` - merged if needed)
+
+**Preserved during update:**
+- Coordination state files (`coordination/`)
+- Your ongoing orchestration sessions
+- Custom project configuration in `.claude.md`
+
 **Check system requirements:**
 ```bash
 # Verify installation and setup

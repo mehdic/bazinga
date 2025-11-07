@@ -460,6 +460,87 @@ def check():
 
 
 @app.command()
+def update(
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Skip confirmation prompts"
+    ),
+):
+    """
+    Update BAZINGA components in the current project.
+
+    Updates agent definitions, scripts, and commands to the latest versions
+    while preserving coordination state files and existing configuration.
+    """
+    print_banner()
+
+    target_dir = Path.cwd()
+
+    # Check if BAZINGA is installed
+    if not (target_dir / ".claude" / "agents" / "orchestrator.md").exists():
+        console.print(
+            "[red]✗ BAZINGA not found in current directory[/red]\n"
+            "Run 'bazinga init --here' to install first."
+        )
+        raise typer.Exit(1)
+
+    if not force:
+        console.print(
+            "\n[yellow]This will update BAZINGA components:[/yellow]\n"
+            "  • Agent definitions (.claude/agents/)\n"
+            "  • Scripts (.claude/scripts/)\n"
+            "  • Commands (.claude/commands/)\n"
+            "  • Configuration (.claude.md - merged if needed)\n\n"
+            "[dim]Coordination files will NOT be modified[/dim]\n"
+        )
+        confirm = typer.confirm("Continue with update?")
+        if not confirm:
+            console.print("[red]Cancelled[/red]")
+            raise typer.Exit(1)
+
+    setup = BazingaSetup()
+
+    console.print("\n[bold]Updating BAZINGA components...[/bold]\n")
+
+    # Update agents
+    console.print("[bold cyan]1. Updating agent definitions[/bold cyan]")
+    if setup.copy_agents(target_dir):
+        console.print("  [green]✓ Agents updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  Failed to update agents[/yellow]")
+
+    # Update scripts
+    console.print("\n[bold cyan]2. Updating scripts[/bold cyan]")
+    if setup.copy_scripts(target_dir):
+        console.print("  [green]✓ Scripts updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  Failed to update scripts[/yellow]")
+
+    # Update commands
+    console.print("\n[bold cyan]3. Updating commands[/bold cyan]")
+    if setup.copy_commands(target_dir):
+        console.print("  [green]✓ Commands updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
+
+    # Update configuration (merge if needed)
+    console.print("\n[bold cyan]4. Updating configuration[/bold cyan]")
+    setup.setup_config(target_dir)
+
+    # Success message
+    console.print(
+        Panel.fit(
+            "[bold green]✓ BAZINGA updated successfully![/bold green]\n\n"
+            "[dim]Your coordination state files were preserved.[/dim]\n\n"
+            "[bold]Next steps:[/bold]\n"
+            "  • Review updated agent definitions if needed\n"
+            "  • Continue using: @orchestrator <your request>",
+            title="🎉 Update Complete",
+            border_style="green",
+        )
+    )
+
+
+@app.command()
 def version():
     """Show BAZINGA CLI version."""
     console.print(f"[bold]BAZINGA CLI[/bold] version [cyan]{__version__}[/cyan]")
@@ -487,6 +568,7 @@ def main_callback(
         console.print(
             "[bold]Available commands:[/bold]\n"
             "  [cyan]init[/cyan]    - Initialize a new BAZINGA project\n"
+            "  [cyan]update[/cyan]  - Update BAZINGA components to latest version\n"
             "  [cyan]check[/cyan]   - Check system requirements and setup\n"
             "  [cyan]version[/cyan] - Show version information\n\n"
             "[dim]Use 'bazinga --help' for more information[/dim]"
