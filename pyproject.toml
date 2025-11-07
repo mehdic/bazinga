@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bazinga-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "BAZINGA CLI - A sophisticated multi-agent orchestration system for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,3 +40,9 @@ bazinga = "bazinga_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bazinga_cli"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"agents" = "share/bazinga_cli/agents"
+"scripts" = "share/bazinga_cli/scripts"
+"commands" = "share/bazinga_cli/commands"
+"config" = "share/bazinga_cli/config"

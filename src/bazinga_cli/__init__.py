@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 console = Console()
 app = typer.Typer(
@@ -45,8 +45,22 @@ class BazingaSetup:
                        If None, uses the package installation directory.
         """
         if source_dir is None:
-            # When installed via pip/uvx, files are in the package directory
-            self.source_dir = Path(__file__).parent.parent.parent
+            # Try multiple locations to find the bazinga files
+
+            # Option 1: Development mode (running from git clone)
+            dev_dir = Path(__file__).parent.parent.parent
+            if (dev_dir / "agents").exists():
+                self.source_dir = dev_dir
+            else:
+                # Option 2: Installed mode (via pip/uvx)
+                # Files are in share/bazinga_cli relative to sys.prefix
+                import sys
+                installed_dir = Path(sys.prefix) / "share" / "bazinga_cli"
+                if installed_dir.exists():
+                    self.source_dir = installed_dir
+                else:
+                    # Fallback: try relative to the package
+                    self.source_dir = dev_dir
         else:
             self.source_dir = source_dir
 
