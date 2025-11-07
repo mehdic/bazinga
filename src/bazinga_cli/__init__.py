@@ -147,6 +147,53 @@ class BazingaSetup:
 
         return True
 
+    def copy_skills(self, target_dir: Path, script_type: str = "sh") -> bool:
+        """
+        Copy Skills to target .claude/skills directory.
+
+        Args:
+            target_dir: Target directory for installation
+            script_type: "sh" for bash scripts or "ps" for PowerShell scripts
+        """
+        skills_dir = target_dir / ".claude" / "skills"
+        skills_dir.mkdir(parents=True, exist_ok=True)
+
+        source_skills = self.source_dir / ".claude" / "skills"
+        if not source_skills.exists():
+            return False
+
+        script_extension = ".sh" if script_type == "sh" else ".ps1"
+        copied_count = 0
+
+        # Copy each skill directory
+        for skill_dir in source_skills.iterdir():
+            if skill_dir.is_dir():
+                dest_skill_dir = skills_dir / skill_dir.name
+                dest_skill_dir.mkdir(exist_ok=True)
+
+                # Copy SKILL.md
+                skill_md = skill_dir / "SKILL.md"
+                if skill_md.exists():
+                    shutil.copy2(skill_md, dest_skill_dir / "SKILL.md")
+                    console.print(f"  ✓ Copied {skill_dir.name}/SKILL.md")
+                    copied_count += 1
+
+                # Copy appropriate script file
+                for script_file in skill_dir.glob("*"):
+                    if script_file.suffix in [".sh", ".ps1"]:
+                        if script_file.suffix == script_extension:
+                            dest = dest_skill_dir / script_file.name
+                            shutil.copy2(script_file, dest)
+
+                            # Make shell scripts executable on Unix-like systems
+                            if script_file.suffix == ".sh" and os.name != 'nt':
+                                dest.chmod(0o755)
+
+                            console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
+                            copied_count += 1
+
+        return copied_count > 0
+
     def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:
         """
         Setup global configuration, merging with existing .claude.md if present.
@@ -409,6 +456,177 @@ def check_command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def detect_project_language(target_dir: Path) -> Optional[str]:
+    """
+    Detect the project language based on files present.
+
+    Returns:
+        "python", "javascript", "go", "java", "ruby", or None if unknown
+    """
+    # Python
+    if (target_dir / "pyproject.toml").exists() or (target_dir / "setup.py").exists() or (target_dir / "requirements.txt").exists():
+        return "python"
+
+    # JavaScript/TypeScript
+    if (target_dir / "package.json").exists():
+        return "javascript"
+
+    # Go
+    if (target_dir / "go.mod").exists():
+        return "go"
+
+    # Java
+    if (target_dir / "pom.xml").exists() or (target_dir / "build.gradle").exists() or (target_dir / "build.gradle.kts").exists():
+        return "java"
+
+    # Ruby
+    if (target_dir / "Gemfile").exists() or any(target_dir.glob("*.gemspec")):
+        return "ruby"
+
+    return None
+
+
+def install_analysis_tools(target_dir: Path, language: str, force: bool = False) -> bool:
+    """
+    Install analysis tools for Skills based on detected language.
+
+    Args:
+        target_dir: Project directory
+        language: Detected language (python, javascript, go, java, ruby)
+        force: Skip confirmation prompt
+
+    Returns:
+        True if tools were installed successfully or skipped, False if failed
+    """
+    tool_commands = {
+        "python": {
+            "tools": ["bandit", "semgrep", "pytest", "pytest-cov", "ruff"],
+            "command": ["pip", "install", "bandit", "semgrep", "pytest", "pytest-cov", "ruff"],
+            "description": "Python analysis tools (bandit, semgrep, pytest, pytest-cov, ruff)",
+        },
+        "javascript": {
+            "tools": ["jest", "eslint", "eslint-plugin-security"],
+            "command": ["npm", "install", "--save-dev", "jest", "eslint", "eslint-plugin-security", "@jest/globals"],
+            "description": "JavaScript analysis tools (jest, eslint, eslint-plugin-security)",
+        },
+        "go": {
+            "tools": ["gosec", "golangci-lint"],
+            "command": None,  # Special handling for Go
+            "description": "Go analysis tools (gosec, golangci-lint)",
+        },
+        "java": {
+            "tools": ["maven/gradle plugins"],
+            "command": None,  # Requires pom.xml/build.gradle configuration
+            "description": "Java analysis tools (via Maven/Gradle plugins)",
+        },
+        "ruby": {
+            "tools": ["brakeman", "rubocop"],
+            "command": ["gem", "install", "brakeman", "rubocop"],
+            "description": "Ruby analysis tools (brakeman, rubocop)",
+        },
+    }
+
+    if language not in tool_commands:
+        return True  # Unknown language, skip
+
+    config = tool_commands[language]
+
+    if not force:
+        console.print(f"\n[bold yellow]Install analysis tools for {language.capitalize()}?[/bold yellow]")
+        console.print(f"[dim]Tools: {config['description']}[/dim]")
+        console.print("[dim]These tools enable automated security scanning, test coverage, and linting.[/dim]\n")
+
+        if not typer.confirm("Install now?", default=True):
+            console.print("[yellow]⏭️  Skipped tool installation[/yellow]")
+            console.print(f"[dim]You can install manually later using the commands in Skills documentation[/dim]")
+            return True
+
+    # Special handling for Go
+    if language == "go":
+        console.print(f"\n[bold cyan]Installing Go tools...[/bold cyan]")
+
+        # Install gosec
+        if not check_command_exists("gosec"):
+            console.print("  • Installing gosec...")
+            try:
+                subprocess.run(
+                    ["go", "install", "github.com/securego/gosec/v2/cmd/gosec@latest"],
+                    check=True,
+                    capture_output=True,
+                )
+                console.print("    [green]✓[/green] gosec installed")
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                console.print("    [yellow]⚠️  Failed to install gosec[/yellow]")
+        else:
+            console.print("    [dim]✓ gosec already installed[/dim]")
+
+        # Install golangci-lint
+        if not check_command_exists("golangci-lint"):
+            console.print("  • Installing golangci-lint...")
+            try:
+                subprocess.run(
+                    ["go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"],
+                    check=True,
+                    capture_output=True,
+                )
+                console.print("    [green]✓[/green] golangci-lint installed")
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                console.print("    [yellow]⚠️  Failed to install golangci-lint[/yellow]")
+        else:
+            console.print("    [dim]✓ golangci-lint already installed[/dim]")
+
+        return True
+
+    # Special handling for Java
+    if language == "java":
+        console.print(f"\n[bold yellow]ℹ️  Java tools require Maven/Gradle configuration[/bold yellow]")
+        console.print("[dim]Analysis tools for Java are configured via build plugins:[/dim]")
+        console.print("[dim]  • SpotBugs + Find Security Bugs (security scanning)[/dim]")
+        console.print("[dim]  • JaCoCo (test coverage)[/dim]")
+        console.print("[dim]  • Checkstyle + PMD (linting)[/dim]")
+        console.print(f"[dim]\nSee .claude/skills/*/SKILL.md for configuration examples.[/dim]")
+        return True
+
+    # Python, JavaScript, Ruby
+    if config["command"]:
+        console.print(f"\n[bold cyan]Installing {language.capitalize()} tools...[/bold cyan]")
+
+        try:
+            # Check if package manager exists
+            package_manager = config["command"][0]
+            if not check_command_exists(package_manager):
+                console.print(f"[red]✗ {package_manager} not found[/red]")
+                console.print(f"[yellow]Please install {package_manager} first, then run tools installation manually[/yellow]")
+                return False
+
+            # Run installation command
+            result = subprocess.run(
+                config["command"],
+                cwd=target_dir,
+                capture_output=True,
+                text=True,
+                timeout=120,  # 2 minute timeout
+            )
+
+            if result.returncode == 0:
+                console.print(f"  [green]✓[/green] Analysis tools installed successfully")
+                return True
+            else:
+                console.print(f"  [yellow]⚠️  Installation completed with warnings[/yellow]")
+                if result.stderr:
+                    console.print(f"[dim]{result.stderr[:500]}[/dim]")
+                return True  # Still return success, tools might work
+
+        except subprocess.TimeoutExpired:
+            console.print(f"  [yellow]⚠️  Installation timed out[/yellow]")
+            return False
+        except Exception as e:
+            console.print(f"  [red]✗ Installation failed: {e}[/red]")
+            return False
+
+    return True
+
+
 def select_script_type() -> str:
     """
     Interactive selection of script type using arrow keys.
@@ -551,17 +769,26 @@ def init(
         if not setup.copy_commands(target_dir):
             console.print("[yellow]⚠️  No commands found[/yellow]")
 
-        console.print("\n[bold cyan]4. Setting up configuration[/bold cyan]")
+        console.print(f"\n[bold cyan]4. Copying skills ({script_type.upper()})[/bold cyan]")
+        if not setup.copy_skills(target_dir, script_type):
+            console.print("[yellow]⚠️  No skills found[/yellow]")
+
+        console.print("\n[bold cyan]5. Setting up configuration[/bold cyan]")
         if not setup.setup_config(target_dir):
             console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]5. Initializing coordination files[/bold cyan]")
+        console.print("\n[bold cyan]6. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
+
+    # Offer to install analysis tools
+    detected_language = detect_project_language(target_dir)
+    if detected_language:
+        install_analysis_tools(target_dir, detected_language, force)
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
-        console.print("\n[bold cyan]6. Initializing git repository[/bold cyan]")
+        console.print("\n[bold cyan]7. Initializing git repository[/bold cyan]")
         try:
             subprocess.run(
                 ["git", "init"],
@@ -595,7 +822,8 @@ def init(
     tree.add_row("📁", ".claude/")
     tree.add_row("  ", "├── agents/      [dim](orchestrator, PM, dev, QA, tech lead)[/dim]")
     tree.add_row("  ", "├── commands/    [dim](slash commands)[/dim]")
-    tree.add_row("  ", "└── scripts/     [dim](initialization scripts)[/dim]")
+    tree.add_row("  ", "├── scripts/     [dim](initialization scripts)[/dim]")
+    tree.add_row("  ", "└── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
     tree.add_row("📁", "coordination/    [dim](state files for agent coordination)[/dim]")
     tree.add_row("📄", ".claude.md       [dim](global configuration)[/dim]")
     console.print(tree)
@@ -724,6 +952,7 @@ def update(
             "  • Agent definitions (.claude/agents/)\n"
             "  • Scripts (.claude/scripts/)\n"
             "  • Commands (.claude/commands/)\n"
+            "  • Skills (.claude/skills/)\n"
             "  • Configuration (.claude.md - merged if needed)\n\n"
             "[dim]Coordination files will NOT be modified[/dim]\n"
         )
@@ -760,8 +989,15 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
 
+    # Update skills (preserve script type)
+    console.print(f"\n[bold cyan]4. Updating skills ({script_type.upper()})[/bold cyan]")
+    if setup.copy_skills(target_dir, script_type):
+        console.print("  [green]✓ Skills updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  Failed to update skills[/yellow]")
+
     # Update configuration (replace old BAZINGA section with new)
-    console.print("\n[bold cyan]4. Updating configuration[/bold cyan]")
+    console.print("\n[bold cyan]5. Updating configuration[/bold cyan]")
     setup.setup_config(target_dir, is_update=True)
 
     # Success message
