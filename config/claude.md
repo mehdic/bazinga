@@ -6,6 +6,51 @@ This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration syste
 
 ---
 
+## 🔴 CRITICAL: Git Branch Requirements (Claude Code Web)
+
+**When working in Claude Code Web environment:**
+
+### BRANCH NAMING RULE
+All git operations MUST use branches that:
+1. Start with `claude/`
+2. End with the session ID
+
+**Example:** `claude/orchestrator-handler-011CUrjhNZS5deVLJRvcYDJn`
+
+### ❌ ABSOLUTELY FORBIDDEN - NEVER CREATE BRANCHES
+- ❌ **NEVER EVER create ANY new branches**
+- ❌ **NEVER use `git branch`** to create branches
+- ❌ **NEVER use `git checkout -b`** to create branches
+- ❌ **NEVER use `git switch -c`** to create branches
+- ❌ **NO feature branches** - not `feature/*`, `fix/*`, `dev/*`, or ANY pattern
+- ❌ **NO temporary branches** - not `temp/*`, `wip/*`, or ANY other names
+- ❌ **NEVER push** to branches that don't follow the `claude/*-<session-id>` pattern (will fail with HTTP 403)
+
+### ✅ REQUIRED GIT WORKFLOW
+1. **Check current branch** at the start of your work: `git branch --show-current`
+2. **Work ONLY on the existing claude/* branch** - the one that's already checked out
+3. **Commit your changes** directly to the current branch
+4. **Push using:** `git push -u origin <current-claude-branch>`
+
+**CRITICAL:** You are already on the correct branch. DO NOT create any new branches. Just commit and push to the current branch.
+
+### Why This Matters
+Claude Code Web uses session-based branch permissions. Only branches matching your session ID can be pushed. Creating feature branches will cause push failures and block your work from being saved.
+
+**Before any git push:**
+```bash
+# Verify you're on the correct branch
+git branch --show-current
+# Should output something like: claude/some-name-<session-id>
+```
+
+**If you need the current branch name**, it's available in the environment or check with:
+```bash
+git branch --show-current
+```
+
+---
+
 ## ⚠️ CRITICAL: Orchestrator Role Enforcement
 
 When you are invoked as `@orchestrator` or via `/orchestrate`:
