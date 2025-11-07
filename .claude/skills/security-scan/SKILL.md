@@ -36,6 +36,7 @@ Automated security vulnerability detection for code reviews. This Skill runs app
 - **JavaScript:** `npm audit --audit-level=high`
 - **Go:** `gosec -severity high`
 - **Ruby:** `brakeman --severity-level 1`
+- **Java:** `spotbugs` with Find Security Bugs (high priority only)
 
 **Output:** `coordination/security_scan.json`
 
@@ -61,6 +62,7 @@ Automated security vulnerability detection for code reviews. This Skill runs app
 - **JavaScript:** `npm audit` (full) + `eslint-plugin-security`
 - **Go:** `gosec` (all severities)
 - **Ruby:** `brakeman` (all findings)
+- **Java:** `spotbugs` (all priorities) + `semgrep` + OWASP Dependency Check
 
 **Output:** `coordination/security_scan.json` with extended analysis
 
@@ -100,6 +102,9 @@ Results are saved to `coordination/security_scan.json`:
   "scan_mode": "basic|advanced",
   "timestamp": "2025-11-07T20:00:00Z",
   "language": "python",
+  "status": "success|partial|error",
+  "tool": "bandit",
+  "error": "",
   "critical_issues": 2,
   "high_issues": 5,
   "medium_issues": 12,
@@ -117,6 +122,14 @@ Results are saved to `coordination/security_scan.json`:
   ]
 }
 ```
+
+### Status Field Values
+
+- **success**: Scan completed without errors
+- **partial**: Scan completed but some tools failed (results may be incomplete)
+- **error**: Scan failed completely (tool installation failed or critical error)
+
+**⚠️ IMPORTANT**: Always check the `status` field before interpreting results. An empty issues array with `status: "error"` means the scan failed, NOT that the code is secure.
 
 ---
 
@@ -146,6 +159,50 @@ go install github.com/securego/gosec/v2/cmd/gosec@latest
 
 ```bash
 gem install brakeman
+```
+
+### Java Projects
+
+**Maven** (`pom.xml`):
+```xml
+<plugin>
+  <groupId>com.github.spotbugs</groupId>
+  <artifactId>spotbugs-maven-plugin</artifactId>
+  <version>4.8.0</version>
+  <dependencies>
+    <dependency>
+      <groupId>com.h3xstream.findsecbugs</groupId>
+      <artifactId>findsecbugs-plugin</artifactId>
+      <version>1.12.0</version>
+    </dependency>
+  </dependencies>
+</plugin>
+
+<!-- Advanced mode: OWASP Dependency Check -->
+<plugin>
+  <groupId>org.owasp</groupId>
+  <artifactId>dependency-check-maven</artifactId>
+  <version>9.0.0</version>
+</plugin>
+```
+
+**Gradle** (`build.gradle`):
+```gradle
+plugins {
+  id 'com.github.spotbugs' version '6.0.0'
+}
+
+dependencies {
+  spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.12.0'
+}
+
+// Advanced mode: OWASP Dependency Check
+apply plugin: 'org.owasp.dependencycheck'
+```
+
+**Semgrep** (Advanced mode):
+```bash
+pip install semgrep  # For Java static analysis
 ```
 
 ---
@@ -262,3 +319,5 @@ This Skill uses industry-standard security tools:
 - **gosec**: Go security checker
 - **npm audit**: JavaScript dependency auditor (npm)
 - **brakeman**: Ruby on Rails security scanner
+- **SpotBugs**: Java bytecode analyzer with Find Security Bugs plugin
+- **OWASP Dependency Check**: Dependency vulnerability scanner (Java, JS, Python)
