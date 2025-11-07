@@ -73,8 +73,14 @@ class BazingaSetup:
 
         return True
 
-    def copy_scripts(self, target_dir: Path) -> bool:
-        """Copy scripts to target .claude/scripts directory."""
+    def copy_scripts(self, target_dir: Path, script_type: str = "sh") -> bool:
+        """
+        Copy scripts to target .claude/scripts directory.
+
+        Args:
+            target_dir: Target directory for installation
+            script_type: "sh" for POSIX shell or "ps" for PowerShell
+        """
         scripts_dir = target_dir / ".claude" / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -82,16 +88,35 @@ class BazingaSetup:
         if not source_scripts.exists():
             return False
 
+        # Determine which extension to copy based on script type
+        script_extension = ".sh" if script_type == "sh" else ".ps1"
+
+        copied_count = 0
         for script_file in source_scripts.glob("*"):
             if script_file.is_file():
+                # Skip non-script files (README, etc.) or wrong script type
+                if script_file.suffix in [".sh", ".ps1"]:
+                    if script_file.suffix != script_extension:
+                        continue  # Skip scripts of the other type
+
                 dest = scripts_dir / script_file.name
                 shutil.copy2(script_file, dest)
-                # Make scripts executable
-                if script_file.suffix == ".sh":
-                    dest.chmod(0o755)
-                console.print(f"  ✓ Copied {script_file.name}")
 
-        return True
+                # Make shell scripts executable on Unix-like systems
+                if script_file.suffix == ".sh" and os.name != 'nt':
+                    dest.chmod(0o755)
+
+                console.print(f"  ✓ Copied {script_file.name}")
+                copied_count += 1
+
+        # Also copy README if it exists
+        readme_file = source_scripts / "README.md"
+        if readme_file.exists():
+            dest = scripts_dir / "README.md"
+            shutil.copy2(readme_file, dest)
+            console.print(f"  ✓ Copied README.md")
+
+        return copied_count > 0
 
     def copy_commands(self, target_dir: Path) -> bool:
         """Copy commands to target .claude/commands directory."""
@@ -260,30 +285,97 @@ class BazingaSetup:
 
         return updated_content
 
-    def run_init_script(self, target_dir: Path) -> bool:
-        """Run the initialization script to set up coordination files."""
-        init_script = target_dir / ".claude" / "scripts" / "init-orchestration.sh"
-        if not init_script.exists():
-            console.print("[yellow]⚠️  Init script not found[/yellow]")
-            return False
+    def detect_script_type(self, target_dir: Path) -> str:
+        """
+        Detect which script type is currently installed.
 
-        try:
-            result = subprocess.run(
-                ["bash", str(init_script)],
-                cwd=target_dir,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            console.print(f"  ✓ Initialized coordination files")
-            return True
-        except subprocess.CalledProcessError as e:
-            console.print(f"[red]✗ Failed to run init script: {e}[/red]")
-            if e.stdout:
-                console.print(e.stdout)
-            if e.stderr:
-                console.print(e.stderr)
-            return False
+        Returns:
+            "sh" or "ps" based on what's found
+        """
+        scripts_dir = target_dir / ".claude" / "scripts"
+        if not scripts_dir.exists():
+            # Default to platform-appropriate type
+            import platform
+            return "ps" if platform.system() == "Windows" else "sh"
+
+        # Check which init script exists
+        if (scripts_dir / "init-orchestration.ps1").exists():
+            return "ps"
+        elif (scripts_dir / "init-orchestration.sh").exists():
+            return "sh"
+        else:
+            # Default to platform-appropriate type
+            import platform
+            return "ps" if platform.system() == "Windows" else "sh"
+
+    def run_init_script(self, target_dir: Path, script_type: str = "sh") -> bool:
+        """
+        Run the initialization script to set up coordination files.
+
+        Args:
+            target_dir: Target directory
+            script_type: "sh" for bash or "ps" for PowerShell
+        """
+        if script_type == "sh":
+            init_script = target_dir / ".claude" / "scripts" / "init-orchestration.sh"
+            if not init_script.exists():
+                console.print("[yellow]⚠️  Init script not found[/yellow]")
+                return False
+
+            try:
+                result = subprocess.run(
+                    ["bash", str(init_script)],
+                    cwd=target_dir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                console.print(f"  ✓ Initialized coordination files")
+                return True
+            except subprocess.CalledProcessError as e:
+                console.print(f"[red]✗ Failed to run init script: {e}[/red]")
+                if e.stdout:
+                    console.print(e.stdout)
+                if e.stderr:
+                    console.print(e.stderr)
+                return False
+        else:  # PowerShell
+            init_script = target_dir / ".claude" / "scripts" / "init-orchestration.ps1"
+            if not init_script.exists():
+                console.print("[yellow]⚠️  Init script not found[/yellow]")
+                return False
+
+            # Check if PowerShell is available
+            pwsh_cmd = None
+            if shutil.which("pwsh"):
+                pwsh_cmd = "pwsh"
+            elif shutil.which("powershell"):
+                pwsh_cmd = "powershell"
+
+            if not pwsh_cmd:
+                console.print(
+                    "[yellow]⚠️  PowerShell not found on this system[/yellow]\n"
+                    f"      Run manually: pwsh -ExecutionPolicy Bypass -File .claude/scripts/init-orchestration.ps1"
+                )
+                return True  # Still return success, user can run manually
+
+            try:
+                result = subprocess.run(
+                    [pwsh_cmd, "-ExecutionPolicy", "Bypass", "-File", str(init_script)],
+                    cwd=target_dir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                console.print(f"  ✓ Initialized coordination files")
+                return True
+            except subprocess.CalledProcessError as e:
+                console.print(f"[red]✗ Failed to run init script: {e}[/red]")
+                if e.stdout:
+                    console.print(e.stdout)
+                if e.stderr:
+                    console.print(e.stderr)
+                return False
 
 
 def check_command_exists(command: str) -> bool:
@@ -291,19 +383,62 @@ def check_command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def select_script_type() -> str:
+    """
+    Interactive selection of script type using arrow keys.
+
+    Returns:
+        "sh" for POSIX shell or "ps" for PowerShell
+    """
+    import sys
+    import platform
+
+    # Determine default based on platform
+    default_script = "ps" if platform.system() == "Windows" else "sh"
+
+    choices = {
+        "sh": "POSIX Shell (bash/zsh) - Linux/macOS",
+        "ps": "PowerShell - Windows/Cross-platform",
+    }
+
+    console.print("\n[bold]Select script type:[/bold]")
+    console.print("  [cyan]1.[/cyan] POSIX Shell (bash/zsh) - Linux/macOS")
+    console.print("  [cyan]2.[/cyan] PowerShell - Windows/Cross-platform")
+
+    default_choice = "1" if default_script == "sh" else "2"
+    console.print(f"\n[dim]Default for your platform: {choices[default_script]}[/dim]")
+
+    # Simple prompt for choice
+    choice = typer.prompt(
+        "Enter choice (1 or 2, or press Enter for default)",
+        default=default_choice,
+        show_default=False,
+    )
+
+    if choice == "1":
+        return "sh"
+    elif choice == "2":
+        return "ps"
+    else:
+        # Invalid choice, use default
+        console.print(f"[yellow]Invalid choice, using default: {default_script}[/yellow]")
+        return default_script
+
+
 def print_banner():
     """Print BAZINGA banner."""
     banner = """
+[bold cyan]
 ██████╗  █████╗ ███████╗██╗███╗   ██╗ ██████╗  █████╗
 ██╔══██╗██╔══██╗╚══███╔╝██║████╗  ██║██╔════╝ ██╔══██╗
 ██████╔╝███████║  ███╔╝ ██║██╔██╗ ██║██║  ███╗███████║
 ██╔══██╗██╔══██║ ███╔╝  ██║██║╚██╗██║██║   ██║██╔══██║
 ██████╔╝██║  ██║███████╗██║██║ ╚████║╚██████╔╝██║  ██║
-╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝
+╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝[/bold cyan]
     """
-    console.print(f"[bold cyan]{banner}[/bold cyan]")
+    console.print(banner)
     console.print(
-        "[bold]Multi-Agent Orchestration System for Claude Code[/bold]\n",
+        "[bold white]Multi-Agent Orchestration System for Claude Code[/bold white]\n",
         justify="center",
     )
 
@@ -333,6 +468,9 @@ def init(
     - Coordination state files
     """
     print_banner()
+
+    # Ask for script type preference
+    script_type = select_script_type()
 
     # Determine target directory
     if here:
@@ -379,8 +517,8 @@ def init(
             console.print("[red]✗ Failed to copy agents[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]2. Copying scripts[/bold cyan]")
-        if not setup.copy_scripts(target_dir):
+        console.print(f"\n[bold cyan]2. Copying scripts ({script_type.upper()})[/bold cyan]")
+        if not setup.copy_scripts(target_dir, script_type):
             console.print("[yellow]⚠️  No scripts found[/yellow]")
 
         console.print("\n[bold cyan]3. Copying commands[/bold cyan]")
@@ -393,7 +531,7 @@ def init(
             raise typer.Exit(1)
 
         console.print("\n[bold cyan]5. Initializing coordination files[/bold cyan]")
-        setup.run_init_script(target_dir)
+        setup.run_init_script(target_dir, script_type)
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
@@ -570,6 +708,9 @@ def update(
 
     setup = BazingaSetup()
 
+    # Detect which script type is currently installed
+    script_type = setup.detect_script_type(target_dir)
+
     console.print("\n[bold]Updating BAZINGA components...[/bold]\n")
 
     # Update agents
@@ -579,9 +720,9 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update agents[/yellow]")
 
-    # Update scripts
-    console.print("\n[bold cyan]2. Updating scripts[/bold cyan]")
-    if setup.copy_scripts(target_dir):
+    # Update scripts (preserve script type)
+    console.print(f"\n[bold cyan]2. Updating scripts ({script_type.upper()})[/bold cyan]")
+    if setup.copy_scripts(target_dir, script_type):
         console.print("  [green]✓ Scripts updated[/green]")
     else:
         console.print("  [yellow]⚠️  Failed to update scripts[/yellow]")
