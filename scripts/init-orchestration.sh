@@ -20,8 +20,14 @@ echo "📅 Session ID: $SESSION_ID"
 if [ ! -d "coordination" ]; then
     echo "📁 Creating coordination/ folder structure..."
     mkdir -p coordination/messages
+    mkdir -p coordination/reports
 else
     echo "📂 coordination/ folder already exists"
+    # Ensure reports directory exists
+    if [ ! -d "coordination/reports" ]; then
+        echo "📁 Creating coordination/reports/ for detailed reports..."
+        mkdir -p coordination/reports
+    fi
 fi
 
 # Create docs folder if it doesn't exist
@@ -80,6 +86,17 @@ if [ ! -f "coordination/orchestrator_state.json" ]; then
   "iteration": 0,
   "total_spawns": 0,
   "decisions_log": [],
+  "token_usage": {
+    "total_estimated": 0,
+    "by_agent_type": {
+      "pm": 0,
+      "developer": 0,
+      "qa": 0,
+      "tech_lead": 0
+    },
+    "by_group": {},
+    "method": "character_count_estimate"
+  },
   "status": "running",
   "start_time": "$TIMESTAMP",
   "last_update": "$TIMESTAMP"
@@ -135,6 +152,9 @@ if [ ! -f "coordination/.gitignore" ]; then
 *.json
 orchestration-log.md
 
+# Reports are ephemeral - generated per session
+reports/
+
 # Keep the folder structure
 !.gitignore
 EOF
@@ -150,10 +170,11 @@ echo "   coordination/"
 echo "   ├── pm_state.json"
 echo "   ├── group_status.json"
 echo "   ├── orchestrator_state.json"
-echo "   └── messages/"
-echo "       ├── dev_to_qa.json"
-echo "       ├── qa_to_techlead.json"
-echo "       └── techlead_to_dev.json"
+echo "   ├── messages/"
+echo "   │   ├── dev_to_qa.json"
+echo "   │   ├── qa_to_techlead.json"
+echo "   │   └── techlead_to_dev.json"
+echo "   └── reports/              (detailed session reports)"
 echo ""
 echo "   docs/"
 echo "   └── orchestration-log.md"

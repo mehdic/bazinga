@@ -1373,29 +1373,210 @@ IF group.review_attempts > 3:
 
 When PM sends BAZINGA:
 
+### Step 1: Aggregate All Metrics
+
+Read all state files and Skills results:
+
+```python
+# Read state files
+pm_state = read_file("coordination/pm_state.json")
+group_status = read_file("coordination/group_status.json")
+orch_state = read_file("coordination/orchestrator_state.json")
+
+# Read Skills results (if they exist)
+security_scan = safe_read_json("coordination/security_scan.json")
+coverage_report = safe_read_json("coordination/coverage_report.json")
+lint_results = safe_read_json("coordination/lint_results.json")
+
+# Calculate metrics
+end_time = current_timestamp()
+start_time = orch_state["start_time"]
+duration_minutes = calculate_duration(start_time, end_time)
+
+# Aggregate across all groups
+total_groups = len(group_status)
+groups_data = []
+for group_id, group_info in group_status.items():
+    if group_id.startswith("_"):  # Skip metadata keys
+        continue
+    groups_data.append({
+        "id": group_id,
+        "revision_count": group_info.get("revision_count", 0),
+        "iterations": group_info.get("iterations", {}),
+        "duration": group_info.get("duration_minutes", 0)
+    })
+
+# Calculate quality metrics
+security_issues = aggregate_security_issues(security_scan)
+coverage_avg = calculate_avg_coverage(coverage_report)
+lint_issues = aggregate_lint_issues(lint_results)
+
+# Calculate efficiency metrics
+first_time_approvals = count_groups_with_revision(groups_data, 0)
+approval_rate = (first_time_approvals / total_groups * 100) if total_groups > 0 else 0
+groups_escalated_opus = count_groups_with_revision(groups_data, 3, ">=")
+groups_escalated_scan = count_groups_with_revision(groups_data, 2, ">=")
+
+# Token usage
+token_usage = orch_state.get("token_usage", {})
+total_tokens = token_usage.get("total_estimated", 0)
+estimated_cost = estimate_cost(total_tokens, groups_escalated_opus)
 ```
-1. Update orchestrator_state.json:
-   - status: "completed"
-   - end_time: [timestamp]
 
-2. Log final entry to orchestration-log.md
+### Step 2: Detect Anomalies
 
-3. Display completion message:
+Identify issues that need attention:
 
-═══════════════════════════════════════════
-✅ Claude Code Multi-Agent Dev Team Orchestration Complete!
-═══════════════════════════════════════════
+```python
+anomalies = []
 
-BAZINGA received from Project Manager!
+# High revision counts (struggled groups)
+for group in groups_data:
+    if group["revision_count"] >= 3:
+        anomalies.append({
+            "type": "high_revisions",
+            "group_id": group["id"],
+            "revision_count": group["revision_count"],
+            "message": f"Group {group['id']}: Required {group['revision_count']} revisions"
+        })
 
-Summary:
-- Mode: [simple/parallel]
-- Groups completed: [N]
-- Total iterations: [X]
-- Duration: [Y] minutes
-- All requirements met ✅
+# Coverage gaps
+if coverage_report:
+    for file_path, coverage in coverage_report.get("files_below_threshold", {}).items():
+        anomalies.append({
+            "type": "coverage_gap",
+            "file": file_path,
+            "coverage": coverage,
+            "message": f"{file_path}: {coverage}% coverage (below threshold)"
+        })
 
-See docs/orchestration-log.md for complete interaction history.
+# Security issues (if any remain unresolved - this should be rare)
+if security_scan:
+    critical = security_scan.get("critical_issues", 0)
+    high = security_scan.get("high_issues", 0)
+    if critical > 0 or high > 0:
+        anomalies.append({
+            "type": "security",
+            "critical": critical,
+            "high": high,
+            "message": f"Security: {critical} critical, {high} high severity issues"
+        })
+```
+
+### Step 3: Generate Detailed Report (Tier 2)
+
+Create comprehensive report file:
+
+```python
+# Generate session filename
+report_filename = f"coordination/reports/session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+
+detailed_report = generate_detailed_report({
+    "session_id": orch_state["session_id"],
+    "mode": pm_state["mode"],
+    "duration_minutes": duration_minutes,
+    "start_time": start_time,
+    "end_time": end_time,
+    "groups": groups_data,
+    "security": security_issues,
+    "coverage": coverage_avg,
+    "lint": lint_issues,
+    "token_usage": token_usage,
+    "efficiency": {
+        "approval_rate": approval_rate,
+        "opus_escalations": groups_escalated_opus,
+        "scan_escalations": groups_escalated_scan
+    },
+    "anomalies": anomalies
+})
+
+# Write detailed report to file
+write_file(report_filename, detailed_report)
+```
+
+### Step 4: Update State Files
+
+```python
+# Update orchestrator_state.json
+orch_state["status"] = "completed"
+orch_state["end_time"] = end_time
+orch_state["duration_minutes"] = duration_minutes
+orch_state["completion_report"] = report_filename
+write_json("coordination/orchestrator_state.json", orch_state)
+
+# Log final entry
+append_to_log("docs/orchestration-log.md", f"""
+## [{end_time}] Orchestration Complete
+
+**Status**: BAZINGA received from PM
+**Duration**: {duration_minutes} minutes
+**Groups completed**: {total_groups}
+**Detailed report**: {report_filename}
+
+---
+""")
+```
+
+### Step 5: Display Concise Report (Tier 1)
+
+Output to user (keep under 30 lines):
+
+```markdown
+═══════════════════════════════════════════════════════════
+✅ BAZINGA - Orchestration Complete!
+═══════════════════════════════════════════════════════════
+
+## Summary
+
+**Mode**: {mode} ({num_developers} developer(s))
+**Duration**: {duration_minutes} minutes
+**Groups**: {total_groups}/{total_groups} completed ✅
+**Token Usage**: ~{total_tokens/1000}K tokens (~${estimated_cost})
+
+## Quality Overview
+
+**Security**: {security_status} ({security_summary})
+**Coverage**: {coverage_status} {coverage_avg}% average (target: 80%)
+**Lint**: {lint_status} ({lint_summary})
+
+## Efficiency
+
+**First-time approval**: {approval_rate}% ({first_time_approvals}/{total_groups} groups)
+**Model escalations**: {groups_escalated_opus} group(s) → Opus at revision 3+
+**Scan escalations**: {groups_escalated_scan} group(s) → advanced at revision 2+
+
+{IF anomalies exist}:
+## Attention Required
+
+{FOR each anomaly}:
+⚠️ **{anomaly.title}**: {anomaly.message}
+   - {anomaly.details}
+   - Recommendation: {anomaly.recommendation}
+
+## Detailed Report
+
+📊 **Full metrics and analysis**: `{report_filename}`
+
+═══════════════════════════════════════════════════════════
+```
+
+**Status emoji logic**:
+- ✅ Green checkmark: All good (0 issues remaining)
+- ⚠️ Yellow warning: Some concerns (issues found but addressed, or minor gaps)
+- ❌ Red X: Problems remain (should be rare - unresolved issues)
+
+**Examples**:
+
+```
+Security: ✅ All issues addressed (3 found → 3 fixed)
+Security: ⚠️ Scan completed with warnings (2 medium issues addressed)
+Security: ❌ Critical issues remain (1 critical unresolved)
+
+Coverage: ✅ 87.5% average (target: 80%)
+Coverage: ⚠️ 78.2% average (below 80% target)
+
+Lint: ✅ All issues fixed (42 found → 42 fixed)
+Lint: ⚠️ 3 warnings remain (5 errors fixed)
 ```
 
 ---
