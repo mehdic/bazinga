@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bazinga-cli"
+version = "0.1.0"
+description = "BAZINGA CLI - A sophisticated multi-agent orchestration system for Claude Code"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Mehdi C", email = "mehdic@users.noreply.github.com"},
+]
+keywords = ["claude", "ai", "multi-agent", "orchestration", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "httpx[socks]>=0.25.0",
+    "platformdirs>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mehdic/bazinga"
+Repository = "https://github.com/mehdic/bazinga"
+Documentation = "https://github.com/mehdic/bazinga#readme"
+Issues = "https://github.com/mehdic/bazinga/issues"
+
+[project.scripts]
+bazinga = "bazinga_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bazinga_cli"]

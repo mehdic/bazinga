@@ -4,6 +4,17 @@
 
 A sophisticated multi-agent orchestration system for Claude Code that coordinates autonomous development teams including Project Manager, Developers, QA Expert, and Tech Lead agents working together to complete software projects.
 
+## Quick Install
+
+```bash
+# One-time use (no installation required)
+uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
+
+# Or install the CLI
+uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
+bazinga init my-project
+```
+
 ## Overview
 
 This system implements adaptive parallelism, intelligent workflow routing, and comprehensive role drift prevention to ensure high-quality software delivery through autonomous agent coordination.
@@ -57,8 +68,13 @@ Developer → Tech Lead → PM
 ## Project Structure
 
 ```
-claude-code-multiagent-dev-team/
+bazinga/
 ├── README.md                    # This file
+├── LICENSE                      # MIT License
+├── pyproject.toml              # Python package configuration
+├── src/                         # Python CLI source code
+│   └── bazinga_cli/            # Main CLI package
+│       └── __init__.py         # CLI implementation (init, check commands)
 ├── agents/                      # Agent definitions
 │   ├── orchestrator.md         # Main orchestrator agent
 │   ├── developer.md            # Developer implementation specialist
@@ -75,10 +91,10 @@ claude-code-multiagent-dev-team/
 │   └── coordination.gitignore  # Gitignore for coordination folder
 ├── docs/                        # Documentation
 │   ├── DOCS_INDEX.md           # Documentation navigation guide
-│   ├── ARCHITECTURE.md         # Detailed architecture (NEW)
+│   ├── ARCHITECTURE.md         # Detailed architecture
 │   ├── ROLE_DRIFT_PREVENTION.md # 6-layer defense system
 │   ├── SCOPE_REDUCTION_INCIDENT.md # Case study
-│   └── original-v4/            # Original the development docs
+│   └── original-v4/            # Original development docs
 │       ├── V4_ARCHITECTURE.md
 │       ├── V4_IMPLEMENTATION_SUMMARY.md
 │       ├── V4_STATE_SCHEMAS.md
@@ -89,57 +105,121 @@ claude-code-multiagent-dev-team/
 
 ## Installation
 
-### Complete File Mapping
+BAZINGA can be installed using the modern Python package manager `uv` or traditional methods.
 
-Here's where each file from this package should go in your target project:
+### Prerequisites
 
-| Source File | Destination in Your Project | Required? | Purpose |
-|-------------|----------------------------|-----------|---------|
-| `agents/*.md` | `.claude/agents/*.md` | ✅ Yes | Agent definitions (orchestrator, PM, developer, QA, tech lead) |
-| `commands/orchestrate.md` | `.claude/commands/orchestrate.md` | ⚠️ Optional | Slash command version (use if you prefer `/orchestrate`) |
-| `config/claude.md` | `.claude.md` | ✅ Yes | Global orchestrator role enforcement |
-| `scripts/init-orchestration.sh` | `.claude/scripts/init-orchestration.sh` | ✅ Yes | Creates coordination/ folder and state files |
-| `scripts/README.md` | `.claude/scripts/README.md` | 📖 Docs | Script documentation |
-| `config/coordination.gitignore` | `coordination/.gitignore` | ⚠️ Optional | Excludes state files from git (created by init script) |
-| `docs/` | `docs/bazinga/` or keep local | 📖 Docs | Architecture, guides, historical docs |
-| `examples/` | `docs/bazinga/examples/` or keep local | 📖 Docs | Usage examples |
-| `README.md` | Keep as reference | 📖 Docs | This file |
+- Python 3.11 or higher
+- Git (optional, for repository initialization)
+- [uv](https://github.com/astral-sh/uv) package manager (recommended)
 
-### Option 1: Quick Install (Essentials Only)
+### Quick Start (Recommended)
 
-Install just the files needed to run BAZINGA:
+**Option 1: One-Time Use with uvx**
+
+Initialize BAZINGA in a new project without installing:
 
 ```bash
-# From the bazinga directory, run in your target project:
-cd /path/to/your/project
+# Create a new project with BAZINGA
+uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
 
-# 1. Copy agents (required)
-mkdir -p .claude/agents
-cp /path/to/bazinga/agents/*.md .claude/agents/
-
-# 2. Copy initialization script (required)
-mkdir -p .claude/scripts
-cp /path/to/bazinga/scripts/init-orchestration.sh .claude/scripts/
-chmod +x .claude/scripts/init-orchestration.sh
-
-# 3. Copy global config (required)
-cp /path/to/bazinga/config/claude.md .claude.md
-
-# 4. Optional: Add slash command
-cp /path/to/bazinga/commands/orchestrate.md .claude/commands/
-
-# 5. Run initialization
-bash .claude/scripts/init-orchestration.sh
+# Or initialize in current directory
+uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
 ```
 
-### Option 2: Full Install (Including Documentation)
+**Option 2: Install CLI Tool**
 
-Install everything including documentation:
+Install the BAZINGA CLI for repeated use:
 
 ```bash
-cd /path/to/your/project
+# Install using uv
+uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
 
-# Copy essentials (same as Option 1)
+# Now use it anywhere
+bazinga init my-project
+```
+
+**Option 3: Traditional pip install**
+
+```bash
+# Install from git
+pip install git+https://github.com/mehdic/bazinga.git
+
+# Use it
+bazinga init my-project
+```
+
+### CLI Commands
+
+**Initialize a new project:**
+```bash
+# Create a new project directory
+bazinga init my-project
+
+# Initialize in current directory
+bazinga init --here
+
+# Skip git initialization
+bazinga init my-project --no-git
+
+# Skip confirmation prompts
+bazinga init my-project --force
+```
+
+**Check system requirements:**
+```bash
+# Verify installation and setup
+bazinga check
+```
+
+**Show version:**
+```bash
+bazinga --version
+```
+
+### What Gets Installed
+
+When you run `bazinga init`, the following structure is created:
+
+```
+your-project/
+├── .claude/
+│   ├── agents/                 # 5 agent definitions
+│   │   ├── orchestrator.md    # Main message router
+│   │   ├── project_manager.md # Project coordinator
+│   │   ├── developer.md       # Code implementer
+│   │   ├── qa_expert.md       # Testing specialist
+│   │   └── techlead.md        # Quality reviewer
+│   ├── commands/              # Slash commands
+│   │   └── orchestrate.md     # /orchestrate command
+│   └── scripts/               # Utility scripts
+│       └── init-orchestration.sh
+├── coordination/              # State files (auto-generated)
+│   ├── pm_state.json
+│   ├── group_status.json
+│   ├── orchestrator_state.json
+│   └── messages/
+├── .claude.md                 # Global configuration
+└── .git/                      # Git repository (optional)
+```
+
+### Manual Installation (Alternative)
+
+If you prefer to install manually or don't have uv installed:
+
+<details>
+<summary>Click to expand manual installation steps</summary>
+
+```bash
+# Clone the repository
+git clone https://github.com/mehdic/bazinga.git
+cd bazinga
+
+# Install using pip
+pip install -e .
+
+# Or copy files manually to your project
+cd /path/to/your/project
 mkdir -p .claude/agents .claude/scripts .claude/commands
 cp /path/to/bazinga/agents/*.md .claude/agents/
 cp /path/to/bazinga/scripts/* .claude/scripts/
@@ -147,39 +227,11 @@ cp /path/to/bazinga/commands/orchestrate.md .claude/commands/
 cp /path/to/bazinga/config/claude.md .claude.md
 chmod +x .claude/scripts/init-orchestration.sh
 
-# Copy documentation (optional but recommended)
-mkdir -p docs/bazinga
-cp -r /path/to/bazinga/docs/* docs/bazinga/
-cp -r /path/to/bazinga/examples docs/bazinga/
-cp /path/to/bazinga/README.md docs/bazinga/
-
 # Run initialization
 bash .claude/scripts/init-orchestration.sh
 ```
 
-### Option 3: New Standalone Project
-
-Start a fresh project with BAZINGA:
-
-```bash
-# Clone or copy the entire bazinga directory
-cp -r /path/to/bazinga /path/to/new-project
-cd /path/to/new-project
-
-# Restructure to standard layout
-mkdir -p .claude/agents .claude/commands .claude/scripts
-mv agents/* .claude/agents/
-mv commands/* .claude/commands/
-mv scripts/* .claude/scripts/
-mv config/claude.md .claude.md
-rm -rf agents commands config
-
-# Initialize
-bash .claude/scripts/init-orchestration.sh
-
-# Initialize git
-git init
-```
+</details>
 
 ## Usage
 
