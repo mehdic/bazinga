@@ -107,16 +107,87 @@ class BazingaSetup:
 
         return True
 
-    def copy_config(self, target_dir: Path) -> bool:
-        """Copy global configuration to target directory."""
+    def setup_config(self, target_dir: Path) -> bool:
+        """
+        Setup global configuration, merging with existing .claude.md if present.
+
+        Strategy:
+        1. Check if .claude.md or .claude/.claude.md exists in target
+        2. If exists, read it and check if BAZINGA config is already present
+        3. If not present, append BAZINGA config (intelligently or at bottom)
+        4. If doesn't exist, create new .claude.md with our content
+        """
         source_config = self.source_dir / "config" / "claude.md"
         if not source_config.exists():
             return False
 
-        dest_config = target_dir / ".claude.md"
-        shutil.copy2(source_config, dest_config)
-        console.print(f"  ✓ Copied .claude.md")
-        return True
+        # Read BAZINGA configuration
+        with open(source_config, 'r') as f:
+            bazinga_config = f.read()
+
+        # Check for existing .claude.md in project root or .claude/ directory
+        possible_locations = [
+            target_dir / ".claude.md",
+            target_dir / ".claude" / ".claude.md",
+        ]
+
+        existing_config_path = None
+        for path in possible_locations:
+            if path.exists():
+                existing_config_path = path
+                break
+
+        if existing_config_path:
+            # Read existing configuration
+            with open(existing_config_path, 'r') as f:
+                existing_content = f.read()
+
+            # Check if BAZINGA configuration is already present
+            if "BAZINGA" in existing_content or "Orchestrator Role Enforcement" in existing_content:
+                console.print(f"  ℹ️  BAZINGA config already present in {existing_config_path.name}")
+                return True
+
+            # Extract BAZINGA-specific content (everything after the first header section)
+            # BAZINGA config starts with the critical orchestrator enforcement section
+            bazinga_lines = bazinga_config.split('\n')
+
+            # Find where BAZINGA-specific config starts (after initial project context)
+            bazinga_start_markers = [
+                "## ⚠️ CRITICAL: Orchestrator Role Enforcement",
+                "---",
+            ]
+
+            bazinga_config_section = None
+            for i, line in enumerate(bazinga_lines):
+                if "⚠️ CRITICAL" in line or "Orchestrator Role Enforcement" in line:
+                    # Include separator line before this section
+                    start_idx = max(0, i - 2)  # Include the --- separator
+                    bazinga_config_section = '\n'.join(bazinga_lines[start_idx:])
+                    break
+
+            if not bazinga_config_section:
+                # Fallback: use everything after line 7
+                bazinga_config_section = '\n'.join(bazinga_lines[7:])
+
+            # Merge: Add BAZINGA config to existing file
+            # Try to insert after initial project description (first 4-5 lines)
+            existing_lines = existing_content.split('\n')
+
+            # Simple strategy: append to bottom with clear separator
+            merged_content = existing_content.rstrip() + '\n\n' + bazinga_config_section
+
+            # Write merged configuration
+            with open(existing_config_path, 'w') as f:
+                f.write(merged_content)
+
+            console.print(f"  ✓ Merged BAZINGA config into existing {existing_config_path.name}")
+            return True
+        else:
+            # No existing config, create new one
+            dest_config = target_dir / ".claude.md"
+            shutil.copy2(source_config, dest_config)
+            console.print(f"  ✓ Created .claude.md with BAZINGA config")
+            return True
 
     def run_init_script(self, target_dir: Path) -> bool:
         """Run the initialization script to set up coordination files."""
@@ -245,9 +316,9 @@ def init(
         if not setup.copy_commands(target_dir):
             console.print("[yellow]⚠️  No commands found[/yellow]")
 
-        console.print("\n[bold cyan]4. Copying configuration[/bold cyan]")
-        if not setup.copy_config(target_dir):
-            console.print("[red]✗ Failed to copy configuration[/red]")
+        console.print("\n[bold cyan]4. Setting up configuration[/bold cyan]")
+        if not setup.setup_config(target_dir):
+            console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
         console.print("\n[bold cyan]5. Initializing coordination files[/bold cyan]")
