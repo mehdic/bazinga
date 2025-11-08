@@ -519,7 +519,7 @@ Every PM response must end with either:
 
 ### Velocity & Metrics Tracker Skill
 
-You have access to `/velocity-tracker` Skill that provides data-driven insights:
+You have access to the velocity-tracker Skill that provides data-driven insights:
 
 **When to invoke:**
 - After completing task groups (record metrics)
@@ -529,10 +529,10 @@ You have access to `/velocity-tracker` Skill that provides data-driven insights:
 
 **Usage:**
 ```bash
-# Invoke Skill to get current metrics
-/velocity-tracker
+# INVOKE the Skill explicitly:
+Skill(command: "velocity-tracker")
 
-# Read output
+# Then read output:
 cat coordination/project_metrics.json
 ```
 
@@ -547,7 +547,8 @@ cat coordination/project_metrics.json
 ```markdown
 Checking project metrics...
 
-[Read coordination/project_metrics.json after invoking /velocity-tracker]
+Skill(command: "velocity-tracker")
+[Read coordination/project_metrics.json after Skill completes]
 
 Current velocity: 12 (above historical avg 10.5) ✓
 Trend: improving

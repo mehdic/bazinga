@@ -583,25 +583,25 @@ You have access to advanced capabilities:
 
 1. **Codebase Analysis Skill**: Run BEFORE coding
    ```
-   /codebase-analysis "your task description"
+   Skill(command: "codebase-analysis")
    ```
    Returns: Similar features, utilities, architectural patterns
 
 2. **Test Pattern Analysis Skill**: Run BEFORE writing tests
    ```
-   /test-pattern-analysis tests/
+   Skill(command: "test-pattern-analysis")
    ```
    Returns: Test framework, fixtures, patterns, suggestions
 
 3. **API Contract Validation Skill**: Run BEFORE committing API changes
    ```
-   /api-contract-validation
+   Skill(command: "api-contract-validation")
    ```
    Returns: Breaking changes, safe changes, recommendations
 
 4. **DB Migration Check Skill**: Run BEFORE committing migrations
    ```
-   /db-migration-check
+   Skill(command: "db-migration-check")
    ```
    Returns: Dangerous operations, safe alternatives, impact analysis
 
@@ -613,12 +613,20 @@ USE THESE SKILLS for better implementation quality!
 
 BEFORE Implementing:
 1. Review codebase context above
-2. {IF superpowers}: Run /codebase-analysis for patterns
+2. {IF superpowers}: **INVOKE Codebase Analysis Skill:**
+   ```
+   Skill(command: "codebase-analysis")
+   ```
+   Read results for patterns and utilities
 
 During Implementation:
 3. Implement the COMPLETE solution
 4. Write unit tests
-5. {IF superpowers}: Run /test-pattern-analysis before testing
+5. {IF superpowers}: **INVOKE Test Pattern Analysis Skill:**
+   ```
+   Skill(command: "test-pattern-analysis")
+   ```
+   Read results before writing tests
 
 BEFORE Reporting READY_FOR_QA:
 6. Run ALL unit tests - MUST pass 100%
@@ -630,8 +638,16 @@ BEFORE Reporting READY_FOR_QA:
    FIX ALL ISSUES before proceeding
 8. Run build check - MUST succeed
 9. {IF superpowers}: Run app startup check - MUST start
-10. {IF superpowers AND API changes}: Run /api-contract-validation
-11. {IF superpowers AND migration changes}: Run /db-migration-check
+10. {IF superpowers AND API changes}: **INVOKE API Contract Validation:**
+    ```
+    Skill(command: "api-contract-validation")
+    ```
+    Read results: `cat coordination/api_contract_results.json`
+11. {IF superpowers AND migration changes}: **INVOKE DB Migration Check:**
+    ```
+    Skill(command: "db-migration-check")
+    ```
+    Read results: `cat coordination/db_migration_results.json`
 
 ONLY THEN:
 12. Commit to branch: {branch_name}
