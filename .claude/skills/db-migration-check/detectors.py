@@ -39,9 +39,17 @@ def detect_dangerous_operations(operation: Dict[str, Any], db_type: str) -> Dict
 def check_postgresql(operation: Dict) -> Dict:
     """Check PostgreSQL operations."""
     op_str = (operation.get('sql') or operation.get('operation', '')).upper()
+    op_type = operation.get('type', '')
 
     # ADD COLUMN with DEFAULT (without NOT VALID)
-    if re.search(r'ADD\s+COLUMN.*DEFAULT', op_str) and 'NOT VALID' not in op_str:
+    # Check both SQL and Alembic patterns
+    is_add_column_with_default = (
+        (re.search(r'ADD\s+COLUMN.*DEFAULT', op_str) or
+         (op_type == 'add_column' and 'SERVER_DEFAULT' in op_str)) and
+        'NOT VALID' not in op_str
+    )
+
+    if is_add_column_with_default:
         return {
             "severity": "critical",
             "issue": "Adding column with DEFAULT locks table during rewrite",
@@ -64,7 +72,13 @@ def check_postgresql(operation: Dict) -> Dict:
         }
 
     # CREATE INDEX without CONCURRENTLY
-    if 'CREATE INDEX' in op_str and 'CONCURRENTLY' not in op_str:
+    # Check both SQL and Alembic patterns
+    is_create_index_without_concurrent = (
+        ('CREATE INDEX' in op_str and 'CONCURRENTLY' not in op_str) or
+        (op_type == 'create_index' and 'CONCURRENTLY' not in op_str)
+    )
+
+    if is_create_index_without_concurrent:
         return {
             "severity": "high",
             "issue": "Index creation without CONCURRENTLY locks table",
@@ -84,7 +98,10 @@ def check_postgresql(operation: Dict) -> Dict:
         }
 
     # DROP COLUMN
-    if 'DROP COLUMN' in op_str:
+    # Check both SQL and Alembic patterns
+    is_drop_column = 'DROP COLUMN' in op_str or op_type == 'drop_column'
+
+    if is_drop_column:
         return {
             "severity": "high",
             "issue": "Dropping column can break running application and rewrites table",
@@ -106,7 +123,13 @@ def check_postgresql(operation: Dict) -> Dict:
         }
 
     # ALTER COLUMN TYPE
-    if re.search(r'ALTER\s+COLUMN.*TYPE', op_str):
+    # Check both SQL and Alembic patterns
+    is_alter_column_type = (
+        re.search(r'ALTER\s+COLUMN.*TYPE', op_str) or
+        (op_type == 'alter_column' and 'TYPE_=' in op_str)
+    )
+
+    if is_alter_column_type:
         return {
             "severity": "critical",
             "issue": "Changing column type rewrites entire table",
@@ -153,9 +176,16 @@ def check_postgresql(operation: Dict) -> Dict:
 def check_mysql(operation: Dict) -> Dict:
     """Check MySQL operations."""
     op_str = (operation.get('sql') or operation.get('operation', '')).upper()
+    op_type = operation.get('type', '')
 
     # ADD COLUMN with DEFAULT
-    if re.search(r'ADD\s+COLUMN.*DEFAULT', op_str):
+    # Check both SQL and Django/Alembic patterns
+    is_add_column_with_default = (
+        re.search(r'ADD\s+COLUMN.*DEFAULT', op_str) or
+        (op_type in ['add_column', 'add_field'] and 'DEFAULT' in op_str)
+    )
+
+    if is_add_column_with_default:
         return {
             "severity": "critical",
             "issue": "Adding column with DEFAULT locks table during rewrite",
@@ -234,9 +264,16 @@ def check_mysql(operation: Dict) -> Dict:
 def check_sqlserver(operation: Dict) -> Dict:
     """Check Microsoft SQL Server operations."""
     op_str = (operation.get('sql') or operation.get('operation', '')).upper()
+    op_type = operation.get('type', '')
 
     # ALTER TABLE ADD COLUMN with DEFAULT
-    if re.search(r'ALTER\s+TABLE.*ADD.*DEFAULT', op_str):
+    # Check both SQL and framework patterns
+    is_add_with_default = (
+        re.search(r'ALTER\s+TABLE.*ADD.*DEFAULT', op_str) or
+        (op_type in ['add_column', 'add_field'] and 'DEFAULT' in op_str)
+    )
+
+    if is_add_with_default:
         return {
             "severity": "critical",
             "issue": "Adding column with DEFAULT in SQL Server locks table and can be slow",
