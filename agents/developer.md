@@ -620,7 +620,18 @@ Always test your implementation:
    # Verify all pass
    ```
 
-4. **ONLY THEN commit**
+4. **Run build check** - MUST succeed
+   ```bash
+   # Run build command (npm run build, cargo build, mvn package, etc.)
+   # If build FAILS due to dependency download errors:
+   #   - Use WebFetch to manually download dependencies
+   #   - Example: WebFetch(url: "https://registry.npmjs.org/package/-/package-1.0.0.tgz")
+   #   - Place in appropriate cache/node_modules location
+   #   - Retry build
+   # Build MUST succeed before committing
+   ```
+
+5. **ONLY THEN commit**
    ```bash
    git add .
    git commit -m "Description"

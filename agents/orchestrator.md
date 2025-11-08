@@ -637,6 +637,9 @@ BEFORE Reporting READY_FOR_QA:
    Read results: `cat coordination/lint_results.json`
    FIX ALL ISSUES before proceeding
 8. Run build check - MUST succeed
+   If build FAILS due to dependency download errors:
+   - Use WebFetch to manually download dependencies
+   - Retry build after placing in correct location
 9. {IF superpowers}: Run app startup check - MUST start
 10. {IF superpowers AND API changes}: **INVOKE API Contract Validation:**
     ```
