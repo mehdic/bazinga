@@ -14,30 +14,11 @@ $TIMESTAMP = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 Write-Host "🔄 Initializing V4 orchestration system..." -ForegroundColor Cyan
 Write-Host "📅 Session ID: $SESSION_ID" -ForegroundColor Cyan
 
-# Create coordination folder structure
-if (-not (Test-Path "coordination")) {
-    Write-Host "📁 Creating coordination/ folder structure..." -ForegroundColor Yellow
-    New-Item -ItemType Directory -Path "coordination\messages" -Force | Out-Null
-    New-Item -ItemType Directory -Path "coordination\reports" -Force | Out-Null
-} else {
-    Write-Host "📂 coordination/ folder already exists" -ForegroundColor Gray
-    # Ensure messages directory exists
-    if (-not (Test-Path "coordination\messages")) {
-        Write-Host "📁 Creating coordination\messages\ for agent messaging..." -ForegroundColor Yellow
-        New-Item -ItemType Directory -Path "coordination\messages" -Force | Out-Null
-    }
-    # Ensure reports directory exists
-    if (-not (Test-Path "coordination\reports")) {
-        Write-Host "📁 Creating coordination\reports\ for detailed reports..." -ForegroundColor Yellow
-        New-Item -ItemType Directory -Path "coordination\reports" -Force | Out-Null
-    }
-}
-
-# Create docs folder if it doesn't exist
-if (-not (Test-Path "docs")) {
-    Write-Host "📁 Creating docs/ folder..." -ForegroundColor Yellow
-    New-Item -ItemType Directory -Path "docs" -Force | Out-Null
-}
+# Ensure all required directories exist (New-Item -Force is idempotent - safe to run multiple times)
+Write-Host "📁 Ensuring directory structure exists..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Path "coordination\messages" -Force | Out-Null
+New-Item -ItemType Directory -Path "coordination\reports" -Force | Out-Null
+New-Item -ItemType Directory -Path "docs" -Force | Out-Null
 
 # Initialize pm_state.json
 if (-not (Test-Path "coordination\pm_state.json")) {
