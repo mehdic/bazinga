@@ -6,6 +6,11 @@ description: Execute spec-kit tasks using BAZINGA multi-agent orchestration with
 
 This command bridges spec-kit's planning phase with BAZINGA's execution phase, creating a seamless spec-driven development workflow.
 
+**🆕 Enhanced Reporting**: Upon completion, you will receive:
+- **Concise summary** showing quality metrics, efficiency, and any issues requiring attention
+- **Detailed report** saved to `coordination/reports/` with comprehensive analysis
+- Links to Skills results (security-scan, test-coverage, lint-check) and token usage
+
 ## User Input
 
 ```text
@@ -375,6 +380,21 @@ Your standard workflow applies, but with these SPEC-KIT specific modifications:
 
 ### Modified Instructions for TECH LEAD
 
+**🆕 AUTOMATIC SKILLS INTEGRATION**: The orchestrator will automatically inject Claude Code Skills into Tech Lead reviews.
+
+**Skills Used** (automatically invoked):
+- **security-scan**: Scans for vulnerabilities (basic mode → advanced mode at revision 2+)
+- **test-coverage**: Generates coverage reports
+- **lint-check**: Checks code quality and style
+
+**Progressive Analysis Strategy**:
+
+| Revision Count | Security Scan Mode | Tech Lead Model | Trigger |
+|----------------|-------------------|-----------------|---------|
+| **0-1 revisions** | Basic (5-10s, high/medium severity) | Sonnet 4.5 | First review |
+| **2 revisions** | Advanced (30-60s, all severities) | Sonnet 4.5 | After first changes requested |
+| **3+ revisions** | Advanced (comprehensive) | Opus | Persistent issues detected |
+
 **Standard workflow**, but additionally:
 
 1. **Validate spec-kit compliance**:
@@ -385,6 +405,11 @@ Your standard workflow applies, but with these SPEC-KIT specific modifications:
 2. **Check tasks.md accuracy**:
    - Verify marked tasks are actually complete
    - Ensure implementation matches task descriptions
+
+3. **Review automated Skill results**:
+   - Security scan findings from coordination/security_scan.json
+   - Coverage report from coordination/coverage_report.json
+   - Lint results from coordination/lint_results.json
 
 ---
 
@@ -403,6 +428,9 @@ Now proceed with your standard orchestration workflow:
 - Developers UPDATE tasks.md with checkmarks
 - All agents REFERENCE spec.md and plan.md for context
 - tasks.md serves as single source of truth for progress
+- 🆕 **Tech Lead automatically uses Claude Code Skills** for security, coverage, and linting
+- 🆕 **Progressive analysis**: basic → advanced scan at revision 2, Opus model at revision 3
+- 🆕 **Revision tracking**: coordination/group_status.json tracks per-group revision counts
 
 ═══════════════════════════════════════════════════════
 🎯 START ORCHESTRATION NOW
