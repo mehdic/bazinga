@@ -301,7 +301,8 @@ START YOUR ANALYSIS NOW.
 
 **Key Points:**
 - Always include previous state in prompt (PM's "memory")
-- PM reads the reference prompt file for detailed instructions
+- PM reads the reference prompt file for detailed instructions (agents/project_manager.md)
+- PM has access to `/velocity-tracker` Skill for data-driven progress tracking
 - PM updates state file before returning
 - PM returns clear decision for orchestrator
 
