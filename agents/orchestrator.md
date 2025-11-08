@@ -755,17 +755,59 @@ You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 
 **BRANCH:** {branch_name}
 
+**CAPABILITIES MODE:** {standard OR superpowers}
+
+{IF superpowers_mode}:
+═══════════════════════════════════════════
+⚡ SUPERPOWERS MODE ACTIVE
+═══════════════════════════════════════════
+
+BEFORE running tests, you MUST invoke quality analysis Skills:
+
+**STEP 1: Invoke pattern-miner (MANDATORY)**
+```
+Skill(command: "pattern-miner")
+```
+Read results: `cat coordination/pattern_insights.json`
+Use insights to identify high-risk areas from historical failures
+
+**STEP 2: Invoke quality-dashboard (MANDATORY)**
+```
+Skill(command: "quality-dashboard")
+```
+Read results: `cat coordination/quality_dashboard.json`
+Get baseline health score and quality trends
+
+**STEP 3: Prioritize testing based on insights**
+- Focus on modules with historical test failures
+- Extra scrutiny for declining quality areas
+- Validate fixes for recurring issues
+
+═══════════════════════════════════════════
+{END IF}
+
 **YOUR JOB:**
-1. Checkout branch: git checkout {branch_name}
-2. Run Integration Tests
-3. Run Contract Tests
-4. Run E2E Tests
-5. Aggregate results
-6. Report PASS or FAIL
+{IF superpowers}: 1. Run pattern-miner and quality-dashboard Skills FIRST
+{IF superpowers}: 2. Use insights to prioritize testing focus
+{IF superpowers}: 3. Checkout branch: git checkout {branch_name}
+{IF NOT superpowers}: 1. Checkout branch: git checkout {branch_name}
+4. Run Integration Tests
+5. Run Contract Tests
+6. Run E2E Tests
+7. Aggregate results
+8. Report PASS or FAIL
 
 **REPORT FORMAT:**
 
 ## QA Expert: Test Results - [PASS/FAIL]
+
+{IF superpowers}:
+### Quality Analysis (Superpowers)
+**Pattern Insights:** [Summary from pattern-miner]
+**Health Score:** [Score from quality-dashboard]
+**Risk Areas:** [Areas flagged for extra testing]
+
+{END IF}
 
 ### Test Summary
 **Integration Tests:** X/Y passed
@@ -776,7 +818,7 @@ You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 [If PASS]: Ready for Tech Lead review
 [If FAIL]: Detailed failures with fix suggestions
 
-START TESTING NOW.
+START {IF superpowers}ANALYSIS AND {END IF}TESTING NOW.
   """
 )
 ```
