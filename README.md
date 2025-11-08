@@ -149,6 +149,40 @@ Skills use **dual-mode analysis** that escalates alongside model escalation:
    - Enables continuous learning across runs
    - Results: `coordination/project_metrics.json`
 
+**Superpowers Skills (Enabled with superpowers=true):**
+
+5. **codebase-analysis** - Pattern extraction and architecture mapping (20-40s)
+   - Identifies design patterns, architecture layers
+   - Maps dependencies and module relationships
+   - Results: `coordination/codebase_patterns.json`
+
+6. **test-pattern-analysis** - Test strategy extraction (15-30s)
+   - Analyzes existing test patterns
+   - Identifies test gaps and coverage opportunities
+   - Results: `coordination/test_patterns.json`
+
+7. **api-contract-validation** - Breaking change detection (10-20s)
+   - Compares API contracts (OpenAPI, GraphQL, Protobuf)
+   - Detects breaking vs non-breaking changes
+   - Results: `coordination/contract_diff.json`
+
+8. **db-migration-check** - Database migration safety analysis (5-15s)
+   - Detects dangerous operations (PostgreSQL, MySQL, SQL Server, MongoDB)
+   - Suggests safe alternatives for zero-downtime migrations
+   - Results: `coordination/migration_analysis.json`
+
+9. **quality-dashboard** ⭐ - Unified project health dashboard (10-15s)
+   - Aggregates all quality metrics (security, coverage, lint, velocity)
+   - Provides overall health score (0-100) with trend analysis
+   - Detects anomalies and generates actionable recommendations
+   - Results: `coordination/quality_dashboard.json`
+
+10. **pattern-miner** ⭐ - Historical pattern analysis (15-20s)
+   - Mines historical data for recurring patterns
+   - Predicts effort based on past similar tasks
+   - Adjusts estimates using confidence-weighted multipliers
+   - Results: `coordination/pattern_insights.json`
+
 #### Language Support
 
 | Language | Security | Coverage | Linting |
@@ -356,7 +390,7 @@ Before sending BAZINGA, PM evaluates accumulated debt:
 
 ### Data-Driven Project Management
 
-BAZINGA PM uses metrics and retrospectives for continuous improvement.
+BAZINGA PM combines **Tier 1** (velocity tracking), **Tier 2** (predictive analytics), and **Tier 3** (advanced insights) for intelligent, proactive project management.
 
 #### The Problem (Before Metrics)
 
@@ -474,6 +508,91 @@ Every run improves the baseline. After 5 runs, PM knows:
 - "Current team velocity averages 11 points"
 
 This knowledge makes future estimates accurate and planning realistic.
+
+---
+
+### Advanced PM Capabilities (Tier 2)
+
+**Philosophy:** Predictive, proactive, data-driven (2024-2025 industry best practices)
+
+PM automatically applies these capabilities at key decision points (<5s total):
+
+#### 1. Risk Scoring & Proactive Alerts 🎯
+
+Calculates risk score for each task group:
+```
+Risk Score = (revision_count × 2) + (dependencies × 1.5) + (complexity × 1)
+```
+
+**Thresholds:**
+- Low (<5): Normal tracking
+- Medium (5-10): Watch closely
+- High (>10): Alert user + suggest mitigation
+
+**Example alert:**
+```
+⚠️  HIGH RISK: Group C (score: 12)
+- 4 revisions (persistent issues)
+- 1 dependency
+- 5 story points complexity
+
+Mitigation: Split into smaller tasks or escalate to Tech Lead
+```
+
+#### 2. Predictive Timeline Estimation 📅
+
+Predicts completion using velocity data:
+```
+Effective Velocity = (historical_avg × 0.7) + (current × 0.3)
+Hours Remaining = (remaining_story_points / effective_velocity) × avg_hours_per_run
+Confidence = 100 - (velocity_variance × 10)
+```
+
+**Example prediction:**
+```
+📈 Estimated Completion: 18 hours (85% confidence)
+Remaining: 8 story points | Velocity: 11.0 (weighted avg)
+Trend: On track ✓
+```
+
+#### 3. Resource Utilization Analysis 👥
+
+Tracks developer efficiency and prevents burnout:
+```
+Efficiency Ratio = actual_time / expected_time
+
+Thresholds:
+- <0.5: Underutilized
+- 0.5-1.3: Optimal ✓
+- >1.5: Overworked ⚠️
+```
+
+**Example analysis:**
+```
+Developer-1: 1.8x ratio (OVERWORKED)
+→ Action: Check if stuck, split remaining work, or escalate
+
+Developer-2: 0.67x ratio (OPTIMAL)
+→ Can handle additional tasks
+```
+
+#### 4. Quality Gate Enforcement (Enhanced) 🚦
+
+Mandatory checks before BAZINGA:
+```
+Security Gate:   0 critical vulnerabilities (configurable)
+Coverage Gate:   ≥70% line coverage (configurable)
+Lint Gate:       ≤5 high-severity issues (configurable)
+Tech Debt Gate:  0 blocking items (configurable)
+```
+
+**Blocks BAZINGA if any gate fails**, forcing quality standards.
+
+**Benefits:**
+- ✅ Proactive risk management (70% of projects fail due to underestimated risks)
+- ✅ User transparency with realistic ETAs
+- ✅ Team health monitoring (prevents burnout)
+- ✅ Quality enforcement (no more "we'll fix it later")
 
 ## Project Structure
 

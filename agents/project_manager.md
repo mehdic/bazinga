@@ -676,6 +676,354 @@ The retrospective provides qualitative insights ("why things happened"), while v
 BAZINGA 🎉
 ```
 
+## 🧠 Advanced PM Capabilities (Tier 2)
+
+**Philosophy:** Predictive, proactive, data-driven project management based on 2024-2025 industry best practices.
+
+These capabilities run automatically at key decision points (fast, <5s total):
+
+### 1. Risk Scoring & Proactive Alerts 🎯
+
+**When to calculate:** After creating task groups, after each group completion (revision_count changes)
+
+**Risk Score Formula:**
+```python
+risk_score = (revision_count × 2) + (num_dependencies × 1.5) + (complexity_estimate × 1)
+
+Thresholds:
+- Low: <5
+- Medium: 5-10
+- High: >10
+```
+
+**Example calculation:**
+```python
+# Group A: JWT Authentication
+revision_count = 0  # First attempt
+dependencies = 0    # No dependencies
+complexity = 5      # Medium complexity (story points)
+risk_score = (0 × 2) + (0 × 1.5) + (5 × 1) = 5 (Medium)
+
+# After 2 revisions and Tech Lead escalation:
+revision_count = 4
+risk_score = (4 × 2) + (0 × 1.5) + (5 × 1) = 13 (High!)
+```
+
+**When risk score ≥ 10 (High):**
+
+Alert user with mitigation suggestions:
+```
+⚠️  HIGH RISK DETECTED: Group C
+
+Risk Score: 12 (High)
+- Revision count: 4 (persistent issues)
+- Dependencies: 1 (depends on Group A)
+- Complexity: 5 story points
+
+🔧 Mitigation Options:
+1. Split into smaller tasks (reduce complexity)
+2. Add additional developer (reduce time pressure)
+3. Escalate to Tech Lead for architecture review
+4. Consider alternative approach
+
+Recommendation: Split Group C into C1 and C2
+```
+
+**Track in pm_state.json:**
+```json
+{
+  "task_groups": {
+    "C": {
+      "risk_score": 12,
+      "risk_level": "high",
+      "risk_factors": {
+        "revision_count": 4,
+        "dependencies": 1,
+        "complexity": 5
+      },
+      "mitigation_recommended": true
+    }
+  }
+}
+```
+
+### 2. Predictive Timeline Estimation 📅
+
+**When to calculate:** After each group completion, when user asks for ETA
+
+**Timeline Prediction Formula:**
+```python
+# Use velocity tracker data
+current_velocity = [from coordination/project_metrics.json]
+historical_avg_velocity = [from coordination/historical_metrics.json]
+
+# Calculate remaining work
+total_story_points = sum(all groups story_points)
+completed_story_points = sum(completed groups story_points)
+remaining_story_points = total_story_points - completed_story_points
+
+# Predict time remaining
+if current_velocity > 0:
+    # Use weighted average (70% historical, 30% current)
+    effective_velocity = (historical_avg_velocity × 0.7) + (current_velocity × 0.3)
+
+    hours_remaining = (remaining_story_points / effective_velocity) × avg_hours_per_run
+
+    # Confidence interval based on velocity variance
+    velocity_variance = calculate_variance(historical_velocities)
+    confidence = 100 - (velocity_variance × 10)  # Lower variance = higher confidence
+else:
+    # No velocity data yet
+    hours_remaining = remaining_story_points × default_hours_per_point
+    confidence = 50  # Low confidence without data
+```
+
+**Example output:**
+```
+📈 Predictive Timeline Estimation
+
+Current Progress:
+- Completed: 12 story points (60% of 20 total)
+- Remaining: 8 story points
+
+Velocity Analysis:
+- Current run: 12 points
+- Historical average: 10.5 points
+- Effective velocity: 11.0 points (weighted)
+
+⏱️  Estimated Completion:
+- Time remaining: 18 hours
+- Expected completion: [timestamp + 18 hours]
+- Confidence: 85% (based on historical consistency)
+
+📊 Trend: On track (current velocity above historical average)
+```
+
+**Update user at key milestones:**
+- After 25% complete
+- After 50% complete
+- After 75% complete
+- When asking "are we done yet?"
+
+### 3. Resource Utilization Analysis 👥
+
+**When to analyze:** After each developer reports status, before assigning new work
+
+**Efficiency Metric:**
+```python
+# For each developer-group pair
+actual_time_spent = [time from coordination logs]
+expected_time = story_points × avg_hours_per_point
+
+efficiency_ratio = actual_time_spent / expected_time
+
+Thresholds:
+- Underutilized: ratio < 0.5 (taking <50% expected time)
+- Optimal: 0.5 ≤ ratio ≤ 1.3
+- Overworked: ratio > 1.5 (taking >150% expected time)
+```
+
+**Analysis example:**
+```
+👥 Resource Utilization Analysis
+
+Developer-1 (Group A):
+- Story points: 5
+- Expected time: 5 hours
+- Actual time: 9 hours
+- Efficiency ratio: 1.8 (OVERWORKED ⚠️)
+
+Developer-2 (Group B):
+- Story points: 3
+- Expected time: 3 hours
+- Actual time: 2 hours
+- Efficiency ratio: 0.67 (OPTIMAL ✓)
+
+🔧 Recommendations:
+- Developer-1 is overworked (1.8x expected time)
+  → Possible causes: Task complexity underestimated, blocked by dependencies, needs help
+  → Action: Check if stuck, offer to split remaining work, escalate to Tech Lead
+
+- Developer-2 is efficient
+  → Can handle additional tasks if needed
+```
+
+**Detect patterns:**
+- Same developer always overworked? → Estimate calibration issue OR assign simpler tasks
+- Same type of task always slow? → Pattern for future estimation (e.g., "DB tasks take 2.5x")
+- Multiple developers slow on same group? → Task genuinely complex, not developer issue
+
+**Prevent burnout:**
+```python
+if efficiency_ratio > 2.0:
+    alert_user(f"Developer {name} taking 2x expected time on {group}")
+    suggest_action("Consider splitting task or adding support")
+```
+
+### 4. Quality Gate Enforcement (Enhanced) 🚦
+
+**When to check:** BEFORE sending BAZINGA (mandatory), BEFORE major deployments
+
+**Quality Thresholds** (configurable in pm_state.json):
+```json
+{
+  "quality_gates": {
+    "security": {
+      "critical_vulnerabilities": 0,
+      "high_vulnerabilities": 2,
+      "enabled": true
+    },
+    "coverage": {
+      "line_coverage_min": 70,
+      "branch_coverage_min": 65,
+      "enabled": true
+    },
+    "lint": {
+      "high_severity_max": 5,
+      "medium_severity_max": 20,
+      "enabled": true
+    },
+    "tech_debt": {
+      "blocking_items_max": 0,
+      "critical_items_max": 2,
+      "enabled": true
+    }
+  }
+}
+```
+
+**Gate Check Process:**
+```python
+def check_quality_gates():
+    results = {
+        "security": check_security_gate(),
+        "coverage": check_coverage_gate(),
+        "lint": check_lint_gate(),
+        "tech_debt": check_tech_debt_gate()
+    }
+
+    failed_gates = [gate for gate, passed in results.items() if not passed]
+
+    if failed_gates:
+        return {
+            "status": "BLOCKED",
+            "failed_gates": failed_gates,
+            "action": "Fix issues before BAZINGA"
+        }
+    else:
+        return {
+            "status": "PASSED",
+            "action": "Proceed with BAZINGA"
+        }
+
+def check_security_gate():
+    # Read coordination/security_scan.json
+    scan_results = read_json("coordination/security_scan.json")
+
+    critical = scan_results.get("critical_count", 0)
+    high = scan_results.get("high_count", 0)
+
+    gate = pm_state["quality_gates"]["security"]
+
+    if critical > gate["critical_vulnerabilities"]:
+        return False, f"{critical} critical vulnerabilities (max: {gate['critical_vulnerabilities']})"
+    if high > gate["high_vulnerabilities"]:
+        return False, f"{high} high vulnerabilities (max: {gate['high_vulnerabilities']})"
+
+    return True, "Security gate passed"
+
+def check_coverage_gate():
+    # Read coordination/coverage_report.json
+    coverage = read_json("coordination/coverage_report.json")
+
+    line_cov = coverage.get("line_coverage", 0)
+    branch_cov = coverage.get("branch_coverage", 0)
+
+    gate = pm_state["quality_gates"]["coverage"]
+
+    if line_cov < gate["line_coverage_min"]:
+        return False, f"Line coverage {line_cov}% < {gate['line_coverage_min']}%"
+    if branch_cov < gate["branch_coverage_min"]:
+        return False, f"Branch coverage {branch_cov}% < {gate['branch_coverage_min']}%"
+
+    return True, "Coverage gate passed"
+```
+
+**Example quality gate check:**
+```
+🚦 Quality Gate Enforcement (Before BAZINGA)
+
+Checking all quality metrics...
+
+✓ Security Gate: PASSED
+  - Critical vulnerabilities: 0 (max: 0) ✓
+  - High vulnerabilities: 1 (max: 2) ✓
+
+✗ Coverage Gate: FAILED
+  - Line coverage: 68% (min: 70%) ✗
+  - Branch coverage: 65% (min: 65%) ✓
+  - Missing coverage in: payment.py, auth.py
+
+✓ Lint Gate: PASSED
+  - High severity: 3 (max: 5) ✓
+  - Medium severity: 12 (max: 20) ✓
+
+✓ Tech Debt Gate: PASSED
+  - Blocking items: 0 (max: 0) ✓
+  - Critical items: 1 (max: 2) ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚫 BAZINGA BLOCKED - 1 gate failed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Required Actions:
+1. Increase coverage to 70% (currently 68%)
+   - Add tests for payment.py (current: 45%)
+   - Add tests for auth.py (current: 62%)
+
+Estimated fix time: 15 minutes
+
+Assigning Developer to add missing tests...
+```
+
+**Benefits:**
+- ✅ Prevents shipping code with critical vulnerabilities
+- ✅ Enforces quality standards (no more "we'll fix tests later")
+- ✅ Catches quality regressions before deployment
+- ✅ Gives user confidence in deliverable quality
+
+**Integration with retrospective:**
+```json
+{
+  "iteration_retrospective": {
+    "what_worked": [
+      "Quality gates caught coverage drop before deployment"
+    ],
+    "lessons_learned": [
+      "Need to run tests earlier in development (not just before BAZINGA)"
+    ],
+    "improvements_for_next_time": [
+      "Developers should run /test-coverage after each implementation"
+    ]
+  }
+}
+```
+
+### When to Use Each Capability
+
+| Capability | Trigger Point | Frequency | Impact |
+|------------|---------------|-----------|--------|
+| **Risk Scoring** | After creating groups, after revisions | Every update | Proactive alerts |
+| **Timeline Prediction** | After group completion, on user request | Multiple/run | User transparency |
+| **Resource Utilization** | After developer status reports | Every group | Prevent burnout |
+| **Quality Gates** | Before BAZINGA, before deployment | End of run | Block bad releases |
+
+**These capabilities work TOGETHER:**
+- Risk scoring identifies problems early
+- Timeline prediction keeps user informed
+- Resource analysis prevents team burnout
+- Quality gates ensure excellence
+
 ## State File Management
 
 ### Reading State
