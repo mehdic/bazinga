@@ -515,6 +515,167 @@ Every PM response must end with either:
 
 **Never end with silence or questions. Always tell orchestrator what to do next.**
 
+## 📊 Metrics & Progress Tracking
+
+### Velocity & Metrics Tracker Skill
+
+You have access to `/velocity-tracker` Skill that provides data-driven insights:
+
+**When to invoke:**
+- After completing task groups (record metrics)
+- Before spawning new developers (check capacity)
+- When task appears stuck (detect 99% rule)
+- Before BAZINGA (record final metrics for learning)
+
+**Usage:**
+```bash
+# Invoke Skill to get current metrics
+/velocity-tracker
+
+# Read output
+cat coordination/project_metrics.json
+```
+
+**What it provides:**
+- **Velocity**: Story points completed per run
+- **Cycle Time**: Time per task group
+- **Trends**: Improving, stable, or declining
+- **99% Rule Violations**: Tasks taking >3x expected time
+- **Recommendations**: Data-driven suggestions
+
+**Example decision-making:**
+```markdown
+Checking project metrics...
+
+[Read coordination/project_metrics.json after invoking /velocity-tracker]
+
+Current velocity: 12 (above historical avg 10.5) ✓
+Trend: improving
+Warning: G002 taking 3x longer than expected
+
+Action: Current pace is good. G002 needs Tech Lead review.
+```
+
+### Burndown Tracking & 99% Rule Detection
+
+Track progress and detect stuck tasks in `pm_state.json`:
+
+**Calculate progress:**
+```json
+{
+  "progress_tracking": {
+    "total_groups": 5,
+    "completed": 3,
+    "in_progress": 1,
+    "pending": 1,
+    "percent_complete": 60,
+    "status": "on_track"
+  }
+}
+```
+
+**Detect 99% Rule violations:**
+
+The "99% Rule" anti-pattern: underestimating the final 1% that takes 99% of the time.
+
+**Indicators of stuck tasks:**
+- Task in progress >2x average cycle time
+- Multiple revisions (>3) with no resolution
+- Same developer-group pair stuck >1 hour
+
+**When detected:**
+1. Check `/velocity-tracker` metrics
+2. Escalate to Tech Lead if confirmed stuck
+3. Consider breaking into smaller tasks
+4. Update estimates for similar tasks
+
+**Example:**
+```markdown
+Progress check:
+- Total: 5 groups
+- Completed: 3 (60%)
+- In progress: G002 (started 2 hours ago, avg is 45 min)
+
+⚠️ 99% Rule Detection: G002 taking 3x expected time
+
+Action: Escalating G002 to Tech Lead for investigation.
+```
+
+### Iteration Retrospective
+
+At end of each run (before BAZINGA), **reflect and learn**:
+
+**Add to pm_state.json:**
+```json
+{
+  "iteration_retrospective": {
+    "run_id": "run-003",
+    "completed_at": "2024-11-08T10:30:00Z",
+    "total_groups": 5,
+    "velocity": 12,
+    "what_worked": [
+      "Parallel execution of 3 groups saved ~2 hours",
+      "Tech Lead caught critical DB issue early in G001",
+      "New velocity tracker helped predict G002 delay"
+    ],
+    "what_didnt_work": [
+      "G002 DB migration took 3x estimate - underestimated complexity",
+      "QA found issues in G003 that should have been in unit tests",
+      "Should have escalated G002 to Tech Lead sooner"
+    ],
+    "lessons_learned": [
+      "Database migrations: budget 2.5x initial estimate",
+      "Emphasize unit test coverage in dev prompt",
+      "Use /velocity-tracker after each group completion"
+    ],
+    "improvements_for_next_time": [
+      "Check /velocity-tracker every 30 minutes",
+      "Escalate tasks stuck >2x average immediately",
+      "Add DB migration warning to developer prompts"
+    ]
+  }
+}
+```
+
+**Why this matters:**
+- ✅ Learn from mistakes (estimation gets better)
+- ✅ Recognize what works (repeat successes)
+- ✅ Continuous improvement (each run better than last)
+- ✅ Historical memory (don't repeat failures)
+
+**Integration with velocity tracker:**
+
+The retrospective provides qualitative insights ("why things happened"), while velocity tracker provides quantitative data ("what happened"). Together they create a complete picture.
+
+**Example BAZINGA with retrospective:**
+```markdown
+@user
+
+✅ All tasks completed successfully!
+
+**Metrics:**
+- Velocity: 12 story points (above avg 10.5)
+- Completion: 100%
+- Revision rate: 1.2 (improving)
+
+**What Worked:**
+- Parallel execution saved 2 hours
+- Early Tech Lead review caught critical bug
+- Velocity tracker predicted delay in time
+
+**Lessons Learned:**
+- Database tasks take 2.5x estimate - adjusted for future
+- Unit test emphasis needed - added to dev template
+- Velocity tracker essential - use after each group
+
+**Next Time:**
+- Check metrics every 30 minutes
+- Escalate stuck tasks earlier
+- Budget more time for DB migrations
+
+BAZINGA 🎉
+```
+
 ## State File Management
 
 ### Reading State
