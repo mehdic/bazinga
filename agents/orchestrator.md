@@ -583,25 +583,25 @@ You have access to advanced capabilities:
 
 1. **Codebase Analysis Skill**: Run BEFORE coding
    ```
-   /codebase-analysis "your task description"
+   Skill(command: "codebase-analysis")
    ```
    Returns: Similar features, utilities, architectural patterns
 
 2. **Test Pattern Analysis Skill**: Run BEFORE writing tests
    ```
-   /test-pattern-analysis tests/
+   Skill(command: "test-pattern-analysis")
    ```
    Returns: Test framework, fixtures, patterns, suggestions
 
 3. **API Contract Validation Skill**: Run BEFORE committing API changes
    ```
-   /api-contract-validation
+   Skill(command: "api-contract-validation")
    ```
    Returns: Breaking changes, safe changes, recommendations
 
 4. **DB Migration Check Skill**: Run BEFORE committing migrations
    ```
-   /db-migration-check
+   Skill(command: "db-migration-check")
    ```
    Returns: Dangerous operations, safe alternatives, impact analysis
 
@@ -613,20 +613,41 @@ USE THESE SKILLS for better implementation quality!
 
 BEFORE Implementing:
 1. Review codebase context above
-2. {IF superpowers}: Run /codebase-analysis for patterns
+2. {IF superpowers}: **INVOKE Codebase Analysis Skill:**
+   ```
+   Skill(command: "codebase-analysis")
+   ```
+   Read results for patterns and utilities
 
 During Implementation:
 3. Implement the COMPLETE solution
 4. Write unit tests
-5. {IF superpowers}: Run /test-pattern-analysis before testing
+5. {IF superpowers}: **INVOKE Test Pattern Analysis Skill:**
+   ```
+   Skill(command: "test-pattern-analysis")
+   ```
+   Read results before writing tests
 
 BEFORE Reporting READY_FOR_QA:
 6. Run ALL unit tests - MUST pass 100%
-7. Run /lint-check - Fix all issues
+7. **INVOKE lint-check Skill (MANDATORY):**
+   ```
+   Skill(command: "lint-check")
+   ```
+   Read results: `cat coordination/lint_results.json`
+   FIX ALL ISSUES before proceeding
 8. Run build check - MUST succeed
 9. {IF superpowers}: Run app startup check - MUST start
-10. {IF superpowers AND API changes}: Run /api-contract-validation
-11. {IF superpowers AND migration changes}: Run /db-migration-check
+10. {IF superpowers AND API changes}: **INVOKE API Contract Validation:**
+    ```
+    Skill(command: "api-contract-validation")
+    ```
+    Read results: `cat coordination/api_contract_results.json`
+11. {IF superpowers AND migration changes}: **INVOKE DB Migration Check:**
+    ```
+    Skill(command: "db-migration-check")
+    ```
+    Read results: `cat coordination/db_migration_results.json`
 
 ONLY THEN:
 12. Commit to branch: {branch_name}
@@ -734,17 +755,59 @@ You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 
 **BRANCH:** {branch_name}
 
+**CAPABILITIES MODE:** {standard OR superpowers}
+
+{IF superpowers_mode}:
+═══════════════════════════════════════════
+⚡ SUPERPOWERS MODE ACTIVE
+═══════════════════════════════════════════
+
+BEFORE running tests, you MUST invoke quality analysis Skills:
+
+**STEP 1: Invoke pattern-miner (MANDATORY)**
+```
+Skill(command: "pattern-miner")
+```
+Read results: `cat coordination/pattern_insights.json`
+Use insights to identify high-risk areas from historical failures
+
+**STEP 2: Invoke quality-dashboard (MANDATORY)**
+```
+Skill(command: "quality-dashboard")
+```
+Read results: `cat coordination/quality_dashboard.json`
+Get baseline health score and quality trends
+
+**STEP 3: Prioritize testing based on insights**
+- Focus on modules with historical test failures
+- Extra scrutiny for declining quality areas
+- Validate fixes for recurring issues
+
+═══════════════════════════════════════════
+{END IF}
+
 **YOUR JOB:**
-1. Checkout branch: git checkout {branch_name}
-2. Run Integration Tests
-3. Run Contract Tests
-4. Run E2E Tests
-5. Aggregate results
-6. Report PASS or FAIL
+{IF superpowers}: 1. Run pattern-miner and quality-dashboard Skills FIRST
+{IF superpowers}: 2. Use insights to prioritize testing focus
+{IF superpowers}: 3. Checkout branch: git checkout {branch_name}
+{IF NOT superpowers}: 1. Checkout branch: git checkout {branch_name}
+4. Run Integration Tests
+5. Run Contract Tests
+6. Run E2E Tests
+7. Aggregate results
+8. Report PASS or FAIL
 
 **REPORT FORMAT:**
 
 ## QA Expert: Test Results - [PASS/FAIL]
+
+{IF superpowers}:
+### Quality Analysis (Superpowers)
+**Pattern Insights:** [Summary from pattern-miner]
+**Health Score:** [Score from quality-dashboard]
+**Risk Areas:** [Areas flagged for extra testing]
+
+{END IF}
 
 ### Test Summary
 **Integration Tests:** X/Y passed
@@ -755,7 +818,7 @@ You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 [If PASS]: Ready for Tech Lead review
 [If FAIL]: Detailed failures with fix suggestions
 
-START TESTING NOW.
+START {IF superpowers}ANALYSIS AND {END IF}TESTING NOW.
   """
 )
 ```
@@ -866,28 +929,57 @@ tech_lead_full_prompt = tech_lead_base + f"""
 
 **DO NOT SKIP THIS STEP**
 
-1. **Export scan mode:**
-   ```bash
-   export SECURITY_SCAN_MODE={scan_mode}
-   ```
+**STEP 1: Export scan mode**
+```bash
+export SECURITY_SCAN_MODE={scan_mode}
+```
 
-2. **The security-scan Skill will automatically run in {scan_mode} mode**
-   - Mode: {scan_mode}
-   - What it scans: {scan_description}
-   - Time: {"5-10 seconds" if scan_mode == "basic" else "30-60 seconds"}
+**STEP 2: Invoke security-scan Skill (MANDATORY)**
 
-3. **Read scan results:**
-   ```bash
-   cat coordination/security_scan.json
-   ```
+YOU MUST explicitly invoke the security-scan Skill:
+```
+Skill(command: "security-scan")
+```
 
-4. **Read other Skill results if available:**
-   ```bash
-   cat coordination/coverage_report.json 2>/dev/null || true
-   cat coordination/lint_results.json 2>/dev/null || true
-   ```
+Wait for Skill to complete. This runs security scanners in {scan_mode} mode:
+- Mode: {scan_mode}
+- What it scans: {scan_description}
+- Time: {"5-10 seconds" if scan_mode == "basic" else "30-60 seconds"}
 
-5. **Use automated findings to guide your manual review**
+**STEP 3: Read security scan results**
+```bash
+cat coordination/security_scan.json
+```
+
+**STEP 4: Invoke lint-check Skill (MANDATORY)**
+
+YOU MUST explicitly invoke the lint-check Skill:
+```
+Skill(command: "lint-check")
+```
+
+Wait for Skill to complete (3-10 seconds).
+
+**STEP 5: Read lint check results**
+```bash
+cat coordination/lint_results.json
+```
+
+**STEP 6: Invoke test-coverage Skill (if tests exist)**
+
+If tests were modified or added, invoke test-coverage Skill:
+```
+Skill(command: "test-coverage")
+```
+
+Then read results:
+```bash
+cat coordination/coverage_report.json 2>/dev/null || true
+```
+
+**STEP 7: Use automated findings to guide your manual review**
+
+Review all Skill results BEFORE doing manual code review.
 
 ═══════════════════════════════════════════════════════════
 

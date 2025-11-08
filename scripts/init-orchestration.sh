@@ -16,25 +16,11 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "🔄 Initializing V4 orchestration system..."
 echo "📅 Session ID: $SESSION_ID"
 
-# Create coordination folder structure
-if [ ! -d "coordination" ]; then
-    echo "📁 Creating coordination/ folder structure..."
-    mkdir -p coordination/messages
-    mkdir -p coordination/reports
-else
-    echo "📂 coordination/ folder already exists"
-    # Ensure reports directory exists
-    if [ ! -d "coordination/reports" ]; then
-        echo "📁 Creating coordination/reports/ for detailed reports..."
-        mkdir -p coordination/reports
-    fi
-fi
-
-# Create docs folder if it doesn't exist
-if [ ! -d "docs" ]; then
-    echo "📁 Creating docs/ folder..."
-    mkdir -p docs
-fi
+# Ensure all required directories exist (mkdir -p is idempotent - safe to run multiple times)
+echo "📁 Ensuring directory structure exists..."
+mkdir -p coordination/messages
+mkdir -p coordination/reports
+mkdir -p docs
 
 # Initialize pm_state.json
 if [ ! -f "coordination/pm_state.json" ]; then

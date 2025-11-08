@@ -17,7 +17,17 @@ This command bridges spec-kit's planning phase with BAZINGA's execution phase, c
 $ARGUMENTS
 ```
 
-If arguments provided, use as feature directory path. Otherwise, auto-detect latest feature.
+**Argument Parsing**:
+1. Check if "superpowers" keyword present → Enable superpowers mode
+2. Remaining text (if any) → Feature directory path
+3. If no path after removing "superpowers" → Auto-detect latest feature
+
+**Examples**:
+- `/orchestrate-from-spec` → Standard mode, auto-detect feature
+- `/orchestrate-from-spec superpowers` → Superpowers mode, auto-detect feature
+- `/orchestrate-from-spec .specify/features/001-auth` → Standard mode, specific feature
+- `/orchestrate-from-spec superpowers .specify/features/001-auth` → Superpowers mode, specific feature
+- `/orchestrate-from-spec using superpowers` → Superpowers mode, auto-detect feature
 
 ---
 
@@ -40,10 +50,31 @@ This command:
 
 ## Phase 1: Validate and Load Spec-Kit Artifacts
 
+### Step 1.0: Parse Superpowers Mode
+
+**Parse Arguments for Superpowers Keyword**:
+```
+SUPERPOWERS_MODE = false
+FEATURE_PATH = ""
+
+# Check if $ARGUMENTS contains "superpowers" keyword (case-insensitive)
+if $ARGUMENTS matches /superpowers|superpower/i:
+  SUPERPOWERS_MODE = true
+  # Remove superpowers keyword and clean up
+  FEATURE_PATH = $ARGUMENTS.gsub(/superpowers|using|with|-/i, "").strip()
+else:
+  FEATURE_PATH = $ARGUMENTS.strip()
+```
+
+**Output**:
+```
+🔋 **SUPERPOWERS MODE**: {ENABLED|DISABLED}
+```
+
 ### Step 1.1: Determine Feature Directory
 
 **Priority Order**:
-1. If $ARGUMENTS contains path → Use it
+1. If FEATURE_PATH is not empty → Use it
 2. Check for `.specify/features/` directory
 3. If multiple features → Use latest (highest number)
 4. If no features found → Show error and suggest workflow
@@ -116,6 +147,7 @@ Then retry /orchestrate-from-spec
 
 **Feature**: JWT Authentication System
 **Location**: .specify/features/001-jwt-auth/
+{**Mode**: 🔋 SUPERPOWERS ENABLED}
 
 **Specification Summary** (from spec.md):
 - User authentication with JWT tokens
@@ -148,10 +180,13 @@ Then retry /orchestrate-from-spec
 
 **Key Enhancement**: Inject spec-kit context into orchestrator's initial state
 
+**Conditional Sections**: Text in {curly braces} should only be included if SUPERPOWERS_MODE = true
+
 ```
 You are now the **ORCHESTRATOR** for the Claude Code Multi-Agent Dev Team.
 
 🆕 **SPEC-KIT INTEGRATION MODE ACTIVE**
+{🔋 **SUPERPOWERS MODE ENABLED** - Advanced Skills active}
 
 You are executing a feature that has been planned using GitHub's spec-kit methodology. All planning artifacts have been prepared, and your job is to coordinate implementation.
 
@@ -283,6 +318,19 @@ Your standard workflow applies, but with these SPEC-KIT specific modifications:
 ### Modified Instructions for DEVELOPERS
 
 **🔴 CRITICAL ADDITIONS**: Use spec-kit artifacts for context and update tasks.md.
+
+{**🔋 SUPERPOWERS MODE ACTIVE**: Use advanced Skills before implementation:
+- **/codebase-analysis** - Find similar features and reusable utilities (10-20s)
+- **/test-pattern-analysis** - Learn testing patterns before writing tests (5-15s)
+- **/api-contract-validation** - Validate API changes don't break contracts (5-15s)
+- **/db-migration-check** - Check migration safety before applying (5-20s)
+
+IMPORTANT: Invoke these Skills BEFORE starting implementation to:
+- Discover existing utilities (EmailService, TokenGenerator, etc.)
+- Follow established patterns
+- Avoid breaking changes
+- Write tests consistent with project style
+}
 
 **Your Modified Workflow**:
 
