@@ -222,7 +222,7 @@ Simply include "superpowers" in your orchestration request:
 
 **4. Database Migration Check Skill** (5-20 seconds)
 - Analyzes database migrations for dangerous operations
-- Supports PostgreSQL, MySQL, MongoDB, SQLite, Oracle
+- Supports PostgreSQL, MySQL, SQL Server, MongoDB (+ SQLite, Oracle)
 - Detects table locks, rewrites, data loss risks
 - Suggests zero-downtime alternatives
 - Works with Alembic, Django, Flyway, Liquibase, Mongoose, ActiveRecord

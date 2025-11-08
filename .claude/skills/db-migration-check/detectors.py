@@ -15,7 +15,7 @@ def detect_dangerous_operations(operation: Dict[str, Any], db_type: str) -> Dict
 
     Args:
         operation: Operation dictionary from parser
-        db_type: Database type (postgresql, mysql, mongodb, sqlite, oracle)
+        db_type: Database type (postgresql, mysql, sqlserver, mongodb, sqlite, oracle)
 
     Returns:
         Dictionary with severity, issue, impact, and safe_alternative
@@ -24,6 +24,8 @@ def detect_dangerous_operations(operation: Dict[str, Any], db_type: str) -> Dict
         return check_postgresql(operation)
     elif db_type == "mysql":
         return check_mysql(operation)
+    elif db_type == "sqlserver":
+        return check_sqlserver(operation)
     elif db_type == "mongodb":
         return check_mongodb(operation)
     elif db_type == "sqlite":
@@ -223,6 +225,143 @@ def check_mysql(operation: Dict) -> Dict:
                     "2. Drop column in next deployment"
                 ],
                 "downtime": "minimal"
+            }
+        }
+
+    return {"severity": "safe", "reason": "Operation appears safe"}
+
+
+def check_sqlserver(operation: Dict) -> Dict:
+    """Check Microsoft SQL Server operations."""
+    op_str = (operation.get('sql') or operation.get('operation', '')).upper()
+
+    # ALTER TABLE ADD COLUMN with DEFAULT
+    if re.search(r'ALTER\s+TABLE.*ADD.*DEFAULT', op_str):
+        return {
+            "severity": "critical",
+            "issue": "Adding column with DEFAULT in SQL Server locks table and can be slow",
+            "impact": {
+                "locks_table": True,
+                "blocks_reads": False,
+                "blocks_writes": True,
+                "estimated_duration": "Dependent on table size and SQL Server version"
+            },
+            "safe_alternative": {
+                "approach": "Two-step migration (SQL Server 2012+)",
+                "steps": [
+                    "1. ALTER TABLE ADD column NULL",
+                    "2. ALTER TABLE ADD CONSTRAINT DF_col DEFAULT value FOR column",
+                    "Note: SQL Server 2012+ adds DEFAULT constraints instantly"
+                ],
+                "downtime": "Minimal on SQL Server 2012+"
+            }
+        }
+
+    # CREATE INDEX without ONLINE=ON
+    if 'CREATE INDEX' in op_str or 'CREATE NONCLUSTERED INDEX' in op_str:
+        if 'ONLINE' not in op_str and 'ON' not in op_str:
+            return {
+                "severity": "high",
+                "issue": "Index creation without ONLINE=ON blocks table modifications",
+                "impact": {
+                    "locks_table": True,
+                    "blocks_writes": True,
+                    "blocks_reads": False
+                },
+                "safe_alternative": {
+                    "approach": "Online index creation (Enterprise Edition)",
+                    "steps": [
+                        "CREATE NONCLUSTERED INDEX idx_name ON table(column) WITH (ONLINE=ON)",
+                        "Note: Requires SQL Server Enterprise Edition"
+                    ],
+                    "downtime": "none with ONLINE=ON"
+                }
+            }
+
+    # DROP COLUMN
+    if 'DROP COLUMN' in op_str:
+        return {
+            "severity": "high",
+            "issue": "Dropping column can break running application",
+            "impact": {
+                "breaks_app": True,
+                "locks_table": True,
+                "instant_metadata_change": True
+            },
+            "safe_alternative": {
+                "approach": "Multi-step removal",
+                "steps": [
+                    "1. Deploy code that doesn't use column",
+                    "2. Wait for deployment completion",
+                    "3. DROP COLUMN (metadata change is instant in SQL Server)"
+                ],
+                "downtime": "minimal"
+            }
+        }
+
+    # ALTER COLUMN (type change)
+    if re.search(r'ALTER\s+COLUMN.*(?:INT|VARCHAR|NVARCHAR|DECIMAL)', op_str):
+        return {
+            "severity": "critical",
+            "issue": "Changing column type requires table lock and data conversion",
+            "impact": {
+                "locks_table": True,
+                "blocks_all": True,
+                "data_conversion_required": True,
+                "estimated_duration": "Depends on table size and conversion complexity"
+            },
+            "safe_alternative": {
+                "approach": "Create new column and migrate",
+                "steps": [
+                    "1. ADD new_column with new type",
+                    "2. UPDATE in batches to populate new_column",
+                    "3. Deploy code using new_column",
+                    "4. DROP old_column"
+                ],
+                "downtime": "none"
+            }
+        }
+
+    # Large UPDATE/DELETE without batching
+    if ('UPDATE' in op_str or 'DELETE' in op_str) and 'TOP' not in op_str:
+        return {
+            "severity": "medium",
+            "issue": "Large UPDATE/DELETE without batching can cause lock escalation",
+            "impact": {
+                "lock_escalation_risk": True,
+                "transaction_log_growth": True,
+                "blocking_risk": True
+            },
+            "safe_alternative": {
+                "approach": "Batch operations with TOP",
+                "steps": [
+                    "WHILE 1=1 BEGIN",
+                    "  UPDATE TOP (1000) table SET column = value WHERE condition",
+                    "  IF @@ROWCOUNT = 0 BREAK",
+                    "END"
+                ],
+                "downtime": "none"
+            }
+        }
+
+    # CREATE CLUSTERED INDEX (table rebuild)
+    if 'CREATE CLUSTERED INDEX' in op_str:
+        return {
+            "severity": "critical",
+            "issue": "Creating clustered index rebuilds entire table",
+            "impact": {
+                "locks_table": True,
+                "rebuilds_table": True,
+                "blocks_all": True,
+                "estimated_duration": "Can take hours on large tables"
+            },
+            "safe_alternative": {
+                "approach": "Use ONLINE=ON if available",
+                "steps": [
+                    "CREATE CLUSTERED INDEX idx WITH (ONLINE=ON) -- Enterprise only",
+                    "Consider maintenance window for Standard Edition"
+                ],
+                "downtime": "none with Enterprise Edition"
             }
         }
 

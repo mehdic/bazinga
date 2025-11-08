@@ -10,18 +10,26 @@ Before applying database migrations, this Skill analyzes migration files to dete
 
 **Key Capabilities:**
 1. **Dangerous Operation Detection**: Identifies table locks, rewrites, data loss risks
-2. **Multi-Database Support**: PostgreSQL, MySQL, MongoDB, SQLite, Oracle
+2. **Multi-Database Support**: PostgreSQL, MySQL, SQL Server, MongoDB (+ SQLite, Oracle)
 3. **Safe Alternative Suggestions**: Recommends zero-downtime approaches
 4. **Migration Framework Detection**: Alembic, Django, Flyway, Liquibase, Mongoose, ActiveRecord
 5. **Performance Impact Analysis**: Estimates lock duration and affected rows
 
 ## Supported Databases
 
+**Top 4 Most Common (Primary Focus):**
+
 | Database | Dangerous Operations Detected | Safe Patterns |
 |----------|------------------------------|---------------|
 | **PostgreSQL** | ADD COLUMN DEFAULT, DROP COLUMN, ADD INDEX, ALTER TYPE | NOT VALID, CONCURRENTLY |
 | **MySQL** | ADD COLUMN DEFAULT, ALTER TYPE, ADD INDEX | Online DDL, pt-online-schema-change |
+| **SQL Server** | ADD COLUMN DEFAULT, CREATE INDEX, ALTER COLUMN, clustered indexes | ONLINE=ON, batched updates |
 | **MongoDB** | Schema changes, index creation on large collections | Background index creation |
+
+**Also Supported:**
+
+| Database | Dangerous Operations Detected | Safe Patterns |
+|----------|------------------------------|---------------|
 | **SQLite** | Table rewrites, column drops | Recreate table pattern |
 | **Oracle** | DDL locks, partition operations, large batch DML | Online operations, parallel DML |
 
@@ -146,6 +154,21 @@ The Skill automatically finds migration files in common locations:
 - `ALGORITHM=INPLACE` for supported operations
 - `pt-online-schema-change` for large tables
 - Add column as NULL first, backfill, then add default
+
+### SQL Server
+
+**Critical Operations:**
+- `ALTER TABLE ADD ... DEFAULT value` - Locks table (version dependent)
+- `ALTER COLUMN` type change - Requires table lock and data conversion
+- `CREATE CLUSTERED INDEX` - Rebuilds entire table
+- `CREATE INDEX` (without ONLINE=ON) - Blocks modifications
+- Large `UPDATE`/`DELETE` without batching - Lock escalation risk
+
+**Safe Patterns:**
+- `CREATE INDEX ... WITH (ONLINE=ON)` (Enterprise Edition)
+- SQL Server 2012+ adds DEFAULT constraints instantly (add column NULL first)
+- Batch large DML with `TOP` clause to prevent lock escalation
+- Use `ONLINE=ON` for index operations when available
 
 ### MongoDB
 
