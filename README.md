@@ -124,20 +124,30 @@ Skills use **dual-mode analysis** that escalates alongside model escalation:
 
 #### Available Skills
 
+**Default Skills (Always Available):**
+
 1. **security-scan** - Security vulnerability detection
-   - Basic: Fast scan for critical/high severity issues
-   - Advanced: Deep analysis with multiple tools (bandit, semgrep, gosec, SpotBugs, etc.)
+   - Basic: Fast scan for critical/high severity issues (5-10s)
+   - Advanced: Deep analysis with multiple tools (30-60s)
    - Results: `coordination/security_scan.json`
 
 2. **test-coverage** - Test coverage analysis
-   - Generates line/branch coverage reports
+   - Generates line/branch coverage reports (5-20s)
    - Identifies untested code paths
    - Results: `coordination/coverage_report.json`
 
 3. **lint-check** - Code quality linting
-   - Style, complexity, best practices
+   - Style, complexity, best practices (3-10s)
    - Language-specific linters (ruff, eslint, golangci-lint, Checkstyle, etc.)
    - Results: `coordination/lint_results.json`
+
+4. **velocity-tracker** - PM metrics and progress tracking (3-5s)
+   - Measures development velocity (story points per run)
+   - Tracks cycle time per task group
+   - Detects 99% rule violations (tasks stuck >3x estimate)
+   - Identifies trends (improving/stable/declining)
+   - Enables continuous learning across runs
+   - Results: `coordination/project_metrics.json`
 
 #### Language Support
 
@@ -344,6 +354,127 @@ Before sending BAZINGA, PM evaluates accumulated debt:
 
 **See `docs/TECH_DEBT_GUIDE.md` for complete guidelines**
 
+### Data-Driven Project Management
+
+BAZINGA PM uses metrics and retrospectives for continuous improvement.
+
+#### The Problem (Before Metrics)
+
+Traditional PM operated blind:
+- ❌ No velocity measurement → Can't predict capacity
+- ❌ No cycle time tracking → Can't detect bottlenecks
+- ❌ No historical learning → Each run starts from zero
+- ❌ No 99% rule detection → Tasks stuck at "almost done" forever
+- ❌ No trend analysis → Can't tell if improving or declining
+
+**Result:** PM was reactive firefighter, not proactive manager.
+
+#### The Solution (Velocity Tracker + Retrospective)
+
+**1. Velocity Tracker Skill**
+
+Runs in 3-5 seconds (faster than lint-check):
+
+```json
+{
+  "current_run": {
+    "velocity": 12,
+    "percent_complete": 60,
+    "revision_rate": 1.2
+  },
+  "trends": {
+    "velocity": "improving",
+    "quality": "improving"
+  },
+  "warnings": [
+    "G002 taking 3x longer than expected - escalate to Tech Lead"
+  ],
+  "recommendations": [
+    "Current velocity (12) exceeds historical average (10.5)"
+  ]
+}
+```
+
+**2. Iteration Retrospective**
+
+PM reflects after each run:
+
+```json
+{
+  "what_worked": [
+    "Parallel execution saved 2 hours",
+    "Velocity tracker predicted delay early"
+  ],
+  "what_didnt_work": [
+    "DB migrations took 3x estimate - complexity underestimated"
+  ],
+  "lessons_learned": [
+    "Budget 2.5x for database tasks",
+    "Check metrics after each task group"
+  ],
+  "improvements_for_next_time": [
+    "Escalate stuck tasks sooner",
+    "Emphasize unit test coverage"
+  ]
+}
+```
+
+**3. 99% Rule Detection**
+
+Industry anti-pattern: underestimating final 1% that takes 99% of time.
+
+PM automatically detects:
+- Tasks in progress >2x average cycle time
+- Multiple revisions (>3) with no resolution
+- Developer-group pairs stuck >1 hour
+
+**Action:** Escalate to Tech Lead, break into smaller tasks, or update estimates.
+
+#### Benefits
+
+**Before (Blind PM):**
+- Reactive firefighting
+- No learning between runs
+- Tasks stuck forever
+- No user visibility
+- Estimation never improves
+
+**After (Data-Driven PM):**
+- Proactive bottleneck detection
+- Continuous improvement
+- Stuck tasks caught early (99% rule)
+- User gets progress % and ETAs
+- Estimates improve with data
+
+**Example PM Decision:**
+```markdown
+Checking metrics... [invokes /velocity-tracker]
+
+Current velocity: 12 (above avg 10.5) ✓
+Trend: improving
+⚠️  G002 taking 3x longer than expected
+
+Action: Pace is good. Escalating G002 to Tech Lead for review.
+```
+
+#### Metrics Tracked
+
+| Metric | Purpose | Good | Bad |
+|--------|---------|------|-----|
+| **Velocity** | Story points/run | Increasing | Decreasing |
+| **Cycle Time** | Minutes/task group | Decreasing | Increasing |
+| **Revision Rate** | Iterations/task | <1.5 | >3 |
+| **Completion %** | Progress tracking | On track | Stuck |
+
+**Historical Learning:**
+
+Every run improves the baseline. After 5 runs, PM knows:
+- "Database tasks take 2.5x initial estimate"
+- "Parallel execution saves ~40%"
+- "Current team velocity averages 11 points"
+
+This knowledge makes future estimates accurate and planning realistic.
+
 ## Project Structure
 
 ```
@@ -375,6 +506,7 @@ bazinga/
 │       ├── security-scan/      # Security vulnerability scanning
 │       ├── test-coverage/      # Test coverage analysis
 │       ├── lint-check/         # Code quality linting
+│       ├── velocity-tracker/   # 🆕 PM metrics & velocity tracking (default)
 │       ├── codebase-analysis/  # 🆕 Codebase pattern analysis (superpowers)
 │       ├── test-pattern-analysis/ # 🆕 Test pattern extraction (superpowers)
 │       ├── api-contract-validation/ # 🆕 API breaking change detection (superpowers)
