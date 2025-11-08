@@ -622,7 +622,12 @@ During Implementation:
 
 BEFORE Reporting READY_FOR_QA:
 6. Run ALL unit tests - MUST pass 100%
-7. Run /lint-check - Fix all issues
+7. **INVOKE lint-check Skill (MANDATORY):**
+   ```
+   Skill(command: "lint-check")
+   ```
+   Read results: `cat coordination/lint_results.json`
+   FIX ALL ISSUES before proceeding
 8. Run build check - MUST succeed
 9. {IF superpowers}: Run app startup check - MUST start
 10. {IF superpowers AND API changes}: Run /api-contract-validation
@@ -866,28 +871,57 @@ tech_lead_full_prompt = tech_lead_base + f"""
 
 **DO NOT SKIP THIS STEP**
 
-1. **Export scan mode:**
-   ```bash
-   export SECURITY_SCAN_MODE={scan_mode}
-   ```
+**STEP 1: Export scan mode**
+```bash
+export SECURITY_SCAN_MODE={scan_mode}
+```
 
-2. **The security-scan Skill will automatically run in {scan_mode} mode**
-   - Mode: {scan_mode}
-   - What it scans: {scan_description}
-   - Time: {"5-10 seconds" if scan_mode == "basic" else "30-60 seconds"}
+**STEP 2: Invoke security-scan Skill (MANDATORY)**
 
-3. **Read scan results:**
-   ```bash
-   cat coordination/security_scan.json
-   ```
+YOU MUST explicitly invoke the security-scan Skill:
+```
+Skill(command: "security-scan")
+```
 
-4. **Read other Skill results if available:**
-   ```bash
-   cat coordination/coverage_report.json 2>/dev/null || true
-   cat coordination/lint_results.json 2>/dev/null || true
-   ```
+Wait for Skill to complete. This runs security scanners in {scan_mode} mode:
+- Mode: {scan_mode}
+- What it scans: {scan_description}
+- Time: {"5-10 seconds" if scan_mode == "basic" else "30-60 seconds"}
 
-5. **Use automated findings to guide your manual review**
+**STEP 3: Read security scan results**
+```bash
+cat coordination/security_scan.json
+```
+
+**STEP 4: Invoke lint-check Skill (MANDATORY)**
+
+YOU MUST explicitly invoke the lint-check Skill:
+```
+Skill(command: "lint-check")
+```
+
+Wait for Skill to complete (3-10 seconds).
+
+**STEP 5: Read lint check results**
+```bash
+cat coordination/lint_results.json
+```
+
+**STEP 6: Invoke test-coverage Skill (if tests exist)**
+
+If tests were modified or added, invoke test-coverage Skill:
+```
+Skill(command: "test-coverage")
+```
+
+Then read results:
+```bash
+cat coordination/coverage_report.json 2>/dev/null || true
+```
+
+**STEP 7: Use automated findings to guide your manual review**
+
+Review all Skill results BEFORE doing manual code review.
 
 ═══════════════════════════════════════════════════════════
 
