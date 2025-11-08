@@ -25,6 +25,7 @@ BAZINGA uses Claude Code Skills to provide agents with specialized tools like `/
 
 ## Features
 
+- **🆕 Tech Debt Tracking**: Explicit logging of engineering tradeoffs with PM gate before deployment
 - **🆕 Developer Superpowers Mode**: Keyword-activated enhanced capabilities (codebase analysis, test patterns, build checks)
 - **🆕 Spec-Kit Integration**: Seamless integration with GitHub's spec-kit for spec-driven development (planning + execution)
 - **🆕 Intelligent Model Escalation**: Automatically escalates Tech Lead to Opus after 3 failed revisions for deeper analysis
@@ -123,20 +124,64 @@ Skills use **dual-mode analysis** that escalates alongside model escalation:
 
 #### Available Skills
 
+**Default Skills (Always Available):**
+
 1. **security-scan** - Security vulnerability detection
-   - Basic: Fast scan for critical/high severity issues
-   - Advanced: Deep analysis with multiple tools (bandit, semgrep, gosec, SpotBugs, etc.)
+   - Basic: Fast scan for critical/high severity issues (5-10s)
+   - Advanced: Deep analysis with multiple tools (30-60s)
    - Results: `coordination/security_scan.json`
 
 2. **test-coverage** - Test coverage analysis
-   - Generates line/branch coverage reports
+   - Generates line/branch coverage reports (5-20s)
    - Identifies untested code paths
    - Results: `coordination/coverage_report.json`
 
 3. **lint-check** - Code quality linting
-   - Style, complexity, best practices
+   - Style, complexity, best practices (3-10s)
    - Language-specific linters (ruff, eslint, golangci-lint, Checkstyle, etc.)
    - Results: `coordination/lint_results.json`
+
+4. **velocity-tracker** - PM metrics and progress tracking (3-5s)
+   - Measures development velocity (story points per run)
+   - Tracks cycle time per task group
+   - Detects 99% rule violations (tasks stuck >3x estimate)
+   - Identifies trends (improving/stable/declining)
+   - Enables continuous learning across runs
+   - Results: `coordination/project_metrics.json`
+
+**Superpowers Skills (Enabled with superpowers=true):**
+
+5. **codebase-analysis** - Pattern extraction and architecture mapping (20-40s)
+   - Identifies design patterns, architecture layers
+   - Maps dependencies and module relationships
+   - Results: `coordination/codebase_patterns.json`
+
+6. **test-pattern-analysis** - Test strategy extraction (15-30s)
+   - Analyzes existing test patterns
+   - Identifies test gaps and coverage opportunities
+   - Results: `coordination/test_patterns.json`
+
+7. **api-contract-validation** - Breaking change detection (10-20s)
+   - Compares API contracts (OpenAPI, GraphQL, Protobuf)
+   - Detects breaking vs non-breaking changes
+   - Results: `coordination/contract_diff.json`
+
+8. **db-migration-check** - Database migration safety analysis (5-15s)
+   - Detects dangerous operations (PostgreSQL, MySQL, SQL Server, MongoDB)
+   - Suggests safe alternatives for zero-downtime migrations
+   - Results: `coordination/migration_analysis.json`
+
+9. **quality-dashboard** ⭐ - Unified project health dashboard (10-15s)
+   - Aggregates all quality metrics (security, coverage, lint, velocity)
+   - Provides overall health score (0-100) with trend analysis
+   - Detects anomalies and generates actionable recommendations
+   - Results: `coordination/quality_dashboard.json`
+
+10. **pattern-miner** ⭐ - Historical pattern analysis (15-20s)
+   - Mines historical data for recurring patterns
+   - Predicts effort based on past similar tasks
+   - Adjusts estimates using confidence-weighted multipliers
+   - Results: `coordination/pattern_insights.json`
 
 #### Language Support
 
@@ -222,7 +267,7 @@ Simply include "superpowers" in your orchestration request:
 
 **4. Database Migration Check Skill** (5-20 seconds)
 - Analyzes database migrations for dangerous operations
-- Supports PostgreSQL, MySQL, MongoDB, SQLite, Oracle
+- Supports PostgreSQL, MySQL, SQL Server, MongoDB (+ SQLite, Oracle)
 - Detects table locks, rewrites, data loss risks
 - Suggests zero-downtime alternatives
 - Works with Alembic, Django, Flyway, Liquibase, Mongoose, ActiveRecord
@@ -267,6 +312,288 @@ Simply include "superpowers" in your orchestration request:
 
 The 2-3 minute investment in superpowers mode typically saves 20-30 minutes during implementation.
 
+### Tech Debt Tracking
+
+BAZINGA includes explicit tech debt tracking to manage engineering tradeoffs transparently.
+
+#### Core Principle: Try First, Log Later
+
+⚠️ **Tech debt is for CONSCIOUS TRADEOFFS, not lazy shortcuts!**
+
+Agents must attempt to solve issues properly before logging them as tech debt.
+
+#### What Gets Logged
+
+**✅ Valid Tech Debt (after 30+ min attempting to fix):**
+- Architectural changes beyond current scope
+- External dependency limitations
+- Performance optimizations requiring data not yet available
+- Features requiring infrastructure not in scope
+
+**❌ Not Valid (fix these instead):**
+- Missing error handling → Add it (10 min)
+- No input validation → Add it (5 min)
+- Hardcoded values → Use env vars (5 min)
+- Skipped tests → Write them (your job)
+
+#### Workflow
+
+1. **Developer** encounters issue → attempts to fix (30+ min) → documents attempts → logs tech debt if out of scope
+2. **Tech Lead** reviews tech debt → validates tradeoffs → may request fixes for "lazy" items
+3. **PM** reviews before BAZINGA → checks for blocking items → gates deployment
+
+#### PM Tech Debt Gate
+
+Before sending BAZINGA, PM evaluates accumulated debt:
+
+| Condition | PM Action | Result |
+|-----------|-----------|--------|
+| **Blocking items** (blocks_deployment=true) | ❌ Report to user | NO BAZINGA |
+| **HIGH severity > 2** | ⚠️ Ask user approval | WAIT |
+| **Only MEDIUM/LOW** | ✅ Include summary | BAZINGA with note |
+
+#### Output
+
+```json
+// coordination/tech_debt.json
+{
+  "project_tech_debt": [
+    {
+      "id": "TD001",
+      "added_by": "Developer-1",
+      "severity": "high",
+      "category": "performance",
+      "description": "User search uses table scan, won't scale past 10K users",
+      "location": "src/users/search.py:45",
+      "impact": "Slow queries (>5s) at 10K+ users",
+      "suggested_fix": "Implement Elasticsearch",
+      "blocks_deployment": false,
+      "attempts_to_fix": "1. Added DB indexes (helped but not enough)\n2. Tried query optimization\n3. Implemented pagination\nConclusion: Need search infrastructure"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "by_severity": {"high": 1, "medium": 2},
+    "blocking_items": 0
+  }
+}
+```
+
+#### Benefits
+
+- **Transparency**: All shortcuts explicitly documented
+- **Quality Gate**: PM prevents shipping with critical issues
+- **User Control**: User decides acceptable tradeoffs
+- **Future Planning**: Logged debt guides next iterations
+
+**See `docs/TECH_DEBT_GUIDE.md` for complete guidelines**
+
+### Data-Driven Project Management
+
+BAZINGA PM combines **Tier 1** (velocity tracking), **Tier 2** (predictive analytics), and **Tier 3** (advanced insights) for intelligent, proactive project management.
+
+#### The Problem (Before Metrics)
+
+Traditional PM operated blind:
+- ❌ No velocity measurement → Can't predict capacity
+- ❌ No cycle time tracking → Can't detect bottlenecks
+- ❌ No historical learning → Each run starts from zero
+- ❌ No 99% rule detection → Tasks stuck at "almost done" forever
+- ❌ No trend analysis → Can't tell if improving or declining
+
+**Result:** PM was reactive firefighter, not proactive manager.
+
+#### The Solution (Velocity Tracker + Retrospective)
+
+**1. Velocity Tracker Skill**
+
+Runs in 3-5 seconds (faster than lint-check):
+
+```json
+{
+  "current_run": {
+    "velocity": 12,
+    "percent_complete": 60,
+    "revision_rate": 1.2
+  },
+  "trends": {
+    "velocity": "improving",
+    "quality": "improving"
+  },
+  "warnings": [
+    "G002 taking 3x longer than expected - escalate to Tech Lead"
+  ],
+  "recommendations": [
+    "Current velocity (12) exceeds historical average (10.5)"
+  ]
+}
+```
+
+**2. Iteration Retrospective**
+
+PM reflects after each run:
+
+```json
+{
+  "what_worked": [
+    "Parallel execution saved 2 hours",
+    "Velocity tracker predicted delay early"
+  ],
+  "what_didnt_work": [
+    "DB migrations took 3x estimate - complexity underestimated"
+  ],
+  "lessons_learned": [
+    "Budget 2.5x for database tasks",
+    "Check metrics after each task group"
+  ],
+  "improvements_for_next_time": [
+    "Escalate stuck tasks sooner",
+    "Emphasize unit test coverage"
+  ]
+}
+```
+
+**3. 99% Rule Detection**
+
+Industry anti-pattern: underestimating final 1% that takes 99% of time.
+
+PM automatically detects:
+- Tasks in progress >2x average cycle time
+- Multiple revisions (>3) with no resolution
+- Developer-group pairs stuck >1 hour
+
+**Action:** Escalate to Tech Lead, break into smaller tasks, or update estimates.
+
+#### Benefits
+
+**Before (Blind PM):**
+- Reactive firefighting
+- No learning between runs
+- Tasks stuck forever
+- No user visibility
+- Estimation never improves
+
+**After (Data-Driven PM):**
+- Proactive bottleneck detection
+- Continuous improvement
+- Stuck tasks caught early (99% rule)
+- User gets progress % and ETAs
+- Estimates improve with data
+
+**Example PM Decision:**
+```markdown
+Checking metrics... [invokes /velocity-tracker]
+
+Current velocity: 12 (above avg 10.5) ✓
+Trend: improving
+⚠️  G002 taking 3x longer than expected
+
+Action: Pace is good. Escalating G002 to Tech Lead for review.
+```
+
+#### Metrics Tracked
+
+| Metric | Purpose | Good | Bad |
+|--------|---------|------|-----|
+| **Velocity** | Story points/run | Increasing | Decreasing |
+| **Cycle Time** | Minutes/task group | Decreasing | Increasing |
+| **Revision Rate** | Iterations/task | <1.5 | >3 |
+| **Completion %** | Progress tracking | On track | Stuck |
+
+**Historical Learning:**
+
+Every run improves the baseline. After 5 runs, PM knows:
+- "Database tasks take 2.5x initial estimate"
+- "Parallel execution saves ~40%"
+- "Current team velocity averages 11 points"
+
+This knowledge makes future estimates accurate and planning realistic.
+
+---
+
+### Advanced PM Capabilities (Tier 2)
+
+**Philosophy:** Predictive, proactive, data-driven (2024-2025 industry best practices)
+
+PM automatically applies these capabilities at key decision points (<5s total):
+
+#### 1. Risk Scoring & Proactive Alerts 🎯
+
+Calculates risk score for each task group:
+```
+Risk Score = (revision_count × 2) + (dependencies × 1.5) + (complexity × 1)
+```
+
+**Thresholds:**
+- Low (<5): Normal tracking
+- Medium (5-10): Watch closely
+- High (>10): Alert user + suggest mitigation
+
+**Example alert:**
+```
+⚠️  HIGH RISK: Group C (score: 12)
+- 4 revisions (persistent issues)
+- 1 dependency
+- 5 story points complexity
+
+Mitigation: Split into smaller tasks or escalate to Tech Lead
+```
+
+#### 2. Predictive Timeline Estimation 📅
+
+Predicts completion using velocity data:
+```
+Effective Velocity = (historical_avg × 0.7) + (current × 0.3)
+Hours Remaining = (remaining_story_points / effective_velocity) × avg_hours_per_run
+Confidence = 100 - (velocity_variance × 10)
+```
+
+**Example prediction:**
+```
+📈 Estimated Completion: 18 hours (85% confidence)
+Remaining: 8 story points | Velocity: 11.0 (weighted avg)
+Trend: On track ✓
+```
+
+#### 3. Resource Utilization Analysis 👥
+
+Tracks developer efficiency and prevents burnout:
+```
+Efficiency Ratio = actual_time / expected_time
+
+Thresholds:
+- <0.5: Underutilized
+- 0.5-1.3: Optimal ✓
+- >1.5: Overworked ⚠️
+```
+
+**Example analysis:**
+```
+Developer-1: 1.8x ratio (OVERWORKED)
+→ Action: Check if stuck, split remaining work, or escalate
+
+Developer-2: 0.67x ratio (OPTIMAL)
+→ Can handle additional tasks
+```
+
+#### 4. Quality Gate Enforcement (Enhanced) 🚦
+
+Mandatory checks before BAZINGA:
+```
+Security Gate:   0 critical vulnerabilities (configurable)
+Coverage Gate:   ≥70% line coverage (configurable)
+Lint Gate:       ≤5 high-severity issues (configurable)
+Tech Debt Gate:  0 blocking items (configurable)
+```
+
+**Blocks BAZINGA if any gate fails**, forcing quality standards.
+
+**Benefits:**
+- ✅ Proactive risk management (70% of projects fail due to underestimated risks)
+- ✅ User transparency with realistic ETAs
+- ✅ Team health monitoring (prevents burnout)
+- ✅ Quality enforcement (no more "we'll fix it later")
+
 ## Project Structure
 
 ```
@@ -289,12 +616,16 @@ bazinga/
 ├── scripts/                     # Utility scripts
 │   ├── init-orchestration.sh   # Initialization script (bash)
 │   ├── init-orchestration.ps1  # Initialization script (PowerShell)
+│   ├── tech_debt.py            # 🆕 Tech debt management utility
 │   └── README.md                # Scripts documentation
+├── docs/                        # Documentation
+│   └── TECH_DEBT_GUIDE.md      # 🆕 Complete tech debt guidelines
 ├── .claude/                     # Claude Code configuration (copied to projects)
 │   └── skills/                 # Automated analysis Skills
 │       ├── security-scan/      # Security vulnerability scanning
 │       ├── test-coverage/      # Test coverage analysis
 │       ├── lint-check/         # Code quality linting
+│       ├── velocity-tracker/   # 🆕 PM metrics & velocity tracking (default)
 │       ├── codebase-analysis/  # 🆕 Codebase pattern analysis (superpowers)
 │       ├── test-pattern-analysis/ # 🆕 Test pattern extraction (superpowers)
 │       ├── api-contract-validation/ # 🆕 API breaking change detection (superpowers)

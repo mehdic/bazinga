@@ -27,6 +27,7 @@ dependencies = [
     "rich>=13.0.0",
     "httpx[socks]>=0.25.0",
     "platformdirs>=3.0.0",
+    "pyyaml>=6.0.0",  # For API contract validation (OpenAPI YAML parsing)
 ]
 
 [project.urls]
@@ -46,3 +47,4 @@ packages = ["src/bazinga_cli"]
 "scripts" = "share/bazinga_cli/scripts"
 "commands" = "share/bazinga_cli/commands"
 "config" = "share/bazinga_cli/config"
+".claude/skills" = "share/bazinga_cli/.claude/skills"

@@ -81,6 +81,8 @@ def parse_sqlalchemy_url(url: str) -> Optional[str]:
         return "postgresql"
     elif url.startswith('mysql'):
         return "mysql"
+    elif url.startswith(('mssql', 'sqlserver')):
+        return "sqlserver"
     elif url.startswith('sqlite'):
         return "sqlite"
     elif url.startswith('oracle'):
@@ -116,6 +118,8 @@ def detect_from_django() -> Optional[str]:
                         return "mysql"
                     elif engine == 'sqlite3':
                         return "sqlite"
+                    elif engine in ['mssql', 'sqlserver']:
+                        return "sqlserver"
                     elif engine == 'oracle':
                         return "oracle"
 
@@ -157,6 +161,8 @@ def parse_jdbc_url(url: str) -> Optional[str]:
         return "postgresql"
     elif 'mysql' in url:
         return "mysql"
+    elif 'sqlserver' in url or 'mssql' in url:
+        return "sqlserver"
     elif 'oracle' in url:
         return "oracle"
     elif 'sqlite' in url:
@@ -213,6 +219,8 @@ def detect_from_rails() -> Optional[str]:
                 return "postgresql"
             elif adapter == 'mysql2':
                 return "mysql"
+            elif adapter in ['sqlserver', 'mssql', 'tinytds']:
+                return "sqlserver"
             elif adapter == 'sqlite3':
                 return "sqlite"
             elif adapter == 'oracle_enhanced':

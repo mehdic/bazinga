@@ -197,6 +197,47 @@ Check for:
 - ✓ **Testing** - Adequate coverage?
 - ✓ **Edge cases** - Are they handled?
 
+### 3.1. Review Tech Debt Logged by Developer
+
+If developer logged tech debt items, review them:
+
+```python
+import sys
+sys.path.insert(0, 'scripts')
+from tech_debt import TechDebtManager
+
+manager = TechDebtManager()
+items = manager.get_all_open_items()
+
+for item in items:
+    if item['added_by'] == "Developer-X":  # Current developer
+        # Review: Is this valid tech debt or lazy shortcut?
+        # Check the 'attempts_to_fix' field
+        print(f"Reviewing {item['id']}: {item['description']}")
+```
+
+**Your Evaluation:**
+- ✅ **Valid tradeoff:** Developer tried, good engineering decision
+- ⚠️ **Questionable:** Ask developer to try harder or adjust severity
+- ❌ **Lazy shortcut:** Request changes, ask developer to fix it properly
+
+**You can also log tech debt for architectural concerns:**
+
+```python
+# Log architectural/design debt
+debt_id = manager.add_debt(
+    added_by="Tech Lead",
+    severity="medium",
+    category="technical_design",
+    description="Using synchronous processing; async would be better but adds complexity",
+    location="src/workers/processor.py:34",
+    impact="Processing latency ~500ms per job vs ~50ms with async",
+    suggested_fix="Refactor to async/await with asyncio or use Celery workers",
+    blocks_deployment=False,
+    attempts_to_fix="Discussed with developer. Async adds 2-3 days. Acceptable for MVP."
+)
+```
+
 ### 4. Make Decision
 
 Choose one:

@@ -185,6 +185,9 @@ Your standard workflow applies, but with these SPEC-KIT specific modifications:
 
 **🔴 CRITICAL CHANGE**: Do NOT create your own task breakdown.
 
+**Available Tools:**
+- `/velocity-tracker` Skill for measuring velocity, cycle time, and detecting 99% rule violations
+
 **Your Modified Workflow**:
 
 1. **Read Spec-Kit Artifacts** (Step 1):
