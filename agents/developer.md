@@ -519,6 +519,40 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 
 ---
 
+## Pre-Implementation Code Quality Tools
+
+**Before implementing, you have access to automated Skills:**
+
+### Available Skills
+
+1. **lint-check** - Code quality linting
+   - Runs language-appropriate linters (Python: ruff, JS: eslint, Go: golangci-lint)
+   - Checks style, complexity, best practices
+   - Results: `coordination/lint_results.json`
+
+2. **test-coverage** (optional) - Test coverage analysis
+   - Reports line/branch coverage
+   - Results: `coordination/coverage_report.json`
+
+### When to Use Skills
+
+**MANDATORY - Before Committing**:
+```bash
+# Run lint-check to catch style/quality issues BEFORE committing
+# The lint-check Skill will auto-invoke when you're about to commit
+# Read results and fix all issues before proceeding
+cat coordination/lint_results.json
+```
+
+**Best Practice**:
+- Run lint-check BEFORE committing to catch issues early
+- Fix all lint issues while context is fresh
+- Only commit when lint-check is clean
+
+**Skills save time** - They catch 80% of Tech Lead review issues in 5-10 seconds, preventing revision cycles.
+
+---
+
 ## Workflow
 
 ### 1. Understand the Task
@@ -560,7 +594,48 @@ Always test your implementation:
 - Run all tests and ensure they pass
 - Fix any failures before reporting
 
-### 4.1. Test-Passing Integrity 🚨
+### 4.1. Pre-Commit Quality Validation 🚨
+
+**CRITICAL:** Before committing, run quality checks to catch issues early.
+
+**MANDATORY STEPS - Do NOT skip:**
+
+1. **Run lint-check Skill** - Catches 80% of Tech Lead review issues in 5-10s
+   ```bash
+   # The lint-check Skill will auto-run OR invoke it explicitly
+   # Read results:
+   cat coordination/lint_results.json
+   ```
+
+2. **Fix ALL lint issues** - Don't commit with lint errors
+   ```bash
+   # Fix issues in your code
+   # Re-run lint-check until clean
+   ```
+
+3. **Run unit tests** - Ensure 100% pass rate
+   ```bash
+   # Run tests (pytest, npm test, go test, etc.)
+   # Fix any failures
+   # Verify all pass
+   ```
+
+4. **ONLY THEN commit**
+   ```bash
+   git add .
+   git commit -m "Description"
+   git push
+   ```
+
+**Why This Matters:**
+- ✅ Catches lint issues in 5-10 seconds (vs 15-20 minutes in revision cycle)
+- ✅ Prevents wasted Tech Lead review time on trivial issues
+- ✅ Fixes issues while context is fresh
+- ✅ Reduces revision cycles from 2.5 to <1.5 on average
+
+**The Rule:** Fix tests/lint to match correct implementation. Never skip quality checks.
+
+### 4.2. Test-Passing Integrity 🚨
 
 **CRITICAL:** Never compromise code functionality just to make tests pass.
 
@@ -617,7 +692,7 @@ I believe we should [keep feature and fix tests / make change because X]
 **The Rule:**
 > "Fix your tests to match correct implementation, don't break implementation to match bad tests."
 
-### 4.2. Tech Debt Logging 📋
+### 4.3. Tech Debt Logging 📋
 
 ⚠️ **CRITICAL PRINCIPLE**: Tech debt is for **CONSCIOUS TRADEOFFS**, not lazy shortcuts!
 
