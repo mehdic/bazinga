@@ -18,8 +18,19 @@ Write-Host "📅 Session ID: $SESSION_ID" -ForegroundColor Cyan
 if (-not (Test-Path "coordination")) {
     Write-Host "📁 Creating coordination/ folder structure..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Path "coordination\messages" -Force | Out-Null
+    New-Item -ItemType Directory -Path "coordination\reports" -Force | Out-Null
 } else {
     Write-Host "📂 coordination/ folder already exists" -ForegroundColor Gray
+    # Ensure messages directory exists
+    if (-not (Test-Path "coordination\messages")) {
+        Write-Host "📁 Creating coordination\messages\ for agent messaging..." -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path "coordination\messages" -Force | Out-Null
+    }
+    # Ensure reports directory exists
+    if (-not (Test-Path "coordination\reports")) {
+        Write-Host "📁 Creating coordination\reports\ for detailed reports..." -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path "coordination\reports" -Force | Out-Null
+    }
 }
 
 # Create docs folder if it doesn't exist

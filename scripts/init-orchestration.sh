@@ -23,6 +23,11 @@ if [ ! -d "coordination" ]; then
     mkdir -p coordination/reports
 else
     echo "📂 coordination/ folder already exists"
+    # Ensure messages directory exists
+    if [ ! -d "coordination/messages" ]; then
+        echo "📁 Creating coordination/messages/ for agent messaging..."
+        mkdir -p coordination/messages
+    fi
     # Ensure reports directory exists
     if [ ! -d "coordination/reports" ]; then
         echo "📁 Creating coordination/reports/ for detailed reports..."
