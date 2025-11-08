@@ -617,6 +617,84 @@ I believe we should [keep feature and fix tests / make change because X]
 **The Rule:**
 > "Fix your tests to match correct implementation, don't break implementation to match bad tests."
 
+### 4.2. Tech Debt Logging 📋
+
+⚠️ **CRITICAL PRINCIPLE**: Tech debt is for **CONSCIOUS TRADEOFFS**, not lazy shortcuts!
+
+**YOU MUST TRY TO FIX ISSUES FIRST** before logging them as tech debt.
+
+#### When to Log Tech Debt (After Genuine Attempts)
+
+✅ **AFTER spending 30+ minutes trying to fix:**
+- Requires architectural changes beyond current scope
+- External dependency limitation (library, API, platform)
+- Solution would delay delivery significantly for marginal benefit
+- Performance optimization requiring data not yet available
+
+✅ **Conscious engineering tradeoffs:**
+```
+"Implemented basic auth; OAuth requires infrastructure beyond MVP scope"
+"Using in-memory cache; Redis blocked by ops team"
+"Single-threaded processing works for 100 users; need workers at 10K+"
+```
+
+❌ **NOT for lazy shortcuts (FIX THESE INSTEAD):**
+```
+❌ "Didn't add error handling" → ADD IT (10 minutes)
+❌ "No input validation" → ADD IT (5 minutes)
+❌ "Hardcoded values" → USE ENV VARS (5 minutes)
+❌ "Skipped tests" → WRITE THEM (part of your job)
+❌ "TODO comments" → FINISH THE WORK
+```
+
+#### How to Log Tech Debt (Python)
+
+```python
+# At top of your script
+import sys
+sys.path.insert(0, 'scripts')
+from tech_debt import TechDebtManager
+
+# Only after genuine attempts to fix
+manager = TechDebtManager()
+
+debt_id = manager.add_debt(
+    added_by="Developer-1",  # Your agent name
+    severity="high",  # critical, high, medium, low
+    category="performance",  # See docs/TECH_DEBT_GUIDE.md
+    description="User search uses full table scan, won't scale past 10K users",
+    location="src/users/search.py:45",
+    impact="Slow queries (>5s) when user count exceeds 10,000",
+    suggested_fix="Implement Elasticsearch for full-text search",
+    blocks_deployment=False,  # True ONLY if production-breaking
+    attempts_to_fix=(
+        "1. Added database indexes on name, email (helped but not enough)\n"
+        "2. Tried query optimization with select_related (marginal)\n"
+        "3. Implemented pagination (helps UX but doesn't fix core issue)\n"
+        "Conclusion: Need search infrastructure, outside current scope"
+    )
+)
+
+print(f"✓ Tech debt logged: {debt_id}")
+```
+
+#### Severity Guidelines
+
+- **CRITICAL** (blocks_deployment=True): Production-breaking, will cause failures
+- **HIGH**: User-facing issues, significant quality concerns
+- **MEDIUM**: Internal quality, non-critical performance
+- **LOW**: Nice-to-have improvements
+
+#### Decision Framework
+
+Before logging, ask yourself:
+1. **Can I fix this in < 30 minutes?** → YES: Fix it now!
+2. **Does this require changes outside current scope?** → YES: Consider tech debt
+3. **Will this actually impact users?** → YES: Must fix OR log with HIGH severity
+4. **Is this a fundamental limitation?** → YES (external): Valid tech debt / NO (lazy): Fix it!
+
+**See `docs/TECH_DEBT_GUIDE.md` for complete guidelines and examples**
+
 ### 5. Report Results
 
 Provide a structured report:

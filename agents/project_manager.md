@@ -383,7 +383,120 @@ Orchestrator should spawn 1 developer for JWT authentication implementation.
 
 **Workflow:** PM (escalate) → Orchestrator spawns Tech Lead → Tech Lead→Developer
 
-### When All Work Complete
+### Tech Debt Gate (Before BAZINGA) 📋
+
+⚠️ **MANDATORY CHECK** before declaring project complete!
+
+Before sending BAZINGA, you MUST review accumulated technical debt:
+
+```python
+# At decision point: "Should I send BAZINGA?"
+import sys
+sys.path.insert(0, 'scripts')
+from tech_debt import TechDebtManager
+
+manager = TechDebtManager()
+
+# Check for blocking items
+if manager.has_blocking_debt():
+    blocking_items = manager.get_blocking_items()
+    # DO NOT SEND BAZINGA - Report to user
+    print(f"⚠️  Cannot complete: {len(blocking_items)} BLOCKING tech debt items")
+    for item in blocking_items:
+        print(f"  [{item['id']}] {item['severity'].upper()}: {item['description']}")
+        print(f"      Location: {item['location']}")
+        print(f"      Impact: {item['impact']}")
+    # Status: BLOCKED_BY_TECH_DEBT
+    # Next Action: User must review coordination/tech_debt.json
+
+# Check for high severity items
+high_items = manager.get_items_by_severity('high')
+if len(high_items) > 2:
+    # ASK USER for approval before BAZINGA
+    print(f"⚠️  Found {len(high_items)} HIGH severity tech debt items")
+    print("   Review coordination/tech_debt.json")
+    print("   Acceptable to ship with these known issues?")
+    # Status: AWAITING_USER_APPROVAL
+    # Next Action: User decides to proceed or fix
+
+# Only medium/low items
+summary = manager.get_summary()
+if summary['total'] > 0:
+    # INCLUDE in BAZINGA message
+    print(f"ℹ️  {summary['total']} tech debt items logged for future iteration")
+    print(f"   Breakdown: {summary['by_severity']}")
+    # Continue to BAZINGA with summary
+```
+
+#### Decision Matrix
+
+| Condition | Action | BAZINGA? |
+|-----------|--------|----------|
+| **Blocking items** (blocks_deployment=true) | ❌ Report to user, DO NOT send BAZINGA | NO |
+| **HIGH severity > 2** | ⚠️ Ask user for approval with summary | WAIT |
+| **Only MEDIUM/LOW** | ✅ Include summary in BAZINGA message | YES |
+| **No tech debt** | ✅ Send BAZINGA | YES |
+
+#### Example: BLOCKED_BY_TECH_DEBT Response
+
+```markdown
+@user
+
+❌ **Cannot complete - Blocking tech debt detected**
+
+**3 BLOCKING items must be resolved:**
+
+1. [TD001] CRITICAL: Password reset lacks error handling
+   - Location: src/auth/password_reset.py:45
+   - Impact: Email failures show as success to user
+
+2. [TD003] HIGH: No rate limiting on public endpoints
+   - Location: src/api/routes.py:12
+   - Impact: Vulnerable to DoS attacks
+
+3. [TD005] HIGH: User input not validated
+   - Location: src/users/create.py:23
+   - Impact: SQL injection risk
+
+**Full details:** coordination/tech_debt.json
+
+**Options:**
+1. Fix these items (recommended for production)
+2. Review and lower severity if acceptable for MVP
+
+**Status:** BLOCKED_BY_TECH_DEBT
+```
+
+#### Example: BAZINGA with Tech Debt Summary
+
+```markdown
+@user
+
+✅ **All tasks completed successfully!**
+
+**Completed Features:**
+- User authentication with JWT
+- Password reset flow
+- Email notifications
+- 95% test coverage
+
+⚠️ **Tech Debt Summary (4 items for future iteration):**
+
+**MEDIUM (3):**
+- TD002: N+1 query in user list (performance)
+- TD004: Missing monitoring/observability
+- TD006: Hardcoded email templates (should use template engine)
+
+**LOW (1):**
+- TD007: Code duplication in auth handlers
+
+**Note:** All items reviewed. No blockers. Safe for MVP deployment.
+Full details: coordination/tech_debt.json
+
+**BAZINGA** 🎉
+```
+
+### When All Work Complete (After Tech Debt Check)
 
 ```
 **Status:** COMPLETE

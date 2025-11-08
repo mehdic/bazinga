@@ -25,6 +25,7 @@ BAZINGA uses Claude Code Skills to provide agents with specialized tools like `/
 
 ## Features
 
+- **🆕 Tech Debt Tracking**: Explicit logging of engineering tradeoffs with PM gate before deployment
 - **🆕 Developer Superpowers Mode**: Keyword-activated enhanced capabilities (codebase analysis, test patterns, build checks)
 - **🆕 Spec-Kit Integration**: Seamless integration with GitHub's spec-kit for spec-driven development (planning + execution)
 - **🆕 Intelligent Model Escalation**: Automatically escalates Tech Lead to Opus after 3 failed revisions for deeper analysis
@@ -267,6 +268,82 @@ Simply include "superpowers" in your orchestration request:
 
 The 2-3 minute investment in superpowers mode typically saves 20-30 minutes during implementation.
 
+### Tech Debt Tracking
+
+BAZINGA includes explicit tech debt tracking to manage engineering tradeoffs transparently.
+
+#### Core Principle: Try First, Log Later
+
+⚠️ **Tech debt is for CONSCIOUS TRADEOFFS, not lazy shortcuts!**
+
+Agents must attempt to solve issues properly before logging them as tech debt.
+
+#### What Gets Logged
+
+**✅ Valid Tech Debt (after 30+ min attempting to fix):**
+- Architectural changes beyond current scope
+- External dependency limitations
+- Performance optimizations requiring data not yet available
+- Features requiring infrastructure not in scope
+
+**❌ Not Valid (fix these instead):**
+- Missing error handling → Add it (10 min)
+- No input validation → Add it (5 min)
+- Hardcoded values → Use env vars (5 min)
+- Skipped tests → Write them (your job)
+
+#### Workflow
+
+1. **Developer** encounters issue → attempts to fix (30+ min) → documents attempts → logs tech debt if out of scope
+2. **Tech Lead** reviews tech debt → validates tradeoffs → may request fixes for "lazy" items
+3. **PM** reviews before BAZINGA → checks for blocking items → gates deployment
+
+#### PM Tech Debt Gate
+
+Before sending BAZINGA, PM evaluates accumulated debt:
+
+| Condition | PM Action | Result |
+|-----------|-----------|--------|
+| **Blocking items** (blocks_deployment=true) | ❌ Report to user | NO BAZINGA |
+| **HIGH severity > 2** | ⚠️ Ask user approval | WAIT |
+| **Only MEDIUM/LOW** | ✅ Include summary | BAZINGA with note |
+
+#### Output
+
+```json
+// coordination/tech_debt.json
+{
+  "project_tech_debt": [
+    {
+      "id": "TD001",
+      "added_by": "Developer-1",
+      "severity": "high",
+      "category": "performance",
+      "description": "User search uses table scan, won't scale past 10K users",
+      "location": "src/users/search.py:45",
+      "impact": "Slow queries (>5s) at 10K+ users",
+      "suggested_fix": "Implement Elasticsearch",
+      "blocks_deployment": false,
+      "attempts_to_fix": "1. Added DB indexes (helped but not enough)\n2. Tried query optimization\n3. Implemented pagination\nConclusion: Need search infrastructure"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "by_severity": {"high": 1, "medium": 2},
+    "blocking_items": 0
+  }
+}
+```
+
+#### Benefits
+
+- **Transparency**: All shortcuts explicitly documented
+- **Quality Gate**: PM prevents shipping with critical issues
+- **User Control**: User decides acceptable tradeoffs
+- **Future Planning**: Logged debt guides next iterations
+
+**See `docs/TECH_DEBT_GUIDE.md` for complete guidelines**
+
 ## Project Structure
 
 ```
@@ -289,7 +366,10 @@ bazinga/
 ├── scripts/                     # Utility scripts
 │   ├── init-orchestration.sh   # Initialization script (bash)
 │   ├── init-orchestration.ps1  # Initialization script (PowerShell)
+│   ├── tech_debt.py            # 🆕 Tech debt management utility
 │   └── README.md                # Scripts documentation
+├── docs/                        # Documentation
+│   └── TECH_DEBT_GUIDE.md      # 🆕 Complete tech debt guidelines
 ├── .claude/                     # Claude Code configuration (copied to projects)
 │   └── skills/                 # Automated analysis Skills
 │       ├── security-scan/      # Security vulnerability scanning
