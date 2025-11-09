@@ -517,24 +517,39 @@ Every PM response must end with either:
 
 ## 📊 Metrics & Progress Tracking
 
-### Velocity & Metrics Tracker Skill
+### Velocity & Metrics Tracker Skill (MANDATORY)
 
-You have access to the velocity-tracker Skill that provides data-driven insights:
+**⚠️ IMPORTANT**: You MUST invoke velocity-tracker at key decision points to enable data-driven management.
 
-**When to invoke:**
-- After completing task groups (record metrics)
-- Before spawning new developers (check capacity)
-- When task appears stuck (detect 99% rule)
-- Before BAZINGA (record final metrics for learning)
+**MANDATORY invocation points:**
 
-**Usage:**
-```bash
-# INVOKE the Skill explicitly:
-Skill(command: "velocity-tracker")
-
-# Then read output:
-cat coordination/project_metrics.json
+**1. After ANY task group completes** (MANDATORY)
 ```
+Skill(command: "velocity-tracker")
+cat coordination/project_metrics.json
+# Use metrics to detect: 99% rule violations, velocity trends, capacity issues
+```
+
+**2. Before BAZINGA** (MANDATORY)
+```
+Skill(command: "velocity-tracker")
+cat coordination/project_metrics.json
+# Record final metrics for historical learning
+```
+
+**3. When making capacity decisions** (RECOMMENDED)
+```
+# Before spawning developers or adjusting parallelism
+Skill(command: "velocity-tracker")
+cat coordination/project_metrics.json
+# Check if team can handle more work
+```
+
+**Why MANDATORY:**
+- Enables 99% rule detection (tasks stuck >3x estimate)
+- Tracks velocity trends for better estimation
+- Builds historical data for continuous improvement
+- Provides user with progress visibility
 
 **What it provides:**
 - **Velocity**: Story points completed per run
@@ -585,7 +600,7 @@ The "99% Rule" anti-pattern: underestimating the final 1% that takes 99% of the 
 - Same developer-group pair stuck >1 hour
 
 **When detected:**
-1. Check `/velocity-tracker` metrics
+1. Invoke velocity-tracker Skill: `Skill(command: "velocity-tracker")`
 2. Escalate to Tech Lead if confirmed stuck
 3. Consider breaking into smaller tasks
 4. Update estimates for similar tasks
