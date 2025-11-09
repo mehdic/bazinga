@@ -1210,20 +1210,53 @@ Task(
 📨 **ORCHESTRATOR**: Received response from PM...
 ```
 
-**UI Messages:** Output based on PM decision:
+**🚨 CRITICAL: BAZINGA Detection and Final Report Generation**
+
 ```
 IF PM response contains "BAZINGA":
     Output: "🎉 **ORCHESTRATOR**: BAZINGA received from PM - All work complete!"
-    Output: "✅ **ORCHESTRATOR**: Workflow completed successfully"
-    → Log completion
-    → Display success message
-    → END WORKFLOW ✅
+
+    ⚠️ **MANDATORY NEXT STEP: Generate Final Report**
+
+    You MUST execute the comprehensive final report generation workflow.
+    This is NOT optional. Do NOT just celebrate and stop.
+
+    **ANTI-PATTERN ❌:**
+    - ❌ Output "Workflow complete!" and stop
+    - ❌ Forward PM's message to user and stop
+    - ❌ Just say "BAZINGA!" and exit
+
+    **CORRECT FLOW ✅:**
+    - ✅ Detect BAZINGA keyword in PM response
+    - ✅ Execute "## Completion" section (lines 1997-2318)
+    - ✅ Aggregate all metrics, Skills results, state files
+    - ✅ Generate and display comprehensive final report
+    - ✅ THEN end workflow
+
+    **ACTION REQUIRED:**
+    Jump to "## Completion" section below and execute ALL 5 steps:
+    1. Step 1: Aggregate All Metrics (read all state files, Skills results)
+    2. Step 2: Detect Anomalies (find issues needing attention)
+    3. Step 3: Generate Detailed Report (write to coordination/reports/)
+    4. Step 4: Update State Files (mark orchestration complete)
+    5. Step 5: Display Concise Report (the 50+ line summary to user)
+
+    → GO TO "## Completion" section NOW ⬇️
 
 ELSE IF PM assigns more work:
     Output: "🔄 **ORCHESTRATOR**: PM assigned additional work - continuing workflow..."
     → Extract next assignments
     → Loop back to spawn developers
 ```
+
+**⚠️ ENFORCEMENT CHECK:**
+
+Before ending workflow, ask yourself:
+- "Did I execute all 5 steps from the Completion section?"
+- "Did I display the comprehensive report with Skills Used, Quality Overview, Efficiency metrics?"
+- "Did I create the detailed report file in coordination/reports/?"
+
+If answer is NO to any → You forgot to execute the Completion section → GO BACK AND DO IT NOW
 
 ---
 
@@ -1709,20 +1742,53 @@ Task(
 📨 **ORCHESTRATOR**: Received response from PM...
 ```
 
-**UI Messages:** Output based on PM decision:
+**🚨 CRITICAL: BAZINGA Detection and Final Report Generation (Parallel Mode)**
+
 ```
 IF PM response contains "BAZINGA":
     Output: "🎉 **ORCHESTRATOR**: BAZINGA received from PM - All work complete!"
-    Output: "✅ **ORCHESTRATOR**: Workflow completed successfully"
-    → Log completion
-    → Display success message
-    → END WORKFLOW ✅
+
+    ⚠️ **MANDATORY NEXT STEP: Generate Final Report**
+
+    You MUST execute the comprehensive final report generation workflow.
+    This is NOT optional. Do NOT just celebrate and stop.
+
+    **ANTI-PATTERN ❌:**
+    - ❌ Output "Workflow complete!" and stop
+    - ❌ Forward PM's message to user and stop
+    - ❌ Just say "BAZINGA!" and exit
+
+    **CORRECT FLOW ✅:**
+    - ✅ Detect BAZINGA keyword in PM response
+    - ✅ Execute "## Completion" section (lines 1997-2318)
+    - ✅ Aggregate all metrics, Skills results, state files
+    - ✅ Generate and display comprehensive final report
+    - ✅ THEN end workflow
+
+    **ACTION REQUIRED:**
+    Jump to "## Completion" section below and execute ALL 5 steps:
+    1. Step 1: Aggregate All Metrics (read all state files, Skills results)
+    2. Step 2: Detect Anomalies (find issues needing attention)
+    3. Step 3: Generate Detailed Report (write to coordination/reports/)
+    4. Step 4: Update State Files (mark orchestration complete)
+    5. Step 5: Display Concise Report (the 50+ line summary to user)
+
+    → GO TO "## Completion" section NOW ⬇️
 
 ELSE IF PM assigns next batch:
     Output: "🔄 **ORCHESTRATOR**: PM assigned next batch of work - continuing with [N] more groups..."
     → Extract next groups
     → Loop back to Step 2B.1 with new groups
 ```
+
+**⚠️ ENFORCEMENT CHECK:**
+
+Before ending workflow, ask yourself:
+- "Did I execute all 5 steps from the Completion section?"
+- "Did I display the comprehensive report with Skills Used, Quality Overview, Efficiency metrics?"
+- "Did I create the detailed report file in coordination/reports/?"
+
+If answer is NO to any → You forgot to execute the Completion section → GO BACK AND DO IT NOW
 
 ---
 
@@ -1747,7 +1813,7 @@ ELSE IF PM assigns next batch:
 | **QA Expert** | Result: "FAIL" | Spawn Developer (fix issues) | ❌ Don't tell dev how to fix |
 | **Tech Lead** | Decision: "APPROVED" | Update state → Spawn PM | ❌ Don't assign next work yourself |
 | **Tech Lead** | Decision: "CHANGES_REQUESTED" | Spawn Developer (revise) | ❌ Don't implement changes yourself |
-| **PM** | Contains "BAZINGA" | END WORKFLOW ✅ | ❌ Don't continue working |
+| **PM** | Contains "BAZINGA" | Execute Completion section (Steps 1-5) → Generate final report → END WORKFLOW ✅ | ❌ Don't stop without generating report |
 | **PM** | Assigns more work | Spawn Developers per PM instructions | ❌ Don't modify PM's plan |
 
 ### Anti-Pattern Detection
