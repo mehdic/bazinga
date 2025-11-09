@@ -26,7 +26,7 @@ BAZINGA uses Claude Code Skills to provide agents with specialized tools like `/
 ## Features
 
 - **🆕 Tech Debt Tracking**: Explicit logging of engineering tradeoffs with PM gate before deployment
-- **🆕 Developer Superpowers Mode**: Keyword-activated enhanced capabilities (codebase analysis, test patterns, build checks)
+- **🆕 Configurable Skills System**: Granular control over which analysis tools run (via /configure-skills command)
 - **🆕 Spec-Kit Integration**: Seamless integration with GitHub's spec-kit for spec-driven development (planning + execution)
 - **🆕 Intelligent Model Escalation**: Automatically escalates Tech Lead to Opus after 3 failed revisions for deeper analysis
 - **🆕 Claude Code Skills**: Automated security scanning, test coverage, and linting with dual-mode analysis (basic/advanced)
@@ -149,7 +149,9 @@ Skills use **dual-mode analysis** that escalates alongside model escalation:
    - Enables continuous learning across runs
    - Results: `coordination/project_metrics.json`
 
-**Superpowers Skills (Enabled with superpowers=true):**
+**Advanced Skills (Configurable via /configure-skills):**
+
+These Skills are disabled by default but can be enabled based on your workflow needs:
 
 5. **codebase-analysis** - Pattern extraction and architecture mapping (20-40s)
    - Identifies design patterns, architecture layers
@@ -183,6 +185,15 @@ Skills use **dual-mode analysis** that escalates alongside model escalation:
    - Adjusts estimates using confidence-weighted multipliers
    - Results: `coordination/pattern_insights.json`
 
+**Configure which Skills run:**
+```bash
+/configure-skills
+# Interactive menu lets you enable/disable Skills per agent
+# Examples: "2 3 9" (enable Skills #2, #3, #9)
+#           "advanced" (enable all advanced Skills)
+#           "fast" (only fast Skills <20s)
+```
+
 #### Language Support
 
 | Language | Security | Coverage | Linting |
@@ -208,109 +219,103 @@ Skills include comprehensive error tracking with explicit status reporting:
 
 This prevents false confidence from empty results - the Tech Lead always knows if a scan actually succeeded.
 
-### Developer Superpowers Mode
+### Skills Configuration
 
-BAZINGA includes enhanced Developer capabilities that can be activated by including the word **"superpowers"** in your orchestration request.
+BAZINGA provides granular control over which analysis tools (Skills) run during orchestration.
 
-#### Two-Tier Capability System
+#### Configuration Command
 
-**Standard Mode** (default):
-- Fast, essential checks (1 min overhead)
-- Pre-commit validation (lint-check Skill)
-- Unit test enforcement
-- Build verification
-
-**Superpowers Mode** (keyword-activated):
-- All standard capabilities PLUS:
-- Codebase analysis before implementation
-- Test pattern analysis before writing tests
-- App startup health checks
-- Code context injection (similar code & utilities)
-- Enhanced workflow with comprehensive checks
-
-#### How to Activate
-
-Simply include "superpowers" in your orchestration request:
+Use the `/configure-skills` command to control which Skills are active:
 
 ```bash
-# Standard mode
-/bazinga.orchestrate "Implement password reset endpoint"
-
-# Superpowers mode - all advanced capabilities active
-/bazinga.orchestrate "superpowers - Implement password reset endpoint"
+/configure-skills
 ```
 
-#### Developer Capabilities in Superpowers Mode
+This opens an interactive menu showing all 11 available Skills grouped by agent:
 
-**1. Codebase Analysis Skill** (10-20 seconds)
-- Finds similar features in the codebase
-- Discovers reusable utilities (EmailService, TokenGenerator, etc.)
-- Detects architectural patterns (service layer, repository, factory)
-- Suggests implementation approach
-- Output: `coordination/codebase_analysis.json`
+```
+🎯 BAZINGA Skills Configuration
 
-**2. Test Pattern Analysis Skill** (5-15 seconds)
-- Detects test framework (pytest, jest, go test, JUnit)
-- Extracts common fixtures and test utilities
-- Identifies test patterns (AAA, Given-When-Then)
-- Learns naming conventions
-- Suggests test cases based on similar tests
-- Output: `coordination/test_patterns.json`
+┌─────────────────────────────────────────────────────────────┐
+│ 🔧 Developer Agent                                          │
+├─────┬───────────────────────────────┬──────────┬────────────┤
+│  1  │ lint-check                    │ 5-10s    │ ✅ ON      │
+│  2  │ codebase-analysis             │ 15-30s   │ ⚪ OFF     │
+│  3  │ test-pattern-analysis         │ 20-40s   │ ⚪ OFF     │
+│  4  │ api-contract-validation       │ 10-20s   │ ⚪ OFF     │
+│  5  │ db-migration-check            │ 10-15s   │ ⚪ OFF     │
+└─────┴───────────────────────────────┴──────────┴────────────┘
 
-**3. API Contract Validation Skill** (5-15 seconds)
-- Detects breaking changes in OpenAPI/Swagger specifications
-- Compares current spec against baseline
-- Identifies removed endpoints, changed response types, removed fields
-- Suggests safe migration strategies (API versioning)
-- Supports FastAPI, Flask, Django, Express auto-generation
-- Output: `coordination/api_contract_validation.json`
+... [Tech Lead, QA Expert, PM sections]
 
-**4. Database Migration Check Skill** (5-20 seconds)
-- Analyzes database migrations for dangerous operations
-- Supports PostgreSQL, MySQL, SQL Server, MongoDB (+ SQLite, Oracle)
-- Detects table locks, rewrites, data loss risks
-- Suggests zero-downtime alternatives
-- Works with Alembic, Django, Flyway, Liquibase, Mongoose, ActiveRecord
-- Output: `coordination/db_migration_check.json`
+💡 Smart Input Options:
+  2 3 9           → Enable Skills #2, #3, #9
+  disable 1 7     → Disable Skills #1, #7
+  advanced        → Enable all advanced Skills
+  fast            → Only fast Skills <20s
+  defaults        → Reset to recommended defaults
+```
 
-**5. Code Context Injection**
-- Orchestrator finds similar code before spawning Developer
-- Injects relevant examples and utilities into Developer prompt
-- Zero runtime cost (happens during spawn)
+#### Default Configuration
 
-**6. Baseline Health Checks**
-- Build check: Compiles project before/after development
-- App startup check (superpowers only): Verifies app starts successfully
-- Catches regressions immediately
+**Fast Skills (✅ ON by default):**
+- #1 lint-check (Developer)
+- #6 security-scan (Tech Lead)
+- #7 lint-check (Tech Lead)
+- #8 test-coverage (Tech Lead)
+- #11 velocity-tracker (PM)
 
-**7. Mandatory Workflow**
-- Pre-implementation: Review codebase context, run analysis Skills
-- During implementation: Follow existing patterns
-- Pre-commit: Run all unit tests (100% pass), lint-check, build verification, API/migration checks
-- Only report READY_FOR_QA when all checks pass
+**Advanced Skills (⚪ OFF by default):**
+- #2 codebase-analysis - Finds similar features and utilities
+- #3 test-pattern-analysis - Learns test patterns
+- #4 api-contract-validation - Detects breaking API changes
+- #5 db-migration-check - Database migration safety
+- #9 pattern-miner - Historical pattern analysis
+- #10 quality-dashboard - Unified project health
+
+#### Usage Examples
+
+```bash
+# Enable advanced Skills for critical work
+/configure-skills
+> 2 3 9
+
+# Enable all advanced Skills quickly
+/configure-skills
+> advanced
+
+# Use only fast Skills for rapid iteration
+/configure-skills
+> fast
+
+# Reset to defaults
+/configure-skills
+> defaults
+```
 
 #### Benefits
 
-**Without Superpowers:**
-- Developer implements from scratch → 45 minutes
-- Misses existing utilities → duplicates code
-- Uses wrong patterns → gets changes requested in review
-- **Total:** 60-90 minutes with revision
+**Fast Mode (defaults):**
+- 1-2 minute overhead
+- Essential quality checks
+- Suitable for rapid iteration
+- Lower resource usage
 
-**With Superpowers:**
-- Skills find utilities → saves 15 minutes
-- Follows existing patterns → passes review first time
-- Reuses code → cleaner implementation
-- **Total:** 30-40 minutes
+**Advanced Mode (all enabled):**
+- 3-5 minute overhead
+- Comprehensive analysis
+- Suitable for critical features
+- Maximum quality assurance
 
-**ROI:** 40% time savings, 90% fewer revisions
+**Custom Configuration:**
+- Mix and match Skills
+- Enable only what you need
+- Configuration persists across sessions
+- No "magic keywords" required
 
-#### Time Overhead
+#### Persistence
 
-- **Standard Mode:** ~1 minute (lint + build checks)
-- **Superpowers Mode:** ~2-3 minutes (+ codebase analysis + test pattern analysis)
-
-The 2-3 minute investment in superpowers mode typically saves 20-30 minutes during implementation.
+Configuration is saved to `coordination/skills_config.json` and persists across all BAZINGA sessions. Update anytime with `/configure-skills`.
 
 ### Tech Debt Tracking
 
@@ -626,10 +631,10 @@ bazinga/
 │       ├── test-coverage/      # Test coverage analysis
 │       ├── lint-check/         # Code quality linting
 │       ├── velocity-tracker/   # 🆕 PM metrics & velocity tracking (default)
-│       ├── codebase-analysis/  # 🆕 Codebase pattern analysis (superpowers)
-│       ├── test-pattern-analysis/ # 🆕 Test pattern extraction (superpowers)
-│       ├── api-contract-validation/ # 🆕 API breaking change detection (superpowers)
-│       └── db-migration-check/ # 🆕 Database migration safety (superpowers)
+│       ├── codebase-analysis/  # 🆕 Codebase pattern analysis (configurable)
+│       ├── test-pattern-analysis/ # 🆕 Test pattern extraction (configurable)
+│       ├── api-contract-validation/ # 🆕 API breaking change detection (configurable)
+│       └── db-migration-check/ # 🆕 Database migration safety (configurable)
 ├── config/                      # Configuration files
 │   ├── claude.md               # Global constraints (.claude.md)
 │   └── coordination.gitignore  # Gitignore for coordination folder
