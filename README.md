@@ -92,6 +92,7 @@ Result: Better quality, but YOU manage the workflow. Easy to skip steps.
 - **Autonomous execution**: Long task lists run for hours without interruption, maintaining best practices throughout
 - **Intelligent guidance**: Framework evaluates skip/stop/issue behaviors and recommends best practices to the team
 - **Specialized roles**: PM plans, Developers code, QA tests, Tech Lead reviews
+- **Configurable testing**: Three modes (full/minimal/disabled) - balance speed vs. quality for your context
 - **Mandatory quality gates**: Security scans, test coverage, linting run automatically at each step
 - **Skills automation**: 11 Skills automate code analysis, security scanning, pattern detection
 - **Parallel execution**: Framework automatically spawns 1-4 developers based on task complexity
@@ -653,8 +654,13 @@ your-project/
    - See: [examples/EXAMPLES.md](examples/EXAMPLES.md)
 
 4. **Skills not running**
-   - Solution: Check `coordination/skills_config.json` or run `/configure-skills`
+   - Solution: Check `coordination/skills_config.json` or run `/bazinga.configure-skills`
    - See: [docs/SKILLS.md](docs/SKILLS.md#configuration)
+
+5. **Want faster iteration without QA Expert**
+   - Solution: Run `/bazinga.configure-testing` and select "minimal" or "disabled" mode
+   - Minimal: 30-40% faster, keeps lint + unit tests
+   - Disabled: 40-60% faster, lint only (prototyping)
 
 ---
 
@@ -664,10 +670,17 @@ your-project/
 
 **Initialize new project:**
 ```bash
-bazinga init my-project          # Create new directory
-bazinga init --here              # Initialize in current directory
-bazinga init my-project --no-git # Skip git initialization
+bazinga init my-project                  # Create new directory (minimal testing by default)
+bazinga init --here                      # Initialize in current directory
+bazinga init my-project --no-git         # Skip git initialization
+bazinga init my-project --testing full   # Initialize with full QA workflow
+bazinga init my-project -t disabled      # Initialize for rapid prototyping
 ```
+
+**Testing modes:**
+- `minimal` (default): Lint + unit tests, skip QA Expert (30-40% faster)
+- `full`: All tests + QA Expert workflow (production quality)
+- `disabled`: Lint only (rapid prototyping, 40-60% faster)
 
 **Update existing project:**
 ```bash
@@ -688,12 +701,20 @@ bazinga --version                # Show version
 
 ### Configuration Files
 
-**Skills configuration:**
+**Testing framework configuration:**
 ```bash
-/configure-skills                # Interactive menu
+/bazinga.configure-testing       # Interactive menu to set testing mode
 ```
 
-Saved to: `coordination/skills_config.json`
+Modes: `full` (all tests + QA) | `minimal` (lint + unit tests) | `disabled` (lint only)
+Saved to: `coordination/testing_config.json` (tracked in git)
+
+**Skills configuration:**
+```bash
+/bazinga.configure-skills        # Interactive menu to enable/disable individual skills
+```
+
+Saved to: `coordination/skills_config.json` (tracked in git)
 
 **Global constraints:**
 - `.claude.md` - Role enforcement, workflow rules
