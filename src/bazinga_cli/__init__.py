@@ -23,7 +23,6 @@ from rich.table import Table
 from rich.text import Text
 
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
-from .state_manager import StateManager
 
 __version__ = "0.1.3"
 
