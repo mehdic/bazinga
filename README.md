@@ -36,67 +36,111 @@ bazinga init my-project
 
 ### Before BAZINGA
 
-**Development is slow and error-prone:**
+**Using Claude Code normally (even with manual multi-agent coordination):**
 
-- You write code, manually test it, push for review
-- Reviewer finds issues 2 days later: missing error handling, security issues, inconsistent style
-- You fix those, push again, wait another day
-- QA finds edge cases you didn't test
-- Security scan in CI catches hardcoded secrets
-- 5 days later, feature finally merges
+- **Single agent**: One agent plans, codes, tests, and reviews all in one go
+- **Manual multi-agent**: You manually coordinate agents yourself, remembering each step
+- **No framework**: No structured workflow following software development best practices
+- **Manual quality checks**: You remember to run security scans, linting, coverage... or you don't
+- **No automation**: Each quality check requires explicit manual invocation
+- **Sequential work**: Can't parallelize independent tasks across multiple agents automatically
+- **No learning**: No velocity tracking or historical data to improve estimates
 
-**Code quality is inconsistent:**
+**What this looks like:**
 
-- No one runs linters consistently
-- Test coverage varies wildly (some devs write tests, some don't)
-- Security scans are expensive/slow, so they run infrequently
-- Each dev has their own coding style
+```
+You: "Implement JWT authentication with user management"
 
-**Estimates are always wrong:**
+Claude Code (single agent):
+  - Plans the work
+  - Writes all the code
+  - Creates some tests (maybe)
+  - Reviews its own code (limited self-critique)
+  - No security scan unless you explicitly ask
+  - No coverage analysis unless you explicitly ask
+  - Pushes to completion
 
-- "This will take 2 hours" → Takes 8 hours
-- No historical data to learn from
-- PM doesn't know if work is 50% done or 90% done
-- Tasks get stuck at "almost done" forever (the 99% rule)
+Result: Fast, but quality varies. No specialization, no quality gates.
 
-**Developers work in isolation:**
+--- OR ---
 
-- Can't parallelize work effectively
-- Unclear task boundaries
-- Duplication of effort
-- Bottlenecks when waiting for reviews
+Claude Code (manual multi-agent - you coordinate):
+  You: "@pm-agent plan this work"
+  You: "now @dev-agent implement the auth module"
+  You: "did I run security scan? let me check... @security run scan"
+  You: "now @qa-agent test this"
+  You: "wait, did the dev finish? let me check state files..."
+  You: "@tech-lead-agent review the code"
+
+Result: Better quality, but YOU manage the workflow. Easy to skip steps.
+```
+
+**Problems:**
+- No separation of concerns (single agent reviews own code)
+- No structured framework (manual multi-agent is ad-hoc)
+- No mandatory quality gates (easy to forget steps)
+- Can't parallelize automatically (you decide and coordinate manually)
+- No metrics or learning over time
+- No automated Skills workflow
 
 ### After BAZINGA
 
-**Development is fast and reliable:**
+**Using BAZINGA: A complete framework following software development best practices:**
 
-- PM breaks work into clear tasks
-- 1-4 developers work in parallel based on complexity
-- Automated quality checks run as code is written (5-60 seconds)
-- QA validates tests, Tech Lead reviews code
-- Issues caught immediately, not days later
-- Feature complete in hours, not days
+- **Structured workflow**: Follows industry-standard SDLC (plan → develop → test → review → deploy)
+- **Automated orchestration**: Framework manages agent coordination, you don't
+- **Autonomous execution**: Long task lists run for hours without interruption, maintaining best practices throughout
+- **Intelligent guidance**: Framework evaluates skip/stop/issue behaviors and recommends best practices to the team
+- **Specialized roles**: PM plans, Developers code, QA tests, Tech Lead reviews
+- **Mandatory quality gates**: Security scans, test coverage, linting run automatically at each step
+- **Skills automation**: 11 Skills automate code analysis, security scanning, pattern detection
+- **Parallel execution**: Framework automatically spawns 1-4 developers based on task complexity
+- **Automatic escalation**: Tech Lead escalates to Opus after 3 failed revisions (no manual intervention)
+- **Velocity tracking**: PM learns from history and improves estimates over time
+- **Separation of concerns**: Authors don't review their own code (enforced by framework)
 
-**Code quality is enforced:**
+**What this looks like:**
 
-- Every change gets security scanned (basic mode: 5-10s, advanced mode: 30-60s)
-- Test coverage tracked automatically
-- Linting catches style issues before review
-- Configurable depth: fast for iteration, thorough for critical work
+```
+You: "Implement JWT authentication with user management"
+     (single command - framework handles the rest)
 
-**Estimates improve over time:**
+BAZINGA Framework executes structured workflow:
 
-- PM tracks velocity (story points per run)
-- Detects stuck tasks (99% rule violations)
-- Learns from history: "Database tasks take 2.5x estimate"
-- User gets realistic progress updates: "60% complete, 3 hours remaining"
+PM Agent:
+  ✓ Analyzes requirements
+  ✓ Breaks into 2 independent task groups
+  ✓ Decides to spawn 2 developers in parallel (automatic)
+  ✓ Tracks velocity using velocity-tracker Skill
 
-**Team works efficiently:**
+Developer-1: Auth module          Developer-2: User management
+  ✓ lint-check Skill (automatic)    ✓ lint-check Skill (automatic)
+  ✓ Writes code + tests              ✓ Writes code + tests
+  ↓                                   ↓
+QA Expert: Validates tests        QA Expert: Validates tests
+  ✓ Runs integration tests          ✓ Runs integration tests
+  ↓                                   ↓
+Tech Lead: Reviews code (both modules)
+  ✓ security-scan Skill (automatic - checks for vulnerabilities)
+  ✓ test-coverage Skill (automatic - validates coverage)
+  ✓ Architectural review
+  ↓
+PM: Confirms completion
+  ✓ All quality gates passed
+  ✓ No blocking tech debt
+  ✓ BAZINGA! ✓
 
-- PM decides 1-4 developers based on task complexity
-- Parallel execution when tasks are independent
-- Clear routing: Dev → QA → Tech Lead → PM
-- Automated quality gates prevent shipping broken code
+Result: High quality + parallelism + automated checks. You wrote one command.
+```
+
+**Benefits:**
+- **Framework enforces best practices**: Can't skip steps (plan → dev → test → review)
+- **Intelligent recommendations**: Detects when agents skip steps, encounter issues, or stop prematurely and suggests corrections
+- **Automated quality checks**: 11 Skills run at appropriate stages (not optional)
+- **Intelligent parallelism**: Framework decides 1-4 developers based on complexity
+- **Complete automation**: You manage the "what", framework manages the "how"
+- **Historical learning**: Metrics improve estimates over time
+- **Repeatable process**: Same workflow every time, zero manual coordination
 
 ---
 
