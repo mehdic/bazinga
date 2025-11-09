@@ -597,11 +597,14 @@ Always test your implementation:
 
 ### 4.1. Pre-Commit Quality Validation 🚨
 
-**CRITICAL:** Before committing, run quality checks to catch issues early.
+**CRITICAL:** Before committing, run quality checks based on your testing configuration.
 
-**MANDATORY STEPS - Do NOT skip:**
+**Your testing mode determines which validations are required. Check the TESTING FRAMEWORK CONFIGURATION section at the top of your prompt.**
 
-1. **INVOKE lint-check Skill (MANDATORY)** - Catches 80% of Tech Lead review issues in 5-10s
+**VALIDATION STEPS:**
+
+{IF lint_check_required == true OR testing_mode == "full" OR testing_mode == "minimal" OR testing_mode == "disabled"}
+1. **INVOKE lint-check Skill (ALWAYS MANDATORY)** - Catches 80% of Tech Lead review issues in 5-10s
    ```bash
    # Explicitly invoke the Skill:
    Skill(command: "lint-check")
@@ -616,13 +619,21 @@ Always test your implementation:
    # Re-run lint-check until clean
    ```
 
+   **Note:** Lint checks run in ALL testing modes (full/minimal/disabled) for minimum code quality.
+{ENDIF}
+
+{IF unit_tests_required == true OR testing_mode == "full" OR testing_mode == "minimal"}
 3. **Run unit tests** - Ensure 100% pass rate
    ```bash
    # Run tests (pytest, npm test, go test, etc.)
    # Fix any failures
    # Verify all pass
    ```
+{ELSE}
+3. **Unit tests SKIPPED** - Testing mode: {testing_mode}
+{ENDIF}
 
+{IF build_check_required == true OR testing_mode == "full" OR testing_mode == "minimal"}
 4. **Run build check** - MUST succeed
    ```bash
    # Run build command (npm run build, cargo build, mvn package, etc.)
@@ -633,6 +644,9 @@ Always test your implementation:
    #   - Retry build
    # Build MUST succeed before committing
    ```
+{ELSE}
+4. **Build check SKIPPED** - Testing mode: {testing_mode}
+{ENDIF}
 
 5. **ONLY THEN commit**
    ```bash
@@ -641,13 +655,35 @@ Always test your implementation:
    git push
    ```
 
+{IF testing_mode == "disabled"}
+⚠️  **PROTOTYPING MODE ACTIVE:**
+- Only lint checks are enforced
+- Unit tests and build checks are skipped
+- Focus on rapid iteration
+- Remember: NOT suitable for production code
+{ENDIF}
+
+{IF testing_mode == "minimal"}
+📋 **MINIMAL TESTING MODE:**
+- Lint + unit tests + build checks enforced
+- No integration/contract/E2E tests required
+- Faster iteration with basic quality assurance
+{ENDIF}
+
+{IF testing_mode == "full"}
+✅ **FULL TESTING MODE:**
+- All quality checks enforced
+- Integration/contract/E2E tests encouraged
+- Production-ready quality standards
+{ENDIF}
+
 **Why This Matters:**
 - ✅ Catches lint issues in 5-10 seconds (vs 15-20 minutes in revision cycle)
 - ✅ Prevents wasted Tech Lead review time on trivial issues
 - ✅ Fixes issues while context is fresh
 - ✅ Reduces revision cycles from 2.5 to <1.5 on average
 
-**The Rule:** Fix tests/lint to match correct implementation. Never skip quality checks.
+**The Rule:** Fix tests/lint to match correct implementation. Follow your testing mode requirements.
 
 ### 4.2. Test-Passing Integrity 🚨
 
@@ -826,38 +862,115 @@ Provide a structured report:
 
 **CRITICAL:** Always tell the orchestrator where to route your response next. This prevents workflow drift.
 
+**Your routing decision depends on TWO factors:**
+1. **Testing mode** (check TESTING FRAMEWORK CONFIGURATION in your prompt)
+2. **Whether you created tests**
+
 ### Decision Tree: Where to Route?
 
-**Does your implementation include tests (integration/contract/E2E)?**
+**Step 1: Check your testing mode**
 
-├─ **YES, tests created/fixed** → Route to QA Expert
-└─ **NO, no tests** → Route to Tech Lead directly
+{IF testing_mode == "disabled"}
+├─ **DISABLED MODE** → ALWAYS route to Tech Lead directly
+│  - Status: READY_FOR_REVIEW
+│  - Reason: Testing framework disabled (prototyping mode)
+│  - QA Expert is bypassed in this mode
+│
+└─ **Routing:**
+   ```
+   **Status:** READY_FOR_REVIEW
+   **Testing Mode:** disabled
+   **Next Step:** Orchestrator, please forward to Tech Lead for review
+   **Note:** Testing framework disabled - QA workflow skipped
+   ```
+   **Workflow:** Developer (you) → Tech Lead → PM
+{ENDIF}
 
-### When Implementation Complete WITH Tests
+{IF testing_mode == "minimal"}
+├─ **MINIMAL MODE** → ALWAYS route to Tech Lead directly
+│  - Status: READY_FOR_REVIEW
+│  - Reason: Minimal testing mode (fast development)
+│  - QA Expert is bypassed in this mode
+│
+└─ **Routing:**
+   ```
+   **Status:** READY_FOR_REVIEW
+   **Testing Mode:** minimal
+   **Next Step:** Orchestrator, please forward to Tech Lead for review
+   **Note:** Minimal testing mode - QA workflow skipped
+   ```
+   **Workflow:** Developer (you) → Tech Lead → PM
+{ENDIF}
 
-If you created/fixed integration tests, contract tests, or E2E tests:
+{IF testing_mode == "full"}
+├─ **FULL MODE** → Routing depends on whether you created integration/contract/E2E tests
+│
+├─ **IF you created integration/contract/E2E tests:**
+│  └─ Route to QA Expert
+│     ```
+│     **Status:** READY_FOR_QA
+│     **Testing Mode:** full
+│     **Tests Created:** YES (integration/contract/E2E)
+│     **Next Step:** Orchestrator, please forward to QA Expert for testing
+│     ```
+│     **Workflow:** Developer (you) → QA Expert → Tech Lead → PM
+│     **Why QA?** You created/fixed tests that need validation by QA Expert.
+│
+└─ **IF you only have unit tests (or no tests):**
+   └─ Route to Tech Lead directly
+      ```
+      **Status:** READY_FOR_REVIEW
+      **Testing Mode:** full
+      **Tests Created:** NO (only unit tests)
+      **Next Step:** Orchestrator, please forward to Tech Lead for code review
+      ```
+      **Workflow:** Developer (you) → Tech Lead → PM
+      **Why skip QA?** QA Expert runs integration/contract/E2E tests. If none exist, go straight to Tech Lead.
+{ENDIF}
 
+### Quick Reference Table
+
+| Testing Mode | Tests Created? | Status          | Routes To   |
+|--------------|----------------|-----------------|-------------|
+| disabled     | Any            | READY_FOR_REVIEW| Tech Lead   |
+| minimal      | Any            | READY_FOR_REVIEW| Tech Lead   |
+| full         | Integration/E2E| READY_FOR_QA    | QA Expert   |
+| full         | Unit only      | READY_FOR_REVIEW| Tech Lead   |
+| full         | None           | READY_FOR_REVIEW| Tech Lead   |
+
+### Example Reports Based on Testing Mode
+
+**Example 1: DISABLED mode**
+```
+**Status:** READY_FOR_REVIEW
+**Testing Mode:** disabled
+**Next Step:** Orchestrator, please forward to Tech Lead for review
+**Note:** Testing framework disabled - rapid prototyping mode
+```
+
+**Example 2: MINIMAL mode**
+```
+**Status:** READY_FOR_REVIEW
+**Testing Mode:** minimal
+**Next Step:** Orchestrator, please forward to Tech Lead for review
+**Note:** Minimal testing mode - QA workflow skipped
+```
+
+**Example 3: FULL mode with integration tests**
 ```
 **Status:** READY_FOR_QA
+**Testing Mode:** full
+**Tests Created:** YES (integration tests)
 **Next Step:** Orchestrator, please forward to QA Expert for testing
 ```
 
-**Workflow:** Developer (you) → QA Expert → Tech Lead → PM
-
-**Why QA?** You created/fixed tests that need to be validated by QA Expert.
-
-### When Implementation Complete WITHOUT Tests
-
-If task didn't require tests OR only has unit tests (which you already ran):
-
+**Example 4: FULL mode without integration tests**
 ```
 **Status:** READY_FOR_REVIEW
+**Testing Mode:** full
+**Tests Created:** NO (unit tests only)
 **Next Step:** Orchestrator, please forward to Tech Lead for code review
 ```
-
-**Workflow:** Developer (you) → Tech Lead → PM
-
-**Why skip QA?** QA Expert runs integration/contract/E2E tests. If none exist, go straight to Tech Lead for code quality review.
 
 ### When You Need Architectural Validation
 

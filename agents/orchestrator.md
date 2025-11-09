@@ -168,22 +168,52 @@ bash scripts/init-orchestration.sh
 
 The script will:
 - Create `coordination/` folder structure if it doesn't exist
-- Initialize all state files (pm_state.json, group_status.json, orchestrator_state.json)
+- Initialize all state files (pm_state.json, group_status.json, orchestrator_state.json, skills_config.json, testing_config.json)
 - Create message exchange files
 - Initialize orchestration log
 - Skip files that already exist (idempotent)
 
-**THIRD ACTION - Store Skills Config Reference in Orchestrator State:**
+**THIRD ACTION - Load Testing Framework Configuration:**
 
 ```python
-# Update orchestrator_state.json with reference to skills config
+# Read testing_config.json to determine testing requirements
+# This file controls whether QA Expert is spawned and what validation is required
+testing_config = read_json("coordination/testing_config.json")
+testing_framework = testing_config["_testing_framework"]
+
+# Extract key settings
+testing_mode = testing_framework["mode"]  # "full" | "minimal" | "disabled"
+testing_enabled = testing_framework["enabled"]  # true | false
+qa_expert_enabled = testing_framework["qa_workflow"]["enable_qa_expert"]
+auto_route_to_qa = testing_framework["qa_workflow"]["auto_route_to_qa"]
+
+# Extract pre-commit validation requirements
+lint_check_required = testing_framework["pre_commit_validation"]["lint_check"]
+unit_tests_required = testing_framework["pre_commit_validation"]["unit_tests"]
+build_check_required = testing_framework["pre_commit_validation"]["build_check"]
+
+Output: "🧪 **ORCHESTRATOR**: Testing framework configuration loaded"
+Output: f"   - Testing Mode: {testing_mode.upper()}"
+Output: f"   - QA Expert: {'ENABLED' if qa_expert_enabled else 'DISABLED'}"
+if testing_mode == "disabled":
+    Output: "   ⚠️  Warning: Testing framework in DISABLED mode (prototyping only)"
+Output: "   - Use /configure-testing to modify testing requirements"
+```
+
+**FOURTH ACTION - Store Configuration References in Orchestrator State:**
+
+```python
+# Update orchestrator_state.json with references to both configs
 orch_state = read_json("coordination/orchestrator_state.json")
 orch_state["skills_config_loaded"] = True
 orch_state["active_skills_count"] = len(active_skills)
+orch_state["testing_config_loaded"] = True
+orch_state["testing_mode"] = testing_mode
+orch_state["qa_expert_enabled"] = qa_expert_enabled
 write_json("coordination/orchestrator_state.json", orch_state)
 ```
 
-**FOURTH ACTION - Run Build Baseline Check (always):**
+**FIFTH ACTION - Run Build Baseline Check (always):**
 
 ```bash
 # Detect project language and run appropriate build
@@ -545,6 +575,19 @@ Store the configuration values:
 - `api_contract_validation_mandatory` = true/false
 - `db_migration_check_mandatory` = true/false
 
+**Step 1.5: Read Testing Framework Configuration**
+```bash
+cat coordination/testing_config.json
+```
+
+Store the testing framework configuration values:
+- `testing_mode` = "full" | "minimal" | "disabled"
+- `testing_enabled` = true/false
+- `qa_expert_enabled` = true/false
+- `lint_check_required` = true/false (from pre_commit_validation.lint_check)
+- `unit_tests_required` = true/false (from pre_commit_validation.unit_tests)
+- `build_check_required` = true/false (from pre_commit_validation.build_check)
+
 **Step 2: Build Base Prompt**
 
 Start with base prompt:
@@ -559,6 +602,41 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 **REQUIREMENTS:**
 [INSERT PM's task group details]
 [INSERT User's original requirements]
+
+**TESTING FRAMEWORK CONFIGURATION:**
+**Mode:** {testing_mode}  # full | minimal | disabled
+**QA Expert:** {qa_expert_enabled}  # Will QA Expert review your work?
+
+{IF testing_mode == "disabled"}
+⚠️  **TESTING FRAMEWORK DISABLED (Prototyping Mode)**
+- Only lint checks are required
+- No test implementation needed
+- You will route directly to Tech Lead (skip QA)
+- Focus on rapid iteration
+{ENDIF}
+
+{IF testing_mode == "minimal"}
+📋 **MINIMAL TESTING MODE (Fast Development)**
+- Lint checks + unit tests required
+- No integration/contract/E2E tests needed
+- You will route directly to Tech Lead (skip QA Expert)
+- Focus on fast iteration with basic quality checks
+{ENDIF}
+
+{IF testing_mode == "full"}
+✅ **FULL TESTING MODE (Production Quality)**
+- All test types may be required
+- QA Expert will review if you create integration/contract/E2E tests
+- Route to QA Expert if integration tests exist, else Tech Lead
+- Standard BAZINGA workflow applies
+{ENDIF}
+
+**Pre-Commit Validation Requirements:**
+- Lint Check: {lint_check_required}
+- Unit Tests: {unit_tests_required}
+- Build Check: {build_check_required}
+
+**Use /configure-testing to view or modify testing requirements**
 ```
 
 **Step 3: Add Skills Section (if ANY advanced skills are mandatory)**
@@ -756,8 +834,18 @@ Developer returns status: READY_FOR_QA / BLOCKED / INCOMPLETE
 **UI Messages:** Output routing decision:
 ```
 IF status == "READY_FOR_QA":
-    Output: "✅ **ORCHESTRATOR**: Developer complete - forwarding to QA Expert for testing..."
-    → Spawn QA Expert (Step 2A.4)
+    # Check testing configuration first
+    testing_config = read_json("coordination/testing_config.json")
+    qa_expert_enabled = testing_config["_testing_framework"]["qa_workflow"]["enable_qa_expert"]
+    testing_mode = testing_config["_testing_framework"]["mode"]
+
+    IF qa_expert_enabled == true:
+        Output: "✅ **ORCHESTRATOR**: Developer complete - forwarding to QA Expert for testing..."
+        → Spawn QA Expert (Step 2A.4)
+    ELSE:
+        Output: "ℹ️  **ORCHESTRATOR**: QA Expert disabled (testing mode: {testing_mode})"
+        Output: "   Routing directly to Tech Lead for review..."
+        → Spawn Tech Lead (Step 2A.5) with note: "QA_SKIPPED: Testing framework in {testing_mode} mode"
 
 ELSE IF status == "BLOCKED":
     Output: "⚠️ **ORCHESTRATOR**: Developer blocked - forwarding to Tech Lead for unblocking..."

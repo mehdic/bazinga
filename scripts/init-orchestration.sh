@@ -131,6 +131,62 @@ else
     echo "✓ skills_config.json already exists"
 fi
 
+# Initialize testing_config.json
+if [ ! -f "coordination/testing_config.json" ]; then
+    echo "📝 Creating testing_config.json..."
+    cat > coordination/testing_config.json <<EOF
+{
+  "_testing_framework": {
+    "enabled": true,
+    "mode": "full",
+    "_mode_options": ["full", "minimal", "disabled"],
+
+    "pre_commit_validation": {
+      "lint_check": true,
+      "unit_tests": true,
+      "build_check": true,
+      "_note": "lint_check should always be true for code quality"
+    },
+
+    "test_requirements": {
+      "require_integration_tests": true,
+      "require_contract_tests": true,
+      "require_e2e_tests": true,
+      "coverage_threshold": 80,
+      "_note": "These only apply when mode=full"
+    },
+
+    "qa_workflow": {
+      "enable_qa_expert": true,
+      "auto_route_to_qa": true,
+      "qa_skills_enabled": true,
+      "_note": "Disable enable_qa_expert to skip QA workflow entirely"
+    }
+  },
+
+  "_metadata": {
+    "description": "Testing framework configuration for BAZINGA",
+    "created": "$TIMESTAMP",
+    "last_updated": "$TIMESTAMP",
+    "version": "1.0",
+    "presets": {
+      "full": "All testing enabled - complete QA workflow",
+      "minimal": "Lint + unit tests only, skip QA Expert",
+      "disabled": "Only lint checks - fastest iteration"
+    },
+    "notes": [
+      "Use /configure-testing to modify this configuration interactively",
+      "Mode 'full' preserves current BAZINGA behavior (recommended for production)",
+      "Mode 'minimal' skips QA Expert but keeps basic quality checks",
+      "Mode 'disabled' is for rapid prototyping only (lint checks still run)"
+    ]
+  }
+}
+EOF
+else
+    echo "✓ testing_config.json already exists"
+fi
+
 # Initialize message files
 MESSAGE_FILES=(
     "coordination/messages/dev_to_qa.json"
@@ -176,8 +232,9 @@ if [ ! -f "coordination/.gitignore" ]; then
 # Coordination state files are temporary and should not be committed
 *.json
 
-# EXCEPT skills_config.json - this is permanent configuration
+# EXCEPT these files - they are permanent configuration
 !skills_config.json
+!testing_config.json
 
 # Reports are ephemeral - generated per session
 reports/
