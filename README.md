@@ -89,6 +89,7 @@ Result: Better quality, but YOU manage the workflow. Easy to skip steps.
 
 - **Structured workflow**: Follows industry-standard SDLC (plan → develop → test → review → deploy)
 - **Automated orchestration**: Framework manages agent coordination, you don't
+- **Autonomous execution**: Long task lists run for hours without interruption, maintaining best practices throughout
 - **Specialized roles**: PM plans, Developers code, QA tests, Tech Lead reviews
 - **Mandatory quality gates**: Security scans, test coverage, linting run automatically at each step
 - **Skills automation**: 11 Skills automate code analysis, security scanning, pattern detection
