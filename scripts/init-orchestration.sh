@@ -138,7 +138,7 @@ if [ ! -f "coordination/testing_config.json" ]; then
 {
   "_testing_framework": {
     "enabled": true,
-    "mode": "full",
+    "mode": "minimal",
     "_mode_options": ["full", "minimal", "disabled"],
 
     "pre_commit_validation": {
@@ -149,17 +149,17 @@ if [ ! -f "coordination/testing_config.json" ]; then
     },
 
     "test_requirements": {
-      "require_integration_tests": true,
-      "require_contract_tests": true,
-      "require_e2e_tests": true,
-      "coverage_threshold": 80,
+      "require_integration_tests": false,
+      "require_contract_tests": false,
+      "require_e2e_tests": false,
+      "coverage_threshold": 0,
       "_note": "These only apply when mode=full"
     },
 
     "qa_workflow": {
-      "enable_qa_expert": true,
-      "auto_route_to_qa": true,
-      "qa_skills_enabled": true,
+      "enable_qa_expert": false,
+      "auto_route_to_qa": false,
+      "qa_skills_enabled": false,
       "_note": "Disable enable_qa_expert to skip QA workflow entirely"
     }
   },
@@ -171,13 +171,13 @@ if [ ! -f "coordination/testing_config.json" ]; then
     "version": "1.0",
     "presets": {
       "full": "All testing enabled - complete QA workflow",
-      "minimal": "Lint + unit tests only, skip QA Expert",
+      "minimal": "Lint + unit tests only, skip QA Expert (DEFAULT)",
       "disabled": "Only lint checks - fastest iteration"
     },
     "notes": [
       "Use /configure-testing to modify this configuration interactively",
-      "Mode 'full' preserves current BAZINGA behavior (recommended for production)",
-      "Mode 'minimal' skips QA Expert but keeps basic quality checks",
+      "Mode 'minimal' is the default - balances speed and quality (current BAZINGA default)",
+      "Mode 'full' enables complete QA workflow for production-critical code",
       "Mode 'disabled' is for rapid prototyping only (lint checks still run)"
     ]
   }
