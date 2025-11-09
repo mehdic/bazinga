@@ -538,8 +538,9 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 
 **MANDATORY - Before Committing**:
 ```bash
-# Run lint-check to catch style/quality issues BEFORE committing
-# The lint-check Skill will auto-invoke when you're about to commit
+# INVOKE lint-check Skill explicitly to catch issues BEFORE committing
+Skill(command: "lint-check")
+
 # Read results and fix all issues before proceeding
 cat coordination/lint_results.json
 ```
@@ -600,9 +601,11 @@ Always test your implementation:
 
 **MANDATORY STEPS - Do NOT skip:**
 
-1. **Run lint-check Skill** - Catches 80% of Tech Lead review issues in 5-10s
+1. **INVOKE lint-check Skill (MANDATORY)** - Catches 80% of Tech Lead review issues in 5-10s
    ```bash
-   # The lint-check Skill will auto-run OR invoke it explicitly
+   # Explicitly invoke the Skill:
+   Skill(command: "lint-check")
+
    # Read results:
    cat coordination/lint_results.json
    ```

@@ -642,10 +642,10 @@ At end of each run (before BAZINGA), **reflect and learn**:
     "lessons_learned": [
       "Database migrations: budget 2.5x initial estimate",
       "Emphasize unit test coverage in dev prompt",
-      "Use /velocity-tracker after each group completion"
+      "Invoke velocity-tracker Skill after each group completion"
     ],
     "improvements_for_next_time": [
-      "Check /velocity-tracker every 30 minutes",
+      "Invoke velocity-tracker Skill every 30 minutes for progress tracking",
       "Escalate tasks stuck >2x average immediately",
       "Add DB migration warning to developer prompts"
     ]
