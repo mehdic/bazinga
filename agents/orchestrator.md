@@ -1878,6 +1878,85 @@ orch_state = read_file("coordination/orchestrator_state.json")
 security_scan = safe_read_json("coordination/security_scan.json")
 coverage_report = safe_read_json("coordination/coverage_report.json")
 lint_results = safe_read_json("coordination/lint_results.json")
+velocity_tracker = safe_read_json("coordination/project_metrics.json")
+codebase_analysis = safe_read_json("coordination/codebase_analysis.json")
+test_patterns = safe_read_json("coordination/test_patterns.json")
+api_contract = safe_read_json("coordination/api_contract_results.json")
+db_migration = safe_read_json("coordination/db_migration_results.json")
+pattern_miner = safe_read_json("coordination/pattern_insights.json")
+quality_dashboard = safe_read_json("coordination/quality_dashboard.json")
+
+# Aggregate Skills usage
+skills_used = []
+if security_scan:
+    skills_used.append({
+        "name": "security-scan",
+        "status": security_scan.get("status", "unknown"),
+        "summary": f"{len(security_scan.get('results', []))} findings"
+    })
+if coverage_report:
+    avg_cov = coverage_report.get("summary", {}).get("line_coverage", 0)
+    skills_used.append({
+        "name": "test-coverage",
+        "status": coverage_report.get("status", "unknown"),
+        "summary": f"{avg_cov}% average coverage"
+    })
+if lint_results:
+    total_issues = len(lint_results.get("results", []))
+    skills_used.append({
+        "name": "lint-check",
+        "status": lint_results.get("status", "unknown"),
+        "summary": f"{total_issues} issues found"
+    })
+if velocity_tracker:
+    velocity = velocity_tracker.get("current_run", {}).get("velocity", 0)
+    skills_used.append({
+        "name": "velocity-tracker",
+        "status": "success",
+        "summary": f"{velocity} points completed"
+    })
+if codebase_analysis:
+    patterns = len(codebase_analysis.get("patterns_found", []))
+    skills_used.append({
+        "name": "codebase-analysis",
+        "status": codebase_analysis.get("status", "unknown"),
+        "summary": f"Found {patterns} patterns"
+    })
+if test_patterns:
+    framework = test_patterns.get("framework", "unknown")
+    skills_used.append({
+        "name": "test-pattern-analysis",
+        "status": test_patterns.get("status", "unknown"),
+        "summary": f"Framework: {framework}"
+    })
+if api_contract:
+    changes = len(api_contract.get("breaking_changes", []))
+    skills_used.append({
+        "name": "api-contract-validation",
+        "status": api_contract.get("status", "unknown"),
+        "summary": f"{changes} breaking changes"
+    })
+if db_migration:
+    risks = len(db_migration.get("dangerous_operations", []))
+    skills_used.append({
+        "name": "db-migration-check",
+        "status": db_migration.get("status", "unknown"),
+        "summary": f"{risks} risky operations"
+    })
+if pattern_miner:
+    insights = len(pattern_miner.get("patterns", []))
+    skills_used.append({
+        "name": "pattern-miner",
+        "status": pattern_miner.get("status", "unknown"),
+        "summary": f"{insights} patterns identified"
+    })
+if quality_dashboard:
+    score = quality_dashboard.get("health_score", 0)
+    skills_used.append({
+        "name": "quality-dashboard",
+        "status": quality_dashboard.get("status", "unknown"),
+        "summary": f"Health score: {score}/100"
+    })
 
 # Read baseline health checks
 build_baseline_status = safe_read_file("coordination/build_baseline_status.txt")
@@ -2061,6 +2140,26 @@ Output to user (keep under 30 lines):
 **Coverage**: {coverage_status} {coverage_avg}% average (target: 80%)
 **Lint**: {lint_status} ({lint_summary})
 **Build**: {build_health["final"]}
+
+## Skills Used
+
+{Read all Skills result files and summarize which ran}
+{Parse coordination/*.json files for Skills results}
+
+**Skills Invoked**: {count} of 11 available
+{FOR each Skill that ran}:
+- **{skill_name}**: {status_emoji} {status} - {brief_summary}
+{END FOR}
+
+{Examples of status display}:
+- **security-scan**: ✅ Success - 0 vulnerabilities found
+- **lint-check**: ✅ Success - 12 issues fixed
+- **test-coverage**: ✅ Success - 87.5% average coverage
+- **velocity-tracker**: ✅ Success - 12 points completed
+- **codebase-analysis**: ✅ Success - Found 3 similar patterns
+- **pattern-miner**: ⚠️ Partial - Limited historical data
+
+📁 **Detailed results**: See `coordination/` folder for full JSON outputs
 
 ## Efficiency
 
