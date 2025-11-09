@@ -267,8 +267,6 @@ for change in breaking_changes:
 
 ## Integration
 
-This Skill is available in:
-- **Superpowers Mode**: Developer must check before committing API changes
-- **Standard Mode**: Not available (time-sensitive)
+This Skill is configurable via `/configure-skills` command.
 
-Orchestrator injects this Skill into Developer prompt when superpowers mode is active and API changes are detected.
+When marked as 'mandatory' in skills_config.json, the Orchestrator automatically invokes this Skill when API changes are detected before Developer commits.

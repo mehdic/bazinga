@@ -2,220 +2,310 @@
 
 > **Repository:** https://github.com/mehdic/bazinga
 
-This directory contains comprehensive documentation for BAZINGA (Claude Code Multi-Agent Dev Team).
+This directory contains comprehensive documentation for BAZINGA (Claude Code Multi-Agent Dev Team), organized to help you find what you need quickly.
 
-## 📚 Documentation Organization
+---
 
-### Main Documentation
+## 🚀 For New Users - Start Here
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[ARCHITECTURE.md](ARCHITECTURE.md)** | Technical deep-dive into system design | Developers, Architects |
-| **[ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md)** | Detailed explanation of 6-layer defense system | System designers |
-| **[SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md)** | Case study of orchestrator role drift issue | Troubleshooters |
+If you're new to BAZINGA, start with these three documents:
 
-### Original Development Documentation (Historical)
+### 1. **[../README.md](../README.md)** - Project Overview
+**Length**: ~200 lines | **Time to read**: 10 minutes
+- What is BAZINGA?
+- Quick start overview
+- Key concepts at a glance
 
-Located in `historical-dev-docs/` - Historical documentation from the development:
+**Next step**: Run through examples to see it in action.
 
-| Document | Purpose | Content |
-|----------|---------|---------|
-| **[V4_ARCHITECTURE.md](historical-dev-docs/V4_ARCHITECTURE.md)** | Original architecture specification | System design, agent roles |
-| **[V4_IMPLEMENTATION_SUMMARY.md](historical-dev-docs/V4_IMPLEMENTATION_SUMMARY.md)** | Implementation history and decisions | Development notes |
-| **[V4_STATE_SCHEMAS.md](historical-dev-docs/V4_STATE_SCHEMAS.md)** | State file schemas and structures | JSON schemas, examples |
-| **[V4_WORKFLOW_DIAGRAMS.md](historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md)** | Visual workflow representations | Diagrams, flow charts |
+---
 
-## 🎯 Reading Guide
+### 2. **[SKILLS.md](SKILLS.md)** - Configurable Quality Analysis Tools
+**Length**: ~1,000 lines | **Time to read**: 15-20 minutes
+- What are Skills and why configure them?
+- 11 available Skills explained (lint-check, security-scan, test-coverage, etc.)
+- Configuration presets: fast, advanced, custom
+- Language support (Python, JavaScript, Go, Java, Ruby)
+- `/configure-skills` command tutorial
 
-### For Quick Start
-1. Start with **[../README.md](../README.md)** (project overview)
-2. Read **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** (usage examples)
-3. Refer to **ARCHITECTURE.md** for technical details as needed
+**Perfect for**: Understanding what quality checks run during your workflows.
 
-### For Understanding System Design
-1. **ARCHITECTURE.md** - Complete technical specification
-2. **historical-dev-docs/V4_ARCHITECTURE.md** - Original design document
-3. **historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md** - Visual representations
+---
 
-### For Preventing Issues
-1. **ROLE_DRIFT_PREVENTION.md** - Understanding the 6-layer defense
-2. **SCOPE_REDUCTION_INCIDENT.md** - Learn from past issues
-3. **ARCHITECTURE.md** (Role Drift Prevention section)
+### 3. **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** - See It In Action
+**Length**: ~350 lines | **Time to read**: 10-15 minutes
+- Real workflow examples
+- How agents interact with each other
+- Decision points and branching
 
-### For State Management
-1. **historical-dev-docs/V4_STATE_SCHEMAS.md** - Complete schema definitions
-2. **ARCHITECTURE.md** (State Management section)
-3. **[../scripts/README.md](../scripts/README.md)** - Initialization guide
+**Perfect for**: Learning by example before reading technical docs.
 
-### For Development History
-1. **historical-dev-docs/V4_IMPLEMENTATION_SUMMARY.md** - Development journey
-2. **SCOPE_REDUCTION_INCIDENT.md** - Key turning point
-3. **ROLE_DRIFT_PREVENTION.md** - Solution evolution
+---
 
-## 📖 Document Summaries
+## 🏗️ Core Concepts - Deep Technical Dives
 
-### ARCHITECTURE.md
-**Length**: ~1,100 lines
+Once familiar with basics, these documents explain how BAZINGA works:
+
+### 4. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System Design & Technical Specifications
+**Length**: ~1,100 lines | **Time to read**: 30-40 minutes
 **Sections**:
-- System Overview
-- Agent Definitions (5 agents)
-- Workflow Patterns (5 types)
-- Role Drift Prevention (6 layers)
-- State Management
-- Routing Mechanism
-- Tool Restrictions
-- Decision Logic
+- System Overview (workflow types, agent roles)
+- Agent Definitions (5 agents: Developer, Tech Lead, QA Expert, PM, Orchestrator)
+- Workflow Patterns (5 routing strategies)
+- Role Drift Prevention (6-layer defense system)
+- State Management (coordination files)
+- Routing Mechanism (how requests flow)
+- Tool Restrictions (what each agent can do)
+- Decision Logic (conditional routing)
 
-**Use when**: You need technical specifications, implementation details, or system behavior understanding.
+**Read this for**: Technical specifications, implementation details, system behavior.
 
-### ROLE_DRIFT_PREVENTION.md
-**Length**: ~350 lines
+**Cross-reference**:
+- Link to [ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md) for detailed defense system
+- Link to [MODEL_ESCALATION.md](MODEL_ESCALATION.md) for escalation strategy
+- Link to historical-dev-docs for original vision
+
+---
+
+### 5. **[ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md)** - Preventing Agent Confusion
+**Length**: ~350 lines | **Time to read**: 15-20 minutes
 **Sections**:
-- Problem Definition
-- Research Findings
-- 6-Layer Defense System
-- Layer Details
-- Implementation Guide
+- Problem Definition (why agents drift from their roles)
+- Research Findings (real cases of drift)
+- 6-Layer Defense System (tooling, constraints, prompts, monitoring)
+- Implementation Guide (how each layer works)
 - Effectiveness Analysis
 
-**Use when**: You're experiencing role drift issues or want to understand how the prevention system works.
+**Read this for**: Understanding how we prevent agents from doing the wrong job.
 
-### SCOPE_REDUCTION_INCIDENT.md
-**Length**: ~150 lines
+**Cross-reference**:
+- Link to [SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md) for real case study
+- Link to [ARCHITECTURE.md](ARCHITECTURE.md) Tool Restrictions section
+
+---
+
+### 6. **[MODEL_ESCALATION.md](MODEL_ESCALATION.md)** - Intelligent Cost-Effective Model Selection
+**Length**: ~423 lines | **Time to read**: 15-20 minutes
 **Sections**:
-- The Incident
-- Root Cause Analysis
-- Solution Implemented
-- Lessons Learned
+- The Problem (why revisions persist)
+- The Solution (automatic escalation strategy)
+- How It Works (step-by-step)
+- Progressive Analysis (basic vs advanced Skills)
+- Real-World Examples (JWT authentication case study)
+- Implementation Details (revision tracking, model parameters)
+- Best Practices (for developers, PMs, tech leads)
 
-**Use when**: Troubleshooting orchestrator behavior or understanding why certain constraints exist.
+**Read this for**: Understanding how BAZINGA automatically picks Sonnet vs Opus based on revision count.
 
-### historical-dev-docs/V4_ARCHITECTURE.md
-**Length**: ~580 lines
-**Focus**: Original system design specifications
+**Key insight**: After 3 revisions, escalate to Opus for deeper analysis. This saves money and time vs staying with fast reviews.
 
-**Use when**: You want to see the original vision or compare with current implementation.
+**Cross-reference**:
+- Link to [SKILLS.md](SKILLS.md) for security-scan mode escalation
+- Link to [PM_METRICS.md](PM_METRICS.md) for revision tracking data
 
-### historical-dev-docs/V4_IMPLEMENTATION_SUMMARY.md
-**Length**: ~350 lines
-**Focus**: Development history, decisions, iterations
+---
 
-**Use when**: Understanding why certain design choices were made.
+### 7. **[PM_METRICS.md](PM_METRICS.md)** - Data-Driven Project Management
+**Length**: ~668 lines | **Time to read**: 20-30 minutes
+**Sections**:
+- The Problem (why metrics matter)
+- Velocity Tracker Skill (what it provides)
+- 99% Rule Detection (catching stuck tasks)
+- Metrics Dashboard (what's tracked)
+- Advanced Capabilities (Tier 2 & 3)
+- Historical Learning (pattern-miner for predictions)
+- Real PM Decision-Making Scenarios
+- Configuration & Enabling
 
-### historical-dev-docs/V4_STATE_SCHEMAS.md
-**Length**: ~710 lines
-**Focus**: JSON schema definitions, examples, validation
+**Read this for**: Understanding how PM makes data-driven decisions and detects problems early.
 
-**Use when**: Working with state files, debugging state issues, or extending the system.
+**Key metrics**:
+- Velocity (story points per run)
+- Cycle time (hours per task)
+- Revision rate (iterations needed)
+- Risk score (escalation triggers)
+- Efficiency ratio (workload monitoring)
 
-### historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md
-**Length**: ~2,100 lines
-**Focus**: Visual workflow representations, ASCII diagrams
+**Cross-reference**:
+- Link to [SKILLS.md](SKILLS.md) for velocity-tracker and pattern-miner Skills
+- Link to [MODEL_ESCALATION.md](MODEL_ESCALATION.md) for revision tracking
 
-**Use when**: You need visual understanding of workflows or want to create documentation.
+---
 
-## 🔍 Finding Information
+## 🎯 Specific Features - How-To Guides
 
-### By Topic
+### 8. **[TECH_DEBT_GUIDE.md](TECH_DEBT_GUIDE.md)** - Managing Technical Debt Responsibly
+**Length**: ~253 lines | **Time to read**: 10 minutes
+**Sections**:
+- Core Principle: "Try First, Log Later"
+- When Tech Debt is Appropriate (and when it's NOT)
+- Decision Framework (4 questions before logging)
+- Tech Debt Categories (valid vs invalid examples)
+- How to Log Tech Debt (Python helper)
+- Severity Guidelines (CRITICAL to LOW)
+- Integration with Workflow (developer → tech lead → PM)
 
-**Agent Behavior**:
-- ARCHITECTURE.md → Agent Definitions section
-- historical-dev-docs/V4_ARCHITECTURE.md → Agent specifications
+**Read this for**: Understanding what counts as legitimate tech debt vs lazy shortcuts.
 
-**Workflow Routing**:
-- ARCHITECTURE.md → Routing Mechanism section
-- historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md → Visual flows
-- ../examples/EXAMPLES.md → Practical examples
+**Key rule**: Spend 30+ minutes trying to fix it. Document your attempts. Then log if truly out of scope.
 
-**Role Drift Prevention**:
-- ROLE_DRIFT_PREVENTION.md → Complete analysis
-- ARCHITECTURE.md → Role Drift Prevention section
-- SCOPE_REDUCTION_INCIDENT.md → Case study
+---
 
-**State Management**:
-- historical-dev-docs/V4_STATE_SCHEMAS.md → Schema definitions
-- ARCHITECTURE.md → State Management section
-- ../scripts/README.md → Initialization
+### 9. **[SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md)** - Case Study: Learning from Mistakes
+**Length**: ~150 lines | **Time to read**: 10 minutes
+**Sections**:
+- The Incident (what went wrong)
+- Root Cause Analysis (why it happened)
+- Solution Implemented (how we fixed it)
+- Lessons Learned (what we take forward)
 
-**Decision Logic**:
-- ARCHITECTURE.md → Decision Logic section
-- historical-dev-docs/V4_IMPLEMENTATION_SUMMARY.md → Evolution
+**Read this for**: Real example of role drift, how it was caught, and what changes prevent it now.
 
-**Tool Restrictions**:
-- ARCHITECTURE.md → Tool Restrictions section
-- Agent definition files (../agents/*.md) → Per-agent tools
+**Related**: [ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md) explains the defense system built after this incident.
 
-### By Question
+---
 
-**"How does the orchestrator decide where to route?"**
-→ ARCHITECTURE.md (Routing Mechanism) + historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md
+## 📚 Original Documentation - Historical Reference
 
-**"Why does PM never use Edit tool?"**
-→ ARCHITECTURE.md (Tool Restrictions) + ROLE_DRIFT_PREVENTION.md
+Located in **`historical-dev-docs/`** - These are historical records of BAZINGA's development. They're preserved for reference but not actively maintained.
 
-**"How does conditional routing work (tests vs no tests)?"**
-→ ARCHITECTURE.md (Workflow Patterns) + ../examples/EXAMPLES.md
+### Original Architecture Documents
 
-**"What's the JSON structure of state files?"**
-→ historical-dev-docs/V4_STATE_SCHEMAS.md
+| Document | Length | Purpose |
+|----------|--------|---------|
+| **[V4_ARCHITECTURE.md](historical-dev-docs/V4_ARCHITECTURE.md)** | ~580 lines | Original system design as envisioned in V4 |
+| **[V4_IMPLEMENTATION_SUMMARY.md](historical-dev-docs/V4_IMPLEMENTATION_SUMMARY.md)** | ~350 lines | Development journey and design decisions |
+| **[V4_STATE_SCHEMAS.md](historical-dev-docs/V4_STATE_SCHEMAS.md)** | ~710 lines | JSON schemas for all coordination files |
+| **[V4_WORKFLOW_DIAGRAMS.md](historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md)** | ~2,100 lines | ASCII diagrams and visual flows |
 
-**"How do I prevent role drift in my own agents?"**
-→ ROLE_DRIFT_PREVENTION.md + SCOPE_REDUCTION_INCIDENT.md
+**When to use**: Comparing original vision with current implementation, or understanding design evolution.
 
-**"What happened during development that led to current design?"**
-→ historical-dev-docs/V4_IMPLEMENTATION_SUMMARY.md + SCOPE_REDUCTION_INCIDENT.md
+---
 
-**"How do parallel workflows work?"**
-→ ARCHITECTURE.md (Workflow Patterns) + historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md
+## 🔍 Finding Information by Topic
+
+### Quick Topic Lookup
+
+**Agent Behavior**
+- [ARCHITECTURE.md](ARCHITECTURE.md) → Agent Definitions section
+- [../agents/](../agents/) → Per-agent capability files
+
+**Workflow Routing**
+- [ARCHITECTURE.md](ARCHITECTURE.md) → Routing Mechanism section
+- [historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md](historical-dev-docs/V4_WORKFLOW_DIAGRAMS.md) → Visual flows
+- [../examples/EXAMPLES.md](../examples/EXAMPLES.md) → Practical examples
+
+**Quality & Skills Configuration**
+- [SKILLS.md](SKILLS.md) → All 11 Skills explained
+- [ARCHITECTURE.md](ARCHITECTURE.md) → Tool Restrictions section
+- [../agents/](../agents/) → Agent capability files
+
+**Code Review & Model Escalation**
+- [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → Strategy & implementation
+- [ARCHITECTURE.md](ARCHITECTURE.md) → Role Drift Prevention section
+- [SKILLS.md](SKILLS.md) → Security-scan progressive modes
+
+**Project Management & Metrics**
+- [PM_METRICS.md](PM_METRICS.md) → Velocity, cycle time, risk scoring
+- [SKILLS.md](SKILLS.md) → velocity-tracker and pattern-miner Skills
+- [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → Revision tracking
+
+**Role Drift Prevention**
+- [ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md) → Complete 6-layer system
+- [SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md) → Real case study
+- [ARCHITECTURE.md](ARCHITECTURE.md) → Role Drift Prevention section
+
+**State Management & Configuration**
+- [historical-dev-docs/V4_STATE_SCHEMAS.md](historical-dev-docs/V4_STATE_SCHEMAS.md) → Schema definitions
+- [ARCHITECTURE.md](ARCHITECTURE.md) → State Management section
+- [../scripts/README.md](../scripts/README.md) → Initialization
+
+**Technical Debt**
+- [TECH_DEBT_GUIDE.md](TECH_DEBT_GUIDE.md) → When to log, how to log, guidelines
+- [ARCHITECTURE.md](ARCHITECTURE.md) → Tool Restrictions (why certain limits exist)
+- [PM_METRICS.md](PM_METRICS.md) → Quality gates section
+
+---
+
+## 🤔 Common Questions → Documentation Map
+
+| Question | Read This |
+|----------|-----------|
+| "How do I configure Skills?" | [SKILLS.md](SKILLS.md) → Quick Start section + `/configure-skills` |
+| "What are the 11 available Skills?" | [SKILLS.md](SKILLS.md) → Available Skills section (both default & advanced) |
+| "How does model escalation work?" | [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → How It Works section |
+| "What does the PM track?" | [PM_METRICS.md](PM_METRICS.md) → Velocity Tracker section |
+| "How do we prevent role drift?" | [ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md) → 6-Layer Defense System |
+| "What happened in the scope incident?" | [SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md) |
+| "When is tech debt appropriate?" | [TECH_DEBT_GUIDE.md](TECH_DEBT_GUIDE.md) → Decision Framework |
+| "How does orchestrator route requests?" | [ARCHITECTURE.md](ARCHITECTURE.md) → Routing Mechanism section |
+| "What are the 5 workflow patterns?" | [ARCHITECTURE.md](ARCHITECTURE.md) → Workflow Patterns section |
+| "What tools can each agent use?" | [ARCHITECTURE.md](ARCHITECTURE.md) → Tool Restrictions section |
+| "How do we catch stuck tasks?" | [PM_METRICS.md](PM_METRICS.md) → 99% Rule Detection section |
+| "Why are security scans progressive?" | [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → Progressive Analysis section |
+
+---
 
 ## 📊 Documentation Statistics
 
-**Total Documentation**: ~5,900 lines across 7 files
-**Main Docs**: ~1,600 lines (3 files)
-**Original Historical Docs**: ~3,900 lines (4 files)
-**Agent Definitions**: ~4,200 lines (5 files in ../agents/)
-**Examples**: ~350 lines (1 file in ../examples/)
+**Active Documentation**: ~3,900 lines across 7 main files
+- **For New Users**: 1 file (~200 lines)
+- **Core Concepts**: 4 files (~3,000 lines)
+- **Specific Features**: 2 files (~400 lines)
 
-**Grand Total**: ~10,500+ lines of comprehensive documentation
+**Historical Documentation**: ~3,900 lines across 4 files (preserved for reference)
+
+**Total**: ~7,800+ lines of comprehensive documentation
+
+**Agent Definitions**: ~4,200 lines (in ../agents/)
+**Examples**: ~350 lines (in ../examples/)
+**Scripts**: ~500 lines (in ../scripts/)
+
+**Grand Total**: ~12,800+ lines of documentation and reference material
+
+---
 
 ## 🤝 Contributing to Documentation
 
 When adding new documentation:
 
-1. **Main docs/** - For current system specifications
-2. **historical-dev-docs/** - Do not modify (historical record)
-3. Update this **DOCS_INDEX.md** with new entries
-4. Follow existing formatting conventions
-5. Include practical examples where applicable
+1. **For current system specs** → Add to /docs/ folder
+2. **For historical reference** → Add to historical-dev-docs/ folder (rarely modified)
+3. **Update this DOCS_INDEX.md** with new entries
+4. **Include cross-references** to related documents
+5. **Add section summaries** with length estimates and audience
 
-## 📝 Documentation Conventions
+**Format guidelines**:
+- Use ATX-style headings (#)
+- Include length estimates and read time
+- Link related documents with cross-references
+- Use tables for quick reference
+- Include both theory and practical examples
 
-- **Headings**: Use ATX-style (#) headings
-- **Code blocks**: Use fenced code blocks with language tags
-- **Diagrams**: ASCII art for portability
-- **Examples**: Include both correct and incorrect usage
-- **Status**: Label with WRONG/CORRECT, ✅/❌
-- **Cross-references**: Link to related documents
+---
 
-## 🆘 Help & Support
+## 🆘 Getting Help
 
-If documentation doesn't answer your question:
+Can't find what you need? Try:
 
-1. Check **../examples/EXAMPLES.md** for practical usage
-2. Review **SCOPE_REDUCTION_INCIDENT.md** for common issues
-3. Examine agent definition files (../agents/*.md)
-4. Review initialization script (../scripts/init-orchestration.sh)
+1. **Quick lookup**: Check "Finding Information by Topic" section above
+2. **Search questions**: Check "Common Questions" table
+3. **Examples**: See [../examples/EXAMPLES.md](../examples/EXAMPLES.md) for practical usage
+4. **Agent definitions**: Check [../agents/](../agents/) folder for per-agent documentation
+5. **Scripts**: Check [../scripts/README.md](../scripts/README.md) for setup help
+
+---
 
 ## 🗂️ Related Resources
 
 - **[../README.md](../README.md)** - Project overview and quick start
-- **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** - Usage examples
-- **[../agents/](../agents/)** - Agent definition files
-- **[../scripts/](../scripts/)** - Utility scripts
+- **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** - Usage examples and workflows
+- **[../agents/](../agents/)** - Agent definition files (developer.md, techlead.md, etc.)
+- **[../scripts/](../scripts/)** - Utility scripts and initialization
 - **[../config/](../config/)** - Configuration files
 
 ---
 
-**Last Updated**: 2025-01-07
-**Version**: 1.0 (Conditional Workflow + 6-Layer Role Drift Prevention)
+**Last Updated**: 2025-01-09
+**Version**: 2.0 (Added SKILLS, MODEL_ESCALATION, PM_METRICS; restructured for new users)
 **Maintained By**: Project contributors

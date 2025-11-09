@@ -233,11 +233,9 @@ cat coordination/test_patterns.json
 
 ## Integration
 
-This Skill is automatically available in:
-- **Superpowers Mode**: Developer must invoke before writing tests
-- **Standard Mode**: Not available (time-sensitive)
+This Skill is configurable via `/configure-skills` command.
 
-Orchestrator injects this Skill into Developer prompt when superpowers mode is active.
+When marked as 'mandatory' in skills_config.json, the Orchestrator injects this Skill into Developer prompt before writing tests.
 
 ## Coverage Integration
 

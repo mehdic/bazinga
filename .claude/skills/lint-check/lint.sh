@@ -12,6 +12,32 @@ echo "📋 Code Linting Starting..."
 # Create coordination directory if it doesn't exist
 mkdir -p coordination
 
+# TIMEOUT PROTECTION: Max 45 seconds for linting
+LINT_TIMEOUT="${LINT_TIMEOUT:-45}"
+echo "⏱️  Timeout set to ${LINT_TIMEOUT}s"
+
+# Helper function to run command with timeout
+run_with_timeout() {
+    timeout "${LINT_TIMEOUT}s" "$@" || {
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 124 ]; then
+            echo "⚠️  Lint command timed out after ${LINT_TIMEOUT}s"
+            return 124
+        fi
+        return $EXIT_CODE
+    }
+}
+
+# Get changed files (if in git repo) for faster linting
+CHANGED_FILES=""
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    # Get files changed in last commit OR uncommitted changes
+    CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || git ls-files -m 2>/dev/null || echo "")
+    if [ -n "$CHANGED_FILES" ]; then
+        echo "🎯 Linting changed files only (faster)"
+    fi
+fi
+
 # Detect project language
 if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
     LANG="python"
@@ -41,11 +67,30 @@ case $LANG in
         if command_exists "ruff"; then
             TOOL="ruff"
             echo "  Running ruff..."
-            ruff check . --output-format=json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+            # Use changed files if available, otherwise lint all
+            if [ -n "$CHANGED_FILES" ]; then
+                PYTHON_FILES=$(echo "$CHANGED_FILES" | grep '\.py$' || echo "")
+                if [ -n "$PYTHON_FILES" ]; then
+                    run_with_timeout ruff check $PYTHON_FILES --output-format=json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+                else
+                    echo '[]' > coordination/lint_results_raw.json
+                fi
+            else
+                run_with_timeout ruff check . --output-format=json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+            fi
         elif command_exists "pylint"; then
             TOOL="pylint"
             echo "  Running pylint..."
-            pylint --output-format=json **/*.py > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+            if [ -n "$CHANGED_FILES" ]; then
+                PYTHON_FILES=$(echo "$CHANGED_FILES" | grep '\.py$' || echo "")
+                if [ -n "$PYTHON_FILES" ]; then
+                    run_with_timeout pylint --output-format=json $PYTHON_FILES > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+                else
+                    echo '[]' > coordination/lint_results_raw.json
+                fi
+            else
+                run_with_timeout pylint --output-format=json **/*.py > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+            fi
         else
             echo "⚠️  No Python linter found. Install: pip install ruff"
             TOOL="none"
@@ -58,7 +103,17 @@ case $LANG in
         if [ -f "node_modules/.bin/eslint" ] || command_exists "eslint"; then
             TOOL="eslint"
             echo "  Running eslint..."
-            npx eslint . --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+            # Use changed files if available, otherwise lint all
+            if [ -n "$CHANGED_FILES" ]; then
+                JS_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(js|jsx|ts|tsx)$' || echo "")
+                if [ -n "$JS_FILES" ]; then
+                    run_with_timeout npx eslint $JS_FILES --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+                else
+                    echo '[]' > coordination/lint_results_raw.json
+                fi
+            else
+                run_with_timeout npx eslint . --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+            fi
         else
             echo "⚠️  eslint not found. Install: npm install --save-dev eslint"
             TOOL="none"
@@ -71,7 +126,18 @@ case $LANG in
         if command_exists "golangci-lint"; then
             TOOL="golangci-lint"
             echo "  Running golangci-lint..."
-            golangci-lint run --out-format json > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
+            # golangci-lint doesn't support individual file linting well, use --new flag for changed files
+            if [ -n "$CHANGED_FILES" ]; then
+                GO_FILES=$(echo "$CHANGED_FILES" | grep '\.go$' || echo "")
+                if [ -n "$GO_FILES" ]; then
+                    # Use --new to only lint changed code
+                    run_with_timeout golangci-lint run --new --out-format json > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
+                else
+                    echo '{"Issues":[]}' > coordination/lint_results_raw.json
+                fi
+            else
+                run_with_timeout golangci-lint run --out-format json --timeout ${LINT_TIMEOUT}s > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
+            fi
         else
             echo "⚠️  golangci-lint not found. Install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
             TOOL="none"

@@ -79,6 +79,45 @@ if (-not (Test-Path "coordination\orchestrator_state.json")) {
     Write-Host "✓ orchestrator_state.json already exists" -ForegroundColor Gray
 }
 
+# Initialize skills_config.json
+if (-not (Test-Path "coordination\skills_config.json")) {
+    Write-Host "📝 Creating skills_config.json..." -ForegroundColor Yellow
+    @"
+{
+  "developer": {
+    "lint-check": "mandatory",
+    "codebase-analysis": "disabled",
+    "test-pattern-analysis": "disabled",
+    "api-contract-validation": "disabled",
+    "db-migration-check": "disabled"
+  },
+  "tech_lead": {
+    "security-scan": "mandatory",
+    "lint-check": "mandatory",
+    "test-coverage": "mandatory"
+  },
+  "qa_expert": {
+    "pattern-miner": "disabled",
+    "quality-dashboard": "disabled"
+  },
+  "pm": {
+    "velocity-tracker": "mandatory"
+  },
+  "_metadata": {
+    "description": "Skills configuration for BAZINGA agents",
+    "last_updated": "$TIMESTAMP",
+    "configuration_notes": [
+      "MANDATORY: Skill will be automatically invoked by the agent",
+      "DISABLED: Skill will not be invoked",
+      "Use /configure-skills to modify this configuration interactively"
+    ]
+  }
+}
+"@ | Out-File -FilePath "coordination\skills_config.json" -Encoding UTF8
+} else {
+    Write-Host "✓ skills_config.json already exists" -ForegroundColor Gray
+}
+
 # Initialize message files
 $MESSAGE_FILES = @(
     "coordination\messages\dev_to_qa.json",
@@ -123,7 +162,9 @@ if (-not (Test-Path "coordination\.gitignore")) {
     @"
 # Coordination state files are temporary and should not be committed
 *.json
-orchestration-log.md
+
+# EXCEPT skills_config.json - this is permanent configuration
+!skills_config.json
 
 # Keep the folder structure
 !.gitignore
@@ -140,6 +181,7 @@ Write-Host "   coordination\"
 Write-Host "   ├── pm_state.json"
 Write-Host "   ├── group_status.json"
 Write-Host "   ├── orchestrator_state.json"
+Write-Host "   ├── skills_config.json"
 Write-Host "   └── messages\"
 Write-Host "       ├── dev_to_qa.json"
 Write-Host "       ├── qa_to_techlead.json"

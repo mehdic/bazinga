@@ -92,6 +92,45 @@ else
     echo "✓ orchestrator_state.json already exists"
 fi
 
+# Initialize skills_config.json
+if [ ! -f "coordination/skills_config.json" ]; then
+    echo "📝 Creating skills_config.json..."
+    cat > coordination/skills_config.json <<EOF
+{
+  "developer": {
+    "lint-check": "mandatory",
+    "codebase-analysis": "disabled",
+    "test-pattern-analysis": "disabled",
+    "api-contract-validation": "disabled",
+    "db-migration-check": "disabled"
+  },
+  "tech_lead": {
+    "security-scan": "mandatory",
+    "lint-check": "mandatory",
+    "test-coverage": "mandatory"
+  },
+  "qa_expert": {
+    "pattern-miner": "disabled",
+    "quality-dashboard": "disabled"
+  },
+  "pm": {
+    "velocity-tracker": "mandatory"
+  },
+  "_metadata": {
+    "description": "Skills configuration for BAZINGA agents",
+    "last_updated": "$TIMESTAMP",
+    "configuration_notes": [
+      "MANDATORY: Skill will be automatically invoked by the agent",
+      "DISABLED: Skill will not be invoked",
+      "Use /configure-skills to modify this configuration interactively"
+    ]
+  }
+}
+EOF
+else
+    echo "✓ skills_config.json already exists"
+fi
+
 # Initialize message files
 MESSAGE_FILES=(
     "coordination/messages/dev_to_qa.json"
@@ -136,7 +175,9 @@ if [ ! -f "coordination/.gitignore" ]; then
     cat > coordination/.gitignore <<EOF
 # Coordination state files are temporary and should not be committed
 *.json
-orchestration-log.md
+
+# EXCEPT skills_config.json - this is permanent configuration
+!skills_config.json
 
 # Reports are ephemeral - generated per session
 reports/
@@ -156,6 +197,7 @@ echo "   coordination/"
 echo "   ├── pm_state.json"
 echo "   ├── group_status.json"
 echo "   ├── orchestrator_state.json"
+echo "   ├── skills_config.json"
 echo "   ├── messages/"
 echo "   │   ├── dev_to_qa.json"
 echo "   │   ├── qa_to_techlead.json"

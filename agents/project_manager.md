@@ -519,22 +519,47 @@ Every PM response must end with either:
 
 ### Velocity & Metrics Tracker Skill
 
-You have access to the velocity-tracker Skill that provides data-driven insights:
-
-**When to invoke:**
-- After completing task groups (record metrics)
-- Before spawning new developers (check capacity)
-- When task appears stuck (detect 99% rule)
-- Before BAZINGA (record final metrics for learning)
-
-**Usage:**
+**Check Skills Configuration:**
 ```bash
-# INVOKE the Skill explicitly:
-Skill(command: "velocity-tracker")
-
-# Then read output:
-cat coordination/project_metrics.json
+# Read skills configuration to determine if velocity-tracker is enabled
+cat coordination/skills_config.json
+# Look for: "pm": { "velocity-tracker": "mandatory" or "disabled" }
 ```
+
+**If velocity-tracker is configured as "mandatory":**
+
+**⚠️ MANDATORY INVOCATION POINTS:**
+
+**1. After ANY task group completes** (MANDATORY)
+```
+Skill(command: "velocity-tracker")
+cat coordination/project_metrics.json
+# Use metrics to detect: 99% rule violations, velocity trends, capacity issues
+```
+
+**2. Before BAZINGA** (MANDATORY)
+```
+Skill(command: "velocity-tracker")
+cat coordination/project_metrics.json
+# Record final metrics for historical learning
+```
+
+**3. When making capacity decisions** (RECOMMENDED)
+```
+# Before spawning developers or adjusting parallelism
+Skill(command: "velocity-tracker")
+cat coordination/project_metrics.json
+# Check if team can handle more work
+```
+
+**If velocity-tracker is configured as "disabled":**
+Skip all velocity-tracker invocations and proceed without metrics tracking.
+
+**Why MANDATORY:**
+- Enables 99% rule detection (tasks stuck >3x estimate)
+- Tracks velocity trends for better estimation
+- Builds historical data for continuous improvement
+- Provides user with progress visibility
 
 **What it provides:**
 - **Velocity**: Story points completed per run
@@ -585,7 +610,7 @@ The "99% Rule" anti-pattern: underestimating the final 1% that takes 99% of the 
 - Same developer-group pair stuck >1 hour
 
 **When detected:**
-1. Check `/velocity-tracker` metrics
+1. Invoke velocity-tracker Skill: `Skill(command: "velocity-tracker")`
 2. Escalate to Tech Lead if confirmed stuck
 3. Consider breaking into smaller tasks
 4. Update estimates for similar tasks
@@ -627,10 +652,10 @@ At end of each run (before BAZINGA), **reflect and learn**:
     "lessons_learned": [
       "Database migrations: budget 2.5x initial estimate",
       "Emphasize unit test coverage in dev prompt",
-      "Use /velocity-tracker after each group completion"
+      "Invoke velocity-tracker Skill after each group completion"
     ],
     "improvements_for_next_time": [
-      "Check /velocity-tracker every 30 minutes",
+      "Invoke velocity-tracker Skill every 30 minutes for progress tracking",
       "Escalate tasks stuck >2x average immediately",
       "Add DB migration warning to developer prompts"
     ]
