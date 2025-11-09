@@ -36,67 +36,76 @@ bazinga init my-project
 
 ### Before BAZINGA
 
-**Development is slow and error-prone:**
+**Using Claude Code normally (single agent doing everything):**
 
-- You write code, manually test it, push for review
-- Reviewer finds issues 2 days later: missing error handling, security issues, inconsistent style
-- You fix those, push again, wait another day
-- QA finds edge cases you didn't test
-- Security scan in CI catches hardcoded secrets
-- 5 days later, feature finally merges
+- One agent plans, codes, tests, and reviews all in one go
+- No specialized expertise: same agent writes code AND reviews security AND validates tests
+- Sequential work only: can't parallelize independent tasks across multiple agents
+- Quality checks are manual: you remember to run security scans... or you don't
+- No velocity tracking: no learning from history to improve future estimates
+- No automatic escalation: stuck on same model even after multiple revision attempts
 
-**Code quality is inconsistent:**
+**What this looks like:**
 
-- No one runs linters consistently
-- Test coverage varies wildly (some devs write tests, some don't)
-- Security scans are expensive/slow, so they run infrequently
-- Each dev has their own coding style
+```
+You: "Implement JWT authentication with user management"
 
-**Estimates are always wrong:**
+Claude Code (single agent):
+  - Plans the work
+  - Writes all the code
+  - Creates some tests (maybe)
+  - Reviews its own code (limited self-critique)
+  - No security scan unless you explicitly ask
+  - No coverage analysis unless you explicitly ask
+  - Pushes to completion
 
-- "This will take 2 hours" → Takes 8 hours
-- No historical data to learn from
-- PM doesn't know if work is 50% done or 90% done
-- Tasks get stuck at "almost done" forever (the 99% rule)
+Result: Fast, but quality varies. No specialization, no quality gates.
+```
 
-**Developers work in isolation:**
-
-- Can't parallelize work effectively
-- Unclear task boundaries
-- Duplication of effort
-- Bottlenecks when waiting for reviews
+**Problems:**
+- No separation of concerns (author reviews own code)
+- No mandatory quality gates
+- Can't work on multiple independent tasks simultaneously
+- No metrics or learning over time
 
 ### After BAZINGA
 
-**Development is fast and reliable:**
+**Using BAZINGA multi-agent system:**
 
-- PM breaks work into clear tasks
-- 1-4 developers work in parallel based on complexity
-- Automated quality checks run as code is written (5-60 seconds)
-- QA validates tests, Tech Lead reviews code
-- Issues caught immediately, not days later
-- Feature complete in hours, not days
+- **Specialized roles**: PM plans, Developers code, QA tests, Tech Lead reviews
+- **Parallel execution**: 1-4 developers work simultaneously on independent tasks
+- **Mandatory quality gates**: Security scans, test coverage, linting run automatically
+- **Automatic escalation**: Tech Lead escalates to Opus after 3 failed revisions
+- **Velocity tracking**: PM learns from history and improves estimates over time
+- **Separation of concerns**: Authors don't review their own code
 
-**Code quality is enforced:**
+**What this looks like:**
 
-- Every change gets security scanned (basic mode: 5-10s, advanced mode: 30-60s)
-- Test coverage tracked automatically
-- Linting catches style issues before review
-- Configurable depth: fast for iteration, thorough for critical work
+```
+You: "Implement JWT authentication with user management"
 
-**Estimates improve over time:**
+PM Agent:
+  - Analyzes requirements
+  - Breaks into 2 independent task groups
+  - Decides to spawn 2 developers in parallel
+  - Tracks velocity and progress
 
-- PM tracks velocity (story points per run)
-- Detects stuck tasks (99% rule violations)
-- Learns from history: "Database tasks take 2.5x estimate"
-- User gets realistic progress updates: "60% complete, 3 hours remaining"
+Developer-1: Auth module          Developer-2: User management
+  ↓ (security scan, linting)        ↓ (security scan, linting)
+QA Expert: Validates tests        QA Expert: Validates tests
+  ↓                                 ↓
+Tech Lead: Reviews code ───────────┘
+  ↓
+PM: Confirms completion, sends BAZINGA
 
-**Team works efficiently:**
+Result: High quality + parallelism. Specialization with quality gates.
+```
 
-- PM decides 1-4 developers based on task complexity
-- Parallel execution when tasks are independent
-- Clear routing: Dev → QA → Tech Lead → PM
-- Automated quality gates prevent shipping broken code
+**Benefits:**
+- Specialized expertise at each stage
+- Automated quality enforcement (not optional)
+- Parallel work on independent tasks (2-4x faster)
+- Historical learning for better estimates
 
 ---
 
