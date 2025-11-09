@@ -22,6 +22,8 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
+
 __version__ = "0.1.3"
 
 console = Console()
@@ -82,8 +84,19 @@ class BazingaSetup:
             return False
 
         for agent_file in agent_files:
-            shutil.copy2(agent_file, agents_dir / agent_file.name)
-            console.print(f"  ✓ Copied {agent_file.name}")
+            try:
+                # SECURITY: Validate filename doesn't contain path traversal
+                safe_filename = PathValidator.validate_filename(agent_file.name)
+                dest = agents_dir / safe_filename
+
+                # SECURITY: Ensure destination is within agents_dir
+                PathValidator.ensure_within_directory(dest, agents_dir)
+
+                shutil.copy2(agent_file, dest)
+                console.print(f"  ✓ Copied {safe_filename}")
+            except SecurityError as e:
+                console.print(f"[red]✗ Skipping unsafe file {agent_file.name}: {e}[/red]")
+                continue
 
         return True
 
@@ -410,15 +423,22 @@ class BazingaSetup:
                 return False
 
             try:
-                result = subprocess.run(
-                    ["bash", str(init_script)],
+                # SECURITY: Validate script path is safe
+                scripts_dir = target_dir / ".claude" / "scripts"
+                safe_script = validate_script_path(init_script, scripts_dir)
+
+                # SECURITY: Use SafeSubprocess with validated command
+                result = SafeSubprocess.run(
+                    ["bash", str(safe_script)],
                     cwd=target_dir,
-                    capture_output=True,
-                    text=True,
+                    timeout=60,  # 1 minute should be enough
                     check=True,
                 )
                 console.print(f"  ✓ Initialized coordination files")
                 return True
+            except SecurityError as e:
+                console.print(f"[red]✗ Security validation failed: {e}[/red]")
+                return False
             except subprocess.CalledProcessError as e:
                 console.print(f"[red]✗ Failed to run init script: {e}[/red]")
                 if e.stdout:
@@ -447,15 +467,22 @@ class BazingaSetup:
                 return True  # Still return success, user can run manually
 
             try:
-                result = subprocess.run(
-                    [pwsh_cmd, "-ExecutionPolicy", "Bypass", "-File", str(init_script)],
+                # SECURITY: Validate script path is safe
+                scripts_dir = target_dir / ".claude" / "scripts"
+                safe_script = validate_script_path(init_script, scripts_dir)
+
+                # SECURITY: Use SafeSubprocess with validated command
+                result = SafeSubprocess.run(
+                    [pwsh_cmd, "-ExecutionPolicy", "Bypass", "-File", str(safe_script)],
                     cwd=target_dir,
-                    capture_output=True,
-                    text=True,
+                    timeout=60,
                     check=True,
                 )
                 console.print(f"  ✓ Initialized coordination files")
                 return True
+            except SecurityError as e:
+                console.print(f"[red]✗ Security validation failed: {e}[/red]")
+                return False
             except subprocess.CalledProcessError as e:
                 console.print(f"[red]✗ Failed to run init script: {e}[/red]")
                 if e.stdout:
@@ -613,14 +640,17 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
                 console.print(f"[yellow]Please install {package_manager} first, then run tools installation manually[/yellow]")
                 return False
 
-            # Run installation command
-            result = subprocess.run(
-                config["command"],
-                cwd=target_dir,
-                capture_output=True,
-                text=True,
-                timeout=120,  # 2 minute timeout
-            )
+            # Run installation command (SECURITY: Use SafeSubprocess)
+            try:
+                result = SafeSubprocess.run(
+                    config["command"],
+                    cwd=target_dir,
+                    timeout=120,  # 2 minute timeout
+                    check=False,  # Don't raise on error, handle below
+                )
+            except SecurityError as e:
+                console.print(f"  [red]✗ Security validation failed: {e}[/red]")
+                return False
 
             if result.returncode == 0:
                 console.print(f"  [green]✓[/green] Analysis tools installed successfully")
@@ -742,9 +772,20 @@ def init(
                 console.print("[red]Cancelled[/red]")
                 raise typer.Exit(1)
     elif project_name:
-        target_dir = Path.cwd() / project_name
+        # SECURITY: Validate project name
+        try:
+            safe_name = PathValidator.validate_project_name(project_name)
+        except SecurityError as e:
+            console.print(f"[red]✗ Invalid project name: {e}[/red]")
+            console.print("\n[yellow]Project name requirements:[/yellow]")
+            console.print("  • Only letters, numbers, hyphens, underscores, and dots")
+            console.print("  • Cannot contain '..' or path separators")
+            console.print("  • Maximum 255 characters")
+            raise typer.Exit(1)
+
+        target_dir = Path.cwd() / safe_name
         if target_dir.exists():
-            console.print(f"[red]✗ Directory '{project_name}' already exists[/red]")
+            console.print(f"[red]✗ Directory '{safe_name}' already exists[/red]")
             raise typer.Exit(1)
         target_dir.mkdir(parents=True, exist_ok=True)
         console.print(f"\n[green]✓[/green] Created directory: [bold]{target_dir}[/bold]")

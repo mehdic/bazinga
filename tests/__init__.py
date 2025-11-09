@@ -1,0 +1,1 @@
+"""BAZINGA CLI test suite."""
