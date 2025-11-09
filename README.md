@@ -90,6 +90,7 @@ Result: Better quality, but YOU manage the workflow. Easy to skip steps.
 - **Structured workflow**: Follows industry-standard SDLC (plan → develop → test → review → deploy)
 - **Automated orchestration**: Framework manages agent coordination, you don't
 - **Autonomous execution**: Long task lists run for hours without interruption, maintaining best practices throughout
+- **Intelligent guidance**: Framework evaluates skip/stop/issue behaviors and recommends best practices to the team
 - **Specialized roles**: PM plans, Developers code, QA tests, Tech Lead reviews
 - **Mandatory quality gates**: Security scans, test coverage, linting run automatically at each step
 - **Skills automation**: 11 Skills automate code analysis, security scanning, pattern detection
@@ -134,6 +135,7 @@ Result: High quality + parallelism + automated checks. You wrote one command.
 
 **Benefits:**
 - **Framework enforces best practices**: Can't skip steps (plan → dev → test → review)
+- **Intelligent recommendations**: Detects when agents skip steps, encounter issues, or stop prematurely and suggests corrections
 - **Automated quality checks**: 11 Skills run at appropriate stages (not optional)
 - **Intelligent parallelism**: Framework decides 1-4 developers based on complexity
 - **Complete automation**: You manage the "what", framework manages the "how"
