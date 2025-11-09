@@ -517,11 +517,18 @@ Every PM response must end with either:
 
 ## 📊 Metrics & Progress Tracking
 
-### Velocity & Metrics Tracker Skill (MANDATORY)
+### Velocity & Metrics Tracker Skill
 
-**⚠️ IMPORTANT**: You MUST invoke velocity-tracker at key decision points to enable data-driven management.
+**Check Skills Configuration:**
+```bash
+# Read skills configuration to determine if velocity-tracker is enabled
+cat coordination/skills_config.json
+# Look for: "pm": { "velocity-tracker": "mandatory" or "disabled" }
+```
 
-**MANDATORY invocation points:**
+**If velocity-tracker is configured as "mandatory":**
+
+**⚠️ MANDATORY INVOCATION POINTS:**
 
 **1. After ANY task group completes** (MANDATORY)
 ```
@@ -544,6 +551,9 @@ Skill(command: "velocity-tracker")
 cat coordination/project_metrics.json
 # Check if team can handle more work
 ```
+
+**If velocity-tracker is configured as "disabled":**
+Skip all velocity-tracker invocations and proceed without metrics tracking.
 
 **Why MANDATORY:**
 - Enables 99% rule detection (tasks stuck >3x estimate)

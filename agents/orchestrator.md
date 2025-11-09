@@ -137,21 +137,25 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**FIRST ACTION - Detect Superpowers Mode:**
+**FIRST ACTION - Read Skills Configuration:**
 
 ```python
-# Check user requirements for "superpowers" keyword
-user_requirements = {user_message}
-superpowers_mode = "superpowers" in user_requirements.lower()
+# Read skills_config.json to determine which Skills are active
+# This file is created during installation and can be modified via /configure-skills
+skills_config = read_json("coordination/skills_config.json")
 
-if superpowers_mode:
-    Output: "⚡ **ORCHESTRATOR**: SUPERPOWERS MODE ACTIVATED - Running advanced capabilities"
-    Output: "   - Codebase analysis before implementation"
-    Output: "   - Test pattern analysis"
-    Output: "   - App startup health checks"
-    Output: "   - Extended build validation"
-else:
-    Output: "🔄 **ORCHESTRATOR**: Running in default mode (fast, essential checks)"
+# Count active Skills
+active_skills = []
+for agent_type, agent_skills in skills_config.items():
+    if agent_type == "_metadata":
+        continue
+    for skill_name, status in agent_skills.items():
+        if status == "mandatory":
+            active_skills.append(f"{agent_type}:{skill_name}")
+
+Output: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
+Output: f"   - Active Skills: {len(active_skills)}"
+Output: "   - Use /configure-skills to modify configuration"
 ```
 
 **SECOND ACTION - Run Initialization Script:**
@@ -169,12 +173,13 @@ The script will:
 - Initialize orchestration log
 - Skip files that already exist (idempotent)
 
-**THIRD ACTION - Store Mode in Orchestrator State:**
+**THIRD ACTION - Store Skills Config Reference in Orchestrator State:**
 
 ```python
-# Update orchestrator_state.json with superpowers mode
+# Update orchestrator_state.json with reference to skills config
 orch_state = read_json("coordination/orchestrator_state.json")
-orch_state["superpowers_mode"] = superpowers_mode
+orch_state["skills_config_loaded"] = True
+orch_state["active_skills_count"] = len(active_skills)
 write_json("coordination/orchestrator_state.json", orch_state)
 ```
 
@@ -225,42 +230,12 @@ else
 fi
 ```
 
-**FIFTH ACTION - Run App Startup Check (superpowers mode only):**
+**FIFTH ACTION - Skip App Startup Check:**
 
 ```bash
-if [ "$superpowers_mode" = true ]; then
-    Output: "⚡ **ORCHESTRATOR**: Running baseline app startup check..."
-
-    # Detect start command
-    if [ -f "package.json" ] && grep -q '"start"' package.json; then
-        START_CMD="npm start"
-    elif [ -f "go.mod" ]; then
-        START_CMD="go run ."
-    elif [ -f "manage.py" ]; then
-        START_CMD="python manage.py runserver"
-    else
-        START_CMD=""
-    fi
-
-    if [ -n "$START_CMD" ]; then
-        # Try to start app with timeout
-        timeout 30s $START_CMD > coordination/app_baseline.log 2>&1 &
-        APP_PID=$!
-        sleep 5
-
-        # Check if still running
-        if kill -0 $APP_PID 2>/dev/null; then
-            echo "success" > coordination/app_baseline_status.txt
-            kill $APP_PID
-            Output: "✅ **ORCHESTRATOR**: App starts successfully (baseline)"
-        else
-            echo "failed" > coordination/app_baseline_status.txt
-            Output: "⚠️ **ORCHESTRATOR**: App failed to start (baseline recorded)"
-        fi
-    else
-        Output: "ℹ️ **ORCHESTRATOR**: Could not detect start command, skipping app check"
-    fi
-fi
+# NOTE: App startup checking has been removed
+# It was not implemented as a Skill and added unnecessary complexity
+# If needed, it can be re-added as a proper Skill in the future
 ```
 
 **After initialization completes:**
@@ -572,85 +547,106 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 {PM's task group details}
 {User's original requirements}
 
-**CAPABILITIES MODE**: {standard OR superpowers}
+**SKILLS CONFIGURATION:**
 
-{IF superpowers_mode}:
+{Read skills_config.json to determine which Skills are active for Developer}
+skills_config = read_json("coordination/skills_config.json")
+dev_skills = skills_config["developer"]
+
+{IF dev_skills["codebase-analysis"] == "mandatory" OR dev_skills["test-pattern-analysis"] == "mandatory" OR dev_skills["api-contract-validation"] == "mandatory" OR dev_skills["db-migration-check"] == "mandatory"}:
 ═══════════════════════════════════════════
-⚡ SUPERPOWERS MODE ACTIVE
+⚡ ADVANCED SKILLS ACTIVE
 ═══════════════════════════════════════════
 
-You have access to advanced capabilities:
+You have access to the following Skills (configured via /configure-skills):
 
+{IF dev_skills["codebase-analysis"] == "mandatory"}:
 1. **Codebase Analysis Skill**: Run BEFORE coding
    ```
    Skill(command: "codebase-analysis")
    ```
    Returns: Similar features, utilities, architectural patterns
+{END IF}
 
+{IF dev_skills["test-pattern-analysis"] == "mandatory"}:
 2. **Test Pattern Analysis Skill**: Run BEFORE writing tests
    ```
    Skill(command: "test-pattern-analysis")
    ```
    Returns: Test framework, fixtures, patterns, suggestions
+{END IF}
 
+{IF dev_skills["api-contract-validation"] == "mandatory"}:
 3. **API Contract Validation Skill**: Run BEFORE committing API changes
    ```
    Skill(command: "api-contract-validation")
    ```
    Returns: Breaking changes, safe changes, recommendations
+{END IF}
 
+{IF dev_skills["db-migration-check"] == "mandatory"}:
 4. **DB Migration Check Skill**: Run BEFORE committing migrations
    ```
    Skill(command: "db-migration-check")
    ```
    Returns: Dangerous operations, safe alternatives, impact analysis
+{END IF}
 
 USE THESE SKILLS for better implementation quality!
 ═══════════════════════════════════════════
 {END IF}
 
-**MANDATORY WORKFLOW** (all modes):
+**MANDATORY WORKFLOW:**
 
 BEFORE Implementing:
 1. Review codebase context above
-2. {IF superpowers}: **INVOKE Codebase Analysis Skill:**
+{IF dev_skills["codebase-analysis"] == "mandatory"}:
+2. **INVOKE Codebase Analysis Skill (MANDATORY):**
    ```
    Skill(command: "codebase-analysis")
    ```
    Read results for patterns and utilities
+{END IF}
 
 During Implementation:
 3. Implement the COMPLETE solution
 4. Write unit tests
-5. {IF superpowers}: **INVOKE Test Pattern Analysis Skill:**
+{IF dev_skills["test-pattern-analysis"] == "mandatory"}:
+5. **INVOKE Test Pattern Analysis Skill (MANDATORY):**
    ```
    Skill(command: "test-pattern-analysis")
    ```
    Read results before writing tests
+{END IF}
 
 BEFORE Reporting READY_FOR_QA:
 6. Run ALL unit tests - MUST pass 100%
+{IF dev_skills["lint-check"] == "mandatory"}:
 7. **INVOKE lint-check Skill (MANDATORY):**
    ```
    Skill(command: "lint-check")
    ```
    Read results: `cat coordination/lint_results.json`
    FIX ALL ISSUES before proceeding
+{END IF}
 8. Run build check - MUST succeed
    If build FAILS due to dependency download errors:
    - Use WebFetch to manually download dependencies
    - Retry build after placing in correct location
-9. {IF superpowers}: Run app startup check - MUST start
-10. {IF superpowers AND API changes}: **INVOKE API Contract Validation:**
+{IF dev_skills["api-contract-validation"] == "mandatory"}:
+9. **INVOKE API Contract Validation (MANDATORY if API changes):**
     ```
     Skill(command: "api-contract-validation")
     ```
     Read results: `cat coordination/api_contract_results.json`
-11. {IF superpowers AND migration changes}: **INVOKE DB Migration Check:**
+{END IF}
+{IF dev_skills["db-migration-check"] == "mandatory"}:
+10. **INVOKE DB Migration Check (MANDATORY if migration changes):**
     ```
     Skill(command: "db-migration-check")
     ```
     Read results: `cat coordination/db_migration_results.json`
+{END IF}
 
 ONLY THEN:
 12. Commit to branch: {branch_name}
@@ -758,28 +754,36 @@ You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
 
 **BRANCH:** {branch_name}
 
-**CAPABILITIES MODE:** {standard OR superpowers}
+**SKILLS CONFIGURATION:**
 
-{IF superpowers_mode}:
+{Read skills_config.json to determine which Skills are active for QA Expert}
+skills_config = read_json("coordination/skills_config.json")
+qa_skills = skills_config["qa_expert"]
+
+{IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}:
 ═══════════════════════════════════════════
-⚡ SUPERPOWERS MODE ACTIVE
+⚡ ADVANCED SKILLS ACTIVE
 ═══════════════════════════════════════════
 
 BEFORE running tests, you MUST invoke quality analysis Skills:
 
+{IF qa_skills["pattern-miner"] == "mandatory"}:
 **STEP 1: Invoke pattern-miner (MANDATORY)**
 ```
 Skill(command: "pattern-miner")
 ```
 Read results: `cat coordination/pattern_insights.json`
 Use insights to identify high-risk areas from historical failures
+{END IF}
 
+{IF qa_skills["quality-dashboard"] == "mandatory"}:
 **STEP 2: Invoke quality-dashboard (MANDATORY)**
 ```
 Skill(command: "quality-dashboard")
 ```
 Read results: `cat coordination/quality_dashboard.json`
 Get baseline health score and quality trends
+{END IF}
 
 **STEP 3: Prioritize testing based on insights**
 - Focus on modules with historical test failures
@@ -790,10 +794,13 @@ Get baseline health score and quality trends
 {END IF}
 
 **YOUR JOB:**
-{IF superpowers}: 1. Run pattern-miner and quality-dashboard Skills FIRST
-{IF superpowers}: 2. Use insights to prioritize testing focus
-{IF superpowers}: 3. Checkout branch: git checkout {branch_name}
-{IF NOT superpowers}: 1. Checkout branch: git checkout {branch_name}
+{IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}:
+1. Run mandatory quality analysis Skills FIRST
+2. Use insights to prioritize testing focus
+3. Checkout branch: git checkout {branch_name}
+{ELSE}:
+1. Checkout branch: git checkout {branch_name}
+{END IF}
 4. Run Integration Tests
 5. Run Contract Tests
 6. Run E2E Tests
@@ -804,11 +811,15 @@ Get baseline health score and quality trends
 
 ## QA Expert: Test Results - [PASS/FAIL]
 
-{IF superpowers}:
-### Quality Analysis (Superpowers)
+{IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}:
+### Quality Analysis
+{IF qa_skills["pattern-miner"] == "mandatory"}:
 **Pattern Insights:** [Summary from pattern-miner]
+{END IF}
+{IF qa_skills["quality-dashboard"] == "mandatory"}:
 **Health Score:** [Score from quality-dashboard]
 **Risk Areas:** [Areas flagged for extra testing]
+{END IF}
 
 {END IF}
 
@@ -821,7 +832,7 @@ Get baseline health score and quality trends
 [If PASS]: Ready for Tech Lead review
 [If FAIL]: Detailed failures with fix suggestions
 
-START {IF superpowers}ANALYSIS AND {END IF}TESTING NOW.
+START {IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}QUALITY ANALYSIS AND {END IF}TESTING NOW.
   """
 )
 ```
@@ -927,16 +938,21 @@ tech_lead_full_prompt = tech_lead_base + f"""
 **BRANCH:** {branch_name}
 
 ═══════════════════════════════════════════════════════════
-**MANDATORY: RUN SECURITY SCAN BEFORE REVIEW**
+**MANDATORY: RUN QUALITY SKILLS BEFORE REVIEW**
 ═══════════════════════════════════════════════════════════
 
-**DO NOT SKIP THIS STEP**
+{Read skills_config.json to determine which Skills are active for Tech Lead}
+skills_config = read_json("coordination/skills_config.json")
+tl_skills = skills_config["tech_lead"]
 
-**STEP 1: Export scan mode**
+**STEP 1: Export scan mode (if security-scan enabled)**
+{IF tl_skills["security-scan"] == "mandatory"}:
 ```bash
 export SECURITY_SCAN_MODE={scan_mode}
 ```
+{END IF}
 
+{IF tl_skills["security-scan"] == "mandatory"}:
 **STEP 2: Invoke security-scan Skill (MANDATORY)**
 
 YOU MUST explicitly invoke the security-scan Skill:
@@ -953,7 +969,9 @@ Wait for Skill to complete. This runs security scanners in {scan_mode} mode:
 ```bash
 cat coordination/security_scan.json
 ```
+{END IF}
 
+{IF tl_skills["lint-check"] == "mandatory"}:
 **STEP 4: Invoke lint-check Skill (MANDATORY)**
 
 YOU MUST explicitly invoke the lint-check Skill:
@@ -967,8 +985,10 @@ Wait for Skill to complete (3-10 seconds).
 ```bash
 cat coordination/lint_results.json
 ```
+{END IF}
 
-**STEP 6: Invoke test-coverage Skill (if tests exist)**
+{IF tl_skills["test-coverage"] == "mandatory"}:
+**STEP 6: Invoke test-coverage Skill (MANDATORY if tests exist)**
 
 If tests were modified or added, invoke test-coverage Skill:
 ```
@@ -979,10 +999,15 @@ Then read results:
 ```bash
 cat coordination/coverage_report.json 2>/dev/null || true
 ```
+{END IF}
 
 **STEP 7: Use automated findings to guide your manual review**
 
+{IF tl_skills["security-scan"] == "mandatory" OR tl_skills["lint-check"] == "mandatory" OR tl_skills["test-coverage"] == "mandatory"}:
 Review all Skill results BEFORE doing manual code review.
+{ELSE}:
+Proceed directly to manual code review (no Skills configured).
+{END IF}
 
 ═══════════════════════════════════════════════════════════
 
@@ -1219,7 +1244,6 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 
 **GROUP:** {group_id}
 **MODE:** Parallel (working alongside {N-1} other developers)
-**CAPABILITIES MODE:** {standard OR superpowers}
 
 **YOUR GROUP:**
 {PM's task group details for this group}
@@ -1229,69 +1253,80 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 {code_contexts[group_id]}
 
 ═══════════════════════════════════════════
-⚡ CAPABILITIES
+⚡ SKILLS CONFIGURATION
 ═══════════════════════════════════════════
 
-{IF superpowers_mode}:
-⚡ SUPERPOWERS MODE ACTIVE
+{Read skills_config.json to determine which Skills are active for Developer}
+skills_config = read_json("coordination/skills_config.json")
+dev_skills = skills_config["developer"]
 
 Available Skills:
-1. Codebase Analysis Skill: Skill(command: "codebase-analysis")
-   - Finds similar features, reusable utilities, architectural patterns
-   - Outputs: coordination/codebase_analysis.json
+{IF dev_skills["lint-check"] == "mandatory"}:
+- Lint Check: Skill(command: "lint-check")
+  Outputs: coordination/lint_results.json
+{END IF}
 
-2. Test Pattern Analysis Skill: Skill(command: "test-pattern-analysis")
-   - Analyzes test framework, fixtures, naming patterns
-   - Outputs: coordination/test_patterns.json
+{IF dev_skills["codebase-analysis"] == "mandatory"}:
+- Codebase Analysis: Skill(command: "codebase-analysis")
+  Outputs: coordination/codebase_analysis.json
+{END IF}
 
-3. API Contract Validation: Skill(command: "api-contract-validation")
-   - Detects breaking changes in API contracts
-   - Outputs: coordination/api_contract_validation.json
+{IF dev_skills["test-pattern-analysis"] == "mandatory"}:
+- Test Pattern Analysis: Skill(command: "test-pattern-analysis")
+  Outputs: coordination/test_patterns.json
+{END IF}
 
-4. DB Migration Check: Skill(command: "db-migration-check")
-   - Detects dangerous database operations
-   - Outputs: coordination/db_migration_check.json
+{IF dev_skills["api-contract-validation"] == "mandatory"}:
+- API Contract Validation: Skill(command: "api-contract-validation")
+  Outputs: coordination/api_contract_validation.json
+{END IF}
 
-{ELSE}:
-📋 STANDARD MODE
-
-Available Skills:
-1. Lint Check: Skill(command: "lint-check") (pre-commit validation)
-
+{IF dev_skills["db-migration-check"] == "mandatory"}:
+- DB Migration Check: Skill(command: "db-migration-check")
+  Outputs: coordination/db_migration_check.json
 {END IF}
 
 ═══════════════════════════════════════════
 
-**MANDATORY WORKFLOW** (all modes):
+**MANDATORY WORKFLOW:**
 
 BEFORE Implementing:
 1. Review codebase context above
-2. {IF superpowers}: **INVOKE Codebase Analysis:**
+{IF dev_skills["codebase-analysis"] == "mandatory"}:
+2. **INVOKE Codebase Analysis (MANDATORY):**
    Skill(command: "codebase-analysis")
    Read: coordination/codebase_analysis.json
+{END IF}
 
 During Implementation:
 3. Create branch: git checkout -b {branch_name}
 4. Implement COMPLETE solution for your group
 5. Write unit tests
-6. {IF superpowers}: **INVOKE Test Pattern Analysis:**
+{IF dev_skills["test-pattern-analysis"] == "mandatory"}:
+6. **INVOKE Test Pattern Analysis (MANDATORY):**
    Skill(command: "test-pattern-analysis")
    Read: coordination/test_patterns.json
+{END IF}
 
 BEFORE Reporting READY_FOR_QA:
 7. Run ALL unit tests - MUST pass 100%
+{IF dev_skills["lint-check"] == "mandatory"}:
 8. **INVOKE lint-check (MANDATORY):**
    Skill(command: "lint-check")
    Read: coordination/lint_results.json
    FIX ALL ISSUES before proceeding
+{END IF}
 9. Run build check - MUST succeed
-10. {IF superpowers}: Run app startup check - MUST start
-11. {IF superpowers AND API changes}: **INVOKE API Contract Validation:**
+{IF dev_skills["api-contract-validation"] == "mandatory"}:
+10. **INVOKE API Contract Validation (MANDATORY if API changes):**
     Skill(command: "api-contract-validation")
     Read: coordination/api_contract_validation.json
-12. {IF superpowers AND migration changes}: **INVOKE DB Migration Check:**
+{END IF}
+{IF dev_skills["db-migration-check"] == "mandatory"}:
+11. **INVOKE DB Migration Check (MANDATORY if migration changes):**
     Skill(command: "db-migration-check")
     Read: coordination/db_migration_check.json
+{END IF}
 
 ONLY THEN:
 13. Commit to YOUR branch: {branch_name}
@@ -1847,11 +1882,6 @@ lint_results = safe_read_json("coordination/lint_results.json")
 # Read baseline health checks
 build_baseline_status = safe_read_file("coordination/build_baseline_status.txt")
 build_final_status = safe_read_file("coordination/build_final_status.txt")
-app_baseline_status = safe_read_file("coordination/app_baseline_status.txt")
-app_final_status = safe_read_file("coordination/app_final_status.txt")
-
-# Determine superpowers mode
-superpowers_mode = orch_state.get("superpowers_mode", False)
 
 # Calculate metrics
 end_time = current_timestamp()
@@ -1895,17 +1925,6 @@ build_health = {
     "final": "✅ Pass" if build_final_passed else "❌ Fail",
     "regression": not build_baseline_passed and build_final_passed  # Fixed during development
 }
-
-# App startup metrics (superpowers only)
-app_health = None
-if superpowers_mode:
-    app_baseline_passed = app_baseline_status and app_baseline_status.strip() == "success"
-    app_final_passed = app_final_status and app_final_status.strip() == "success"
-    app_health = {
-        "baseline": "✅ Started" if app_baseline_passed else "❌ Failed",
-        "final": "✅ Started" if app_final_passed else "❌ Failed",
-        "regression": app_baseline_passed and not app_final_passed  # Broke during development
-    }
 ```
 
 ### Step 2: Detect Anomalies
@@ -1963,15 +1982,6 @@ if not build_final_passed and build_baseline_passed:
         "details": f"Baseline: {build_health['baseline']}, Final: {build_health['final']}",
         "recommendation": "CRITICAL: Fix build before deployment"
     })
-
-# App startup regressions (superpowers only)
-if app_health and app_health["regression"]:
-    anomalies.append({
-        "type": "app_regression",
-        "message": "App was starting at baseline but fails now",
-        "details": f"Baseline: {app_health['baseline']}, Final: {app_health['final']}",
-        "recommendation": "CRITICAL: Fix startup issue before deployment"
-    })
 ```
 
 ### Step 3: Generate Detailed Report (Tier 2)
@@ -1985,7 +1995,6 @@ report_filename = f"coordination/reports/session_{datetime.now().strftime('%Y%m%
 detailed_report = generate_detailed_report({
     "session_id": orch_state["session_id"],
     "mode": pm_state["mode"],
-    "superpowers_mode": superpowers_mode,
     "duration_minutes": duration_minutes,
     "start_time": start_time,
     "end_time": end_time,
@@ -1994,7 +2003,6 @@ detailed_report = generate_detailed_report({
     "coverage": coverage_avg,
     "lint": lint_issues,
     "build_health": build_health,
-    "app_health": app_health,
     "token_usage": token_usage,
     "efficiency": {
         "approval_rate": approval_rate,
@@ -2042,7 +2050,7 @@ Output to user (keep under 30 lines):
 
 ## Summary
 
-**Mode**: {mode} ({num_developers} developer(s)){IF superpowers_mode}: ⚡ SUPERPOWERS
+**Mode**: {mode} ({num_developers} developer(s))
 **Duration**: {duration_minutes} minutes
 **Groups**: {total_groups}/{total_groups} completed ✅
 **Token Usage**: ~{total_tokens/1000}K tokens (~${estimated_cost})
@@ -2053,8 +2061,6 @@ Output to user (keep under 30 lines):
 **Coverage**: {coverage_status} {coverage_avg}% average (target: 80%)
 **Lint**: {lint_status} ({lint_summary})
 **Build**: {build_health["final"]}
-{IF superpowers_mode}:
-**App Startup**: {app_health["final"]}
 
 ## Efficiency
 
