@@ -1,6 +1,8 @@
-# Configure Testing Framework
+# Bazinga Configure Testing
 
 You are helping the user configure the BAZINGA testing framework. This controls how much testing and quality assurance is applied during development.
+
+**Command:** /bazinga.configure-testing
 
 ## Step 1: Read Current Configuration
 

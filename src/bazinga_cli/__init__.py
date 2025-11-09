@@ -924,7 +924,7 @@ def init(
             "  3. Use: @orchestrator <your request>\n\n"
             "[bold]Example:[/bold]\n"
             "  @orchestrator implement user authentication with JWT\n\n"
-            "[dim]Change testing mode: /configure-testing[/dim]",
+            "[dim]Change testing mode: /bazinga.configure-testing[/dim]",
             title="🎉 Installation Complete",
             border_style="green",
         )

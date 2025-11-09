@@ -122,7 +122,7 @@ if [ ! -f "coordination/skills_config.json" ]; then
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent",
       "DISABLED: Skill will not be invoked",
-      "Use /configure-skills to modify this configuration interactively"
+      "Use /bazinga.configure-skills to modify this configuration interactively"
     ]
   }
 }
@@ -175,7 +175,7 @@ if [ ! -f "coordination/testing_config.json" ]; then
       "disabled": "Only lint checks - fastest iteration"
     },
     "notes": [
-      "Use /configure-testing to modify this configuration interactively",
+      "Use /bazinga.configure-testing to modify this configuration interactively",
       "Mode 'minimal' is the default - balances speed and quality (current BAZINGA default)",
       "Mode 'full' enables complete QA workflow for production-critical code",
       "Mode 'disabled' is for rapid prototyping only (lint checks still run)"

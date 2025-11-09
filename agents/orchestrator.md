@@ -141,7 +141,7 @@ PM Response: BAZINGA → END
 
 ```python
 # Read skills_config.json to determine which Skills are active
-# This file is created during installation and can be modified via /configure-skills
+# This file is created during installation and can be modified via /bazinga.configure-skills
 skills_config = read_json("coordination/skills_config.json")
 
 # Count active Skills
@@ -155,7 +155,7 @@ for agent_type, agent_skills in skills_config.items():
 
 Output: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
 Output: f"   - Active Skills: {len(active_skills)}"
-Output: "   - Use /configure-skills to modify configuration"
+Output: "   - Use /bazinga.configure-skills to modify configuration"
 ```
 
 **SECOND ACTION - Run Initialization Script:**
@@ -197,7 +197,7 @@ Output: f"   - Testing Mode: {testing_mode.upper()}"
 Output: f"   - QA Expert: {'ENABLED' if qa_expert_enabled else 'DISABLED'}"
 if testing_mode == "disabled":
     Output: "   ⚠️  Warning: Testing framework in DISABLED mode (prototyping only)"
-Output: "   - Use /configure-testing to modify testing requirements"
+Output: "   - Use /bazinga.configure-testing to modify testing requirements"
 ```
 
 **FOURTH ACTION - Store Configuration References in Orchestrator State:**
@@ -636,7 +636,7 @@ You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
 - Unit Tests: {unit_tests_required}
 - Build Check: {build_check_required}
 
-**Use /configure-testing to view or modify testing requirements**
+**Use /bazinga.configure-testing to view or modify testing requirements**
 ```
 
 **Step 3: Add Skills Section (if ANY advanced skills are mandatory)**
