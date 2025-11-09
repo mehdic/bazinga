@@ -1,7 +1,7 @@
 ---
 name: quality-dashboard
 description: Unified project health dashboard aggregating all quality metrics
-category: superpowers
+category: analytics
 execution_time: 10-15s
 ---
 

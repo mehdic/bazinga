@@ -324,7 +324,7 @@ alembic revision -m "add user email"
 # Developer writes migration
 # op.add_column('users', sa.Column('email', sa.String(255), server_default=''))
 
-# Developer invokes Skill (or automatic in superpowers mode)
+# Developer invokes Skill
 /db-migration-check
 
 # Skill analyzes migration (10 seconds)
@@ -365,8 +365,6 @@ alembic revision -m "add user email"
 
 ## Integration
 
-This Skill is available in:
-- **Superpowers Mode**: Developer must check before committing migrations
-- **Standard Mode**: Not available (time-sensitive)
+This Skill is configurable via `/configure-skills` command.
 
-Orchestrator injects this Skill into Developer prompt when superpowers mode is active and database migration changes are detected.
+When marked as 'mandatory' in skills_config.json, the Orchestrator automatically invokes this Skill when database migration changes are detected before Developer commits.

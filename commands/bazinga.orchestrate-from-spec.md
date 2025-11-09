@@ -18,16 +18,13 @@ $ARGUMENTS
 ```
 
 **Argument Parsing**:
-1. Check if "superpowers" keyword present → Enable superpowers mode
-2. Remaining text (if any) → Feature directory path
-3. If no path after removing "superpowers" → Auto-detect latest feature
+1. Parse feature directory path (if provided)
+2. If no path → Auto-detect latest feature
+3. Uses Skills configured in coordination/skills_config.json
 
 **Examples**:
-- `/orchestrate-from-spec` → Standard mode, auto-detect feature
-- `/orchestrate-from-spec superpowers` → Superpowers mode, auto-detect feature
-- `/orchestrate-from-spec .specify/features/001-auth` → Standard mode, specific feature
-- `/orchestrate-from-spec superpowers .specify/features/001-auth` → Superpowers mode, specific feature
-- `/orchestrate-from-spec using superpowers` → Superpowers mode, auto-detect feature
+- `/orchestrate-from-spec` → Auto-detect feature, use configured Skills
+- `/orchestrate-from-spec .specify/features/001-auth` → Specific feature, use configured Skills
 
 ---
 
@@ -50,28 +47,20 @@ This command:
 
 ## Phase 1: Validate and Load Spec-Kit Artifacts
 
-### Step 1.0: Parse Superpowers Mode
+### Step 1.0: Determine Feature Directory
 
-**Parse Arguments for Superpowers Keyword**:
+**Parse Arguments for Feature Path**:
 ```
-SUPERPOWERS_MODE = false
 FEATURE_PATH = ""
 
-# Check if $ARGUMENTS contains "superpowers" keyword (case-insensitive)
-if $ARGUMENTS matches /superpowers|superpower/i:
-  SUPERPOWERS_MODE = true
-  # Remove superpowers keyword and clean up
-  FEATURE_PATH = $ARGUMENTS.gsub(/superpowers|using|with|-/i, "").strip()
-else:
-  FEATURE_PATH = $ARGUMENTS.strip()
+# Parse feature path from arguments
+FEATURE_PATH = $ARGUMENTS.strip()
 ```
 
 **Output**:
 ```
-🔋 **SUPERPOWERS MODE**: {ENABLED|DISABLED}
+📂 **FEATURE PATH**: {FEATURE_DIR}
 ```
-
-### Step 1.1: Determine Feature Directory
 
 **Priority Order**:
 1. If FEATURE_PATH is not empty → Use it
@@ -90,7 +79,7 @@ If no spec-kit features found:
    Then run /orchestrate-from-spec again."
 ```
 
-### Step 1.2: Validate Required Files
+### Step 1.1: Validate Required Files
 
 **Check for Required Files**:
 ```bash
@@ -132,7 +121,7 @@ Cannot proceed. Please run:
 Then retry /orchestrate-from-spec
 ```
 
-### Step 1.3: Parse and Display Summary
+### Step 1.2: Parse and Display Summary
 
 **Read and Parse**:
 1. `spec.md` - Extract feature title and key requirements
@@ -147,7 +136,6 @@ Then retry /orchestrate-from-spec
 
 **Feature**: JWT Authentication System
 **Location**: .specify/features/001-jwt-auth/
-{**Mode**: 🔋 SUPERPOWERS ENABLED}
 
 **Specification Summary** (from spec.md):
 - User authentication with JWT tokens
@@ -180,13 +168,11 @@ Then retry /orchestrate-from-spec
 
 **Key Enhancement**: Inject spec-kit context into orchestrator's initial state
 
-**Conditional Sections**: Text in {curly braces} should only be included if SUPERPOWERS_MODE = true
-
 ```
 You are now the **ORCHESTRATOR** for the Claude Code Multi-Agent Dev Team.
 
 🆕 **SPEC-KIT INTEGRATION MODE ACTIVE**
-{🔋 **SUPERPOWERS MODE ENABLED** - Advanced Skills active}
+✅ **Skills Mode**: Advanced Skills enabled per coordination/skills_config.json
 
 You are executing a feature that has been planned using GitHub's spec-kit methodology. All planning artifacts have been prepared, and your job is to coordinate implementation.
 
@@ -200,15 +186,15 @@ You are executing a feature that has been planned using GitHub's spec-kit method
 ✅ spec.md - Feature requirements and acceptance criteria
 ✅ tasks.md - Pre-defined task breakdown with checklist format
 ✅ plan.md - Technical architecture and approach
-{✅ research.md - Research findings and unknowns resolved}
-{✅ data-model.md - Data structures and schemas}
-{✅ contracts/ - API contracts and interfaces}
+✅ research.md - Research findings and unknowns resolved (if available)
+✅ data-model.md - Data structures and schemas (if available)
+✅ contracts/ - API contracts and interfaces (if available)
 
 **User Stories Identified** (from tasks.md):
-{List of [US1], [US2], [US3] with descriptions}
+List of [US1], [US2], [US3] with descriptions
 
 **Parallel Execution Opportunities** (from tasks.md):
-{List of tasks marked with [P]}
+List of tasks marked with [P]
 
 ═══════════════════════════════════════════════════════
 
@@ -319,18 +305,17 @@ Your standard workflow applies, but with these SPEC-KIT specific modifications:
 
 **🔴 CRITICAL ADDITIONS**: Use spec-kit artifacts for context and update tasks.md.
 
-{**🔋 SUPERPOWERS MODE ACTIVE**: Use advanced Skills before implementation:
+**Skills Available** (if marked as 'mandatory' in coordination/skills_config.json):
 - **/codebase-analysis** - Find similar features and reusable utilities (10-20s)
 - **/test-pattern-analysis** - Learn testing patterns before writing tests (5-15s)
 - **/api-contract-validation** - Validate API changes don't break contracts (5-15s)
 - **/db-migration-check** - Check migration safety before applying (5-20s)
 
-IMPORTANT: Invoke these Skills BEFORE starting implementation to:
+IMPORTANT: Use Skills when available to:
 - Discover existing utilities (EmailService, TokenGenerator, etc.)
 - Follow established patterns
 - Avoid breaking changes
 - Write tests consistent with project style
-}
 
 **Your Modified Workflow**:
 

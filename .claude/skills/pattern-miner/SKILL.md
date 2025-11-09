@@ -1,7 +1,7 @@
 ---
 name: pattern-miner
 description: Mine historical data for patterns and predictive insights
-category: superpowers
+category: analytics
 execution_time: 15-20s
 ---
 
