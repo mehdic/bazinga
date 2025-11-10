@@ -462,7 +462,7 @@ See [LICENSE](LICENSE) for full details.
 
 ## Acknowledgments
 
-Built for Claude Code using the Claude Agent SDK. Inspired by ChatDev, MetaGPT, and other multi-agent frameworks but optimized specifically for Claude Code's capabilities.
+Built for Claude Code using the Claude Agent SDK.
 
 Special thanks to:
 - Claude Code team for the Skills system and agent SDK
