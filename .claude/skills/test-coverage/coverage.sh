@@ -5,12 +5,19 @@
 # Runs test coverage analysis based on project language
 #
 
-set -e
+# Don't exit on error for graceful degradation
+set +e
 
 echo "🧪 Test Coverage Analysis Starting..."
 
 # Create coordination directory if it doesn't exist
 mkdir -p coordination
+
+# Load profile from skills_config.json for graceful degradation
+PROFILE="lite"
+if [ -f "coordination/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' coordination/skills_config.json 2>/dev/null || echo "lite")
+fi
 
 # Detect project language and test framework
 if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
@@ -32,16 +39,58 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
+# Function to check tool availability and handle graceful degradation
+check_tool_or_skip() {
+    local tool=$1
+    local install_cmd=$2
+    local tool_name=$3  # Human readable name
+
+    if ! command_exists "$tool"; then
+        if [ "$PROFILE" = "lite" ]; then
+            # Lite mode: Skip gracefully with warning
+            echo "⚠️  $tool_name not installed - skipping in lite mode"
+            echo "   Install with: $install_cmd"
+            cat > coordination/coverage_report.json << EOF
+{
+  "status": "skipped",
+  "language": "$LANG",
+  "reason": "$tool_name not installed",
+  "recommendation": "Install with: $install_cmd",
+  "impact": "Test coverage analysis was skipped. Install $tool_name for coverage metrics.",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+            exit 0
+        else
+            # Advanced mode: Fail if tool not available
+            echo "❌ $tool_name required but not installed"
+            cat > coordination/coverage_report.json << EOF
+{
+  "status": "error",
+  "language": "$LANG",
+  "reason": "$tool_name required but not installed",
+  "recommendation": "Install with: $install_cmd",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+            exit 1
+        fi
+    fi
+}
+
 # Run coverage based on language
 case $LANG in
     python)
-        # Check for pytest and pytest-cov
-        if ! command_exists "pytest"; then
-            echo "⚙️  Installing pytest..."
-            pip install pytest pytest-cov --quiet
-        elif ! python -c "import pytest_cov" 2>/dev/null; then
-            echo "⚙️  Installing pytest-cov..."
-            pip install pytest-cov --quiet
+        # Check for pytest with graceful degradation
+        check_tool_or_skip "pytest" "pip install pytest pytest-cov" "pytest and pytest-cov (Python test coverage)"
+
+        # Check for pytest-cov module
+        if ! python -c "import pytest_cov" 2>/dev/null; then
+            if [ "$PROFILE" = "lite" ]; then
+                echo "⚠️  pytest-cov not installed - skipping in lite mode"
+                echo '{"status":"skipped","reason":"pytest-cov not installed"}' > coordination/coverage_report.json
+                exit 0
+            fi
         fi
 
         echo "  Running pytest with coverage..."
@@ -59,23 +108,22 @@ case $LANG in
         ;;
 
     javascript)
-        # Check for jest
-        if [ ! -f "node_modules/.bin/jest" ]; then
-            echo "⚙️  Jest not found. Please install: npm install --save-dev jest"
-            echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
-        else
-            echo "  Running jest with coverage..."
-            npm test -- --coverage --json --outputFile=coordination/jest-results.json 2>/dev/null || {
-                echo "⚠️  Tests failed or no tests found"
-                echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
-            }
+        # Check for jest with graceful degradation
+        if ! [ -f "node_modules/.bin/jest" ] && ! command_exists "jest"; then
+            check_tool_or_skip "jest" "npm install --save-dev jest" "jest (JavaScript test coverage)"
+        fi
 
-            # Jest outputs to coverage/coverage-final.json
-            if [ -f "coverage/coverage-final.json" ]; then
-                cp coverage/coverage-final.json coordination/coverage_report_raw.json
-            elif [ ! -f "coordination/coverage_report_raw.json" ]; then
-                echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
-            fi
+        echo "  Running jest with coverage..."
+        npm test -- --coverage --json --outputFile=coordination/jest-results.json 2>/dev/null || {
+            echo "⚠️  Tests failed or no tests found"
+            echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
+        }
+
+        # Jest outputs to coverage/coverage-final.json
+        if [ -f "coverage/coverage-final.json" ]; then
+            cp coverage/coverage-final.json coordination/coverage_report_raw.json
+        elif [ ! -f "coordination/coverage_report_raw.json" ]; then
+            echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
         fi
         ;;
 
