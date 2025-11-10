@@ -1,6 +1,10 @@
-# Configure Skills
+# Bazinga Configure Skills
 
 You are helping the user configure which Skills should be invoked during BAZINGA orchestration.
+
+**Command:** /bazinga.configure-skills
+
+**Note:** This command configures individual Skills. To configure the overall testing framework (enable/disable QA Expert, set testing rigor), use `/bazinga.configure-testing` instead.
 
 ## Step 1: Read Current Configuration
 

@@ -122,13 +122,69 @@ if [ ! -f "coordination/skills_config.json" ]; then
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent",
       "DISABLED: Skill will not be invoked",
-      "Use /configure-skills to modify this configuration interactively"
+      "Use /bazinga.configure-skills to modify this configuration interactively"
     ]
   }
 }
 EOF
 else
     echo "✓ skills_config.json already exists"
+fi
+
+# Initialize testing_config.json
+if [ ! -f "coordination/testing_config.json" ]; then
+    echo "📝 Creating testing_config.json..."
+    cat > coordination/testing_config.json <<EOF
+{
+  "_testing_framework": {
+    "enabled": true,
+    "mode": "minimal",
+    "_mode_options": ["full", "minimal", "disabled"],
+
+    "pre_commit_validation": {
+      "lint_check": true,
+      "unit_tests": true,
+      "build_check": true,
+      "_note": "lint_check should always be true for code quality"
+    },
+
+    "test_requirements": {
+      "require_integration_tests": false,
+      "require_contract_tests": false,
+      "require_e2e_tests": false,
+      "coverage_threshold": 0,
+      "_note": "These only apply when mode=full"
+    },
+
+    "qa_workflow": {
+      "enable_qa_expert": false,
+      "auto_route_to_qa": false,
+      "qa_skills_enabled": false,
+      "_note": "Disable enable_qa_expert to skip QA workflow entirely"
+    }
+  },
+
+  "_metadata": {
+    "description": "Testing framework configuration for BAZINGA",
+    "created": "$TIMESTAMP",
+    "last_updated": "$TIMESTAMP",
+    "version": "1.0",
+    "presets": {
+      "full": "All testing enabled - complete QA workflow",
+      "minimal": "Lint + unit tests only, skip QA Expert (DEFAULT)",
+      "disabled": "Only lint checks - fastest iteration"
+    },
+    "notes": [
+      "Use /bazinga.configure-testing to modify this configuration interactively",
+      "Mode 'minimal' is the default - balances speed and quality (current BAZINGA default)",
+      "Mode 'full' enables complete QA workflow for production-critical code",
+      "Mode 'disabled' is for rapid prototyping only (lint checks still run)"
+    ]
+  }
+}
+EOF
+else
+    echo "✓ testing_config.json already exists"
 fi
 
 # Initialize message files
@@ -176,8 +232,9 @@ if [ ! -f "coordination/.gitignore" ]; then
 # Coordination state files are temporary and should not be committed
 *.json
 
-# EXCEPT skills_config.json - this is permanent configuration
+# EXCEPT these files - they are permanent configuration
 !skills_config.json
+!testing_config.json
 
 # Reports are ephemeral - generated per session
 reports/

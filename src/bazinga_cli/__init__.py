@@ -745,6 +745,12 @@ def init(
     no_git: bool = typer.Option(
         False, "--no-git", help="Skip git repository initialization"
     ),
+    testing_mode: str = typer.Option(
+        "minimal",
+        "--testing",
+        "-t",
+        help="Testing framework mode: full, minimal (default), or disabled",
+    ),
 ):
     """
     Initialize a new BAZINGA project with multi-agent orchestration.
@@ -754,8 +760,23 @@ def init(
     - Initialization scripts
     - Configuration files
     - Coordination state files
+
+    Testing modes:
+    - full: All tests + QA Expert (production)
+    - minimal: Lint + unit tests only (default)
+    - disabled: Lint only (rapid prototyping)
     """
     print_banner()
+
+    # Validate testing mode
+    valid_testing_modes = ["full", "minimal", "disabled"]
+    if testing_mode.lower() not in valid_testing_modes:
+        console.print(
+            f"[red]✗ Invalid testing mode: '{testing_mode}'[/red]\n"
+            f"Valid options: {', '.join(valid_testing_modes)}"
+        )
+        raise typer.Exit(1)
+    testing_mode = testing_mode.lower()
 
     # Ask for script type preference
     script_type = select_script_type()
@@ -836,6 +857,37 @@ def init(
         console.print("\n[bold cyan]6. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
+        # Update testing configuration if not default
+        if testing_mode != "minimal":
+            import json
+            testing_config_path = target_dir / "coordination" / "testing_config.json"
+            if testing_config_path.exists():
+                try:
+                    with open(testing_config_path, "r") as f:
+                        testing_config = json.load(f)
+
+                    # Update mode and related settings
+                    testing_config["_testing_framework"]["mode"] = testing_mode
+
+                    if testing_mode == "full":
+                        testing_config["_testing_framework"]["test_requirements"]["require_integration_tests"] = True
+                        testing_config["_testing_framework"]["test_requirements"]["require_contract_tests"] = True
+                        testing_config["_testing_framework"]["test_requirements"]["require_e2e_tests"] = True
+                        testing_config["_testing_framework"]["test_requirements"]["coverage_threshold"] = 80
+                        testing_config["_testing_framework"]["qa_workflow"]["enable_qa_expert"] = True
+                        testing_config["_testing_framework"]["qa_workflow"]["auto_route_to_qa"] = True
+                    elif testing_mode == "disabled":
+                        testing_config["_testing_framework"]["enabled"] = False
+                        testing_config["_testing_framework"]["pre_commit_validation"]["unit_tests"] = False
+                        testing_config["_testing_framework"]["pre_commit_validation"]["build_check"] = False
+
+                    with open(testing_config_path, "w") as f:
+                        json.dump(testing_config, f, indent=2)
+
+                    console.print(f"  ✓ Testing mode set to: [bold]{testing_mode}[/bold]")
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Failed to update testing mode: {e}[/yellow]")
+
     # Offer to install analysis tools
     detected_language = detect_project_language(target_dir)
     if detected_language:
@@ -856,16 +908,23 @@ def init(
             console.print("[yellow]⚠️  Git initialization failed[/yellow]")
 
     # Success message
+    testing_mode_desc = {
+        "full": "Full testing with QA Expert",
+        "minimal": "Minimal testing (lint + unit tests)",
+        "disabled": "Prototyping mode (lint only)"
+    }
     console.print(
         Panel.fit(
-            "[bold green]✓ BAZINGA installed successfully![/bold green]\n\n"
-            "Your multi-agent orchestration system is ready.\n\n"
+            f"[bold green]✓ BAZINGA installed successfully![/bold green]\n\n"
+            f"Your multi-agent orchestration system is ready.\n"
+            f"[dim]Testing mode: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
             "[bold]Next steps:[/bold]\n"
             f"  1. cd {target_dir.name if project_name else '.'}\n"
             "  2. Open with Claude Code\n"
             "  3. Use: @orchestrator <your request>\n\n"
             "[bold]Example:[/bold]\n"
-            "  @orchestrator implement user authentication with JWT",
+            "  @orchestrator implement user authentication with JWT\n\n"
+            "[dim]Change testing mode: /bazinga.configure-testing[/dim]",
             title="🎉 Installation Complete",
             border_style="green",
         )

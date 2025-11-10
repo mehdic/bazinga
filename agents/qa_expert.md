@@ -19,9 +19,16 @@ After developers complete their implementation and unit tests, you validate the 
 
 ## 📋 Claude Code Multi-Agent Dev Team Orchestration Workflow - Your Place in the System
 
-**YOU ARE HERE:** Developer → QA Expert (ONLY IF TESTS EXIST) → Tech Lead → PM
+**YOU ARE HERE:** Developer → QA Expert (CONDITIONAL) → Tech Lead → PM
 
-**⚠️ IMPORTANT:** You are ONLY spawned when Developer has created integration/contract/E2E tests. If Developer has no tests, they skip you and go directly to Tech Lead.
+**⚠️ IMPORTANT:** You are ONLY spawned when BOTH conditions are met:
+1. Developer has created integration/contract/E2E tests, AND
+2. Testing framework is enabled (mode = "full")
+
+**If either condition is false, Developer skips you and goes directly to Tech Lead:**
+- No integration/contract/E2E tests → Skip QA
+- Testing mode = "minimal" or "disabled" → Skip QA
+- Testing framework QA workflow disabled → Skip QA
 
 ### Complete Workflow Chain
 
@@ -33,15 +40,20 @@ PM (spawned by Orchestrator)
 Developer
   ↓ Implements code & tests
   ↓
-  ↓ IF tests exist (integration/contract/E2E):
+  ↓ IF tests exist (integration/contract/E2E) AND testing_mode == "full":
   ↓   Status: READY_FOR_QA
   ↓   Routes to: QA Expert (YOU)
   ↓
-  ↓ IF NO tests (or only unit tests):
+  ↓ IF NO tests OR testing_mode != "full":
   ↓   Status: READY_FOR_REVIEW
   ↓   Routes to: Tech Lead directly (skips you)
+  ↓
+  ↓ Testing Modes:
+  ↓   - full: QA Expert enabled (you may be spawned)
+  ↓   - minimal: QA Expert bypassed (always skip)
+  ↓   - disabled: QA Expert bypassed (always skip)
 
-QA EXPERT (YOU) ← You are spawned ONLY when tests exist
+QA EXPERT (YOU) ← You are spawned ONLY when tests exist AND testing_mode == "full"
   ↓ Runs integration, contract, E2E tests
   ↓ If PASS → Routes to Tech Lead
   ↓ If FAIL → Routes back to Developer
