@@ -16,17 +16,43 @@ cat coordination/skills_config.json 2>/dev/null
 
 Parse the current status (mandatory/disabled) for each Skill.
 
-## Step 2: Display Numbered Menu
+## Step 2: Display Profile and Numbered Menu
 
-Present this numbered menu to the user:
+First, show the current profile:
 
 ```
 🎯 BAZINGA Skills Configuration
 
+Current Profile: [PROFILE]
+  • lite: Fast development (3 core skills)
+  • advanced: Comprehensive analysis (10 skills)
+  • custom: User-configured
+```
+
+Then present this numbered menu organized by profile:
+
+```
+📦 CORE SKILLS (Lite Profile - Always Active)
+
 ┌─────────────────────────────────────────────────────────────┐
-│ 🔧 Developer Agent                                          │
+│ 🔧 Developer                                                │
 ├─────┬───────────────────────────────┬──────────┬────────────┤
 │  1  │ lint-check                    │ 5-10s    │ [STATUS]   │
+└─────┴───────────────────────────────┴──────────┴────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 🛡️ Tech Lead                                                │
+├─────┬───────────────────────────────┬──────────┬────────────┤
+│  6  │ security-scan                 │ 5-60s    │ [STATUS]   │
+│  7  │ lint-check                    │ 5-10s    │ [STATUS]   │
+│  8  │ test-coverage                 │ 10-20s   │ [STATUS]   │
+└─────┴───────────────────────────────┴──────────┴────────────┘
+
+⚡ ADVANCED SKILLS (Opt-in for Comprehensive Analysis)
+
+┌─────────────────────────────────────────────────────────────┐
+│ 🔧 Developer                                                │
+├─────┬───────────────────────────────┬──────────┬────────────┤
 │  2  │ codebase-analysis             │ 15-30s   │ [STATUS]   │
 │  3  │ test-pattern-analysis         │ 20-40s   │ [STATUS]   │
 │  4  │ api-contract-validation       │ 10-20s   │ [STATUS]   │
@@ -34,22 +60,14 @@ Present this numbered menu to the user:
 └─────┴───────────────────────────────┴──────────┴────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│ 🛡️ Tech Lead Agent                                          │
-├─────┬───────────────────────────────┬──────────┬────────────┤
-│  6  │ security-scan                 │ 5-60s    │ [STATUS]   │
-│  7  │ lint-check                    │ 5-10s    │ [STATUS]   │
-│  8  │ test-coverage                 │ 10-20s   │ [STATUS]   │
-└─────┴───────────────────────────────┴──────────┴────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ 🧪 QA Expert Agent                                          │
+│ 🧪 QA Expert                                                │
 ├─────┬───────────────────────────────┬──────────┬────────────┤
 │  9  │ pattern-miner                 │ 30-60s   │ [STATUS]   │
 │ 10  │ quality-dashboard             │ 15-30s   │ [STATUS]   │
 └─────┴───────────────────────────────┴──────────┴────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│ 📊 Project Manager Agent                                    │
+│ 📊 Project Manager                                          │
 ├─────┬───────────────────────────────┬──────────┬────────────┤
 │ 11  │ velocity-tracker              │ 5-10s    │ [STATUS]   │
 └─────┴───────────────────────────────┴──────────┴────────────┘
@@ -57,7 +75,7 @@ Present this numbered menu to the user:
 [STATUS] = ✅ ON or ⚪ OFF
 ```
 
-Replace [STATUS] with actual current state:
+Replace [STATUS] with actual current state and [PROFILE] with the profile from _metadata.profile:
 - ✅ ON = mandatory
 - ⚪ OFF = disabled
 
@@ -74,17 +92,17 @@ Numbers:
   2 3 9               → Same as "enable 2 3 9" (enable is default)
 
 Presets:
-  defaults            → Reset to defaults (1,6,7,8,11 ON, rest OFF)
-  all                 → Enable all Skills
+  lite                → Lite profile: Core skills only (1,6,7,8 ON)
+  advanced            → Advanced profile: All 10 skills enabled
+  defaults            → Same as lite (recommended)
   none                → Disable all Skills
-  fast                → Only fast Skills <20s (1,6,7,8,11)
-  advanced            → Only advanced Skills (2,3,4,5,9,10)
 
 Examples:
   "2 3 9"                    → Enable codebase-analysis, test-pattern-analysis, pattern-miner
   "enable 2, disable 7"      → Enable #2, disable #7
-  "advanced"                 → Enable all advanced Skills (2,3,4,5,9,10)
-  "defaults"                 → Reset to recommended defaults
+  "lite"                     → Switch to lite profile (fast development)
+  "advanced"                 → Switch to advanced profile (all skills)
+  "defaults"                 → Reset to lite profile defaults
 
 What would you like to change?
 ```
@@ -100,11 +118,9 @@ Support these input patterns:
 - `"enable 2, disable 7"` → mixed operations
 
 **Presets:**
-- `"defaults"` or `"default"` or `"reset"` → Skills 1,6,7,8,11 ON, rest OFF
-- `"all"` or `"everything"` → all Skills ON
-- `"none"` or `"nothing"` → all Skills OFF
-- `"fast"` or `"fast-only"` → Skills 1,6,7,8,11 ON (execution time <20s)
-- `"advanced"` → Skills 2,3,4,5,9,10 ON (advanced analysis)
+- `"lite"` or `"defaults"` or `"default"` or `"reset"` → Lite profile: Skills 1,6,7,8 ON, rest OFF (profile=lite)
+- `"advanced"` → Advanced profile: all 10 Skills ON (profile=advanced)
+- `"none"` or `"nothing"` → all Skills OFF (profile=custom)
 
 **Skill number mappings:**
 ```
@@ -128,6 +144,20 @@ After parsing user input, update the configuration:
 ```bash
 cat > coordination/skills_config.json << 'EOF'
 {
+  "_metadata": {
+    "profile": "lite|advanced|custom",
+    "version": "2.0",
+    "description": "Description based on profile",
+    "created": "existing_timestamp",
+    "last_updated": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "configuration_notes": [
+      "MANDATORY: Skill will be automatically invoked by the agent",
+      "DISABLED: Skill will not be invoked",
+      "Use /bazinga.configure-skills to modify this configuration interactively",
+      "LITE PROFILE: 3 core skills (security-scan, lint-check, test-coverage)",
+      "ADVANCED PROFILE: All 10 skills enabled"
+    ]
+  },
   "developer": {
     "lint-check": "mandatory|disabled",
     "codebase-analysis": "mandatory|disabled",
@@ -146,19 +176,15 @@ cat > coordination/skills_config.json << 'EOF'
   },
   "pm": {
     "velocity-tracker": "mandatory|disabled"
-  },
-  "_metadata": {
-    "description": "Skills configuration for BAZINGA agents",
-    "last_updated": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-    "configuration_notes": [
-      "MANDATORY: Skill will be automatically invoked by the agent",
-      "DISABLED: Skill will not be invoked",
-      "Use /configure-skills to modify this configuration interactively"
-    ]
   }
 }
 EOF
 ```
+
+**Profile metadata rules:**
+- If using "lite" preset: Set profile="lite", description="Lite profile - core skills only for fast development"
+- If using "advanced" preset: Set profile="advanced", description="Advanced profile - all skills enabled for comprehensive analysis"
+- If manual skill selection: Set profile="custom", description="Custom profile - user-configured skills"
 
 ## Step 6: Confirm Changes
 
@@ -195,15 +221,29 @@ Run /configure-skills anytime to adjust.
 
 ## Important Notes
 
-**Default Configuration:**
-- Skills 1, 6, 7, 8, 11 are ON (fast, essential quality checks)
-- Skills 2, 3, 4, 5, 9, 10 are OFF (advanced, slower analysis)
+**Profiles:**
+- **Lite** (default): Fast development with 3 core skills (1, 6, 7, 8)
+  - Security scan, lint check, test coverage
+  - Recommended for most projects
+- **Advanced**: Comprehensive analysis with all 10 skills
+  - Includes pattern mining, velocity tracking, API validation, etc.
+  - Use for production-critical features or complex projects
+- **Custom**: Individually selected skills
+
+**Default Configuration (Lite Profile):**
+- Skills 1, 6, 7, 8 are ON (core quality gates)
+- Skills 2, 3, 4, 5, 9, 10, 11 are OFF (advanced analysis)
+
+**Graceful Degradation:**
+- Lite mode: Skills skip gracefully if tools missing (warns but continues)
+- Advanced mode: Skills fail if required tools missing (user explicitly opted in)
+- Tools not installed? You'll see warnings with installation instructions
 
 **Persistence:**
 - Configuration persists across all BAZINGA sessions
 - Tracked in git (unlike other coordination/*.json files)
 
 **Performance Guidance:**
-- Fast Skills (<20s): 1, 6, 7, 8, 11
-- Advanced Skills (15-60s): 2, 3, 4, 5, 9, 10
-- Consider your workflow: enable advanced Skills for critical work, disable for rapid iteration
+- Core Skills (<20s): 1, 6, 7, 8
+- Advanced Skills (15-60s): 2, 3, 4, 5, 9, 10, 11
+- Consider your workflow: use lite for iteration, advanced for production

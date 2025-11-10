@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set +e  # Don't exit on error for graceful degradation
 
 # Colors
 RED=$'\033[0;31m'
@@ -19,17 +19,51 @@ HISTORICAL_FILE="${COORD_DIR}/historical_metrics.json"
 DASHBOARD_FILE="${COORD_DIR}/quality_dashboard.json"
 PREVIOUS_DASHBOARD="${COORD_DIR}/quality_dashboard_previous.json"
 
+echo "📊 Quality Dashboard"
+echo "=================================================="
+echo
+
+# Load profile from skills_config.json for graceful degradation
+PROFILE="lite"
+if [ -f "${COORD_DIR}/skills_config.json" ]; then
+    if command -v jq &> /dev/null; then
+        PROFILE=$(jq -r '._metadata.profile // "lite"' "${COORD_DIR}/skills_config.json" 2>/dev/null || echo "lite")
+    fi
+fi
+
 # Check if jq is available - graceful fallback
 if ! command -v jq &> /dev/null; then
-    echo -e "${YELLOW}⚠️  jq not found - using basic parsing${NC}"
+    if [ "$PROFILE" = "lite" ]; then
+        # Lite mode: Skip gracefully
+        echo -e "${YELLOW}⚠️  jq not installed - quality dashboard skipped in lite mode${NC}"
+        echo "   Install with: apt-get install jq (or brew install jq on macOS)"
+        cat > "$DASHBOARD_FILE" <<EOF
+{
+  "status": "skipped",
+  "reason": "jq not installed",
+  "recommendation": "Install with: apt-get install jq (or brew install jq on macOS)",
+  "impact": "Quality dashboard was skipped. Install jq for unified health metrics.",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+        exit 0
+    else
+        # Advanced mode: Fail if jq missing
+        echo -e "${RED}❌ jq required but not installed${NC}"
+        cat > "$DASHBOARD_FILE" <<EOF
+{
+  "status": "error",
+  "reason": "jq required but not installed",
+  "recommendation": "Install with: apt-get install jq (or brew install jq on macOS)",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+        exit 1
+    fi
     USE_JQ=false
 else
     USE_JQ=true
 fi
-
-echo "📊 Quality Dashboard"
-echo "=================================================="
-echo
 
 # Save previous dashboard for trend comparison
 if [ -f "$DASHBOARD_FILE" ]; then

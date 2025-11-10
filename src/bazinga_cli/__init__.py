@@ -539,111 +539,163 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
     Returns:
         True if tools were installed successfully or skipped, False if failed
     """
-    tool_commands = {
+    tool_configs = {
         "python": {
-            "tools": ["bandit", "semgrep", "pytest", "pytest-cov", "ruff"],
-            "command": ["pip", "install", "bandit", "semgrep", "pytest", "pytest-cov", "ruff"],
-            "description": "Python analysis tools (bandit, semgrep, pytest, pytest-cov, ruff)",
+            "core": ["bandit", "ruff", "pytest-cov"],
+            "advanced": ["semgrep"],
+            "package_manager": "pip",
+            "check_command": lambda t: check_command_exists(t),
+            "install_cmd": lambda tools: ["pip", "install"] + tools,
         },
         "javascript": {
-            "tools": ["jest", "eslint", "eslint-plugin-security"],
-            "command": ["npm", "install", "--save-dev", "jest", "eslint", "eslint-plugin-security", "@jest/globals"],
-            "description": "JavaScript analysis tools (jest, eslint, eslint-plugin-security)",
+            "core": ["jest", "eslint"],
+            "advanced": [],
+            "package_manager": "npm",
+            "check_command": lambda t: (target_dir / "node_modules" / ".bin" / t).exists() or check_command_exists(t),
+            "install_cmd": lambda tools: ["npm", "install", "--save-dev"] + tools + (["@jest/globals"] if "jest" in tools else []),
         },
         "go": {
-            "tools": ["gosec", "golangci-lint"],
-            "command": None,  # Special handling for Go
-            "description": "Go analysis tools (gosec, golangci-lint)",
+            "core": ["gosec", "golangci-lint"],
+            "advanced": [],
+            "package_manager": "go",
+            "check_command": lambda t: check_command_exists(t),
+            "install_cmd": None,  # Special handling
         },
         "java": {
-            "tools": ["maven/gradle plugins"],
-            "command": None,  # Requires pom.xml/build.gradle configuration
-            "description": "Java analysis tools (via Maven/Gradle plugins)",
+            "core": [],
+            "advanced": [],
+            "package_manager": "maven/gradle",
+            "check_command": None,
+            "install_cmd": None,  # Requires build.gradle/pom.xml configuration
         },
         "ruby": {
-            "tools": ["brakeman", "rubocop"],
-            "command": ["gem", "install", "brakeman", "rubocop"],
-            "description": "Ruby analysis tools (brakeman, rubocop)",
+            "core": ["brakeman", "rubocop"],
+            "advanced": [],
+            "package_manager": "gem",
+            "check_command": lambda t: check_command_exists(t),
+            "install_cmd": lambda tools: ["gem", "install"] + tools,
         },
     }
 
-    if language not in tool_commands:
+    if language not in tool_configs:
         return True  # Unknown language, skip
 
-    config = tool_commands[language]
+    config = tool_configs[language]
+
+    # Check which tools are already installed
+    all_tools = config["core"] + config["advanced"]
+    if config["check_command"] and all_tools:
+        installed_tools = [tool for tool in all_tools if config["check_command"](tool)]
+        missing_core = [tool for tool in config["core"] if tool not in installed_tools]
+        missing_advanced = [tool for tool in config["advanced"] if tool not in installed_tools]
+    else:
+        installed_tools = []
+        missing_core = config["core"]
+        missing_advanced = config["advanced"]
+
+    # Show tool status
+    console.print(f"\n[bold]{language.capitalize()} project detected[/bold]")
+
+    if installed_tools:
+        console.print(f"[dim]✓ Already installed: {', '.join(installed_tools)}[/dim]")
+
+    missing_tools = missing_core + missing_advanced
+
+    if not missing_tools and all_tools:
+        console.print(f"[green]✓ All analysis tools are installed[/green]")
+        return True
+
+    if not all_tools:
+        # Special handling for Java
+        if language == "java":
+            console.print(f"\n[bold yellow]ℹ️  Java tools require Maven/Gradle configuration[/bold yellow]")
+            console.print("[dim]Analysis tools for Java are configured via build plugins:[/dim]")
+            console.print("[dim]  • SpotBugs + Find Security Bugs (security scanning)[/dim]")
+            console.print("[dim]  • JaCoCo (test coverage)[/dim]")
+            console.print("[dim]  • Checkstyle + PMD (linting)[/dim]")
+            console.print(f"[dim]\nSee .claude/skills/*/README.md for configuration examples.[/dim]")
+            return True
+        return True
+
+    # Show what's missing
+    if missing_core:
+        console.print(f"\n[bold yellow]Missing core tools:[/bold yellow] {', '.join(missing_core)}")
+        console.print("[dim]Core tools enable: security scanning, linting, test coverage[/dim]")
+
+    if missing_advanced:
+        console.print(f"[dim]Missing advanced tools: {', '.join(missing_advanced)}[/dim]")
+
+    # Explain graceful degradation
+    console.print(f"\n[dim]💡 In lite mode, skills skip gracefully if tools are missing.[/dim]")
+    console.print(f"[dim]   You can still use BAZINGA - just with reduced analysis.[/dim]")
 
     if not force:
-        console.print(f"\n[bold yellow]Install analysis tools for {language.capitalize()}?[/bold yellow]")
-        console.print(f"[dim]Tools: {config['description']}[/dim]")
-        console.print("[dim]These tools enable automated security scanning, test coverage, and linting.[/dim]\n")
-
-        if not typer.confirm("Install now?", default=True):
+        if not typer.confirm(f"\nInstall missing tools now?", default=True):
             console.print("[yellow]⏭️  Skipped tool installation[/yellow]")
-            console.print(f"[dim]You can install manually later using the commands in Skills documentation[/dim]")
+            console.print(f"[dim]\nYou can install manually later:[/dim]")
+            if language == "python":
+                console.print(f"[dim]  pip install {' '.join(missing_tools)}[/dim]")
+            elif language == "javascript":
+                console.print(f"[dim]  npm install --save-dev {' '.join(missing_tools)}[/dim]")
+            elif language == "go":
+                for tool in missing_tools:
+                    if tool == "gosec":
+                        console.print(f"[dim]  go install github.com/securego/gosec/v2/cmd/gosec@latest[/dim]")
+                    elif tool == "golangci-lint":
+                        console.print(f"[dim]  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest[/dim]")
+            elif language == "ruby":
+                console.print(f"[dim]  gem install {' '.join(missing_tools)}[/dim]")
             return True
 
-    # Special handling for Go
+    # Special handling for Go - install only missing tools
     if language == "go":
         console.print(f"\n[bold cyan]Installing Go tools...[/bold cyan]")
 
-        # Install gosec
-        if not check_command_exists("gosec"):
-            console.print("  • Installing gosec...")
-            try:
-                subprocess.run(
-                    ["go", "install", "github.com/securego/gosec/v2/cmd/gosec@latest"],
-                    check=True,
-                    capture_output=True,
-                )
-                console.print("    [green]✓[/green] gosec installed")
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                console.print("    [yellow]⚠️  Failed to install gosec[/yellow]")
-        else:
-            console.print("    [dim]✓ gosec already installed[/dim]")
-
-        # Install golangci-lint
-        if not check_command_exists("golangci-lint"):
-            console.print("  • Installing golangci-lint...")
-            try:
-                subprocess.run(
-                    ["go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"],
-                    check=True,
-                    capture_output=True,
-                )
-                console.print("    [green]✓[/green] golangci-lint installed")
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                console.print("    [yellow]⚠️  Failed to install golangci-lint[/yellow]")
-        else:
-            console.print("    [dim]✓ golangci-lint already installed[/dim]")
+        for tool in missing_tools:
+            if tool == "gosec":
+                console.print("  • Installing gosec...")
+                try:
+                    subprocess.run(
+                        ["go", "install", "github.com/securego/gosec/v2/cmd/gosec@latest"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    console.print("    [green]✓[/green] gosec installed")
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    console.print("    [yellow]⚠️  Failed to install gosec[/yellow]")
+            elif tool == "golangci-lint":
+                console.print("  • Installing golangci-lint...")
+                try:
+                    subprocess.run(
+                        ["go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    console.print("    [green]✓[/green] golangci-lint installed")
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    console.print("    [yellow]⚠️  Failed to install golangci-lint[/yellow]")
 
         return True
 
-    # Special handling for Java
-    if language == "java":
-        console.print(f"\n[bold yellow]ℹ️  Java tools require Maven/Gradle configuration[/bold yellow]")
-        console.print("[dim]Analysis tools for Java are configured via build plugins:[/dim]")
-        console.print("[dim]  • SpotBugs + Find Security Bugs (security scanning)[/dim]")
-        console.print("[dim]  • JaCoCo (test coverage)[/dim]")
-        console.print("[dim]  • Checkstyle + PMD (linting)[/dim]")
-        console.print(f"[dim]\nSee .claude/skills/*/SKILL.md for configuration examples.[/dim]")
-        return True
-
-    # Python, JavaScript, Ruby
-    if config["command"]:
+    # Python, JavaScript, Ruby - install only missing tools
+    if config["install_cmd"] and missing_tools:
         console.print(f"\n[bold cyan]Installing {language.capitalize()} tools...[/bold cyan]")
 
         try:
             # Check if package manager exists
-            package_manager = config["command"][0]
+            package_manager = config["package_manager"]
             if not check_command_exists(package_manager):
                 console.print(f"[red]✗ {package_manager} not found[/red]")
-                console.print(f"[yellow]Please install {package_manager} first, then run tools installation manually[/yellow]")
+                console.print(f"[yellow]Please install {package_manager} first, then run tool installation manually[/yellow]")
                 return False
+
+            # Build installation command for missing tools only
+            install_command = config["install_cmd"](missing_tools)
 
             # Run installation command (SECURITY: Use SafeSubprocess)
             try:
                 result = SafeSubprocess.run(
-                    config["command"],
+                    install_command,
                     cwd=target_dir,
                     timeout=120,  # 2 minute timeout
                     check=False,  # Don't raise on error, handle below
@@ -751,6 +803,12 @@ def init(
         "-t",
         help="Testing framework mode: full, minimal (default), or disabled",
     ),
+    profile: str = typer.Option(
+        "lite",
+        "--profile",
+        "-p",
+        help="Configuration profile: lite (default), advanced, or custom",
+    ),
 ):
     """
     Initialize a new BAZINGA project with multi-agent orchestration.
@@ -761,12 +819,40 @@ def init(
     - Configuration files
     - Coordination state files
 
-    Testing modes:
+    Profiles:
+    - lite (default): Fast development with 3 core skills, parallel mode enabled
+    - advanced: All 10 skills enabled, full testing mode
+    - custom: Use individual flags (--testing) for fine control
+
+    Testing modes (for custom profile):
     - full: All tests + QA Expert (production)
     - minimal: Lint + unit tests only (default)
     - disabled: Lint only (rapid prototyping)
     """
     print_banner()
+
+    # Validate profile
+    valid_profiles = ["lite", "advanced", "custom"]
+    if profile.lower() not in valid_profiles:
+        console.print(
+            f"[red]✗ Invalid profile: '{profile}'[/red]\n"
+            f"Valid options: {', '.join(valid_profiles)}"
+        )
+        raise typer.Exit(1)
+    profile = profile.lower()
+
+    # Handle profile presets
+    if profile == "advanced":
+        # Advanced profile: Enable all skills, full testing
+        testing_mode = "full"
+        console.print(f"[cyan]Using advanced profile: All skills enabled, full testing mode[/cyan]\n")
+    elif profile == "lite":
+        # Lite profile: Core skills only, minimal testing (already default in init script)
+        # If user didn't specify testing mode, keep minimal
+        if testing_mode == "minimal":
+            pass  # Use default
+        console.print(f"[cyan]Using lite profile: 3 core skills, parallel mode enabled[/cyan]\n")
+    # custom profile uses individual flags as-is
 
     # Validate testing mode
     valid_testing_modes = ["full", "minimal", "disabled"]
@@ -782,7 +868,8 @@ def init(
     script_type = select_script_type()
 
     # Determine target directory
-    if here:
+    if here or not project_name:
+        # Default to current directory if --here flag or no project name provided
         target_dir = Path.cwd()
         if not force:
             console.print(
@@ -810,14 +897,6 @@ def init(
             raise typer.Exit(1)
         target_dir.mkdir(parents=True, exist_ok=True)
         console.print(f"\n[green]✓[/green] Created directory: [bold]{target_dir}[/bold]")
-    else:
-        console.print(
-            "[red]Error:[/red] Please provide a project name or use --here flag"
-        )
-        console.print("\nExamples:")
-        console.print("  bazinga init my-project")
-        console.print("  bazinga init --here")
-        raise typer.Exit(1)
 
     # Setup instance
     setup = BazingaSetup()
@@ -888,6 +967,35 @@ def init(
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Failed to update testing mode: {e}[/yellow]")
 
+        # Update skills configuration for advanced profile
+        if profile == "advanced":
+            import json
+            skills_config_path = target_dir / "coordination" / "skills_config.json"
+            if skills_config_path.exists():
+                try:
+                    with open(skills_config_path, "r") as f:
+                        skills_config = json.load(f)
+
+                    # Update profile metadata
+                    skills_config["_metadata"]["profile"] = "advanced"
+                    skills_config["_metadata"]["description"] = "Advanced profile - all skills enabled for comprehensive analysis"
+
+                    # Enable all advanced skills
+                    skills_config["developer"]["codebase-analysis"] = "mandatory"
+                    skills_config["developer"]["test-pattern-analysis"] = "mandatory"
+                    skills_config["developer"]["api-contract-validation"] = "mandatory"
+                    skills_config["developer"]["db-migration-check"] = "mandatory"
+                    skills_config["qa_expert"]["pattern-miner"] = "mandatory"
+                    skills_config["qa_expert"]["quality-dashboard"] = "mandatory"
+                    skills_config["pm"]["velocity-tracker"] = "mandatory"
+
+                    with open(skills_config_path, "w") as f:
+                        json.dump(skills_config, f, indent=2)
+
+                    console.print(f"  ✓ Advanced profile: All 10 skills enabled")
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Failed to update skills config: {e}[/yellow]")
+
     # Offer to install analysis tools
     detected_language = detect_project_language(target_dir)
     if detected_language:
@@ -908,23 +1016,38 @@ def init(
             console.print("[yellow]⚠️  Git initialization failed[/yellow]")
 
     # Success message
+    profile_desc = {
+        "lite": "Lite (3 core skills, fast development)",
+        "advanced": "Advanced (10 skills, comprehensive analysis)",
+        "custom": "Custom (user-configured)"
+    }
     testing_mode_desc = {
         "full": "Full testing with QA Expert",
         "minimal": "Minimal testing (lint + unit tests)",
         "disabled": "Prototyping mode (lint only)"
     }
+
+    config_commands = "[dim]Customize:\n"
+    config_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
+    config_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
+
+    # Determine next steps message based on whether project was created
+    if project_name:
+        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: @orchestrator <your request>"
+    else:
+        next_steps = "  1. Open with Claude Code\n  2. Use: @orchestrator <your request>"
+
     console.print(
         Panel.fit(
             f"[bold green]✓ BAZINGA installed successfully![/bold green]\n\n"
             f"Your multi-agent orchestration system is ready.\n"
-            f"[dim]Testing mode: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
+            f"[dim]Profile: {profile_desc.get(profile, profile)}[/dim]\n"
+            f"[dim]Testing: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
             "[bold]Next steps:[/bold]\n"
-            f"  1. cd {target_dir.name if project_name else '.'}\n"
-            "  2. Open with Claude Code\n"
-            "  3. Use: @orchestrator <your request>\n\n"
+            f"{next_steps}\n\n"
             "[bold]Example:[/bold]\n"
             "  @orchestrator implement user authentication with JWT\n\n"
-            "[dim]Change testing mode: /bazinga.configure-testing[/dim]",
+            f"{config_commands}",
             title="🎉 Installation Complete",
             border_style="green",
         )

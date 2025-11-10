@@ -4,11 +4,15 @@
 
 This directory contains comprehensive documentation for BAZINGA (Claude Code Multi-Agent Dev Team), organized to help you find what you need quickly.
 
+**💡 Key Concept:** BAZINGA has two modes:
+- **Lite** (default) - 3 core skills, fast iteration, perfect for most work
+- **Advanced** - All 10 skills, comprehensive analysis, for production-critical code
+
 ---
 
 ## 🚀 For New Users - Start Here
 
-If you're new to BAZINGA, start with these three documents:
+If you're new to BAZINGA, start with these four documents:
 
 ### 1. **[../README.md](../README.md)** - Project Overview
 **Length**: ~200 lines | **Time to read**: 10 minutes
@@ -20,19 +24,30 @@ If you're new to BAZINGA, start with these three documents:
 
 ---
 
-### 2. **[SKILLS.md](SKILLS.md)** - Configurable Quality Analysis Tools
+### 2. **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command Cheat Sheet
+**Length**: ~400 lines | **Time to read**: 5-10 minutes
+- Quick command reference
+- Common workflows and examples
+- Configuration options
+- Performance tips
+
+**Perfect for**: Quick lookups and daily use.
+
+---
+
+### 3. **[SKILLS.md](SKILLS.md)** - Configurable Quality Analysis Tools
 **Length**: ~1,000 lines | **Time to read**: 15-20 minutes
 - What are Skills and why configure them?
-- 11 available Skills explained (lint-check, security-scan, test-coverage, etc.)
-- Configuration presets: fast, advanced, custom
+- 3 Core Skills (lite profile) vs 7 Advanced Skills
+- Configuration presets: lite (default), advanced, custom
 - Language support (Python, JavaScript, Go, Java, Ruby)
-- `/configure-skills` command tutorial
+- `/bazinga.configure-skills` command tutorial
 
 **Perfect for**: Understanding what quality checks run during your workflows.
 
 ---
 
-### 3. **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** - See It In Action
+### 4. **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** - See It In Action
 **Length**: ~350 lines | **Time to read**: 10-15 minutes
 - Real workflow examples
 - How agents interact with each other
@@ -46,7 +61,23 @@ If you're new to BAZINGA, start with these three documents:
 
 Once familiar with basics, these documents explain how BAZINGA works:
 
-### 4. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System Design & Technical Specifications
+### 5. **[ADVANCED.md](ADVANCED.md)** - Advanced Features & Production Use
+**Length**: ~900 lines | **Time to read**: 25-30 minutes
+**Sections**:
+- Profiles Overview (lite vs advanced vs custom)
+- Advanced Skills (detailed explanations of 7 advanced skills)
+- Full Testing Mode (QA Expert, integration/E2E tests)
+- Configuration (how to switch profiles)
+- Performance Considerations (time investment per skill)
+- When to Use Advanced Mode (decision framework)
+
+**Read this for**: Understanding advanced features, full testing mode, and when to escalate from lite to advanced.
+
+**Key insight**: Most projects need lite mode (3 core skills). Use advanced mode for production-critical code, API changes, database migrations, or complex refactoring.
+
+---
+
+### 6. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System Design & Technical Specifications
 **Length**: ~1,100 lines | **Time to read**: 30-40 minutes
 **Sections**:
 - System Overview (workflow types, agent roles)
@@ -67,7 +98,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ---
 
-### 5. **[ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md)** - Preventing Agent Confusion
+### 7. **[ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md)** - Preventing Agent Confusion
 **Length**: ~350 lines | **Time to read**: 15-20 minutes
 **Sections**:
 - Problem Definition (why agents drift from their roles)
@@ -84,7 +115,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ---
 
-### 6. **[MODEL_ESCALATION.md](MODEL_ESCALATION.md)** - Intelligent Cost-Effective Model Selection
+### 8. **[MODEL_ESCALATION.md](MODEL_ESCALATION.md)** - Intelligent Cost-Effective Model Selection
 **Length**: ~423 lines | **Time to read**: 15-20 minutes
 **Sections**:
 - The Problem (why revisions persist)
@@ -105,7 +136,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ---
 
-### 7. **[PM_METRICS.md](PM_METRICS.md)** - Data-Driven Project Management
+### 9. **[PM_METRICS.md](PM_METRICS.md)** - Data-Driven Project Management
 **Length**: ~668 lines | **Time to read**: 20-30 minutes
 **Sections**:
 - The Problem (why metrics matter)
@@ -134,7 +165,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ## 🎯 Specific Features - How-To Guides
 
-### 8. **[TECH_DEBT_GUIDE.md](TECH_DEBT_GUIDE.md)** - Managing Technical Debt Responsibly
+### 10. **[TECH_DEBT_GUIDE.md](TECH_DEBT_GUIDE.md)** - Managing Technical Debt Responsibly
 **Length**: ~253 lines | **Time to read**: 10 minutes
 **Sections**:
 - Core Principle: "Try First, Log Later"
@@ -151,7 +182,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ---
 
-### 9. **[SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md)** - Case Study: Learning from Mistakes
+### 11. **[SCOPE_REDUCTION_INCIDENT.md](SCOPE_REDUCTION_INCIDENT.md)** - Case Study: Learning from Mistakes
 **Length**: ~150 lines | **Time to read**: 10 minutes
 **Sections**:
 - The Incident (what went wrong)
@@ -231,8 +262,10 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 
 | Question | Read This |
 |----------|-----------|
-| "How do I configure Skills?" | [SKILLS.md](SKILLS.md) → Quick Start section + `/configure-skills` |
-| "What are the 11 available Skills?" | [SKILLS.md](SKILLS.md) → Available Skills section (both default & advanced) |
+| "What's the quick command reference?" | [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → All commands and workflows |
+| "When should I use advanced mode?" | [ADVANCED.md](ADVANCED.md) → When to Use Advanced Mode |
+| "How do I configure Skills?" | [SKILLS.md](SKILLS.md) → Quick Start section + `/bazinga.configure-skills` |
+| "What are the core vs advanced Skills?" | [SKILLS.md](SKILLS.md) → Available Skills section (lite vs advanced) |
 | "How does model escalation work?" | [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → How It Works section |
 | "What does the PM track?" | [PM_METRICS.md](PM_METRICS.md) → Velocity Tracker section |
 | "How do we prevent role drift?" | [ROLE_DRIFT_PREVENTION.md](ROLE_DRIFT_PREVENTION.md) → 6-Layer Defense System |
@@ -248,9 +281,9 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 
 ## 📊 Documentation Statistics
 
-**Active Documentation**: ~3,900 lines across 7 main files
-- **For New Users**: 1 file (~200 lines)
-- **Core Concepts**: 4 files (~3,000 lines)
+**Active Documentation**: ~5,200 lines across 11 main files
+- **For New Users**: 4 files (~1,500 lines)
+- **Core Concepts**: 5 files (~3,300 lines)
 - **Specific Features**: 2 files (~400 lines)
 
 **Historical Documentation**: ~3,900 lines across 4 files (preserved for reference)
@@ -306,6 +339,6 @@ Can't find what you need? Try:
 
 ---
 
-**Last Updated**: 2025-01-09
-**Version**: 2.0 (Added SKILLS, MODEL_ESCALATION, PM_METRICS; restructured for new users)
+**Last Updated**: 2025-01-10
+**Version**: 2.1 (Added QUICK_REFERENCE, ADVANCED; restructured for lite/advanced profiles)
 **Maintained By**: Project contributors

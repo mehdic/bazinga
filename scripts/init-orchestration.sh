@@ -92,11 +92,25 @@ else
     echo "✓ orchestrator_state.json already exists"
 fi
 
-# Initialize skills_config.json
+# Initialize skills_config.json (Lite Profile by default)
 if [ ! -f "coordination/skills_config.json" ]; then
-    echo "📝 Creating skills_config.json..."
+    echo "📝 Creating skills_config.json (lite profile)..."
     cat > coordination/skills_config.json <<EOF
 {
+  "_metadata": {
+    "profile": "lite",
+    "version": "2.0",
+    "description": "Lite profile - core skills only for fast development",
+    "created": "$TIMESTAMP",
+    "last_updated": "$TIMESTAMP",
+    "configuration_notes": [
+      "MANDATORY: Skill will be automatically invoked by the agent",
+      "DISABLED: Skill will not be invoked",
+      "Use /bazinga.configure-skills to modify this configuration interactively",
+      "LITE PROFILE: 3 core skills (security-scan, lint-check, test-coverage)",
+      "ADVANCED PROFILE: All 10 skills enabled - use --profile advanced during init"
+    ]
+  },
   "developer": {
     "lint-check": "mandatory",
     "codebase-analysis": "disabled",
@@ -114,16 +128,7 @@ if [ ! -f "coordination/skills_config.json" ]; then
     "quality-dashboard": "disabled"
   },
   "pm": {
-    "velocity-tracker": "mandatory"
-  },
-  "_metadata": {
-    "description": "Skills configuration for BAZINGA agents",
-    "last_updated": "$TIMESTAMP",
-    "configuration_notes": [
-      "MANDATORY: Skill will be automatically invoked by the agent",
-      "DISABLED: Skill will not be invoked",
-      "Use /bazinga.configure-skills to modify this configuration interactively"
-    ]
+    "velocity-tracker": "disabled"
   }
 }
 EOF

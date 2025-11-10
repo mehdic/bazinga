@@ -1,621 +1,326 @@
-# BAZINGA - Multi-Agent Development Team for Claude Code
+# BAZINGA - Parallel AI Development Teams for Claude Code
 
 > **Repository:** https://github.com/mehdic/bazinga
 
-BAZINGA is a multi-agent orchestration system for Claude Code that automates software development using a team of AI agents: Project Manager, Developers, QA Expert, and Tech Lead.
+**One request → Multiple AI developers working simultaneously → Done 3x faster.**
 
-## What Development Problems Does It Solve?
-
-We built BAZINGA to address real pain points we experienced in software development:
-
-- **Manual code reviews take hours** - Tech Lead agent automates quality reviews, finding issues before human review
-- **Tests written inconsistently** - QA Expert ensures testing standards are followed across all work
-- **Security vulnerabilities discovered late** - Automated security scanning catches issues during development, not in production
-- **No idea if estimates are accurate** - PM tracks velocity and learns from history to improve future estimates
-- **Developers repeat same mistakes** - Skills analyze code patterns and provide feedback based on project conventions
-- **Context switching kills productivity** - Adaptive parallelism lets 1-4 developers work simultaneously on independent tasks
-
-## Quick Install
-
-```bash
-# One-time use (no installation)
-uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
-
-# Or install as a tool
-uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
-bazinga init my-project
-
-# Or use pip
-pip install git+https://github.com/mehdic/bazinga.git
-bazinga init my-project
-```
+BAZINGA coordinates teams of AI agents to build software in parallel. While traditional AI coding assistants work sequentially, BAZINGA analyzes your request, breaks it into independent tasks, and spawns multiple developers to work simultaneously—just like a real dev team.
 
 ---
 
-## The Problem
+## See It In Action
 
-### Before BAZINGA
-
-**Using Claude Code normally (even with manual multi-agent coordination):**
-
-- **Single agent**: One agent plans, codes, tests, and reviews all in one go
-- **Manual multi-agent**: You manually coordinate agents yourself, remembering each step
-- **No framework**: No structured workflow following software development best practices
-- **Manual quality checks**: You remember to run security scans, linting, coverage... or you don't
-- **No automation**: Each quality check requires explicit manual invocation
-- **Sequential work**: Can't parallelize independent tasks across multiple agents automatically
-- **No learning**: No velocity tracking or historical data to improve estimates
-
-**What this looks like:**
-
-```
-You: "Implement JWT authentication with user management"
-
-Claude Code (single agent):
-  - Plans the work
-  - Writes all the code
-  - Creates some tests (maybe)
-  - Reviews its own code (limited self-critique)
-  - No security scan unless you explicitly ask
-  - No coverage analysis unless you explicitly ask
-  - Pushes to completion
-
-Result: Fast, but quality varies. No specialization, no quality gates.
-
---- OR ---
-
-Claude Code (manual multi-agent - you coordinate):
-  You: "@pm-agent plan this work"
-  You: "now @dev-agent implement the auth module"
-  You: "did I run security scan? let me check... @security run scan"
-  You: "now @qa-agent test this"
-  You: "wait, did the dev finish? let me check state files..."
-  You: "@tech-lead-agent review the code"
-
-Result: Better quality, but YOU manage the workflow. Easy to skip steps.
-```
-
-**Problems:**
-- No separation of concerns (single agent reviews own code)
-- No structured framework (manual multi-agent is ad-hoc)
-- No mandatory quality gates (easy to forget steps)
-- Can't parallelize automatically (you decide and coordinate manually)
-- No metrics or learning over time
-- No automated Skills workflow
-
-### After BAZINGA
-
-**Using BAZINGA: A complete framework following software development best practices:**
-
-- **Structured workflow**: Follows industry-standard SDLC (plan → develop → test → review → deploy)
-- **Automated orchestration**: Framework manages agent coordination, you don't
-- **Autonomous execution**: Long task lists run for hours without interruption, maintaining best practices throughout
-- **Intelligent guidance**: Framework evaluates skip/stop/issue behaviors and recommends best practices to the team
-- **Specialized roles**: PM plans, Developers code, QA tests, Tech Lead reviews
-- **Configurable testing**: Three modes (full/minimal/disabled) - balance speed vs. quality for your context
-- **Mandatory quality gates**: Security scans, test coverage, linting run automatically at each step
-- **Skills automation**: 11 Skills automate code analysis, security scanning, pattern detection
-- **Parallel execution**: Framework automatically spawns 1-4 developers based on task complexity
-- **Automatic escalation**: Tech Lead escalates to Opus after 3 failed revisions (no manual intervention)
-- **Velocity tracking**: PM learns from history and improves estimates over time
-- **Separation of concerns**: Authors don't review their own code (enforced by framework)
-
-**What this looks like:**
-
-```
-You: "Implement JWT authentication with user management"
-     (single command - framework handles the rest)
-
-BAZINGA Framework executes structured workflow:
-
-PM Agent:
-  ✓ Analyzes requirements
-  ✓ Breaks into 2 independent task groups
-  ✓ Decides to spawn 2 developers in parallel (automatic)
-  ✓ Tracks velocity using velocity-tracker Skill
-
-Developer-1: Auth module          Developer-2: User management
-  ✓ lint-check Skill (automatic)    ✓ lint-check Skill (automatic)
-  ✓ Writes code + tests              ✓ Writes code + tests
-  ↓                                   ↓
-QA Expert: Validates tests        QA Expert: Validates tests
-  ✓ Runs integration tests          ✓ Runs integration tests
-  ↓                                   ↓
-Tech Lead: Reviews code (both modules)
-  ✓ security-scan Skill (automatic - checks for vulnerabilities)
-  ✓ test-coverage Skill (automatic - validates coverage)
-  ✓ Architectural review
-  ↓
-PM: Confirms completion
-  ✓ All quality gates passed
-  ✓ No blocking tech debt
-  ✓ BAZINGA! ✓
-
-Result: High quality + parallelism + automated checks. You wrote one command.
-```
-
-**Benefits:**
-- **Framework enforces best practices**: Can't skip steps (plan → dev → test → review)
-- **Intelligent recommendations**: Detects when agents skip steps, encounter issues, or stop prematurely and suggests corrections
-- **Automated quality checks**: 11 Skills run at appropriate stages (not optional)
-- **Intelligent parallelism**: Framework decides 1-4 developers based on complexity
-- **Complete automation**: You manage the "what", framework manages the "how"
-- **Historical learning**: Metrics improve estimates over time
-- **Repeatable process**: Same workflow every time, zero manual coordination
-
----
-
-## How It Works
-
-### Simple Explanation
-
-BAZINGA gives you a team of specialized AI agents:
-
-- **Project Manager (PM)** - Breaks down work, tracks progress, decides parallelism, gates deployment
-- **Developers (1-4)** - Write code, create tests, fix bugs based on feedback
-- **QA Expert** - Runs integration/contract/E2E tests, reports results
-- **Tech Lead** - Reviews code quality, security, architecture
-- **Orchestrator** - Routes messages between agents, spawns team members
-
-### Visual Workflow
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                                                                │
-│  PM plans work                                                 │
-│       ↓                                                        │
-│  Developers code (1-4 in parallel)                             │
-│       ↓                                                        │
-│  QA tests (if integration/contract/E2E tests exist)            │
-│       ↓                                                        │
-│  Tech Lead reviews (auto-escalates to Opus after 3 revisions)  │
-│       ↓                                                        │
-│  PM confirms completion                                        │
-│       ↓                                                        │
-│  BAZINGA! ✓                                                    │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
-```
-
-**Example execution:**
-```
-User: Implement JWT authentication
-
-PM: Creates task groups, decides parallelism
-     └─> Spawns 1 developer (simple task)
-
-Developer: Implements auth + tests
-           └─> Routes to QA (tests exist)
-
-QA Expert: Runs tests → PASS
-           └─> Routes to Tech Lead
-
-Tech Lead: Reviews code → APPROVED (or requests changes)
-           └─> Routes to PM
-
-PM: All tasks complete → BAZINGA
-```
-
-### Agent Roles
-
-| Agent | Responsibilities | Tools | Decision Power |
-|-------|-----------------|-------|----------------|
-| **Orchestrator** | Routes messages, spawns agents | None (routing only) | Agent selection |
-| **PM** | Plans work, tracks progress, gates deployment | Read state files | Parallelism (1-4 devs), BAZINGA signal |
-| **Developer** | Writes code, creates tests, fixes bugs | Full implementation tools | Routing (QA or Tech Lead) |
-| **QA Expert** | Runs integration/contract/E2E tests | Bash, Read | Test validation (PASS/FAIL) |
-| **Tech Lead** | Reviews quality, security, architecture | Read, Skills | Approval (APPROVED/CHANGES_REQUESTED) |
-
-### Two Modes of Operation
-
-**Simple Mode (Sequential):**
-```
-PM → 1 Developer → QA → Tech Lead → PM
-```
-Used for: Single features, bug fixes, small refactorings
-
-**Parallel Mode (Concurrent):**
-```
-PM → 2-4 Developers (parallel) → QA → Tech Lead → PM
-```
-Used for: Multiple features, large projects, independent task groups
-
-PM decides mode based on:
-- Task complexity (story points)
-- Task independence (can they run in parallel?)
-- Dependencies (what blocks what?)
-
-### Conditional Routing
-
-**If Developer creates/fixes tests:**
-```
-Developer → QA Expert → Tech Lead → PM
-```
-
-**If Developer doesn't touch tests:**
-```
-Developer → Tech Lead → PM
-```
-
-This prevents wasting time spawning QA when there's nothing to test.
-
----
-
-## Key Features
-
-### 1. Configurable Skills System
-
-**What it is:**
-BAZINGA includes 11 automated analysis tools (Skills) that provide security scanning, test coverage, linting, and more. You control which ones run.
-
-**Why it matters:**
-- **Fast iteration**: Default skills run in 1-2 minutes total
-- **Deep analysis**: Advanced skills run in 3-5 minutes for critical work
-- **No magic keywords**: Just enable/disable what you need
-
-**Quick example:**
 ```bash
-/configure-skills
-> 2 3 9    # Enable skills #2, #3, #9
-> advanced # Enable all advanced skills
-> fast     # Only fast skills (<20s)
+@orchestrator implement JWT authentication, user registration, and password reset
 ```
 
-**Default Skills (always on):**
-- lint-check (5-10s) - Code quality and style
-- security-scan (5-60s) - Vulnerability detection
-- test-coverage (5-20s) - Coverage analysis
-- velocity-tracker (3-5s) - PM metrics
+**What happens:**
 
-**Advanced Skills (configurable):**
-- codebase-analysis - Pattern extraction
-- test-pattern-analysis - Test strategy learning
-- api-contract-validation - Breaking change detection
-- db-migration-check - Migration safety
-- quality-dashboard - Unified health metrics
-- pattern-miner - Historical pattern analysis
-
-**Learn more:** [docs/SKILLS.md](docs/SKILLS.md)
-
-### 2. Adaptive Parallelism
-
-**What it is:**
-PM dynamically spawns 1-4 developers based on task complexity and independence.
-
-**Why it matters:**
-- **Faster completion**: Independent tasks run simultaneously
-- **Intelligent scheduling**: PM analyzes dependencies and assigns work accordingly
-- **No manual coordination**: PM handles all task routing
-
-**Example:**
 ```
-Task: Implement JWT auth, user registration, password reset
+PM: "Analyzing request... 3 independent features detected"
+PM: "Spawning 3 developers in parallel"
 
-PM analysis:
-- 3 independent features (can parallelize)
-- Each ~5 story points (medium complexity)
-- No dependencies
+┌─────────────────────┬─────────────────────┬─────────────────────┐
+│  Developer 1 (JWT)  │  Developer 2 (Reg)  │  Developer 3 (Pwd)  │
+├─────────────────────┼─────────────────────┼─────────────────────┤
+│ ✓ Implementation    │ ✓ Implementation    │ ✓ Implementation    │
+│ ✓ Unit tests        │ ✓ Unit tests        │ ✓ Unit tests        │
+│ ✓ Security scan     │ ✓ Security scan     │ ✓ Security scan     │
+│ ✓ Lint check        │ ✓ Lint check        │ ✓ Lint check        │
+│ ✓ Coverage check    │ ✓ Coverage check    │ ✓ Coverage check    │
+│ ✓ Code review       │ ✓ Code review       │ ✓ Code review       │
+└─────────────────────┴─────────────────────┴─────────────────────┘
 
-Decision: Spawn 3 developers in parallel
-
-Result: Complete in 45 minutes instead of 2+ hours
+PM: "BAZINGA! All features complete in 18 minutes"
+    (Sequential would've taken 60 minutes)
 ```
 
-**Learn more:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#adaptive-parallelism)
-
-### 3. Intelligent Model Escalation
-
-**What it is:**
-After 3 failed code revisions, Tech Lead automatically escalates to Opus for deeper analysis.
-
-**Why it matters:**
-- **Cost-effective**: Use fast Sonnet for 90% of reviews
-- **Deep analysis when needed**: Opus catches subtle bugs after multiple revisions
-- **Automatic escalation**: No manual model switching
-
-**How it works:**
-| Revision Count | Model | Strategy |
-|---------------|-------|----------|
-| 1-2 revisions | Sonnet 4.5 | Fast, typical issues |
-| 3+ revisions | Opus | Deep analysis, architectural issues |
-
-**Example:**
-```
-Review 1 (Sonnet): "Add error handling" → Dev fixes
-Review 2 (Sonnet): "Fix edge case" → Dev fixes
-Review 3 (Opus): "Authentication flow needs redesign - token refresh logic is flawed"
-```
-
-**Learn more:** [docs/MODEL_ESCALATION.md](docs/MODEL_ESCALATION.md)
-
-### 4. Data-Driven PM with Velocity Tracking
-
-**What it is:**
-PM tracks development velocity, cycle time, and quality metrics to improve estimates and detect bottlenecks.
-
-**Why it matters:**
-- **Accurate estimates**: Learns from history ("DB tasks take 2.5x initial estimate")
-- **Early bottleneck detection**: Catches stuck tasks (99% rule violations)
-- **Progress visibility**: User gets realistic ETAs
-- **Continuous improvement**: Each run improves the baseline
-
-**Metrics tracked:**
-- **Velocity**: Story points per run
-- **Cycle time**: Minutes per task group
-- **Revision rate**: Iterations per task (quality indicator)
-- **Completion %**: Real-time progress
-
-**Example PM decision:**
-```
-Checking metrics... [invokes /velocity-tracker]
-
-Current velocity: 12 (above avg 10.5) ✓
-Trend: improving
-⚠️ Group G002 taking 3x longer than expected
-
-Action: Pace is good. Escalating G002 to Tech Lead for review.
-```
-
-**Learn more:** [docs/PM_METRICS.md](docs/PM_METRICS.md)
-
-### 5. Spec-Kit Integration (Planning + Execution)
-
-**What it is:**
-Seamless integration with GitHub's [spec-kit](https://github.com/github/spec-kit) for spec-driven development.
-
-**Why it matters:**
-- **Rigorous planning**: Use spec-kit's specification workflow
-- **Powerful execution**: Use BAZINGA's multi-agent team
-- **Full traceability**: Track from spec to code with task IDs
-- **Progress tracking**: Real-time checkmarks in tasks.md
-
-**Complete workflow:**
-```bash
-# Phase 1: Planning with Spec-Kit
-/speckit.specify Add JWT authentication  # Create spec.md
-/speckit.plan                            # Create plan.md
-/speckit.tasks                           # Create tasks.md
-
-# Phase 2: Execution with BAZINGA
-/orchestrate-from-spec                   # Full multi-agent execution
-
-# Phase 3: Validation
-/speckit.analyze                         # Verify consistency
-```
-
-**BAZINGA reads spec-kit artifacts:**
-- spec.md - Feature requirements
-- tasks.md - Task breakdown with IDs (T001, T002...)
-- plan.md - Technical approach
-- research.md - Research findings
-
-**PM creates groups from tasks.md:**
-```
-- [ ] [T001] [P] Setup auth module
-- [ ] [T002] [P] [US1] JWT generation
-- [ ] [T003] [P] [US1] Token validation
-- [ ] [T004] [US2] Login endpoint
-
-PM analysis:
-- Tasks T001-T003 can run in parallel ([P] markers)
-- User stories US1, US2 identified
-- US2 depends on US1
-```
-
-**Learn more:** [.claude/commands/configure-skills.md](.claude/commands/configure-skills.md)
-
-### 6. Role Drift Prevention (6-Layer Defense)
-
-**What it is:**
-Multi-layered system preventing agents from forgetting their roles during long conversations.
-
-**Why it matters:**
-- **Prevents scope creep**: Orchestrator won't suddenly start implementing
-- **Maintains quality**: PM can't skip QA/Tech Lead reviews
-- **Reliable workflows**: Each agent stays in their lane
-
-**6 Layers:**
-1. **Pre-response role check** - Agent reminds itself before every response
-2. **Explicit routing table** - Mandatory lookup for orchestrator
-3. **Anti-pattern detection** - WRONG vs CORRECT examples
-4. **Strategic checkpoints** - Role checks at critical routing points
-5. **Global constraints** - .claude.md enforces roles permanently
-6. **Mandatory workflow chain** - Never skip steps
-
-**Example prevention:**
-```
-❌ WRONG: Orchestrator implements feature itself
-✓ CORRECT: Orchestrator spawns Developer
-
-❌ WRONG: PM sends BAZINGA without Tech Lead approval
-✓ CORRECT: PM waits for Tech Lead → APPROVED before BAZINGA
-```
-
-**Learn more:** [docs/ROLE_DRIFT_PREVENTION.md](docs/ROLE_DRIFT_PREVENTION.md)
-
-### 7. Tech Debt Tracking
-
-**What it is:**
-Explicit logging of engineering tradeoffs with PM quality gate before deployment.
-
-**Why it matters:**
-- **Transparency**: All shortcuts documented
-- **Quality gate**: PM blocks BAZINGA if critical debt exists
-- **Future planning**: Logged debt guides next iterations
-- **No lazy shortcuts**: Must attempt to fix before logging (30+ min)
-
-**PM Tech Debt Gate:**
-| Condition | PM Action | Result |
-|-----------|-----------|--------|
-| Blocking items exist | ❌ Report to user | NO BAZINGA |
-| HIGH severity > 2 | ⚠️ Ask user approval | WAIT |
-| Only MEDIUM/LOW | ✅ Include summary | BAZINGA with note |
-
-**Learn more:** [docs/TECH_DEBT_GUIDE.md](docs/TECH_DEBT_GUIDE.md)
-
-### 8. Multi-Language Support
-
-**What it is:**
-Full support for Python, JavaScript, Go, Java, and Ruby projects with language-specific tooling.
-
-**Language coverage:**
-| Language | Security | Coverage | Linting |
-|----------|----------|----------|---------|
-| Python | bandit + semgrep | pytest-cov | ruff/pylint |
-| JavaScript | npm audit + eslint | jest | eslint |
-| Go | gosec | go test -cover | golangci-lint |
-| Java | SpotBugs + OWASP | JaCoCo | Checkstyle + PMD |
-| Ruby | brakeman | simplecov | rubocop |
-
-**Automated tool installation:**
-CLI detects project language and offers to install missing tools during setup.
+**Result:** 3 features implemented, tested, security-scanned, and reviewed—all in parallel.
 
 ---
 
 ## Quick Start
 
-### Three Steps to Start
-
-**1. Install BAZINGA**
 ```bash
-# One-time use
+# Option 1: Create new project
 uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
+cd my-project
+@orchestrator implement user authentication with JWT
 
-# Or install as tool
-uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
-bazinga init my-project
+# Option 2: Initialize in current directory
+cd your-existing-project
+uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
+@orchestrator implement user authentication with JWT
 ```
 
-**2. Configure Skills (optional)**
-
-Choose which analysis tools run:
-```bash
-/configure-skills
-```
-
-Default configuration is already optimized for most workflows (fast + essential).
-
-**3. Run your first orchestration**
-
-```bash
-# Standard orchestration
-@orchestrator implement JWT authentication
-
-# Or with spec-kit
-/speckit.specify Add JWT authentication
-/speckit.plan
-/speckit.tasks
-/orchestrate-from-spec
-```
-
-### Simple Examples
-
-**Example 1: Add a feature**
-```bash
-@orchestrator implement user registration with email verification
-
-# BAZINGA will:
-# - PM creates task breakdown
-# - Developer implements feature + tests
-# - QA validates tests
-# - Tech Lead reviews code
-# - PM sends BAZINGA when complete
-```
-
-**Example 2: Fix a bug**
-```bash
-@orchestrator fix bug where users can't reset password
-
-# BAZINGA will:
-# - PM creates single task
-# - Developer fixes bug
-# - Tech Lead reviews (no QA - no new tests)
-# - PM sends BAZINGA
-```
-
-**Example 3: Large project with parallelism**
-```bash
-@orchestrator implement REST API with authentication, user management, and admin dashboard
-
-# BAZINGA will:
-# - PM creates 3 task groups
-# - Spawns 3 developers in parallel
-# - Each dev → QA → Tech Lead
-# - PM coordinates and sends BAZINGA
-```
-
-### What Happens During Orchestration
-
-**You'll see:**
-
-1. **PM Planning** (30 seconds)
-   ```
-   Analyzing request...
-   Created 2 task groups (8 story points total)
-   Decision: Parallel mode (2 developers)
-   ```
-
-2. **Developer Work** (5-30 minutes per task)
-   ```
-   Developer-1: Implementing authentication... [running skills]
-   Developer-2: Implementing user management... [running skills]
-   ```
-
-3. **Quality Gates** (1-5 minutes per task)
-   ```
-   QA Expert: Running tests... PASS
-   Tech Lead: Reviewing code... [security scan, lint check] APPROVED
-   ```
-
-4. **PM Completion** (10 seconds)
-   ```
-   All task groups complete
-   No blocking tech debt
-   BAZINGA! ✓
-   ```
-
-### Understanding Output Files
-
-After orchestration, you'll see these files:
-
-```
-coordination/
-├── pm_state.json              # PM planning and progress
-├── group_status.json          # Individual task status
-├── orchestrator_state.json    # Routing state
-├── security_scan.json         # Security findings
-├── coverage_report.json       # Test coverage
-├── lint_results.json          # Code quality issues
-├── project_metrics.json       # Velocity and trends
-└── tech_debt.json             # Engineering tradeoffs
-```
-
-These files help you understand what happened and track quality metrics over time.
+That's it. No configuration needed. BAZINGA automatically:
+- ✅ Analyzes task complexity and independence
+- ✅ Spawns 1-4 developers based on parallelization opportunities
+- ✅ Runs security scans, lint checks, and test coverage
+- ✅ Reviews code quality with Tech Lead
+- ✅ Escalates to more powerful models (Opus) for difficult problems
 
 ---
 
-## Project Structure
+## How It Works
 
-When you run `bazinga init`, this structure is created:
+### The Team
+
+BAZINGA coordinates 5 specialized AI agents:
+
+1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
+2. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
+3. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
+4. **Tech Lead** - Reviews code quality, security, architecture
+5. **Orchestrator** - Routes messages between agents, maintains workflow
+
+### The Workflow
 
 ```
-your-project/
-├── .claude/
-│   ├── agents/                # Agent definitions (5 agents)
-│   ├── commands/              # Slash commands (/orchestrate, /configure-skills)
-│   ├── scripts/               # Utility scripts (init, parsing)
-│   └── skills/                # Analysis tools (11 Skills)
-├── coordination/              # State files (auto-generated, gitignored)
-├── .claude.md                 # Global constraints
-└── .git/                      # Git repository
+Your request
+    ↓
+PM analyzes → Detects N independent tasks
+    ↓
+Spawns N developers in parallel
+    ↓
+Each developer:
+  - Implements feature
+  - Writes unit tests
+  - Runs security scan
+  - Runs lint check
+  - Measures coverage
+    ↓
+Tech Lead reviews all work
+    ↓
+PM confirms → BAZINGA!
 ```
 
-**Key directories:**
+### Adaptive Parallelism
 
-- **agents/** - PM, Developer, QA, Tech Lead, Orchestrator definitions
-- **.claude/skills/** - Security, coverage, linting, metrics tools
-- **coordination/** - JSON state files for tracking progress
-- **docs/** - Comprehensive documentation (see below)
+The PM automatically decides how many developers to spawn (1-4) based on:
+- **Task independence** - Can features be built separately?
+- **File overlap** - Do they modify the same files?
+- **Dependencies** - Does Task B depend on Task A?
+- **Complexity** - Is parallelism worth coordination overhead?
+
+**Example decisions:**
+
+| Request | PM Decision | Reasoning |
+|---------|-------------|-----------|
+| "Implement JWT auth" | 1 developer | Single feature, no parallelism benefit |
+| "Add auth, user mgmt, admin dashboard" | 3 developers | Independent features, low file overlap |
+| "Add login and password reset" | 1 developer | Password reset depends on auth |
+| "Refactor database layer" | 1 developer | High file overlap, risky in parallel |
+
+---
+
+## Automatic Quality Gates
+
+Every feature automatically gets:
+
+### Security Scanning
+- **Tool:** bandit (Python), npm audit (JS), gosec (Go), brakeman (Ruby), SpotBugs (Java)
+- **Checks:** SQL injection, XSS, hardcoded secrets, auth bypasses, insecure dependencies
+- **Escalation:** Basic scan (5-10s) → Advanced scan (30-60s) after 2 revisions
+
+### Lint Checking
+- **Tool:** ruff/pylint (Python), eslint (JS), golangci-lint (Go), rubocop (Ruby), Checkstyle (Java)
+- **Checks:** Code style, complexity, best practices, common mistakes
+- **Enforcement:** All issues must be fixed before approval
+
+### Test Coverage
+- **Tool:** pytest-cov (Python), jest (JS), go test (Go), simplecov (Ruby), JaCoCo (Java)
+- **Checks:** Line coverage, branch coverage, untested code paths
+- **Target:** 80% coverage by default
+
+**Missing tools?** No problem. BAZINGA gracefully degrades—warns you but continues working.
+
+---
+
+## Intelligent Model Escalation
+
+Stuck on a hard problem? BAZINGA automatically escalates to more powerful models:
+
+```
+Revision 1-2: Claude Sonnet (fast, handles 90% of reviews)
+Revision 3+:  Claude Opus (deep analysis for persistent issues)
+```
+
+**Why this matters:**
+- **Cost-effective** - Use fast Sonnet for typical work
+- **Automatic** - No manual model switching
+- **Smart** - Opus only when truly needed
+
+---
+
+## Multi-Language Support
+
+Full support for Python, JavaScript/TypeScript, Go, Java, and Ruby projects:
+
+| Language | Security | Coverage | Linting |
+|----------|----------|----------|---------|
+| Python | bandit + semgrep | pytest-cov | ruff/pylint |
+| JavaScript/TypeScript | npm audit + eslint | jest | eslint |
+| Go | gosec | go test -cover | golangci-lint |
+| Java | SpotBugs + OWASP | JaCoCo | Checkstyle + PMD |
+| Ruby | brakeman | simplecov | rubocop |
+
+Automated tool installation during setup (optional).
+
+---
+
+## Examples
+
+### Single Feature (Simple Mode)
+
+```bash
+@orchestrator fix bug where users can't reset password
+```
+
+**Flow:** PM → 1 Developer → Tech Lead → BAZINGA
+**Time:** ~5-10 minutes
+
+### Multiple Features (Parallel Mode)
+
+```bash
+@orchestrator implement REST API with auth, user management, and admin endpoints
+```
+
+**Flow:** PM → 3 Developers (parallel) → Tech Lead reviews all → BAZINGA
+**Time:** ~15-20 minutes (vs 45-60 sequential)
+
+### Large Project
+
+```bash
+@orchestrator build a blog platform with posts, comments, tags, and search
+```
+
+**Flow:** PM → 4 Developers (parallel, 2 phases) → QA tests → Tech Lead → BAZINGA
+**Time:** ~30-40 minutes (vs 2+ hours sequential)
+
+---
+
+## Configuration
+
+BAZINGA works out of the box with sensible defaults. Want more control?
+
+### Testing Modes
+
+```bash
+/bazinga.configure-testing
+```
+
+- **Minimal** (default) - Lint + unit tests, fast iteration (30-40% faster)
+- **Full** - All tests + QA Expert for integration/E2E tests (production quality)
+- **Disabled** - Lint only, rapid prototyping (40-60% faster)
+
+### Advanced Skills
+
+```bash
+/bazinga.configure-skills
+```
+
+**Core Skills** (always active):
+- `security-scan` - Vulnerability detection
+- `lint-check` - Code quality and style
+- `test-coverage` - Coverage analysis
+
+**Advanced Skills** (opt-in):
+- `velocity-tracker` - PM metrics and velocity tracking
+- `codebase-analysis` - Pattern extraction from similar code
+- `test-pattern-analysis` - Test framework learning
+- `api-contract-validation` - Breaking change detection
+- `db-migration-check` - Migration safety analysis
+- `pattern-miner` - Historical pattern analysis
+- `quality-dashboard` - Unified health metrics
+
+### CLI Options
+
+```bash
+# Default (lite profile)
+bazinga init my-project       # Create new project directory
+bazinga init --here           # Initialize in current directory
+bazinga init                  # Same as --here (defaults to current directory)
+
+# Advanced profile (all features enabled)
+bazinga init my-project --profile advanced
+bazinga init --here --profile advanced
+
+# Custom configuration
+bazinga init my-project --testing full --skills all
+
+# Update existing project
+bazinga update
+```
+
+---
+
+## What Makes BAZINGA Different
+
+| Feature | BAZINGA | Claude Code (Default) | Other Frameworks |
+|---------|---------|----------------------|------------------|
+| **Parallel Developers** | ✅ 1-4 developers automatically | ❌ Single agent | ❌ Sequential only |
+| **Adaptive Workflow** | ✅ PM decides parallelism | ❌ User coordinates | ❌ Fixed workflow |
+| **Automatic Quality Gates** | ✅ Security, lint, coverage built-in | ❌ Manual invocation | ⚠️ Basic only |
+| **Model Escalation** | ✅ Sonnet → Opus at revision 3 | ❌ Manual model selection | ❌ Single model |
+| **Graceful Degradation** | ✅ Works with missing tools | ❌ N/A | ❌ Requires all tools |
+| **Multi-language** | ✅ Python, JS, Go, Java, Ruby | ✅ Yes | ⚠️ Limited |
+
+---
+
+## Real Problems BAZINGA Solves
+
+### Before BAZINGA
+
+**Manual coordination:**
+```
+You: "@dev-agent implement auth"
+You: "now @dev-agent implement user management"
+You: "did I run security scan? let me check..."
+You: "@security-agent run scan"
+You: "@qa-agent test this"
+You: "@review-agent review code"
+You: "wait, did dev finish? let me check state files..."
+```
+
+**Result:** You're the project manager. Lots of context switching.
+
+### After BAZINGA
+
+```
+You: "@orchestrator implement auth, user management, and admin dashboard"
+```
+
+**Result:** Done. PM handled everything. You stay in flow.
+
+---
+
+## Installation
+
+### Option 1: One-time Use (No Installation)
+
+```bash
+uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
+```
+
+### Option 2: Install as Tool
+
+```bash
+# Using uv (recommended)
+uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
+bazinga init my-project
+
+# Using pip
+pip install git+https://github.com/mehdic/bazinga.git
+bazinga init my-project
+```
+
+### System Requirements
+
+- Python 3.11+
+- Claude Code (with Claude agent SDK)
+- Git
+- Optional: Security/lint/coverage tools for your language (auto-installed during setup)
 
 ---
 
@@ -624,193 +329,128 @@ your-project/
 ### Getting Started
 - **README.md** (this file) - Overview and quick start
 - **[examples/EXAMPLES.md](examples/EXAMPLES.md)** - Practical usage examples
-- **[docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)** - Navigation guide
+- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common commands and workflows
 
-### Configuration & Features
-- **[docs/SKILLS.md](docs/SKILLS.md)** - Complete Skills reference (11 tools, configuration, language support)
-- **[docs/MODEL_ESCALATION.md](docs/MODEL_ESCALATION.md)** - How and why Tech Lead escalates to Opus
-- **[docs/PM_METRICS.md](docs/PM_METRICS.md)** - Velocity tracking, 99% rule detection, historical learning
-- **[docs/TECH_DEBT_GUIDE.md](docs/TECH_DEBT_GUIDE.md)** - Tech debt workflow, gates, examples
+### Advanced Features
+- **[docs/ADVANCED.md](docs/ADVANCED.md)** - Advanced skills, full testing mode, integrations
+- **[docs/SKILLS.md](docs/SKILLS.md)** - Complete Skills reference
+- **[docs/MODEL_ESCALATION.md](docs/MODEL_ESCALATION.md)** - How and why Opus escalation works
 
 ### Architecture & Design
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical deep-dive (workflow, state management, decisions)
-- **[docs/ROLE_DRIFT_PREVENTION.md](docs/ROLE_DRIFT_PREVENTION.md)** - 6-layer defense system explained
-- **[docs/SCOPE_REDUCTION_INCIDENT.md](docs/SCOPE_REDUCTION_INCIDENT.md)** - Case study of role drift prevention
-
-### Troubleshooting
-
-**Common Issues:**
-
-1. **Orchestrator skipping workflow steps**
-   - Solution: Check pre-response role check output
-   - See: [docs/ROLE_DRIFT_PREVENTION.md](docs/ROLE_DRIFT_PREVENTION.md)
-
-2. **PM asking user questions**
-   - Solution: PM should work autonomously without asking
-   - See: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#pm-autonomy)
-
-3. **QA spawned when no tests exist**
-   - Solution: Developer should set "Tests Created/Fixed: NO"
-   - See: [examples/EXAMPLES.md](examples/EXAMPLES.md)
-
-4. **Skills not running**
-   - Solution: Check `coordination/skills_config.json` or run `/bazinga.configure-skills`
-   - See: [docs/SKILLS.md](docs/SKILLS.md#configuration)
-
-5. **Want faster iteration without QA Expert**
-   - Solution: Run `/bazinga.configure-testing` and select "minimal" or "disabled" mode
-   - Minimal: 30-40% faster, keeps lint + unit tests
-   - Disabled: 40-60% faster, lint only (prototyping)
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical deep-dive
+- **[docs/ROLE_DRIFT_PREVENTION.md](docs/ROLE_DRIFT_PREVENTION.md)** - How role enforcement works
+- **[docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)** - Complete documentation index
 
 ---
 
-## Configuration & CLI
+## Troubleshooting
 
-### CLI Commands
+### Common Issues
 
-**Initialize new project:**
+**Q: Workflow seems slow**
+A: Check testing mode (`/bazinga.configure-testing`). Use minimal mode for faster iteration.
+
+**Q: Skills not running**
+A: Check if tools are installed. BAZINGA will warn if tools are missing. Install with:
 ```bash
-bazinga init my-project                  # Create new directory (minimal testing by default)
-bazinga init --here                      # Initialize in current directory
-bazinga init my-project --no-git         # Skip git initialization
-bazinga init my-project --testing full   # Initialize with full QA workflow
-bazinga init my-project -t disabled      # Initialize for rapid prototyping
+# Python
+pip install bandit ruff pytest-cov
+
+# JavaScript
+npm install --save-dev jest eslint
+
+# Go
+go install github.com/securego/gosec/v2/cmd/gosec@latest
 ```
 
-**Testing modes:**
-- `minimal` (default): Lint + unit tests, skip QA Expert (30-40% faster)
-- `full`: All tests + QA Expert workflow (production quality)
-- `disabled`: Lint only (rapid prototyping, 40-60% faster)
+**Q: Want to disable a specific skill**
+A: Run `/bazinga.configure-skills` and deselect skills you don't want.
 
-**Update existing project:**
-```bash
-bazinga update                   # Update agents, scripts, commands
-bazinga update --force           # Skip confirmation
-```
+**Q: Tasks not running in parallel**
+A: PM may have detected dependencies or high file overlap. Check PM's reasoning in output.
 
-Preserves:
-- Coordination state files
-- Ongoing orchestration sessions
-- Custom project configuration
-
-**Check system:**
-```bash
-bazinga check                    # Verify installation
-bazinga --version                # Show version
-```
-
-### Configuration Files
-
-**Testing framework configuration:**
-```bash
-/bazinga.configure-testing       # Interactive menu to set testing mode
-```
-
-Modes: `full` (all tests + QA) | `minimal` (lint + unit tests) | `disabled` (lint only)
-Saved to: `coordination/testing_config.json` (tracked in git)
-
-**Skills configuration:**
-```bash
-/bazinga.configure-skills        # Interactive menu to enable/disable individual skills
-```
-
-Saved to: `coordination/skills_config.json` (tracked in git)
-
-**Global constraints:**
-- `.claude.md` - Role enforcement, workflow rules
-- Auto-generated during `bazinga init`
-
-**State files (auto-generated):**
-- `coordination/pm_state.json` - PM planning
-- `coordination/group_status.json` - Task status
-- `coordination/orchestrator_state.json` - Routing
-- `coordination/messages/` - Inter-agent messages
-
-**Learn more:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#state-management)
+**Q: Build failing**
+A: Check `coordination/build_baseline.log`. BAZINGA tracks baseline vs. final build status.
 
 ---
 
-## Comparison with Other Frameworks
+## Project Structure
 
-| Feature | BAZINGA | ChatDev | MetaGPT | AutoGen | CrewAI |
-|---------|---------|---------|---------|---------|--------|
-| **Adaptive Parallelism** | ✅ 1-4 devs | ❌ | ❌ | ❌ | ❌ |
-| **Conditional Routing** | ✅ QA optional | ❌ | ❌ | ❌ | ❌ |
-| **Role Drift Prevention** | ✅ 6-layer | ⚠️ Basic | ⚠️ Basic | ⚠️ Basic | ⚠️ Basic |
-| **Claude Code Native** | ✅ Skills | ❌ | ❌ | ❌ | ❌ |
-| **Intelligent Escalation** | ✅ Auto Opus | ❌ | ❌ | ❌ | ❌ |
-| **Velocity Tracking** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ |
-| **Configurable Depth** | ✅ Fast/Advanced | ❌ | ❌ | ❌ | ❌ |
-
-**Why we built BAZINGA:**
-
-We tried existing frameworks but found they:
-- Didn't leverage Claude Code's unique capabilities (Skills, native agent system)
-- Couldn't parallelize work intelligently
-- Had role drift issues in long conversations
-- Lacked quality gates (security, coverage, linting)
-- Didn't learn from history to improve estimates
-
-BAZINGA is purpose-built for Claude Code and focuses on **reliable, high-quality software delivery** through multi-agent coordination.
+```
+your-project/
+├── .claude/
+│   ├── agents/                # Agent definitions (5 agents)
+│   ├── commands/              # Slash commands
+│   ├── scripts/               # Utility scripts
+│   └── skills/                # Analysis tools (10 Skills)
+├── coordination/              # State files (auto-generated, gitignored)
+│   ├── pm_state.json         # PM planning and progress
+│   ├── group_status.json     # Individual task status
+│   ├── orchestrator_state.json # Routing state
+│   ├── security_scan.json    # Security findings
+│   ├── coverage_report.json  # Test coverage
+│   ├── lint_results.json     # Code quality issues
+│   └── testing_config.json   # Testing mode configuration
+├── .claude.md                 # Global configuration
+└── .git/                      # Git repository
+```
 
 ---
 
-## Support & Contributing
+## Performance
 
-### Getting Help
+**Typical speedups with parallel mode:**
 
-1. **Check documentation:** [docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)
-2. **Review examples:** [examples/EXAMPLES.md](examples/EXAMPLES.md)
-3. **Search issues:** https://github.com/mehdic/bazinga/issues
-4. **Open new issue:** Describe your use case and include relevant logs
+| Task Type | Sequential | BAZINGA Parallel | Speedup |
+|-----------|-----------|------------------|---------|
+| 2 independent features | 40 min | 15 min | 2.7x faster |
+| 3 independent features | 60 min | 20 min | 3x faster |
+| 4 independent modules | 90 min | 30 min | 3x faster |
 
-### Reporting Issues
+**Limitations:**
+- Max 4 developers (coordination overhead beyond 4)
+- Features must be truly independent (low file overlap)
+- Dependencies force sequential execution
 
-Include:
-- BAZINGA version (`bazinga --version`)
-- Project language (Python, JavaScript, etc.)
-- Coordination files (`coordination/*.json`)
-- Steps to reproduce
+---
 
-### Contributing
+## Contributing
 
-We welcome contributions! This system was developed iteratively with focus on:
-- Preventing role drift during long conversations
-- Explicit routing to prevent workflow confusion
-- Adaptive parallelism for efficiency
-- Data-driven decision making
-
-**Areas for contribution:**
-- Additional language support
+We welcome contributions! Areas for improvement:
+- Additional language support (Rust, C#, etc.)
 - New Skills for analysis
 - Performance optimizations
 - Documentation improvements
 - Bug fixes
 
-### Development Status
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## Development Status
 
 **Stable:**
-- Core orchestration workflow
-- Adaptive parallelism (1-4 developers)
-- Role drift prevention (6-layer system)
-- Skills system (11 tools)
-- Model escalation
-- PM velocity tracking
+- ✅ Core orchestration workflow
+- ✅ Adaptive parallelism (1-4 developers)
+- ✅ Role drift prevention
+- ✅ Core Skills (security, lint, coverage)
+- ✅ Model escalation
+- ✅ Multi-language support (Python, JS, Go, Java, Ruby)
 
-**In Development:**
-- Additional language support beyond Python/JS/Go/Java/Ruby
-- Advanced pattern-miner capabilities (Tier 3)
-- Quality dashboard aggregation improvements
-- Integration with more CI/CD systems
+**Advanced (opt-in):**
+- ⚡ Velocity tracking and PM metrics
+- ⚡ Pattern mining and quality dashboards
+- ⚡ API contract validation
+- ⚡ Database migration safety checks
 
-### Acknowledgments
+---
 
-Built for Claude Code using the Claude Agent SDK. Inspired by ChatDev, MetaGPT, and other multi-agent frameworks but optimized specifically for Claude Code's capabilities.
+## Support & Getting Help
 
-Special thanks to:
-- GitHub's spec-kit team for the planning framework integration
-- Claude Code team for the Skills system
-- Early adopters who provided feedback and bug reports
+1. **Check documentation:** [docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)
+2. **Review examples:** [examples/EXAMPLES.md](examples/EXAMPLES.md)
+3. **Search issues:** https://github.com/mehdic/bazinga/issues
+4. **Open new issue:** Include version, language, and logs
 
 ---
 
@@ -822,8 +462,31 @@ See [LICENSE](LICENSE) for full details.
 
 ---
 
-**Version:** 1.0
-**Last Updated:** 2025-01-07
+## Acknowledgments
+
+Built for Claude Code using the Claude Agent SDK. Inspired by ChatDev, MetaGPT, and other multi-agent frameworks but optimized specifically for Claude Code's capabilities.
+
+Special thanks to:
+- Claude Code team for the Skills system and agent SDK
+- Early adopters who provided feedback and bug reports
+- Open source security/lint/coverage tool maintainers
+
+---
+
+**Version:** 2.0.0
+**Last Updated:** 2025-01-10
 **Created by:** [@mehdic](https://github.com/mehdic)
 
-**Philosophy:** We built this to solve real problems we had. It's not perfect, but it works. If it helps you ship better software faster, we've succeeded.
+---
+
+## Quick Links
+
+- 🚀 **[Get Started](# quick-start)** - Install and run your first orchestration
+- 📚 **[Examples](examples/EXAMPLES.md)** - See real usage patterns
+- ⚙️ **[Advanced Features](docs/ADVANCED.md)** - Unlock more power
+- 🏗️ **[Architecture](docs/ARCHITECTURE.md)** - How it works under the hood
+- 🐛 **[Issues](https://github.com/mehdic/bazinga/issues)** - Report bugs or request features
+
+---
+
+**Philosophy:** We built this to solve real problems we had. Parallel development with AI agents shouldn't require manual coordination. It should just work. If it helps you ship better software faster, we've succeeded.

@@ -16,13 +16,53 @@ import sys
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from datetime import datetime
+
+# Load profile for graceful degradation
+def load_profile():
+    """Load profile from skills_config.json"""
+    try:
+        with open("coordination/skills_config.json", "r") as f:
+            config = json.load(f)
+            return config.get("_metadata", {}).get("profile", "lite")
+    except:
+        return "lite"
+
+PROFILE = load_profile()
 
 try:
     from parser import find_openapi_specs, parse_spec, auto_generate_spec
     from diff import compare_specs, classify_change_severity
-except ImportError:
-    from .parser import find_openapi_specs, parse_spec, auto_generate_spec
-    from .diff import compare_specs, classify_change_severity
+except ImportError as e:
+    # Graceful degradation if modules can't be imported
+    if PROFILE == "lite":
+        # Lite mode: Skip gracefully
+        print(f"⚠️  Module import failed - API contract validation skipped in lite mode")
+        print(f"   Error: {e}")
+        output = {
+            "status": "skipped",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "impact": "API contract validation was skipped. You can manually review OpenAPI specs for breaking changes.",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/api_contract_validation.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(0)
+    else:
+        # Advanced mode: Fail
+        print(f"❌ Required modules not found: {e}")
+        output = {
+            "status": "error",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/api_contract_validation.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(1)
 
 
 def find_baseline(coordination_dir: str = "coordination") -> Optional[Dict]:
