@@ -18,14 +18,53 @@ import re
 from pathlib import Path
 from typing import List, Dict, Any
 from collections import Counter
+from datetime import datetime
+
+# Load profile for graceful degradation
+def load_profile():
+    """Load profile from skills_config.json"""
+    try:
+        with open("coordination/skills_config.json", "r") as f:
+            config = json.load(f)
+            return config.get("_metadata", {}).get("profile", "lite")
+    except:
+        return "lite"
+
+PROFILE = load_profile()
 
 try:
     from similarity import calculate_similarity, extract_keywords
     from patterns import detect_patterns, find_utilities, extract_conventions
-except ImportError:
-    # If modules not in same directory, try relative import
-    from .similarity import calculate_similarity, extract_keywords
-    from .patterns import detect_patterns, find_utilities, extract_conventions
+except ImportError as e:
+    # Graceful degradation if modules can't be imported
+    if PROFILE == "lite":
+        # Lite mode: Skip gracefully
+        print(f"⚠️  Module import failed - codebase analysis skipped in lite mode")
+        print(f"   Error: {e}")
+        output = {
+            "status": "skipped",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "impact": "Codebase analysis was skipped.",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/codebase_analysis.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(0)
+    else:
+        # Advanced mode: Fail
+        print(f"❌ Required modules not found: {e}")
+        output = {
+            "status": "error",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/codebase_analysis.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(1)
 
 
 def find_code_files(root_dir: str = ".", exclude_dirs: List[str] = None) -> List[str]:

@@ -25,33 +25,37 @@ Skills are automated analysis tools that agents invoke to validate code quality,
 - Results are saved to `coordination/` for agent access
 - Skills can be enabled or disabled based on your workflow
 
+**💡 Profiles:** BAZINGA has two main modes:
+- **Lite** (default) - 3 core skills, fast iteration (~1-2 min overhead)
+- **Advanced** - All 10 skills, comprehensive analysis (~3-5 min overhead)
+
 ### Why Configure Skills?
 
 **Different Workflows Need Different Tools:**
 
-| Scenario | Fast Mode | Advanced Mode | Custom |
+| Scenario | Lite Mode | Advanced Mode | Custom |
 |----------|-----------|---------------|--------|
-| **Rapid Iteration** | ✅ Essential | ❌ Too slow | ✅ Maybe |
+| **Rapid Iteration** | ✅ Perfect | ❌ Too slow | ✅ Maybe |
 | **Critical Features** | ⚠️ Basic | ✅ Comprehensive | ✅ Maybe |
-| **Database Work** | ❌ Missing | ✅ Good | ✅ db-migration-check |
-| **API Changes** | ❌ Missing | ✅ Good | ✅ api-contract-validation |
+| **Database Work** | ⚠️ Missing | ✅ Good | ✅ db-migration-check |
+| **API Changes** | ⚠️ Missing | ✅ Good | ✅ api-contract-validation |
 
 **Time Investment:**
 
-- **Fast Mode (defaults)**: 1-2 minute overhead (linting, security basics, coverage)
-- **Advanced Mode (all)**: 3-5 minute overhead (adds pattern analysis, deeper security)
+- **Lite Mode (default)**: 1-2 minute overhead (security, linting, coverage)
+- **Advanced Mode**: 3-5 minute overhead (adds pattern analysis, deeper insights)
 - **Custom Mode**: You decide what's worth the time
 
 ---
 
 ## Quick Start
 
-### Using /configure-skills Command
+### Using /bazinga.configure-skills Command
 
 Open the interactive configuration menu:
 
 ```bash
-/configure-skills
+/bazinga.configure-skills
 ```
 
 This displays all 11 Skills grouped by agent with current status:
@@ -98,42 +102,41 @@ Numbers (enable by default):
   disable 1 7     → Turn off Skills #1, #7
 
 Presets:
-  defaults        → Reset to defaults (1,6,7,8,11 ON)
-  fast            → Only fast Skills <20s (same as defaults)
-  advanced        → Only advanced Skills (2,3,4,5,9,10)
-  all             → Enable all Skills
+  lite            → Lite profile (1,6,7,8 ON) - default, fast iteration
+  advanced        → Advanced profile (all 10 skills ON)
+  defaults        → Same as lite (recommended)
   none            → Disable all Skills
 
 Examples:
   "2 3 9"                    → Enable codebase-analysis, test-pattern, pattern-miner
   "disable 6"                → Turn off security-scan
-  "advanced"                 → Enable all advanced analysis
-  "fast"                     → Use only fast Skills for rapid iteration
+  "advanced"                 → Enable all advanced Skills
+  "lite"                     → Reset to lite profile for fast iteration
 ```
 
 ### Configuration Examples
 
 **For rapid iteration (1-2 min overhead):**
 ```bash
-/configure-skills
-> fast
+/bazinga.configure-skills
+> lite
 ```
 
 **For critical features (3-5 min overhead):**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > advanced
 ```
 
 **Custom: Enable pattern analysis and quality dashboard:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > 2 9 10
 ```
 
 **Custom: Disable security scanning for trusted code:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > disable 6
 ```
 
@@ -141,9 +144,9 @@ Examples:
 
 ## Available Skills
 
-### Default Skills (Always Available)
+### Core Skills (Lite Profile - Default)
 
-These four Skills are recommended by default and run automatically:
+These three Skills are enabled by default in lite mode and run automatically:
 
 #### 1. **lint-check** (Developer & Tech Lead)
 - **Problem**: Code quality issues go unnoticed
@@ -244,38 +247,7 @@ These four Skills are recommended by default and run automatically:
 
 ---
 
-#### 4. **velocity-tracker** (PM only)
-- **Problem**: PM can't measure progress or detect stuck tasks
-- **What it does**: Tracks story points per run, cycle time per task, detects 99% rule violations
-- **Time**: 3-5 seconds (FAST)
-- **When to use**: PM invokes automatically during progress checks (enabled by default)
-- **Output**: `coordination/project_metrics.json`
-
-**Example output:**
-```json
-{
-  "current_run": {
-    "velocity": 12,
-    "percent_complete": 60,
-    "cycle_time_minutes": 45,
-    "revision_rate": 1.2
-  },
-  "trends": {
-    "velocity": "improving",
-    "quality": "stable"
-  },
-  "warnings": [
-    "G002 taking 3x longer than expected (99% rule) - escalate to Tech Lead"
-  ],
-  "recommendations": [
-    "Current velocity (12) exceeds historical average (10.5) - on track"
-  ]
-}
-```
-
----
-
-### Advanced Skills (Configurable)
+### Advanced Skills (Opt-in)
 
 These Skills are disabled by default but provide deeper analysis. Enable them for:
 - Critical features
@@ -539,7 +511,7 @@ Clear signal: Fix coverage before shipping
 
 ## Configuration Presets
 
-### Preset: "defaults" or "fast"
+### Preset: "lite" or "defaults"
 
 **When to use:** Daily development, rapid iteration, tight deadlines
 
@@ -548,10 +520,9 @@ Clear signal: Fix coverage before shipping
 - ✅ #6 Tech Lead security-scan (basic mode, 5-10s)
 - ✅ #7 Tech Lead lint-check (5-10s)
 - ✅ #8 Tech Lead test-coverage (10-20s)
-- ✅ #11 PM velocity-tracker (5-10s)
 
 **What's disabled:**
-- ⚪ All advanced Skills
+- ⚪ All 7 advanced Skills (including velocity-tracker)
 
 **Total time**: 1-2 minutes overhead per orchestration run
 
@@ -563,8 +534,8 @@ Clear signal: Fix coverage before shipping
 
 **Example:**
 ```bash
-/configure-skills
-> defaults
+/bazinga.configure-skills
+> lite
 ```
 
 ---
@@ -574,13 +545,14 @@ Clear signal: Fix coverage before shipping
 **When to use:** Critical features, production work, knowledge building
 
 **What's enabled:**
-- ✅ All fast Skills (1, 6, 7, 8, 11)
+- ✅ All lite Skills (1, 6, 7, 8)
 - ✅ #2 Developer codebase-analysis (15-30s)
 - ✅ #3 Developer test-pattern-analysis (15-30s)
 - ✅ #4 Developer api-contract-validation (10-20s)
 - ✅ #5 Developer db-migration-check (10-20s)
 - ✅ #9 QA Expert pattern-miner (15-20s)
 - ✅ #10 QA Expert quality-dashboard (10-15s)
+- ✅ #11 PM velocity-tracker (5-10s)
 
 **Total time**: 3-5 minutes overhead per orchestration run
 
@@ -593,7 +565,7 @@ Clear signal: Fix coverage before shipping
 
 **Example:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > advanced
 ```
 
@@ -622,21 +594,21 @@ Clear signal: Fix coverage before shipping
 
 **For API-heavy work:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > 1 4 6 7 8 11
 # Enable: lint, api-contract-validation, security, lint, coverage, velocity
 ```
 
 **For database work:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > 1 5 6 7 8 11
 # Enable: lint, db-migration-check, security, lint, coverage, velocity
 ```
 
 **For rapid iteration with coverage focus:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > 1 8 11
 # Enable: lint (dev), test-coverage, velocity
 # Fast: skip all advanced analysis
@@ -644,7 +616,7 @@ Clear signal: Fix coverage before shipping
 
 **For learning/knowledge building:**
 ```bash
-/configure-skills
+/bazinga.configure-skills
 > 2 3 9 10
 # Enable: codebase-analysis, test-pattern-analysis, pattern-miner, quality-dashboard
 # Skip: lint, security, coverage (focus on patterns and insights)
@@ -762,7 +734,7 @@ Configuration is persisted in `coordination/skills_config.json`:
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent",
       "DISABLED: Skill will not be invoked",
-      "Use /configure-skills to modify this configuration interactively"
+      "Use /bazinga.configure-skills to modify this configuration interactively"
     ]
   }
 }
@@ -853,14 +825,14 @@ Tech Lead receives code for review
 
 - Configuration is **automatically saved** to `coordination/skills_config.json`
 - Configuration **persists across all BAZINGA sessions**
-- Use `/configure-skills` anytime to adjust
+- Use `/bazinga.configure-skills` anytime to adjust
 - Configuration is **tracked in git** (safe to commit)
 
 ---
 
 ## Benefits of Each Mode
 
-### Fast Mode (Defaults)
+### Lite Mode (Default)
 
 **Overhead:** 1-2 minutes per orchestration run
 
@@ -895,6 +867,7 @@ Tech Lead receives code for review
 - Database migration safety
 - Historical learning and pattern detection
 - Complete project health visibility
+- PM velocity tracking
 
 **Cons:**
 - Slower (3-5 min overhead)
@@ -977,7 +950,7 @@ bazinga check
 cat coordination/skills_config.json
 
 # Reset to defaults
-/configure-skills
+/bazinga.configure-skills
 > defaults
 
 # Re-run orchestration
@@ -998,7 +971,7 @@ This helps you decide what Skills are worth the time for your workflow.
 
 ## Next Steps
 
-- **Quick start**: Run `/configure-skills` and select a preset
+- **Quick start**: Run `/bazinga.configure-skills` and select a preset
 - **Learn more**: See agent documentation (`agents/developer.md`, `agents/techlead.md`, etc.)
 - **Integration**: See how orchestrator uses Skills in `agents/orchestrator.md`
 - **Examples**: See `examples/EXAMPLES.md` for real workflow examples

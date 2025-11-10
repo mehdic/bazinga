@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set +e  # Don't exit on error for graceful degradation
 
 # Velocity & Metrics Tracker
 # Analyzes PM state to calculate velocity, cycle times, and trends
@@ -21,9 +21,41 @@ echo "=================================================="
 # Ensure coordination directory exists
 mkdir -p "${COORD_DIR}"
 
+# Load profile from skills_config.json for graceful degradation
+PROFILE="lite"
+if [ -f "${COORD_DIR}/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' "${COORD_DIR}/skills_config.json" 2>/dev/null || echo "lite")
+fi
+
 # Check if jq is available
 if ! command -v jq &> /dev/null; then
-    echo -e "${YELLOW}⚠️  jq not found - using basic parsing (install jq for full functionality)${NC}"
+    if [ "$PROFILE" = "lite" ]; then
+        # Lite mode: Skip gracefully
+        echo -e "${YELLOW}⚠️  jq not installed - velocity tracking skipped in lite mode${NC}"
+        echo "   Install with: apt-get install jq (or brew install jq on macOS)"
+        cat > "$METRICS_FILE" <<EOF
+{
+  "status": "skipped",
+  "reason": "jq not installed",
+  "recommendation": "Install with: apt-get install jq (or brew install jq on macOS)",
+  "impact": "Velocity tracking was skipped. Install jq for project metrics.",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+        exit 0
+    else
+        # Advanced mode: Fail if jq missing
+        echo -e "${RED}❌ jq required but not installed${NC}"
+        cat > "$METRICS_FILE" <<EOF
+{
+  "status": "error",
+  "reason": "jq required but not installed",
+  "recommendation": "Install with: apt-get install jq (or brew install jq on macOS)",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+        exit 1
+    fi
     USE_JQ=false
 else
     USE_JQ=true

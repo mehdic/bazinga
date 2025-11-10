@@ -18,6 +18,19 @@ import json
 import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from datetime import datetime
+
+# Load profile for graceful degradation
+def load_profile():
+    """Load profile from skills_config.json"""
+    try:
+        with open("coordination/skills_config.json", "r") as f:
+            config = json.load(f)
+            return config.get("_metadata", {}).get("profile", "lite")
+    except:
+        return "lite"
+
+PROFILE = load_profile()
 
 try:
     from frameworks import detect_framework, get_framework_version
@@ -28,15 +41,36 @@ try:
         find_test_utilities,
         analyze_test_file
     )
-except ImportError:
-    from .frameworks import detect_framework, get_framework_version
-    from .patterns import (
-        extract_fixtures,
-        detect_test_structure,
-        extract_naming_pattern,
-        find_test_utilities,
-        analyze_test_file
-    )
+except ImportError as e:
+    # Graceful degradation if modules can't be imported
+    if PROFILE == "lite":
+        # Lite mode: Skip gracefully
+        print(f"⚠️  Module import failed - test pattern analysis skipped in lite mode")
+        print(f"   Error: {e}")
+        output = {
+            "status": "skipped",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "impact": "Test pattern analysis was skipped. Tests can still be written manually.",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/test_patterns.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(0)
+    else:
+        # Advanced mode: Fail
+        print(f"❌ Required modules not found: {e}")
+        output = {
+            "status": "error",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/test_patterns.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(1)
 
 
 def find_test_files(path: str) -> List[str]:

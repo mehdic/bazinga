@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set +e  # Don't exit on error for graceful degradation
 
 # Simple pattern miner - analyzes historical data for patterns
 # Full implementation would include ML-based clustering, but this version
@@ -11,6 +11,15 @@ PATTERN_FILE="${COORD_DIR}/pattern_insights.json"
 
 echo "🔍 Pattern Miner - Analyzing historical data..."
 echo "=================================================="
+
+# Load profile from skills_config.json for graceful degradation
+PROFILE="lite"
+if [ -f "${COORD_DIR}/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' "${COORD_DIR}/skills_config.json" 2>/dev/null || echo "lite")
+fi
+
+# Note: This skill has minimal dependencies (bash only)
+# Graceful degradation mainly applies if historical_metrics.json is missing
 
 # Check if we have enough historical data
 if [ ! -f "$HISTORICAL_FILE" ]; then

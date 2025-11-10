@@ -16,15 +16,54 @@ import sys
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from datetime import datetime
+
+# Load profile for graceful degradation
+def load_profile():
+    """Load profile from skills_config.json"""
+    try:
+        with open("coordination/skills_config.json", "r") as f:
+            config = json.load(f)
+            return config.get("_metadata", {}).get("profile", "lite")
+    except:
+        return "lite"
+
+PROFILE = load_profile()
 
 try:
     from parsers import find_migrations, parse_migration_file
     from detectors import detect_dangerous_operations
     from frameworks import detect_database_and_framework
-except ImportError:
-    from .parsers import find_migrations, parse_migration_file
-    from .detectors import detect_dangerous_operations
-    from .frameworks import detect_database_and_framework
+except ImportError as e:
+    # Graceful degradation if modules can't be imported
+    if PROFILE == "lite":
+        # Lite mode: Skip gracefully
+        print(f"⚠️  Module import failed - database migration check skipped in lite mode")
+        print(f"   Error: {e}")
+        output = {
+            "status": "skipped",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "impact": "Database migration safety check was skipped. Review migrations manually before deploying.",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/db_migration_check.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(0)
+    else:
+        # Advanced mode: Fail
+        print(f"❌ Required modules not found: {e}")
+        output = {
+            "status": "error",
+            "reason": f"Module import failed: {e}",
+            "recommendation": "Check that all skill modules are present",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        Path("coordination").mkdir(exist_ok=True)
+        with open("coordination/db_migration_check.json", "w") as f:
+            json.dump(output, f, indent=2)
+        sys.exit(1)
 
 
 def check_migrations() -> Dict[str, Any]:
