@@ -1159,6 +1159,99 @@ def check():
         console.print("    bazinga init --here")
 
 
+def update_cli() -> bool:
+    """
+    Update the BAZINGA CLI itself by pulling latest changes and reinstalling.
+
+    Returns True if update was successful, False otherwise.
+    """
+    try:
+        # Find where bazinga-cli is installed from
+        result = subprocess.run(
+            ["pip", "show", "bazinga-cli"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode != 0:
+            console.print("  [dim]Could not find bazinga-cli package info[/dim]")
+            return False
+
+        # Parse the output to find installation location
+        location = None
+        editable_project_location = None
+        for line in result.stdout.split('\n'):
+            if line.startswith('Location:'):
+                location = line.split(':', 1)[1].strip()
+            elif line.startswith('Editable project location:'):
+                editable_project_location = line.split(':', 1)[1].strip()
+
+        # If it's an editable install, update from git
+        if editable_project_location:
+            bazinga_repo = Path(editable_project_location)
+            console.print(f"  [dim]Found editable install at: {bazinga_repo}[/dim]")
+
+            # Check if it's a git repo
+            if not (bazinga_repo / ".git").exists():
+                console.print("  [dim]Not a git repository, skipping git pull[/dim]")
+            else:
+                # Pull latest changes
+                console.print("  [dim]Pulling latest changes...[/dim]")
+                pull_result = subprocess.run(
+                    ["git", "pull"],
+                    cwd=bazinga_repo,
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+
+                if pull_result.returncode != 0:
+                    console.print(f"  [yellow]Warning: git pull failed: {pull_result.stderr}[/yellow]")
+                elif "Already up to date" in pull_result.stdout or "Already up-to-date" in pull_result.stdout:
+                    console.print("  [dim]Already up to date[/dim]")
+                else:
+                    console.print("  [dim]Pulled latest changes[/dim]")
+
+            # Reinstall the package
+            console.print("  [dim]Reinstalling CLI...[/dim]")
+            install_result = subprocess.run(
+                ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+
+            if install_result.returncode != 0:
+                console.print(f"  [yellow]Warning: reinstall failed: {install_result.stderr}[/yellow]")
+                return False
+
+            return True
+        else:
+            # Not an editable install, try upgrading from PyPI
+            console.print("  [dim]Checking PyPI for updates...[/dim]")
+            upgrade_result = subprocess.run(
+                ["pip", "install", "--upgrade", "bazinga-cli", "--quiet"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+
+            if upgrade_result.returncode != 0:
+                console.print(f"  [yellow]Warning: upgrade failed: {upgrade_result.stderr}[/yellow]")
+                return False
+
+            # Check if anything was actually upgraded
+            if "already satisfied" in upgrade_result.stdout.lower():
+                console.print("  [dim]Already up to date[/dim]")
+
+            return True
+
+    except Exception as e:
+        console.print(f"  [yellow]Warning: CLI update failed: {e}[/yellow]")
+        return False
+
+
 @app.command()
 def update(
     force: bool = typer.Option(
@@ -1168,8 +1261,9 @@ def update(
     """
     Update BAZINGA components in the current project.
 
-    Updates agent definitions, scripts, and commands to the latest versions
-    while preserving coordination state files and existing configuration.
+    Updates the BAZINGA CLI itself and project components (agents, scripts,
+    commands, skills) to the latest versions while preserving coordination
+    state files and existing configuration.
     """
     print_banner()
 
@@ -1185,7 +1279,8 @@ def update(
 
     if not force:
         console.print(
-            "\n[yellow]This will update BAZINGA components:[/yellow]\n"
+            "\n[yellow]This will update:[/yellow]\n"
+            "  • BAZINGA CLI (pull latest & reinstall)\n"
             "  • Agent definitions (.claude/agents/)\n"
             "  • Scripts (.claude/scripts/)\n"
             "  • Commands (.claude/commands/)\n"
@@ -1198,12 +1293,22 @@ def update(
             console.print("[red]Cancelled[/red]")
             raise typer.Exit(1)
 
+    console.print("\n[bold]Updating BAZINGA...[/bold]\n")
+
+    # Step 0: Update the CLI itself
+    console.print("[bold cyan]0. Updating BAZINGA CLI[/bold cyan]")
+    cli_updated = update_cli()
+    if cli_updated:
+        console.print("  [green]✓ CLI updated (restart may be needed for changes to take effect)[/green]")
+    else:
+        console.print("  [yellow]⚠️  CLI update failed or not needed[/yellow]")
+
     setup = BazingaSetup()
 
     # Detect which script type is currently installed
     script_type = setup.detect_script_type(target_dir)
 
-    console.print("\n[bold]Updating BAZINGA components...[/bold]\n")
+    console.print()
 
     # Update agents
     console.print("[bold cyan]1. Updating agent definitions[/bold cyan]")
