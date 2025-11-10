@@ -816,7 +816,8 @@ def init(
     script_type = select_script_type()
 
     # Determine target directory
-    if here:
+    if here or not project_name:
+        # Default to current directory if --here flag or no project name provided
         target_dir = Path.cwd()
         if not force:
             console.print(
@@ -844,14 +845,6 @@ def init(
             raise typer.Exit(1)
         target_dir.mkdir(parents=True, exist_ok=True)
         console.print(f"\n[green]✓[/green] Created directory: [bold]{target_dir}[/bold]")
-    else:
-        console.print(
-            "[red]Error:[/red] Please provide a project name or use --here flag"
-        )
-        console.print("\nExamples:")
-        console.print("  bazinga init my-project")
-        console.print("  bazinga init --here")
-        raise typer.Exit(1)
 
     # Setup instance
     setup = BazingaSetup()
@@ -986,6 +979,12 @@ def init(
     config_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
     config_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
 
+    # Determine next steps message based on whether project was created
+    if project_name:
+        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: @orchestrator <your request>"
+    else:
+        next_steps = "  1. Open with Claude Code\n  2. Use: @orchestrator <your request>"
+
     console.print(
         Panel.fit(
             f"[bold green]✓ BAZINGA installed successfully![/bold green]\n\n"
@@ -993,9 +992,7 @@ def init(
             f"[dim]Profile: {profile_desc.get(profile, profile)}[/dim]\n"
             f"[dim]Testing: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
             "[bold]Next steps:[/bold]\n"
-            f"  1. cd {target_dir.name if project_name else '.'}\n"
-            "  2. Open with Claude Code\n"
-            "  3. Use: @orchestrator <your request>\n\n"
+            f"{next_steps}\n\n"
             "[bold]Example:[/bold]\n"
             "  @orchestrator implement user authentication with JWT\n\n"
             f"{config_commands}",

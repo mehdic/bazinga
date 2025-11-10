@@ -42,11 +42,14 @@ PM: "BAZINGA! All features complete in 18 minutes"
 ## Quick Start
 
 ```bash
-# Install and initialize (one command)
+# Option 1: Create new project
 uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
-
-# Start building
 cd my-project
+@orchestrator implement user authentication with JWT
+
+# Option 2: Initialize in current directory
+cd your-existing-project
+uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
 @orchestrator implement user authentication with JWT
 ```
 
@@ -235,10 +238,13 @@ BAZINGA works out of the box with sensible defaults. Want more control?
 
 ```bash
 # Default (lite profile)
-bazinga init my-project
+bazinga init my-project       # Create new project directory
+bazinga init --here           # Initialize in current directory
+bazinga init                  # Same as --here (defaults to current directory)
 
 # Advanced profile (all features enabled)
 bazinga init my-project --profile advanced
+bazinga init --here --profile advanced
 
 # Custom configuration
 bazinga init my-project --testing full --skills all
