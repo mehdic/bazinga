@@ -255,16 +255,14 @@ bazinga update
 
 ---
 
-## What Makes BAZINGA Different
+## Key Features
 
-| Feature | BAZINGA | Claude Code (Default) | Other Frameworks |
-|---------|---------|----------------------|------------------|
-| **Parallel Developers** | ✅ 1-4 developers automatically | ❌ Single agent | ❌ Sequential only |
-| **Adaptive Workflow** | ✅ PM decides parallelism | ❌ User coordinates | ❌ Fixed workflow |
-| **Automatic Quality Gates** | ✅ Security, lint, coverage built-in | ❌ Manual invocation | ⚠️ Basic only |
-| **Model Escalation** | ✅ Sonnet → Opus at revision 3 | ❌ Manual model selection | ❌ Single model |
-| **Graceful Degradation** | ✅ Works with missing tools | ❌ N/A | ❌ Requires all tools |
-| **Multi-language** | ✅ Python, JS, Go, Java, Ruby | ✅ Yes | ⚠️ Limited |
+- **Parallel Developers** - 1-4 developers working simultaneously, automatically coordinated
+- **Adaptive Workflow** - PM decides parallelism based on task independence
+- **Automatic Quality Gates** - Security scanning, linting, and test coverage built-in
+- **Model Escalation** - Automatically escalates from Sonnet to Opus at revision 3
+- **Graceful Degradation** - Works even with missing tools, warns but continues
+- **Multi-language Support** - Python, JavaScript/TypeScript, Go, Java, Ruby
 
 ---
 
@@ -464,7 +462,7 @@ See [LICENSE](LICENSE) for full details.
 
 ## Acknowledgments
 
-Built for Claude Code using the Claude Agent SDK. Inspired by ChatDev, MetaGPT, and other multi-agent frameworks but optimized specifically for Claude Code's capabilities.
+Built for Claude Code using the Claude Agent SDK.
 
 Special thanks to:
 - Claude Code team for the Skills system and agent SDK
