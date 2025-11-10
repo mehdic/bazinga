@@ -5,12 +5,19 @@
 # Runs code quality linters based on project language
 #
 
-set -e
+# Don't exit on error for graceful degradation
+set +e
 
 echo "📋 Code Linting Starting..."
 
 # Create coordination directory if it doesn't exist
 mkdir -p coordination
+
+# Load profile from skills_config.json for graceful degradation
+PROFILE="lite"
+if [ -f "coordination/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' coordination/skills_config.json 2>/dev/null || echo "lite")
+fi
 
 # TIMEOUT PROTECTION: Max 45 seconds for linting
 LINT_TIMEOUT="${LINT_TIMEOUT:-45}"
@@ -60,9 +67,53 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
+# Function to check tool availability and handle graceful degradation
+check_tool_or_skip() {
+    local tool=$1
+    local install_cmd=$2
+    local tool_name=$3  # Human readable name
+
+    if ! command_exists "$tool"; then
+        if [ "$PROFILE" = "lite" ]; then
+            # Lite mode: Skip gracefully with warning
+            echo "⚠️  $tool_name not installed - skipping in lite mode"
+            echo "   Install with: $install_cmd"
+            cat > coordination/lint_results.json << EOF
+{
+  "status": "skipped",
+  "language": "$LANG",
+  "reason": "$tool_name not installed",
+  "recommendation": "Install with: $install_cmd",
+  "impact": "Code linting was skipped. Install $tool_name for code quality checks.",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+            exit 0
+        else
+            # Advanced mode: Fail if tool not available
+            echo "❌ $tool_name required but not installed"
+            cat > coordination/lint_results.json << EOF
+{
+  "status": "error",
+  "language": "$LANG",
+  "reason": "$tool_name required but not installed",
+  "recommendation": "Install with: $install_cmd",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+            exit 1
+        fi
+    fi
+}
+
 # Run linter based on language
 case $LANG in
     python)
+        # Check for Python linter with graceful degradation
+        if ! command_exists "ruff" && ! command_exists "pylint"; then
+            check_tool_or_skip "ruff" "pip install ruff" "ruff or pylint (Python linter)"
+        fi
+
         # Prefer ruff (fast), fallback to pylint
         if command_exists "ruff"; then
             TOOL="ruff"
@@ -91,71 +142,57 @@ case $LANG in
             else
                 run_with_timeout pylint --output-format=json **/*.py > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
             fi
-        else
-            echo "⚠️  No Python linter found. Install: pip install ruff"
-            TOOL="none"
-            echo '[]' > coordination/lint_results_raw.json
         fi
         ;;
 
     javascript)
-        # Check for eslint
-        if [ -f "node_modules/.bin/eslint" ] || command_exists "eslint"; then
-            TOOL="eslint"
-            echo "  Running eslint..."
-            # Use changed files if available, otherwise lint all
-            if [ -n "$CHANGED_FILES" ]; then
-                JS_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(js|jsx|ts|tsx)$' || echo "")
-                if [ -n "$JS_FILES" ]; then
-                    run_with_timeout npx eslint $JS_FILES --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
-                else
-                    echo '[]' > coordination/lint_results_raw.json
-                fi
+        # Check for eslint with graceful degradation
+        if ! [ -f "node_modules/.bin/eslint" ] && ! command_exists "eslint"; then
+            check_tool_or_skip "eslint" "npm install --save-dev eslint" "eslint (JavaScript linter)"
+        fi
+
+        TOOL="eslint"
+        echo "  Running eslint..."
+        # Use changed files if available, otherwise lint all
+        if [ -n "$CHANGED_FILES" ]; then
+            JS_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(js|jsx|ts|tsx)$' || echo "")
+            if [ -n "$JS_FILES" ]; then
+                run_with_timeout npx eslint $JS_FILES --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
             else
-                run_with_timeout npx eslint . --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
+                echo '[]' > coordination/lint_results_raw.json
             fi
         else
-            echo "⚠️  eslint not found. Install: npm install --save-dev eslint"
-            TOOL="none"
-            echo '[]' > coordination/lint_results_raw.json
+            run_with_timeout npx eslint . --format json > coordination/lint_results_raw.json 2>/dev/null || echo '[]' > coordination/lint_results_raw.json
         fi
         ;;
 
     go)
-        # Check for golangci-lint
-        if command_exists "golangci-lint"; then
-            TOOL="golangci-lint"
-            echo "  Running golangci-lint..."
-            # golangci-lint doesn't support individual file linting well, use --new flag for changed files
-            if [ -n "$CHANGED_FILES" ]; then
-                GO_FILES=$(echo "$CHANGED_FILES" | grep '\.go$' || echo "")
-                if [ -n "$GO_FILES" ]; then
-                    # Use --new to only lint changed code
-                    run_with_timeout golangci-lint run --new --out-format json > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
-                else
-                    echo '{"Issues":[]}' > coordination/lint_results_raw.json
-                fi
+        # Check for golangci-lint with graceful degradation
+        check_tool_or_skip "golangci-lint" "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest" "golangci-lint (Go linter)"
+
+        TOOL="golangci-lint"
+        echo "  Running golangci-lint..."
+        # golangci-lint doesn't support individual file linting well, use --new flag for changed files
+        if [ -n "$CHANGED_FILES" ]; then
+            GO_FILES=$(echo "$CHANGED_FILES" | grep '\.go$' || echo "")
+            if [ -n "$GO_FILES" ]; then
+                # Use --new to only lint changed code
+                run_with_timeout golangci-lint run --new --out-format json > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
             else
-                run_with_timeout golangci-lint run --out-format json --timeout ${LINT_TIMEOUT}s > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
+                echo '{"Issues":[]}' > coordination/lint_results_raw.json
             fi
         else
-            echo "⚠️  golangci-lint not found. Install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-            TOOL="none"
-            echo '{"Issues":[]}' > coordination/lint_results_raw.json
+            run_with_timeout golangci-lint run --out-format json --timeout ${LINT_TIMEOUT}s > coordination/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > coordination/lint_results_raw.json
         fi
         ;;
 
     ruby)
-        # Check for rubocop
-        if command_exists "rubocop"; then
-            TOOL="rubocop"
-            echo "  Running rubocop..."
-            rubocop --format json > coordination/lint_results_raw.json 2>/dev/null || echo '{"files":[]}' > coordination/lint_results_raw.json
-        else
-            echo "⚠️  rubocop not found. Install: gem install rubocop"
-            TOOL="none"
-            echo '{"files":[]}' > coordination/lint_results_raw.json
-        fi
+        # Check for rubocop with graceful degradation
+        check_tool_or_skip "rubocop" "gem install rubocop" "rubocop (Ruby linter)"
+
+        TOOL="rubocop"
+        echo "  Running rubocop..."
+        rubocop --format json > coordination/lint_results_raw.json 2>/dev/null || echo '{"files":[]}' > coordination/lint_results_raw.json
         ;;
 
     java)

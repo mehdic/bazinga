@@ -6,7 +6,8 @@
 # Mode is controlled via SECURITY_SCAN_MODE environment variable
 #
 
-set -e
+# Don't exit on error for graceful degradation
+set +e
 
 # Get mode from environment (default: basic)
 MODE="${SECURITY_SCAN_MODE:-basic}"
@@ -20,6 +21,12 @@ mkdir -p coordination
 SCAN_STATUS="success"
 SCAN_ERROR=""
 TOOL_USED="none"
+
+# Load profile from skills_config.json for graceful degradation
+PROFILE="lite"
+if [ -f "coordination/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' coordination/skills_config.json 2>/dev/null || echo "lite")
+fi
 
 # Detect project language
 if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
@@ -43,18 +50,55 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# Function to install tool if missing
+# Function to check tool availability and handle graceful degradation
+check_tool_or_skip() {
+    local tool=$1
+    local install_cmd=$2
+    local tool_name=$3  # Human readable name
+
+    if ! command_exists "$tool"; then
+        if [ "$PROFILE" = "lite" ]; then
+            # Lite mode: Skip gracefully with warning
+            echo "⚠️  $tool_name not installed - skipping in lite mode"
+            echo "   Install with: $install_cmd"
+            cat > coordination/security_scan.json << EOF
+{
+  "status": "skipped",
+  "scan_mode": "$MODE",
+  "language": "$LANG",
+  "reason": "$tool_name not installed",
+  "recommendation": "Install with: $install_cmd",
+  "impact": "Security scan was skipped. Install $tool_name for vulnerability detection.",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+            exit 0
+        else
+            # Advanced mode: Try to install, fail if it doesn't work
+            echo "⚙️  Installing $tool..."
+            if ! eval "$install_cmd" 2>/dev/null; then
+                echo "❌ Failed to install $tool_name"
+                cat > coordination/security_scan.json << EOF
+{
+  "status": "error",
+  "scan_mode": "$MODE",
+  "language": "$LANG",
+  "reason": "$tool_name required but not installed",
+  "recommendation": "Install with: $install_cmd",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+                exit 1
+            fi
+        fi
+    fi
+}
+
+# Legacy function for backward compatibility
 install_if_missing() {
     local tool=$1
     local install_cmd=$2
-
-    if ! command_exists "$tool"; then
-        echo "⚙️  Installing $tool..."
-        eval "$install_cmd" || {
-            echo "⚠️  Failed to install $tool. Please install manually."
-            return 1
-        }
-    fi
+    check_tool_or_skip "$tool" "$install_cmd" "$tool"
 }
 
 # Run scan based on mode and language
@@ -64,20 +108,16 @@ case $MODE in
 
         case $LANG in
             python)
-                # Install bandit if needed
-                if ! install_if_missing "bandit" "pip install bandit --quiet"; then
-                    SCAN_STATUS="error"
-                    SCAN_ERROR="Failed to install bandit"
+                # Check for bandit with graceful degradation
+                check_tool_or_skip "bandit" "pip install bandit" "bandit (Python security scanner)"
+
+                TOOL_USED="bandit"
+                # Basic: High/medium severity only (-ll flag)
+                echo "  Running bandit (high/medium severity)..."
+                if ! bandit -r . -f json -o coordination/security_scan_raw.json -ll 2>/dev/null; then
+                    SCAN_STATUS="partial"
+                    SCAN_ERROR="Bandit scan failed or had errors"
                     echo '{"results":[]}' > coordination/security_scan_raw.json
-                else
-                    TOOL_USED="bandit"
-                    # Basic: High/medium severity only (-ll flag)
-                    echo "  Running bandit (high/medium severity)..."
-                    if ! bandit -r . -f json -o coordination/security_scan_raw.json -ll 2>/dev/null; then
-                        SCAN_STATUS="partial"
-                        SCAN_ERROR="Bandit scan failed or had errors"
-                        echo '{"results":[]}' > coordination/security_scan_raw.json
-                    fi
                 fi
                 ;;
 
@@ -93,43 +133,29 @@ case $MODE in
                 ;;
 
             go)
-                # Install gosec if needed
-                if ! command_exists "gosec"; then
-                    echo "⚙️  Installing gosec..."
-                    if ! go install github.com/securego/gosec/v2/cmd/gosec@latest; then
-                        SCAN_STATUS="error"
-                        SCAN_ERROR="Failed to install gosec"
-                        echo '{"issues":[]}' > coordination/security_scan_raw.json
-                    else
-                        export PATH=$PATH:$(go env GOPATH)/bin
-                    fi
-                fi
+                # Check for gosec with graceful degradation
+                check_tool_or_skip "gosec" "go install github.com/securego/gosec/v2/cmd/gosec@latest" "gosec (Go security scanner)"
 
-                if [ "$SCAN_STATUS" != "error" ]; then
-                    TOOL_USED="gosec"
-                    echo "  Running gosec (high severity)..."
-                    if ! gosec -severity high -fmt json -out coordination/security_scan_raw.json ./... 2>/dev/null; then
-                        SCAN_STATUS="partial"
-                        SCAN_ERROR="gosec scan failed"
-                        echo '{"issues":[]}' > coordination/security_scan_raw.json
-                    fi
+                export PATH=$PATH:$(go env GOPATH)/bin
+                TOOL_USED="gosec"
+                echo "  Running gosec (high severity)..."
+                if ! gosec -severity high -fmt json -out coordination/security_scan_raw.json ./... 2>/dev/null; then
+                    SCAN_STATUS="partial"
+                    SCAN_ERROR="gosec scan failed"
+                    echo '{"issues":[]}' > coordination/security_scan_raw.json
                 fi
                 ;;
 
             ruby)
-                # Install brakeman if needed
-                if ! install_if_missing "brakeman" "gem install brakeman"; then
-                    SCAN_STATUS="error"
-                    SCAN_ERROR="Failed to install brakeman"
+                # Check for brakeman with graceful degradation
+                check_tool_or_skip "brakeman" "gem install brakeman" "brakeman (Ruby security scanner)"
+
+                TOOL_USED="brakeman"
+                echo "  Running brakeman (high severity)..."
+                if ! brakeman -f json -o coordination/security_scan_raw.json --severity-level 1 2>/dev/null; then
+                    SCAN_STATUS="partial"
+                    SCAN_ERROR="brakeman scan failed"
                     echo '{"warnings":[]}' > coordination/security_scan_raw.json
-                else
-                    TOOL_USED="brakeman"
-                    echo "  Running brakeman (high severity)..."
-                    if ! brakeman -f json -o coordination/security_scan_raw.json --severity-level 1 2>/dev/null; then
-                        SCAN_STATUS="partial"
-                        SCAN_ERROR="brakeman scan failed"
-                        echo '{"warnings":[]}' > coordination/security_scan_raw.json
-                    fi
                 fi
                 ;;
 
@@ -201,44 +227,40 @@ case $MODE in
         case $LANG in
             python)
                 TOOL_USED="bandit+semgrep"
-                # Install tools if needed
-                if ! install_if_missing "bandit" "pip install bandit --quiet"; then
-                    SCAN_STATUS="error"
-                    SCAN_ERROR="Failed to install bandit"
-                    echo '{"results":[]}' > coordination/security_scan_raw.json
-                elif ! install_if_missing "semgrep" "pip install semgrep --quiet"; then
-                    SCAN_STATUS="partial"
-                    SCAN_ERROR="Failed to install semgrep, running bandit only"
+                # Check for required tools with graceful degradation
+                check_tool_or_skip "bandit" "pip install bandit" "bandit (Python security scanner)"
+
+                # Semgrep is optional even in advanced mode (fallback to bandit only)
+                if ! command_exists "semgrep"; then
+                    echo "  semgrep not installed, using bandit only"
                     TOOL_USED="bandit"
                 fi
 
-                if [ "$SCAN_STATUS" != "error" ]; then
-                    # Run bandit (all severities)
-                    echo "  Running bandit (all severities)..."
-                    if ! bandit -r . -f json -o coordination/bandit_full.json 2>/dev/null; then
-                        SCAN_STATUS="partial"
-                        SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Bandit scan failed"
-                        echo '{"results":[]}' > coordination/bandit_full.json
-                    fi
+                # Run bandit (all severities)
+                echo "  Running bandit (all severities)..."
+                if ! bandit -r . -f json -o coordination/bandit_full.json 2>/dev/null; then
+                    SCAN_STATUS="partial"
+                    SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Bandit scan failed"
+                    echo '{"results":[]}' > coordination/bandit_full.json
+                fi
 
-                    # Run semgrep if available (comprehensive patterns)
-                    if command_exists "semgrep"; then
-                        echo "  Running semgrep (security patterns)..."
-                        if ! semgrep --config=auto --json -o coordination/semgrep.json 2>/dev/null; then
-                            SCAN_STATUS="partial"
-                            SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Semgrep scan failed"
-                            echo '{"results":[]}' > coordination/semgrep.json
-                        fi
-                    else
+                # Run semgrep if available (comprehensive patterns)
+                if command_exists "semgrep"; then
+                    echo "  Running semgrep (security patterns)..."
+                    if ! semgrep --config=auto --json -o coordination/semgrep.json 2>/dev/null; then
+                        SCAN_STATUS="partial"
+                        SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Semgrep scan failed"
                         echo '{"results":[]}' > coordination/semgrep.json
                     fi
+                else
+                    echo '{"results":[]}' > coordination/semgrep.json
+                fi
 
-                    # Combine results
-                    if command_exists "jq"; then
-                        jq -s '{"bandit": .[0], "semgrep": .[1]}' coordination/bandit_full.json coordination/semgrep.json > coordination/security_scan_raw.json
-                    else
-                        cat coordination/bandit_full.json > coordination/security_scan_raw.json
-                    fi
+                # Combine results
+                if command_exists "jq"; then
+                    jq -s '{"bandit": .[0], "semgrep": .[1]}' coordination/bandit_full.json coordination/semgrep.json > coordination/security_scan_raw.json
+                else
+                    cat coordination/bandit_full.json > coordination/security_scan_raw.json
                 fi
                 ;;
 

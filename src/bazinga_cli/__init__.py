@@ -751,6 +751,12 @@ def init(
         "-t",
         help="Testing framework mode: full, minimal (default), or disabled",
     ),
+    profile: str = typer.Option(
+        "lite",
+        "--profile",
+        "-p",
+        help="Configuration profile: lite (default), advanced, or custom",
+    ),
 ):
     """
     Initialize a new BAZINGA project with multi-agent orchestration.
@@ -761,12 +767,40 @@ def init(
     - Configuration files
     - Coordination state files
 
-    Testing modes:
+    Profiles:
+    - lite (default): Fast development with 3 core skills, parallel mode enabled
+    - advanced: All 10 skills enabled, full testing mode
+    - custom: Use individual flags (--testing) for fine control
+
+    Testing modes (for custom profile):
     - full: All tests + QA Expert (production)
     - minimal: Lint + unit tests only (default)
     - disabled: Lint only (rapid prototyping)
     """
     print_banner()
+
+    # Validate profile
+    valid_profiles = ["lite", "advanced", "custom"]
+    if profile.lower() not in valid_profiles:
+        console.print(
+            f"[red]✗ Invalid profile: '{profile}'[/red]\n"
+            f"Valid options: {', '.join(valid_profiles)}"
+        )
+        raise typer.Exit(1)
+    profile = profile.lower()
+
+    # Handle profile presets
+    if profile == "advanced":
+        # Advanced profile: Enable all skills, full testing
+        testing_mode = "full"
+        console.print(f"[cyan]Using advanced profile: All skills enabled, full testing mode[/cyan]\n")
+    elif profile == "lite":
+        # Lite profile: Core skills only, minimal testing (already default in init script)
+        # If user didn't specify testing mode, keep minimal
+        if testing_mode == "minimal":
+            pass  # Use default
+        console.print(f"[cyan]Using lite profile: 3 core skills, parallel mode enabled[/cyan]\n")
+    # custom profile uses individual flags as-is
 
     # Validate testing mode
     valid_testing_modes = ["full", "minimal", "disabled"]
@@ -888,6 +922,35 @@ def init(
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Failed to update testing mode: {e}[/yellow]")
 
+        # Update skills configuration for advanced profile
+        if profile == "advanced":
+            import json
+            skills_config_path = target_dir / "coordination" / "skills_config.json"
+            if skills_config_path.exists():
+                try:
+                    with open(skills_config_path, "r") as f:
+                        skills_config = json.load(f)
+
+                    # Update profile metadata
+                    skills_config["_metadata"]["profile"] = "advanced"
+                    skills_config["_metadata"]["description"] = "Advanced profile - all skills enabled for comprehensive analysis"
+
+                    # Enable all advanced skills
+                    skills_config["developer"]["codebase-analysis"] = "mandatory"
+                    skills_config["developer"]["test-pattern-analysis"] = "mandatory"
+                    skills_config["developer"]["api-contract-validation"] = "mandatory"
+                    skills_config["developer"]["db-migration-check"] = "mandatory"
+                    skills_config["qa_expert"]["pattern-miner"] = "mandatory"
+                    skills_config["qa_expert"]["quality-dashboard"] = "mandatory"
+                    skills_config["pm"]["velocity-tracker"] = "mandatory"
+
+                    with open(skills_config_path, "w") as f:
+                        json.dump(skills_config, f, indent=2)
+
+                    console.print(f"  ✓ Advanced profile: All 10 skills enabled")
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Failed to update skills config: {e}[/yellow]")
+
     # Offer to install analysis tools
     detected_language = detect_project_language(target_dir)
     if detected_language:
@@ -908,23 +971,34 @@ def init(
             console.print("[yellow]⚠️  Git initialization failed[/yellow]")
 
     # Success message
+    profile_desc = {
+        "lite": "Lite (3 core skills, fast development)",
+        "advanced": "Advanced (10 skills, comprehensive analysis)",
+        "custom": "Custom (user-configured)"
+    }
     testing_mode_desc = {
         "full": "Full testing with QA Expert",
         "minimal": "Minimal testing (lint + unit tests)",
         "disabled": "Prototyping mode (lint only)"
     }
+
+    config_commands = "[dim]Customize:\n"
+    config_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
+    config_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
+
     console.print(
         Panel.fit(
             f"[bold green]✓ BAZINGA installed successfully![/bold green]\n\n"
             f"Your multi-agent orchestration system is ready.\n"
-            f"[dim]Testing mode: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
+            f"[dim]Profile: {profile_desc.get(profile, profile)}[/dim]\n"
+            f"[dim]Testing: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
             "[bold]Next steps:[/bold]\n"
             f"  1. cd {target_dir.name if project_name else '.'}\n"
             "  2. Open with Claude Code\n"
             "  3. Use: @orchestrator <your request>\n\n"
             "[bold]Example:[/bold]\n"
             "  @orchestrator implement user authentication with JWT\n\n"
-            "[dim]Change testing mode: /bazinga.configure-testing[/dim]",
+            f"{config_commands}",
             title="🎉 Installation Complete",
             border_style="green",
         )
