@@ -340,7 +340,7 @@ This automatically:
 
 ```bash
 # If installed with uv
-uv tool upgrade bazinga-cli --from git+https://github.com/mehdic/bazinga.git
+uv tool install --force bazinga-cli --from git+https://github.com/mehdic/bazinga.git
 
 # If installed with pip
 pip install --upgrade git+https://github.com/mehdic/bazinga.git
