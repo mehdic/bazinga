@@ -322,6 +322,33 @@ bazinga init my-project
 - Git
 - Optional: Security/lint/coverage tools for your language (auto-installed during setup)
 
+### Updating BAZINGA
+
+Once installed, update both the CLI and project components with:
+
+```bash
+cd your-bazinga-project
+bazinga update
+```
+
+This automatically:
+- ✅ Pulls latest CLI changes and reinstalls
+- ✅ Updates agent definitions, scripts, commands, skills
+- ✅ Preserves your coordination state and configuration
+
+**Manual CLI update** (if needed):
+
+```bash
+# If installed with uv
+uv tool upgrade bazinga-cli --from git+https://github.com/mehdic/bazinga.git
+
+# If installed with pip
+pip install --upgrade git+https://github.com/mehdic/bazinga.git
+
+# If editable install (development)
+cd /path/to/bazinga && git pull && pip install -e .
+```
+
 ---
 
 ## Documentation
