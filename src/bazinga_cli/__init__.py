@@ -539,111 +539,163 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
     Returns:
         True if tools were installed successfully or skipped, False if failed
     """
-    tool_commands = {
+    tool_configs = {
         "python": {
-            "tools": ["bandit", "semgrep", "pytest", "pytest-cov", "ruff"],
-            "command": ["pip", "install", "bandit", "semgrep", "pytest", "pytest-cov", "ruff"],
-            "description": "Python analysis tools (bandit, semgrep, pytest, pytest-cov, ruff)",
+            "core": ["bandit", "ruff", "pytest-cov"],
+            "advanced": ["semgrep"],
+            "package_manager": "pip",
+            "check_command": lambda t: check_command_exists(t),
+            "install_cmd": lambda tools: ["pip", "install"] + tools,
         },
         "javascript": {
-            "tools": ["jest", "eslint", "eslint-plugin-security"],
-            "command": ["npm", "install", "--save-dev", "jest", "eslint", "eslint-plugin-security", "@jest/globals"],
-            "description": "JavaScript analysis tools (jest, eslint, eslint-plugin-security)",
+            "core": ["jest", "eslint"],
+            "advanced": [],
+            "package_manager": "npm",
+            "check_command": lambda t: (target_dir / "node_modules" / ".bin" / t).exists() or check_command_exists(t),
+            "install_cmd": lambda tools: ["npm", "install", "--save-dev"] + tools + (["@jest/globals"] if "jest" in tools else []),
         },
         "go": {
-            "tools": ["gosec", "golangci-lint"],
-            "command": None,  # Special handling for Go
-            "description": "Go analysis tools (gosec, golangci-lint)",
+            "core": ["gosec", "golangci-lint"],
+            "advanced": [],
+            "package_manager": "go",
+            "check_command": lambda t: check_command_exists(t),
+            "install_cmd": None,  # Special handling
         },
         "java": {
-            "tools": ["maven/gradle plugins"],
-            "command": None,  # Requires pom.xml/build.gradle configuration
-            "description": "Java analysis tools (via Maven/Gradle plugins)",
+            "core": [],
+            "advanced": [],
+            "package_manager": "maven/gradle",
+            "check_command": None,
+            "install_cmd": None,  # Requires build.gradle/pom.xml configuration
         },
         "ruby": {
-            "tools": ["brakeman", "rubocop"],
-            "command": ["gem", "install", "brakeman", "rubocop"],
-            "description": "Ruby analysis tools (brakeman, rubocop)",
+            "core": ["brakeman", "rubocop"],
+            "advanced": [],
+            "package_manager": "gem",
+            "check_command": lambda t: check_command_exists(t),
+            "install_cmd": lambda tools: ["gem", "install"] + tools,
         },
     }
 
-    if language not in tool_commands:
+    if language not in tool_configs:
         return True  # Unknown language, skip
 
-    config = tool_commands[language]
+    config = tool_configs[language]
+
+    # Check which tools are already installed
+    all_tools = config["core"] + config["advanced"]
+    if config["check_command"] and all_tools:
+        installed_tools = [tool for tool in all_tools if config["check_command"](tool)]
+        missing_core = [tool for tool in config["core"] if tool not in installed_tools]
+        missing_advanced = [tool for tool in config["advanced"] if tool not in installed_tools]
+    else:
+        installed_tools = []
+        missing_core = config["core"]
+        missing_advanced = config["advanced"]
+
+    # Show tool status
+    console.print(f"\n[bold]{language.capitalize()} project detected[/bold]")
+
+    if installed_tools:
+        console.print(f"[dim]✓ Already installed: {', '.join(installed_tools)}[/dim]")
+
+    missing_tools = missing_core + missing_advanced
+
+    if not missing_tools and all_tools:
+        console.print(f"[green]✓ All analysis tools are installed[/green]")
+        return True
+
+    if not all_tools:
+        # Special handling for Java
+        if language == "java":
+            console.print(f"\n[bold yellow]ℹ️  Java tools require Maven/Gradle configuration[/bold yellow]")
+            console.print("[dim]Analysis tools for Java are configured via build plugins:[/dim]")
+            console.print("[dim]  • SpotBugs + Find Security Bugs (security scanning)[/dim]")
+            console.print("[dim]  • JaCoCo (test coverage)[/dim]")
+            console.print("[dim]  • Checkstyle + PMD (linting)[/dim]")
+            console.print(f"[dim]\nSee .claude/skills/*/README.md for configuration examples.[/dim]")
+            return True
+        return True
+
+    # Show what's missing
+    if missing_core:
+        console.print(f"\n[bold yellow]Missing core tools:[/bold yellow] {', '.join(missing_core)}")
+        console.print("[dim]Core tools enable: security scanning, linting, test coverage[/dim]")
+
+    if missing_advanced:
+        console.print(f"[dim]Missing advanced tools: {', '.join(missing_advanced)}[/dim]")
+
+    # Explain graceful degradation
+    console.print(f"\n[dim]💡 In lite mode, skills skip gracefully if tools are missing.[/dim]")
+    console.print(f"[dim]   You can still use BAZINGA - just with reduced analysis.[/dim]")
 
     if not force:
-        console.print(f"\n[bold yellow]Install analysis tools for {language.capitalize()}?[/bold yellow]")
-        console.print(f"[dim]Tools: {config['description']}[/dim]")
-        console.print("[dim]These tools enable automated security scanning, test coverage, and linting.[/dim]\n")
-
-        if not typer.confirm("Install now?", default=True):
+        if not typer.confirm(f"\nInstall missing tools now?", default=True):
             console.print("[yellow]⏭️  Skipped tool installation[/yellow]")
-            console.print(f"[dim]You can install manually later using the commands in Skills documentation[/dim]")
+            console.print(f"[dim]\nYou can install manually later:[/dim]")
+            if language == "python":
+                console.print(f"[dim]  pip install {' '.join(missing_tools)}[/dim]")
+            elif language == "javascript":
+                console.print(f"[dim]  npm install --save-dev {' '.join(missing_tools)}[/dim]")
+            elif language == "go":
+                for tool in missing_tools:
+                    if tool == "gosec":
+                        console.print(f"[dim]  go install github.com/securego/gosec/v2/cmd/gosec@latest[/dim]")
+                    elif tool == "golangci-lint":
+                        console.print(f"[dim]  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest[/dim]")
+            elif language == "ruby":
+                console.print(f"[dim]  gem install {' '.join(missing_tools)}[/dim]")
             return True
 
-    # Special handling for Go
+    # Special handling for Go - install only missing tools
     if language == "go":
         console.print(f"\n[bold cyan]Installing Go tools...[/bold cyan]")
 
-        # Install gosec
-        if not check_command_exists("gosec"):
-            console.print("  • Installing gosec...")
-            try:
-                subprocess.run(
-                    ["go", "install", "github.com/securego/gosec/v2/cmd/gosec@latest"],
-                    check=True,
-                    capture_output=True,
-                )
-                console.print("    [green]✓[/green] gosec installed")
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                console.print("    [yellow]⚠️  Failed to install gosec[/yellow]")
-        else:
-            console.print("    [dim]✓ gosec already installed[/dim]")
-
-        # Install golangci-lint
-        if not check_command_exists("golangci-lint"):
-            console.print("  • Installing golangci-lint...")
-            try:
-                subprocess.run(
-                    ["go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"],
-                    check=True,
-                    capture_output=True,
-                )
-                console.print("    [green]✓[/green] golangci-lint installed")
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                console.print("    [yellow]⚠️  Failed to install golangci-lint[/yellow]")
-        else:
-            console.print("    [dim]✓ golangci-lint already installed[/dim]")
+        for tool in missing_tools:
+            if tool == "gosec":
+                console.print("  • Installing gosec...")
+                try:
+                    subprocess.run(
+                        ["go", "install", "github.com/securego/gosec/v2/cmd/gosec@latest"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    console.print("    [green]✓[/green] gosec installed")
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    console.print("    [yellow]⚠️  Failed to install gosec[/yellow]")
+            elif tool == "golangci-lint":
+                console.print("  • Installing golangci-lint...")
+                try:
+                    subprocess.run(
+                        ["go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    console.print("    [green]✓[/green] golangci-lint installed")
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    console.print("    [yellow]⚠️  Failed to install golangci-lint[/yellow]")
 
         return True
 
-    # Special handling for Java
-    if language == "java":
-        console.print(f"\n[bold yellow]ℹ️  Java tools require Maven/Gradle configuration[/bold yellow]")
-        console.print("[dim]Analysis tools for Java are configured via build plugins:[/dim]")
-        console.print("[dim]  • SpotBugs + Find Security Bugs (security scanning)[/dim]")
-        console.print("[dim]  • JaCoCo (test coverage)[/dim]")
-        console.print("[dim]  • Checkstyle + PMD (linting)[/dim]")
-        console.print(f"[dim]\nSee .claude/skills/*/SKILL.md for configuration examples.[/dim]")
-        return True
-
-    # Python, JavaScript, Ruby
-    if config["command"]:
+    # Python, JavaScript, Ruby - install only missing tools
+    if config["install_cmd"] and missing_tools:
         console.print(f"\n[bold cyan]Installing {language.capitalize()} tools...[/bold cyan]")
 
         try:
             # Check if package manager exists
-            package_manager = config["command"][0]
+            package_manager = config["package_manager"]
             if not check_command_exists(package_manager):
                 console.print(f"[red]✗ {package_manager} not found[/red]")
-                console.print(f"[yellow]Please install {package_manager} first, then run tools installation manually[/yellow]")
+                console.print(f"[yellow]Please install {package_manager} first, then run tool installation manually[/yellow]")
                 return False
+
+            # Build installation command for missing tools only
+            install_command = config["install_cmd"](missing_tools)
 
             # Run installation command (SECURITY: Use SafeSubprocess)
             try:
                 result = SafeSubprocess.run(
-                    config["command"],
+                    install_command,
                     cwd=target_dir,
                     timeout=120,  # 2 minute timeout
                     check=False,  # Don't raise on error, handle below
