@@ -150,7 +150,7 @@ class BazingaSetup:
         commands_dir = target_dir / ".claude" / "commands"
         commands_dir.mkdir(parents=True, exist_ok=True)
 
-        source_commands = self.source_dir / "commands"
+        source_commands = self.source_dir / ".claude" / "commands"
         if not source_commands.exists():
             return False
 
