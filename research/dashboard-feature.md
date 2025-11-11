@@ -211,20 +211,23 @@ When available from quality-dashboard skill:
 
 ### CLI Installation (Recommended)
 
-When you install or update BAZINGA CLI, the dashboard is automatically included:
+When you install or update BAZINGA, the dashboard and its dependencies are automatically installed:
 
 ```bash
-# Fresh install with dashboard
-pip install -e .[dashboard]
+# Fresh install (automatically installs dashboard + dependencies)
+bazinga init --here
 
-# Update existing installation
+# Update existing installation (automatically updates dashboard + dependencies)
 bazinga update
+
+# Manual dependency installation if needed
+bazinga setup-dashboard
 
 # Verify dashboard installed
 ls -la dashboard/
 ```
 
-**Note:** Version 0.1.4+ includes dashboard in the package. Earlier versions need manual installation.
+**Note:** Version 1.0.5+ automatically installs dashboard dependencies during init/update. Earlier versions require manual installation.
 
 ### Automatic Setup
 
@@ -244,17 +247,22 @@ cd /home/user/bazinga
 
 ### Manual Setup
 
-If you need to start the dashboard manually:
+Dashboard dependencies are automatically installed during `bazinga init` or `bazinga update`.
+
+If you need to manually install or start the dashboard:
 
 ```bash
-# Install dependencies
+# Reinstall dependencies if needed (with confirmation)
+bazinga setup-dashboard
+
+# Or install directly with pip
 cd dashboard
 pip3 install -r requirements.txt
 
-# Start server
+# Start server manually
 python3 server.py
 
-# Server will run on http://localhost:8080
+# Server will run on http://localhost:53124
 ```
 
 ### Configuration

@@ -6,22 +6,39 @@ Real-time orchestration monitoring dashboard with WebSocket updates.
 
 ### Automatic (Recommended)
 
-The dashboard starts automatically when you initialize orchestration:
+The dashboard and its dependencies are automatically installed when you run:
 
 ```bash
-cd /home/user/bazinga
+# Initial setup (installs dashboard dependencies automatically)
+bazinga init --here
+
+# Or update existing installation (updates dashboard dependencies)
+bazinga update
+```
+
+The dashboard server then starts automatically when you initialize orchestration:
+
+```bash
 ./scripts/init-orchestration.sh
+```
+
+### Manual Dependency Installation
+
+If you need to install or reinstall dependencies manually:
+
+```bash
+# Option 1: Use CLI command (with confirmation)
+bazinga setup-dashboard
+
+# Option 2: Install directly with pip
+cd dashboard
+pip3 install -r requirements.txt
 ```
 
 ### Manual Start
 
 ```bash
 cd dashboard
-
-# Install dependencies (first time only)
-pip3 install -r requirements.txt
-
-# Start server
 python3 server.py
 ```
 
