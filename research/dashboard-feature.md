@@ -220,6 +220,9 @@ pip install -e .[dashboard]
 # Update existing installation
 bazinga update
 
+# Install dashboard dependencies (with confirmation)
+bazinga setup-dashboard
+
 # Verify dashboard installed
 ls -la dashboard/
 ```
@@ -244,17 +247,20 @@ cd /home/user/bazinga
 
 ### Manual Setup
 
-If you need to start the dashboard manually:
+If you need to install dependencies or start the dashboard manually:
 
 ```bash
-# Install dependencies
+# Option 1: Install dependencies using CLI (recommended)
+bazinga setup-dashboard
+
+# Option 2: Install dependencies manually
 cd dashboard
 pip3 install -r requirements.txt
 
 # Start server
 python3 server.py
 
-# Server will run on http://localhost:8080
+# Server will run on http://localhost:53124
 ```
 
 ### Configuration

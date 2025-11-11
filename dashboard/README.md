@@ -13,15 +13,25 @@ cd /home/user/bazinga
 ./scripts/init-orchestration.sh
 ```
 
+### Installing Dependencies
+
+Use the CLI command to install dashboard dependencies with confirmation:
+
+```bash
+bazinga setup-dashboard
+```
+
+Or install manually:
+
+```bash
+cd dashboard
+pip3 install -r requirements.txt
+```
+
 ### Manual Start
 
 ```bash
 cd dashboard
-
-# Install dependencies (first time only)
-pip3 install -r requirements.txt
-
-# Start server
 python3 server.py
 ```
 

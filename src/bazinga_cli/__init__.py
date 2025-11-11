@@ -24,7 +24,7 @@ from rich.text import Text
 
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
 
-__version__ = "0.1.3"
+__version__ = "1.0.5"
 
 console = Console()
 app = typer.Typer(
@@ -1390,6 +1390,186 @@ def update(
 
 
 @app.command()
+def setup_dashboard(
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Skip confirmation prompts"
+    ),
+):
+    """
+    Install dashboard dependencies for real-time orchestration monitoring.
+
+    This command installs the required Python packages for the BAZINGA
+    dashboard server:
+    - flask (web server)
+    - flask-sock (WebSocket support)
+    - watchdog (file system monitoring)
+    - anthropic (AI diagram generation)
+
+    The dashboard provides real-time monitoring of orchestration sessions
+    with workflow visualization, agent status tracking, and more.
+    """
+    target_dir = Path.cwd()
+
+    # Check if BAZINGA is installed
+    if not (target_dir / ".claude" / "agents" / "orchestrator.md").exists():
+        console.print(
+            "[red]✗ BAZINGA not found in current directory[/red]\n"
+            "Run 'bazinga init --here' to install BAZINGA first."
+        )
+        raise typer.Exit(1)
+
+    # Check if dashboard folder exists
+    dashboard_dir = target_dir / "dashboard"
+    if not dashboard_dir.exists():
+        console.print(
+            "[yellow]⚠️  Dashboard folder not found[/yellow]\n"
+            "[dim]The dashboard may not be installed in this project.[/dim]\n"
+            "[dim]Try running 'bazinga update' first.[/dim]"
+        )
+        raise typer.Exit(1)
+
+    console.print("\n[bold]Dashboard Dependency Installation[/bold]\n")
+
+    # Define required packages
+    required_packages = [
+        ("flask", "3.0.0"),
+        ("flask-sock", "0.7.0"),
+        ("watchdog", "3.0.0"),
+        ("anthropic", "0.39.0"),
+    ]
+
+    # Check which packages are already installed
+    console.print("[bold cyan]Checking installed packages...[/bold cyan]\n")
+
+    installed = []
+    missing = []
+
+    for package, version in required_packages:
+        try:
+            # Try importing to check if installed
+            if package == "flask-sock":
+                import flask_sock
+                installed.append(f"{package}=={version}")
+            elif package == "flask":
+                import flask
+                installed.append(f"{package}=={version}")
+            elif package == "watchdog":
+                import watchdog
+                installed.append(f"{package}=={version}")
+            elif package == "anthropic":
+                import anthropic
+                installed.append(f"{package}=={version}")
+        except ImportError:
+            missing.append(f"{package}=={version}")
+
+    # Show status
+    if installed:
+        console.print("[green]✓ Already installed:[/green]")
+        for pkg in installed:
+            console.print(f"  [dim]• {pkg}[/dim]")
+        console.print()
+
+    if not missing:
+        console.print("[bold green]✓ All dashboard dependencies are already installed![/bold green]\n")
+        console.print("[dim]You can start the dashboard with:[/dim]")
+        console.print("[dim]  cd dashboard && ./dashboard.sh start[/dim]")
+        console.print("[dim]  or: cd dashboard && python3 server.py[/dim]")
+        return
+
+    # Show what needs to be installed
+    console.print("[bold yellow]Missing dependencies:[/bold yellow]")
+    for pkg in missing:
+        console.print(f"  • {pkg}")
+    console.print()
+
+    console.print("[dim]These packages enable:[/dim]")
+    console.print("[dim]  • Real-time WebSocket updates[/dim]")
+    console.print("[dim]  • Workflow visualization[/dim]")
+    console.print("[dim]  • Agent status tracking[/dim]")
+    console.print("[dim]  • AI-powered diagrams (optional)[/dim]")
+    console.print()
+
+    # Prompt for confirmation
+    if not force:
+        console.print("[bold]Installation options:[/bold]")
+        console.print("  [cyan]y[/cyan] - Install dependencies now")
+        console.print("  [cyan]n[/cyan] - Skip for now")
+        console.print()
+
+        choice = typer.prompt(
+            "Install dashboard dependencies?",
+            type=str,
+            default="y",
+            show_default=True,
+        ).lower()
+
+        if choice not in ["y", "yes"]:
+            console.print("\n[yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
+            console.print("\n[dim]You can install manually later:[/dim]")
+            console.print(f"[dim]  cd dashboard[/dim]")
+            console.print(f"[dim]  pip3 install -r requirements.txt[/dim]")
+            console.print("\n[dim]Or run this command again:[/dim]")
+            console.print(f"[dim]  bazinga setup-dashboard[/dim]")
+            return
+
+    # Install dependencies
+    console.print("\n[bold cyan]Installing dashboard dependencies...[/bold cyan]\n")
+
+    requirements_file = dashboard_dir / "requirements.txt"
+
+    if not requirements_file.exists():
+        console.print("[red]✗ requirements.txt not found in dashboard folder[/red]")
+        raise typer.Exit(1)
+
+    try:
+        # Check if pip is available
+        if not check_command_exists("pip3") and not check_command_exists("pip"):
+            console.print("[red]✗ pip not found[/red]")
+            console.print("[yellow]Please install pip first[/yellow]")
+            raise typer.Exit(1)
+
+        pip_cmd = "pip3" if check_command_exists("pip3") else "pip"
+
+        # Install using requirements.txt
+        result = subprocess.run(
+            [pip_cmd, "install", "-r", str(requirements_file)],
+            cwd=dashboard_dir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode == 0:
+            console.print("[bold green]✓ Dashboard dependencies installed successfully![/bold green]\n")
+            console.print("[bold]Next steps:[/bold]")
+            console.print("  1. Start the dashboard:")
+            console.print("     [cyan]cd dashboard && ./dashboard.sh start[/cyan]")
+            console.print("  2. Open in browser:")
+            console.print("     [cyan]http://localhost:53124[/cyan]")
+            console.print("\n[dim]Or the dashboard will auto-start when you run orchestration:[/dim]")
+            console.print("[dim]  ./scripts/init-orchestration.sh[/dim]")
+        else:
+            console.print("[yellow]⚠️  Installation completed with warnings[/yellow]")
+            if result.stderr:
+                console.print(f"\n[dim]Error details:[/dim]")
+                console.print(f"[dim]{result.stderr[:500]}[/dim]")
+            console.print("\n[yellow]Some dependencies may still work. Try starting the dashboard:[/yellow]")
+            console.print("  [cyan]cd dashboard && python3 server.py[/cyan]")
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]✗ Installation timed out[/red]")
+        console.print("[yellow]Try installing manually:[/yellow]")
+        console.print(f"  [cyan]cd dashboard && pip3 install -r requirements.txt[/cyan]")
+        raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]✗ Installation failed: {e}[/red]")
+        console.print("\n[yellow]Try installing manually:[/yellow]")
+        console.print(f"  [cyan]cd dashboard && pip3 install -r requirements.txt[/cyan]")
+        raise typer.Exit(1)
+
+
+@app.command()
 def version():
     """Show BAZINGA CLI version."""
     console.print(f"[bold]BAZINGA CLI[/bold] version [cyan]{__version__}[/cyan]")
@@ -1416,10 +1596,11 @@ def main_callback(
         print_banner()
         console.print(
             "[bold]Available commands:[/bold]\n"
-            "  [cyan]init[/cyan]    - Initialize a new BAZINGA project\n"
-            "  [cyan]update[/cyan]  - Update BAZINGA components to latest version\n"
-            "  [cyan]check[/cyan]   - Check system requirements and setup\n"
-            "  [cyan]version[/cyan] - Show version information\n\n"
+            "  [cyan]init[/cyan]           - Initialize a new BAZINGA project\n"
+            "  [cyan]update[/cyan]         - Update BAZINGA components to latest version\n"
+            "  [cyan]setup-dashboard[/cyan] - Install dashboard dependencies\n"
+            "  [cyan]check[/cyan]          - Check system requirements and setup\n"
+            "  [cyan]version[/cyan]        - Show version information\n\n"
             "[dim]Use 'bazinga --help' for more information[/dim]"
         )
 
