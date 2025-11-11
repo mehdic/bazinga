@@ -24,7 +24,7 @@ from rich.text import Text
 
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 console = Console()
 app = typer.Typer(
@@ -746,6 +746,12 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
         console.print("  [yellow]⚠️  requirements.txt not found in dashboard folder[/yellow]")
         return True
 
+    # Check for marker file indicating dependencies were already installed
+    marker_file = dashboard_dir / ".deps-installed"
+    if marker_file.exists() and not force:
+        console.print("  [green]✓[/green] Dashboard dependencies already installed")
+        return True
+
     # Define required packages
     required_packages = [
         ("flask", "flask"),
@@ -764,6 +770,8 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
 
     if not missing:
         console.print("  [green]✓[/green] Dashboard dependencies already installed")
+        # Create marker file so we don't check again
+        marker_file.touch()
         return True
 
     # Show what needs to be installed
@@ -797,11 +805,15 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
 
         if result.returncode == 0:
             console.print("  [green]✓[/green] Dashboard dependencies installed")
+            # Create marker file to skip prompt next time
+            marker_file.touch()
             return True
         else:
             console.print("  [yellow]⚠️  Dashboard dependency installation completed with warnings[/yellow]")
             if result.stderr and "error" in result.stderr.lower():
                 console.print(f"  [dim]{result.stderr[:200]}[/dim]")
+            # Still create marker file to avoid repeated prompts
+            marker_file.touch()
             return True  # Still return success, dependencies might work
 
     except subprocess.TimeoutExpired:
@@ -1608,6 +1620,16 @@ def setup_dashboard(
         )
         raise typer.Exit(1)
 
+    # Check for marker file indicating dependencies were already installed
+    marker_file = dashboard_dir / ".deps-installed"
+    if marker_file.exists() and not force:
+        console.print("\n[bold green]✓ Dashboard dependencies already installed![/bold green]\n")
+        console.print("[dim]You can start the dashboard with:[/dim]")
+        console.print("[dim]  cd dashboard && ./dashboard.sh start[/dim]")
+        console.print("[dim]  or: cd dashboard && python3 server.py[/dim]")
+        console.print("\n[dim]To reinstall, use: bazinga setup-dashboard --force[/dim]")
+        return
+
     console.print("\n[bold]Dashboard Dependency Installation[/bold]\n")
 
     # Define required packages
@@ -1721,6 +1743,8 @@ def setup_dashboard(
 
         if result.returncode == 0:
             console.print("[bold green]✓ Dashboard dependencies installed successfully![/bold green]\n")
+            # Create marker file to skip prompt next time
+            marker_file.touch()
             console.print("[bold]Next steps:[/bold]")
             console.print("  1. Start the dashboard:")
             console.print("     [cyan]cd dashboard && ./dashboard.sh start[/cyan]")
@@ -1733,6 +1757,8 @@ def setup_dashboard(
             if result.stderr:
                 console.print(f"\n[dim]Error details:[/dim]")
                 console.print(f"[dim]{result.stderr[:500]}[/dim]")
+            # Still create marker file to avoid repeated prompts
+            marker_file.touch()
             console.print("\n[yellow]Some dependencies may still work. Try starting the dashboard:[/yellow]")
             console.print("  [cyan]cd dashboard && python3 server.py[/cyan]")
 
