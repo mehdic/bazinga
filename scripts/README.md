@@ -48,4 +48,4 @@ bash .claude/scripts/init-orchestration.sh
 **Notes:**
 - State files contain temporary session data and should NOT be committed to git
 - The `.gitignore` file ensures state files are excluded automatically
-- Session IDs use format: `v4_YYYYMMDD_HHMMSS` for easy tracking
+- Session IDs use format: `bazinga_YYYYMMDD_HHMMSS` for easy tracking
