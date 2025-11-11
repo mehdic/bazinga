@@ -364,7 +364,7 @@ def start_file_watcher():
 
 def main():
     """Start dashboard server."""
-    port = int(os.environ.get('DASHBOARD_PORT', 8080))
+    port = int(os.environ.get('DASHBOARD_PORT', 53124))
 
     print("=" * 60)
     print("🚀 BAZINGA Orchestration Dashboard")

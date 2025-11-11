@@ -277,7 +277,7 @@ echo ""
 
 # Check if dashboard server is running and start if needed
 echo "🖥️  Checking dashboard server status..."
-DASHBOARD_PORT="${DASHBOARD_PORT:-8080}"
+DASHBOARD_PORT="${DASHBOARD_PORT:-53124}"
 DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
 
 # Check if server is already running

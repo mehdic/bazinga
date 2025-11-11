@@ -25,7 +25,7 @@ pip3 install -r requirements.txt
 python3 server.py
 ```
 
-Server runs on: **http://localhost:8080**
+Server runs on: **http://localhost:53124**
 
 ## Features
 
@@ -58,15 +58,36 @@ export ANTHROPIC_API_KEY="your-api-key"
 
 Restart the dashboard server.
 
-## Stopping the Server
+## Managing the Dashboard
+
+Use the dashboard management script:
 
 ```bash
-kill $(cat /tmp/bazinga-dashboard.pid)
+cd dashboard
+
+# Start
+./dashboard.sh start
+
+# Stop
+./dashboard.sh stop
+
+# Restart
+./dashboard.sh restart
+
+# Check status
+./dashboard.sh status
+
+# View logs
+./dashboard.sh logs
 ```
 
-## Logs
+Or manually:
 
 ```bash
+# Stop
+kill $(cat /tmp/bazinga-dashboard.pid)
+
+# View logs
 tail -f /tmp/bazinga-dashboard.log
 ```
 
@@ -79,7 +100,7 @@ Full documentation: `/research/dashboard-feature.md`
 **Port already in use:**
 ```bash
 # Change port
-export DASHBOARD_PORT=8081
+export DASHBOARD_PORT=8080
 python3 server.py
 ```
 

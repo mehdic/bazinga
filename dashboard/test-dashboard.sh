@@ -28,16 +28,16 @@ else
     echo "✅ Dependencies already installed"
 fi
 
-# Test if port 8080 is available
+# Test if port 53124 is available
 echo ""
-echo "🔍 Checking if port 8080 is available..."
-if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  Port 8080 is already in use"
+echo "🔍 Checking if port 53124 is available..."
+if lsof -Pi :53124 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠️  Port 53124 is already in use"
     echo "   Skipping server start test"
     echo "   You can manually test by stopping the running server and executing:"
     echo "   python3 server.py"
 else
-    echo "✅ Port 8080 is available"
+    echo "✅ Port 53124 is available"
 
     # Start server in background
     echo ""
@@ -52,11 +52,11 @@ else
     if kill -0 $SERVER_PID 2>/dev/null; then
         echo "✅ Dashboard server started successfully (PID: $SERVER_PID)"
         echo ""
-        echo "🌐 Dashboard URL: http://localhost:8080"
+        echo "🌐 Dashboard URL: http://localhost:53124"
         echo "📋 Server logs: tail -f /tmp/bazinga-dashboard-test.log"
         echo ""
         echo "🧪 Test Steps:"
-        echo "   1. Open http://localhost:8080 in your browser"
+        echo "   1. Open http://localhost:53124 in your browser"
         echo "   2. Verify the dashboard loads"
         echo "   3. Check WebSocket connection status (top right)"
         echo "   4. Try refreshing the page"

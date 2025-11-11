@@ -261,9 +261,15 @@ Edit `coordination/skills_config.json`:
 ### Accessing the Dashboard
 
 1. Start orchestration (dashboard auto-starts)
-2. Open browser to `http://localhost:8080`
+2. Open browser to `http://localhost:53124`
 3. Dashboard automatically connects via WebSocket
 4. Watch real-time updates as orchestration progresses
+
+**Works with both orchestration commands:**
+- `/bazinga.orchestrate <task>` - Ad-hoc task orchestration
+- `/bazinga.orchestrate-from-spec` - Spec-kit integrated orchestration
+
+Both commands use the same coordination folder, so the dashboard monitors them identically.
 
 ### Stopping the Dashboard
 
@@ -565,7 +571,7 @@ cd dashboard && python3 server.py
 
 ### Accessing Dashboard
 ```
-http://localhost:8080
+http://localhost:53124
 ```
 
 ### Enable AI Diagram
@@ -580,11 +586,24 @@ http://localhost:8080
 
 ### Environment Variables
 ```bash
-export DASHBOARD_PORT=8080              # Optional
+export DASHBOARD_PORT=53124             # Optional (default: 53124)
 export ANTHROPIC_API_KEY="sk-..."      # For AI features
 ```
 
-### Stopping Dashboard
+### Managing Dashboard
+
+Use the management script:
+```bash
+cd dashboard
+
+./dashboard.sh start    # Start server
+./dashboard.sh stop     # Stop server
+./dashboard.sh restart  # Restart server
+./dashboard.sh status   # Check status
+./dashboard.sh logs     # Tail logs
+```
+
+Or manually:
 ```bash
 kill $(cat /tmp/bazinga-dashboard.pid)
 ```
@@ -597,7 +616,7 @@ tail -f /tmp/bazinga-dashboard.log
 ### Troubleshooting
 ```bash
 # Check if running
-lsof -i :8080
+lsof -i :53124
 
 # Check server process
 ps aux | grep "python3 server.py"
