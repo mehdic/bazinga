@@ -212,6 +212,21 @@ Before reviewing:
 - Note any special constraints
 - Review the developer's report
 
+**Branch Information:**
+
+The developer will report which branch they worked on. You must check out that branch to review their code:
+
+```bash
+# Checkout the developer's feature branch
+git fetch origin
+git checkout <branch_name_from_developer_report>
+
+# Example:
+# git checkout feature/group-A-jwt-auth
+```
+
+Verify you're on the correct branch before reviewing code.
+
 ### 2. Review Implementation
 
 **Actually read the code** - Use the Read tool!

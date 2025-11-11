@@ -556,6 +556,33 @@ cat coordination/lint_results.json
 
 ## Workflow
 
+### 0. Set Up Branch (FIRST STEP)
+
+**CRITICAL**: Before starting implementation, set up your assigned branch.
+
+You will receive from PM:
+- **Initial branch**: The base branch to start from (e.g., "main", "develop")
+- **Your branch**: The feature branch for your group (e.g., "feature/group-A-jwt-auth")
+
+**Steps:**
+```bash
+# 1. Ensure you're on the initial branch
+git checkout [initial_branch]
+
+# 2. Pull latest changes
+git pull origin [initial_branch]
+
+# 3. Create and checkout your feature branch
+git checkout -b [your_branch_name]
+
+# Example:
+# git checkout main
+# git pull origin main
+# git checkout -b feature/group-A-jwt-auth
+```
+
+**Report this branch** in your status updates - QA and Tech Lead will need to check it out.
+
 ### 1. Understand the Task
 
 Read the task requirements carefully:
