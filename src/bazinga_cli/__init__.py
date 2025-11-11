@@ -1166,7 +1166,7 @@ def update_cli() -> bool:
     Returns True if update was successful, False otherwise.
     """
     try:
-        # Find where bazinga-cli is installed from
+        # Try pip first (for pip installs and editable installs)
         result = subprocess.run(
             ["pip", "show", "bazinga-cli"],
             capture_output=True,
@@ -1174,78 +1174,102 @@ def update_cli() -> bool:
             check=False
         )
 
-        if result.returncode != 0:
-            console.print("  [dim]Could not find bazinga-cli package info[/dim]")
-            return False
+        if result.returncode == 0:
+            # Parse the output to find installation location
+            location = None
+            editable_project_location = None
+            for line in result.stdout.split('\n'):
+                if line.startswith('Location:'):
+                    location = line.split(':', 1)[1].strip()
+                elif line.startswith('Editable project location:'):
+                    editable_project_location = line.split(':', 1)[1].strip()
 
-        # Parse the output to find installation location
-        location = None
-        editable_project_location = None
-        for line in result.stdout.split('\n'):
-            if line.startswith('Location:'):
-                location = line.split(':', 1)[1].strip()
-            elif line.startswith('Editable project location:'):
-                editable_project_location = line.split(':', 1)[1].strip()
+            # If it's an editable install, update from git
+            if editable_project_location:
+                bazinga_repo = Path(editable_project_location)
+                console.print(f"  [dim]Found editable install at: {bazinga_repo}[/dim]")
 
-        # If it's an editable install, update from git
-        if editable_project_location:
-            bazinga_repo = Path(editable_project_location)
-            console.print(f"  [dim]Found editable install at: {bazinga_repo}[/dim]")
+                # Check if it's a git repo
+                if not (bazinga_repo / ".git").exists():
+                    console.print("  [dim]Not a git repository, skipping git pull[/dim]")
+                else:
+                    # Pull latest changes
+                    console.print("  [dim]Pulling latest changes...[/dim]")
+                    pull_result = subprocess.run(
+                        ["git", "pull"],
+                        cwd=bazinga_repo,
+                        capture_output=True,
+                        text=True,
+                        check=False
+                    )
 
-            # Check if it's a git repo
-            if not (bazinga_repo / ".git").exists():
-                console.print("  [dim]Not a git repository, skipping git pull[/dim]")
-            else:
-                # Pull latest changes
-                console.print("  [dim]Pulling latest changes...[/dim]")
-                pull_result = subprocess.run(
-                    ["git", "pull"],
-                    cwd=bazinga_repo,
+                    if pull_result.returncode != 0:
+                        console.print(f"  [yellow]Warning: git pull failed: {pull_result.stderr}[/yellow]")
+                    elif "Already up to date" in pull_result.stdout or "Already up-to-date" in pull_result.stdout:
+                        console.print("  [dim]Already up to date[/dim]")
+                    else:
+                        console.print("  [dim]Pulled latest changes[/dim]")
+
+                # Reinstall the package
+                console.print("  [dim]Reinstalling CLI...[/dim]")
+                install_result = subprocess.run(
+                    ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
                     capture_output=True,
                     text=True,
                     check=False
                 )
 
-                if pull_result.returncode != 0:
-                    console.print(f"  [yellow]Warning: git pull failed: {pull_result.stderr}[/yellow]")
-                elif "Already up to date" in pull_result.stdout or "Already up-to-date" in pull_result.stdout:
-                    console.print("  [dim]Already up to date[/dim]")
-                else:
-                    console.print("  [dim]Pulled latest changes[/dim]")
+                if install_result.returncode != 0:
+                    console.print(f"  [yellow]Warning: reinstall failed: {install_result.stderr}[/yellow]")
+                    return False
 
-            # Reinstall the package
-            console.print("  [dim]Reinstalling CLI...[/dim]")
-            install_result = subprocess.run(
-                ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
+                return True
+            else:
+                # Not an editable install, try upgrading from PyPI or git
+                console.print("  [dim]Upgrading from git repository...[/dim]")
+                upgrade_result = subprocess.run(
+                    ["pip", "install", "--upgrade", "git+https://github.com/mehdic/bazinga.git", "--quiet"],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+
+                if upgrade_result.returncode != 0:
+                    console.print(f"  [yellow]Warning: upgrade failed: {upgrade_result.stderr}[/yellow]")
+                    return False
+
+                return True
+
+        # pip show failed - try uv tool (for uv tool installs)
+        console.print("  [dim]Checking for uv tool installation...[/dim]")
+        uv_check = subprocess.run(
+            ["uv", "tool", "list"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if uv_check.returncode == 0 and "bazinga-cli" in uv_check.stdout:
+            console.print("  [dim]Found uv tool installation, upgrading...[/dim]")
+            uv_upgrade = subprocess.run(
+                ["uv", "tool", "install", "--force", "bazinga-cli", "--from", "git+https://github.com/mehdic/bazinga.git"],
                 capture_output=True,
                 text=True,
                 check=False
             )
 
-            if install_result.returncode != 0:
-                console.print(f"  [yellow]Warning: reinstall failed: {install_result.stderr}[/yellow]")
+            if uv_upgrade.returncode != 0:
+                console.print(f"  [yellow]Warning: uv upgrade failed: {uv_upgrade.stderr}[/yellow]")
                 return False
 
+            console.print("  [dim]CLI upgraded via uv[/dim]")
             return True
-        else:
-            # Not an editable install, try upgrading from PyPI
-            console.print("  [dim]Checking PyPI for updates...[/dim]")
-            upgrade_result = subprocess.run(
-                ["pip", "install", "--upgrade", "bazinga-cli", "--quiet"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
 
-            if upgrade_result.returncode != 0:
-                console.print(f"  [yellow]Warning: upgrade failed: {upgrade_result.stderr}[/yellow]")
-                return False
-
-            # Check if anything was actually upgraded
-            if "already satisfied" in upgrade_result.stdout.lower():
-                console.print("  [dim]Already up to date[/dim]")
-
-            return True
+        # Neither pip nor uv found the installation
+        console.print("  [dim]Could not detect installation method (pip or uv)[/dim]")
+        console.print("  [dim]You may need to manually reinstall:[/dim]")
+        console.print("  [dim]  uv tool install --force bazinga-cli --from git+https://github.com/mehdic/bazinga.git[/dim]")
+        return False
 
     except Exception as e:
         console.print(f"  [yellow]Warning: CLI update failed: {e}[/yellow]")
