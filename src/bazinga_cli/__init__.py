@@ -1250,7 +1250,7 @@ def update_cli() -> bool:
         )
 
         if uv_check.returncode == 0 and "bazinga-cli" in uv_check.stdout:
-            console.print("  [dim]Found uv tool installation, upgrading...[/dim]")
+            console.print("  [dim]Found uv tool installation, checking for updates...[/dim]")
             uv_upgrade = subprocess.run(
                 ["uv", "tool", "install", "--force", "bazinga-cli", "--from", "git+https://github.com/mehdic/bazinga.git"],
                 capture_output=True,
@@ -1263,16 +1263,15 @@ def update_cli() -> bool:
                 console.print(f"  [dim]stderr: {uv_upgrade.stderr}[/dim]")
                 return False
 
-            # Check if upgrade output indicates success
-            if "Installed" in uv_upgrade.stderr or "installed" in uv_upgrade.stderr.lower():
-                console.print("  [dim]CLI upgraded successfully via uv[/dim]")
+            # Check if there was actually an update (uv shows "Updated" when pulling new commits)
+            if "Updated https://github.com" in uv_upgrade.stderr:
+                console.print("  [dim]New version detected, CLI updated[/dim]")
                 return True
-            elif uv_upgrade.stderr:
-                # Show what actually happened
-                console.print(f"  [yellow]uv output: {uv_upgrade.stderr.strip()}[/yellow]")
-                return False
+            elif "Installed" in uv_upgrade.stderr or "installed" in uv_upgrade.stderr.lower():
+                console.print("  [dim]Already up to date (no new commits)[/dim]")
+                return True
             else:
-                console.print("  [dim]CLI reinstalled via uv[/dim]")
+                console.print("  [dim]CLI reinstalled[/dim]")
                 return True
 
         # Neither pip nor uv found the installation
