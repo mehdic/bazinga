@@ -1856,13 +1856,66 @@ Before declaring complete, ensure all feature branches are merged back to initia
 
 **Next Action for Final Developer:**
 Orchestrator should spawn 1 developer for FINAL MERGE with instructions:
-- Checkout initial branch: [initial_branch]
-- Merge all feature branches: [list all group branch_name values]
-- Resolve any conflicts
-- Verify all tests pass on merged code
-- Report back when initial branch contains all work
 
-**Wait for merge completion before BAZINGA.**
+**Task: Merge all feature branches and verify integration**
+
+1. **Checkout initial branch:**
+   ```bash
+   git checkout [initial_branch]
+   git pull origin [initial_branch]
+   ```
+
+2. **Merge all feature branches:**
+   ```bash
+   git merge [branch_1]
+   git merge [branch_2]
+   git merge [branch_3]
+   # ... for each group's branch_name
+   ```
+
+3. **Resolve any merge conflicts:**
+   - If conflicts occur, resolve them carefully
+   - Prefer keeping functionality from both branches where possible
+   - Test affected areas after resolution
+
+4. **CRITICAL: Verify build succeeds:**
+   ```bash
+   # Run the project's build command (if applicable)
+   # Examples:
+   # - Python: python -m py_compile **/*.py (syntax check)
+   # - JavaScript: npm run build
+   # - Go: go build ./...
+   # - Java: mvn compile
+   # - Rust: cargo build
+
+   # Build MUST succeed before proceeding
+   ```
+
+5. **CRITICAL: Run all unit tests:**
+   ```bash
+   # Run the project's test suite
+   # Examples:
+   # - Python: pytest
+   # - JavaScript: npm test
+   # - Go: go test ./...
+   # - Java: mvn test
+   # - Rust: cargo test
+
+   # ALL tests MUST pass before proceeding
+   ```
+
+6. **Report results:**
+   - Build status: PASS/FAIL
+   - Test status: X/Y tests passing
+   - Any issues encountered and how resolved
+   - Confirmation that initial branch contains all work
+
+**Wait for merge verification before BAZINGA.**
+
+**If build or tests fail after merge:**
+- Spawn developer to fix integration issues
+- Re-verify build and tests
+- Only then proceed to BAZINGA
 
 ### Summary
 - Total groups: N
@@ -1879,7 +1932,8 @@ Project complete! All requirements met and merged to [initial_branch].
 **CRITICAL**:
 1. The word "BAZINGA" must appear in your response for orchestrator to detect completion
 2. **Before BAZINGA**, spawn a developer to merge all branches back to initial_branch
-3. Only send BAZINGA after merge is complete and confirmed
+3. **After merge**, verify build succeeds and all unit tests pass
+4. Only send BAZINGA after merge is complete, build passes, and tests pass
 
 ## Handling Failures and Incomplete Work
 
