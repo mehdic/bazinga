@@ -39,6 +39,12 @@ class CoordinationWatcher(FileSystemEventHandler):
     def __init__(self):
         self.last_update = {}
         self.cooldown = 0.5  # Prevent rapid-fire updates
+        print(f"👁️  CoordinationWatcher initialized")
+
+    def on_any_event(self, event):
+        """Debug: Log all events."""
+        if not event.is_directory:
+            print(f"📝 File event: {event.event_type} - {Path(event.src_path).name}")
 
     def on_modified(self, event):
         if event.is_directory:
@@ -46,21 +52,24 @@ class CoordinationWatcher(FileSystemEventHandler):
 
         # Only care about JSON files
         if not event.src_path.endswith('.json'):
+            print(f"⏭️  Skipping non-JSON file: {Path(event.src_path).name}")
             return
 
         # Cooldown to prevent duplicate events
         current_time = time.time()
         if event.src_path in self.last_update:
             if current_time - self.last_update[event.src_path] < self.cooldown:
+                print(f"⏭️  Cooldown active for: {Path(event.src_path).name}")
                 return
 
         self.last_update[event.src_path] = current_time
 
         # Broadcast update to all clients
         try:
+            print(f"📡 Broadcasting update for: {Path(event.src_path).name}")
             data = load_coordination_data()
             broadcast_to_clients(data)
-            print(f"📡 Broadcasted update: {Path(event.src_path).name}")
+            print(f"✅ Broadcasted successfully (clients: {len(clients)})")
         except Exception as e:
             print(f"⚠️  Error broadcasting update: {e}")
 
@@ -632,20 +641,26 @@ def websocket(ws):
     """WebSocket endpoint for real-time updates."""
     clients.append(ws)
     print(f"✅ Client connected (total: {len(clients)})")
+    print(f"   Client info: {ws}")
 
     try:
         # Send initial data
+        print(f"📤 Sending initial data to client...")
         data = load_coordination_data()
         ws.send(json.dumps(data))
+        print(f"✅ Initial data sent successfully")
 
         # Keep connection alive
         while True:
             message = ws.receive()
             if message:
+                print(f"💓 Heartbeat received from client")
                 # Echo back for heartbeat
                 ws.send(json.dumps({'type': 'pong'}))
     except Exception as e:
         print(f"⚠️  WebSocket error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         if ws in clients:
             clients.remove(ws)
@@ -658,11 +673,26 @@ def start_file_watcher():
         print("   Dashboard will start, but won't receive updates until orchestration begins.")
         return
 
+    print(f"\n{'='*60}")
+    print(f"🔍 Setting up file watcher...")
+    print(f"{'='*60}")
+    print(f"📁 Watching directory: {COORDINATION_DIR.absolute()}")
+
+    # List current JSON files
+    json_files = list(COORDINATION_DIR.glob('*.json'))
+    print(f"📋 Current JSON files ({len(json_files)}):")
+    for f in json_files:
+        print(f"   - {f.name}")
+
+    if not json_files:
+        print(f"⚠️  No JSON files found yet - waiting for orchestration to start...")
+
     event_handler = CoordinationWatcher()
     observer = Observer()
     observer.schedule(event_handler, str(COORDINATION_DIR), recursive=False)
     observer.start()
-    print(f"👁️  Watching: {COORDINATION_DIR}")
+    print(f"✅ File watcher started successfully")
+    print(f"{'='*60}\n")
     return observer
 
 def main():
