@@ -723,6 +723,98 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
     return True
 
 
+def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> bool:
+    """
+    Install dashboard dependencies for real-time orchestration monitoring.
+
+    Args:
+        target_dir: Project directory
+        force: Skip confirmation prompt
+
+    Returns:
+        True if dependencies were installed successfully or skipped, False if failed
+    """
+    dashboard_dir = target_dir / "dashboard"
+
+    # Check if dashboard folder exists
+    if not dashboard_dir.exists():
+        console.print("  [dim]Dashboard folder not found, skipping dependency installation[/dim]")
+        return True
+
+    requirements_file = dashboard_dir / "requirements.txt"
+    if not requirements_file.exists():
+        console.print("  [yellow]⚠️  requirements.txt not found in dashboard folder[/yellow]")
+        return True
+
+    # Define required packages
+    required_packages = [
+        ("flask", "flask"),
+        ("flask-sock", "flask_sock"),
+        ("watchdog", "watchdog"),
+        ("anthropic", "anthropic"),
+    ]
+
+    # Check which packages are already installed
+    missing = []
+    for package_name, import_name in required_packages:
+        try:
+            __import__(import_name)
+        except ImportError:
+            missing.append(package_name)
+
+    if not missing:
+        console.print("  [green]✓[/green] Dashboard dependencies already installed")
+        return True
+
+    # Show what needs to be installed
+    console.print(f"  [dim]Missing packages: {', '.join(missing)}[/dim]")
+    console.print("  [dim]These enable: real-time monitoring, workflow visualization, WebSocket updates[/dim]")
+
+    if not force:
+        if not typer.confirm("  Install dashboard dependencies?", default=True):
+            console.print("  [yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
+            console.print(f"  [dim]You can install later with: bazinga setup-dashboard[/dim]")
+            return True
+
+    # Install dependencies
+    try:
+        # Check if pip is available
+        if not check_command_exists("pip3") and not check_command_exists("pip"):
+            console.print("  [yellow]⚠️  pip not found, skipping dashboard dependencies[/yellow]")
+            console.print(f"  [dim]Install manually: cd dashboard && pip3 install -r requirements.txt[/dim]")
+            return True
+
+        pip_cmd = "pip3" if check_command_exists("pip3") else "pip"
+
+        # Install using requirements.txt
+        result = subprocess.run(
+            [pip_cmd, "install", "-q", "-r", str(requirements_file)],
+            cwd=dashboard_dir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode == 0:
+            console.print("  [green]✓[/green] Dashboard dependencies installed")
+            return True
+        else:
+            console.print("  [yellow]⚠️  Dashboard dependency installation completed with warnings[/yellow]")
+            if result.stderr and "error" in result.stderr.lower():
+                console.print(f"  [dim]{result.stderr[:200]}[/dim]")
+            return True  # Still return success, dependencies might work
+
+    except subprocess.TimeoutExpired:
+        console.print("  [yellow]⚠️  Dashboard dependency installation timed out[/yellow]")
+        console.print(f"  [dim]Install manually: cd dashboard && pip3 install -r requirements.txt[/dim]")
+        return True  # Don't fail the whole installation
+
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Dashboard dependency installation failed: {e}[/yellow]")
+        console.print(f"  [dim]Install manually: cd dashboard && pip3 install -r requirements.txt[/dim]")
+        return True  # Don't fail the whole installation
+
+
 def select_script_type() -> str:
     """
     Interactive selection of script type using arrow keys.
@@ -1001,9 +1093,13 @@ def init(
     if detected_language:
         install_analysis_tools(target_dir, detected_language, force)
 
+    # Install dashboard dependencies
+    console.print("\n[bold cyan]7. Installing dashboard dependencies[/bold cyan]")
+    install_dashboard_dependencies(target_dir, force)
+
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
-        console.print("\n[bold cyan]7. Initializing git repository[/bold cyan]")
+        console.print("\n[bold cyan]8. Initializing git repository[/bold cyan]")
         try:
             subprocess.run(
                 ["git", "init"],
@@ -1374,6 +1470,10 @@ def update(
     # Update configuration (replace old BAZINGA section with new)
     console.print("\n[bold cyan]5. Updating configuration[/bold cyan]")
     setup.setup_config(target_dir, is_update=True)
+
+    # Update dashboard dependencies
+    console.print("\n[bold cyan]6. Updating dashboard dependencies[/bold cyan]")
+    install_dashboard_dependencies(target_dir, force)
 
     # Success message
     console.print(
