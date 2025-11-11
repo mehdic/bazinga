@@ -1688,6 +1688,7 @@ Write complete state to `coordination/pm_state.json`:
 ```json
 {
   "session_id": "session_YYYYMMDD_HHMMSS",
+  "initial_branch": "main",  // ← Capture git branch at start
   "mode": "simple" | "parallel",
   "mode_reasoning": "Explanation of why you chose this mode",
   "original_requirements": "Full user requirements",
@@ -1703,6 +1704,15 @@ Write complete state to `coordination/pm_state.json`:
   "estimated_time_remaining_minutes": 30
 }
 ```
+
+**CRITICAL: Capture Initial Branch**
+
+Before creating task groups, run:
+```bash
+git branch --show-current
+```
+
+Store the output in `initial_branch` field. This is the branch all work will be merged back to.
 
 ### Step 7: Return Decision
 
@@ -1743,6 +1753,10 @@ Execute N groups in parallel (N = [parallel_count]):
 
 ### Next Action
 Orchestrator should spawn [N] developer(s) for group(s): [IDs]
+
+**Branch Information to Pass:**
+- Initial branch: [from pm_state.json initial_branch field]
+- Each group's branch: [from group's branch_name field]
 ```
 
 ## Phase 2: Progress Tracking (Subsequent Spawns)
@@ -1829,22 +1843,97 @@ Orchestrator should spawn [N] developer(s) for group(s): [IDs]
 ### All Tasks Complete ✅
 
 All task groups have been successfully completed and approved:
-- Group A: JWT Authentication ✅
-- Group B: User Registration ✅
-- Group C: Password Reset ✅
+- Group A: JWT Authentication ✅ (branch: feature/group-A-jwt-auth)
+- Group B: User Registration ✅ (branch: feature/group-B-user-reg)
+- Group C: Password Reset ✅ (branch: feature/group-C-pwd-reset)
+
+### Branch Merge Required
+
+Before declaring complete, ensure all feature branches are merged back to initial branch:
+
+**Current state:** Feature branches contain completed work
+**Required:** All work must be on initial branch: [from pm_state.json initial_branch]
+
+**Next Action for Final Developer:**
+Orchestrator should spawn 1 developer for FINAL MERGE with instructions:
+
+**Task: Merge all feature branches and verify integration**
+
+1. **Checkout initial branch:**
+   ```bash
+   git checkout [initial_branch]
+   git pull origin [initial_branch]
+   ```
+
+2. **Merge all feature branches:**
+   ```bash
+   git merge [branch_1]
+   git merge [branch_2]
+   git merge [branch_3]
+   # ... for each group's branch_name
+   ```
+
+3. **Resolve any merge conflicts:**
+   - If conflicts occur, resolve them carefully
+   - Prefer keeping functionality from both branches where possible
+   - Test affected areas after resolution
+
+4. **CRITICAL: Verify build succeeds:**
+   ```bash
+   # Run the project's build command (if applicable)
+   # Examples:
+   # - Python: python -m py_compile **/*.py (syntax check)
+   # - JavaScript: npm run build
+   # - Go: go build ./...
+   # - Java: mvn compile
+   # - Rust: cargo build
+
+   # Build MUST succeed before proceeding
+   ```
+
+5. **CRITICAL: Run all unit tests:**
+   ```bash
+   # Run the project's test suite
+   # Examples:
+   # - Python: pytest
+   # - JavaScript: npm test
+   # - Go: go test ./...
+   # - Java: mvn test
+   # - Rust: cargo test
+
+   # ALL tests MUST pass before proceeding
+   ```
+
+6. **Report results:**
+   - Build status: PASS/FAIL
+   - Test status: X/Y tests passing
+   - Any issues encountered and how resolved
+   - Confirmation that initial branch contains all work
+
+**Wait for merge verification before BAZINGA.**
+
+**If build or tests fail after merge:**
+- Spawn developer to fix integration issues
+- Re-verify build and tests
+- Only then proceed to BAZINGA
 
 ### Summary
 - Total groups: N
 - Total duration: X minutes
 - Parallel efficiency: Nx speedup
 - Quality: All groups approved by Tech Lead
+- Branches: All merged to [initial_branch]
 
 ### BAZINGA
 
-Project complete! All requirements met.
+Project complete! All requirements met and merged to [initial_branch].
 ```
 
-**CRITICAL**: The word "BAZINGA" must appear in your response for orchestrator to detect completion.
+**CRITICAL**:
+1. The word "BAZINGA" must appear in your response for orchestrator to detect completion
+2. **Before BAZINGA**, spawn a developer to merge all branches back to initial_branch
+3. **After merge**, verify build succeeds and all unit tests pass
+4. Only send BAZINGA after merge is complete, build passes, and tests pass
 
 ## Handling Failures and Incomplete Work
 
