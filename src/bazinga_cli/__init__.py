@@ -1259,11 +1259,21 @@ def update_cli() -> bool:
             )
 
             if uv_upgrade.returncode != 0:
-                console.print(f"  [yellow]Warning: uv upgrade failed: {uv_upgrade.stderr}[/yellow]")
+                console.print(f"  [yellow]Warning: uv upgrade failed[/yellow]")
+                console.print(f"  [dim]stderr: {uv_upgrade.stderr}[/dim]")
                 return False
 
-            console.print("  [dim]CLI upgraded via uv[/dim]")
-            return True
+            # Check if upgrade output indicates success
+            if "Installed" in uv_upgrade.stderr or "installed" in uv_upgrade.stderr.lower():
+                console.print("  [dim]CLI upgraded successfully via uv[/dim]")
+                return True
+            elif uv_upgrade.stderr:
+                # Show what actually happened
+                console.print(f"  [yellow]uv output: {uv_upgrade.stderr.strip()}[/yellow]")
+                return False
+            else:
+                console.print("  [dim]CLI reinstalled via uv[/dim]")
+                return True
 
         # Neither pip nor uv found the installation
         console.print("  [dim]Could not detect installation method (pip or uv)[/dim]")
