@@ -24,7 +24,7 @@ from rich.text import Text
 
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 
 console = Console()
 app = typer.Typer(
@@ -1320,6 +1320,8 @@ def update_cli() -> bool:
                 bazinga_repo = Path(editable_project_location)
                 console.print(f"  [dim]Found editable install at: {bazinga_repo}[/dim]")
 
+                was_updated = False
+
                 # Check if it's a git repo
                 if not (bazinga_repo / ".git").exists():
                     console.print("  [dim]Not a git repository, skipping git pull[/dim]")
@@ -1340,26 +1342,28 @@ def update_cli() -> bool:
                         console.print("  [dim]Already up to date[/dim]")
                     else:
                         console.print("  [dim]Pulled latest changes[/dim]")
+                        was_updated = True
 
-                # Reinstall the package
-                console.print("  [dim]Reinstalling CLI...[/dim]")
-                install_result = subprocess.run(
-                    ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
+                # Only reinstall if there were updates
+                if was_updated:
+                    console.print("  [dim]Reinstalling CLI...[/dim]")
+                    install_result = subprocess.run(
+                        ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
+                        capture_output=True,
+                        text=True,
+                        check=False
+                    )
 
-                if install_result.returncode != 0:
-                    console.print(f"  [yellow]Warning: reinstall failed: {install_result.stderr}[/yellow]")
-                    return False
+                    if install_result.returncode != 0:
+                        console.print(f"  [yellow]Warning: reinstall failed: {install_result.stderr}[/yellow]")
+                        return False
 
-                return True
+                return was_updated
             else:
                 # Not an editable install, try upgrading from PyPI or git
                 console.print("  [dim]Upgrading from git repository...[/dim]")
                 upgrade_result = subprocess.run(
-                    ["pip", "install", "--upgrade", "git+https://github.com/mehdic/bazinga.git", "--quiet"],
+                    ["pip", "install", "--upgrade", "git+https://github.com/mehdic/bazinga.git"],
                     capture_output=True,
                     text=True,
                     check=False
@@ -1369,7 +1373,17 @@ def update_cli() -> bool:
                     console.print(f"  [yellow]Warning: upgrade failed: {upgrade_result.stderr}[/yellow]")
                     return False
 
-                return True
+                # Check if there was an actual update
+                output = upgrade_result.stdout + upgrade_result.stderr
+                if "Successfully installed" in output or "Successfully upgraded" in output:
+                    console.print("  [dim]CLI updated[/dim]")
+                    return True
+                elif "Requirement already satisfied" in output or "already up-to-date" in output.lower():
+                    console.print("  [dim]Already up to date[/dim]")
+                    return False
+                else:
+                    # Uncertain, assume update happened
+                    return True
 
         # pip show failed - try uv tool (for uv tool installs)
         console.print("  [dim]Checking for uv tool installation...[/dim]")
@@ -1395,15 +1409,14 @@ def update_cli() -> bool:
                 return False
 
             # Check if there was actually an update (uv shows "Updated" when pulling new commits)
-            if "Updated https://github.com" in uv_upgrade.stderr:
-                console.print("  [dim]New version detected, CLI updated[/dim]")
-                return True
-            elif "Installed" in uv_upgrade.stderr or "installed" in uv_upgrade.stderr.lower():
-                console.print("  [dim]Already up to date (no new commits)[/dim]")
+            output = uv_upgrade.stdout + uv_upgrade.stderr
+            if "Updated https://github.com" in output or "Installed bazinga-cli" in output:
+                console.print("  [dim]CLI updated[/dim]")
                 return True
             else:
-                console.print("  [dim]CLI reinstalled[/dim]")
-                return True
+                # No update detected - already up to date
+                console.print("  [dim]Already up to date[/dim]")
+                return False
 
         # Neither pip nor uv found the installation
         console.print("  [dim]Could not detect installation method (pip or uv)[/dim]")
