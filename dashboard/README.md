@@ -99,8 +99,8 @@ Full documentation: `/research/dashboard-feature.md`
 
 **Port already in use:**
 ```bash
-# Change port
-export DASHBOARD_PORT=8080
+# Change port to a different one
+export DASHBOARD_PORT=9000
 python3 server.py
 ```
 
