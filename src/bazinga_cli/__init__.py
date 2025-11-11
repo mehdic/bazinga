@@ -1025,7 +1025,30 @@ def init(
             console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]6. Initializing coordination files[/bold cyan]")
+        console.print("\n[bold cyan]6. Copying dashboard files[/bold cyan]")
+        source_dashboard = setup.source_dir / "dashboard"
+        target_dashboard = target_dir / "dashboard"
+
+        if source_dashboard.exists():
+            try:
+                shutil.copytree(source_dashboard, target_dashboard)
+                console.print("  ✓ Dashboard installed")
+
+                # Copy research folder too (for documentation)
+                source_research = setup.source_dir / "research"
+                target_research = target_dir / "research"
+                if source_research.exists():
+                    target_research.mkdir(parents=True, exist_ok=True)
+                    dashboard_doc = source_research / "dashboard-feature.md"
+                    if dashboard_doc.exists():
+                        shutil.copy2(dashboard_doc, target_research / "dashboard-feature.md")
+                        console.print("  ✓ Copied dashboard documentation")
+            except Exception as e:
+                console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+        else:
+            console.print("  [yellow]⚠️  Dashboard not found in source[/yellow]")
+
+        console.print("\n[bold cyan]7. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
         # Update testing configuration if not default
@@ -1094,12 +1117,12 @@ def init(
         install_analysis_tools(target_dir, detected_language, force)
 
     # Install dashboard dependencies
-    console.print("\n[bold cyan]7. Installing dashboard dependencies[/bold cyan]")
+    console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
     install_dashboard_dependencies(target_dir, force)
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
-        console.print("\n[bold cyan]8. Initializing git repository[/bold cyan]")
+        console.print("\n[bold cyan]9. Initializing git repository[/bold cyan]")
         try:
             subprocess.run(
                 ["git", "init"],
@@ -1426,11 +1449,11 @@ def update(
 
     # Step 0: Update the CLI itself
     console.print("[bold cyan]0. Updating BAZINGA CLI[/bold cyan]")
-    cli_updated = update_cli()
-    if cli_updated:
-        console.print("  [green]✓ CLI updated (restart may be needed for changes to take effect)[/green]")
+    cli_was_updated = update_cli()
+    if cli_was_updated:
+        console.print("  [green]✓ CLI updated[/green]")
     else:
-        console.print("  [yellow]⚠️  CLI update failed or not needed[/yellow]")
+        console.print("  [dim]Already up to date[/dim]")
 
     setup = BazingaSetup()
 
@@ -1471,18 +1494,75 @@ def update(
     console.print("\n[bold cyan]5. Updating configuration[/bold cyan]")
     setup.setup_config(target_dir, is_update=True)
 
+    # Copy dashboard folder
+    console.print("\n[bold cyan]6. Copying dashboard files[/bold cyan]")
+    source_dashboard = setup.source_dir / "dashboard"
+    target_dashboard = target_dir / "dashboard"
+
+    if source_dashboard.exists():
+        import shutil
+        try:
+            if target_dashboard.exists():
+                # Update existing dashboard (preserve any custom modifications to server.py if any)
+                for item in source_dashboard.iterdir():
+                    if item.is_file():
+                        shutil.copy2(item, target_dashboard / item.name)
+                        console.print(f"  ✓ Updated {item.name}")
+                    elif item.is_dir():
+                        target_subdir = target_dashboard / item.name
+                        if target_subdir.exists():
+                            shutil.rmtree(target_subdir)
+                        shutil.copytree(item, target_subdir)
+                        console.print(f"  ✓ Updated {item.name}/")
+            else:
+                # Fresh copy of dashboard
+                shutil.copytree(source_dashboard, target_dashboard)
+                console.print("  ✓ Dashboard installed")
+
+            # Copy research folder too (for documentation)
+            source_research = setup.source_dir / "research"
+            target_research = target_dir / "research"
+            if source_research.exists():
+                if not target_research.exists():
+                    target_research.mkdir(parents=True, exist_ok=True)
+                dashboard_doc = source_research / "dashboard-feature.md"
+                if dashboard_doc.exists():
+                    shutil.copy2(dashboard_doc, target_research / "dashboard-feature.md")
+                    console.print("  ✓ Updated dashboard documentation")
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+    else:
+        console.print("  [yellow]⚠️  Dashboard not found in source[/yellow]")
+
     # Update dashboard dependencies
-    console.print("\n[bold cyan]6. Updating dashboard dependencies[/bold cyan]")
+    console.print("\n[bold cyan]7. Installing dashboard dependencies[/bold cyan]")
     install_dashboard_dependencies(target_dir, force)
 
     # Success message
+    success_message = (
+        "[bold green]✓ BAZINGA updated successfully![/bold green]\n\n"
+        "[dim]Your coordination state files were preserved.[/dim]\n\n"
+    )
+
+    if cli_was_updated:
+        success_message += (
+            "[bold yellow]⚠️  CLI was updated during this run[/bold yellow]\n"
+            "[yellow]Run 'bazinga update' again to use new CLI features.[/yellow]\n\n"
+        )
+
+    success_message += (
+        "[bold]Next steps:[/bold]\n"
+    )
+
+    if cli_was_updated:
+        success_message += "  • [cyan]bazinga update[/cyan] (run again to complete update)\n"
+
+    success_message += "  • Review updated agent definitions if needed\n"
+    success_message += "  • Continue using: @orchestrator <your request>"
+
     console.print(
         Panel.fit(
-            "[bold green]✓ BAZINGA updated successfully![/bold green]\n\n"
-            "[dim]Your coordination state files were preserved.[/dim]\n\n"
-            "[bold]Next steps:[/bold]\n"
-            "  • Review updated agent definitions if needed\n"
-            "  • Continue using: @orchestrator <your request>",
+            success_message,
             title="🎉 Update Complete",
             border_style="green",
         )
