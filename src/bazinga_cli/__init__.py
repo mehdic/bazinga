@@ -150,21 +150,15 @@ class BazingaSetup:
         commands_dir = target_dir / ".claude" / "commands"
         commands_dir.mkdir(parents=True, exist_ok=True)
 
-        # Copy from both locations: commands/ and .claude/commands/
-        source_locations = [
-            self.source_dir / "commands",
-            self.source_dir / ".claude" / "commands"
-        ]
+        source_commands = self.source_dir / ".claude" / "commands"
+        if not source_commands.exists():
+            return False
 
-        copied_any = False
-        for source_commands in source_locations:
-            if source_commands.exists():
-                for cmd_file in source_commands.glob("*.md"):
-                    shutil.copy2(cmd_file, commands_dir / cmd_file.name)
-                    console.print(f"  ✓ Copied {cmd_file.name}")
-                    copied_any = True
+        for cmd_file in source_commands.glob("*.md"):
+            shutil.copy2(cmd_file, commands_dir / cmd_file.name)
+            console.print(f"  ✓ Copied {cmd_file.name}")
 
-        return copied_any
+        return True
 
     def copy_skills(self, target_dir: Path, script_type: str = "sh") -> bool:
         """
