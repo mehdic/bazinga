@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BAZINGA Orchestration Dashboard</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+    <!-- Mermaid for workflow diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <!-- Marked for markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
+</head>
+<body>
+    <!-- Session Navigation Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>📁 Sessions</h2>
+            <button class="toggle-btn" id="sidebar-toggle">◀</button>
+        </div>
+        <div class="sessions-list" id="sessions-list">
+            <div class="loading">Loading sessions...</div>
+        </div>
+    </aside>
+
+    <!-- Main Dashboard -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-top">
+                <div class="logo">
+                    <h1>🚀 BAZINGA</h1>
+                    <span class="subtitle">Orchestration Dashboard</span>
+                </div>
+                <div class="connection-status" id="connection-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+            </div>
+            <div class="session-info" id="session-info">
+                <div class="session-id">
+                    <strong>Session:</strong>
+                    <span id="session-id-text">Loading...</span>
+                </div>
+                <div class="session-status">
+                    <span class="status-badge" id="status-badge">INITIALIZING</span>
+                </div>
+                <div class="session-time">
+                    <strong>Started:</strong> <span id="start-time">--:--</span> |
+                    <strong>Elapsed:</strong> <span id="elapsed-time">0m</span>
+                </div>
+                <div class="session-stats">
+                    <span id="total-iterations">0 iterations</span>
+                    <span id="total-spawns">0 spawns</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Progress Overview -->
+        <section class="section progress-section">
+            <h2>📊 Progress Overview</h2>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%">
+                        <span class="progress-text" id="progress-text">0%</span>
+                    </div>
+                </div>
+                <div class="progress-details">
+                    <div class="progress-stat">
+                        <span class="stat-label">Total Groups</span>
+                        <span class="stat-value" id="total-groups">0</span>
+                    </div>
+                    <div class="progress-stat completed">
+                        <span class="stat-label">✅ Completed</span>
+                        <span class="stat-value" id="completed-groups">0</span>
+                    </div>
+                    <div class="progress-stat in-progress">
+                        <span class="stat-label">🔄 In Progress</span>
+                        <span class="stat-value" id="inprogress-groups">0</span>
+                    </div>
+                    <div class="progress-stat pending">
+                        <span class="stat-label">⏳ Pending</span>
+                        <span class="stat-value" id="pending-groups">0</span>
+                    </div>
+                </div>
+                <div class="current-phase">
+                    <strong>Current Phase:</strong>
+                    <span id="current-phase" class="phase-badge">Initializing...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Workflow Visualization -->
+        <section class="section workflow-section">
+            <div class="section-header">
+                <h2>🗺️ Workflow Visualization</h2>
+                <div class="workflow-controls">
+                    <button class="btn-secondary" id="refresh-workflow">🔄 Refresh</button>
+                    <button class="btn-primary" id="generate-ai-diagram" style="display: none;">
+                        🤖 Generate AI Diagram
+                    </button>
+                </div>
+            </div>
+            <div class="workflow-container">
+                <div class="workflow-diagram" id="workflow-diagram">
+                    <div class="placeholder">
+                        <p>Workflow diagram will appear here once orchestration starts...</p>
+                    </div>
+                </div>
+            </div>
+            <!-- AI Diagram Modal -->
+            <div class="modal" id="ai-diagram-modal">
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h3>🤖 AI-Generated Workflow Analysis</h3>
+                        <button class="modal-close" id="close-ai-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ai-diagram-loading" id="ai-diagram-loading">
+                            <div class="spinner"></div>
+                            <p>Generating AI-powered workflow analysis...</p>
+                        </div>
+                        <div class="ai-diagram-content" id="ai-diagram-content" style="display: none;">
+                            <div class="ai-narrative" id="ai-narrative"></div>
+                            <div class="ai-insights" id="ai-insights"></div>
+                            <div class="ai-diagram" id="ai-diagram-render"></div>
+                        </div>
+                        <div class="ai-diagram-error" id="ai-diagram-error" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Task Groups -->
+        <section class="section groups-section">
+            <h2>📦 Task Groups</h2>
+            <div class="groups-container" id="groups-container">
+                <div class="placeholder">
+                    <p>Task groups will appear here once PM creates the breakdown...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Agent Activity & Communication -->
+        <div class="two-column">
+            <!-- Agent Status -->
+            <section class="section agent-status-section">
+                <h2>👥 Agent Status</h2>
+                <div class="agent-status-container" id="agent-status-container">
+                    <div class="placeholder">
+                        <p>Agent activity will appear here...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Communication Log -->
+            <section class="section communication-section">
+                <h2>💬 Recent Activity</h2>
+                <div class="communication-container" id="communication-container">
+                    <div class="placeholder">
+                        <p>Agent communications will appear here...</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Quality Metrics (if available) -->
+        <section class="section quality-section" id="quality-section" style="display: none;">
+            <h2>📈 Quality Metrics</h2>
+            <div class="quality-container" id="quality-container">
+                <div class="quality-score">
+                    <div class="score-circle" id="overall-score-circle">
+                        <span class="score-value" id="overall-score">--</span>
+                        <span class="score-label">Health</span>
+                    </div>
+                </div>
+                <div class="quality-metrics">
+                    <div class="metric-card" id="security-metric">
+                        <h4>🔒 Security</h4>
+                        <div class="metric-value">--</div>
+                        <div class="metric-trend"></div>
+                    </div>
+                    <div class="metric-card" id="coverage-metric">
+                        <h4>🧪 Coverage</h4>
+                        <div class="metric-value">--</div>
+                        <div class="metric-trend"></div>
+                    </div>
+                    <div class="metric-card" id="lint-metric">
+                        <h4>✨ Lint</h4>
+                        <div class="metric-value">--</div>
+                        <div class="metric-trend"></div>
+                    </div>
+                    <div class="metric-card" id="velocity-metric">
+                        <h4>⚡ Velocity</h4>
+                        <div class="metric-value">--</div>
+                        <div class="metric-trend"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Communication Detail Modal -->
+    <div class="modal" id="communication-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Communication Details</h3>
+                <button class="modal-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script src="js/data-loader.js"></script>
+    <script src="js/websocket-client.js"></script>
+    <script src="js/workflow-viz.js"></script>
+    <script src="js/agent-comms.js"></script>
+    <script src="js/agent-status.js"></script>
+    <script src="js/session-nav.js"></script>
+    <script src="js/quality-metrics.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

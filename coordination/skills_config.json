@@ -18,6 +18,9 @@
   "pm": {
     "velocity-tracker": "mandatory"
   },
+  "dashboard": {
+    "dashboard_ai_diagram_enabled": false
+  },
   "_metadata": {
     "description": "Skills configuration for BAZINGA agents",
     "last_updated": "2025-01-09T00:00:00Z",
