@@ -13,7 +13,7 @@ set -e  # Exit on error
 SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-echo "🔄 Initializing BAZINGA orchestration system..."
+echo "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..."
 echo "📅 Session ID: $SESSION_ID"
 
 # Ensure all required directories exist (mkdir -p is idempotent - safe to run multiple times)

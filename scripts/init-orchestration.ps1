@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $SESSION_ID = "bazinga_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
 $TIMESTAMP = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
-Write-Host "🔄 Initializing BAZINGA orchestration system..." -ForegroundColor Cyan
+Write-Host "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..." -ForegroundColor Cyan
 Write-Host "📅 Session ID: $SESSION_ID" -ForegroundColor Cyan
 
 # Ensure all required directories exist (New-Item -Force is idempotent - safe to run multiple times)
