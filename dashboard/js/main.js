@@ -287,6 +287,12 @@ const Dashboard = (function() {
             console.log('📡 Received WebSocket update');
             updateDashboard(data);
 
+            // Check for notifications
+            if (window.notificationManager) {
+                window.notificationManager.checkSessionStatus(data);
+                window.notificationManager.checkCustomTriggers(data);
+            }
+
             // Also refresh communications log periodically
             if (Math.random() < 0.3) { // 30% chance to reduce load
                 AgentComms.update();
@@ -351,6 +357,9 @@ const Dashboard = (function() {
      * Setup event listeners
      */
     function setupEventListeners() {
+        // Tab switching
+        setupTabs();
+
         // Refresh workflow button
         const refreshBtn = document.getElementById('refresh-workflow');
         if (refreshBtn) {
@@ -371,7 +380,7 @@ const Dashboard = (function() {
         const closeAiModal = document.getElementById('close-ai-modal');
         if (closeAiModal) {
             closeAiModal.addEventListener('click', () => {
-                document.getElementById('ai-diagram-modal').classList.remove('active');
+                document.getElementById('ai-diagram-modal').style.display = 'none';
             });
         }
 
@@ -379,7 +388,7 @@ const Dashboard = (function() {
         const closeModal = document.getElementById('close-modal');
         if (closeModal) {
             closeModal.addEventListener('click', () => {
-                document.getElementById('communication-modal').classList.remove('active');
+                document.getElementById('communication-modal').style.display = 'none';
             });
         }
 
@@ -387,7 +396,7 @@ const Dashboard = (function() {
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    modal.classList.remove('active');
+                    modal.style.display = 'none';
                 }
             });
         });
@@ -402,6 +411,65 @@ const Dashboard = (function() {
                 }
             }
         }, 1000);
+    }
+
+    /**
+     * Setup tab switching
+     */
+    function setupTabs() {
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.tab;
+
+                // Remove active class from all tabs and contents
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab
+                btn.classList.add('active');
+                document.getElementById(`tab-${tabName}`)?.classList.add('active');
+
+                // Load data for the tab
+                loadTabContent(tabName);
+            });
+        });
+    }
+
+    /**
+     * Load content for specific tab
+     */
+    async function loadTabContent(tabName) {
+        const data = DataLoader.getCached().data;
+
+        switch (tabName) {
+            case 'timeline':
+                if (window.timelineViz) {
+                    await window.timelineViz.loadTimeline();
+                }
+                break;
+            case 'gantt':
+                if (window.ganttChart) {
+                    await window.ganttChart.loadGantt();
+                }
+                break;
+            case 'dependency':
+                if (window.dependencyGraph && data) {
+                    await window.dependencyGraph.loadDependencies(data);
+                }
+                break;
+            case 'logs':
+                if (window.logStreamer) {
+                    await window.logStreamer.loadLogs();
+                    window.logStreamer.startAutoRefresh();
+                }
+                break;
+            case 'workflow':
+                // Workflow is loaded by default
+                break;
+        }
     }
 
     /**

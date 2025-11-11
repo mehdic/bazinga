@@ -24,7 +24,7 @@ from rich.text import Text
 
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
 
-__version__ = "1.0.7"
+__version__ = "1.1.0"
 
 console = Console()
 app = typer.Typer(

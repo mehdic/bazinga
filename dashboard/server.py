@@ -10,6 +10,8 @@ import json
 import os
 import sys
 import time
+import shutil
+from datetime import datetime
 from pathlib import Path
 from threading import Thread
 from flask import Flask, send_from_directory, jsonify, request
@@ -27,6 +29,9 @@ clients = []
 BASE_DIR = Path(__file__).parent.parent
 COORDINATION_DIR = BASE_DIR / 'coordination'
 DOCS_DIR = BASE_DIR / 'docs'
+SESSIONS_DIR = COORDINATION_DIR / 'sessions'
+ARCHIVE_DIR = COORDINATION_DIR / 'archive'
+CONFIG_DIR = COORDINATION_DIR
 
 class CoordinationWatcher(FileSystemEventHandler):
     """Watches coordination folder for changes and broadcasts updates."""
@@ -237,20 +242,14 @@ def get_sessions():
 def generate_ai_diagram():
     """Generate AI-powered workflow diagram (if enabled)."""
     # Check if feature is enabled
-    skills_file = COORDINATION_DIR / 'skills_config.json'
-    if not skills_file.exists():
-        return jsonify({'error': 'Skills config not found'}), 404
+    config = load_dashboard_config()
+    if not config.get('ai_diagrams_enabled', False):
+        return jsonify({
+            'error': 'AI diagram feature is disabled',
+            'message': 'Enable in dashboard configuration'
+        }), 403
 
     try:
-        with open(skills_file, 'r') as f:
-            skills_config = json.load(f)
-
-        if not skills_config.get('dashboard_ai_diagram_enabled', False):
-            return jsonify({
-                'error': 'AI diagram feature is disabled',
-                'message': 'Enable in coordination/skills_config.json by setting dashboard_ai_diagram_enabled: true'
-            }), 403
-
         # Get current state
         data = load_coordination_data()
 
@@ -321,6 +320,310 @@ Make the Mermaid diagram visually clear and informative."""
                 'insights': []
             })
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== New Enhanced Features =====
+
+def load_dashboard_config():
+    """Load dashboard configuration."""
+    config_file = CONFIG_DIR / 'dashboard_config.json'
+    default_config = {
+        'ai_diagrams_enabled': False,
+        'update_frequency': 1000,
+        'theme': 'dark',
+        'notification_sound': True,
+        'browser_notifications': True,
+        'session_retention_days': 30,
+        'email_notifications': {
+            'enabled': False,
+            'smtp_server': '',
+            'smtp_port': 587,
+            'from_email': '',
+            'to_emails': []
+        },
+        'slack_notifications': {
+            'enabled': False,
+            'webhook_url': ''
+        },
+        'custom_triggers': []
+    }
+
+    if config_file.exists():
+        try:
+            with open(config_file, 'r') as f:
+                user_config = json.load(f)
+                default_config.update(user_config)
+        except:
+            pass
+
+    return default_config
+
+def save_dashboard_config(config):
+    """Save dashboard configuration."""
+    config_file = CONFIG_DIR / 'dashboard_config.json'
+    with open(config_file, 'w') as f:
+        json.dump(config, f, indent=2)
+
+def save_session_snapshot(session_data):
+    """Save a session snapshot for history."""
+    SESSIONS_DIR.mkdir(exist_ok=True)
+
+    session_id = session_data.get('session_id', f"session_{int(time.time())}")
+    timestamp = datetime.now().isoformat()
+
+    snapshot = {
+        'session_id': session_id,
+        'timestamp': timestamp,
+        'data': session_data,
+        'status': session_data.get('status', 'unknown')
+    }
+
+    session_file = SESSIONS_DIR / f"{session_id}.json"
+    with open(session_file, 'w') as f:
+        json.dump(snapshot, f, indent=2)
+
+@app.route('/api/config', methods=['GET', 'POST'])
+def dashboard_config():
+    """Get or update dashboard configuration."""
+    if request.method == 'GET':
+        config = load_dashboard_config()
+        return jsonify(config)
+    else:
+        try:
+            new_config = request.json
+            save_dashboard_config(new_config)
+            return jsonify({'success': True, 'config': new_config})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/search', methods=['POST'])
+def search_sessions():
+    """Search sessions by content, date, status."""
+    try:
+        query = request.json.get('query', '')
+        filters = request.json.get('filters', {})
+
+        sessions = []
+
+        # Load all session files
+        if SESSIONS_DIR.exists():
+            for session_file in SESSIONS_DIR.glob('*.json'):
+                try:
+                    with open(session_file, 'r') as f:
+                        session = json.load(f)
+
+                    # Apply filters
+                    if filters.get('status') and session.get('status') != filters['status']:
+                        continue
+
+                    if filters.get('date_from'):
+                        session_date = datetime.fromisoformat(session.get('timestamp', ''))
+                        filter_date = datetime.fromisoformat(filters['date_from'])
+                        if session_date < filter_date:
+                            continue
+
+                    if filters.get('date_to'):
+                        session_date = datetime.fromisoformat(session.get('timestamp', ''))
+                        filter_date = datetime.fromisoformat(filters['date_to'])
+                        if session_date > filter_date:
+                            continue
+
+                    # Search in content
+                    if query:
+                        session_str = json.dumps(session).lower()
+                        if query.lower() not in session_str:
+                            continue
+
+                    sessions.append(session)
+                except:
+                    continue
+
+        # Sort by timestamp, newest first
+        sessions.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        return jsonify({'sessions': sessions, 'count': len(sessions)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/<session_id>', methods=['GET', 'DELETE'])
+def manage_session(session_id):
+    """Get or delete a specific session."""
+    session_file = SESSIONS_DIR / f"{session_id}.json"
+
+    if request.method == 'GET':
+        if not session_file.exists():
+            return jsonify({'error': 'Session not found'}), 404
+
+        try:
+            with open(session_file, 'r') as f:
+                session = json.load(f)
+            return jsonify(session)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        if not session_file.exists():
+            return jsonify({'error': 'Session not found'}), 404
+
+        try:
+            session_file.unlink()
+            return jsonify({'success': True, 'message': 'Session deleted'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/<session_id>/archive', methods=['POST'])
+def archive_session(session_id):
+    """Archive a session."""
+    session_file = SESSIONS_DIR / f"{session_id}.json"
+
+    if not session_file.exists():
+        return jsonify({'error': 'Session not found'}), 404
+
+    try:
+        ARCHIVE_DIR.mkdir(exist_ok=True)
+        archive_file = ARCHIVE_DIR / f"{session_id}.json"
+        shutil.move(str(session_file), str(archive_file))
+        return jsonify({'success': True, 'message': 'Session archived'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/<session_id>/export', methods=['GET'])
+def export_session(session_id):
+    """Export session data."""
+    session_file = SESSIONS_DIR / f"{session_id}.json"
+
+    if not session_file.exists():
+        return jsonify({'error': 'Session not found'}), 404
+
+    try:
+        with open(session_file, 'r') as f:
+            session = json.load(f)
+
+        export_format = request.args.get('format', 'json')
+
+        if export_format == 'json':
+            return jsonify(session)
+        else:
+            return jsonify({'error': 'Unsupported format'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/compare', methods=['POST'])
+def compare_sessions():
+    """Compare two sessions."""
+    try:
+        session1_id = request.json.get('session1')
+        session2_id = request.json.get('session2')
+
+        session1_file = SESSIONS_DIR / f"{session1_id}.json"
+        session2_file = SESSIONS_DIR / f"{session2_id}.json"
+
+        if not session1_file.exists() or not session2_file.exists():
+            return jsonify({'error': 'One or both sessions not found'}), 404
+
+        with open(session1_file, 'r') as f:
+            session1 = json.load(f)
+        with open(session2_file, 'r') as f:
+            session2 = json.load(f)
+
+        # Generate comparison
+        comparison = {
+            'session1': session1,
+            'session2': session2,
+            'differences': generate_session_diff(session1, session2)
+        }
+
+        return jsonify(comparison)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def generate_session_diff(session1, session2):
+    """Generate differences between two sessions."""
+    diffs = []
+
+    # Compare key metrics
+    s1_data = session1.get('data', {})
+    s2_data = session2.get('data', {})
+
+    # Compare statuses
+    if s1_data.get('status') != s2_data.get('status'):
+        diffs.append({
+            'field': 'status',
+            'session1': s1_data.get('status'),
+            'session2': s2_data.get('status')
+        })
+
+    # Compare task groups if present
+    s1_groups = s1_data.get('group_status', {}).get('task_groups', [])
+    s2_groups = s2_data.get('group_status', {}).get('task_groups', [])
+
+    if len(s1_groups) != len(s2_groups):
+        diffs.append({
+            'field': 'task_group_count',
+            'session1': len(s1_groups),
+            'session2': len(s2_groups)
+        })
+
+    return diffs
+
+@app.route('/api/timeline', methods=['GET'])
+def get_timeline():
+    """Get timeline data for agent execution visualization."""
+    try:
+        data = load_coordination_data()
+        timeline = []
+
+        # Parse orchestrator state for timeline
+        orch_state = data.get('orchestrator_state', {})
+        if orch_state:
+            timeline.append({
+                'agent': 'Orchestrator',
+                'action': 'Started',
+                'timestamp': orch_state.get('start_time'),
+                'duration': 0
+            })
+
+        # Parse group status for agent activities
+        group_status = data.get('group_status', {})
+        if group_status:
+            for group in group_status.get('task_groups', []):
+                for agent_key in ['dev_agent', 'qa_agent', 'tl_agent']:
+                    agent_data = group.get(agent_key, {})
+                    if agent_data and agent_data.get('start_time'):
+                        timeline.append({
+                            'agent': agent_key.replace('_', ' ').title(),
+                            'action': f"Working on {group.get('group_name', 'task')}",
+                            'timestamp': agent_data.get('start_time'),
+                            'duration': agent_data.get('duration', 0),
+                            'status': agent_data.get('status')
+                        })
+
+        # Sort by timestamp
+        timeline.sort(key=lambda x: x.get('timestamp', 0) or 0)
+
+        return jsonify({'timeline': timeline})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs/stream', methods=['GET'])
+def stream_logs():
+    """Stream real-time logs."""
+    log_file = DOCS_DIR / 'orchestration-log.md'
+
+    if not log_file.exists():
+        return jsonify({'logs': []})
+
+    try:
+        with open(log_file, 'r') as f:
+            content = f.read()
+
+        # Get last N lines
+        lines = content.split('\n')
+        limit = int(request.args.get('limit', 100))
+        recent_lines = lines[-limit:] if len(lines) > limit else lines
+
+        return jsonify({'logs': recent_lines, 'total': len(lines)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
