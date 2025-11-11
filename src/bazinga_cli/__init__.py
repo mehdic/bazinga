@@ -1426,11 +1426,11 @@ def update(
 
     # Step 0: Update the CLI itself
     console.print("[bold cyan]0. Updating BAZINGA CLI[/bold cyan]")
-    cli_updated = update_cli()
-    if cli_updated:
-        console.print("  [green]✓ CLI updated (restart may be needed for changes to take effect)[/green]")
+    cli_was_updated = update_cli()
+    if cli_was_updated:
+        console.print("  [green]✓ CLI updated[/green]")
     else:
-        console.print("  [yellow]⚠️  CLI update failed or not needed[/yellow]")
+        console.print("  [dim]Already up to date[/dim]")
 
     setup = BazingaSetup()
 
@@ -1476,13 +1476,30 @@ def update(
     install_dashboard_dependencies(target_dir, force)
 
     # Success message
+    success_message = (
+        "[bold green]✓ BAZINGA updated successfully![/bold green]\n\n"
+        "[dim]Your coordination state files were preserved.[/dim]\n\n"
+    )
+
+    if cli_was_updated:
+        success_message += (
+            "[bold yellow]⚠️  CLI was updated during this run[/bold yellow]\n"
+            "[yellow]Run 'bazinga update' again to use new CLI features.[/yellow]\n\n"
+        )
+
+    success_message += (
+        "[bold]Next steps:[/bold]\n"
+    )
+
+    if cli_was_updated:
+        success_message += "  • [cyan]bazinga update[/cyan] (run again to complete update)\n"
+
+    success_message += "  • Review updated agent definitions if needed\n"
+    success_message += "  • Continue using: @orchestrator <your request>"
+
     console.print(
         Panel.fit(
-            "[bold green]✓ BAZINGA updated successfully![/bold green]\n\n"
-            "[dim]Your coordination state files were preserved.[/dim]\n\n"
-            "[bold]Next steps:[/bold]\n"
-            "  • Review updated agent definitions if needed\n"
-            "  • Continue using: @orchestrator <your request>",
+            success_message,
             title="🎉 Update Complete",
             border_style="green",
         )
