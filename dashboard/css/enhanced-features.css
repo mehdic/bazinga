@@ -1,0 +1,467 @@
+/* Enhanced Features CSS */
+
+/* Search Bar */
+.search-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1rem;
+    border-bottom: 1px solid #374151;
+}
+
+.search-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+#search-input {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    color: #fff;
+    font-size: 0.875rem;
+}
+
+#search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.btn-icon {
+    padding: 0.5rem;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 1.25rem;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background: #374151;
+    color: #fff;
+}
+
+/* Filter Panel */
+.filter-panel {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #1f2937;
+    border-radius: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.filter-group label {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+}
+
+.filter-group select,
+.filter-group input[type="date"] {
+    padding: 0.375rem 0.75rem;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 0.375rem;
+    color: #fff;
+    font-size: 0.875rem;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 0.375rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+/* Header Actions */
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-danger {
+    padding: 0.5rem 1rem;
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #374151;
+}
+
+.tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.tab-btn.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+.tab-content {
+    display: none;
+    padding: 1rem 0;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Timeline Visualization */
+.timeline-container,
+.gantt-container {
+    min-height: 400px;
+    background: #1f2937;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+.timeline-container svg,
+.gantt-container svg {
+    font-family: inherit;
+}
+
+/* Logs Container */
+.logs-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.logs-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.logs-container {
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+#logs-content {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #9ca3af;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Configuration Modal */
+.config-section {
+    margin-bottom: 2rem;
+}
+
+.config-section h4 {
+    margin-bottom: 1rem;
+    color: #3b82f6;
+    font-size: 1rem;
+}
+
+.config-item {
+    margin-bottom: 1rem;
+}
+
+.config-item label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.config-item input[type="text"],
+.config-item input[type="email"],
+.config-item input[type="number"],
+.config-item select {
+    padding: 0.5rem;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.375rem;
+    color: #fff;
+    font-size: 0.875rem;
+}
+
+.config-item input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #374151;
+}
+
+/* Comparison Modal */
+.comparison-selector {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.comparison-selector > div {
+    flex: 1;
+}
+
+.comparison-selector label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.comparison-selector select {
+    width: 100%;
+    padding: 0.5rem;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.375rem;
+    color: #fff;
+}
+
+.comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+
+.comparison-col {
+    background: #1f2937;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.comparison-col h5 {
+    margin-bottom: 1rem;
+    color: #3b82f6;
+}
+
+.comparison-col pre {
+    font-size: 0.75rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.comparison-col ul {
+    list-style: none;
+    padding: 0;
+}
+
+.comparison-col li {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #111827;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+/* Session Items */
+.sidebar-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #374151;
+}
+
+.session-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.session-item:hover {
+    background: #374151;
+    border-color: #3b82f6;
+}
+
+.session-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.session-item-id {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #fff;
+}
+
+.session-item-status {
+    padding: 0.125rem 0.5rem;
+    background: #374151;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.session-item-status.status-completed {
+    background: #10b981;
+    color: #fff;
+}
+
+.session-item-status.status-running {
+    background: #f59e0b;
+    color: #fff;
+}
+
+.session-item-status.status-failed {
+    background: #ef4444;
+    color: #fff;
+}
+
+.session-item-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.no-sessions {
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+/* Dependency Graph */
+.dependency-container {
+    min-height: 400px;
+    background: #1f2937;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.dependency-container .mermaid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .comparison-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+
+    .filter-panel {
+        flex-direction: column;
+    }
+}
+
+/* Modal size variants */
+.modal-content.modal-large {
+    max-width: 90vw;
+    width: 1200px;
+}
+
+/* Status colors for timeline/gantt */
+.status-completed {
+    fill: #10b981;
+}
+
+.status-in-progress {
+    fill: #f59e0b;
+}
+
+.status-pending {
+    fill: #6b7280;
+}
+
+.status-failed {
+    fill: #ef4444;
+}
+
+/* Theme support */
+body[data-theme="light"] {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+body[data-theme="light"] .search-bar {
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom-color: #e5e7eb;
+}
+
+body[data-theme="light"] #search-input,
+body[data-theme="light"] .btn-icon,
+body[data-theme="light"] .filter-panel,
+body[data-theme="light"] .timeline-container,
+body[data-theme="light"] .gantt-container,
+body[data-theme="light"] .logs-container,
+body[data-theme="light"] .session-item {
+    background: #fff;
+    border-color: #e5e7eb;
+    color: #111827;
+}
+
+body[data-theme="light"] .config-item input,
+body[data-theme="light"] .config-item select,
+body[data-theme="light"] .comparison-col {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    color: #111827;
+}

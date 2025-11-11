@@ -137,7 +137,23 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**FIRST ACTION - Read Skills Configuration:**
+**FIRST ACTION - Run Initialization Script:**
+
+```bash
+# This script creates all required coordination files if they don't exist
+# Safe to run multiple times (idempotent)
+bash scripts/init-orchestration.sh
+```
+
+The script will:
+- Create `coordination/` folder structure if it doesn't exist
+- Initialize all state files (pm_state.json, group_status.json, orchestrator_state.json, skills_config.json, testing_config.json)
+- Create message exchange files
+- Initialize orchestration log
+- **Start dashboard server** (if not already running)
+- Skip files that already exist (idempotent)
+
+**SECOND ACTION - Read Skills Configuration:**
 
 ```python
 # Read skills_config.json to determine which Skills are active
@@ -157,21 +173,6 @@ Output: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
 Output: f"   - Active Skills: {len(active_skills)}"
 Output: "   - Use /bazinga.configure-skills to modify configuration"
 ```
-
-**SECOND ACTION - Run Initialization Script:**
-
-```bash
-# This script creates all required coordination files if they don't exist
-# Safe to run multiple times (idempotent)
-bash scripts/init-orchestration.sh
-```
-
-The script will:
-- Create `coordination/` folder structure if it doesn't exist
-- Initialize all state files (pm_state.json, group_status.json, orchestrator_state.json, skills_config.json, testing_config.json)
-- Create message exchange files
-- Initialize orchestration log
-- Skip files that already exist (idempotent)
 
 **THIRD ACTION - Load Testing Framework Configuration:**
 

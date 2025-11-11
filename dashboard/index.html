@@ -5,17 +5,167 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BAZINGA Orchestration Dashboard</title>
     <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/enhanced-features.css">
     <!-- Mermaid for workflow diagrams -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <!-- Marked for markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
+    <!-- D3.js for timeline and Gantt charts -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
+    <!-- Configuration Modal -->
+    <div class="modal" id="config-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>⚙️ Dashboard Configuration</h3>
+                <button class="modal-close" id="close-config-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-section">
+                    <h4>General Settings</h4>
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="config-ai-diagrams">
+                            Enable AI-Generated Diagrams
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="config-browser-notifs">
+                            Enable Browser Notifications
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="config-sound-alerts">
+                            Enable Sound Alerts
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            Theme:
+                            <select id="config-theme">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            Update Frequency (ms):
+                            <input type="number" id="config-update-freq" min="500" max="10000" step="500" value="1000">
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            Session Retention (days):
+                            <input type="number" id="config-retention-days" min="1" max="365" value="30">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h4>Notifications</h4>
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="config-email-enabled">
+                            Enable Email Notifications
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            SMTP Server:
+                            <input type="text" id="config-smtp-server" placeholder="smtp.gmail.com">
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            SMTP Port:
+                            <input type="number" id="config-smtp-port" value="587">
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            From Email:
+                            <input type="email" id="config-from-email" placeholder="bot@example.com">
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            To Emails (comma-separated):
+                            <input type="text" id="config-to-emails" placeholder="team@example.com, alerts@example.com">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h4>Slack Integration</h4>
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="config-slack-enabled">
+                            Enable Slack Notifications
+                        </label>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            Webhook URL:
+                            <input type="text" id="config-slack-webhook" placeholder="https://hooks.slack.com/services/...">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="config-cancel">Cancel</button>
+                    <button class="btn-primary" id="config-save">Save Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Search/Filter Bar -->
+    <div class="search-bar" id="search-bar">
+        <div class="search-controls">
+            <input type="text" id="search-input" placeholder="🔍 Search sessions..." />
+            <button class="btn-icon" id="filter-toggle" title="Toggle filters">
+                <span>🎛️</span>
+            </button>
+            <button class="btn-icon" id="config-btn" title="Settings">
+                <span>⚙️</span>
+            </button>
+        </div>
+        <div class="filter-panel" id="filter-panel" style="display: none;">
+            <div class="filter-group">
+                <label>Status:</label>
+                <select id="filter-status">
+                    <option value="">All</option>
+                    <option value="running">Running</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Date From:</label>
+                <input type="date" id="filter-date-from" />
+            </div>
+            <div class="filter-group">
+                <label>Date To:</label>
+                <input type="date" id="filter-date-to" />
+            </div>
+            <button class="btn-secondary btn-sm" id="clear-filters">Clear</button>
+            <button class="btn-primary btn-sm" id="apply-filters">Apply</button>
+        </div>
+    </div>
+
     <!-- Session Navigation Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2>📁 Sessions</h2>
             <button class="toggle-btn" id="sidebar-toggle">◀</button>
+        </div>
+        <div class="sidebar-actions">
+            <button class="btn-secondary btn-sm" id="refresh-sessions">🔄</button>
+            <button class="btn-secondary btn-sm" id="compare-sessions">⚖️</button>
         </div>
         <div class="sessions-list" id="sessions-list">
             <div class="loading">Loading sessions...</div>
@@ -30,6 +180,11 @@
                 <div class="logo">
                     <h1>🚀 BAZINGA</h1>
                     <span class="subtitle">Orchestration Dashboard</span>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-secondary" id="export-session">📥 Export</button>
+                    <button class="btn-secondary" id="archive-session">📦 Archive</button>
+                    <button class="btn-danger" id="delete-session">🗑️ Delete</button>
                 </div>
                 <div class="connection-status" id="connection-status">
                     <span class="status-dot"></span>
@@ -89,43 +244,79 @@
             </div>
         </section>
 
-        <!-- Workflow Visualization -->
-        <section class="section workflow-section">
-            <div class="section-header">
-                <h2>🗺️ Workflow Visualization</h2>
-                <div class="workflow-controls">
-                    <button class="btn-secondary" id="refresh-workflow">🔄 Refresh</button>
-                    <button class="btn-primary" id="generate-ai-diagram" style="display: none;">
-                        🤖 Generate AI Diagram
-                    </button>
+        <!-- Tabs for Different Views -->
+        <section class="section">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="workflow">🗺️ Workflow</button>
+                <button class="tab-btn" data-tab="timeline">⏱️ Timeline</button>
+                <button class="tab-btn" data-tab="gantt">📊 Gantt Chart</button>
+                <button class="tab-btn" data-tab="dependency">🔗 Dependencies</button>
+                <button class="tab-btn" data-tab="logs">📜 Logs</button>
+            </div>
+
+            <!-- Workflow Tab -->
+            <div class="tab-content active" id="tab-workflow">
+                <div class="section-header">
+                    <h2>🗺️ Workflow Visualization</h2>
+                    <div class="workflow-controls">
+                        <button class="btn-secondary" id="refresh-workflow">🔄 Refresh</button>
+                        <button class="btn-primary" id="generate-ai-diagram" style="display: none;">
+                            🤖 Generate AI Diagram
+                        </button>
+                    </div>
+                </div>
+                <div class="workflow-container">
+                    <div class="workflow-diagram" id="workflow-diagram">
+                        <div class="placeholder">
+                            <p>Workflow diagram will appear here once orchestration starts...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="workflow-container">
-                <div class="workflow-diagram" id="workflow-diagram">
+
+            <!-- Timeline Tab -->
+            <div class="tab-content" id="tab-timeline">
+                <h2>⏱️ Agent Execution Timeline</h2>
+                <div class="timeline-container" id="timeline-container">
                     <div class="placeholder">
-                        <p>Workflow diagram will appear here once orchestration starts...</p>
+                        <p>Timeline will appear once agents start working...</p>
                     </div>
                 </div>
             </div>
-            <!-- AI Diagram Modal -->
-            <div class="modal" id="ai-diagram-modal">
-                <div class="modal-content modal-large">
-                    <div class="modal-header">
-                        <h3>🤖 AI-Generated Workflow Analysis</h3>
-                        <button class="modal-close" id="close-ai-modal">&times;</button>
+
+            <!-- Gantt Chart Tab -->
+            <div class="tab-content" id="tab-gantt">
+                <h2>📊 Parallel Execution Gantt Chart</h2>
+                <div class="gantt-container" id="gantt-container">
+                    <div class="placeholder">
+                        <p>Gantt chart will appear once agents start working...</p>
                     </div>
-                    <div class="modal-body">
-                        <div class="ai-diagram-loading" id="ai-diagram-loading">
-                            <div class="spinner"></div>
-                            <p>Generating AI-powered workflow analysis...</p>
-                        </div>
-                        <div class="ai-diagram-content" id="ai-diagram-content" style="display: none;">
-                            <div class="ai-narrative" id="ai-narrative"></div>
-                            <div class="ai-insights" id="ai-insights"></div>
-                            <div class="ai-diagram" id="ai-diagram-render"></div>
-                        </div>
-                        <div class="ai-diagram-error" id="ai-diagram-error" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Dependency Graph Tab -->
+            <div class="tab-content" id="tab-dependency">
+                <h2>🔗 Task Dependency Graph</h2>
+                <div class="dependency-container" id="dependency-container">
+                    <div class="placeholder">
+                        <p>Dependency graph will appear once PM creates task breakdown...</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div class="tab-content" id="tab-logs">
+                <h2>📜 Real-Time Logs</h2>
+                <div class="logs-controls">
+                    <button class="btn-secondary btn-sm" id="logs-refresh">🔄 Refresh</button>
+                    <button class="btn-secondary btn-sm" id="logs-scroll-bottom">⬇️ Scroll to Bottom</button>
+                    <label>
+                        Auto-scroll:
+                        <input type="checkbox" id="logs-autoscroll" checked>
+                    </label>
+                </div>
+                <div class="logs-container" id="logs-container">
+                    <pre id="logs-content">Waiting for logs...</pre>
                 </div>
             </div>
         </section>
@@ -199,6 +390,28 @@
         </section>
     </main>
 
+    <!-- AI Diagram Modal -->
+    <div class="modal" id="ai-diagram-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>🤖 AI-Generated Workflow Analysis</h3>
+                <button class="modal-close" id="close-ai-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="ai-diagram-loading" id="ai-diagram-loading">
+                    <div class="spinner"></div>
+                    <p>Generating AI-powered workflow analysis...</p>
+                </div>
+                <div class="ai-diagram-content" id="ai-diagram-content" style="display: none;">
+                    <div class="ai-narrative" id="ai-narrative"></div>
+                    <div class="ai-insights" id="ai-insights"></div>
+                    <div class="ai-diagram" id="ai-diagram-render"></div>
+                </div>
+                <div class="ai-diagram-error" id="ai-diagram-error" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Communication Detail Modal -->
     <div class="modal" id="communication-modal">
         <div class="modal-content">
@@ -212,6 +425,37 @@
         </div>
     </div>
 
+    <!-- Session Comparison Modal -->
+    <div class="modal" id="comparison-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>⚖️ Session Comparison</h3>
+                <button class="modal-close" id="close-comparison-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="comparison-selector">
+                    <div>
+                        <label>Session 1:</label>
+                        <select id="compare-session1"></select>
+                    </div>
+                    <div>
+                        <label>Session 2:</label>
+                        <select id="compare-session2"></select>
+                    </div>
+                    <button class="btn-primary" id="run-comparison">Compare</button>
+                </div>
+                <div class="comparison-results" id="comparison-results" style="display: none;">
+                    <!-- Comparison results -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio for notifications -->
+    <audio id="notification-sound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSyF0fPTgjMGHm7A7+OZUQ0BVQAA" type="audio/wav" />
+    </audio>
+
     <!-- JavaScript Modules -->
     <script src="js/data-loader.js"></script>
     <script src="js/websocket-client.js"></script>
@@ -220,6 +464,14 @@
     <script src="js/agent-status.js"></script>
     <script src="js/session-nav.js"></script>
     <script src="js/quality-metrics.js"></script>
+    <script src="js/timeline.js"></script>
+    <script src="js/gantt.js"></script>
+    <script src="js/dependencies.js"></script>
+    <script src="js/logs.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/session-mgmt.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
