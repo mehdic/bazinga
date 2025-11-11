@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bazinga-cli"
-version = "0.1.3"
+version = "0.1.4"
 description = "BAZINGA CLI - A sophisticated multi-agent orchestration system for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,12 @@ dev = [
     "pytest-timeout>=2.1.0",
     "pytest-mock>=3.11.0",
 ]
+dashboard = [
+    "flask>=3.0.0",
+    "flask-sock>=0.7.0",
+    "watchdog>=3.0.0",
+    "anthropic>=0.39.0",  # For AI diagram feature
+]
 
 [project.urls]
 Homepage = "https://github.com/mehdic/bazinga"
@@ -56,3 +62,5 @@ packages = ["src/bazinga_cli"]
 ".claude/commands" = "share/bazinga_cli/.claude/commands"
 "config" = "share/bazinga_cli/config"
 ".claude/skills" = "share/bazinga_cli/.claude/skills"
+"dashboard" = "share/bazinga_cli/dashboard"
+"research" = "share/bazinga_cli/research"

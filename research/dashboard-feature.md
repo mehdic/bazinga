@@ -209,6 +209,23 @@ When available from quality-dashboard skill:
 - pip3
 - BAZINGA framework installed
 
+### CLI Installation (Recommended)
+
+When you install or update BAZINGA CLI, the dashboard is automatically included:
+
+```bash
+# Fresh install with dashboard
+pip install -e .[dashboard]
+
+# Update existing installation
+bazinga update
+
+# Verify dashboard installed
+ls -la dashboard/
+```
+
+**Note:** Version 0.1.4+ includes dashboard in the package. Earlier versions need manual installation.
+
 ### Automatic Setup
 
 The dashboard is automatically initialized and started when you run orchestration:
