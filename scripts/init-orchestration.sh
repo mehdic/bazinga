@@ -233,6 +233,62 @@ else
     echo "✓ orchestration-log.md already exists"
 fi
 
+# Update sessions history
+echo "📝 Updating sessions history..."
+SESSIONS_HISTORY="coordination/sessions_history.json"
+
+# Initialize history file if it doesn't exist
+if [ ! -f "$SESSIONS_HISTORY" ]; then
+    cat > "$SESSIONS_HISTORY" <<EOF
+{
+  "_metadata": {
+    "description": "Historical record of all orchestration sessions",
+    "version": "1.0"
+  },
+  "sessions": []
+}
+EOF
+fi
+
+# Add current session to history (using Python for JSON manipulation)
+python3 - <<PYTHON_SCRIPT
+import json
+from pathlib import Path
+from datetime import datetime
+
+history_file = Path("$SESSIONS_HISTORY")
+session_id = "$SESSION_ID"
+timestamp = "$TIMESTAMP"
+
+# Load existing history
+with open(history_file, 'r') as f:
+    history = json.load(f)
+
+# Check if this session already exists
+session_exists = any(s.get('session_id') == session_id for s in history.get('sessions', []))
+
+if not session_exists:
+    # Add new session
+    history['sessions'].append({
+        'session_id': session_id,
+        'start_time': timestamp,
+        'status': 'started',
+        'end_time': None
+    })
+
+    # Keep only last 50 sessions to prevent file from growing too large
+    if len(history['sessions']) > 50:
+        history['sessions'] = history['sessions'][-50:]
+
+    # Save updated history
+    with open(history_file, 'w') as f:
+        json.dump(history, f, indent=2)
+
+    print(f"✅ Session {session_id} added to history")
+else:
+    print(f"✓ Session {session_id} already in history")
+PYTHON_SCRIPT
+
 # Create .gitignore for coordination folder if it doesn't exist
 if [ ! -f "coordination/.gitignore" ]; then
     echo "📝 Creating coordination/.gitignore..."
@@ -240,9 +296,10 @@ if [ ! -f "coordination/.gitignore" ]; then
 # Coordination state files are temporary and should not be committed
 *.json
 
-# EXCEPT these files - they are permanent configuration
+# EXCEPT these files - they are permanent configuration or historical data
 !skills_config.json
 !testing_config.json
+!sessions_history.json
 
 # Reports are ephemeral - generated per session
 reports/

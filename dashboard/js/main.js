@@ -50,10 +50,14 @@ const Dashboard = (function() {
         try {
             // Load coordination data
             const data = await DataLoader.fetchData();
-            updateDashboard(data);
 
             // Load orchestration log
             const log = await DataLoader.fetchLog();
+
+            // Update dashboard with both data and log
+            updateDashboard(data, log);
+
+            // Update communications
             AgentComms.render(log);
 
         } catch (error) {
@@ -65,7 +69,7 @@ const Dashboard = (function() {
     /**
      * Update dashboard with new data
      */
-    function updateDashboard(data) {
+    function updateDashboard(data, log = null) {
         try {
             // Update header/session info
             updateSessionInfo(data);
@@ -79,8 +83,12 @@ const Dashboard = (function() {
             // Update workflow visualization
             WorkflowViz.update(data);
 
-            // Update agent status
-            AgentStatus.update(data);
+            // Update agent status (needs log to parse activity)
+            if (!log) {
+                // Get cached log if not provided
+                log = DataLoader.getCached().log;
+            }
+            AgentStatus.render(data, log);
 
             // Update quality metrics
             QualityMetrics.update(data);
@@ -310,14 +318,14 @@ const Dashboard = (function() {
      * Setup fallback polling
      */
     function setupPolling() {
-        // Poll every 10 seconds as fallback
+        // Poll every 5 seconds as fallback
         updateInterval = setInterval(async () => {
             // Only poll if WebSocket is not connected
             if (WebSocketClient.getState() !== WebSocket.OPEN) {
                 console.log('🔄 Polling for updates (WebSocket not connected)...');
                 await loadData();
             }
-        }, 10000);
+        }, 5000);
     }
 
     /**
