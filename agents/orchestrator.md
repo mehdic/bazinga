@@ -1173,7 +1173,16 @@ Task(
   description: f"Tech Lead reviewing {group_id} (revision {revision_count})",
   prompt: tech_lead_full_prompt
 )
+
+# IMPORTANT: Model selection is per-agent only
+# The orchestrator continues using sonnet (default) after spawning tech lead
+# Only the tech lead agent uses the model specified above
 ```
+
+**⚠️ CRITICAL: Model Scope**
+The `model: model_to_use` parameter above applies ONLY to the Tech Lead agent you just spawned.
+YOU (the orchestrator) continue using your default model (Sonnet 4.5).
+All future agent spawns use Sonnet 4.5 unless explicitly specified otherwise.
 
 ### Step 2A.7: Route Tech Lead Response
 
@@ -1677,9 +1686,29 @@ ELSE IF result == "FAIL":
 
 ### Step 2B.6: Spawn Tech Lead (Per Group)
 
-**UI Message:** Output before spawning each Tech Lead:
+For each QA that passes, determine model based on revision count:
+
+```python
+# Read revision count for this group
+group_status = read_file("coordination/group_status.json")
+revision_count = group_status.get(group_id, {}).get("revision_count", 0)
+
+# Model escalation at revision 3+
+if revision_count >= 3:
+    model_to_use = "opus"
+    model_reason = f"(Revision #{revision_count} - Using Opus for persistent issue)"
+else:
+    model_to_use = "sonnet"
+    model_reason = f"(Revision #{revision_count} - Using Sonnet)"
+```
+
+**UI Messages:** Output before spawning each Tech Lead:
 ```
 👔 **ORCHESTRATOR**: Spawning Tech Lead to review Group [X]...
+{IF revision_count >= 3}:
+    ⚡ **ORCHESTRATOR**: Escalating to Opus model (revision #{revision_count}) for deeper analysis...
+{IF revision_count >= 2}:
+    🔍 **ORCHESTRATOR**: Using advanced security scan (revision #{revision_count})...
 ```
 
 For each QA that passes:
@@ -1687,27 +1716,45 @@ For each QA that passes:
 ```
 Task(
   subagent_type: "general-purpose",
-  description: "Tech Lead reviewing Group {group_id}",
-  prompt: """
+  model: model_to_use,
+  description: f"Tech Lead reviewing Group {group_id} (revision {revision_count})",
+  prompt: f"""
 You are a TECH LEAD in a Claude Code Multi-Agent Dev Team orchestration system.
 
 **GROUP:** {group_id}
+**REVISION:** {revision_count}
+**MODEL:** {model_to_use}
+
+{IF revision_count >= 3}:
+⚠️ **ENHANCED ANALYSIS REQUIRED (OPUS MODEL)**
+
+This code has been revised {revision_count} times. Persistent issues detected.
+Apply extra thorough review - look for subtle bugs, edge cases, architectural issues.
 
 **CONTEXT:**
-- Developer: {dev summary}
-- QA: ALL PASS ({test counts})
+- Developer: {{dev summary}}
+- QA: ALL PASS ({{test counts}})
 
-**FILES:** {list}
-**BRANCH:** {branch_name}
+**FILES:** {{list}}
+**BRANCH:** {{branch_name}}
 
 **IMPORTANT:** Do NOT send BAZINGA. That's PM's job.
 
-[Same tech lead prompt as simple mode]
+[Same tech lead prompt as simple mode with Skills based on revision_count]
 
 START REVIEW NOW.
   """
 )
+
+# IMPORTANT: Model selection is per-agent only
+# The orchestrator continues using sonnet (default) after spawning tech lead
+# Only the tech lead agent uses the model specified above
 ```
+
+**⚠️ CRITICAL: Model Scope**
+The `model: model_to_use` parameter above applies ONLY to the Tech Lead agent you just spawned.
+YOU (the orchestrator) continue using your default model (Sonnet 4.5).
+All future agent spawns use Sonnet 4.5 unless explicitly specified otherwise.
 
 ### Step 2B.7: Route Tech Lead Response (Per Group)
 
