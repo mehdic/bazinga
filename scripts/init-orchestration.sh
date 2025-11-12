@@ -348,36 +348,13 @@ else
         echo "   Dashboard server not started. You can manually start it with:"
         echo "   cd dashboard && python3 server.py"
     else
-        # Start dashboard server in background
-        echo "🚀 Starting dashboard server on port $DASHBOARD_PORT..."
-
-        # Check if Python dependencies are installed (but don't install - that's done via bazinga update/setup-dashboard)
-        if ! python3 -c "import flask, flask_sock, watchdog" 2>/dev/null; then
-            echo "⚠️  Dashboard dependencies not installed."
-            echo "   Run: bazinga setup-dashboard"
-            echo "   Dashboard will not start until dependencies are installed."
-            echo ""
-        else
-            # Start server in background
-            cd dashboard && python3 server.py > /tmp/bazinga-dashboard.log 2>&1 &
-            DASHBOARD_PID=$!
-            echo $DASHBOARD_PID > "$DASHBOARD_PID_FILE"
-            cd ..
-
-            # Wait a moment for server to start
-            sleep 1
-
-            # Check if server started successfully
-            if kill -0 $DASHBOARD_PID 2>/dev/null; then
-                echo "✅ Dashboard server started (PID: $DASHBOARD_PID)"
-                echo "🌐 Dashboard: http://localhost:$DASHBOARD_PORT"
-                echo "📋 View logs: tail -f /tmp/bazinga-dashboard.log"
-            else
-                echo "❌ Failed to start dashboard server"
-                echo "   Check logs: cat /tmp/bazinga-dashboard.log"
-                rm -f "$DASHBOARD_PID_FILE"
-            fi
-        fi
+        # Launch dashboard startup script in background
+        # This script handles dependency installation and server startup asynchronously
+        echo "🚀 Starting dashboard server (background process)..."
+        bash scripts/start-dashboard.sh &
+        echo "   Dashboard will be available at http://localhost:$DASHBOARD_PORT"
+        echo "   (Installation may take a moment if dependencies need to be installed)"
+        echo "   View logs: tail -f /tmp/bazinga-dashboard.log"
     fi
 fi
 echo ""
