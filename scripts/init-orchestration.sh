@@ -32,8 +32,16 @@ if [ "$FORCE_NEW" = true ]; then
         echo "🗂️  Archiving old session: $OLD_SESSION"
         ARCHIVE_DIR="coordination/archive/$OLD_SESSION"
         mkdir -p "$ARCHIVE_DIR"
+
+        # Archive coordination state files
         mv coordination/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
         mv coordination/messages/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+
+        # Archive old log file
+        if [ -f "docs/orchestration-log.md" ]; then
+            mv docs/orchestration-log.md "$ARCHIVE_DIR/orchestration-log.md"
+            echo "   Archived old log file"
+        fi
     fi
     SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
     echo "📅 Starting new session: $SESSION_ID"
