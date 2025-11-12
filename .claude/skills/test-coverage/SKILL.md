@@ -1,263 +1,142 @@
 ---
 name: test-coverage
 description: "Generate comprehensive test coverage reports when reviewing code. Identifies untested code paths and low-coverage areas. Supports Python (pytest-cov), JavaScript (jest), Go (go test -cover), Java (JaCoCo). Use when reviewing tests or before approving code changes."
-allowed-tools: [Bash, Read, Write]
+version: 1.0.0
+allowed-tools: [Bash, Read]
 ---
 
 # Test Coverage Analysis Skill
 
-## Purpose
+You are the test-coverage skill. When invoked, you run appropriate coverage tools based on project language and generate structured coverage reports.
 
-Automated test coverage analysis for code reviews. This Skill runs appropriate coverage tools based on project language and generates structured coverage reports.
+## When to Invoke This Skill
 
-## What It Does
-
-- Detects project language and test framework
-- Runs coverage analysis
-- Generates detailed reports with uncovered lines
-- Flags critical code with <80% coverage
-- Provides historical trend analysis (if data available)
-
----
-
-## Supported Languages
-
-### Python
-- **Tool:** pytest with pytest-cov
-- **Coverage types:** Line and branch coverage
-- **Output:** Detailed per-file breakdown
-
-### JavaScript/TypeScript
-- **Tool:** Jest with coverage
-- **Coverage types:** Line, branch, function, statement
-- **Output:** Istanbul format reports
-
-### Go
-- **Tool:** go test -cover
-- **Coverage types:** Package and function coverage
-- **Output:** Coverage percentage per package
-
-### Java
-- **Tool:** JaCoCo via Maven/Gradle
-- **Coverage types:** Line, branch, method, class coverage
-- **Output:** XML/HTML reports with per-package breakdown
-- **Integration:** Seamlessly integrates with Maven Surefire and Gradle test tasks
-
----
-
-## Output Format
-
-Results are saved to `coordination/coverage_report.json`:
-
-```json
-{
-  "timestamp": "2025-11-07T20:00:00Z",
-  "language": "python",
-  "overall_coverage": 67.5,
-  "coverage_by_file": {
-    "auth.py": {
-      "line_coverage": 45.2,
-      "branch_coverage": 38.0,
-      "uncovered_lines": [45, 46, 47, 52, 89-103]
-    },
-    "payment.py": {
-      "line_coverage": 52.1,
-      "branch_coverage": 48.5,
-      "uncovered_lines": [23, 45-52, 78]
-    }
-  },
-  "files_below_threshold": [
-    {
-      "file": "auth.py",
-      "coverage": 45.2,
-      "threshold": 80
-    }
-  ],
-  "critical_uncovered_paths": [
-    "auth.py:45-52 (token validation error handling)",
-    "payment.py:89-103 (refund logic edge cases)"
-  ]
-}
-```
-
----
-
-## How to Use
-
-### Automatic Invocation
-
-This Skill is **automatically invoked** by Claude when:
+**Invoke this skill when:**
 - Tech Lead is reviewing test files
-- Before approving code changes
+- Before approving code changes or pull requests
 - Developer claims "added tests"
+- Before merging to main branch
+- Checking if coverage meets project standards
 
-### Manual Test
+**Do NOT invoke when:**
+- No tests exist in the project
+- Just viewing code (not reviewing for approval)
+- Emergency hotfix (skip coverage check)
+- Documentation-only changes
+
+---
+
+## Your Task
+
+When invoked:
+1. Execute the test coverage script
+2. Read the generated coverage report
+3. Return a summary to the calling agent
+
+---
+
+## Step 1: Execute Coverage Script
+
+Use the **Bash** tool to run the pre-built coverage script:
 
 ```bash
-# Run coverage analysis
 bash .claude/skills/test-coverage/coverage.sh
-
-# Or PowerShell
-.\.claude\skills\test-coverage\coverage.ps1
 ```
+
+This script will:
+- Detect project language (Python, JavaScript, Go, Java)
+- Auto-install required tools (pytest-cov, jest, etc.) if needed
+- Run coverage analysis
+- Parse results
+- Generate `coordination/coverage_report.json`
 
 ---
 
-## Installation Requirements
+## Step 2: Read Generated Report
 
-### Python Projects
+Use the **Read** tool to read:
 
 ```bash
-pip install pytest pytest-cov
+coordination/coverage_report.json
 ```
 
-### JavaScript Projects
+Extract key information:
+- `overall_coverage` - Total line coverage percentage
+- `files_below_threshold` - Files with coverage < 80%
+- `critical_uncovered_paths` - Important code without tests
 
-```bash
-npm install --save-dev jest
-# Or if using existing test setup
-npm install --save-dev @jest/globals
+---
+
+## Step 3: Return Summary
+
+Return a concise summary to the calling agent:
+
 ```
+Test Coverage Report:
+- Overall coverage: {percentage}%
+- Files below 80% threshold: {count} files
+- Critical areas with low coverage:
+  - {file1}: {percentage}% coverage
+  - {file2}: {percentage}% coverage
 
-### Go Projects
-
-No additional installation needed (built-in to go test).
-
-### Java Projects
-
-**Maven** (`pom.xml`):
-```xml
-<plugin>
-  <groupId>org.jacoco</groupId>
-  <artifactId>jacoco-maven-plugin</artifactId>
-  <version>0.8.11</version>
-  <executions>
-    <execution>
-      <goals>
-        <goal>prepare-agent</goal>
-      </goals>
-    </execution>
-    <execution>
-      <id>report</id>
-      <phase>test</phase>
-      <goals>
-        <goal>report</goal>
-      </goals>
-    </execution>
-  </executions>
-</plugin>
-```
-
-**Gradle** (`build.gradle`):
-```gradle
-plugins {
-  id 'jacoco'
-}
-
-jacoco {
-  toolVersion = '0.8.11'
-}
-
-jacocoTestReport {
-  reports {
-    xml.required = true
-    html.required = true
-  }
-}
-
-test {
-  finalizedBy jacocoTestReport
-}
+Details saved to: coordination/coverage_report.json
 ```
 
 ---
 
-## Interpreting Results
+## Example Invocation
 
-### Coverage Thresholds
+**Scenario: Reviewing PR with New Authentication Tests**
 
-- **>= 80%:** Good coverage
-- **60-79%:** Acceptable, but could improve
-- **< 60%:** Low coverage, needs attention
-- **< 40%:** Critical, high risk
+Input: Tech Lead reviewing PR #123 with new auth module tests
 
-### Focus Areas
+Expected output:
+```
+Test Coverage Report:
+- Overall coverage: 78%
+- Files below 80% threshold: 2 files
+- Critical areas with low coverage:
+  - auth.py: 68% coverage (uncovered lines: 45-52, 89-103)
+  - payment.py: 52% coverage (uncovered lines: 23, 45-78)
 
-**Critical uncovered code:**
-- Authentication logic
-- Payment/transaction handling
-- Data validation
-- Error handling paths
-- Edge cases
-
-**Less critical:**
-- Logging statements
-- Simple getters/setters
-- Configuration loading
-
----
-
-## Configuration
-
-### Python: pytest.ini or pyproject.toml
-
-```ini
-[tool:pytest]
-addopts = --cov=. --cov-report=json --cov-report=term-missing
+Details saved to: coordination/coverage_report.json
 ```
 
-### JavaScript: jest.config.js
+**Scenario: Full Coverage Achieved**
 
-```javascript
-module.exports = {
-  collectCoverage: true,
-  coverageReporters: ['json', 'text'],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80
-    }
-  }
-};
+Input: Tech Lead final review before merge
+
+Expected output:
+```
+Test Coverage Report:
+- Overall coverage: 94%
+- Files below 80% threshold: 0 files
+- All critical code paths covered
+
+Details saved to: coordination/coverage_report.json
 ```
 
-### Go: No configuration needed
+---
 
-Go coverage is built-in to the test command.
+## Error Handling
+
+**If coverage tool not installed:**
+- Script attempts auto-installation
+- Falls back gracefully if installation fails
+- Returns partial report with error note
+
+**If no tests found:**
+- Return: "No tests found in project. Cannot generate coverage report."
+
+**If tests fail:**
+- Return: "Tests failed. Coverage report not generated. Fix failing tests first."
 
 ---
 
-## Troubleshooting
+## Notes
 
-**Issue:** pytest-cov not found
-
-**Solution:**
-```bash
-pip install pytest-cov
-```
-
-**Issue:** No tests found
-
-**Solution:** Ensure tests follow naming convention (test_*.py, *.test.js, *_test.go)
-
-**Issue:** Coverage report not generated
-
-**Solution:** Check that tests actually run and pass. Coverage isn't generated if tests fail.
-
----
-
-## Implementation
-
-See `coverage.sh` (bash) or `coverage.ps1` (PowerShell) for full implementation details.
-
----
-
-## Credits
-
-This Skill uses standard coverage tools:
-- **pytest-cov**: Python coverage (pytest-dev)
-- **Jest**: JavaScript testing framework (Facebook)
-- **go test -cover**: Go built-in coverage
-- **JaCoCo**: Java Code Coverage (EclEmma)
+- The script (260+ lines) handles all language detection and tool execution
+- Supports both bash (Linux/Mac) and PowerShell (Windows)
+- Graceful degradation when tools unavailable
+- Focuses on line coverage as primary metric
+- Excludes test files, generated code, and config from coverage analysis
