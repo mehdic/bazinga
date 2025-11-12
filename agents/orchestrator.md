@@ -1029,6 +1029,25 @@ START {IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashbo
 📨 **ORCHESTRATOR**: Received test results from QA Expert: [PASS/FAIL]
 ```
 
+**🔴 CRITICAL - LOG THIS INTERACTION:**
+
+IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration [N] - QA Expert
+
+### Prompt Sent:
+[Full QA prompt]
+
+### Agent Response:
+[Full QA response]
+
+### Orchestrator Decision:
+Test Result: [PASS/FAIL] - Next action: [forwarding to Tech Lead / sending back to Developer]
+
+---
+```
+
 **UI Messages:** Output routing decision:
 ```
 IF result == "PASS":
@@ -1245,6 +1264,25 @@ All future agent spawns use Sonnet 4.5 unless explicitly specified otherwise.
 **UI Message:** Output after receiving Tech Lead response:
 ```
 📨 **ORCHESTRATOR**: Received review from Tech Lead: [APPROVED/CHANGES_REQUESTED]
+```
+
+**🔴 CRITICAL - LOG THIS INTERACTION:**
+
+IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration [N] - Tech Lead
+
+### Prompt Sent:
+[Full Tech Lead prompt]
+
+### Agent Response:
+[Full Tech Lead response]
+
+### Orchestrator Decision:
+Review Result: [APPROVED/CHANGES_REQUESTED] - Next action: [forwarding to PM / sending back to Developer]
+
+---
 ```
 
 **UI Messages:** Output routing decision:
@@ -1645,6 +1683,25 @@ START IMPLEMENTING NOW.
 
 Example: "📨 **ORCHESTRATOR**: Received status from Developer (Group A): READY_FOR_QA"
 
+**🔴 CRITICAL - LOG EACH DEVELOPER INTERACTION:**
+
+For EACH developer response, IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration [N] - Developer (Group [X])
+
+### Prompt Sent:
+[Full Developer prompt for this group]
+
+### Agent Response:
+[Full Developer response]
+
+### Orchestrator Decision:
+Status: [STATUS] - Next action: [what you're doing for this group]
+
+---
+```
+
 You'll receive N responses (one from each developer).
 
 **Track each independently** - don't wait for all to finish before proceeding.
@@ -1710,6 +1767,25 @@ START TESTING NOW.
 **UI Message:** Output after receiving each QA response:
 ```
 📨 **ORCHESTRATOR**: Received test results from QA Expert (Group [X]): [PASS/FAIL]
+```
+
+**🔴 CRITICAL - LOG EACH QA INTERACTION:**
+
+For EACH QA response, IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration [N] - QA Expert (Group [X])
+
+### Prompt Sent:
+[Full QA prompt for this group]
+
+### Agent Response:
+[Full QA response]
+
+### Orchestrator Decision:
+Test Result: [PASS/FAIL] - Next action: [what you're doing for this group]
+
+---
 ```
 
 **UI Messages:** Output routing decision for each group:
@@ -1805,6 +1881,25 @@ All future agent spawns use Sonnet 4.5 unless explicitly specified otherwise.
 **UI Message:** Output after receiving each Tech Lead response:
 ```
 📨 **ORCHESTRATOR**: Received review from Tech Lead (Group [X]): [APPROVED/CHANGES_REQUESTED]
+```
+
+**🔴 CRITICAL - LOG EACH TECH LEAD INTERACTION:**
+
+For EACH Tech Lead response, IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration [N] - Tech Lead (Group [X])
+
+### Prompt Sent:
+[Full Tech Lead prompt for this group]
+
+### Agent Response:
+[Full Tech Lead response]
+
+### Orchestrator Decision:
+Review Result: [APPROVED/CHANGES_REQUESTED] - Next action: [what you're doing for this group]
+
+---
 ```
 
 **UI Messages:** Output routing decision for each group:
