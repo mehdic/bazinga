@@ -310,14 +310,14 @@ const Dashboard = (function() {
      * Setup fallback polling
      */
     function setupPolling() {
-        // Poll every 10 seconds as fallback
+        // Poll every 5 seconds as fallback
         updateInterval = setInterval(async () => {
             // Only poll if WebSocket is not connected
             if (WebSocketClient.getState() !== WebSocket.OPEN) {
                 console.log('🔄 Polling for updates (WebSocket not connected)...');
                 await loadData();
             }
-        }, 10000);
+        }, 5000);
     }
 
     /**

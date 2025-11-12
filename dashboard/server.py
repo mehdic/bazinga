@@ -339,7 +339,7 @@ def load_dashboard_config():
     config_file = CONFIG_DIR / 'dashboard_config.json'
     default_config = {
         'ai_diagrams_enabled': False,
-        'update_frequency': 1000,
+        'update_frequency': 5000,  # 5 seconds default
         'theme': 'dark',
         'notification_sound': True,
         'browser_notifications': True,
@@ -581,39 +581,101 @@ def get_timeline():
     """Get timeline data for agent execution visualization."""
     try:
         data = load_coordination_data()
+        log = load_orchestration_log()
         timeline = []
 
-        # Parse orchestrator state for timeline
+        # Parse orchestrator state for session start
         orch_state = data.get('orchestrator_state', {})
-        if orch_state:
+        if orch_state and orch_state.get('start_time'):
             timeline.append({
                 'agent': 'Orchestrator',
-                'action': 'Started',
+                'action': 'Started Session',
                 'timestamp': orch_state.get('start_time'),
-                'duration': 0
+                'duration': 0,
+                'status': 'completed'
             })
 
-        # Parse group status for agent activities
-        group_status = data.get('group_status', {})
-        if group_status:
-            for group in group_status.get('task_groups', []):
-                for agent_key in ['dev_agent', 'qa_agent', 'tl_agent']:
-                    agent_data = group.get(agent_key, {})
-                    if agent_data and agent_data.get('start_time'):
+        # Parse orchestration log for agent activities
+        if log and log.get('entries'):
+            for entry in log.get('entries', []):
+                header = entry.get('header', '')
+
+                # Parse header: ## [TIMESTAMP] Iteration N - Agent Type (Group X)
+                import re
+                match = re.match(r'##\s*\[([^\]]+)\]\s*Iteration\s*(\d+)\s*-\s*([^(]+)(?:\(Group\s*([^\)]+)\))?', header)
+
+                if match:
+                    timestamp_str, iteration, agent_type, group_id = match.groups()
+                    agent_type = agent_type.strip()
+
+                    # Map agent types to display names
+                    agent_map = {
+                        'Project Manager': 'PM',
+                        'Developer': 'Developer',
+                        'QA Expert': 'QA',
+                        'Tech Lead': 'Tech Lead'
+                    }
+
+                    display_agent = agent_map.get(agent_type, agent_type)
+                    action = f"Iteration {iteration}"
+                    if group_id:
+                        action += f" (Group {group_id.strip()})"
+
+                    timeline.append({
+                        'agent': display_agent,
+                        'action': action,
+                        'timestamp': timestamp_str,
+                        'duration': 60,  # Estimate 60 seconds per agent action
+                        'status': 'completed'
+                    })
+
+        # If no log entries, try to build from PM state
+        if not timeline or len(timeline) == 1:
+            pm_state = data.get('pm_state', {})
+            if pm_state and pm_state.get('task_groups'):
+                # Add estimated entries based on groups
+                groups = pm_state.get('task_groups', {})
+                for group_id, group in groups.items():
+                    status = group.get('status', 'pending')
+                    if status != 'pending':
+                        # Add developer entry
                         timeline.append({
-                            'agent': agent_key.replace('_', ' ').title(),
-                            'action': f"Working on {group.get('group_name', 'task')}",
-                            'timestamp': agent_data.get('start_time'),
-                            'duration': agent_data.get('duration', 0),
-                            'status': agent_data.get('status')
+                            'agent': 'Developer',
+                            'action': f"Implemented {group.get('name', group_id)}",
+                            'timestamp': orch_state.get('start_time'),
+                            'duration': 120,
+                            'status': 'completed' if status == 'completed' else 'in-progress'
                         })
 
+                        # Add QA if applicable
+                        if status in ['completed', 'in_qa', 'in_review']:
+                            timeline.append({
+                                'agent': 'QA',
+                                'action': f"Tested {group.get('name', group_id)}",
+                                'timestamp': orch_state.get('start_time'),
+                                'duration': 90,
+                                'status': 'completed'
+                            })
+
+                        # Add Tech Lead if completed
+                        if status == 'completed':
+                            timeline.append({
+                                'agent': 'Tech Lead',
+                                'action': f"Reviewed {group.get('name', group_id)}",
+                                'timestamp': orch_state.get('start_time'),
+                                'duration': 60,
+                                'status': 'completed'
+                            })
+
         # Sort by timestamp
-        timeline.sort(key=lambda x: x.get('timestamp', 0) or 0)
+        timeline.sort(key=lambda x: x.get('timestamp', '') or '')
 
         return jsonify({'timeline': timeline})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"⚠️  Error generating timeline: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'timeline': []}), 500
 
 @app.route('/api/logs/stream', methods=['GET'])
 def stream_logs():
