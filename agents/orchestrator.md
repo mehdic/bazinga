@@ -447,7 +447,12 @@ Iteration: 1
 Agent ID: pm_main
 ```
 
-The bazinga-db skill will handle database storage automatically. This replaces file-based logging and prevents race conditions.
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically. This replaces file-based logging and prevents race conditions.
 
 **⚠️ YOU MUST LOG EVERY AGENT INTERACTION TO DATABASE - This is not optional!**
 **⚠️ NEVER skip this step - Database logging is MANDATORY after EVERY agent spawn!**
@@ -856,6 +861,13 @@ Iteration: [current iteration number]
 Agent ID: developer_1
 ```
 
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically.
+
 **⚠️ MANDATORY: Log BEFORE proceeding to next step!**
 
 Developer returns status: READY_FOR_QA / BLOCKED / INCOMPLETE
@@ -1041,6 +1053,13 @@ Content: [Full QA response text]
 Iteration: [current iteration number]
 Agent ID: qa_expert
 ```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically.
 
 **⚠️ MANDATORY: Log BEFORE routing based on test results!**
 
@@ -1276,6 +1295,13 @@ Content: [Full Tech Lead response text]
 Iteration: [current iteration number]
 Agent ID: tech_lead
 ```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically.
 
 **⚠️ MANDATORY: Log BEFORE updating group status and routing!**
 
@@ -1692,6 +1718,13 @@ Iteration: [current iteration number]
 Agent ID: developer_[X] (where X is group number: 1, 2, 3, or 4)
 ```
 
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically.
+
 **⚠️ Log EACH developer separately - don't batch!**
 
 You'll receive N responses (one from each developer).
@@ -1775,6 +1808,13 @@ Content: [Full QA response text]
 Iteration: [current iteration number]
 Agent ID: qa_group_[X] (where X is group identifier: a, b, c, or d)
 ```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically.
 
 **⚠️ Log EACH QA separately - track per group!**
 
@@ -1887,6 +1927,13 @@ Content: [Full Tech Lead response text]
 Iteration: [current iteration number]
 Agent ID: tech_lead_group_[X] (where X is group identifier: a, b, c, or d)
 ```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will read your request above and handle database storage automatically.
 
 **⚠️ Log EACH Tech Lead separately - track per group!**
 
