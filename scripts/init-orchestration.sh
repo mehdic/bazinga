@@ -351,7 +351,7 @@ else
         # Launch dashboard startup script in background
         # This script handles dependency installation and server startup asynchronously
         echo "🚀 Starting dashboard server (background process)..."
-        bash scripts/start-dashboard.sh &
+        bash .claude/scripts/start-dashboard.sh &
         echo "   Dashboard will be available at http://localhost:$DASHBOARD_PORT"
         echo "   (Installation may take a moment if dependencies need to be installed)"
         echo "   View logs: tail -f /tmp/bazinga-dashboard.log"

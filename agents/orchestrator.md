@@ -144,7 +144,7 @@ PM Response: BAZINGA → END
 ```bash
 # This script creates all required coordination files if they don't exist
 # Safe to run multiple times (idempotent)
-bash scripts/init-orchestration.sh
+bash .claude/scripts/init-orchestration.sh
 ```
 
 **What this script does (completes in ~1-2 seconds):**
