@@ -497,12 +497,16 @@ While orchestration runs, you can monitor:
 # Watch tasks.md for checkmark updates
 watch -n 2 "cat {FEATURE_DIR}/tasks.md | grep '\[x\]' | wc -l"
 
-# Check orchestration log
-tail -f docs/orchestration-log.md
+# Check orchestration logs from database
+python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py \
+  --db /home/user/bazinga/coordination/bazinga.db \
+  stream-logs "{session_id}" 20 0
 
 # Check PM state
 cat coordination/pm_state.json | jq '.completed_groups'
 ```
+
+**Note:** Orchestration logs are now stored in the database (bazinga.db) instead of orchestration-log.md for better concurrency and performance.
 
 ### Step 3.2: Handle Completion
 

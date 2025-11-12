@@ -3,7 +3,7 @@
 BAZINGA Dashboard Server
 ========================
 Lightweight WebSocket server for real-time orchestration monitoring.
-Watches coordination folder and pushes updates to connected clients.
+Queries database for real-time state and logs.
 """
 
 import json
@@ -19,6 +19,10 @@ from flask_sock import Sock
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# Import BazingaDB for database operations
+sys.path.insert(0, str(Path(__file__).parent.parent / '.claude' / 'skills' / 'bazinga-db' / 'scripts'))
+from bazinga_db import BazingaDB
+
 app = Flask(__name__, static_folder='.')
 sock = Sock(app)
 
@@ -32,14 +36,18 @@ DOCS_DIR = BASE_DIR / 'docs'
 SESSIONS_DIR = COORDINATION_DIR / 'sessions'
 ARCHIVE_DIR = COORDINATION_DIR / 'archive'
 CONFIG_DIR = COORDINATION_DIR
+DB_PATH = COORDINATION_DIR / 'bazinga.db'
+
+# Initialize database connection
+db = None
 
 class CoordinationWatcher(FileSystemEventHandler):
-    """Watches coordination folder for changes and broadcasts updates."""
+    """Watches database file for changes and broadcasts updates."""
 
     def __init__(self):
         self.last_update = {}
         self.cooldown = 0.5  # Prevent rapid-fire updates
-        print(f"👁️  CoordinationWatcher initialized")
+        print(f"👁️  CoordinationWatcher initialized (database mode)")
 
     def on_any_event(self, event):
         """Debug: Log all events."""
@@ -50,23 +58,24 @@ class CoordinationWatcher(FileSystemEventHandler):
         if event.is_directory:
             return
 
-        # Only care about JSON files
-        if not event.src_path.endswith('.json'):
-            print(f"⏭️  Skipping non-JSON file: {Path(event.src_path).name}")
+        # Only care about database file changes (including WAL files)
+        filename = Path(event.src_path).name
+        if not (filename == 'bazinga.db' or filename.startswith('bazinga.db-')):
+            print(f"⏭️  Skipping non-database file: {filename}")
             return
 
         # Cooldown to prevent duplicate events
         current_time = time.time()
         if event.src_path in self.last_update:
             if current_time - self.last_update[event.src_path] < self.cooldown:
-                print(f"⏭️  Cooldown active for: {Path(event.src_path).name}")
+                print(f"⏭️  Cooldown active for: {filename}")
                 return
 
         self.last_update[event.src_path] = current_time
 
         # Broadcast update to all clients
         try:
-            print(f"📡 Broadcasting update for: {Path(event.src_path).name}")
+            print(f"📡 Broadcasting database update")
             data = load_coordination_data()
             broadcast_to_clients(data)
             print(f"✅ Broadcasted successfully (clients: {len(clients)})")
@@ -88,8 +97,40 @@ def broadcast_to_clients(data):
         if client in clients:
             clients.remove(client)
 
+def get_current_session_id():
+    """Get the most recent active session ID from database."""
+    global db
+    if not db or not DB_PATH.exists():
+        return None
+
+    try:
+        # Query for most recent active session
+        sessions = db.query("""
+            SELECT session_id FROM sessions
+            WHERE status = 'active'
+            ORDER BY start_time DESC
+            LIMIT 1
+        """)
+
+        if sessions:
+            return sessions[0]['session_id']
+
+        # If no active sessions, get most recent session
+        sessions = db.query("""
+            SELECT session_id FROM sessions
+            ORDER BY start_time DESC
+            LIMIT 1
+        """)
+
+        return sessions[0]['session_id'] if sessions else None
+    except Exception as e:
+        print(f"⚠️  Error getting current session: {e}")
+        return None
+
 def load_coordination_data():
-    """Load all coordination state files."""
+    """Load all coordination state from database."""
+    global db
+
     data = {
         'timestamp': time.time(),
         'orchestrator_state': None,
@@ -99,64 +140,74 @@ def load_coordination_data():
         'skills_config': None
     }
 
-    # Load orchestrator state
-    orchestrator_file = COORDINATION_DIR / 'orchestrator_state.json'
-    if orchestrator_file.exists():
-        try:
-            with open(orchestrator_file, 'r') as f:
-                data['orchestrator_state'] = json.load(f)
-        except Exception as e:
-            print(f"⚠️  Error loading orchestrator_state.json: {e}")
+    if not db or not DB_PATH.exists():
+        print(f"⚠️  Database not available at {DB_PATH}")
+        return data
 
-    # Load PM state
-    pm_file = COORDINATION_DIR / 'pm_state.json'
-    if pm_file.exists():
-        try:
-            with open(pm_file, 'r') as f:
-                data['pm_state'] = json.load(f)
-        except Exception as e:
-            print(f"⚠️  Error loading pm_state.json: {e}")
+    try:
+        # Get current session ID
+        session_id = get_current_session_id()
+        if not session_id:
+            print(f"⚠️  No active session found")
+            return data
 
-    # Load group status
-    group_file = COORDINATION_DIR / 'group_status.json'
-    if group_file.exists():
-        try:
-            with open(group_file, 'r') as f:
-                data['group_status'] = json.load(f)
-        except Exception as e:
-            print(f"⚠️  Error loading group_status.json: {e}")
+        # Get dashboard snapshot (efficient single query)
+        snapshot = db.get_dashboard_snapshot(session_id)
 
-    # Load quality dashboard
-    quality_file = COORDINATION_DIR / 'quality_dashboard.json'
-    if quality_file.exists():
-        try:
-            with open(quality_file, 'r') as f:
-                data['quality_dashboard'] = json.load(f)
-        except Exception as e:
-            print(f"⚠️  Error loading quality_dashboard.json: {e}")
+        # Map database data to expected format
+        data['orchestrator_state'] = snapshot.get('orchestrator_state')
+        data['pm_state'] = snapshot.get('pm_state')
 
-    # Load skills config
-    skills_file = COORDINATION_DIR / 'skills_config.json'
-    if skills_file.exists():
-        try:
-            with open(skills_file, 'r') as f:
-                data['skills_config'] = json.load(f)
-        except Exception as e:
-            print(f"⚠️  Error loading skills_config.json: {e}")
+        # Convert task_groups array to group_status object
+        task_groups = snapshot.get('task_groups', [])
+        if task_groups:
+            data['group_status'] = {
+                'task_groups': {
+                    group['id']: {
+                        'name': group['name'],
+                        'status': group['status'],
+                        'assigned_to': group.get('assigned_to'),
+                        'revision_count': group.get('revision_count', 0),
+                        'last_review_status': group.get('last_review_status')
+                    }
+                    for group in task_groups
+                }
+            }
+
+        # Load skills config from database configuration table
+        data['skills_config'] = db.get_config('skills_config')
+
+        # Load quality dashboard config if exists
+        data['quality_dashboard'] = db.get_config('quality_dashboard')
+
+        print(f"✅ Loaded data for session: {session_id}")
+
+    except Exception as e:
+        print(f"⚠️  Error loading coordination data from database: {e}")
+        import traceback
+        traceback.print_exc()
 
     return data
 
 def load_orchestration_log():
-    """Load and parse orchestration log."""
-    log_file = DOCS_DIR / 'orchestration-log.md'
-    if not log_file.exists():
+    """Load and parse orchestration log from database."""
+    global db
+
+    if not db or not DB_PATH.exists():
+        print(f"⚠️  Database not available")
         return {'content': '', 'entries': []}
 
     try:
-        with open(log_file, 'r') as f:
-            content = f.read()
+        # Get current session ID
+        session_id = get_current_session_id()
+        if not session_id:
+            print(f"⚠️  No active session found")
+            return {'content': '', 'entries': []}
 
-        # Parse log entries (basic parsing)
+        # Get logs from database in markdown format
+        content = db.stream_logs(session_id, limit=1000)
+
+        # Parse log entries from markdown
         entries = []
         current_entry = None
 
@@ -181,86 +232,47 @@ def load_orchestration_log():
             'count': len(entries)
         }
     except Exception as e:
-        print(f"⚠️  Error loading orchestration log: {e}")
+        print(f"⚠️  Error loading orchestration log from database: {e}")
+        import traceback
+        traceback.print_exc()
         return {'content': '', 'entries': []}
 
 def list_sessions():
-    """List all available orchestration sessions."""
-    sessions = []
-    session_ids = set()
+    """List all available orchestration sessions from database."""
+    global db
 
-    # Check coordination folder for current session
-    orchestrator_file = COORDINATION_DIR / 'orchestrator_state.json'
-    current_session_id = None
-    if orchestrator_file.exists():
-        try:
-            with open(orchestrator_file, 'r') as f:
-                state = json.load(f)
-                current_session_id = state.get('session_id', 'current')
-                sessions.append({
-                    'session_id': current_session_id,
-                    'start_time': state.get('start_time'),
-                    'status': state.get('status', 'running'),
-                    'is_current': True
-                })
-                session_ids.add(current_session_id)
-        except Exception as e:
-            print(f"⚠️  Error loading current session: {e}")
+    if not db or not DB_PATH.exists():
+        print(f"⚠️  Database not available")
+        return []
 
-    # Check sessions history file
-    history_file = COORDINATION_DIR / 'sessions_history.json'
-    if history_file.exists():
-        try:
-            with open(history_file, 'r') as f:
-                history = json.load(f)
-                for session in history.get('sessions', []):
-                    session_id = session.get('session_id')
-                    if session_id and session_id not in session_ids:
-                        sessions.append({
-                            'session_id': session_id,
-                            'start_time': session.get('start_time'),
-                            'end_time': session.get('end_time'),
-                            'status': session.get('status', 'completed'),
-                            'is_current': False
-                        })
-                        session_ids.add(session_id)
-        except Exception as e:
-            print(f"⚠️  Error loading sessions history: {e}")
+    try:
+        # Query all sessions from database
+        all_sessions = db.query("""
+            SELECT session_id, start_time, end_time, mode, status, original_requirements
+            FROM sessions
+            ORDER BY start_time DESC
+        """)
 
-    # Check reports folder for historical sessions
-    reports_dir = COORDINATION_DIR / 'reports'
-    if reports_dir.exists():
-        for report_file in reports_dir.glob('session_*.md'):
-            session_id = report_file.stem.replace('session_', '')
-            if session_id not in session_ids:
-                # Try to extract timestamp from filename
-                try:
-                    # Parse bazinga_YYYYMMDD_HHMMSS format
-                    import re
-                    match = re.match(r'.*(\d{8})_(\d{6})', session_id)
-                    if match:
-                        date_str = match.group(1)
-                        time_str = match.group(2)
-                        from datetime import datetime
-                        start_time = datetime.strptime(f"{date_str}{time_str}", "%Y%m%d%H%M%S").isoformat()
-                    else:
-                        start_time = None
-                except:
-                    start_time = None
+        sessions = []
+        for row in all_sessions:
+            sessions.append({
+                'session_id': row['session_id'],
+                'start_time': row['start_time'],
+                'end_time': row.get('end_time'),
+                'mode': row.get('mode'),
+                'status': row['status'],
+                'original_requirements': row.get('original_requirements'),
+                'is_current': row['status'] == 'active'
+            })
 
-                sessions.append({
-                    'session_id': session_id,
-                    'start_time': start_time,
-                    'status': 'completed',
-                    'is_current': False
-                })
-                session_ids.add(session_id)
+        print(f"📊 Found {len(sessions)} sessions in database")
+        return sessions
 
-    # Sort sessions: current first, then by start time descending
-    sessions.sort(key=lambda s: (not s.get('is_current', False), s.get('start_time', '') or ''), reverse=True)
-
-    print(f"📊 Found {len(sessions)} sessions")
-    return sessions
+    except Exception as e:
+        print(f"⚠️  Error loading sessions from database: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 # Routes
 
@@ -724,31 +736,53 @@ def get_timeline():
 
 @app.route('/api/logs/stream', methods=['GET'])
 def stream_logs():
-    """Stream real-time logs."""
+    """Stream real-time logs from database."""
+    global db
+
     try:
         print(f"📋 /api/logs/stream requested")
-        log_file = DOCS_DIR / 'orchestration-log.md'
 
-        if not log_file.exists():
-            print(f"⚠️  Log file not found: {log_file}")
-            return jsonify({'logs': [], 'total': 0, 'message': 'No log file found'})
+        if not db or not DB_PATH.exists():
+            print(f"⚠️  Database not available")
+            return jsonify({'logs': [], 'total': 0, 'message': 'Database not available'})
 
-        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
+        # Get current session ID
+        session_id = get_current_session_id()
+        if not session_id:
+            print(f"⚠️  No active session found")
+            return jsonify({'logs': [], 'total': 0, 'message': 'No active session'})
 
-        # Get last N lines
-        lines = content.split('\n')
+        # Get limit parameter
         limit = int(request.args.get('limit', 100))
-        recent_lines = lines[-limit:] if len(lines) > limit else lines
 
-        print(f"✅ Returning {len(recent_lines)} log lines (total: {len(lines)})")
-        return jsonify({'logs': recent_lines, 'total': len(lines)})
+        # Get logs from database
+        logs = db.get_logs(session_id, limit=limit)
+
+        # Format logs as lines
+        log_lines = []
+        for log in reversed(logs):  # Show oldest first
+            timestamp = log['timestamp']
+            agent_type = log['agent_type'].upper() if log['agent_type'] else 'UNKNOWN'
+            iteration = log['iteration'] if log['iteration'] else '?'
+            content = log['content']
+
+            # Format as markdown-like structure
+            log_lines.append(f"## [{timestamp}] Iteration {iteration} - {agent_type}")
+            log_lines.append("")
+            log_lines.append(content)
+            log_lines.append("")
+            log_lines.append("---")
+            log_lines.append("")
+
+        total_count = len(logs)
+        print(f"✅ Returning {len(log_lines)} log lines from {total_count} entries")
+        return jsonify({'logs': log_lines, 'total': total_count})
 
     except ValueError as e:
         print(f"⚠️  Invalid limit parameter: {e}")
         return jsonify({'error': 'Invalid limit parameter', 'logs': []}), 400
     except Exception as e:
-        print(f"❌ Error streaming logs: {e}")
+        print(f"❌ Error streaming logs from database: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e), 'logs': []}), 500
@@ -784,36 +818,35 @@ def websocket(ws):
         print(f"❌ Client disconnected (remaining: {len(clients)})")
 
 def start_file_watcher():
-    """Start watching coordination folder for changes."""
+    """Start watching database file for changes."""
     if not COORDINATION_DIR.exists():
         print(f"⚠️  Coordination folder not found: {COORDINATION_DIR}")
-        print("   Dashboard will start, but won't receive updates until orchestration begins.")
+        print("   Dashboard will start, but won't receive updates.")
         return
 
     print(f"\n{'='*60}")
-    print(f"🔍 Setting up file watcher...")
+    print(f"🔍 Setting up database watcher...")
     print(f"{'='*60}")
     print(f"📁 Watching directory: {COORDINATION_DIR.absolute()}")
+    print(f"📊 Database file: {DB_PATH.name}")
 
-    # List current JSON files
-    json_files = list(COORDINATION_DIR.glob('*.json'))
-    print(f"📋 Current JSON files ({len(json_files)}):")
-    for f in json_files:
-        print(f"   - {f.name}")
-
-    if not json_files:
-        print(f"⚠️  No JSON files found yet - waiting for orchestration to start...")
+    if DB_PATH.exists():
+        print(f"✅ Database file exists ({DB_PATH.stat().st_size} bytes)")
+    else:
+        print(f"⚠️  Database not found yet - waiting for initialization...")
 
     event_handler = CoordinationWatcher()
     observer = Observer()
     observer.schedule(event_handler, str(COORDINATION_DIR), recursive=False)
     observer.start()
-    print(f"✅ File watcher started successfully")
+    print(f"✅ Database watcher started successfully")
     print(f"{'='*60}\n")
     return observer
 
 def main():
     """Start dashboard server."""
+    global db
+
     port = int(os.environ.get('DASHBOARD_PORT', 53124))
 
     print("=" * 60)
@@ -822,7 +855,19 @@ def main():
     print(f"📡 Server: http://localhost:{port}")
     print(f"🌐 Dashboard: http://localhost:{port}/")
     print(f"📁 Coordination: {COORDINATION_DIR}")
+    print(f"🗄️  Database: {DB_PATH}")
     print("=" * 60)
+
+    # Initialize database connection
+    if DB_PATH.exists():
+        try:
+            db = BazingaDB(str(DB_PATH))
+            print(f"✅ Database connection established")
+        except Exception as e:
+            print(f"⚠️  Failed to connect to database: {e}")
+            print("   Dashboard will start in limited mode")
+    else:
+        print(f"⚠️  Database not found - dashboard will wait for initialization")
 
     # Start file watcher in background thread
     observer = start_file_watcher()
