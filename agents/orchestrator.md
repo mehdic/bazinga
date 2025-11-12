@@ -431,6 +431,27 @@ Example outputs:
 - "📨 **ORCHESTRATOR**: Received decision from PM: SIMPLE mode with 1 developer"
 - "📨 **ORCHESTRATOR**: Received decision from PM: PARALLEL mode with 3 developers"
 
+**🔴 CRITICAL - LOG THIS INTERACTION:**
+
+After receiving PM response, IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration 1 - Project Manager
+
+### Prompt Sent:
+[Full PM prompt you sent]
+
+### Agent Response:
+[Full PM response]
+
+### Orchestrator Decision:
+Proceeding with [MODE] mode using [N] developer(s)
+
+---
+```
+
+**⚠️ YOU MUST LOG EVERY AGENT INTERACTION - This is not optional!**
+
 PM will return something like:
 
 ```markdown
@@ -819,6 +840,25 @@ Task(
 Examples:
 - "📨 **ORCHESTRATOR**: Received status from Developer: READY_FOR_QA"
 - "📨 **ORCHESTRATOR**: Received status from Developer: BLOCKED"
+
+**🔴 CRITICAL - LOG THIS INTERACTION:**
+
+IMMEDIATELY write to `docs/orchestration-log.md`:
+
+```markdown
+## [TIMESTAMP] Iteration [N] - Developer
+
+### Prompt Sent:
+[Full Developer prompt]
+
+### Agent Response:
+[Full Developer response]
+
+### Orchestrator Decision:
+Status: [STATUS] - Next action: [what you're doing next]
+
+---
+```
 
 Developer returns status: READY_FOR_QA / BLOCKED / INCOMPLETE
 
