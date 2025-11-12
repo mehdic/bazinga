@@ -58,6 +58,9 @@ const WorkflowViz = (function() {
         Object.entries(taskGroups).forEach(([groupId, group]) => {
             const status = group.status || 'pending';
             const statusClass = status.replace('_', '');
+            const groupInfo = groupStatus[groupId] || {};
+            const iterations = groupInfo.iterations || {};
+            const revisionCount = groupInfo.revision_count || 0;
 
             // Main group node
             mermaidCode += `    ${groupId}["Group ${groupId}: ${group.name}"]:::${statusClass}\n`;
@@ -67,19 +70,25 @@ const WorkflowViz = (function() {
 
             // Add agent pipeline for in-progress or completed groups
             if (status !== 'pending') {
-                const iterations = groupStatus[groupId]?.iterations || {};
-
-                // Developer node
+                // Developer node - always show if not pending
                 mermaidCode += `    ${groupId}_DEV["🧑‍💻 Developer"]:::agent\n`;
                 mermaidCode += `    ${groupId} --> ${groupId}_DEV\n`;
 
-                // QA node (if ran)
-                if (iterations.qa > 0 || status === 'completed') {
+                // QA node - show if any revision happened or status is beyond dev
+                const showQA = iterations.qa > 0 ||
+                              revisionCount > 0 ||
+                              ['in_qa', 'in_review', 'completed'].includes(status);
+
+                if (showQA) {
                     mermaidCode += `    ${groupId}_QA["🧪 QA Expert"]:::agent\n`;
                     mermaidCode += `    ${groupId}_DEV --> ${groupId}_QA\n`;
 
-                    // Tech Lead node (if ran)
-                    if (iterations.tech_lead > 0 || status === 'completed') {
+                    // Tech Lead node - show if TL iteration or status is review/completed
+                    const showTL = iterations.tech_lead > 0 ||
+                                  revisionCount > 0 ||
+                                  ['in_review', 'completed'].includes(status);
+
+                    if (showTL) {
                         mermaidCode += `    ${groupId}_TL["👔 Tech Lead"]:::agent\n`;
                         mermaidCode += `    ${groupId}_QA --> ${groupId}_TL\n`;
 
