@@ -187,34 +187,79 @@ def load_orchestration_log():
 def list_sessions():
     """List all available orchestration sessions."""
     sessions = []
+    session_ids = set()
 
     # Check coordination folder for current session
     orchestrator_file = COORDINATION_DIR / 'orchestrator_state.json'
+    current_session_id = None
     if orchestrator_file.exists():
         try:
             with open(orchestrator_file, 'r') as f:
                 state = json.load(f)
+                current_session_id = state.get('session_id', 'current')
                 sessions.append({
-                    'session_id': state.get('session_id', 'current'),
+                    'session_id': current_session_id,
                     'start_time': state.get('start_time'),
-                    'status': state.get('status', 'unknown'),
+                    'status': state.get('status', 'running'),
                     'is_current': True
                 })
-        except:
-            pass
+                session_ids.add(current_session_id)
+        except Exception as e:
+            print(f"⚠️  Error loading current session: {e}")
+
+    # Check sessions history file
+    history_file = COORDINATION_DIR / 'sessions_history.json'
+    if history_file.exists():
+        try:
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+                for session in history.get('sessions', []):
+                    session_id = session.get('session_id')
+                    if session_id and session_id not in session_ids:
+                        sessions.append({
+                            'session_id': session_id,
+                            'start_time': session.get('start_time'),
+                            'end_time': session.get('end_time'),
+                            'status': session.get('status', 'completed'),
+                            'is_current': False
+                        })
+                        session_ids.add(session_id)
+        except Exception as e:
+            print(f"⚠️  Error loading sessions history: {e}")
 
     # Check reports folder for historical sessions
     reports_dir = COORDINATION_DIR / 'reports'
     if reports_dir.exists():
         for report_file in reports_dir.glob('session_*.md'):
             session_id = report_file.stem.replace('session_', '')
-            sessions.append({
-                'session_id': session_id,
-                'start_time': session_id,  # Parse from filename if needed
-                'status': 'completed',
-                'is_current': False
-            })
+            if session_id not in session_ids:
+                # Try to extract timestamp from filename
+                try:
+                    # Parse bazinga_YYYYMMDD_HHMMSS format
+                    import re
+                    match = re.match(r'.*(\d{8})_(\d{6})', session_id)
+                    if match:
+                        date_str = match.group(1)
+                        time_str = match.group(2)
+                        from datetime import datetime
+                        start_time = datetime.strptime(f"{date_str}{time_str}", "%Y%m%d%H%M%S").isoformat()
+                    else:
+                        start_time = None
+                except:
+                    start_time = None
 
+                sessions.append({
+                    'session_id': session_id,
+                    'start_time': start_time,
+                    'status': 'completed',
+                    'is_current': False
+                })
+                session_ids.add(session_id)
+
+    # Sort sessions: current first, then by start time descending
+    sessions.sort(key=lambda s: (not s.get('is_current', False), s.get('start_time', '') or ''), reverse=True)
+
+    print(f"📊 Found {len(sessions)} sessions")
     return sessions
 
 # Routes
@@ -680,13 +725,15 @@ def get_timeline():
 @app.route('/api/logs/stream', methods=['GET'])
 def stream_logs():
     """Stream real-time logs."""
-    log_file = DOCS_DIR / 'orchestration-log.md'
-
-    if not log_file.exists():
-        return jsonify({'logs': []})
-
     try:
-        with open(log_file, 'r') as f:
+        print(f"📋 /api/logs/stream requested")
+        log_file = DOCS_DIR / 'orchestration-log.md'
+
+        if not log_file.exists():
+            print(f"⚠️  Log file not found: {log_file}")
+            return jsonify({'logs': [], 'total': 0, 'message': 'No log file found'})
+
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
 
         # Get last N lines
@@ -694,9 +741,17 @@ def stream_logs():
         limit = int(request.args.get('limit', 100))
         recent_lines = lines[-limit:] if len(lines) > limit else lines
 
+        print(f"✅ Returning {len(recent_lines)} log lines (total: {len(lines)})")
         return jsonify({'logs': recent_lines, 'total': len(lines)})
+
+    except ValueError as e:
+        print(f"⚠️  Invalid limit parameter: {e}")
+        return jsonify({'error': 'Invalid limit parameter', 'logs': []}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Error streaming logs: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'logs': []}), 500
 
 @sock.route('/ws')
 def websocket(ws):
