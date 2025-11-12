@@ -351,40 +351,32 @@ else
         # Start dashboard server in background
         echo "🚀 Starting dashboard server on port $DASHBOARD_PORT..."
 
-        # Check if Python dependencies are installed
-        if ! python3 -c "import flask, flask_sock, watchdog, anthropic" 2>/dev/null; then
-            echo "⚠️  Dashboard dependencies not installed. Installing..."
-            pip3 install -q -r dashboard/requirements.txt
-        fi
-
-        # Start server in background
-        cd dashboard && python3 server.py > /tmp/bazinga-dashboard.log 2>&1 &
-        DASHBOARD_PID=$!
-        echo $DASHBOARD_PID > "$DASHBOARD_PID_FILE"
-        cd ..
-
-        # Wait a moment for server to start
-        sleep 2
-
-        # Check if server started successfully
-        if kill -0 $DASHBOARD_PID 2>/dev/null; then
-            echo "✅ Dashboard server started (PID: $DASHBOARD_PID)"
-            echo "🌐 Dashboard: http://localhost:$DASHBOARD_PORT"
-            echo "📋 View logs: tail -f /tmp/bazinga-dashboard.log"
+        # Check if Python dependencies are installed (but don't install - that's done via bazinga update/setup-dashboard)
+        if ! python3 -c "import flask, flask_sock, watchdog" 2>/dev/null; then
+            echo "⚠️  Dashboard dependencies not installed."
+            echo "   Run: bazinga setup-dashboard"
+            echo "   Dashboard will not start until dependencies are installed."
             echo ""
-            echo "💡 Tip: The dashboard provides real-time monitoring of orchestration progress"
-            echo "   - Workflow visualization (Mermaid diagrams)"
-            echo "   - Agent status and communications"
-            echo "   - Task group progress"
-            echo "   - Quality metrics (when available)"
-            echo ""
-            echo "🤖 AI Diagram Feature: Disabled by default"
-            echo "   To enable: Edit coordination/skills_config.json and set"
-            echo "   \"dashboard_ai_diagram_enabled\": true"
         else
-            echo "❌ Failed to start dashboard server"
-            echo "   Check logs: cat /tmp/bazinga-dashboard.log"
-            rm -f "$DASHBOARD_PID_FILE"
+            # Start server in background
+            cd dashboard && python3 server.py > /tmp/bazinga-dashboard.log 2>&1 &
+            DASHBOARD_PID=$!
+            echo $DASHBOARD_PID > "$DASHBOARD_PID_FILE"
+            cd ..
+
+            # Wait a moment for server to start
+            sleep 1
+
+            # Check if server started successfully
+            if kill -0 $DASHBOARD_PID 2>/dev/null; then
+                echo "✅ Dashboard server started (PID: $DASHBOARD_PID)"
+                echo "🌐 Dashboard: http://localhost:$DASHBOARD_PORT"
+                echo "📋 View logs: tail -f /tmp/bazinga-dashboard.log"
+            else
+                echo "❌ Failed to start dashboard server"
+                echo "   Check logs: cat /tmp/bazinga-dashboard.log"
+                rm -f "$DASHBOARD_PID_FILE"
+            fi
         fi
     fi
 fi

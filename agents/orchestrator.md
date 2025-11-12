@@ -139,19 +139,23 @@ PM Response: BAZINGA → END
 
 **FIRST ACTION - Run Initialization Script:**
 
+**IMPORTANT:** Run this synchronously (do NOT use run_in_background). The script completes in 1-2 seconds.
+
 ```bash
 # This script creates all required coordination files if they don't exist
 # Safe to run multiple times (idempotent)
 bash scripts/init-orchestration.sh
 ```
 
-The script will:
-- Create `coordination/` folder structure if it doesn't exist
-- Initialize all state files (pm_state.json, group_status.json, orchestrator_state.json, skills_config.json, testing_config.json)
-- Create message exchange files
-- Initialize orchestration log
-- **Start dashboard server** (if not already running)
-- Skip files that already exist (idempotent)
+**What this script does (completes in ~1-2 seconds):**
+- Creates `coordination/` folder structure if it doesn't exist
+- Initializes all state files (pm_state.json, group_status.json, orchestrator_state.json, skills_config.json, testing_config.json)
+- Creates message exchange files
+- Initializes orchestration log
+- Starts dashboard server in background (if not already running)
+- Skips files that already exist (idempotent)
+
+**After the script completes, proceed immediately to SECOND ACTION.**
 
 **SECOND ACTION - Read Skills Configuration:**
 
