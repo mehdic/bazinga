@@ -1,180 +1,83 @@
 ---
 name: codebase-analysis
 description: Analyze codebase to find similar features, reusable utilities, and architectural patterns
-allowed-tools: [Bash, Read, Write, Grep]
+version: 1.0.0
+allowed-tools: [Bash, Read]
 ---
 
 # Codebase Analysis Skill
 
 You are the codebase-analysis skill. When invoked with a task description, you analyze the existing codebase to find similar features, reusable utilities, and architectural patterns.
 
+## When to Invoke This Skill
+
+**Invoke this skill when:**
+- Before starting new feature development
+- Developer needs to find similar existing code
+- Looking for reusable utilities or patterns
+- Understanding codebase architecture
+- Avoiding duplicate implementations
+
+**Do NOT invoke when:**
+- Implementing completely novel features with no precedent
+- Working in greenfield projects with no existing code
+- Fixing typos or documentation
+- Emergency bug fixes (skip analysis to save time)
+
+---
+
 ## Your Task
 
-When invoked, you will:
-1. Extract keywords from the task description
-2. Find similar existing features
-3. Discover reusable utilities
-4. Identify architectural patterns
-5. Extract project conventions
-6. Generate implementation suggestions
+When invoked:
+1. Execute the codebase analysis script with task description
+2. Read the generated analysis report
+3. Return a summary to the calling agent
 
 ---
 
-## Step 1: Extract Keywords from Task
+## Step 1: Execute Codebase Analysis Script
 
-When invoked, you'll receive a task description (e.g., "Implement password reset endpoint").
-
-Extract relevant keywords:
-- Primary feature: "password reset"
-- Related concepts: "email", "token", "authentication", "validation"
-- Component type: "endpoint", "API"
-
----
-
-## Step 2: Find Similar Features
-
-Use **Grep** to search for similar functionality:
+Use the **Bash** tool to run the pre-built analysis script with the task description:
 
 ```bash
-# Search for related keywords in source files
-grep -r -i "password\|reset\|token" --include="*.py" --include="*.js" --include="*.go" --include="*.java" -l .
+python3 .claude/skills/codebase-analysis/analyze.py --task "{task_description}"
 ```
 
-Use the **Read** tool to read the top 3-5 most relevant files.
-
-Analyze each file for:
-- Similar functionality patterns
-- Key functions/classes used
-- Dependencies and imports
-- Error handling approaches
-- Test coverage approach
-
-Calculate similarity score (0-1):
-```
-similarity = (matching_keywords / total_keywords) × (shared_patterns_count / 10)
-```
+This script will:
+- Extract keywords from task description
+- Find similar existing features
+- Discover reusable utilities
+- Identify architectural patterns
+- Extract project conventions
+- Generate `coordination/codebase_analysis.json`
 
 ---
 
-## Step 3: Discover Reusable Utilities
+## Step 2: Read Generated Report
 
-Use **Bash** to find common utility directories:
+Use the **Read** tool to read:
 
 ```bash
-find . -type d -name "utils" -o -name "helpers" -o -name "lib" -o -name "common" -o -name "services"
+coordination/codebase_analysis.json
 ```
 
-Use **Grep** to find relevant utility functions:
-
-```bash
-# For task "password reset", search for:
-grep -r "class.*Service\|def send_email\|def generate_token\|def validate_email" utils/ lib/ services/ --include="*.py"
-```
-
-For each utility found:
-- Extract name, file path, purpose
-- Check if it matches task requirements
+Extract key information:
+- `similar_features` - Existing code to reference
+- `reusable_utilities` - Functions/classes to reuse
+- `architectural_patterns` - Project patterns to follow
+- `suggested_approach` - Implementation guidance
+- `conventions` - Code style and standards
 
 ---
 
-## Step 4: Identify Architectural Patterns
+## Step 3: Return Summary
 
-Use **Bash** to analyze directory structure:
-
-```bash
-ls -d */ | head -20
-```
-
-Identify common patterns:
-- **Service layer**: `services/` directory exists → "Service layer pattern"
-- **Repository**: `repositories/` or `repos/` exists → "Repository pattern"
-- **Factory**: Files ending in `_factory.py` → "Factory pattern"
-- **MVC**: `models/`, `views/`, `controllers/` → "MVC pattern"
-
-Use **Grep** to detect dependency injection:
-```bash
-grep -r "def __init__.*:.*\)" --include="*.py" | head -5
-```
-
----
-
-## Step 5: Extract Project Conventions
-
-**Test coverage target:**
-Use **Read** to check:
-- `pytest.ini` for `--cov-fail-under=XX`
-- `jest.config.js` for `coverageThreshold`
-
-**Error handling:**
-Use **Grep** to find common error response patterns:
-```bash
-grep -r "def error_response\|class.*Error\|return.*error" utils/ lib/ --include="*.py" -l | head -3
-```
-
-**Code style:**
-- Check for `.editorconfig`, `.prettierrc`, `pyproject.toml`
-
----
-
-## Step 6: Generate Implementation Suggestion
-
-Based on analysis, create a suggested approach:
-
-```
-Suggested approach:
-1. Create {FeatureName}Service in services/ (following service layer pattern)
-2. Reuse {UtilityName} from utils/{file}
-3. Follow {PatternName} pattern like {SimilarFile}
-4. Add tests with {coverage_target}% coverage
-5. Use {ErrorHandler} for error responses
-```
-
----
-
-## Step 7: Write Output
-
-Use the **Write** tool to create `coordination/codebase_analysis.json`:
-
-```json
-{
-  "task": "<original task description>",
-  "similar_features": [
-    {
-      "file": "<file path>",
-      "similarity_score": <0-1>,
-      "patterns": ["<pattern1>", "<pattern2>"],
-      "key_functions": ["<function1>", "<function2>"]
-    }
-  ],
-  "reusable_utilities": [
-    {
-      "name": "<utility name>",
-      "file": "<file path>",
-      "functions": ["<function1>", "<function2>"]
-    }
-  ],
-  "architectural_patterns": [
-    "<pattern 1>",
-    "<pattern 2>"
-  ],
-  "suggested_approach": "<implementation suggestion>",
-  "conventions": [
-    "<convention 1>",
-    "<convention 2>"
-  ]
-}
-```
-
----
-
-## Step 8: Return Summary
-
-Return a concise summary:
+Return a concise summary to the calling agent:
 
 ```
 Codebase Analysis:
-- Similar features found: X
-- Reusable utilities: Y
+- Similar features found: {count}
+- Reusable utilities: {count}
 
 Most similar: {file} (similarity: {score})
 
@@ -188,6 +91,71 @@ Architectural patterns:
 
 Suggested approach:
 {approach}
+
+Details saved to: coordination/codebase_analysis.json
+```
+
+---
+
+## Example Invocation
+
+**Scenario: Implementing Password Reset**
+
+Input: Developer needs to implement password reset endpoint
+
+Expected output:
+```
+Codebase Analysis:
+- Similar features found: 3
+- Reusable utilities: 5
+
+Most similar: auth/login.py (similarity: 0.82)
+
+Reusable utilities:
+- EmailService (utils/email.py): Send templated emails
+- TokenGenerator (utils/crypto.py): Generate secure tokens
+- UserValidator (utils/validators.py): Validate email addresses
+
+Architectural patterns:
+- Service layer pattern (services/ directory)
+- Repository pattern for database access
+- JWT authentication
+
+Suggested approach:
+1. Create PasswordResetService in services/ (following service layer pattern)
+2. Reuse EmailService from utils/email.py
+3. Reuse TokenGenerator from utils/crypto.py
+4. Follow existing auth patterns in auth/login.py
+5. Add tests with 80% coverage target
+
+Details saved to: coordination/codebase_analysis.json
+```
+
+**Scenario: No Similar Features Found**
+
+Input: Implementing completely new payment integration
+
+Expected output:
+```
+Codebase Analysis:
+- Similar features found: 0
+- Reusable utilities: 2
+
+No similar payment features found in codebase.
+
+Reusable utilities:
+- ApiClient (utils/http.py): HTTP client wrapper
+- ConfigLoader (utils/config.py): Load environment config
+
+Architectural patterns:
+- Service layer pattern
+- Dependency injection
+
+Suggested approach:
+1. Implement from scratch following project patterns
+2. Create PaymentService in services/
+3. Reuse ApiClient for external API calls
+4. Add comprehensive tests (no existing payment tests to reference)
 
 Details saved to: coordination/codebase_analysis.json
 ```
@@ -209,7 +177,8 @@ Details saved to: coordination/codebase_analysis.json
 
 ## Notes
 
-- Focus on **high similarity matches** (>0.7)
-- Prioritize **reusable code** to avoid duplication
-- Respect **existing patterns** for consistency
-- Include **test patterns** in analysis
+- The script handles all similarity matching and pattern detection
+- Focuses on high similarity matches (>0.7)
+- Prioritizes reusable code to avoid duplication
+- Respects existing patterns for consistency
+- Includes test patterns in analysis
