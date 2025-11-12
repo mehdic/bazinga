@@ -43,10 +43,26 @@ const SessionNav = (function() {
             return;
         }
 
-        // Sort sessions: current first, then by timestamp descending
+        // Sort sessions: current first, then by start_time descending (latest to oldest)
         const sortedSessions = [...sessions].sort((a, b) => {
+            // Current session always first
             if (a.is_current && !b.is_current) return -1;
             if (!a.is_current && b.is_current) return 1;
+
+            // Then sort by start_time (latest first)
+            const timeA = a.start_time || '';
+            const timeB = b.start_time || '';
+
+            // If both have timestamps, compare them
+            if (timeA && timeB) {
+                return timeB.localeCompare(timeA); // Descending (latest first)
+            }
+
+            // If only one has timestamp, prioritize it
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
+
+            // Fallback to session_id comparison
             return b.session_id.localeCompare(a.session_id);
         });
 
@@ -130,8 +146,8 @@ const SessionNav = (function() {
     /**
      * Select a session
      */
-    function selectSession(sessionId) {
-        console.log('Selecting session:', sessionId);
+    async function selectSession(sessionId) {
+        console.log('📂 Selecting session:', sessionId);
         currentSessionId = sessionId;
 
         // Update active state in UI
@@ -143,12 +159,35 @@ const SessionNav = (function() {
             }
         });
 
-        // TODO: Load session-specific data
-        // For now, we only support current session (live data)
-        // Historical session support could be added later
+        // Show loading indicator
+        const mainContent = document.querySelector('.dashboard-container');
+        if (mainContent) {
+            mainContent.style.opacity = '0.5';
+            mainContent.style.pointerEvents = 'none';
+        }
 
-        // Reload current data
-        window.Dashboard.refresh();
+        try {
+            // TODO: Load session-specific data from API
+            // For now, we only support current session (live data)
+            // Historical session support could be added later
+            console.log('🔄 Refreshing dashboard data...');
+
+            // Reload current data
+            if (window.Dashboard && window.Dashboard.refresh) {
+                await window.Dashboard.refresh();
+                console.log('✅ Dashboard refreshed successfully');
+            } else {
+                console.error('❌ Dashboard.refresh() not available');
+            }
+        } catch (error) {
+            console.error('❌ Error refreshing dashboard:', error);
+        } finally {
+            // Remove loading indicator
+            if (mainContent) {
+                mainContent.style.opacity = '1';
+                mainContent.style.pointerEvents = 'auto';
+            }
+        }
     }
 
     /**
