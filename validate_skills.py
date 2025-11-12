@@ -38,7 +38,7 @@ def validate_skill(skill_path):
         return False
 
     # Check required fields
-    allowed_props = {'name', 'description', 'license', 'allowed-tools', 'metadata'}
+    allowed_props = {'name', 'description', 'license', 'allowed-tools', 'metadata', 'version', 'dependencies'}
     required_props = {'name', 'description'}
 
     errors = []

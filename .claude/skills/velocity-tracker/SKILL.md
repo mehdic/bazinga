@@ -1,230 +1,142 @@
 ---
 name: velocity-tracker
 description: Track development velocity, cycle times, and identify trends for PM decision-making
-allowed-tools: [Bash, Read, Write]
+version: 1.0.0
+allowed-tools: [Bash, Read]
 ---
 
 # Velocity Tracker Skill
 
 You are the velocity-tracker skill. When invoked, you analyze historical project data to provide quantitative metrics for PM decision-making.
 
+## When to Invoke This Skill
+
+**Invoke this skill when:**
+- After completing each task group (to track cycle time)
+- Before spawning new developers (to check velocity capacity)
+- When a task appears stuck (to detect 99% rule violations)
+- Before sending BAZINGA (to record final metrics for learning)
+- Planning next iteration (to use historical data)
+
+**Do NOT invoke when:**
+- First run with no completed tasks yet
+- Emergency bug fixes (skip metrics to save time)
+- User explicitly requests fast mode
+- No PM state file exists yet
+
+---
+
 ## Your Task
 
-When invoked, you will:
-1. Calculate current project velocity and cycle times
-2. Compare against historical metrics
-3. Detect trends (improving/stable/declining)
-4. Identify 99% rule violations (tasks taking >3x estimate)
-5. Generate predictions and recommendations
+When invoked:
+1. Execute the velocity tracking script
+2. Read the generated metrics report
+3. Return a summary to the calling agent
 
 ---
 
-## Step 1: Read PM State
+## Step 1: Execute Velocity Tracking Script
 
-Use the **Read** tool to read `coordination/pm_state.json`.
+Use the **Bash** tool to run the pre-built tracking script:
 
-Extract:
-- `task_groups`: List of all task groups
-- `completed_groups`: Groups with status "completed"
-- `in_progress_groups`: Groups currently being worked on
-- Timestamps: `start_time`, `end_time` for each group
+```bash
+bash .claude/skills/velocity-tracker/track.sh
+```
+
+This script will:
+- Read `coordination/pm_state.json`
+- Calculate current velocity and cycle times
+- Compare against historical metrics
+- Detect trends (improving/stable/declining)
+- Identify 99% rule violations
+- Generate `coordination/project_metrics.json`
+- Update `coordination/historical_metrics.json`
 
 ---
 
-## Step 2: Calculate Current Metrics
+## Step 2: Read Generated Report
 
-Based on the PM state data, calculate:
+Use the **Read** tool to read the generated report:
 
-**Velocity:**
-```
-velocity = sum(story_points for completed groups)
-```
-
-**Cycle Time per Group:**
-```
-cycle_time_minutes = (end_time - start_time) in minutes
+```bash
+coordination/project_metrics.json
 ```
 
-**Percent Complete:**
-```
-percent_complete = (completed_groups / total_groups) * 100
-```
-
-**Estimated Remaining Time:**
-```
-avg_cycle_time = average of all completed cycle times
-remaining_time = (total_groups - completed_groups) * avg_cycle_time
-```
-
-**Revision Rate:**
-```
-revision_rate = average iterations per completed group
-```
+Extract key information:
+- `current_run.velocity` - Story points completed
+- `current_run.percent_complete` - Progress percentage
+- `trends.velocity` - Velocity trend
+- `warnings` - Any 99% rule violations
+- `recommendations` - Action items
 
 ---
 
-## Step 3: Load Historical Data
-
-Use the **Read** tool to read `coordination/historical_metrics.json` (if it exists).
-
-If the file doesn't exist, set:
-```
-historical_metrics = {
-    "total_runs": 0,
-    "average_velocity": 0,
-    "average_cycle_time_minutes": 0,
-    "completion_rate": 0,
-    "revision_rate": 0
-}
-```
-
-If it exists, extract:
-- `average_velocity`
-- `average_cycle_time_minutes`
-- `completion_rate`
-- `revision_rate`
-
----
-
-## Step 4: Detect Trends
-
-Compare current metrics to historical averages:
-
-**Velocity Trend:**
-- If `current_velocity > historical_avg * 1.05`: trend = "improving"
-- If `current_velocity < historical_avg * 0.95`: trend = "declining"
-- Otherwise: trend = "stable"
-
-**Cycle Time Trend:**
-- If `current_avg_cycle_time < historical_avg * 0.95`: trend = "improving"
-- If `current_avg_cycle_time > historical_avg * 1.05`: trend = "declining"
-- Otherwise: trend = "stable"
-
-**Quality Trend:**
-- If `current_revision_rate < historical_revision_rate * 0.9`: trend = "improving"
-- If `current_revision_rate > historical_revision_rate * 1.1`: trend = "declining"
-- Otherwise: trend = "stable"
-
----
-
-## Step 5: Detect 99% Rule Violations
-
-For each completed group, check:
-
-```
-if cycle_time > (estimated_time * 3):
-    # 99% rule violation detected
-    add warning: {
-        "type": "99_percent_rule",
-        "group_id": group_id,
-        "message": "Task taking 3x longer than expected",
-        "recommendation": "Consider Tech Lead escalation or breaking into smaller tasks"
-    }
-```
-
----
-
-## Step 6: Generate Recommendations
-
-Based on analysis, generate recommendations:
-
-**If velocity > historical:**
-- "Current velocity (X) exceeds historical average (Y) - good progress"
-
-**If velocity < historical:**
-- "Velocity below average - may need additional resources or task breakdown"
-
-**If 99% rule violations:**
-- "Task GROUP_ID taking 3x longer - recommend escalation"
-
-**Pattern detection:**
-- Look for task types that consistently take longer (database, auth, etc.)
-- Example: "Database tasks taking 2.5x estimate - budget more time"
-
----
-
-## Step 7: Write Output
-
-Use the **Write** tool to create `coordination/project_metrics.json`:
-
-```json
-{
-  "timestamp": "<ISO 8601 timestamp>",
-  "current_run": {
-    "run_id": "<from pm_state.json>",
-    "total_groups": <number>,
-    "completed_groups": <number>,
-    "in_progress": <number>,
-    "pending": <number>,
-    "percent_complete": <percentage>,
-    "velocity": <story points completed>,
-    "estimated_remaining_time": "<hours or minutes>",
-    "cycle_times": {
-      "<group_id>": {
-        "duration_minutes": <minutes>,
-        "story_points": <points>,
-        "iterations": <count>,
-        "status": "completed|in_progress"
-      }
-    }
-  },
-  "historical_metrics": {
-    "total_runs": <count>,
-    "average_velocity": <average>,
-    "average_cycle_time_minutes": <average>,
-    "completion_rate": <percentage>,
-    "revision_rate": <average>
-  },
-  "trends": {
-    "velocity": "improving|stable|declining",
-    "cycle_time": "improving|stable|declining",
-    "quality": "improving|stable|declining"
-  },
-  "warnings": [
-    {
-      "type": "99_percent_rule",
-      "group_id": "<id>",
-      "message": "<description>",
-      "recommendation": "<action>"
-    }
-  ],
-  "recommendations": [
-    "<recommendation 1>",
-    "<recommendation 2>"
-  ]
-}
-```
-
----
-
-## Step 8: Update Historical Metrics
-
-If this run is complete, append current metrics to `coordination/historical_metrics.json` using the **Write** tool.
-
-Update running averages:
-```
-new_avg_velocity = (old_avg * total_runs + current_velocity) / (total_runs + 1)
-new_avg_cycle_time = (old_avg * total_runs + current_cycle_time) / (total_runs + 1)
-```
-
----
-
-## Step 9: Return Summary
+## Step 3: Return Summary
 
 Return a concise summary to the calling agent:
 
 ```
 Velocity Metrics:
-- Current velocity: X story points (historical avg: Y)
-- Trend: improving/stable/declining
-- Cycle time: X minutes average
-- Completion: X%
+- Current velocity: {velocity} story points (historical avg: {historical_avg})
+- Trend: {improving/stable/declining}
+- Cycle time: {avg_minutes} minutes average
+- Completion: {percent}%
 
-Warnings:
-- [List any 99% rule violations]
+{If warnings exist:}
+⚠️  Warnings:
+- {warning 1}
+- {warning 2}
 
-Recommendations:
-- [List top 3 recommendations]
+Top Recommendations:
+1. {recommendation 1}
+2. {recommendation 2}
+3. {recommendation 3}
+
+Details saved to: coordination/project_metrics.json
+```
+
+---
+
+## Example Invocation
+
+**Scenario 1: Normal Progress Check**
+
+Input: PM agent requests velocity check after completing task group G002
+
+Expected output:
+```
+Velocity Metrics:
+- Current velocity: 12 story points (historical avg: 10.5)
+- Trend: improving
+- Cycle time: 45 minutes average
+- Completion: 40%
+
+Top Recommendations:
+1. Current velocity exceeds historical average - good progress
+2. Estimated remaining time: 3.5 hours
+
+Details saved to: coordination/project_metrics.json
+```
+
+**Scenario 2: 99% Rule Violation Detected**
+
+Input: PM agent checks why task G003 is taking too long
+
+Expected output:
+```
+Velocity Metrics:
+- Current velocity: 8 story points (historical avg: 10.5)
+- Trend: declining
+- Cycle time: 125 minutes average
+- Completion: 30%
+
+⚠️  Warnings:
+- 99% Rule Violation: Task G003 taking 3x longer than expected (135 min vs 45 min estimate)
+
+Top Recommendations:
+1. Escalate G003 to Tech Lead for investigation
+2. Velocity below average - may need task breakdown
+3. Database tasks pattern: taking 2.5x estimate
 
 Details saved to: coordination/project_metrics.json
 ```
@@ -233,11 +145,23 @@ Details saved to: coordination/project_metrics.json
 
 ## Error Handling
 
-If `coordination/pm_state.json` doesn't exist:
-- Return: "Error: PM state file not found. Cannot calculate metrics."
+**If script fails:**
+- Check the script output for error messages
+- Verify `coordination/pm_state.json` exists
+- Return error message to calling agent
 
-If no completed groups yet:
+**If no completed groups:**
 - Return: "No completed groups yet. Run velocity tracker after completing at least one task group."
 
-If any step fails:
-- Log the error and return a partial report with available data
+**If historical data missing:**
+- Script will create initial baseline
+- Note: "First run - no historical comparison available"
+
+---
+
+## Notes
+
+- The script handles all calculation logic (260+ lines)
+- Supports both bash (Linux/Mac) and PowerShell (Windows)
+- Gracefully degrades if historical data is missing
+- Automatically updates historical metrics for future runs
