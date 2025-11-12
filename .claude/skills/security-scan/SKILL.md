@@ -6,318 +6,358 @@ allowed-tools: [Bash, Read, Write, Grep]
 
 # Security Scanning Skill
 
-## Purpose
+You are the security-scan skill. When invoked, you run appropriate security scanners based on project language and provide structured security reports.
 
-Automated security vulnerability detection for code reviews. This Skill runs appropriate security scanners based on project language and provides structured security reports.
+## Your Task
 
-## Mode Selection
-
-**Mode is automatically determined by revision count:**
-
-- **Basic Mode** (revision_count < 2): Fast scan focusing on high/medium severity issues (5-10 seconds)
-- **Advanced Mode** (revision_count >= 2): Comprehensive scan with all severities and deep analysis (30-60 seconds)
-
-**The mode is passed via environment variable `SECURITY_SCAN_MODE` set by the Tech Lead agent.**
+When invoked, you will:
+1. Check the scan mode (basic or advanced) from environment variable
+2. Detect the project language
+3. Run appropriate security scanning tools
+4. Parse scan results
+5. Generate a structured security report
 
 ---
 
-## Basic Mode
+## Step 1: Determine Scan Mode
 
-**What it scans:**
-- High and medium severity vulnerabilities only
-- Common patterns: SQL injection, XSS, hardcoded secrets, authentication bypasses
-- Dependency vulnerabilities (high severity only)
-- Fast execution optimized for first-pass review
-
-**Time:** 5-10 seconds
-
-**Tools by language:**
-- **Python:** `bandit -ll` (high/medium only)
-- **JavaScript:** `npm audit --audit-level=high`
-- **Go:** `gosec -severity high`
-- **Ruby:** `brakeman --severity-level 1`
-- **Java:** `spotbugs` with Find Security Bugs (high priority only)
-
-**Output:** `coordination/security_scan.json`
-
-**Use case:** First code review, quick feedback loop
-
----
-
-## Advanced Mode
-
-**What it scans:**
-- ALL severity levels (critical, high, medium, low, info)
-- Deep pattern analysis with semgrep
-- Comprehensive dependency vulnerability graph
-- Timing attack detection
-- Race condition patterns
-- Custom project-specific security rules (if configured)
-- Historical vulnerability context
-
-**Time:** 30-60 seconds
-
-**Tools by language:**
-- **Python:** `bandit` (all severities) + `semgrep --config=auto`
-- **JavaScript:** `npm audit` (full) + `eslint-plugin-security`
-- **Go:** `gosec` (all severities)
-- **Ruby:** `brakeman` (all findings)
-- **Java:** `spotbugs` (all priorities) + `semgrep` + OWASP Dependency Check
-
-**Output:** `coordination/security_scan.json` with extended analysis
-
-**Use case:** Code revised 2+ times, persistent security issues, need comprehensive analysis
-
----
-
-## How to Use
-
-### Automatic Invocation
-
-This Skill is **automatically invoked** by Claude when:
-- Tech Lead is reviewing code changes
-- Before approving pull requests
-- Security-sensitive code is modified (auth, database, API endpoints)
-
-### Manual Test
+Check the environment variable `SECURITY_SCAN_MODE` via **Bash**:
 
 ```bash
-# Test basic mode
-export SECURITY_SCAN_MODE=basic
-bash .claude/skills/security-scan/scan.sh
+echo $SECURITY_SCAN_MODE
+```
 
-# Test advanced mode
-export SECURITY_SCAN_MODE=advanced
-bash .claude/skills/security-scan/scan.sh
+If not set or equals "basic":
+- Use **basic mode** (fast, high/medium severity only)
+- Runtime: 5-10 seconds
+
+If equals "advanced":
+- Use **advanced mode** (all severities, comprehensive)
+- Runtime: 30-60 seconds
+
+---
+
+## Step 2: Detect Project Language
+
+Use the **Read** tool to check for language indicators:
+
+**Python:**
+- Check for: `requirements.txt`, `pyproject.toml`, `setup.py`, `*.py` files
+- If found: language = "python"
+
+**JavaScript/TypeScript:**
+- Check for: `package.json`, `node_modules/`
+- If found: language = "javascript"
+
+**Go:**
+- Check for: `go.mod`, `go.sum`, `*.go` files
+- If found: language = "go"
+
+**Ruby:**
+- Check for: `Gemfile`, `Gemfile.lock`, `*.rb` files
+- If found: language = "ruby"
+
+**Java:**
+- Check for: `pom.xml`, `build.gradle`, `*.java` files
+- If found: language = "java"
+
+---
+
+## Step 3: Run Security Scan
+
+Based on language and mode, use the **Bash** tool to run security scanners:
+
+### Python:
+
+**Basic Mode:**
+```bash
+# Check if bandit is installed
+which bandit || pip install bandit
+
+# Run with high/medium severity only
+bandit -r . -ll -f json -o security_scan.json 2>&1
+```
+
+**Advanced Mode:**
+```bash
+# Install semgrep if needed
+which semgrep || pip install semgrep
+
+# Run bandit (all severities)
+bandit -r . -f json -o bandit_results.json 2>&1
+
+# Run semgrep with auto rules
+semgrep --config=auto --json -o semgrep_results.json . 2>&1
+```
+
+### JavaScript/TypeScript:
+
+**Basic Mode:**
+```bash
+# npm audit is built-in
+npm audit --json --audit-level=high > security_scan.json 2>&1
+```
+
+**Advanced Mode:**
+```bash
+# Full npm audit
+npm audit --json > npm_audit.json 2>&1
+
+# Install and run eslint-plugin-security if available
+if [ -f "package.json" ] && grep -q "eslint-plugin-security" package.json; then
+    npx eslint . --format json > eslint_security.json 2>&1
+fi
+```
+
+### Go:
+
+**Basic Mode:**
+```bash
+# Install gosec if needed
+which gosec || go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+# Run with high severity only
+gosec -severity high -fmt json -out security_scan.json ./... 2>&1
+```
+
+**Advanced Mode:**
+```bash
+# Run with all severities
+gosec -fmt json -out security_scan.json ./... 2>&1
+```
+
+### Ruby:
+
+**Basic Mode:**
+```bash
+# Install brakeman if needed
+which brakeman || gem install brakeman
+
+# Run with severity level 1 (high)
+brakeman --format json --output security_scan.json --severity-level 1 2>&1
+```
+
+**Advanced Mode:**
+```bash
+# Run with all findings
+brakeman --format json --output security_scan.json 2>&1
+```
+
+### Java:
+
+**Basic Mode:**
+```bash
+# Maven
+if [ -f "pom.xml" ]; then
+    mvn spotbugs:check -Dspotbugs.effort=Max -Dspotbugs.threshold=High 2>&1
+fi
+
+# Gradle
+if [ -f "build.gradle" ]; then
+    ./gradlew spotbugsMain 2>&1
+fi
+```
+
+**Advanced Mode:**
+```bash
+# Maven with all priorities + dependency check
+if [ -f "pom.xml" ]; then
+    mvn spotbugs:check 2>&1
+    mvn dependency-check:check 2>&1
+fi
+
+# Gradle
+if [ -f "build.gradle" ]; then
+    ./gradlew spotbugsMain dependencyCheckAnalyze 2>&1
+fi
 ```
 
 ---
 
-## Output Format
+## Step 4: Parse Scan Results
 
-Results are saved to `coordination/security_scan.json`:
+Use the **Read** tool to read the scan results file(s).
 
+### For Python (bandit):
+Read `security_scan.json` or `bandit_results.json`:
 ```json
 {
-  "scan_mode": "basic|advanced",
-  "timestamp": "2025-11-07T20:00:00Z",
-  "language": "python",
-  "status": "success|partial|error",
-  "tool": "bandit",
-  "error": "",
-  "critical_issues": 2,
-  "high_issues": 5,
-  "medium_issues": 12,
-  "low_issues": 8,
-  "info_issues": 4,
-  "issues": [
+  "results": [
     {
-      "severity": "HIGH",
-      "title": "SQL Injection",
-      "file": "auth.py",
-      "line": 45,
-      "description": "String interpolation in SQL query",
-      "recommendation": "Use parameterized queries"
+      "issue_severity": "HIGH",
+      "issue_text": "SQL injection risk",
+      "filename": "auth.py",
+      "line_number": 45
     }
   ]
 }
 ```
 
-### Status Field Values
+### For JavaScript (npm audit):
+Read `security_scan.json`:
+```json
+{
+  "vulnerabilities": {
+    "package-name": {
+      "severity": "high",
+      "title": "Vulnerability description"
+    }
+  }
+}
+```
 
-- **success**: Scan completed without errors
-- **partial**: Scan completed but some tools failed (results may be incomplete)
-- **error**: Scan failed completely (tool installation failed or critical error)
-
-**⚠️ IMPORTANT**: Always check the `status` field before interpreting results. An empty issues array with `status: "error"` means the scan failed, NOT that the code is secure.
+### For Go (gosec):
+Read `security_scan.json`:
+```json
+{
+  "Issues": [
+    {
+      "severity": "HIGH",
+      "what": "Issue description",
+      "file": "main.go",
+      "line": "45"
+    }
+  ]
+}
+```
 
 ---
 
-## Installation Requirements
+## Step 5: Categorize Issues by Severity
 
-### Python Projects
+Count issues by severity level:
 
+```
+critical_issues = count of CRITICAL severity
+high_issues = count of HIGH severity
+medium_issues = count of MEDIUM severity
+low_issues = count of LOW severity (advanced mode only)
+info_issues = count of INFO severity (advanced mode only)
+```
+
+---
+
+## Step 6: Generate Structured Report
+
+Use the **Write** tool to create `coordination/security_scan.json`:
+
+```json
+{
+  "scan_mode": "basic|advanced",
+  "timestamp": "<ISO 8601 timestamp>",
+  "language": "<detected language>",
+  "status": "success|partial|error",
+  "tool": "<tool name used>",
+  "error": "<error message if status != success>",
+  "critical_issues": <count>,
+  "high_issues": <count>,
+  "medium_issues": <count>,
+  "low_issues": <count>,
+  "info_issues": <count>,
+  "issues": [
+    {
+      "severity": "CRITICAL|HIGH|MEDIUM|LOW|INFO",
+      "title": "<issue title>",
+      "file": "<file path>",
+      "line": <line number>,
+      "description": "<detailed description>",
+      "recommendation": "<how to fix>"
+    }
+  ]
+}
+```
+
+**Status field values:**
+- `"success"`: Scan completed without errors
+- `"partial"`: Scan completed but some tools failed
+- `"error"`: Scan failed completely
+
+---
+
+## Step 7: Return Summary
+
+Return a concise summary to the calling agent:
+
+```
+Security Scan Report (MODE mode):
+- Tool: <tool name>
+- Critical issues: X
+- High issues: Y
+- Medium issues: Z
+[In advanced mode also show: Low issues, Info issues]
+
+Top issues:
+1. <severity>: <issue title> (<file>:<line>)
+2. <severity>: <issue title> (<file>:<line>)
+3. <severity>: <issue title> (<file>:<line>)
+
+Details saved to: coordination/security_scan.json
+```
+
+---
+
+## Error Handling
+
+**If security tool not installed:**
 ```bash
+# Try to install automatically
+# For bandit:
 pip install bandit
-pip install semgrep  # Advanced mode only
-```
 
-### JavaScript Projects
-
-```bash
-npm install  # npm audit built-in
-npm install --save-dev eslint-plugin-security  # Advanced mode only
-```
-
-### Go Projects
-
-```bash
+# For gosec:
 go install github.com/securego/gosec/v2/cmd/gosec@latest
-```
 
-### Ruby Projects
-
-```bash
+# For brakeman:
 gem install brakeman
 ```
 
-### Java Projects
+If auto-installation fails:
+- Set status to "error"
+- Include installation instructions in error message
 
-**Maven** (`pom.xml`):
-```xml
-<plugin>
-  <groupId>com.github.spotbugs</groupId>
-  <artifactId>spotbugs-maven-plugin</artifactId>
-  <version>4.8.0</version>
-  <dependencies>
-    <dependency>
-      <groupId>com.h3xstream.findsecbugs</groupId>
-      <artifactId>findsecbugs-plugin</artifactId>
-      <version>1.12.0</version>
-    </dependency>
-  </dependencies>
-</plugin>
+**If scan fails:**
+- Set status to "partial" or "error"
+- Save whatever results were obtained
+- Include error details in report
 
-<!-- Advanced mode: OWASP Dependency Check -->
-<plugin>
-  <groupId>org.owasp</groupId>
-  <artifactId>dependency-check-maven</artifactId>
-  <version>9.0.0</version>
-</plugin>
-```
-
-**Gradle** (`build.gradle`):
-```gradle
-plugins {
-  id 'com.github.spotbugs' version '6.0.0'
-}
-
-dependencies {
-  spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.12.0'
-}
-
-// Advanced mode: OWASP Dependency Check
-apply plugin: 'org.owasp.dependencycheck'
-```
-
-**Semgrep** (Advanced mode):
-```bash
-pip install semgrep  # For Java static analysis
-```
+**If no security issues found:**
+- Return successful report with 0 issues
+- Status: "success"
 
 ---
 
-## Implementation
+## Severity Prioritization
 
-See `scan.sh` (bash) or `scan.ps1` (PowerShell) for full implementation details.
+When summarizing results, prioritize by severity:
 
----
-
-## Interpreting Results
-
-### Critical Issues (MUST FIX)
-- SQL injection
-- Authentication bypasses
-- Hardcoded secrets/credentials
-- Remote code execution vulnerabilities
-
-### High Issues (SHOULD FIX)
-- XSS vulnerabilities
-- Insecure cryptography
-- Path traversal
-- Missing authentication checks
-
-### Medium Issues (GOOD TO FIX)
-- Weak random number generation
-- Missing CSRF protection
-- Insecure file permissions
-
-### Low/Info Issues (OPTIONAL - Advanced mode only)
-- Code smells with security implications
-- Deprecated functions
-- Best practice recommendations
+1. **CRITICAL** - Must fix immediately (SQL injection, auth bypass, hardcoded secrets)
+2. **HIGH** - Should fix before deployment (XSS, insecure crypto, path traversal)
+3. **MEDIUM** - Good to fix (weak RNG, missing CSRF, insecure permissions)
+4. **LOW** - Optional (code smells, deprecated functions) - advanced mode only
+5. **INFO** - Best practices - advanced mode only
 
 ---
 
-## Progressive Analysis
+## Mode Comparison
 
-This Skill works in concert with the Tech Lead model escalation:
+**Basic Mode (default):**
+- Fast execution (5-10 seconds)
+- High/medium severity only
+- Single tool per language
+- Good for first-pass review
 
-```
-Revision 0-1: Basic scan (fast) + Tech Lead (Sonnet)
-Revision 2:   Advanced scan (comprehensive) + Tech Lead (Sonnet)
-Revision 3+:  Advanced scan + Tech Lead (Opus)
-```
-
-Progressive intelligence as issues persist.
-
----
-
-## Troubleshooting
-
-**Issue:** Tool not found (bandit, semgrep, etc.)
-
-**Solution:** The script will attempt to install missing tools automatically. If it fails, manually install:
-```bash
-# Python
-pip install bandit semgrep
-
-# JavaScript
-# npm audit is built-in, no installation needed
-
-# Go
-go install github.com/securego/gosec/v2/cmd/gosec@latest
-```
-
-**Issue:** Scan hangs or takes too long
-
-**Solution:**
-- Basic mode should complete in <10s. If it hangs, check for large codebases.
-- Advanced mode can take 30-60s, which is normal.
-- For very large projects, consider excluding vendor/node_modules directories.
-
-**Issue:** False positives
-
-**Solution:**
-- Create `.bandit` config file to exclude false positives
-- Use inline comments: `# nosec` (bandit) or `// nosemgrep` (semgrep)
-- Configure tool-specific ignore files
+**Advanced Mode (revision_count >= 2):**
+- Comprehensive (30-60 seconds)
+- All severity levels
+- Multiple tools per language
+- Deep analysis
+- Good for persistent issues
 
 ---
 
-## Configuration
+## Notes
 
-### Custom Security Rules
-
-Create `.claude/skills/security-scan/custom-rules/` directory with project-specific rules:
-
-**Example: custom-sql-check.yaml (semgrep)**
-```yaml
-rules:
-  - id: custom-sql-injection
-    pattern: execute($SQL)
-    message: Potential SQL injection
-    severity: ERROR
-```
-
-### Exclude Paths
-
-Create `.claude/skills/security-scan/exclude-paths.txt`:
-```
-vendor/
-node_modules/
-test/
-```
-
----
-
-## Credits
-
-This Skill uses industry-standard security tools:
-- **bandit**: Python security scanner (PyCQA)
-- **semgrep**: Multi-language static analysis (r2c/Semgrep)
-- **gosec**: Go security checker
-- **npm audit**: JavaScript dependency auditor (npm)
-- **brakeman**: Ruby on Rails security scanner
-- **SpotBugs**: Java bytecode analyzer with Find Security Bugs plugin
-- **OWASP Dependency Check**: Dependency vulnerability scanner (Java, JS, Python)
+- Always check the **status** field before interpreting results
+- Empty issues array with status="error" means scan FAILED, not that code is secure
+- In basic mode, low/info severities are not scanned
+- Tools may produce false positives - include recommendation to review findings

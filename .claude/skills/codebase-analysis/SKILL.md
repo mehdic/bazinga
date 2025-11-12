@@ -1,190 +1,215 @@
+---
+name: codebase-analysis
+description: Analyze codebase to find similar features, reusable utilities, and architectural patterns
+allowed-tools: [Bash, Read, Write, Grep]
+---
+
 # Codebase Analysis Skill
 
-**Type:** Model-invoked analysis tool
-**Purpose:** Analyze codebase to find similar features, reusable utilities, and architectural patterns
-**Complexity:** Medium (10-20 seconds runtime)
+You are the codebase-analysis skill. When invoked with a task description, you analyze the existing codebase to find similar features, reusable utilities, and architectural patterns.
 
-## What This Skill Does
+## Your Task
 
-Before implementing a new feature, this Skill analyzes the existing codebase to help developers:
+When invoked, you will:
+1. Extract keywords from the task description
+2. Find similar existing features
+3. Discover reusable utilities
+4. Identify architectural patterns
+5. Extract project conventions
+6. Generate implementation suggestions
 
-1. **Find Similar Features**: Identify existing code that solves similar problems
-2. **Discover Reusable Utilities**: Locate helper functions, services, and utilities
-3. **Understand Architectural Patterns**: Detect patterns like service layer, repository, factory
-4. **Follow Project Conventions**: Extract coding conventions and best practices
+---
 
-## Usage
+## Step 1: Extract Keywords from Task
+
+When invoked, you'll receive a task description (e.g., "Implement password reset endpoint").
+
+Extract relevant keywords:
+- Primary feature: "password reset"
+- Related concepts: "email", "token", "authentication", "validation"
+- Component type: "endpoint", "API"
+
+---
+
+## Step 2: Find Similar Features
+
+Use **Grep** to search for similar functionality:
 
 ```bash
-/codebase-analysis "Implement password reset endpoint"
+# Search for related keywords in source files
+grep -r -i "password\|reset\|token" --include="*.py" --include="*.js" --include="*.go" --include="*.java" -l .
 ```
 
-## Output
+Use the **Read** tool to read the top 3-5 most relevant files.
 
-**File:** `coordination/codebase_analysis.json`
+Analyze each file for:
+- Similar functionality patterns
+- Key functions/classes used
+- Dependencies and imports
+- Error handling approaches
+- Test coverage approach
+
+Calculate similarity score (0-1):
+```
+similarity = (matching_keywords / total_keywords) × (shared_patterns_count / 10)
+```
+
+---
+
+## Step 3: Discover Reusable Utilities
+
+Use **Bash** to find common utility directories:
+
+```bash
+find . -type d -name "utils" -o -name "helpers" -o -name "lib" -o -name "common" -o -name "services"
+```
+
+Use **Grep** to find relevant utility functions:
+
+```bash
+# For task "password reset", search for:
+grep -r "class.*Service\|def send_email\|def generate_token\|def validate_email" utils/ lib/ services/ --include="*.py"
+```
+
+For each utility found:
+- Extract name, file path, purpose
+- Check if it matches task requirements
+
+---
+
+## Step 4: Identify Architectural Patterns
+
+Use **Bash** to analyze directory structure:
+
+```bash
+ls -d */ | head -20
+```
+
+Identify common patterns:
+- **Service layer**: `services/` directory exists → "Service layer pattern"
+- **Repository**: `repositories/` or `repos/` exists → "Repository pattern"
+- **Factory**: Files ending in `_factory.py` → "Factory pattern"
+- **MVC**: `models/`, `views/`, `controllers/` → "MVC pattern"
+
+Use **Grep** to detect dependency injection:
+```bash
+grep -r "def __init__.*:.*\)" --include="*.py" | head -5
+```
+
+---
+
+## Step 5: Extract Project Conventions
+
+**Test coverage target:**
+Use **Read** to check:
+- `pytest.ini` for `--cov-fail-under=XX`
+- `jest.config.js` for `coverageThreshold`
+
+**Error handling:**
+Use **Grep** to find common error response patterns:
+```bash
+grep -r "def error_response\|class.*Error\|return.*error" utils/ lib/ --include="*.py" -l | head -3
+```
+
+**Code style:**
+- Check for `.editorconfig`, `.prettierrc`, `pyproject.toml`
+
+---
+
+## Step 6: Generate Implementation Suggestion
+
+Based on analysis, create a suggested approach:
+
+```
+Suggested approach:
+1. Create {FeatureName}Service in services/ (following service layer pattern)
+2. Reuse {UtilityName} from utils/{file}
+3. Follow {PatternName} pattern like {SimilarFile}
+4. Add tests with {coverage_target}% coverage
+5. Use {ErrorHandler} for error responses
+```
+
+---
+
+## Step 7: Write Output
+
+Use the **Write** tool to create `coordination/codebase_analysis.json`:
 
 ```json
 {
-  "task": "Implement password reset endpoint",
+  "task": "<original task description>",
   "similar_features": [
     {
-      "file": "user_registration.py",
-      "similarity_score": 0.85,
-      "patterns": ["email validation", "token generation", "service layer"],
-      "key_functions": ["generate_token()", "send_email()"]
+      "file": "<file path>",
+      "similarity_score": <0-1>,
+      "patterns": ["<pattern1>", "<pattern2>"],
+      "key_functions": ["<function1>", "<function2>"]
     }
   ],
   "reusable_utilities": [
-    {"name": "EmailService", "file": "utils/email.py", "functions": ["send_email()"]},
-    {"name": "TokenGenerator", "file": "utils/tokens.py", "functions": ["generate_token()"]}
+    {
+      "name": "<utility name>",
+      "file": "<file path>",
+      "functions": ["<function1>", "<function2>"]
+    }
   ],
   "architectural_patterns": [
-    "Service layer pattern (services/)",
-    "Repository pattern (repositories/)",
-    "Factory pattern (factories/)"
+    "<pattern 1>",
+    "<pattern 2>"
   ],
-  "suggested_approach": "Create PasswordResetService in services/, use existing EmailService and TokenGenerator",
+  "suggested_approach": "<implementation suggestion>",
   "conventions": [
-    "All business logic goes in services/",
-    "Use error_response() for errors from utils/responses.py",
-    "80% test coverage minimum"
+    "<convention 1>",
+    "<convention 2>"
   ]
 }
 ```
 
-## How It Works
+---
 
-### Step 1: Extract Keywords
+## Step 8: Return Summary
 
-Extract relevant keywords from the task description:
-- Task: "Implement password reset endpoint"
-- Keywords: ["password", "reset", "endpoint", "email", "token", "auth"]
+Return a concise summary:
 
-### Step 2: Find Similar Files
+```
+Codebase Analysis:
+- Similar features found: X
+- Reusable utilities: Y
 
-Search codebase for files containing similar functionality:
-- Use grep to find keyword matches
-- Use text similarity (TF-IDF, cosine similarity) to rank files
-- Return top 5 most similar files
+Most similar: {file} (similarity: {score})
 
-### Step 3: Detect Utilities
+Reusable utilities:
+- {utility1}: {description}
+- {utility2}: {description}
 
-Scan common utility directories:
-- `utils/`, `lib/`, `helpers/`, `services/`, `common/`
-- Extract class/function names
-- Match utilities relevant to keywords
+Architectural patterns:
+- {pattern1}
+- {pattern2}
 
-### Step 4: Identify Patterns
+Suggested approach:
+{approach}
 
-Analyze directory structure and imports:
-- Service layer: `services/` directory
-- Repository: `repositories/` or `repos/` directory
-- Factory: Files ending in `_factory.py`
-- Dependency injection: Constructor patterns
-
-### Step 5: Extract Conventions
-
-Parse existing code to find conventions:
-- Test coverage requirements (from pytest.ini, jest.config.js)
-- Error handling patterns (common error response functions)
-- Code style (from analysis of existing files)
-
-### Step 6: Generate Suggestion
-
-Based on analysis, suggest implementation approach:
-- Which patterns to follow
-- Which utilities to reuse
-- Where to place new code
-- How to structure implementation
-
-## Implementation
-
-The Skill is implemented in Python and runs as an external tool invoked by the model.
-
-**Files:**
-- `analyze.py`: Main analysis orchestrator
-- `similarity.py`: Text similarity functions (TF-IDF, cosine)
-- `patterns.py`: Pattern detection logic
-
-**Runtime:** 10-20 seconds depending on codebase size
-
-**Languages Supported:** All (language-agnostic analysis)
-
-## When to Use
-
-✅ **Use this Skill when:**
-- Implementing a new feature
-- Unfamiliar with codebase structure
-- Want to follow existing patterns
-- Need to find reusable utilities
-
-❌ **Don't use when:**
-- Task is trivial (e.g., fixing typo)
-- Already familiar with implementation approach
-- Time is critical and task is small
-
-## Example Workflow
-
-```bash
-# Developer receives task
-Task: "Implement password reset endpoint"
-
-# Developer invokes Skill
-/codebase-analysis "Implement password reset endpoint"
-
-# Skill analyzes codebase (10-20 seconds)
-# Writes results to coordination/codebase_analysis.json
-
-# Developer reads results
-cat coordination/codebase_analysis.json
-
-# Developer sees:
-# - Similar feature: user_registration.py
-# - Utilities: EmailService, TokenGenerator
-# - Pattern: Service layer
-# - Suggestion: Create PasswordResetService
-
-# Developer implements following patterns
-# Reuses EmailService and TokenGenerator
-# Creates PasswordResetService in services/
-# Follows existing conventions
+Details saved to: coordination/codebase_analysis.json
 ```
 
-## Benefits
+---
 
-**Without Skill:**
-- Developer implements from scratch → 45 minutes
-- Misses existing utilities → duplicates code
-- Uses wrong patterns → gets changes requested in review
-- **Total:** 60-90 minutes with revision
+## Error Handling
 
-**With Skill:**
-- Skill finds utilities → saves 15 minutes
-- Follows existing patterns → passes review first time
-- Reuses code → cleaner implementation
-- **Total:** 30-40 minutes
+**If no similar features found:**
+- Return: "No similar features found. Suggest implementing from scratch following project patterns."
 
-**ROI:** 8x (40% time savings, 90% fewer revisions)
+**If no utilities found:**
+- Return: "No reusable utilities found. Developer may need to create new utility functions."
 
-## Technical Details
+**If codebase structure unclear:**
+- Return: "Could not detect clear architectural patterns. Analyze manually."
 
-**Dependencies:**
-- Python 3.8+
-- scikit-learn (for TF-IDF)
-- Standard library (ast, os, re, json)
+---
 
-**Performance:**
-- Small codebase (<100 files): 5-10 seconds
-- Medium codebase (100-500 files): 10-15 seconds
-- Large codebase (500+ files): 15-25 seconds
+## Notes
 
-**Limitations:**
-- Text-based similarity (doesn't execute code)
-- Best for codebases with clear structure
-- May miss implicit patterns
-
-## Integration
-
-This Skill is configurable via `/configure-skills` command.
-
-When marked as 'mandatory' in skills_config.json, the Orchestrator injects this Skill into Developer prompt before implementation begins.
+- Focus on **high similarity matches** (>0.7)
+- Prioritize **reusable code** to avoid duplication
+- Respect **existing patterns** for consistency
+- Include **test patterns** in analysis

@@ -1,248 +1,352 @@
+---
+name: test-pattern-analysis
+description: Analyze existing tests to identify patterns, fixtures, and conventions before writing new tests
+allowed-tools: [Bash, Read, Write, Grep]
+---
+
 # Test Pattern Analysis Skill
 
-**Type:** Model-invoked test analysis tool
-**Purpose:** Analyze existing tests to identify patterns, fixtures, and conventions
-**Complexity:** Medium (5-15 seconds runtime)
+You are the test-pattern-analysis skill. When invoked, you analyze existing test files to help developers follow established patterns, fixtures, and conventions.
 
-## What This Skill Does
+## Your Task
 
-Before writing tests, this Skill analyzes existing test files to help developers:
+When invoked, you will:
+1. Detect the test framework being used
+2. Find and analyze existing test files
+3. Identify common fixtures and test utilities
+4. Extract test naming conventions and patterns
+5. Suggest test cases based on similar tests
+6. Generate a structured report
 
-1. **Identify Test Framework**: Detect pytest, jest, go test, JUnit, etc.
-2. **Find Common Fixtures**: Extract reusable fixtures and their usage
-3. **Understand Test Patterns**: Detect AAA, Given-When-Then, etc.
-4. **Learn Naming Conventions**: Extract test naming patterns
-5. **Discover Test Utilities**: Find helper functions for testing
-6. **Suggest Test Cases**: Recommend test scenarios based on similar tests
+---
 
-## Usage
+## Step 1: Detect Test Framework
 
+Use the **Read** tool to check for framework indicators:
+
+**Python (pytest):**
+- Check for: `pytest.ini`, `pyproject.toml` with `[tool.pytest]`, `conftest.py`
+- If found: framework = "pytest"
+
+**Python (unittest):**
+- Check for files starting with `test_` importing `unittest`
+- If found: framework = "unittest"
+
+**JavaScript (Jest):**
+- Check `package.json` for "jest" in devDependencies or scripts
+- Check for: `jest.config.js`, `jest.config.json`
+- If found: framework = "jest"
+
+**Go:**
+- Check for files ending in `_test.go`
+- If found: framework = "testing"
+
+**Java (JUnit):**
+- Check for: `pom.xml` or `build.gradle` with junit dependencies
+- If found: framework = "junit"
+
+---
+
+## Step 2: Find Test Files
+
+Use the **Bash** tool to find test files:
+
+**Python:**
 ```bash
-/test-pattern-analysis tests/
+find . -name "test_*.py" -o -name "*_test.py" | head -20
 ```
 
-Or for specific test file:
-
+**JavaScript:**
 ```bash
-/test-pattern-analysis tests/test_auth.py
+find . -name "*.test.js" -o -name "*.test.ts" -o -name "*.spec.js" | head -20
 ```
 
-## Output
+**Go:**
+```bash
+find . -name "*_test.go" | head -20
+```
 
-**File:** `coordination/test_patterns.json`
+**Java:**
+```bash
+find . -name "*Test.java" -o -name "*Tests.java" | head -20
+```
+
+---
+
+## Step 3: Find Common Fixtures
+
+### For pytest:
+
+Use the **Read** tool to read `conftest.py` files (if they exist).
+
+Look for `@pytest.fixture` decorators:
+```python
+@pytest.fixture
+def test_client():
+    # fixture code
+```
+
+Extract:
+- Fixture name
+- Scope (function, class, module, session)
+- Docstring (if present)
+
+### For Jest:
+
+Use the **Grep** tool to search for `beforeEach`, `beforeAll`, `afterEach`, `afterAll`:
+```bash
+grep -r "beforeEach\|beforeAll" tests/ --include="*.test.js" --include="*.test.ts"
+```
+
+Extract common setup patterns.
+
+### For Go:
+
+Look for setup/teardown functions in test files:
+```go
+func TestMain(m *testing.M) {
+    // setup
+}
+```
+
+### For Java:
+
+Use **Grep** to find `@Before`, `@BeforeEach`, `@BeforeAll` annotations:
+```bash
+grep -r "@Before\|@BeforeEach\|@BeforeAll" src/test/java/
+```
+
+---
+
+## Step 4: Analyze Test Structure Patterns
+
+Use the **Read** tool to read 3-5 representative test files.
+
+Identify patterns:
+
+**AAA (Arrange-Act-Assert):**
+Look for three distinct sections in tests:
+```python
+def test_example():
+    # Arrange
+    user = create_user()
+
+    # Act
+    result = user.login()
+
+    # Assert
+    assert result.success
+```
+
+**Given-When-Then:**
+Look for comments or structure like:
+```javascript
+test('user login', () => {
+    // Given
+    const user = createUser();
+
+    // When
+    const result = user.login();
+
+    // Then
+    expect(result).toBeSuccess();
+});
+```
+
+---
+
+## Step 5: Extract Naming Conventions
+
+Analyze test function names to find patterns:
+
+Use **Grep** to get all test function names:
+```bash
+# Python
+grep -h "def test_" tests/**/*.py | head -20
+
+# JavaScript
+grep -h "test(\|it(" tests/**/*.test.js | head -20
+
+# Go
+grep -h "func Test" **/*_test.go | head -20
+```
+
+Identify naming patterns:
+- `test_<function>_<scenario>_<expected>` (Python)
+- `test_<feature>_<condition>` (Python)
+- `should_<expected>_when_<scenario>` (JavaScript)
+- `Test<Function><Scenario>` (Go, Java)
+
+---
+
+## Step 6: Find Test Utilities
+
+Use the **Grep** tool to find helper functions:
+
+**Assertion helpers:**
+```bash
+grep -r "def assert_\|def expect_" tests/ --include="*.py"
+grep -r "function assert\|const assert" tests/ --include="*.js"
+```
+
+**Mock builders:**
+```bash
+grep -r "def create_mock\|def mock_" tests/ --include="*.py"
+grep -r "function createMock\|function mock" tests/ --include="*.js"
+```
+
+**Test data factories:**
+```bash
+grep -r "def create_test_\|def build_" tests/ --include="*.py"
+grep -r "function createTest\|function build" tests/ --include="*.js"
+```
+
+---
+
+## Step 7: Find Similar Tests
+
+If the invoking agent provided a task description (e.g., "write tests for password reset"), search for similar tests:
+
+Use **Grep** to search for related keywords:
+```bash
+grep -r "password\|reset\|email" tests/ --include="test_*.py" -l
+```
+
+Use the **Read** tool to read the most relevant test files found.
+
+Extract:
+- Test structure and patterns used
+- Edge cases covered
+- Common assertions
+
+---
+
+## Step 8: Determine Coverage Target
+
+Look for coverage configuration:
+
+**pytest:**
+Use **Read** tool to check `pytest.ini` or `pyproject.toml` for:
+```ini
+[tool:pytest]
+addopts = --cov-fail-under=80
+```
+
+**jest:**
+Use **Read** tool to check `jest.config.js` for:
+```javascript
+coverageThreshold: {
+  global: {
+    lines: 80
+  }
+}
+```
+
+If not found, assume default: 80%
+
+---
+
+## Step 9: Generate Test Suggestions
+
+Based on similar tests found, suggest test cases:
+
+**For a feature like "password reset":**
+- Happy path: `test_password_reset_valid_email_sends_token`
+- Error cases: `test_password_reset_invalid_email_returns_error`
+- Edge cases: `test_password_reset_expired_token_returns_error`
+- Security: `test_password_reset_rate_limiting_prevents_abuse`
+
+---
+
+## Step 10: Write Structured Report
+
+Use the **Write** tool to create `coordination/test_patterns.json`:
 
 ```json
 {
-  "framework": "pytest",
-  "version": "7.4.0",
-  "test_directory": "tests/",
+  "framework": "<detected framework>",
+  "test_directory": "<main test directory>",
   "common_fixtures": [
     {
-      "name": "test_client",
-      "file": "tests/conftest.py",
-      "scope": "function",
-      "usage": "Provides Flask test client"
-    },
-    {
-      "name": "mock_db",
-      "file": "tests/conftest.py",
-      "scope": "function",
-      "usage": "Provides mocked database"
+      "name": "<fixture_name>",
+      "file": "<file_path>",
+      "scope": "<scope>",
+      "usage": "<description>"
     }
   ],
   "test_patterns": {
-    "structure": "AAA (Arrange-Act-Assert)",
-    "naming": "test_<function>_<scenario>_<expected>",
-    "example": "test_login_valid_credentials_returns_token"
+    "structure": "AAA|Given-When-Then|Four-Phase",
+    "naming": "<extracted pattern>",
+    "example": "<example test name>"
   },
   "similar_tests": [
     {
-      "file": "tests/test_user_registration.py",
-      "test_name": "test_registration_valid_email",
-      "pattern": "AAA",
-      "coverage": "92%",
-      "edge_cases": ["invalid email", "duplicate user", "db failure"]
+      "file": "<file_path>",
+      "test_name": "<name>",
+      "pattern": "<pattern used>",
+      "edge_cases": ["<case1>", "<case2>"]
     }
   ],
   "suggested_tests": [
-    "test_password_reset_valid_email_sends_token",
-    "test_password_reset_invalid_email_returns_error",
-    "test_password_reset_expired_token_returns_error",
-    "test_password_reset_db_failure_handles_gracefully"
+    "<suggested test name 1>",
+    "<suggested test name 2>",
+    "<suggested test name 3>"
   ],
-  "coverage_target": "80%",
+  "coverage_target": "<percentage>",
   "utilities": [
-    {"name": "assert_email_sent", "file": "tests/helpers.py"},
-    {"name": "create_test_user", "file": "tests/fixtures.py"}
+    {"name": "<utility_name>", "file": "<file_path>"}
   ]
 }
 ```
 
-## How It Works
+---
 
-### Step 1: Detect Test Framework
+## Step 11: Return Summary
 
-Scan for test framework indicators:
-- **pytest**: `pytest.ini`, `conftest.py`, `@pytest.fixture`
-- **jest**: `jest.config.js`, `*.test.js`, `describe()`
-- **go test**: `*_test.go`, `func Test*(t *testing.T)`
-- **JUnit**: `@Test`, `@Before`, `junit` in pom.xml
+Return a concise summary to the calling agent:
 
-### Step 2: Find Common Fixtures
+```
+Test Pattern Analysis:
+- Framework: <framework>
+- Pattern: <AAA|Given-When-Then>
+- Naming convention: <pattern>
+- Common fixtures: <fixture1>, <fixture2>
+- Coverage target: X%
 
-For pytest:
-- Parse `conftest.py` for `@pytest.fixture`
-- Extract fixture names, scopes, and docstrings
+Suggested test cases:
+1. <test case 1>
+2. <test case 2>
+3. <test case 3>
 
-For jest:
-- Find `beforeEach()`, `beforeAll()` setups
-- Extract mock objects and test data
+Similar tests to reference:
+- <file1>: <test_name>
+- <file2>: <test_name>
 
-For go:
-- Find setup/teardown functions
-- Extract test helpers
-
-### Step 3: Analyze Test Structure
-
-Identify patterns:
-- **AAA (Arrange-Act-Assert)**: Setup, execute, verify
-- **Given-When-Then**: BDD style
-- **Four-Phase Test**: Setup, exercise, verify, teardown
-
-Detect by analyzing comment patterns and code structure.
-
-### Step 4: Extract Naming Conventions
-
-Analyze test names to find patterns:
-- `test_<function>_<scenario>_<expected>`
-- `test_<feature>_<condition>`
-- `should_<expected>_when_<scenario>`
-
-### Step 5: Find Similar Tests
-
-Search for tests similar to current task:
-- Match keywords from task to test names
-- Find tests for similar features
-- Extract edge cases and scenarios
-
-### Step 6: Find Test Utilities
-
-Scan for helper functions:
-- Assertion helpers: `assert_*`, `expect_*`
-- Mock builders: `create_mock_*`, `mock_*`
-- Test data factories: `create_test_*`, `build_*`
-
-### Step 7: Generate Test Suggestions
-
-Based on analysis, suggest test cases:
-- Happy path test
-- Error condition tests
-- Edge case tests
-- Boundary tests
-
-## Implementation
-
-The Skill is implemented in Python and runs as an external tool invoked by the model.
-
-**Files:**
-- `analyze_tests.py`: Main test analysis orchestrator
-- `frameworks.py`: Test framework detection
-- `patterns.py`: Pattern extraction and analysis
-
-**Runtime:** 5-15 seconds depending on test suite size
-
-**Languages Supported:** Python (pytest), JavaScript (jest), Go (testing), Java (JUnit)
-
-## When to Use
-
-✅ **Use this Skill when:**
-- Writing tests for a new feature
-- Unfamiliar with project's test conventions
-- Want to follow existing test patterns
-- Need to match existing test coverage standards
-
-❌ **Don't use when:**
-- No existing tests in project
-- Task is trivial (e.g., single unit test)
-- Already familiar with test patterns
-- Time is critical and tests are simple
-
-## Example Workflow
-
-```bash
-# Developer implements feature
-# Developer ready to write tests
-
-# Developer invokes Skill
-/test-pattern-analysis tests/
-
-# Skill analyzes existing tests (5-15 seconds)
-# Writes results to coordination/test_patterns.json
-
-# Developer reads patterns
-cat coordination/test_patterns.json
-
-# Developer sees:
-# - Framework: pytest
-# - Fixtures: test_client, mock_db
-# - Pattern: AAA (Arrange-Act-Assert)
-# - Naming: test_<function>_<scenario>_<expected>
-# - Suggested tests: list of test cases
-
-# Developer writes tests following patterns
-# Uses existing fixtures
-# Follows naming convention
-# Implements suggested test cases
-# Tests pass review first time
+Details saved to: coordination/test_patterns.json
 ```
 
-## Benefits
+---
 
-**Without Skill:**
-- Developer guesses at test patterns → inconsistent tests
-- Misses common fixtures → duplicates setup code
-- Wrong naming convention → gets changes requested
-- Misses edge cases → insufficient coverage
-- **Total:** 30-45 minutes + revision cycle
+## Error Handling
 
-**With Skill:**
-- Skill provides patterns → consistent tests
-- Uses existing fixtures → clean tests
-- Follows naming convention → passes review
-- Suggests edge cases → complete coverage
-- **Total:** 20-30 minutes, no revisions
+**If no test files found:**
+- Return: "No existing tests found. Cannot extract patterns. Developer should create tests from scratch."
 
-**ROI:** 5x (30% time savings, 80% fewer revisions)
+**If no fixtures found:**
+- Return: "No common fixtures found. Developer may need to create setup functions."
 
-## Technical Details
+**If framework detection fails:**
+- Try to infer from file patterns
+- If still unclear, return: "Could not detect test framework. Please specify framework."
 
-**Dependencies:**
-- Python 3.8+
-- Standard library (ast, re, json, pathlib)
-- No external dependencies
+**If no similar tests found:**
+- Return: "No similar tests found. Suggest generic test patterns (happy path, error cases, edge cases)."
 
-**Performance:**
-- Small test suite (<50 tests): 5 seconds
-- Medium test suite (50-200 tests): 8-12 seconds
-- Large test suite (200+ tests): 12-20 seconds
+---
 
-**Limitations:**
-- Text-based analysis (doesn't execute tests)
-- Best for projects with existing test suite
-- May miss implicit patterns
+## Notes
 
-## Integration
-
-This Skill is configurable via `/configure-skills` command.
-
-When marked as 'mandatory' in skills_config.json, the Orchestrator injects this Skill into Developer prompt before writing tests.
-
-## Coverage Integration
-
-The Skill also checks for coverage requirements:
-- pytest: `pytest.ini` `--cov-fail-under`
-- jest: `jest.config.js` `coverageThreshold`
-- go: Coverage comments in tests
-- JUnit: JaCoCo configuration
-
-Reports coverage target so developer knows the standard to meet.
+- Focus on extracting **reusable patterns** that save developer time
+- Prioritize **fixtures** and **utilities** that can be reused
+- Suggest **comprehensive test cases** including edge cases and error paths
+- Ensure naming conventions are followed for consistency

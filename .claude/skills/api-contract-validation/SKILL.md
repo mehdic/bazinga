@@ -1,272 +1,245 @@
+---
+name: api-contract-validation
+description: Detect breaking changes in API contracts (OpenAPI/Swagger specs)
+allowed-tools: [Bash, Read, Write, Grep]
+---
+
 # API Contract Validation Skill
 
-**Type:** Model-invoked API validation tool
-**Purpose:** Detect breaking changes in API contracts (OpenAPI/Swagger specs)
-**Complexity:** Medium (5-15 seconds runtime)
+You are the api-contract-validation skill. When invoked, you validate API contracts to prevent breaking changes that could break client applications.
 
-## What This Skill Does
+## Your Task
 
-Before deploying API changes, this Skill validates API contracts to prevent breaking changes that could break client applications.
+When invoked, you will:
+1. Find OpenAPI/Swagger specification files
+2. Load baseline (previous version) for comparison
+3. Compare specs to detect breaking changes
+4. Identify safe changes
+5. Generate recommendations
+6. Generate structured report
 
-**Key Capabilities:**
-1. **Breaking Change Detection**: Identifies removed endpoints, changed response types, removed fields
-2. **OpenAPI/Swagger Support**: Parses OpenAPI 2.0, 3.0, 3.1 specs (JSON/YAML)
-3. **Baseline Comparison**: Compares new spec against previous version
-4. **Safe Change Validation**: Ensures backward compatibility
-5. **Multi-Framework**: Detects specs from FastAPI, Flask, Express, Django, Spring Boot
+---
 
-## Usage
+## Step 1: Find OpenAPI Specs
+
+Use **Bash** to search for OpenAPI/Swagger files:
 
 ```bash
-/api-contract-validation
+find . -name "openapi.yaml" -o -name "openapi.json" -o -name "swagger.yaml" -o -name "swagger.json" -o -name "api.yaml" | head -5
 ```
 
-The Skill automatically finds OpenAPI specs in common locations:
-- `openapi.yaml`, `openapi.json`
-- `swagger.yaml`, `swagger.json`
-- `docs/api/openapi.yaml`
-- Auto-generated from FastAPI, Flask-RESTX, Express
+If not found, check for auto-generation from frameworks:
 
-## Output
+**FastAPI (Python):**
+```bash
+# Check if FastAPI is used
+grep -r "from fastapi import" --include="*.py" -l | head -1
+# If found, generate spec:
+# python -c "from main import app; import json; print(json.dumps(app.openapi()))" > openapi.json
+```
 
-**File:** `coordination/api_contract_validation.json`
+**Express (Node.js):**
+```bash
+grep -r "swagger-jsdoc\|swagger-ui-express" package.json
+```
+
+---
+
+## Step 2: Load Current and Baseline Specs
+
+Use the **Read** tool to:
+1. Read current spec file
+2. Read `coordination/api_baseline.json` (if exists)
+
+**If baseline doesn't exist:**
+- This is first run
+- Save current spec as baseline for future comparisons
+- Return: "Baseline created. Run again after API changes to detect breaking changes."
+
+---
+
+## Step 3: Compare Specs for Breaking Changes
+
+**CRITICAL breaking changes:**
+
+1. **Endpoint removed:**
+```
+if path exists in baseline but not in current:
+    breaking_change = "Endpoint {path} removed - clients may break"
+```
+
+2. **Required parameter removed:**
+```
+if required param in baseline but not in current:
+    breaking_change = "Required parameter {param} removed from {endpoint}"
+```
+
+3. **Response field removed:**
+```
+if field in baseline response schema but not in current:
+    breaking_change = "Response field {field} removed from {endpoint}"
+```
+
+4. **Response status code changed:**
+```
+if success status changed (e.g., 200 → 404):
+    breaking_change = "Status code changed for {endpoint}"
+```
+
+**HIGH severity:**
+
+5. **Field type changed (incompatible):**
+```
+if field type changed (e.g., string → integer):
+    breaking_change = "Field {field} type changed from {old} to {new}"
+```
+
+6. **Required parameter added:**
+```
+if new required param added:
+    breaking_change = "New required parameter {param} added to {endpoint}"
+```
+
+7. **Enum values removed:**
+```
+if enum values exist in baseline but not current:
+    breaking_change = "Enum values removed from {field}"
+```
+
+**SAFE changes:**
+
+- New endpoint added
+- Optional parameter added
+- Optional response field added
+- Enum values added
+- Documentation updated
+
+---
+
+## Step 4: Detect Field Type Changes
+
+For each field in responses:
+
+```
+if baseline_type == "integer" and current_type == "number":
+    # Widening (int → float) - potentially safe
+    warning = "Field type widened (safe if clients handle floats)"
+
+elif baseline_type == "number" and current_type == "integer":
+    # Narrowing - breaking
+    breaking = "Field type narrowed (breaks clients expecting floats)"
+```
+
+---
+
+## Step 5: Generate Recommendations
+
+For each breaking change, suggest alternatives:
+
+**If endpoint removed:**
+- "Consider API versioning (/v2/endpoint) instead of removal"
+- "Deprecate with 410 Gone status before removing"
+
+**If field removed:**
+- "Add field back or create new versioned endpoint"
+- "Deprecate field first with warning, remove in v2"
+
+**If required param added:**
+- "Make parameter optional with default value"
+- "Create new endpoint version with new parameter"
+
+---
+
+## Step 6: Write Output
+
+Use the **Write** tool to create `coordination/api_contract_validation.json`:
 
 ```json
 {
-  "status": "breaking_changes_detected",
-  "specs_found": ["openapi.yaml"],
-  "baseline_exists": true,
+  "status": "breaking_changes_detected|safe|no_baseline",
+  "specs_found": ["<spec file 1>"],
+  "baseline_exists": true|false,
   "breaking_changes": [
     {
-      "severity": "critical",
-      "type": "endpoint_removed",
-      "path": "/api/users/{id}",
-      "method": "DELETE",
-      "message": "Endpoint removed - clients may break"
-    },
-    {
-      "severity": "high",
-      "type": "response_field_removed",
-      "path": "/api/users",
-      "method": "GET",
-      "field": "user.email",
-      "message": "Required response field removed"
+      "severity": "critical|high",
+      "type": "endpoint_removed|field_removed|type_changed|...",
+      "path": "<API path>",
+      "method": "<HTTP method>",
+      "field": "<field name>",
+      "message": "<description>",
+      "old_value": "<baseline value>",
+      "new_value": "<current value>"
     }
   ],
   "warnings": [
     {
       "severity": "medium",
-      "type": "field_type_changed",
-      "path": "/api/orders",
-      "field": "total",
-      "old_type": "integer",
-      "new_type": "number",
-      "message": "Field type widened (safe if clients handle floats)"
+      "type": "field_type_widened|...",
+      "path": "<API path>",
+      "message": "<description>"
     }
   ],
   "safe_changes": [
     {
-      "type": "endpoint_added",
-      "path": "/api/health",
-      "method": "GET",
-      "message": "New endpoint added (backward compatible)"
-    },
-    {
-      "type": "response_field_added",
-      "path": "/api/users",
-      "field": "user.created_at",
-      "message": "New optional field added"
+      "type": "endpoint_added|field_added|...",
+      "path": "<API path>",
+      "message": "<description>"
     }
   ],
   "recommendations": [
-    "Consider versioning API (/v2/users) instead of removing /api/users/{id}",
-    "Deprecate endpoint with 410 Gone status before complete removal",
-    "Add email field back or version the endpoint"
+    "<recommendation 1>",
+    "<recommendation 2>"
   ]
 }
 ```
 
-## Breaking Changes Detected
+Also update `coordination/api_baseline.json` with current spec for next comparison.
 
-**Critical (deployment blockers):**
-- Endpoint removed
-- Required request parameter removed
-- Required response field removed
-- Response status code changed (200 → 404)
-- Authentication requirement added
+---
 
-**High (likely to break clients):**
-- Response field type changed (incompatible)
-- Required parameter added
-- Enum values removed
-- Error response format changed
+## Step 7: Return Summary
 
-**Medium (might break clients):**
-- Optional field type widened (int → float)
-- New validation rules (stricter)
-- Response field deprecated
-- Default values changed
+Return a concise summary:
 
-**Safe Changes:**
-- New endpoint added
-- Optional response field added
-- Optional parameter added
-- Documentation updated
-- Enum values added
+```
+API Contract Validation:
+- Specs analyzed: X
+- Baseline: {exists/created}
 
-## How It Works
+⚠️  BREAKING CHANGES: Y
+- Critical: X
+- High: Y
 
-### Step 1: Find OpenAPI Specs
+Safe changes: Z
 
-Search for OpenAPI/Swagger files:
-```python
-# Common locations
-spec_paths = [
-    "openapi.yaml", "openapi.json",
-    "swagger.yaml", "swagger.json",
-    "docs/api/openapi.yaml",
-    "api/openapi.yaml"
-]
+{If breaking changes:}
+Top recommendations:
+1. <recommendation 1>
+2. <recommendation 2>
 
-# Auto-generate from frameworks
-if has_fastapi:
-    run: "python -c 'from main import app; import json; print(json.dumps(app.openapi()))' > openapi.json"
+Details saved to: coordination/api_contract_validation.json
 ```
 
-### Step 2: Load Baseline (Previous Version)
+---
 
-```python
-# Check coordination/ for previous spec
-baseline_path = "coordination/api_baseline.json"
-if exists(baseline_path):
-    baseline_spec = load_json(baseline_path)
-else:
-    # First run - save current as baseline
-    save_json(baseline_path, current_spec)
-    return {"status": "baseline_created"}
-```
+## Error Handling
 
-### Step 3: Compare Specs
+**If no specs found:**
+- Return: "No OpenAPI/Swagger specs found. Cannot validate API contracts."
 
-```python
-breaking_changes = []
+**If spec parsing fails:**
+- Return: "Failed to parse spec: {error}. Check spec format."
 
-# Check for removed endpoints
-for path, methods in baseline_spec["paths"].items():
-    if path not in current_spec["paths"]:
-        breaking_changes.append({
-            "severity": "critical",
-            "type": "endpoint_removed",
-            "path": path
-        })
+**If no baseline:**
+- Create baseline from current spec
+- Return: "Baseline created for future comparisons."
 
-# Check for removed response fields
-for path, methods in current_spec["paths"].items():
-    for method, operation in methods.items():
-        baseline_schema = get_response_schema(baseline_spec, path, method)
-        current_schema = get_response_schema(current_spec, path, method)
+---
 
-        removed_fields = find_removed_fields(baseline_schema, current_schema)
-        for field in removed_fields:
-            breaking_changes.append({
-                "severity": "high",
-                "type": "response_field_removed",
-                "field": field
-            })
-```
+## Notes
 
-### Step 4: Generate Recommendations
-
-```python
-recommendations = []
-
-for change in breaking_changes:
-    if change["type"] == "endpoint_removed":
-        recommendations.append(
-            f"Consider API versioning (/v2{change['path']}) instead of removal"
-        )
-    elif change["type"] == "response_field_removed":
-        recommendations.append(
-            f"Add field back or create new versioned endpoint"
-        )
-```
-
-## Implementation
-
-**Files:**
-- `validate.py`: Main validation orchestrator
-- `parser.py`: OpenAPI spec parser (YAML/JSON)
-- `diff.py`: Spec comparison and breaking change detection
-- `frameworks.py`: Auto-detection and spec generation
-
-**Dependencies:**
-- Python 3.8+
-- PyYAML (for YAML parsing)
-- jsonschema (for schema validation)
-
-**Runtime:** 5-15 seconds depending on spec size
-
-**Languages Supported:** Any (analyzes OpenAPI specs, not code)
-
-## When to Use
-
-✅ **Use this Skill when:**
-- Making changes to API endpoints
-- Modifying request/response schemas
-- Before deploying API updates
-- In CI/CD pipeline for API changes
-
-❌ **Don't use when:**
-- No OpenAPI spec exists
-- Creating brand new API (no baseline)
-- Non-REST APIs (GraphQL, gRPC - different validation)
-
-## Example Workflow
-
-```bash
-# Developer modifies API endpoint
-# Developer ready to commit
-
-# Developer invokes Skill
-/api-contract-validation
-
-# Skill analyzes API spec (5-15 seconds)
-# Compares against baseline
-# Detects breaking changes
-
-# Developer sees:
-# - CRITICAL: Removed /api/users/{id} DELETE endpoint
-# - Recommendation: Use API versioning instead
-
-# Developer fixes:
-# - Adds /v2/api/users with new behavior
-# - Keeps /v1/api/users/{id} DELETE for backward compat
-# - Updates clients to use v2
-
-# Re-run validation
-/api-contract-validation
-# Result: All safe changes ✅
-```
-
-## Benefits
-
-**Without Skill:**
-- Developer removes endpoint → deploys
-- Client apps break in production
-- Emergency rollback required
-- Customer complaints
-- **Total:** 2-4 hours incident response
-
-**With Skill:**
-- Skill detects breaking change (10 seconds)
-- Developer versions API instead
-- Smooth deployment, no breakage
-- **Total:** 20 minutes to implement versioning
-
-**ROI:** 6-12x (prevents production incidents)
-
-## Integration
-
-This Skill is configurable via `/configure-skills` command.
-
-When marked as 'mandatory' in skills_config.json, the Orchestrator automatically invokes this Skill when API changes are detected before Developer commits.
+- **Endpoint removal** is CRITICAL (breaks existing clients)
+- **Field removal** from responses is HIGH severity
+- **Adding optional fields** is safe
+- **Type widening** (int → float) may be safe depending on clients
+- Always suggest **versioning** over breaking changes

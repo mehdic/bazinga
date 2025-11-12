@@ -1,266 +1,243 @@
-# Velocity & Metrics Tracker Skill
+---
+name: velocity-tracker
+description: Track development velocity, cycle times, and identify trends for PM decision-making
+allowed-tools: [Bash, Read, Write]
+---
 
-**Type:** Model-invoked project metrics analyzer
-**Purpose:** Track development velocity, cycle times, and identify trends for PM decision-making
-**Complexity:** Low (3-5 seconds runtime)
+# Velocity Tracker Skill
 
-## What This Skill Does
+You are the velocity-tracker skill. When invoked, you analyze historical project data to provide quantitative metrics for PM decision-making.
 
-Analyzes historical project data to provide PM with quantitative metrics for:
+## Your Task
 
-1. **Velocity Tracking**: Measures work completed per iteration (story points)
-2. **Cycle Time Analysis**: Time taken per task group from start to completion
-3. **Trend Detection**: Identifies if team is improving, declining, or stable
-4. **99% Rule Detection**: Flags tasks taking abnormally long (>3x estimate)
-5. **Historical Comparison**: Compares current run to past performance
+When invoked, you will:
+1. Calculate current project velocity and cycle times
+2. Compare against historical metrics
+3. Detect trends (improving/stable/declining)
+4. Identify 99% rule violations (tasks taking >3x estimate)
+5. Generate predictions and recommendations
 
-## Why This Exists
+---
 
-**Current Problem:** PM operates blind - no metrics, no learning, no prediction
-- Can't answer "Are we getting faster or slower?"
-- Can't detect tasks stuck at 99% completion
-- Each project starts from zero knowledge
-- Estimation never improves
+## Step 1: Read PM State
 
-**Solution:** Track quantitative metrics to enable data-driven PM decisions
+Use the **Read** tool to read `coordination/pm_state.json`.
 
-## Usage
+Extract:
+- `task_groups`: List of all task groups
+- `completed_groups`: Groups with status "completed"
+- `in_progress_groups`: Groups currently being worked on
+- Timestamps: `start_time`, `end_time` for each group
 
-```bash
-# Automatically invoked by PM during progress reviews
-/velocity-tracker
+---
+
+## Step 2: Calculate Current Metrics
+
+Based on the PM state data, calculate:
+
+**Velocity:**
+```
+velocity = sum(story_points for completed groups)
 ```
 
-The PM should invoke this Skill:
-- After completing each task group (track cycle time)
-- Before spawning new developers (check velocity)
-- Before sending BAZINGA (record final metrics)
-- When detecting potential delays (identify patterns)
+**Cycle Time per Group:**
+```
+cycle_time_minutes = (end_time - start_time) in minutes
+```
 
-## Output
+**Percent Complete:**
+```
+percent_complete = (completed_groups / total_groups) * 100
+```
 
-**File:** `coordination/project_metrics.json`
+**Estimated Remaining Time:**
+```
+avg_cycle_time = average of all completed cycle times
+remaining_time = (total_groups - completed_groups) * avg_cycle_time
+```
+
+**Revision Rate:**
+```
+revision_rate = average iterations per completed group
+```
+
+---
+
+## Step 3: Load Historical Data
+
+Use the **Read** tool to read `coordination/historical_metrics.json` (if it exists).
+
+If the file doesn't exist, set:
+```
+historical_metrics = {
+    "total_runs": 0,
+    "average_velocity": 0,
+    "average_cycle_time_minutes": 0,
+    "completion_rate": 0,
+    "revision_rate": 0
+}
+```
+
+If it exists, extract:
+- `average_velocity`
+- `average_cycle_time_minutes`
+- `completion_rate`
+- `revision_rate`
+
+---
+
+## Step 4: Detect Trends
+
+Compare current metrics to historical averages:
+
+**Velocity Trend:**
+- If `current_velocity > historical_avg * 1.05`: trend = "improving"
+- If `current_velocity < historical_avg * 0.95`: trend = "declining"
+- Otherwise: trend = "stable"
+
+**Cycle Time Trend:**
+- If `current_avg_cycle_time < historical_avg * 0.95`: trend = "improving"
+- If `current_avg_cycle_time > historical_avg * 1.05`: trend = "declining"
+- Otherwise: trend = "stable"
+
+**Quality Trend:**
+- If `current_revision_rate < historical_revision_rate * 0.9`: trend = "improving"
+- If `current_revision_rate > historical_revision_rate * 1.1`: trend = "declining"
+- Otherwise: trend = "stable"
+
+---
+
+## Step 5: Detect 99% Rule Violations
+
+For each completed group, check:
+
+```
+if cycle_time > (estimated_time * 3):
+    # 99% rule violation detected
+    add warning: {
+        "type": "99_percent_rule",
+        "group_id": group_id,
+        "message": "Task taking 3x longer than expected",
+        "recommendation": "Consider Tech Lead escalation or breaking into smaller tasks"
+    }
+```
+
+---
+
+## Step 6: Generate Recommendations
+
+Based on analysis, generate recommendations:
+
+**If velocity > historical:**
+- "Current velocity (X) exceeds historical average (Y) - good progress"
+
+**If velocity < historical:**
+- "Velocity below average - may need additional resources or task breakdown"
+
+**If 99% rule violations:**
+- "Task GROUP_ID taking 3x longer - recommend escalation"
+
+**Pattern detection:**
+- Look for task types that consistently take longer (database, auth, etc.)
+- Example: "Database tasks taking 2.5x estimate - budget more time"
+
+---
+
+## Step 7: Write Output
+
+Use the **Write** tool to create `coordination/project_metrics.json`:
 
 ```json
 {
-  "timestamp": "2024-11-08T10:30:00Z",
+  "timestamp": "<ISO 8601 timestamp>",
   "current_run": {
-    "run_id": "run-003",
-    "total_groups": 5,
-    "completed_groups": 3,
-    "in_progress": 1,
-    "pending": 1,
-    "percent_complete": 60,
-    "velocity": 12,
-    "estimated_remaining_time": "1.5 hours",
+    "run_id": "<from pm_state.json>",
+    "total_groups": <number>,
+    "completed_groups": <number>,
+    "in_progress": <number>,
+    "pending": <number>,
+    "percent_complete": <percentage>,
+    "velocity": <story points completed>,
+    "estimated_remaining_time": "<hours or minutes>",
     "cycle_times": {
-      "G001": {
-        "duration_minutes": 45,
-        "story_points": 3,
-        "iterations": 1,
-        "status": "completed"
-      },
-      "G002": {
-        "duration_minutes": 135,
-        "story_points": 5,
-        "iterations": 3,
-        "status": "completed",
-        "warning": "took 3x longer than similar tasks"
-      },
-      "G003": {
-        "duration_minutes": 72,
-        "story_points": 4,
-        "iterations": 1,
-        "status": "in_progress"
+      "<group_id>": {
+        "duration_minutes": <minutes>,
+        "story_points": <points>,
+        "iterations": <count>,
+        "status": "completed|in_progress"
       }
     }
   },
   "historical_metrics": {
-    "total_runs": 3,
-    "average_velocity": 10.5,
-    "average_cycle_time_minutes": 52,
-    "completion_rate": 0.95,
-    "revision_rate": 1.3
+    "total_runs": <count>,
+    "average_velocity": <average>,
+    "average_cycle_time_minutes": <average>,
+    "completion_rate": <percentage>,
+    "revision_rate": <average>
   },
   "trends": {
-    "velocity": "improving",
-    "cycle_time": "stable",
-    "quality": "improving"
+    "velocity": "improving|stable|declining",
+    "cycle_time": "improving|stable|declining",
+    "quality": "improving|stable|declining"
   },
   "warnings": [
     {
       "type": "99_percent_rule",
-      "group_id": "G002",
-      "message": "Task taking 3x longer than expected (135 min vs 45 min estimate)",
-      "recommendation": "Consider Tech Lead escalation or breaking into smaller tasks"
+      "group_id": "<id>",
+      "message": "<description>",
+      "recommendation": "<action>"
     }
   ],
   "recommendations": [
-    "Current velocity (12) exceeds historical average (10.5) - good progress",
-    "G002 pattern: Database tasks taking 2.5x estimate - budget more time",
-    "Quality trend improving - fewer revisions per task"
+    "<recommendation 1>",
+    "<recommendation 2>"
   ]
 }
 ```
 
-## Metrics Explained
+---
 
-### Velocity
-**Definition:** Total story points completed in current run
-**Use:** Forecast capacity, measure team throughput
-**Good:** Increasing or stable velocity
-**Bad:** Declining velocity (bottleneck indicator)
+## Step 8: Update Historical Metrics
 
-### Cycle Time
-**Definition:** Time from task start to completion (in minutes)
-**Use:** Identify slow tasks, detect 99% rule violations
-**Good:** Decreasing cycle time (getting faster)
-**Bad:** Increasing cycle time (getting slower)
+If this run is complete, append current metrics to `coordination/historical_metrics.json` using the **Write** tool.
 
-### 99% Rule Violation
-**Definition:** Tasks taking >3x estimated time
-**Use:** Detect "stuck forever" tasks requiring intervention
-**Action:** Escalate to Tech Lead, break into smaller tasks, or get user input
-
-### Revision Rate
-**Definition:** Average iterations per task group
-**Use:** Quality indicator (lower is better)
-**Good:** <1.5 revisions per task
-**Bad:** >3 revisions (quality issues)
-
-## How It Works
-
-### Step 1: Read PM State
-```bash
-# Read coordination/pm_state.json
-# Extract: task_groups, completed_groups, timestamps
+Update running averages:
+```
+new_avg_velocity = (old_avg * total_runs + current_velocity) / (total_runs + 1)
+new_avg_cycle_time = (old_avg * total_runs + current_cycle_time) / (total_runs + 1)
 ```
 
-### Step 2: Calculate Current Metrics
-- **Velocity**: Sum story_points from completed groups
-- **Cycle Time**: (end_time - start_time) per group
-- **% Complete**: completed / total * 100
-- **Remaining Time**: (total - completed) * avg_cycle_time
+---
 
-### Step 3: Load Historical Data
-```bash
-# Read coordination/historical_metrics.json
-# Extract: past velocities, cycle times, patterns
+## Step 9: Return Summary
+
+Return a concise summary to the calling agent:
+
+```
+Velocity Metrics:
+- Current velocity: X story points (historical avg: Y)
+- Trend: improving/stable/declining
+- Cycle time: X minutes average
+- Completion: X%
+
+Warnings:
+- [List any 99% rule violations]
+
+Recommendations:
+- [List top 3 recommendations]
+
+Details saved to: coordination/project_metrics.json
 ```
 
-### Step 4: Detect Trends
-- Compare current to historical average
-- Classify: improving, stable, declining
-- Identify patterns (e.g., "DB tasks take 2.5x longer")
+---
 
-### Step 5: Generate Warnings
-- **99% Rule**: Tasks >3x expected time
-- **Velocity Drop**: >20% below historical average
-- **Stuck Tasks**: In progress >2x average cycle time
+## Error Handling
 
-### Step 6: Write Output
-```bash
-# Write coordination/project_metrics.json
-# Append to coordination/historical_metrics.json
-```
+If `coordination/pm_state.json` doesn't exist:
+- Return: "Error: PM state file not found. Cannot calculate metrics."
 
-## PM Integration
+If no completed groups yet:
+- Return: "No completed groups yet. Run velocity tracker after completing at least one task group."
 
-**Before spawning developers:**
-```markdown
-@orchestrator
-
-Checking project metrics...
-
-[Invoke /velocity-tracker]
-
-Current velocity: 12 (above average 10.5) ✓
-Estimated remaining: 1.5 hours
-Warning: Database tasks taking 2.5x estimate
-
-Adjusting plan: Allocating extra time for remaining DB migration task.
-
-Spawning Developer-1 for group G004...
-```
-
-**When detecting delay:**
-```markdown
-@orchestrator
-
-Progress check: Group G002 has been in progress for 2 hours.
-
-[Invoke /velocity-tracker]
-
-⚠️ 99% Rule Violation detected!
-- G002 expected: 45 minutes
-- G002 actual: 135 minutes (3x over)
-- Recommendation: Escalate to Tech Lead
-
-Spawning Tech Lead to investigate G002 delay...
-```
-
-## When PM Should Use This
-
-✅ **Use when:**
-- After completing a task group (record metrics)
-- Before spawning new developers (check capacity)
-- When task appears stuck (detect 99% rule)
-- Before BAZINGA (record final metrics for learning)
-- Planning next iteration (use historical data)
-
-❌ **Don't use when:**
-- First run (no historical data yet)
-- Emergency bug fixes (skip metrics)
-- User explicitly requests fast mode
-
-## Benefits
-
-**Without Metrics:**
-- PM guesses blindly
-- No learning from past runs
-- Can't detect stuck tasks
-- Estimation never improves
-- No visibility into progress
-- **Result:** Inefficient, reactive PM
-
-**With Metrics:**
-- Data-driven decisions
-- Continuous improvement
-- Early problem detection
-- Improving estimates over time
-- User visibility
-- **Result:** Efficient, proactive PM
-
-**ROI:** 10x (transforms PM from reactive to proactive)
-
-## Implementation
-
-**Files:**
-- `track.sh`: Bash script for metrics calculation
-- `track.ps1`: PowerShell script for Windows
-- `SKILL.md`: This documentation
-
-**Dependencies:**
-- `jq` (for JSON parsing in bash) - graceful fallback if missing
-- Standard shell utilities (date, awk, bc)
-
-**Runtime:**
-- Small projects (<5 groups): 1-2 seconds
-- Medium projects (5-15 groups): 2-4 seconds
-- Large projects (15+ groups): 4-6 seconds
-
-**Data Storage:**
-```
-coordination/
-├── project_metrics.json      # Current run metrics
-└── historical_metrics.json   # Cross-run learning
-```
-
-## Integration with Other Features
-
-- **Tech Debt Tracking**: Metrics help PM decide if debt is acceptable
-- **Model Escalation**: Velocity drop triggers earlier escalation
-- **Adaptive Parallelism**: Velocity data informs spawn decisions
-- **Quality Gates**: Revision rate affects approval decisions
-
-This Skill transforms PM from "orchestrator" to "data-driven manager" - making BAZINGA smarter with every run.
+If any step fails:
+- Log the error and return a partial report with available data
