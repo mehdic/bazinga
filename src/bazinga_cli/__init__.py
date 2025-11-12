@@ -23,6 +23,7 @@ from rich.table import Table
 from rich.text import Text
 
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
+from .telemetry import track_command
 
 __version__ = "1.1.0"
 
@@ -1196,6 +1197,9 @@ def init(
     tree.add_row("📄", ".claude.md       [dim](global configuration)[/dim]")
     console.print(tree)
 
+    # Track installation (anonymous telemetry)
+    track_command("init", __version__)
+
 
 @app.command()
 def check():
@@ -1592,6 +1596,9 @@ def update(
             border_style="green",
         )
     )
+
+    # Track update (anonymous telemetry)
+    track_command("update", __version__)
 
 
 @app.command()
