@@ -5,22 +5,55 @@
 # This script creates the required folder structure and state files
 # for orchestration. Safe to run multiple times (idempotent).
 #
-# Usage: ./.claude/scripts/init-orchestration.sh
+# Usage:
+#   ./.claude/scripts/init-orchestration.sh           # Resume existing or create new
+#   ./.claude/scripts/init-orchestration.sh --new     # Force new session
+#
 
 set -e  # Exit on error
 
-# Generate session ID with timestamp
-SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-echo "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..."
-echo "📅 Session ID: $SESSION_ID"
+# Check for --new flag to force new session
+FORCE_NEW=false
+if [ "$1" = "--new" ]; then
+    FORCE_NEW=true
+fi
 
 # Ensure all required directories exist (mkdir -p is idempotent - safe to run multiple times)
-echo "📁 Ensuring directory structure exists..."
+echo "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..."
 mkdir -p coordination/messages
 mkdir -p coordination/reports
 mkdir -p docs
+
+# Check if this is an existing session or new session
+if [ "$FORCE_NEW" = true ]; then
+    # Force new session - archive old one first
+    if [ -f "coordination/orchestrator_state.json" ]; then
+        OLD_SESSION=$(python3 -c "import json; print(json.load(open('coordination/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
+        echo "🗂️  Archiving old session: $OLD_SESSION"
+        ARCHIVE_DIR="coordination/archive/$OLD_SESSION"
+        mkdir -p "$ARCHIVE_DIR"
+        mv coordination/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+        mv coordination/messages/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+    fi
+    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+    echo "📅 Starting new session: $SESSION_ID"
+elif [ -f "coordination/orchestrator_state.json" ]; then
+    # Existing session - read the session ID from existing file
+    SESSION_ID=$(python3 -c "import json; print(json.load(open('coordination/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
+    if [ "$SESSION_ID" = "unknown" ]; then
+        # File exists but no session_id, generate one
+        SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+        echo "📅 Creating new session ID: $SESSION_ID"
+    else
+        echo "📂 Resuming existing session: $SESSION_ID"
+    fi
+else
+    # New session - generate fresh session ID
+    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+    echo "📅 Creating new session: $SESSION_ID"
+fi
+
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Initialize pm_state.json
 if [ ! -f "coordination/pm_state.json" ]; then
