@@ -99,10 +99,10 @@ This Skill is **automatically invoked** by Claude when:
 
 ```bash
 # Run linting
-bash .claude/skills/lint-check/lint.sh
+bash .claude/skills/lint-check/scripts/lint.sh
 
 # Or PowerShell
-.\.claude\skills\lint-check\lint.ps1
+.\.claude\skills\lint-check\scripts\lint.ps1
 ```
 
 ---

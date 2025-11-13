@@ -95,10 +95,10 @@ This Skill is **automatically invoked** by Claude when:
 
 ```bash
 # Run coverage analysis
-bash .claude/skills/test-coverage/coverage.sh
+bash .claude/skills/test-coverage/scripts/coverage.sh
 
 # Or PowerShell
-.\.claude\skills\test-coverage\coverage.ps1
+.\.claude\skills\test-coverage\scripts\coverage.ps1
 ```
 
 ---

@@ -84,11 +84,11 @@ This Skill is **automatically invoked** by Claude when:
 ```bash
 # Test basic mode
 export SECURITY_SCAN_MODE=basic
-bash .claude/skills/security-scan/scan.sh
+bash .claude/skills/security-scan/scripts/scan.sh
 
 # Test advanced mode
 export SECURITY_SCAN_MODE=advanced
-bash .claude/skills/security-scan/scan.sh
+bash .claude/skills/security-scan/scripts/scan.sh
 ```
 
 ---
