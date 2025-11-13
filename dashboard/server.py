@@ -570,58 +570,113 @@ def manage_session(session_id):
 
 @app.route('/api/sessions/<session_id>/archive', methods=['POST'])
 def archive_session(session_id):
-    """Archive a session."""
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+    """Archive a session (mark as archived in database)."""
+    global db
 
-    if not session_file.exists():
-        return jsonify({'error': 'Session not found'}), 404
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
 
     try:
-        ARCHIVE_DIR.mkdir(exist_ok=True)
-        archive_file = ARCHIVE_DIR / f"{session_id}.json"
-        shutil.move(str(session_file), str(archive_file))
+        # Check if session exists
+        session_data = db.get_session(session_id)
+        if not session_data:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Update session status to 'archived'
+        db.update_session_status(session_id, 'archived')
+
         return jsonify({'success': True, 'message': 'Session archived'})
     except Exception as e:
+        print(f"⚠️  Error archiving session: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/<session_id>/export', methods=['GET'])
 def export_session(session_id):
-    """Export session data."""
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+    """Export session data from database."""
+    global db
 
-    if not session_file.exists():
-        return jsonify({'error': 'Session not found'}), 404
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
 
     try:
-        with open(session_file, 'r') as f:
-            session = json.load(f)
+        # Get session data from database
+        session_data = db.get_session(session_id)
+        if not session_data:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Get full snapshot with all related data
+        snapshot = db.get_dashboard_snapshot(session_id)
+
+        # Build complete export
+        export_data = {
+            'session': session_data,
+            'orchestrator_state': snapshot.get('orchestrator_state'),
+            'pm_state': snapshot.get('pm_state'),
+            'task_groups': snapshot.get('task_groups', []),
+            'logs': snapshot.get('recent_logs', []),
+            'token_usage': snapshot.get('token_usage'),
+            'exported_at': datetime.now().isoformat()
+        }
 
         export_format = request.args.get('format', 'json')
 
         if export_format == 'json':
-            return jsonify(session)
+            return jsonify(export_data)
         else:
             return jsonify({'error': 'Unsupported format'}), 400
     except Exception as e:
+        print(f"⚠️  Error exporting session: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/compare', methods=['POST'])
 def compare_sessions():
-    """Compare two sessions."""
+    """Compare two sessions from database."""
+    global db
+
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
+
     try:
         session1_id = request.json.get('session1')
         session2_id = request.json.get('session2')
 
-        session1_file = SESSIONS_DIR / f"{session1_id}.json"
-        session2_file = SESSIONS_DIR / f"{session2_id}.json"
+        # Get both sessions from database
+        session1_data = db.get_session(session1_id)
+        session2_data = db.get_session(session2_id)
 
-        if not session1_file.exists() or not session2_file.exists():
+        if not session1_data or not session2_data:
             return jsonify({'error': 'One or both sessions not found'}), 404
 
-        with open(session1_file, 'r') as f:
-            session1 = json.load(f)
-        with open(session2_file, 'r') as f:
-            session2 = json.load(f)
+        # Get snapshots for both sessions
+        snapshot1 = db.get_dashboard_snapshot(session1_id)
+        snapshot2 = db.get_dashboard_snapshot(session2_id)
+
+        # Build session objects for comparison
+        session1 = {
+            'session_id': session1_id,
+            'data': {
+                'status': session1_data.get('status'),
+                'mode': session1_data.get('mode'),
+                'created_at': session1_data.get('created_at'),
+                'end_time': session1_data.get('end_time'),
+                'group_status': {'task_groups': snapshot1.get('task_groups', [])},
+                'pm_state': snapshot1.get('pm_state'),
+                'token_usage': snapshot1.get('token_usage')
+            }
+        }
+
+        session2 = {
+            'session_id': session2_id,
+            'data': {
+                'status': session2_data.get('status'),
+                'mode': session2_data.get('mode'),
+                'created_at': session2_data.get('created_at'),
+                'end_time': session2_data.get('end_time'),
+                'group_status': {'task_groups': snapshot2.get('task_groups', [])},
+                'pm_state': snapshot2.get('pm_state'),
+                'token_usage': snapshot2.get('token_usage')
+            }
+        }
 
         # Generate comparison
         comparison = {
@@ -632,6 +687,9 @@ def compare_sessions():
 
         return jsonify(comparison)
     except Exception as e:
+        print(f"⚠️  Error comparing sessions: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 def generate_session_diff(session1, session2):
