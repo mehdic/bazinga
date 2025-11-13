@@ -315,26 +315,7 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
 
    ### 🔴 MANDATORY: Store configuration in database
 
-   **YOU MUST invoke bazinga-db skill to save orchestrator state.**
-
-   **First, get current orchestrator state:**
-
-   Request to bazinga-db skill:
-   ```
-   bazinga-db, please get the latest orchestrator state:
-
-   Session ID: [current session_id]
-   State Type: orchestrator
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db")
-   ```
-
-   **WAIT for bazinga-db response.** It will return current state or empty if first time.
-
-   **Now update state with config information and save:**
+   **YOU MUST invoke bazinga-db skill to save orchestrator initial state.**
 
    Request to bazinga-db skill:
    ```
@@ -343,11 +324,15 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    Session ID: [current session_id]
    State Type: orchestrator
    State Data: {
+     "session_id": "[current session_id]",
+     "current_phase": "initialization",
      "skills_config_loaded": true,
-     "active_skills_count": [count from config],
+     "active_skills_count": [count from skills_config.json],
      "testing_config_loaded": true,
-     "testing_mode": "[mode from config]",
-     "qa_expert_enabled": [boolean from config]
+     "testing_mode": "[mode from testing_config.json]",
+     "qa_expert_enabled": [boolean from testing_config.json],
+     "iteration": 0,
+     "total_spawns": 0
    }
    ```
 
@@ -356,13 +341,15 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    Skill(command: "bazinga-db")
    ```
 
+   **WAIT for confirmation.** Database will save the initial orchestrator state.
+
    **REQUIRED OUTPUT - Display confirmation:**
    ```
    ✅ **ORCHESTRATOR**: Configuration stored in database
    ```
 
    **Validation:**
-   - ✓ [ ] bazinga-db skill invoked twice (get + save)
+   - ✓ [ ] bazinga-db skill invoked
    - ✓ [ ] Confirmation message displayed
 
    **IF VALIDATION FAILS: Configuration not persisted. Cannot proceed.**
@@ -1302,65 +1289,48 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 
 ---
 
-## State Management from Database
+## State Management from Database - REFERENCE
+
+**⚠️ IMPORTANT:** These are **separate operations** you perform at different times. Do NOT execute them all in sequence! Only use the operation you need at that moment.
 
 ### Reading State
 
-Before spawning PM or when making decisions, query state from database.
-
-**To get PM state:**
+**When you need PM state** (before spawning PM):
 
 Request to bazinga-db skill:
 ```
-bazinga-db, please get the latest PM state:
-
-Session ID: [current session_id]
-State Type: pm
+bazinga-db, please get the latest PM state for session [current session_id]
 ```
 
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
+Then invoke: `Skill(command: "bazinga-db")`
 
-**WAIT for response.** Returns PM state or null if first iteration.
+Wait for response. Returns PM state or null if first iteration.
 
 ---
 
-**To get orchestrator state:**
+**When you need orchestrator state** (to check current phase):
 
 Request to bazinga-db skill:
 ```
-bazinga-db, please get the latest orchestrator state:
-
-Session ID: [current session_id]
-State Type: orchestrator
+bazinga-db, please get the latest orchestrator state for session [current session_id]
 ```
 
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
+Then invoke: `Skill(command: "bazinga-db")`
 
-**WAIT for response.** Returns orchestrator state or null if first time.
+Wait for response. Returns orchestrator state or null if first time.
 
 ---
 
-**To get task groups:**
+**When you need task groups** (to check progress):
 
 Request to bazinga-db skill:
 ```
-bazinga-db, please get all task groups:
-
-Session ID: [current session_id]
+bazinga-db, please get all task groups for session [current session_id]
 ```
 
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
+Then invoke: `Skill(command: "bazinga-db")`
 
-**WAIT for response.** Returns array of task groups.
+Wait for response. Returns array of task groups.
 
 ### Updating Orchestrator State
 

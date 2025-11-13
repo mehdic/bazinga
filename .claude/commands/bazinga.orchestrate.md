@@ -297,22 +297,7 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
 
 4. **Store config references in database:**
 
-   Get current orchestrator state:
-   ```
-   bazinga-db, please get the latest orchestrator state:
-
-   Session ID: [current session_id]
-   State Type: orchestrator
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db")
-   ```
-
-   **WAIT for bazinga-db response.** It will return current state or empty if first time.
-
-   **Now update state with config information and save:**
+   **YOU MUST invoke bazinga-db skill to save orchestrator initial state.**
 
    Request to bazinga-db skill:
    ```
@@ -321,11 +306,15 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    Session ID: [current session_id]
    State Type: orchestrator
    State Data: {
+     "session_id": "[current session_id]",
+     "current_phase": "initialization",
      "skills_config_loaded": true,
-     "active_skills_count": [count from config],
+     "active_skills_count": [count from skills_config.json],
      "testing_config_loaded": true,
-     "testing_mode": "[mode from config]",
-     "qa_expert_enabled": [boolean from config]
+     "testing_mode": "[mode from testing_config.json]",
+     "qa_expert_enabled": [boolean from testing_config.json],
+     "iteration": 0,
+     "total_spawns": 0
    }
    ```
 
@@ -333,6 +322,10 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    ```
    Skill(command: "bazinga-db")
    ```
+
+   **WAIT for confirmation.** Database will save the initial orchestrator state.
+
+   Display: "✅ **ORCHESTRATOR**: Configuration stored in database"
 
 5. **Run build baseline check:**
 
