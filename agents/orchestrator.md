@@ -251,6 +251,44 @@ All state stored in SQLite database at `coordination/bazinga.db`:
 - **Benefits:** Concurrent-safe, ACID transactions, fast indexed queries
 - **Details:** See `.claude/skills/bazinga-db/SKILL.md` for complete schema
 
+### ═══════════════════════════════════════════
+### ⚠️ INITIALIZATION VERIFICATION CHECKPOINT
+### ═══════════════════════════════════════════
+
+**🔴 CRITICAL: Before spawning PM, you MUST verify ALL initialization steps completed.**
+
+**MANDATORY VERIFICATION CHECKLIST:**
+
+Output the following verification to confirm initialization:
+
+```
+✓ [ ] Session ID generated: [show session_id]
+✓ [ ] Database initialized (bazinga-db invoked)
+✓ [ ] Skills configuration loaded and displayed
+✓ [ ] Testing configuration loaded and displayed
+✓ [ ] Config stored in database
+```
+
+**YOU MUST display the contents of BOTH configuration files to prove you read them:**
+
+```
+📋 SKILLS CONFIG (coordination/skills_config.json):
+[paste full skills_config.json contents here]
+
+📋 TESTING CONFIG (coordination/testing_config.json):
+[paste full testing_config.json contents here]
+```
+
+**IF YOU CANNOT DISPLAY BOTH CONFIG FILES: STOP. Go back to Step 3 and read them.**
+
+**Validation Rules:**
+- ❌ If you did NOT output both config files → Initialization FAILED
+- ❌ If "🎯 ORCHESTRATOR: Skills configuration loaded" was NOT displayed → Initialization FAILED
+- ❌ If "🧪 ORCHESTRATOR: Testing framework configuration loaded" was NOT displayed → Initialization FAILED
+- ✅ If ALL messages displayed AND both configs output → Initialization PASSED
+
+**ONLY AFTER displaying both config files may you proceed to Phase 1.**
+
 ---
 
 ## Workflow Overview
@@ -402,30 +440,106 @@ Build code context section with similar files and available utilities for develo
 👨‍💻 **ORCHESTRATOR**: Spawning Developer for implementation...
 ```
 
-Build developer prompt using `coordination/templates/prompt_building.md`:
-- Base: Role, group (main), mode (Simple)
-- Code context from Step 2A.0
-- Testing framework section (from testing_config.json)
-- Advanced skills section (from skills_config.json):
-  - Skill(command: "codebase-analysis")
-  - Skill(command: "test-pattern-analysis")
-  - Skill(command: "lint-check")
-  - Skill(command: "api-contract-validation")
-  - Skill(command: "db-migration-check")
-  Reference skill SKILL.md files for details
-- Mandatory workflow with skill invocations:
-  - BEFORE implementing: Skill(command: "codebase-analysis")
-  - BEFORE writing tests: Skill(command: "test-pattern-analysis")
-  - BEFORE reporting: Skill(command: "lint-check")
-  - IF API changes: Skill(command: "api-contract-validation")
-  - IF migration changes: Skill(command: "db-migration-check")
-- Report format
+### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
+
+**YOU MUST follow `coordination/templates/prompt_building.md` EXACTLY.**
+**DO NOT write custom prompts. DO NOT improvise. DO NOT skip this process.**
+
+**Step-by-Step Prompt Building Process:**
+
+**1. Check skills_config.json for developer mandatory skills:**
+
+From the skills_config.json you loaded during initialization, identify which developer skills have status = "mandatory":
+
+```
+Developer Skills Status:
+- lint-check: [mandatory/disabled]
+- codebase-analysis: [mandatory/disabled]
+- test-pattern-analysis: [mandatory/disabled]
+- api-contract-validation: [mandatory/disabled]
+- db-migration-check: [mandatory/disabled]
+```
+
+**2. Build prompt sections (following prompt_building.md template):**
+
+Include these sections in order:
+- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
+- ✓ Group assignment (main)
+- ✓ Mode (Simple)
+- ✓ Code context from Step 2A.0
+- ✓ Testing framework section (from testing_config.json)
+- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Mandatory workflow steps (with Skill() invocations)
+- ✓ Report format
+
+**3. For EACH mandatory skill, add to prompt:**
+
+```
+⚡ ADVANCED SKILLS ACTIVE
+
+You have access to the following mandatory Skills:
+
+[FOR EACH skill where status = "mandatory"]:
+X. **[Skill Name]**: Run [WHEN]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+
+USE THESE SKILLS - They are MANDATORY!
+```
+
+**4. Add MANDATORY WORKFLOW section:**
+
+```
+**MANDATORY WORKFLOW:**
+
+BEFORE Implementing:
+1. Review codebase context above
+[IF codebase-analysis is mandatory]:
+2. INVOKE Codebase Analysis Skill (MANDATORY)
+   Skill(command: "codebase-analysis")
+
+During Implementation:
+3. Implement the COMPLETE solution
+4. Write unit tests
+[IF test-pattern-analysis is mandatory]:
+5. INVOKE Test Pattern Analysis Skill (MANDATORY)
+   Skill(command: "test-pattern-analysis")
+
+BEFORE Reporting READY_FOR_QA:
+6. Run ALL unit tests - MUST pass 100%
+[IF lint-check is mandatory]:
+7. INVOKE lint-check Skill (MANDATORY)
+   Skill(command: "lint-check")
+8. Run build check - MUST succeed
+[IF api-contract-validation is mandatory AND api_changes]:
+9. INVOKE API Contract Validation (MANDATORY)
+   Skill(command: "api-contract-validation")
+[IF db-migration-check is mandatory AND migration_changes]:
+10. INVOKE DB Migration Check (MANDATORY)
+    Skill(command: "db-migration-check")
+
+ONLY THEN:
+11. Commit to branch: [branch_name]
+12. Report: READY_FOR_QA
+```
+
+**5. VALIDATION - Before spawning, verify your prompt contains:**
+
+```
+✓ [ ] The word "Skill(command:" appears at least once (for each mandatory skill)
+✓ [ ] Testing mode from testing_config.json is mentioned
+✓ [ ] MANDATORY WORKFLOW section exists
+✓ [ ] Report format specified
+```
+
+**IF ANY CHECKBOX IS UNCHECKED: Your prompt is INCOMPLETE. Fix it before spawning.**
 
 See `agents/developer.md` for full developer agent definition.
+See `coordination/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt])
+Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt built using above process])
 ```
 
 ### Step 2A.2: Receive Developer Response
@@ -471,31 +585,85 @@ Skill(command: "bazinga-db")
 🧪 **ORCHESTRATOR**: Spawning QA Expert for testing validation...
 ```
 
-Build QA prompt with developer's changes and test requirements.
+### 🔴 MANDATORY QA EXPERT PROMPT BUILDING - SKILLS REQUIRED
 
-See `agents/qa_expert.md` for full QA agent definition.
+**YOU MUST include mandatory skills in QA Expert prompt.**
+
+**1. Check skills_config.json for qa_expert mandatory skills:**
+
+From the skills_config.json you loaded during initialization, identify which qa_expert skills have status = "mandatory":
+
+```
+QA Expert Skills Status:
+- pattern-miner: [mandatory/disabled]
+- quality-dashboard: [mandatory/disabled]
+```
+
+**2. Build QA Expert prompt following prompt_building.md template:**
+
+Include these sections:
+- ✓ Role definition (QA Expert in Claude Code Multi-Agent Dev Team)
+- ✓ Developer changes summary and test requirements
+- ✓ Testing framework section (from testing_config.json)
+- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Mandatory testing workflow with skill invocations
+- ✓ Report format
+
+**3. For EACH mandatory skill, add to QA Expert prompt:**
+
+```
+⚡ ADVANCED SKILLS ACTIVE
+
+You have access to the following mandatory Skills:
+
+[FOR EACH skill where status = "mandatory"]:
+X. **[Skill Name]**: Run [WHEN]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+
+USE THESE SKILLS - They are MANDATORY!
+```
+
+**4. Add MANDATORY TESTING WORKFLOW to QA Expert prompt:**
+
+```
+**MANDATORY TESTING WORKFLOW:**
+
+Run Tests:
+1. Execute integration tests
+2. Execute contract tests
+3. Execute E2E tests (if applicable)
+4. Verify test results
+
+AFTER Testing:
+[IF pattern-miner is mandatory]:
+5. INVOKE Pattern Miner Skill (MANDATORY)
+   Skill(command: "pattern-miner")
+
+[IF quality-dashboard is mandatory]:
+6. INVOKE Quality Dashboard Skill (MANDATORY)
+   Skill(command: "quality-dashboard")
+
+THEN:
+7. Make recommendation: APPROVE_FOR_REVIEW or REQUEST_CHANGES
+```
+
+**5. VALIDATION - Before spawning QA Expert, verify prompt contains:**
+
+```
+✓ [ ] Testing workflow defined
+✓ [ ] Skill invocation instructions (if any mandatory skills)
+✓ [ ] Recommendation format (APPROVE_FOR_REVIEW/REQUEST_CHANGES)
+```
+
+**IF ANY CHECKBOX IS UNCHECKED: QA Expert prompt is INCOMPLETE. Fix it before spawning.**
+
+See `agents/qa_expert.md` for full QA Expert agent definition.
+See `coordination/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA prompt])
-```
-
-**After QA completes, invoke quality skills:**
-
-```
-pattern-miner, please analyze test patterns
-```
-**Then invoke:**
-```
-Skill(command: "pattern-miner")
-```
-
-```
-quality-dashboard, please generate snapshot
-```
-**Then invoke:**
-```
-Skill(command: "quality-dashboard")
+Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA Expert prompt built using above process])
 ```
 
 **Log QA interaction:**
@@ -531,39 +699,90 @@ Skill(command: "bazinga-db")
 👔 **ORCHESTRATOR**: Spawning Tech Lead for code review...
 ```
 
-Build Tech Lead prompt with implementation details and review requirements.
+### 🔴 MANDATORY TECH LEAD PROMPT BUILDING - SKILLS REQUIRED
+
+**YOU MUST include mandatory skills in Tech Lead prompt.**
+
+**1. Check skills_config.json for tech_lead mandatory skills:**
+
+From the skills_config.json you loaded during initialization, identify which tech_lead skills have status = "mandatory":
+
+```
+Tech Lead Skills Status:
+- security-scan: [mandatory/disabled]
+- lint-check: [mandatory/disabled]
+- test-coverage: [mandatory/disabled]
+```
+
+**2. Build Tech Lead prompt following prompt_building.md template:**
+
+Include these sections:
+- ✓ Role definition (Tech Lead in Claude Code Multi-Agent Dev Team)
+- ✓ Group assignment and implementation summary
+- ✓ Testing framework section (from testing_config.json)
+- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Mandatory review workflow with skill invocations
+- ✓ Report format
+
+**3. For EACH mandatory skill, add to Tech Lead prompt:**
+
+```
+⚡ ADVANCED SKILLS ACTIVE
+
+You have access to the following mandatory Skills:
+
+[FOR EACH skill where status = "mandatory"]:
+X. **[Skill Name]**: Run [WHEN]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+
+USE THESE SKILLS - They are MANDATORY before approving!
+```
+
+**4. Add MANDATORY REVIEW WORKFLOW to Tech Lead prompt:**
+
+```
+**MANDATORY REVIEW WORKFLOW:**
+
+BEFORE Manual Review:
+[IF security-scan is mandatory]:
+1. INVOKE Security Scan Skill (MANDATORY)
+   Skill(command: "security-scan")
+
+[IF lint-check is mandatory]:
+2. INVOKE Lint Check Skill (MANDATORY)
+   Skill(command: "lint-check")
+
+[IF test-coverage is mandatory]:
+3. INVOKE Test Coverage Skill (MANDATORY)
+   Skill(command: "test-coverage")
+
+THEN Perform Manual Review:
+4. Review architecture and code quality
+5. Assess performance implications
+6. Check security best practices
+7. Evaluate test adequacy
+
+ONLY THEN:
+8. Make decision: APPROVED or REQUEST_CHANGES
+```
+
+**5. VALIDATION - Before spawning Tech Lead, verify prompt contains:**
+
+```
+✓ [ ] At least one "Skill(command:" instruction (for each mandatory skill)
+✓ [ ] MANDATORY REVIEW WORKFLOW section
+✓ [ ] Decision format (APPROVED/REQUEST_CHANGES)
+```
+
+**IF ANY CHECKBOX IS UNCHECKED: Tech Lead prompt is INCOMPLETE. Fix it before spawning.**
 
 See `agents/techlead.md` for full Tech Lead agent definition.
+See `coordination/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [TL prompt])
-```
-
-**After Tech Lead review, invoke validation skills:**
-
-```
-security-scan, please scan changes
-```
-**Then invoke:**
-```
-Skill(command: "security-scan")
-```
-
-```
-lint-check, please check code quality
-```
-**Then invoke:**
-```
-Skill(command: "lint-check")
-```
-
-```
-test-coverage, please analyze coverage
-```
-**Then invoke:**
-```
-Skill(command: "test-coverage")
+Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [Tech Lead prompt built using above process])
 ```
 
 **Log Tech Lead interaction:**
@@ -677,23 +896,46 @@ Task(subagent_type: "general-purpose", description: "Developer Group C", prompt:
 ... up to 4 developers max
 ```
 
-**Developer Prompt Structure** (per group):
+### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
-Build each prompt using `coordination/templates/prompt_building.md`:
-- Base: Role, group ID, mode (Parallel), branch name
-- Code context for this group
-- Testing framework section (from testing_config.json)
-- Advanced skills section (from skills_config.json):
-  - Skill(command: "codebase-analysis")
-  - Skill(command: "test-pattern-analysis")
-  - Skill(command: "lint-check")
-  - Skill(command: "api-contract-validation")
-  - Skill(command: "db-migration-check")
-  Reference skill SKILL.md files for details
-- Mandatory workflow with skill invocations
-- Report format
+**YOU MUST build EACH developer prompt using the same process as Simple Mode (Step 2A.1).**
+
+**For EACH group, follow this process:**
+
+**1. Check skills_config.json for developer mandatory skills** (same as Simple Mode)
+
+**2. Build prompt sections for THIS group:**
+- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
+- ✓ Group assignment (specific group ID: A, B, C, etc.)
+- ✓ Mode (Parallel)
+- ✓ Branch name for this group
+- ✓ Code context for THIS group (from Step 2B.0)
+- ✓ Testing framework section (from testing_config.json)
+- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Mandatory workflow steps (with Skill() invocations)
+- ✓ Report format
+
+**3. For EACH mandatory skill, add to THIS group's prompt:**
+Same skill section as Simple Mode (see Step 2A.1)
+
+**4. Add MANDATORY WORKFLOW section to THIS group's prompt:**
+Same workflow as Simple Mode, but include group-specific branch name
+
+**5. VALIDATION - Before spawning, verify EACH group's prompt contains:**
+```
+✓ [ ] "Skill(command:" appears at least once per mandatory skill
+✓ [ ] Testing mode from testing_config.json
+✓ [ ] MANDATORY WORKFLOW section
+✓ [ ] Group-specific branch name
+✓ [ ] Report format
+```
+
+**REPEAT THIS PROCESS FOR EACH GROUP (A, B, C, D).**
+
+**IF ANY GROUP'S PROMPT IS INCOMPLETE: Fix ALL prompts before spawning.**
 
 See `coordination/templates/message_templates.md` for standard prompt format.
+See `agents/developer.md` for full developer agent definition.
 
 ### Step 2B.2: Receive All Developer Responses
 
@@ -734,26 +976,17 @@ The routing chain for each group is:
    - IF status is BLOCKED/INCOMPLETE → Provide feedback, respawn developer (track revisions)
 
 2. **Spawn QA Expert** (Step 2B.4) - IF qa_expert_enabled:
-   - Build QA prompt (similar to Phase 2A but for this group's files)
-   - Spawn: `Task(subagent_type="general-purpose", description="QA Group [X]", prompt=[QA prompt])`
 
-   **After QA completes, invoke quality skills:**
+   ### 🔴 USE SAME QA PROMPT BUILDING PROCESS AS STEP 2A.4
 
-   ```
-   pattern-miner, please analyze test patterns for Group [X]
-   ```
-   Then invoke:
-   ```
-   Skill(command: "pattern-miner")
-   ```
+   **Follow the EXACT same mandatory prompt building process from Step 2A.4**, but for this group's files:
+   - Check skills_config.json for qa_expert mandatory skills
+   - Build prompt following prompt_building.md template
+   - Include mandatory skills section (if any)
+   - Add mandatory testing workflow with skill invocations
+   - Validate prompt before spawning
 
-   ```
-   quality-dashboard, please generate snapshot for Group [X]
-   ```
-   Then invoke:
-   ```
-   Skill(command: "quality-dashboard")
-   ```
+   Spawn: `Task(subagent_type="general-purpose", description="QA Group [X]", prompt=[QA prompt built using Step 2A.4 process])`
 
    **Log QA response:**
    ```
@@ -776,34 +1009,17 @@ The routing chain for each group is:
    - IF QA requests changes → Respawn developer with QA feedback (track revisions)
 
 4. **Spawn Tech Lead** (Step 2B.6):
-   - Build Tech Lead prompt (review for this group's files)
-   - Spawn: `Task(subagent_type="general-purpose", description="Tech Lead Group [X]", prompt=[TL prompt])`
 
-   **After Tech Lead review, invoke validation skills:**
+   ### 🔴 USE SAME TECH LEAD PROMPT BUILDING PROCESS AS STEP 2A.6
 
-   ```
-   security-scan, please scan changes for Group [X]
-   ```
-   Then invoke:
-   ```
-   Skill(command: "security-scan")
-   ```
+   **Follow the EXACT same mandatory prompt building process from Step 2A.6**, but for this group's files:
+   - Check skills_config.json for tech_lead mandatory skills
+   - Build prompt following prompt_building.md template
+   - Include mandatory skills section (for each mandatory skill)
+   - Add mandatory review workflow with skill invocations
+   - Validate prompt before spawning
 
-   ```
-   lint-check, please check code quality for Group [X]
-   ```
-   Then invoke:
-   ```
-   Skill(command: "lint-check")
-   ```
-
-   ```
-   test-coverage, please analyze coverage for Group [X]
-   ```
-   Then invoke:
-   ```
-   Skill(command: "test-coverage")
-   ```
+   Spawn: `Task(subagent_type="general-purpose", description="Tech Lead Group [X]", prompt=[Tech Lead prompt built using Step 2A.6 process])`
 
    **Log Tech Lead response:**
    ```
