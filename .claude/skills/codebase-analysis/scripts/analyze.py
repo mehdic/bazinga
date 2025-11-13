@@ -8,7 +8,7 @@ Usage:
     python analyze.py "Implement password reset endpoint"
 
 Output:
-    coordination/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+    bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
 """
 
 import os
@@ -24,7 +24,7 @@ from datetime import datetime
 # Get current session ID from database
 def get_current_session_id():
     """Get the most recent session ID from the database."""
-    db_path = "coordination/bazinga.db"
+    db_path = "bazinga/bazinga.db"
     if not os.path.exists(db_path):
         return "bazinga_default"
 
@@ -40,7 +40,7 @@ def get_current_session_id():
         return "bazinga_default"
 
 SESSION_ID = get_current_session_id()
-OUTPUT_DIR = Path(f"coordination/artifacts/{SESSION_ID}/skills")
+OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_FILE = OUTPUT_DIR / "codebase_analysis.json"
 
@@ -50,7 +50,7 @@ print(f"📁 Output directory: {OUTPUT_DIR}")
 def load_profile():
     """Load profile from skills_config.json"""
     try:
-        with open("coordination/skills_config.json", "r") as f:
+        with open("bazinga/skills_config.json", "r") as f:
             config = json.load(f)
             return config.get("_metadata", {}).get("profile", "lite")
     except:
@@ -74,7 +74,7 @@ except ImportError as e:
             "impact": "Codebase analysis was skipped.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
@@ -87,7 +87,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
@@ -107,7 +107,7 @@ def find_code_files(root_dir: str = ".", exclude_dirs: List[str] = None) -> List
     if exclude_dirs is None:
         exclude_dirs = [
             ".git", "node_modules", "venv", "__pycache__", ".pytest_cache",
-            "build", "dist", ".next", ".cache", "coordination", "docs"
+            "build", "dist", ".next", ".cache", "bazinga", "docs"
         ]
 
     code_extensions = {
@@ -393,7 +393,7 @@ def main():
     result = analyze_codebase(task_description)
 
     # Write output
-    output_dir = Path("coordination")
+    output_dir = Path("bazinga")
     output_dir.mkdir(exist_ok=True)
 
     output_file = output_dir / "codebase_analysis.json"

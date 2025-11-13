@@ -16,7 +16,7 @@ echo "🔒 Security Scan Starting (Mode: $MODE)..."
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="coordination/bazinga.db"
+    local db_path="bazinga/bazinga.db"
     if [ ! -f "$db_path" ]; then
         echo "bazinga_default"
         return
@@ -41,7 +41,7 @@ except:
 }
 
 SESSION_ID=$(get_current_session_id)
-OUTPUT_DIR="coordination/artifacts/$SESSION_ID/skills"
+OUTPUT_DIR="bazinga/artifacts/$SESSION_ID/skills"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/security_scan.json"
 
@@ -54,8 +54,8 @@ TOOL_USED="none"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
-if [ -f "coordination/skills_config.json" ] && command -v jq &> /dev/null; then
-    PROFILE=$(jq -r '._metadata.profile // "lite"' coordination/skills_config.json 2>/dev/null || echo "lite")
+if [ -f "bazinga/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
 fi
 
 # Detect project language
@@ -144,10 +144,10 @@ case $MODE in
                 TOOL_USED="bandit"
                 # Basic: High/medium severity only (-ll flag)
                 echo "  Running bandit (high/medium severity)..."
-                if ! bandit -r . -f json -o coordination/security_scan_raw.json -ll 2>/dev/null; then
+                if ! bandit -r . -f json -o bazinga/security_scan_raw.json -ll 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="Bandit scan failed or had errors"
-                    echo '{"results":[]}' > coordination/security_scan_raw.json
+                    echo '{"results":[]}' > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -155,10 +155,10 @@ case $MODE in
                 TOOL_USED="npm-audit"
                 # npm audit is built-in
                 echo "  Running npm audit (high severity)..."
-                if ! npm audit --audit-level=high --json > coordination/security_scan_raw.json 2>/dev/null; then
+                if ! npm audit --audit-level=high --json > bazinga/security_scan_raw.json 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="npm audit failed (possibly network issue)"
-                    echo '{"vulnerabilities":{}}' > coordination/security_scan_raw.json
+                    echo '{"vulnerabilities":{}}' > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -169,10 +169,10 @@ case $MODE in
                 export PATH=$PATH:$(go env GOPATH)/bin
                 TOOL_USED="gosec"
                 echo "  Running gosec (high severity)..."
-                if ! gosec -severity high -fmt json -out coordination/security_scan_raw.json ./... 2>/dev/null; then
+                if ! gosec -severity high -fmt json -out bazinga/security_scan_raw.json ./... 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="gosec scan failed"
-                    echo '{"issues":[]}' > coordination/security_scan_raw.json
+                    echo '{"issues":[]}' > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -182,10 +182,10 @@ case $MODE in
 
                 TOOL_USED="brakeman"
                 echo "  Running brakeman (high severity)..."
-                if ! brakeman -f json -o coordination/security_scan_raw.json --severity-level 1 2>/dev/null; then
+                if ! brakeman -f json -o bazinga/security_scan_raw.json --severity-level 1 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="brakeman scan failed"
-                    echo '{"warnings":[]}' > coordination/security_scan_raw.json
+                    echo '{"warnings":[]}' > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -202,14 +202,14 @@ case $MODE in
                         # Check if SpotBugs report exists
                         if [ -f "target/spotbugsXml.xml" ]; then
                             # Convert XML to JSON if possible
-                            echo '{"tool":"spotbugs","source":"target/spotbugsXml.xml"}' > coordination/security_scan_raw.json
+                            echo '{"tool":"spotbugs","source":"target/spotbugsXml.xml"}' > bazinga/security_scan_raw.json
                         else
-                            echo '{"issues":[]}' > coordination/security_scan_raw.json
+                            echo '{"issues":[]}' > bazinga/security_scan_raw.json
                         fi
                     else
                         SCAN_STATUS="error"
                         SCAN_ERROR="Maven not found for Java project"
-                        echo '{"issues":[]}' > coordination/security_scan_raw.json
+                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
                     fi
                 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
                     TOOL_USED="spotbugs-gradle"
@@ -224,19 +224,19 @@ case $MODE in
                         fi
                         # Check for Gradle SpotBugs report
                         if [ -f "build/reports/spotbugs/main.xml" ]; then
-                            echo '{"tool":"spotbugs","source":"build/reports/spotbugs/main.xml"}' > coordination/security_scan_raw.json
+                            echo '{"tool":"spotbugs","source":"build/reports/spotbugs/main.xml"}' > bazinga/security_scan_raw.json
                         else
-                            echo '{"issues":[]}' > coordination/security_scan_raw.json
+                            echo '{"issues":[]}' > bazinga/security_scan_raw.json
                         fi
                     else
                         SCAN_STATUS="error"
                         SCAN_ERROR="Gradle not found for Java project"
-                        echo '{"issues":[]}' > coordination/security_scan_raw.json
+                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
                     fi
                 else
                     SCAN_STATUS="error"
                     SCAN_ERROR="No Maven or Gradle build file found for Java project"
-                    echo '{"issues":[]}' > coordination/security_scan_raw.json
+                    echo '{"issues":[]}' > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -244,7 +244,7 @@ case $MODE in
                 echo "❌ Unknown language. Cannot run security scan."
                 SCAN_STATUS="error"
                 SCAN_ERROR="Unknown or unsupported language"
-                echo '{"issues":[]}' > coordination/security_scan_raw.json
+                echo '{"issues":[]}' > bazinga/security_scan_raw.json
                 ;;
         esac
 
@@ -268,29 +268,29 @@ case $MODE in
 
                 # Run bandit (all severities)
                 echo "  Running bandit (all severities)..."
-                if ! bandit -r . -f json -o coordination/bandit_full.json 2>/dev/null; then
+                if ! bandit -r . -f json -o bazinga/bandit_full.json 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Bandit scan failed"
-                    echo '{"results":[]}' > coordination/bandit_full.json
+                    echo '{"results":[]}' > bazinga/bandit_full.json
                 fi
 
                 # Run semgrep if available (comprehensive patterns)
                 if command_exists "semgrep"; then
                     echo "  Running semgrep (security patterns)..."
-                    if ! semgrep --config=auto --json -o coordination/semgrep.json 2>/dev/null; then
+                    if ! semgrep --config=auto --json -o bazinga/semgrep.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Semgrep scan failed"
-                        echo '{"results":[]}' > coordination/semgrep.json
+                        echo '{"results":[]}' > bazinga/semgrep.json
                     fi
                 else
-                    echo '{"results":[]}' > coordination/semgrep.json
+                    echo '{"results":[]}' > bazinga/semgrep.json
                 fi
 
                 # Combine results
                 if command_exists "jq"; then
-                    jq -s '{"bandit": .[0], "semgrep": .[1]}' coordination/bandit_full.json coordination/semgrep.json > coordination/security_scan_raw.json
+                    jq -s '{"bandit": .[0], "semgrep": .[1]}' bazinga/bandit_full.json bazinga/semgrep.json > bazinga/security_scan_raw.json
                 else
-                    cat coordination/bandit_full.json > coordination/security_scan_raw.json
+                    cat bazinga/bandit_full.json > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -298,30 +298,30 @@ case $MODE in
                 TOOL_USED="npm-audit"
                 # Full npm audit
                 echo "  Running npm audit (all severabilities)..."
-                if ! npm audit --json > coordination/npm_audit.json 2>/dev/null; then
+                if ! npm audit --json > bazinga/npm_audit.json 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="npm audit failed (possibly network issue)"
-                    echo '{"vulnerabilities":{}}' > coordination/npm_audit.json
+                    echo '{"vulnerabilities":{}}' > bazinga/npm_audit.json
                 fi
 
                 # Try eslint with security plugin if available
                 if npm list eslint-plugin-security &> /dev/null; then
                     TOOL_USED="npm-audit+eslint-security"
                     echo "  Running eslint security plugin..."
-                    if ! npx eslint . --plugin security --format json > coordination/eslint_security.json 2>/dev/null; then
+                    if ! npx eslint . --plugin security --format json > bazinga/eslint_security.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }eslint-security scan failed"
-                        echo '[]' > coordination/eslint_security.json
+                        echo '[]' > bazinga/eslint_security.json
                     fi
 
                     # Combine if jq available
                     if command_exists "jq"; then
-                        jq -s '{"npm_audit": .[0], "eslint": .[1]}' coordination/npm_audit.json coordination/eslint_security.json > coordination/security_scan_raw.json
+                        jq -s '{"npm_audit": .[0], "eslint": .[1]}' bazinga/npm_audit.json bazinga/eslint_security.json > bazinga/security_scan_raw.json
                     else
-                        cat coordination/npm_audit.json > coordination/security_scan_raw.json
+                        cat bazinga/npm_audit.json > bazinga/security_scan_raw.json
                     fi
                 else
-                    cat coordination/npm_audit.json > coordination/security_scan_raw.json
+                    cat bazinga/npm_audit.json > bazinga/security_scan_raw.json
                 fi
                 ;;
 
@@ -333,7 +333,7 @@ case $MODE in
                     if ! go install github.com/securego/gosec/v2/cmd/gosec@latest; then
                         SCAN_STATUS="error"
                         SCAN_ERROR="Failed to install gosec"
-                        echo '{"issues":[]}' > coordination/security_scan_raw.json
+                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
                     else
                         export PATH=$PATH:$(go env GOPATH)/bin
                     fi
@@ -341,10 +341,10 @@ case $MODE in
 
                 if [ "$SCAN_STATUS" != "error" ]; then
                     echo "  Running gosec (all severities)..."
-                    if ! gosec -fmt json -out coordination/security_scan_raw.json ./... 2>/dev/null; then
+                    if ! gosec -fmt json -out bazinga/security_scan_raw.json ./... 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="gosec scan failed"
-                        echo '{"issues":[]}' > coordination/security_scan_raw.json
+                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
                     fi
                 fi
                 ;;
@@ -355,13 +355,13 @@ case $MODE in
                 if ! install_if_missing "brakeman" "gem install brakeman"; then
                     SCAN_STATUS="error"
                     SCAN_ERROR="Failed to install brakeman"
-                    echo '{"warnings":[]}' > coordination/security_scan_raw.json
+                    echo '{"warnings":[]}' > bazinga/security_scan_raw.json
                 else
                     echo "  Running brakeman (all findings)..."
-                    if ! brakeman -f json -o coordination/security_scan_raw.json 2>/dev/null; then
+                    if ! brakeman -f json -o bazinga/security_scan_raw.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="brakeman scan failed"
-                        echo '{"warnings":[]}' > coordination/security_scan_raw.json
+                        echo '{"warnings":[]}' > bazinga/security_scan_raw.json
                     fi
                 fi
                 ;;
@@ -415,22 +415,22 @@ case $MODE in
                 # Run semgrep if available
                 if command_exists "semgrep"; then
                     echo "  Running semgrep for Java..."
-                    if ! semgrep --config=auto --json -o coordination/semgrep_java.json 2>/dev/null; then
+                    if ! semgrep --config=auto --json -o bazinga/semgrep_java.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Semgrep scan failed"
-                        echo '{"results":[]}' > coordination/semgrep_java.json
+                        echo '{"results":[]}' > bazinga/semgrep_java.json
                     fi
                 fi
 
                 # Consolidate Java results
-                echo '{"tool":"spotbugs+owasp+semgrep","status":"see_build_reports"}' > coordination/security_scan_raw.json
+                echo '{"tool":"spotbugs+owasp+semgrep","status":"see_build_reports"}' > bazinga/security_scan_raw.json
                 ;;
 
             *)
                 echo "❌ Unknown language. Cannot run security scan."
                 SCAN_STATUS="error"
                 SCAN_ERROR="Unknown or unsupported language"
-                echo '{"issues":[]}' > coordination/security_scan_raw.json
+                echo '{"issues":[]}' > bazinga/security_scan_raw.json
                 ;;
         esac
 
@@ -449,7 +449,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata and status
 if command_exists "jq"; then
     jq ". + {\"scan_mode\": \"$MODE\", \"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"status\": \"$SCAN_STATUS\", \"tool\": \"$TOOL_USED\", \"error\": \"$SCAN_ERROR\"}" \
-        coordination/security_scan_raw.json > $OUTPUT_FILE
+        bazinga/security_scan_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available - simple JSON append
     cat > $OUTPUT_FILE <<EOF
@@ -460,13 +460,13 @@ else
   "status": "$SCAN_STATUS",
   "tool": "$TOOL_USED",
   "error": "$SCAN_ERROR",
-  "raw_results": $(cat coordination/security_scan_raw.json)
+  "raw_results": $(cat bazinga/security_scan_raw.json)
 }
 EOF
 fi
 
 # Clean up intermediate files
-rm -f coordination/bandit_full.json coordination/semgrep.json coordination/npm_audit.json coordination/eslint_security.json coordination/security_scan_raw.json 2>/dev/null || true
+rm -f bazinga/bandit_full.json bazinga/semgrep.json bazinga/npm_audit.json bazinga/eslint_security.json bazinga/security_scan_raw.json 2>/dev/null || true
 
 # Report status
 echo "📊 Scan mode: $MODE | Language: $LANG | Status: $SCAN_STATUS"

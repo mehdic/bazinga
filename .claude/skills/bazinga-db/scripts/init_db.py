@@ -173,7 +173,7 @@ def init_database(db_path: str) -> None:
 def main():
     if len(sys.argv) < 2:
         print("Usage: python init_db.py <database_path>")
-        print("Example: python init_db.py /home/user/bazinga/coordination/bazinga.db")
+        print("Example: python init_db.py /home/user/bazinga/bazinga/bazinga.db")
         sys.exit(1)
 
     db_path = sys.argv[1]

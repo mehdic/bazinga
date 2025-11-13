@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 # Simple pattern miner - PowerShell version
-$COORD_DIR = "coordination"
+$COORD_DIR = "bazinga"
 $HISTORICAL_FILE = "$COORD_DIR/historical_metrics.json"
 $PATTERN_FILE = "$COORD_DIR/pattern_insights.json"
 

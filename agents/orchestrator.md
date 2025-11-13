@@ -52,7 +52,7 @@ Examples:
 **All session artifacts MUST follow this structure:**
 
 ```
-coordination/
+bazinga/
 ├── bazinga.db                    # Database (all state/logs)
 ├── skills_config.json            # Skills configuration (git-tracked)
 ├── testing_config.json           # Testing configuration (git-tracked)
@@ -75,20 +75,20 @@ coordination/
 
 **Path Variables:**
 - `SESSION_ID`: Current session ID (e.g., bazinga_20250113_143530)
-- `ARTIFACTS_DIR`: `coordination/artifacts/{SESSION_ID}/`
-- `SKILLS_DIR`: `coordination/artifacts/{SESSION_ID}/skills/`
+- `ARTIFACTS_DIR`: `bazinga/artifacts/{SESSION_ID}/`
+- `SKILLS_DIR`: `bazinga/artifacts/{SESSION_ID}/skills/`
 
 **Rules:**
-1. **All session artifacts** → `coordination/artifacts/{SESSION_ID}/`
-2. **All skill outputs** → `coordination/artifacts/{SESSION_ID}/skills/`
-3. **Configuration files** → `coordination/` (root level)
-4. **Templates** → `coordination/templates/`
-5. **Never write to coordination root** - only artifacts/, templates/, or config files
+1. **All session artifacts** → `bazinga/artifacts/{SESSION_ID}/`
+2. **All skill outputs** → `bazinga/artifacts/{SESSION_ID}/skills/`
+3. **Configuration files** → `bazinga/` (root level)
+4. **Templates** → `bazinga/templates/`
+5. **Never write to bazinga root** - only artifacts/, templates/, or config files
 
 **Example paths for current session:**
-- Build baseline: `coordination/artifacts/{SESSION_ID}/build_baseline.log`
-- Completion report: `coordination/artifacts/{SESSION_ID}/completion_report.md`
-- Security scan: `coordination/artifacts/{SESSION_ID}/skills/security_scan.json`
+- Build baseline: `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
+- Completion report: `bazinga/artifacts/{SESSION_ID}/completion_report.md`
+- Security scan: `bazinga/artifacts/{SESSION_ID}/skills/security_scan.json`
 
 ---
 
@@ -102,8 +102,8 @@ coordination/
   - State management (orchestrator/PM/task groups - REQUIRED)
   - All database operations (replaces file-based logging)
 - ✅ **Read** - ONLY for reading configuration files:
-  - `coordination/skills_config.json` (skills configuration)
-  - `coordination/testing_config.json` (testing configuration)
+  - `bazinga/skills_config.json` (skills configuration)
+  - `bazinga/testing_config.json` (testing configuration)
 - ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
 **FORBIDDEN tools for implementation:**
@@ -261,7 +261,7 @@ SESSION_ID="bazinga_20251113_160528"  # ← Use the ACTUAL session_id from respo
 ```
 🔄 **ORCHESTRATOR**: Resuming existing session
 📊 Session ID: bazinga_20251113_160528  # ← Use the actual SESSION_ID you just extracted
-📁 Database: coordination/bazinga.db
+📁 Database: bazinga/bazinga.db
 ```
 
 Display this message to confirm which session you're resuming.
@@ -364,7 +364,7 @@ Display:
    ```
    ✅ **ORCHESTRATOR**: Session created in database
    📊 Session ID: [session_id]
-   📁 Database: coordination/bazinga.db
+   📁 Database: bazinga/bazinga.db
    💾 Status: [created/ready] (database auto-initialized if needed)
    ```
 
@@ -381,16 +381,16 @@ Display:
 
    ```bash
    # Read active skills configuration
-   cat coordination/skills_config.json
+   cat bazinga/skills_config.json
 
    # Read testing framework configuration
-   cat coordination/testing_config.json
+   cat bazinga/testing_config.json
    ```
 
    Display: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
    Display: "🧪 **ORCHESTRATOR**: Testing framework configuration loaded"
 
-   See `coordination/templates/prompt_building.md` for how these configs are used to build agent prompts.
+   See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
 4. **Store config references in database:**
 
@@ -448,8 +448,8 @@ Display:
    #   - Python: python -m compileall . && mypy .
    #   - Ruby: bundle exec rubocop --parallel
 
-   # Save results to coordination/artifacts/{SESSION_ID}/build_baseline.log
-   # and coordination/artifacts/{SESSION_ID}/build_baseline_status.txt
+   # Save results to bazinga/artifacts/{SESSION_ID}/build_baseline.log
+   # and bazinga/artifacts/{SESSION_ID}/build_baseline_status.txt
    ```
 
    Display result:
@@ -464,7 +464,7 @@ Display:
 
 **Database Storage:**
 
-All state stored in SQLite database at `coordination/bazinga.db`:
+All state stored in SQLite database at `bazinga/bazinga.db`:
 - **Tables:** sessions, orchestration_logs, state_snapshots, task_groups, token_usage, skill_outputs, configuration
 - **Benefits:** Concurrent-safe, ACID transactions, fast indexed queries
 - **Details:** See `.claude/skills/bazinga-db/SKILL.md` for complete schema
@@ -500,7 +500,7 @@ YOU MUST have displayed this message in Step 2:
 ```
 ✅ **ORCHESTRATOR**: Session created in database
 📊 Session ID: [session_id]
-📁 Database: coordination/bazinga.db
+📁 Database: bazinga/bazinga.db
 💾 Status: [created/ready] (database auto-initialized if needed)
 ```
 
@@ -511,10 +511,10 @@ YOU MUST have displayed this message in Step 2:
 **YOU MUST display the contents of BOTH configuration files to prove you read them:**
 
 ```
-📋 SKILLS CONFIG (coordination/skills_config.json):
+📋 SKILLS CONFIG (bazinga/skills_config.json):
 [paste full skills_config.json contents here]
 
-📋 TESTING CONFIG (coordination/testing_config.json):
+📋 TESTING CONFIG (bazinga/testing_config.json):
 [paste full testing_config.json contents here]
 ```
 
@@ -640,7 +640,7 @@ Agent ID: pm_main
 Skill(command: "bazinga-db")
 ```
 
-See `coordination/templates/message_templates.md` for PM response format examples.
+See `bazinga/templates/message_templates.md` for PM response format examples.
 
 ### Step 1.4: Route Based on Mode
 
@@ -683,7 +683,7 @@ Build code context section with similar files and available utilities for develo
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-**YOU MUST follow `coordination/templates/prompt_building.md` EXACTLY.**
+**YOU MUST follow `bazinga/templates/prompt_building.md` EXACTLY.**
 **DO NOT write custom prompts. DO NOT improvise. DO NOT skip this process.**
 
 **Step-by-Step Prompt Building Process:**
@@ -776,7 +776,7 @@ ONLY THEN:
 **IF ANY CHECKBOX IS UNCHECKED: Your prompt is INCOMPLETE. Fix it before spawning.**
 
 See `agents/developer.md` for full developer agent definition.
-See `coordination/templates/prompt_building.md` for the template reference.
+See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
@@ -900,7 +900,7 @@ THEN:
 **IF ANY CHECKBOX IS UNCHECKED: QA Expert prompt is INCOMPLETE. Fix it before spawning.**
 
 See `agents/qa_expert.md` for full QA Expert agent definition.
-See `coordination/templates/prompt_building.md` for the template reference.
+See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
@@ -1019,7 +1019,7 @@ ONLY THEN:
 **IF ANY CHECKBOX IS UNCHECKED: Tech Lead prompt is INCOMPLETE. Fix it before spawning.**
 
 See `agents/techlead.md` for full Tech Lead agent definition.
-See `coordination/templates/prompt_building.md` for the template reference.
+See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
@@ -1101,7 +1101,7 @@ Skill(command: "bazinga-db")
 - Respawn from appropriate stage
 - Track iteration count in database
 
-**IMPORTANT:** All agent prompts follow `coordination/templates/prompt_building.md`. All database logging follows `coordination/templates/logging_pattern.md`.
+**IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md`. All database logging follows `bazinga/templates/logging_pattern.md`.
 
 ---
 ## Phase 2B: Parallel Mode Execution
@@ -1175,7 +1175,7 @@ Same workflow as Simple Mode, but include group-specific branch name
 
 **IF ANY GROUP'S PROMPT IS INCOMPLETE: Fix ALL prompts before spawning.**
 
-See `coordination/templates/message_templates.md` for standard prompt format.
+See `bazinga/templates/message_templates.md` for standard prompt format.
 See `agents/developer.md` for full developer agent definition.
 
 ### Step 2B.2: Receive All Developer Responses
@@ -1187,7 +1187,7 @@ See `agents/developer.md` for full developer agent definition.
 
 **For EACH developer response:**
 
-Log to database (see `coordination/templates/logging_pattern.md`):
+Log to database (see `bazinga/templates/logging_pattern.md`):
 ```
 bazinga-db, please log this developer interaction:
 
@@ -1284,7 +1284,7 @@ The routing chain for each group is:
 
 **IMPORTANT:** Track revision counts per group in database. Escalate if >2 revisions.
 
-All agent prompts follow same pattern as Phase 2A (see `coordination/templates/prompt_building.md`).
+All agent prompts follow same pattern as Phase 2A (see `bazinga/templates/prompt_building.md`).
 
 ### Step 2B.8: Spawn PM When All Groups Complete
 
@@ -1604,10 +1604,10 @@ Flag any anomalies for inclusion in reports.
 Create comprehensive report file:
 
 ```
-coordination/artifacts/{SESSION_ID}/completion_report.md
+bazinga/artifacts/{SESSION_ID}/completion_report.md
 ```
 
-See `coordination/templates/completion_report.md` for full report structure.
+See `bazinga/templates/completion_report.md` for full report structure.
 
 Report includes:
 - Session summary (mode, duration, groups)
@@ -1661,7 +1661,7 @@ Skill(command: "bazinga-db")
 
 Output to user (keep under 30 lines):
 
-See `coordination/templates/completion_report.md` for Tier 1 report format.
+See `bazinga/templates/completion_report.md` for Tier 1 report format.
 
 Display includes:
 - Mode, duration, groups completed
@@ -1683,7 +1683,7 @@ Example output:
 
 **Quality**: All checks passed ✅
 **Skills Used**: 6 of 11 available
-**Detailed Report**: coordination/artifacts/bazinga_20250113_143530/completion_report.md
+**Detailed Report**: bazinga/artifacts/bazinga_20250113_143530/completion_report.md
 
 ═══════════════════════════════════════════════════════════
 ```
@@ -1721,7 +1721,7 @@ Example output:
 - **codebase-analysis**: ✅ Success - Found 3 similar patterns
 - **pattern-miner**: ⚠️ Partial - Limited historical data
 
-📁 **Detailed results**: See `coordination/` folder for full JSON outputs
+📁 **Detailed results**: See `bazinga/` folder for full JSON outputs
 
 ## Efficiency
 
@@ -1855,7 +1855,7 @@ Agent ID: [identifier]
 **Your ONLY tools:**
 ✅ Task (spawn agents)
 ✅ **Skill (bazinga-db for logging - MANDATORY after every agent response)**
-✅ Read (ONLY for coordination/skills_config.json and coordination/testing_config.json)
+✅ Read (ONLY for bazinga/skills_config.json and bazinga/testing_config.json)
 ✅ Bash (ONLY for initialization - session ID, database check)
 
 **FORBIDDEN:**

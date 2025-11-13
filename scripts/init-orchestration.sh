@@ -20,22 +20,22 @@ fi
 
 # Ensure all required directories exist (mkdir -p is idempotent - safe to run multiple times)
 echo "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..."
-mkdir -p coordination/messages
-mkdir -p coordination/reports
+mkdir -p bazinga/messages
+mkdir -p bazinga/reports
 mkdir -p docs
 
 # Check if this is an existing session or new session
 if [ "$FORCE_NEW" = true ]; then
     # Force new session - archive old one first
-    if [ -f "coordination/orchestrator_state.json" ]; then
-        OLD_SESSION=$(python3 -c "import json; print(json.load(open('coordination/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
+    if [ -f "bazinga/orchestrator_state.json" ]; then
+        OLD_SESSION=$(python3 -c "import json; print(json.load(open('bazinga/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
         echo "🗂️  Archiving old session: $OLD_SESSION"
-        ARCHIVE_DIR="coordination/archive/$OLD_SESSION"
+        ARCHIVE_DIR="bazinga/archive/$OLD_SESSION"
         mkdir -p "$ARCHIVE_DIR"
 
         # Archive coordination state files
-        mv coordination/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
-        mv coordination/messages/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+        mv bazinga/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+        mv bazinga/messages/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
 
         # Archive old log file
         if [ -f "docs/orchestration-log.md" ]; then
@@ -45,9 +45,9 @@ if [ "$FORCE_NEW" = true ]; then
     fi
     SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
     echo "📅 Starting new session: $SESSION_ID"
-elif [ -f "coordination/orchestrator_state.json" ]; then
+elif [ -f "bazinga/orchestrator_state.json" ]; then
     # Existing session - read the session ID from existing file
-    SESSION_ID=$(python3 -c "import json; print(json.load(open('coordination/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
+    SESSION_ID=$(python3 -c "import json; print(json.load(open('bazinga/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
     if [ "$SESSION_ID" = "unknown" ]; then
         # File exists but no session_id, generate one
         SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
@@ -64,9 +64,9 @@ fi
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Initialize pm_state.json
-if [ ! -f "coordination/pm_state.json" ]; then
+if [ ! -f "bazinga/pm_state.json" ]; then
     echo "📝 Creating pm_state.json..."
-    cat > coordination/pm_state.json <<EOF
+    cat > bazinga/pm_state.json <<EOF
 {
   "session_id": "$SESSION_ID",
   "mode": null,
@@ -84,9 +84,9 @@ else
 fi
 
 # Initialize group_status.json
-if [ ! -f "coordination/group_status.json" ]; then
+if [ ! -f "bazinga/group_status.json" ]; then
     echo "📝 Creating group_status.json..."
-    cat > coordination/group_status.json <<EOF
+    cat > bazinga/group_status.json <<EOF
 {
   "_comment": "Tracks per-group status including revision counts for opus escalation",
   "_format": {
@@ -103,9 +103,9 @@ else
 fi
 
 # Initialize orchestrator_state.json
-if [ ! -f "coordination/orchestrator_state.json" ]; then
+if [ ! -f "bazinga/orchestrator_state.json" ]; then
     echo "📝 Creating orchestrator_state.json..."
-    cat > coordination/orchestrator_state.json <<EOF
+    cat > bazinga/orchestrator_state.json <<EOF
 {
   "session_id": "$SESSION_ID",
   "current_phase": "initialization",
@@ -134,9 +134,9 @@ else
 fi
 
 # Initialize skills_config.json (Lite Profile by default)
-if [ ! -f "coordination/skills_config.json" ]; then
+if [ ! -f "bazinga/skills_config.json" ]; then
     echo "📝 Creating skills_config.json (lite profile)..."
-    cat > coordination/skills_config.json <<EOF
+    cat > bazinga/skills_config.json <<EOF
 {
   "_metadata": {
     "profile": "lite",
@@ -181,9 +181,9 @@ else
 fi
 
 # Initialize testing_config.json
-if [ ! -f "coordination/testing_config.json" ]; then
+if [ ! -f "bazinga/testing_config.json" ]; then
     echo "📝 Creating testing_config.json..."
-    cat > coordination/testing_config.json <<EOF
+    cat > bazinga/testing_config.json <<EOF
 {
   "_testing_framework": {
     "enabled": true,
@@ -238,9 +238,9 @@ fi
 
 # Initialize message files
 MESSAGE_FILES=(
-    "coordination/messages/dev_to_qa.json"
-    "coordination/messages/qa_to_techlead.json"
-    "coordination/messages/techlead_to_dev.json"
+    "bazinga/messages/dev_to_qa.json"
+    "bazinga/messages/qa_to_techlead.json"
+    "bazinga/messages/techlead_to_dev.json"
 )
 
 for msg_file in "${MESSAGE_FILES[@]}"; do
@@ -276,7 +276,7 @@ fi
 
 # Update sessions history
 echo "📝 Updating sessions history..."
-SESSIONS_HISTORY="coordination/sessions_history.json"
+SESSIONS_HISTORY="bazinga/sessions_history.json"
 
 # Initialize history file if it doesn't exist
 if [ ! -f "$SESSIONS_HISTORY" ]; then
@@ -331,9 +331,9 @@ else:
 PYTHON_SCRIPT
 
 # Create .gitignore for coordination folder if it doesn't exist
-if [ ! -f "coordination/.gitignore" ]; then
-    echo "📝 Creating coordination/.gitignore..."
-    cat > coordination/.gitignore <<EOF
+if [ ! -f "bazinga/.gitignore" ]; then
+    echo "📝 Creating bazinga/.gitignore..."
+    cat > bazinga/.gitignore <<EOF
 # Coordination state files are temporary and should not be committed
 *.json
 
@@ -349,13 +349,13 @@ reports/
 !.gitignore
 EOF
 else
-    echo "✓ coordination/.gitignore already exists"
+    echo "✓ bazinga/.gitignore already exists"
 fi
 
 # Initialize database
 echo ""
 echo "🗄️  Initializing BAZINGA database..."
-DB_PATH="coordination/bazinga.db"
+DB_PATH="bazinga/bazinga.db"
 DB_INIT_SCRIPT=".claude/skills/bazinga-db/scripts/init_db.py"
 DB_CLI_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
 
@@ -391,7 +391,7 @@ echo ""
 echo "✅ Initialization complete!"
 echo ""
 echo "📊 Created structure:"
-echo "   coordination/"
+echo "   bazinga/"
 echo "   ├── bazinga.db            (SQLite database - primary storage)"
 echo "   ├── pm_state.json"
 echo "   ├── group_status.json"
@@ -408,7 +408,7 @@ echo "   └── orchestration-log.md"
 echo ""
 echo "🚀 Ready for orchestration!"
 echo "📊 Session ID: $SESSION_ID"
-echo "🗄️  Database: coordination/bazinga.db"
+echo "🗄️  Database: bazinga/bazinga.db"
 echo ""
 
 # Check if dashboard server is running and start if needed

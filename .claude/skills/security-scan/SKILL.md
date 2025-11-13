@@ -53,7 +53,7 @@ The script will:
 - Detect project language (Python, JavaScript, Go, Ruby, Java)
 - Run appropriate security scanner (bandit, npm audit, gosec, brakeman, spotbugs)
 - Parse results and categorize by severity
-- Generate `coordination/artifacts/{SESSION_ID}/skills/security_scan.json`
+- Generate `bazinga/artifacts/{SESSION_ID}/skills/security_scan.json`
 
 ---
 
@@ -62,7 +62,7 @@ The script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/security_scan.json
+bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
 ```
 
 Extract key information:
@@ -90,7 +90,7 @@ Top issues:
 2. {severity}: {issue title} ({file}:{line})
 3. {severity}: {issue title} ({file}:{line})
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/security_scan.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
 ```
 
 ---
@@ -114,7 +114,7 @@ Top issues:
 2. HIGH: Hardcoded secret detected (config.py:12)
 3. MEDIUM: Weak random number generation (token.py:89)
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/security_scan.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
 ```
 
 **Scenario: Persistent Issues (Advanced Mode)**
@@ -135,7 +135,7 @@ Top issues:
 2. HIGH: Authentication bypass possible (middleware.py:78)
 3. HIGH: XSS vulnerability in user input (forms.py:45)
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/security_scan.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
 ```
 
 ---

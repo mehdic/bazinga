@@ -283,16 +283,16 @@ SafeSubprocess.run(
 
 **Before**:
 ```python
-state = json.load(open("coordination/state.json"))
+state = json.load(open("bazinga/state.json"))
 state["key"] = "value"
-json.dump(state, open("coordination/state.json", "w"))
+json.dump(state, open("bazinga/state.json", "w"))
 ```
 
 **After**:
 ```python
 from bazinga_cli.state_manager import StateManager
 
-manager = StateManager("coordination")
+manager = StateManager("bazinga")
 with manager.lock_state("state.json") as state:
     state["key"] = "value"
     # Automatically written atomically

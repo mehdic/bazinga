@@ -73,7 +73,7 @@ dashboard/
 The dashboard uses WebSocket connections to receive instant updates when coordination files change. No polling required!
 
 **How it works:**
-1. `watchdog` monitors `/coordination/` folder
+1. `watchdog` monitors `/bazinga/` folder
 2. When a `.json` file changes, server parses the data
 3. Server broadcasts update to all connected clients
 4. Dashboard UI updates automatically
@@ -129,7 +129,7 @@ When enabled, provides intelligent analysis and enhanced visualizations:
 
 **How to enable:**
 
-1. Edit `coordination/skills_config.json`:
+1. Edit `bazinga/skills_config.json`:
    ```json
    {
      "dashboard": {
@@ -153,7 +153,7 @@ When enabled, provides intelligent analysis and enhanced visualizations:
 
 Left sidebar shows:
 - Current session (marked with 🔴)
-- Historical sessions from `coordination/reports/`
+- Historical sessions from `bazinga/reports/`
 - Session status (running/completed)
 - Quick switching between sessions
 
@@ -272,7 +272,7 @@ python3 server.py
 - `ANTHROPIC_API_KEY`: Required for AI diagram feature
 
 **Skills Configuration:**
-Edit `coordination/skills_config.json`:
+Edit `bazinga/skills_config.json`:
 ```json
 {
   "dashboard": {
@@ -402,7 +402,7 @@ Generates AI-powered workflow diagram (requires feature enabled).
 ```json
 {
   "error": "AI diagram feature is disabled",
-  "message": "Enable in coordination/skills_config.json..."
+  "message": "Enable in bazinga/skills_config.json..."
 }
 ```
 
@@ -601,7 +601,7 @@ http://localhost:53124
 
 ### Enable AI Diagram
 ```json
-// coordination/skills_config.json
+// bazinga/skills_config.json
 {
   "dashboard": {
     "dashboard_ai_diagram_enabled": true

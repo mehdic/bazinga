@@ -9,7 +9,7 @@ You are helping the user configure the BAZINGA testing framework. This controls 
 First, read the current configuration:
 
 ```bash
-cat coordination/testing_config.json 2>/dev/null
+cat bazinga/testing_config.json 2>/dev/null
 ```
 
 Parse the current testing mode and individual settings.
@@ -230,11 +230,11 @@ If user confirms with "yes" or "y", proceed. Otherwise, go back to menu.
 
 ## Step 7: Update Configuration File
 
-Use the Write tool to update `coordination/testing_config.json`:
+Use the Write tool to update `bazinga/testing_config.json`:
 
 ```python
 # Read current config
-current_config = read_json("coordination/testing_config.json")
+current_config = read_json("bazinga/testing_config.json")
 
 # Update the _testing_framework section with new values
 current_config["_testing_framework"]["mode"] = selected_mode
@@ -245,7 +245,7 @@ current_config["_testing_framework"]["enabled"] = (selected_mode != "disabled")
 current_config["_metadata"]["last_updated"] = current_timestamp()
 
 # Write back to file
-write_json("coordination/testing_config.json", current_config)
+write_json("bazinga/testing_config.json", current_config)
 ```
 
 **IMPORTANT:** Preserve the `_metadata.created` timestamp! Only update `last_updated`.
@@ -311,7 +311,7 @@ Quality level: LOW 🚀
 
 ## Error Handling
 
-If `coordination/testing_config.json` doesn't exist:
+If `bazinga/testing_config.json` doesn't exist:
 1. Show message: "Testing config not found. Running initialization..."
 2. Run: `bash scripts/init-orchestration.sh`
 3. Confirm file created, then continue

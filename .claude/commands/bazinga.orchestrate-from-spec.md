@@ -8,7 +8,7 @@ This command bridges spec-kit's planning phase with BAZINGA's execution phase, c
 
 **🆕 Enhanced Reporting**: Upon completion, you will receive:
 - **Concise summary** showing quality metrics, efficiency, and any issues requiring attention
-- **Detailed report** saved to `coordination/artifacts/{SESSION_ID}/completion_report.md` with comprehensive analysis
+- **Detailed report** saved to `bazinga/artifacts/{SESSION_ID}/completion_report.md` with comprehensive analysis
 - Links to Skills results (security-scan, test-coverage, lint-check) and token usage
 
 ## User Input
@@ -20,7 +20,7 @@ $ARGUMENTS
 **Argument Parsing**:
 1. Parse feature directory path (if provided)
 2. If no path → Auto-detect latest feature
-3. Uses Skills configured in coordination/skills_config.json
+3. Uses Skills configured in bazinga/skills_config.json
 
 **Examples**:
 - `/orchestrate-from-spec` → Auto-detect feature, use configured Skills
@@ -172,7 +172,7 @@ Then retry /orchestrate-from-spec
 You are now the **ORCHESTRATOR** for the Claude Code Multi-Agent Dev Team.
 
 🆕 **SPEC-KIT INTEGRATION MODE ACTIVE**
-✅ **Skills Mode**: Advanced Skills enabled per coordination/skills_config.json
+✅ **Skills Mode**: Advanced Skills enabled per bazinga/skills_config.json
 
 You are executing a feature that has been planned using GitHub's spec-kit methodology. All planning artifacts have been prepared, and your job is to coordinate implementation.
 
@@ -305,7 +305,7 @@ Your standard workflow applies, but with these SPEC-KIT specific modifications:
 
 **🔴 CRITICAL ADDITIONS**: Use spec-kit artifacts for context and update tasks.md.
 
-**Skills Available** (if marked as 'mandatory' in coordination/skills_config.json):
+**Skills Available** (if marked as 'mandatory' in bazinga/skills_config.json):
 - **/codebase-analysis** - Find similar features and reusable utilities (10-20s)
 - **/test-pattern-analysis** - Learn testing patterns before writing tests (5-15s)
 - **/api-contract-validation** - Validate API changes don't break contracts (5-15s)
@@ -443,9 +443,9 @@ IMPORTANT: Use Skills when available to:
    - Ensure implementation matches task descriptions
 
 3. **Review automated Skill results**:
-   - Security scan findings from coordination/security_scan.json
-   - Coverage report from coordination/coverage_report.json
-   - Lint results from coordination/lint_results.json
+   - Security scan findings from bazinga/security_scan.json
+   - Coverage report from bazinga/coverage_report.json
+   - Lint results from bazinga/lint_results.json
 
 ---
 
@@ -466,7 +466,7 @@ Now proceed with your standard orchestration workflow:
 - tasks.md serves as single source of truth for progress
 - 🆕 **Tech Lead automatically uses Claude Code Skills** for security, coverage, and linting
 - 🆕 **Progressive analysis**: basic → advanced scan at revision 2, Opus model at revision 3
-- 🆕 **Revision tracking**: coordination/group_status.json tracks per-group revision counts
+- 🆕 **Revision tracking**: bazinga/group_status.json tracks per-group revision counts
 
 ═══════════════════════════════════════════════════════
 🎯 START ORCHESTRATION NOW
@@ -519,7 +519,7 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**Note:** All orchestration data is stored in coordination/bazinga.db. Use the bazinga-db skill to query it instead of direct bash commands.
+**Note:** All orchestration data is stored in bazinga/bazinga.db. Use the bazinga-db skill to query it instead of direct bash commands.
 
 ### Step 3.2: Handle Completion
 

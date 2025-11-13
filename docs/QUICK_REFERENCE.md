@@ -61,7 +61,7 @@ PM: Analyzes request → Spawns N developers (1-4) → Parallel implementation
 
 ### 3. Check Status
 
-Project state is tracked in `coordination/*.json` files:
+Project state is tracked in `bazinga/*.json` files:
 - `pm_state.json` - Task groups, progress, iteration count
 - `group_status.json` - Per-task status, revision counts
 - `orchestrator_state.json` - Active agents, routing state
@@ -296,7 +296,7 @@ your-project/
 │   ├── commands/              # Slash commands
 │   ├── scripts/               # Utility scripts
 │   └── skills/                # 10 Skills (analysis tools)
-├── coordination/              # State files (auto-generated)
+├── bazinga/              # State files (auto-generated)
 │   ├── pm_state.json         # PM planning
 │   ├── group_status.json     # Task status
 │   ├── orchestrator_state.json # Routing state
@@ -309,7 +309,7 @@ your-project/
 └── .git/                      # Git repository
 ```
 
-**Note:** All `coordination/*.json` files are gitignored except `skills_config.json` and `testing_config.json`.
+**Note:** All `bazinga/*.json` files are gitignored except `skills_config.json` and `testing_config.json`.
 
 ---
 
@@ -418,7 +418,7 @@ PM may have detected:
 - High file overlap
 - Complexity makes parallel risky
 
-Check PM's reasoning in `coordination/pm_state.json`.
+Check PM's reasoning in `bazinga/pm_state.json`.
 
 ---
 

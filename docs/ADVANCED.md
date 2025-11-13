@@ -55,7 +55,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** Before Developer starts coding (invoked by PM).
 
-**Output:** `coordination/codebase_analysis.json`
+**Output:** `bazinga/codebase_analysis.json`
 
 **Example output:**
 ```json
@@ -87,7 +87,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** After Developer writes code, before writing tests.
 
-**Output:** `coordination/test_patterns.json`
+**Output:** `bazinga/test_patterns.json`
 
 **Example output:**
 ```json
@@ -119,7 +119,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** After Developer modifies API endpoints.
 
-**Output:** `coordination/api_contract_validation.json`
+**Output:** `bazinga/api_contract_validation.json`
 
 **Example output:**
 ```json
@@ -159,7 +159,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** After Developer creates/modifies migrations.
 
-**Output:** `coordination/db_migration_check.json`
+**Output:** `bazinga/db_migration_check.json`
 
 **Example output:**
 ```json
@@ -197,7 +197,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** In QA Expert phase (full testing mode only).
 
-**Output:** `coordination/pattern_mining.json`
+**Output:** `bazinga/pattern_mining.json`
 
 **Example output:**
 ```json
@@ -235,7 +235,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** In QA Expert phase (full testing mode only), after all tests complete.
 
-**Output:** `coordination/quality_dashboard.json`
+**Output:** `bazinga/quality_dashboard.json`
 
 **Example output:**
 ```json
@@ -287,7 +287,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** Throughout orchestration lifecycle (PM phases).
 
-**Output:** `coordination/velocity_metrics.json`
+**Output:** `bazinga/velocity_metrics.json`
 
 **Example output:**
 ```json
@@ -348,7 +348,7 @@ Full testing mode enables the QA Expert agent and comprehensive test requirement
 > Select: "full"
 ```
 
-**Configuration saved to:** `coordination/testing_config.json`
+**Configuration saved to:** `bazinga/testing_config.json`
 
 ```json
 {

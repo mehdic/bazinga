@@ -11,7 +11,7 @@ echo "🧪 Testing BAZINGA Dashboard..."
 echo ""
 
 # Check if coordination folder exists
-if [ ! -d "../coordination" ]; then
+if [ ! -d "../bazinga" ]; then
     echo "⚠️  Coordination folder not found. Running init-orchestration.sh..."
     cd ..
     ./scripts/init-orchestration.sh

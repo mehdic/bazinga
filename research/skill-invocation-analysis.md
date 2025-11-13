@@ -14,7 +14,7 @@ This report analyzes how Claude Code skills are invoked within the BAZINGA orche
 - ✅ Two distinct invocation patterns (standard skills + bazinga-db)
 - ✅ All agents use correct `Skill(command: "skill-name")` syntax
 - ✅ Configuration-driven skill enablement via `skills_config.json`
-- ✅ Results consistently stored in `coordination/` folder
+- ✅ Results consistently stored in `bazinga/` folder
 - ✅ No issues found in orchestrator or agent implementations
 
 ---
@@ -31,7 +31,7 @@ This report analyzes how Claude Code skills are invoked within the BAZINGA orche
 When invoked, a skill:
 1. Reads its own `SKILL.md` to understand its task
 2. Executes its script(s) autonomously
-3. Writes results to `coordination/` folder
+3. Writes results to `bazinga/` folder
 4. Returns completion message to calling agent
 
 ---
@@ -50,7 +50,7 @@ Skill(command: "lint-check")
 # 2. Skill executes autonomously (reads SKILL.md, runs script, outputs results)
 
 # 3. Agent reads the results file
-cat coordination/lint_results.json
+cat bazinga/lint_results.json
 
 # 4. Agent uses results in decision-making
 ```
@@ -58,7 +58,7 @@ cat coordination/lint_results.json
 **Characteristics:**
 - ✅ Simple one-parameter invocation
 - ✅ Skill handles everything internally
-- ✅ Results always in `coordination/` folder
+- ✅ Results always in `bazinga/` folder
 - ✅ Standardized naming: `{skill-name}_results.json` or similar
 
 **Example from developer.md:**
@@ -67,7 +67,7 @@ cat coordination/lint_results.json
 Skill(command: "lint-check")
 
 # Read results and fix all issues
-cat coordination/lint_results.json
+cat bazinga/lint_results.json
 ```
 
 ---
@@ -129,7 +129,7 @@ Skill(command: "bazinga-db")
 
 ### skills_config.json
 
-The system uses `coordination/skills_config.json` to determine which skills are mandatory:
+The system uses `bazinga/skills_config.json` to determine which skills are mandatory:
 
 ```json
 {
@@ -160,7 +160,7 @@ The system uses `coordination/skills_config.json` to determine which skills are 
 **Initialization (orchestrator.md lines 162-180):**
 ```python
 # Read skills_config.json to determine which Skills are active
-skills_config = read_json("coordination/skills_config.json")
+skills_config = read_json("bazinga/skills_config.json")
 
 # Count active Skills
 active_skills = []
@@ -178,7 +178,7 @@ Output: f"   - Active Skills: {len(active_skills)}"
 **Dynamic Prompt Building (orchestrator.md lines 596-770):**
 ```python
 # Read Skills Configuration
-cat coordination/skills_config.json
+cat bazinga/skills_config.json
 
 # Store configuration values
 lint_check_mandatory = skills_config["developer"]["lint-check"] == "mandatory"
@@ -190,7 +190,7 @@ IF codebase_analysis_mandatory:
     """
     **INVOKE Codebase Analysis Skill (MANDATORY):**
     Skill(command: "codebase-analysis")
-    Read results: cat coordination/codebase_analysis.json
+    Read results: cat bazinga/codebase_analysis.json
     """
 ```
 
@@ -236,7 +236,7 @@ Skill(command: "bazinga-db")
 
 **Findings:**
 1. ✅ Uses `Skill(command: "lint-check")` for code quality (line 636)
-2. ✅ Reads results from `coordination/lint_results.json` after invocation
+2. ✅ Reads results from `bazinga/lint_results.json` after invocation
 3. ✅ Correctly waits for skill to complete before reading results
 4. ✅ Instructions mention all developer skills: codebase-analysis, test-pattern-analysis, api-contract-validation, db-migration-check
 
@@ -246,7 +246,7 @@ Skill(command: "bazinga-db")
 Skill(command: "lint-check")
 
 # Read results
-cat coordination/lint_results.json
+cat bazinga/lint_results.json
 
 # Fix issues, then proceed
 ```
@@ -264,7 +264,7 @@ cat coordination/lint_results.json
 
 **Findings:**
 1. ✅ Expected to invoke security-scan, lint-check, test-coverage
-2. ✅ Reads results from `coordination/` folder
+2. ✅ Reads results from `bazinga/` folder
 3. ✅ Orchestrator dynamically injects skill invocation instructions
 
 **How it works (orchestrator.md lines 1139-1193):**
@@ -281,7 +281,7 @@ Skill(command: "security-scan")
 Wait for Skill to complete...
 
 **STEP 3: Read security scan results**
-cat coordination/security_scan.json
+cat bazinga/security_scan.json
 ```
 
 **Advanced Features:**
@@ -298,7 +298,7 @@ cat coordination/security_scan.json
 **Findings:**
 1. ✅ Uses `Skill(command: "pattern-miner")` for historical analysis (line 143)
 2. ✅ Uses `Skill(command: "quality-dashboard")` for health metrics (line 149)
-3. ✅ Reads results from `coordination/` folder
+3. ✅ Reads results from `bazinga/` folder
 4. ✅ Uses insights to prioritize testing (lines 153-157)
 
 **Invocation Examples (lines 142-150):**
@@ -306,12 +306,12 @@ cat coordination/security_scan.json
 **STEP 1: Invoke pattern-miner (if MANDATORY)**
 Skill(command: "pattern-miner")
 
-Read results: cat coordination/pattern_insights.json
+Read results: cat bazinga/pattern_insights.json
 
 **STEP 2: Invoke quality-dashboard (if MANDATORY)**
 Skill(command: "quality-dashboard")
 
-Read results: cat coordination/quality_dashboard.json
+Read results: cat bazinga/quality_dashboard.json
 ```
 
 **Advanced Usage:**
@@ -333,7 +333,7 @@ Read results: cat coordination/quality_dashboard.json
 Skill(command: "velocity-tracker")
 
 **STEP 2: Read velocity metrics**
-cat coordination/project_metrics.json
+cat bazinga/project_metrics.json
 
 **STEP 3: Use metrics to inform decision**
 - Check current velocity vs baseline
@@ -350,16 +350,16 @@ cat coordination/project_metrics.json
 | Skill Name | Pattern | Result File | Used By | Status |
 |------------|---------|-------------|---------|--------|
 | bazinga-db | Pattern 2 (text request) | (varies) | Orchestrator | ✅ Mandatory |
-| lint-check | Pattern 1 | `coordination/lint_results.json` | Developer, Tech Lead | ✅ Mandatory |
-| test-coverage | Pattern 1 | `coordination/coverage_report.json` | Tech Lead | ✅ Mandatory |
-| security-scan | Pattern 1 | `coordination/security_scan.json` | Tech Lead | ✅ Mandatory |
-| codebase-analysis | Pattern 1 | `coordination/codebase_analysis.json` | Developer | ✅ Optional |
-| test-pattern-analysis | Pattern 1 | `coordination/test_patterns.json` | Developer | ✅ Mandatory |
-| api-contract-validation | Pattern 1 | `coordination/api_contract_validation.json` | Developer | ✅ Optional |
-| db-migration-check | Pattern 1 | `coordination/db_migration_check.json` | Developer | ✅ Optional |
-| pattern-miner | Pattern 1 | `coordination/pattern_insights.json` | QA Expert | ✅ Optional |
-| quality-dashboard | Pattern 1 | `coordination/quality_dashboard.json` | QA Expert | ✅ Optional |
-| velocity-tracker | Pattern 1 | `coordination/project_metrics.json` | PM | ✅ Mandatory |
+| lint-check | Pattern 1 | `bazinga/lint_results.json` | Developer, Tech Lead | ✅ Mandatory |
+| test-coverage | Pattern 1 | `bazinga/coverage_report.json` | Tech Lead | ✅ Mandatory |
+| security-scan | Pattern 1 | `bazinga/security_scan.json` | Tech Lead | ✅ Mandatory |
+| codebase-analysis | Pattern 1 | `bazinga/codebase_analysis.json` | Developer | ✅ Optional |
+| test-pattern-analysis | Pattern 1 | `bazinga/test_patterns.json` | Developer | ✅ Mandatory |
+| api-contract-validation | Pattern 1 | `bazinga/api_contract_validation.json` | Developer | ✅ Optional |
+| db-migration-check | Pattern 1 | `bazinga/db_migration_check.json` | Developer | ✅ Optional |
+| pattern-miner | Pattern 1 | `bazinga/pattern_insights.json` | QA Expert | ✅ Optional |
+| quality-dashboard | Pattern 1 | `bazinga/quality_dashboard.json` | QA Expert | ✅ Optional |
+| velocity-tracker | Pattern 1 | `bazinga/project_metrics.json` | PM | ✅ Mandatory |
 
 ---
 
@@ -379,7 +379,7 @@ cat coordination/project_metrics.json
 ### 3. Consistent Patterns
 - ✅ All standard skills use Pattern 1 (simple invocation)
 - ✅ Only bazinga-db uses Pattern 2 (multi-operation with text request)
-- ✅ All results go to `coordination/` folder
+- ✅ All results go to `bazinga/` folder
 - ✅ Predictable file naming conventions
 
 ### 4. Autonomous Execution
@@ -400,7 +400,7 @@ cat coordination/project_metrics.json
 
 - [x] ✅ All agents use `Skill(command: "skill-name")` syntax
 - [x] ✅ bazinga-db uses text request pattern correctly
-- [x] ✅ Results stored in `coordination/` folder
+- [x] ✅ Results stored in `bazinga/` folder
 - [x] ✅ Configuration-driven skill enablement working
 - [x] ✅ Orchestrator dynamically builds prompts with skills
 - [x] ✅ All mandatory skills are invoked in workflows
@@ -466,7 +466,7 @@ The two-pattern approach (standard skills + bazinga-db multi-operation) is elega
 Skill(command: "skill-name")
 
 # 2. Read results
-cat coordination/{skill-name}_results.json
+cat bazinga/{skill-name}_results.json
 
 # 3. Use results in decision
 ```
@@ -494,7 +494,7 @@ Skill(command: "bazinga-db")
 
 ```bash
 # Check which skills are enabled
-cat coordination/skills_config.json
+cat bazinga/skills_config.json
 
 # Modify skills configuration
 /bazinga.configure-skills

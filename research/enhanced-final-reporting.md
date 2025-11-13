@@ -32,7 +32,7 @@ This tells users THAT work is complete, but not:
 
 ### 1. State Files
 
-#### `coordination/group_status.json`
+#### `bazinga/group_status.json`
 ```json
 {
   "_comment": "Tracks per-group status including revision counts",
@@ -56,7 +56,7 @@ This tells users THAT work is complete, but not:
 - Duration per group
 - Status progression
 
-#### `coordination/orchestrator_state.json`
+#### `bazinga/orchestrator_state.json`
 ```json
 {
   "session_id": "session_...",
@@ -85,7 +85,7 @@ This tells users THAT work is complete, but not:
 - Decision history (for audit trail)
 - Session duration
 
-#### `coordination/pm_state.json`
+#### `bazinga/pm_state.json`
 ```json
 {
   "mode": "simple|parallel",
@@ -110,7 +110,7 @@ This tells users THAT work is complete, but not:
 
 ### 2. Skills Results (Per Group)
 
-#### `coordination/security_scan.json`
+#### `bazinga/security_scan.json`
 ```json
 {
   "scan_mode": "basic|advanced",
@@ -134,7 +134,7 @@ This tells users THAT work is complete, but not:
 - Scan status (success/partial/error)
 - Tool effectiveness
 
-#### `coordination/coverage_report.json`
+#### `bazinga/coverage_report.json`
 ```json
 {
   "timestamp": "2025-11-07T20:00:00Z",
@@ -152,7 +152,7 @@ This tells users THAT work is complete, but not:
 - Per-file coverage
 - Files below threshold
 
-#### `coordination/lint_results.json`
+#### `bazinga/lint_results.json`
 ```json
 {
   "timestamp": "2025-11-07T20:00:00Z",
@@ -290,7 +290,7 @@ def estimate_tokens(text):
 - Highlight anomalies and issues requiring attention
 - Link to detailed report for deep-dive
 
-**Tier 2: Detailed Report File** (saved to `coordination/reports/`)
+**Tier 2: Detailed Report File** (saved to `bazinga/reports/`)
 - Complete metrics and data
 - Properly formatted for analysis
 - Timestamped for audit trail
@@ -339,7 +339,7 @@ What the user sees immediately after BAZINGA:
 
 ## Detailed Report
 
-📊 **Full metrics and analysis**: `coordination/reports/session_20251107_151523.md`
+📊 **Full metrics and analysis**: `bazinga/reports/session_20251107_151523.md`
 
 ═══════════════════════════════════════════════════════════
 ```
@@ -357,7 +357,7 @@ What the user sees immediately after BAZINGA:
 
 ## Tier 2: Full Report Format
 
-Saved to: `coordination/reports/session_YYYYMMDD_HHMMSS.md`
+Saved to: `bazinga/reports/session_YYYYMMDD_HHMMSS.md`
 
 ```markdown
 ═══════════════════════════════════════════════════════════
@@ -624,12 +624,12 @@ Saved to: `coordination/reports/session_YYYYMMDD_HHMMSS.md`
 
 📁 **Complete Logs**:
 - Orchestration log: `docs/orchestration-log.md`
-- State files: `coordination/` (pm_state.json, group_status.json, orchestrator_state.json)
+- State files: `bazinga/` (pm_state.json, group_status.json, orchestrator_state.json)
 
 📊 **Skills Reports**:
-- Security scan: `coordination/security_scan.json`
-- Test coverage: `coordination/coverage_report.json`
-- Lint results: `coordination/lint_results.json`
+- Security scan: `bazinga/security_scan.json`
+- Test coverage: `bazinga/coverage_report.json`
+- Lint results: `bazinga/lint_results.json`
 
 🔍 **Audit Trail**:
 - All agent interactions logged
@@ -671,7 +671,7 @@ Saved to: `coordination/reports/session_YYYYMMDD_HHMMSS.md`
 ### Phase 1: Data Aggregation & Reporting (Required)
 
 1. **Create reports directory structure**:
-   - Add `coordination/reports/` to init script
+   - Add `bazinga/reports/` to init script
    - Add to `.gitignore` (reports are ephemeral)
    - Create naming convention: `session_YYYYMMDD_HHMMSS.md`
 
@@ -746,15 +746,15 @@ Saved to: `coordination/reports/session_YYYYMMDD_HHMMSS.md`
 - `agents/orchestrator.md` - Add report generation logic
 - `commands/orchestrate.md` - Update completion message
 - `commands/orchestrate-from-spec.md` - Update completion message
-- `coordination/orchestrator_state.json` - Add token tracking fields
-- `coordination/reports/` - NEW: Directory for detailed reports
+- `bazinga/orchestrator_state.json` - Add token tracking fields
+- `bazinga/reports/` - NEW: Directory for detailed reports
 - `.claude/scripts/init-orchestration.sh` - Add reports directory creation
-- `coordination/.gitignore` - Add reports/ to gitignore
+- `bazinga/.gitignore` - Add reports/ to gitignore
 
 ## Folder Structure
 
 ```
-coordination/
+bazinga/
 ├── pm_state.json
 ├── group_status.json
 ├── orchestrator_state.json

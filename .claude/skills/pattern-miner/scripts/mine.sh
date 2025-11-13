@@ -7,7 +7,7 @@ set +e  # Don't exit on error for graceful degradation
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="coordination/bazinga.db"
+    local db_path="bazinga/bazinga.db"
     if [ ! -f "$db_path" ]; then
         echo "bazinga_default"
         return
@@ -33,7 +33,7 @@ except:
 
 SESSION_ID=$(get_current_session_id)
 
-COORD_DIR="coordination"
+COORD_DIR="bazinga"
 SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
 mkdir -p "$SKILLS_DIR"
 

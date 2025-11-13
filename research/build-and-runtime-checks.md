@@ -39,12 +39,12 @@ Add health checks to track regressions:
 ```bash
 # Before Developer starts (baseline)
 npm run build
-# Store: coordination/build_baseline.log
+# Store: bazinga/build_baseline.log
 # Exit code: 0 (success) or 1 (failure)
 
 # After Developer finishes (comparison)
 npm run build
-# Store: coordination/build_after.log
+# Store: bazinga/build_after.log
 # Exit code: 0 (success) or 1 (failure)
 
 # Metric
@@ -223,11 +223,11 @@ Instead of running E2E twice, leverage QA's results:
 
 ```python
 # After QA runs tests (this already happens)
-qa_results = read_json("coordination/qa_results.json")
+qa_results = read_json("bazinga/qa_results.json")
 
 # Compare to baseline (if exists)
-if file_exists("coordination/qa_baseline.json"):
-    baseline = read_json("coordination/qa_baseline.json")
+if file_exists("bazinga/qa_baseline.json"):
+    baseline = read_json("bazinga/qa_baseline.json")
 
     regression = baseline["total_pass"] - qa_results["total_pass"]
 
@@ -235,7 +235,7 @@ if file_exists("coordination/qa_baseline.json"):
         report(f"⚠️ {regression} E2E tests regressed")
 else:
     # First run - save as baseline
-    write_json("coordination/qa_baseline.json", qa_results)
+    write_json("bazinga/qa_baseline.json", qa_results)
 ```
 
 **This gives you the E2E comparison you want WITHOUT running tests twice.**
@@ -251,13 +251,13 @@ else:
 1. **Baseline (before any development):**
    - Trigger: PM starts (first agent spawned)
    - Command: Standard build for detected language
-   - Store: `coordination/build_baseline.log`
+   - Store: `bazinga/build_baseline.log`
    - Non-blocking: Continue even if fails
 
 2. **Post-Development (after Developer finishes):**
    - Trigger: Developer finishes, before reporting READY_FOR_QA
    - Command: Same build command
-   - Store: `coordination/build_after.log`
+   - Store: `bazinga/build_after.log`
    - Compare to baseline
 
 **Build Commands by Language:**
@@ -285,12 +285,12 @@ BUILD_COMMANDS = {
 3. 🆕 **Run build check**:
    ```bash
    # Run build
-   npm run build 2>&1 | tee coordination/build_after.log
+   npm run build 2>&1 | tee bazinga/build_after.log
    BUILD_STATUS=$?
 
    # Compare to baseline
-   if [ -f coordination/build_baseline.log ]; then
-       BASELINE_STATUS=$(cat coordination/build_baseline_status.txt)
+   if [ -f bazinga/build_baseline.log ]; then
+       BASELINE_STATUS=$(cat bazinga/build_baseline_status.txt)
 
        if [ $BASELINE_STATUS -eq 0 ] && [ $BUILD_STATUS -ne 0 ]; then
            echo "⚠️ WARNING: Build was successful before, but failing now"
@@ -315,8 +315,8 @@ After spawning PM, before PM analyzes:
 1. 🆕 **Run baseline build check**:
    ```bash
    echo "Running baseline build check..."
-   npm run build 2>&1 | tee coordination/build_baseline.log
-   echo $? > coordination/build_baseline_status.txt
+   npm run build 2>&1 | tee bazinga/build_baseline.log
+   echo $? > bazinga/build_baseline_status.txt
    ```
 
 2. Continue with PM analysis (non-blocking)
@@ -342,7 +342,7 @@ Errors introduced:
 - src/users.py: Type mismatch on line 78
 - src/utils.py: Import error on line 12
 
-📋 See coordination/build_after.log for details
+📋 See bazinga/build_after.log for details
 ```
 
 **Time Impact:**
@@ -368,7 +368,7 @@ function check_app_startup() {
     echo "Checking app startup..."
 
     # Start app with timeout
-    timeout 30s npm start > coordination/app_startup.log 2>&1 &
+    timeout 30s npm start > bazinga/app_startup.log 2>&1 &
     APP_PID=$!
 
     # Wait for startup
@@ -387,7 +387,7 @@ function check_app_startup() {
 
 # Run baseline
 check_app_startup
-echo $? > coordination/app_baseline_status.txt
+echo $? > bazinga/app_baseline_status.txt
 ```
 
 **My honest recommendation: SKIP THIS**
@@ -416,12 +416,12 @@ qa_results = {
 }
 
 # Save baseline if first run
-if not exists("coordination/qa_baseline.json"):
-    write_json("coordination/qa_baseline.json", qa_results)
+if not exists("bazinga/qa_baseline.json"):
+    write_json("bazinga/qa_baseline.json", qa_results)
     baseline_comparison = "First run - baseline established"
 else:
     # Compare to baseline
-    baseline = read_json("coordination/qa_baseline.json")
+    baseline = read_json("bazinga/qa_baseline.json")
     regression = baseline["total_pass"] - qa_results["total_pass"]
 
     if regression > 0:

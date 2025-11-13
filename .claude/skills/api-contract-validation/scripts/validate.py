@@ -8,7 +8,7 @@ Usage:
     python validate.py
 
 Output:
-    coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
+    bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 """
 
 import os
@@ -22,7 +22,7 @@ from datetime import datetime
 # Get current session ID from database
 def get_current_session_id():
     """Get the most recent session ID from the database."""
-    db_path = "coordination/bazinga.db"
+    db_path = "bazinga/bazinga.db"
     if not os.path.exists(db_path):
         return "bazinga_default"
 
@@ -38,7 +38,7 @@ def get_current_session_id():
         return "bazinga_default"
 
 SESSION_ID = get_current_session_id()
-OUTPUT_DIR = Path(f"coordination/artifacts/{SESSION_ID}/skills")
+OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_FILE = OUTPUT_DIR / "api_contract_validation.json"
 
@@ -48,7 +48,7 @@ print(f"📁 Output directory: {OUTPUT_DIR}")
 def load_profile():
     """Load profile from skills_config.json"""
     try:
-        with open("coordination/skills_config.json", "r") as f:
+        with open("bazinga/skills_config.json", "r") as f:
             config = json.load(f)
             return config.get("_metadata", {}).get("profile", "lite")
     except:
@@ -72,7 +72,7 @@ except ImportError as e:
             "impact": "API contract validation was skipped. You can manually review OpenAPI specs for breaking changes.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
@@ -85,13 +85,13 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
 
 
-def find_baseline(coordination_dir: str = "coordination") -> Optional[Dict]:
+def find_baseline(coordination_dir: str = "bazinga") -> Optional[Dict]:
     """
     Find baseline API spec from previous run.
 
@@ -114,7 +114,7 @@ def find_baseline(coordination_dir: str = "coordination") -> Optional[Dict]:
     return None
 
 
-def save_baseline(spec: Dict, coordination_dir: str = "coordination"):
+def save_baseline(spec: Dict, coordination_dir: str = "bazinga"):
     """
     Save current spec as baseline for future comparisons.
 
@@ -301,7 +301,7 @@ def main():
     result = validate_api_contract()
 
     # Write output
-    output_dir = Path("coordination")
+    output_dir = Path("bazinga")
     output_dir.mkdir(exist_ok=True)
 
     output_file = output_dir / "api_contract_validation.json"

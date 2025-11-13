@@ -12,7 +12,7 @@ echo "🧪 Test Coverage Analysis Starting..."
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="coordination/bazinga.db"
+    local db_path="bazinga/bazinga.db"
     if [ ! -f "$db_path" ]; then
         echo "bazinga_default"
         return
@@ -37,7 +37,7 @@ except:
 }
 
 SESSION_ID=$(get_current_session_id)
-OUTPUT_DIR="coordination/artifacts/$SESSION_ID/skills"
+OUTPUT_DIR="bazinga/artifacts/$SESSION_ID/skills"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/coverage_report.json"
 
@@ -45,8 +45,8 @@ echo "📁 Output directory: $OUTPUT_DIR"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
-if [ -f "coordination/skills_config.json" ] && command -v jq &> /dev/null; then
-    PROFILE=$(jq -r '._metadata.profile // "lite"' coordination/skills_config.json 2>/dev/null || echo "lite")
+if [ -f "bazinga/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
 fi
 
 # Detect project language and test framework
@@ -126,14 +126,14 @@ case $LANG in
         echo "  Running pytest with coverage..."
         pytest --cov=. --cov-report=json --cov-report=term-missing --quiet 2>/dev/null || {
             echo "⚠️  Tests failed or no tests found"
-            echo '{"totals":{"percent_covered":0},"files":{}}' > coordination/coverage_report_raw.json
+            echo '{"totals":{"percent_covered":0},"files":{}}' > bazinga/coverage_report_raw.json
         }
 
         # pytest-cov outputs to coverage.json by default
         if [ -f "coverage.json" ]; then
-            mv coverage.json coordination/coverage_report_raw.json
-        elif [ ! -f "coordination/coverage_report_raw.json" ]; then
-            echo '{"totals":{"percent_covered":0},"files":{}}' > coordination/coverage_report_raw.json
+            mv coverage.json bazinga/coverage_report_raw.json
+        elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
+            echo '{"totals":{"percent_covered":0},"files":{}}' > bazinga/coverage_report_raw.json
         fi
         ;;
 
@@ -144,32 +144,32 @@ case $LANG in
         fi
 
         echo "  Running jest with coverage..."
-        npm test -- --coverage --json --outputFile=coordination/jest-results.json 2>/dev/null || {
+        npm test -- --coverage --json --outputFile=bazinga/jest-results.json 2>/dev/null || {
             echo "⚠️  Tests failed or no tests found"
-            echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
+            echo '{"coverageMap":{}}' > bazinga/coverage_report_raw.json
         }
 
         # Jest outputs to coverage/coverage-final.json
         if [ -f "coverage/coverage-final.json" ]; then
-            cp coverage/coverage-final.json coordination/coverage_report_raw.json
-        elif [ ! -f "coordination/coverage_report_raw.json" ]; then
-            echo '{"coverageMap":{}}' > coordination/coverage_report_raw.json
+            cp coverage/coverage-final.json bazinga/coverage_report_raw.json
+        elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
+            echo '{"coverageMap":{}}' > bazinga/coverage_report_raw.json
         fi
         ;;
 
     go)
         echo "  Running go test with coverage..."
-        go test -coverprofile=coordination/coverage.out ./... 2>/dev/null || {
+        go test -coverprofile=bazinga/coverage.out ./... 2>/dev/null || {
             echo "⚠️  Tests failed or no tests found"
-            echo '{"coverage":0}' > coordination/coverage_report_raw.json
+            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
         }
 
-        if [ -f "coordination/coverage.out" ]; then
+        if [ -f "bazinga/coverage.out" ]; then
             # Parse go coverage output
-            COVERAGE=$(go tool cover -func=coordination/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-            echo "{\"coverage\":$COVERAGE}" > coordination/coverage_report_raw.json
-        elif [ ! -f "coordination/coverage_report_raw.json" ]; then
-            echo '{"coverage":0}' > coordination/coverage_report_raw.json
+            COVERAGE=$(go tool cover -func=bazinga/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+            echo "{\"coverage\":$COVERAGE}" > bazinga/coverage_report_raw.json
+        elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
+            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
         fi
         ;;
 
@@ -180,7 +180,7 @@ case $LANG in
                 echo "  Running Maven tests with JaCoCo coverage..."
                 mvn test jacoco:report 2>/dev/null || {
                     echo "⚠️  Tests failed or no tests found"
-                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
                 }
 
                 # JaCoCo XML report location (Maven)
@@ -192,20 +192,20 @@ case $LANG in
                         TOTAL=$((LINE_COVERED + LINE_MISSED))
                         if [ $TOTAL -gt 0 ]; then
                             COVERAGE=$(echo "scale=2; $LINE_COVERED * 100 / $TOTAL" | bc)
-                            echo "{\"coverage\":$COVERAGE,\"source\":\"target/site/jacoco/jacoco.xml\"}" > coordination/coverage_report_raw.json
+                            echo "{\"coverage\":$COVERAGE,\"source\":\"target/site/jacoco/jacoco.xml\"}" > bazinga/coverage_report_raw.json
                         else
-                            echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
                         fi
                     else
                         # Fallback without xmllint
-                        echo '{"coverage":"see target/site/jacoco/index.html","source":"target/site/jacoco/jacoco.xml"}' > coordination/coverage_report_raw.json
+                        echo '{"coverage":"see target/site/jacoco/index.html","source":"target/site/jacoco/jacoco.xml"}' > bazinga/coverage_report_raw.json
                     fi
-                elif [ ! -f "coordination/coverage_report_raw.json" ]; then
-                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
+                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
                 fi
             else
                 echo "❌ Maven not found for Java project"
-                echo '{"error":"Maven not found"}' > coordination/coverage_report_raw.json
+                echo '{"error":"Maven not found"}' > bazinga/coverage_report_raw.json
             fi
         elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
             GRADLE_CMD="gradle"
@@ -215,7 +215,7 @@ case $LANG in
                 echo "  Running Gradle tests with JaCoCo coverage..."
                 $GRADLE_CMD test jacocoTestReport 2>/dev/null || {
                     echo "⚠️  Tests failed or no tests found"
-                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
                 }
 
                 # JaCoCo XML report location (Gradle)
@@ -227,30 +227,30 @@ case $LANG in
                         TOTAL=$((LINE_COVERED + LINE_MISSED))
                         if [ $TOTAL -gt 0 ]; then
                             COVERAGE=$(echo "scale=2; $LINE_COVERED * 100 / $TOTAL" | bc)
-                            echo "{\"coverage\":$COVERAGE,\"source\":\"build/reports/jacoco/test/jacocoTestReport.xml\"}" > coordination/coverage_report_raw.json
+                            echo "{\"coverage\":$COVERAGE,\"source\":\"build/reports/jacoco/test/jacocoTestReport.xml\"}" > bazinga/coverage_report_raw.json
                         else
-                            echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
                         fi
                     else
                         # Fallback without xmllint
-                        echo '{"coverage":"see build/reports/jacoco/test/html/index.html","source":"build/reports/jacoco/test/jacocoTestReport.xml"}' > coordination/coverage_report_raw.json
+                        echo '{"coverage":"see build/reports/jacoco/test/html/index.html","source":"build/reports/jacoco/test/jacocoTestReport.xml"}' > bazinga/coverage_report_raw.json
                     fi
-                elif [ ! -f "coordination/coverage_report_raw.json" ]; then
-                    echo '{"coverage":0}' > coordination/coverage_report_raw.json
+                elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
+                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
                 fi
             else
                 echo "❌ Gradle not found for Java project"
-                echo '{"error":"Gradle not found"}' > coordination/coverage_report_raw.json
+                echo '{"error":"Gradle not found"}' > bazinga/coverage_report_raw.json
             fi
         else
             echo "❌ No Maven or Gradle build file found"
-            echo '{"error":"No build file"}' > coordination/coverage_report_raw.json
+            echo '{"error":"No build file"}' > bazinga/coverage_report_raw.json
         fi
         ;;
 
     *)
         echo "❌ Unknown language. Cannot run coverage analysis."
-        echo '{"error":"Unknown language"}' > coordination/coverage_report_raw.json
+        echo '{"error":"Unknown language"}' > bazinga/coverage_report_raw.json
         ;;
 esac
 
@@ -260,20 +260,20 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata
 if command_exists "jq"; then
     jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\"}" \
-        coordination/coverage_report_raw.json > $OUTPUT_FILE
+        bazinga/coverage_report_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
     cat > $OUTPUT_FILE <<EOF
 {
   "timestamp": "$TIMESTAMP",
   "language": "$LANG",
-  "raw_results": $(cat coordination/coverage_report_raw.json)
+  "raw_results": $(cat bazinga/coverage_report_raw.json)
 }
 EOF
 fi
 
 # Clean up
-rm -f coordination/coverage_report_raw.json coordination/jest-results.json 2>/dev/null || true
+rm -f bazinga/coverage_report_raw.json bazinga/jest-results.json 2>/dev/null || true
 
 echo "✅ Coverage analysis complete"
 echo "📁 Results saved to: $OUTPUT_FILE"

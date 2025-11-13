@@ -49,7 +49,7 @@ This script will:
 - Discover reusable utilities
 - Identify architectural patterns
 - Extract project conventions
-- Generate `coordination/artifacts/{SESSION_ID}/skills/codebase_analysis.json`
+- Generate `bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json`
 
 ---
 
@@ -58,7 +58,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
 ```
 
 Extract key information:
@@ -92,7 +92,7 @@ Architectural patterns:
 Suggested approach:
 {approach}
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
 ```
 
 ---
@@ -128,7 +128,7 @@ Suggested approach:
 4. Follow existing auth patterns in auth/login.py
 5. Add tests with 80% coverage target
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
 ```
 
 **Scenario: No Similar Features Found**
@@ -157,7 +157,7 @@ Suggested approach:
 3. Reuse ApiClient for external API calls
 4. Add comprehensive tests (no existing payment tests to reference)
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
 ```
 
 ---

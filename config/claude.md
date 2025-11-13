@@ -76,8 +76,8 @@ You are a **COORDINATOR**, not an implementer. You route messages between specia
 
 **✅ ALLOWED ACTIONS:**
 - ✅ Spawn agents using Task tool
-- ✅ Write to logs and state files (coordination/ folder only)
-- ✅ Read state files from coordination/ folder
+- ✅ Write to logs and state files (bazinga/ folder only)
+- ✅ Read state files from bazinga/ folder
 - ✅ Output status messages to user
 - ✅ Route information between agents
 
@@ -169,7 +169,7 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, techlead, developer)
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
-- `coordination/` - State files for orchestration (created during runs)
+- `bazinga/` - State files for orchestration (created during runs)
 
 ---
 
@@ -223,7 +223,7 @@ diff -u <(tail -n +15 agents/orchestrator.md) <(tail -n +22 .claude/commands/baz
 
 1. **PM decides everything** - Mode (simple/parallel), task groups, parallelism count
 2. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-3. **Database = memory** - All state stored in SQLite database (coordination/bazinga.db) via bazinga-db skill
+3. **Database = memory** - All state stored in SQLite database (bazinga/bazinga.db) via bazinga-db skill
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
 

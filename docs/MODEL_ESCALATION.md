@@ -54,7 +54,7 @@ BAZINGA's model escalation is fully automated. Here's the technical flow:
 
 ### Step 1: PM Tracks Revisions
 
-Every time the Tech Lead requests changes, the Project Manager updates the revision count in `coordination/group_status.json`:
+Every time the Tech Lead requests changes, the Project Manager updates the revision count in `bazinga/group_status.json`:
 
 ```json
 {
@@ -281,7 +281,7 @@ Result: Approved with confidence in security design
 
 ### Revision Tracking
 
-The PM tracks revisions in `coordination/group_status.json`:
+The PM tracks revisions in `bazinga/group_status.json`:
 
 ```json
 {

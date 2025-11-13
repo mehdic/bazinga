@@ -27,7 +27,7 @@ Of the 5 proposed capabilities, **2 should be Skills** and **3 should use other 
 Developer workflow:
 1. Complete implementation
 2. Invoke lint-check Skill: `/lint-check`
-3. Read results from coordination/lint_results.json
+3. Read results from bazinga/lint_results.json
 4. If issues found: fix them, retry
 5. When clean: commit
 ```
@@ -51,7 +51,7 @@ Developer workflow:
 - ✅ Reusable across different Developer instances
 - ✅ Time-consuming (10-20 seconds) - better as background tool
 
-**Output:** `coordination/codebase_analysis.json`
+**Output:** `bazinga/codebase_analysis.json`
 
 ```json
 {
@@ -103,10 +103,10 @@ Developer workflow:
 /codebase-analysis "Implement password reset endpoint"
 
 # Skill analyzes codebase
-# Writes results to coordination/codebase_analysis.json
+# Writes results to bazinga/codebase_analysis.json
 
 # Developer reads results
-cat coordination/codebase_analysis.json
+cat bazinga/codebase_analysis.json
 
 # Developer uses patterns and utilities from analysis
 ```
@@ -124,7 +124,7 @@ cat coordination/codebase_analysis.json
 - ✅ Reusable across projects
 - ✅ Specialized logic (test-specific analysis)
 
-**Output:** `coordination/test_patterns.json`
+**Output:** `bazinga/test_patterns.json`
 
 ```json
 {
@@ -194,10 +194,10 @@ cat coordination/codebase_analysis.json
 /test-pattern-analysis tests/
 
 # Skill analyzes existing tests
-# Writes results to coordination/test_patterns.json
+# Writes results to bazinga/test_patterns.json
 
 # Developer reads patterns
-cat coordination/test_patterns.json
+cat bazinga/test_patterns.json
 
 # Developer follows patterns and uses fixtures
 ```

@@ -208,8 +208,8 @@ Not all complete? → Assign next groups
 ### ALLOWED Tools (Coordination Only)
 
 **✅ Read - State Files ONLY:**
-- ✅ Read `coordination/*.json` (pm_state, group_status, orchestrator_state)
-- ✅ Read `coordination/messages/*.json` (agent message exchange)
+- ✅ Read `bazinga/*.json` (pm_state, group_status, orchestrator_state)
+- ✅ Read `bazinga/messages/*.json` (agent message exchange)
 - ✅ Read documentation files in `docs/`
 - ❌ **NEVER** read code files for implementation purposes
 
@@ -408,14 +408,14 @@ if manager.has_blocking_debt():
         print(f"      Location: {item['location']}")
         print(f"      Impact: {item['impact']}")
     # Status: BLOCKED_BY_TECH_DEBT
-    # Next Action: User must review coordination/tech_debt.json
+    # Next Action: User must review bazinga/tech_debt.json
 
 # Check for high severity items
 high_items = manager.get_items_by_severity('high')
 if len(high_items) > 2:
     # ASK USER for approval before BAZINGA
     print(f"⚠️  Found {len(high_items)} HIGH severity tech debt items")
-    print("   Review coordination/tech_debt.json")
+    print("   Review bazinga/tech_debt.json")
     print("   Acceptable to ship with these known issues?")
     # Status: AWAITING_USER_APPROVAL
     # Next Action: User decides to proceed or fix
@@ -459,7 +459,7 @@ if summary['total'] > 0:
    - Location: src/users/create.py:23
    - Impact: SQL injection risk
 
-**Full details:** coordination/tech_debt.json
+**Full details:** bazinga/tech_debt.json
 
 **Options:**
 1. Fix these items (recommended for production)
@@ -492,7 +492,7 @@ if summary['total'] > 0:
 - TD007: Code duplication in auth handlers
 
 **Note:** All items reviewed. No blockers. Safe for MVP deployment.
-Full details: coordination/tech_debt.json
+Full details: bazinga/tech_debt.json
 
 **BAZINGA** 🎉
 ```
@@ -523,7 +523,7 @@ Every PM response must end with either:
 **Check Skills Configuration:**
 ```bash
 # Read skills configuration to determine if velocity-tracker is enabled
-cat coordination/skills_config.json
+cat bazinga/skills_config.json
 # Look for: "pm": { "velocity-tracker": "mandatory" or "disabled" }
 ```
 
@@ -534,14 +534,14 @@ cat coordination/skills_config.json
 **1. After ANY task group completes** (MANDATORY)
 ```
 Skill(command: "velocity-tracker")
-cat coordination/project_metrics.json
+cat bazinga/project_metrics.json
 # Use metrics to detect: 99% rule violations, velocity trends, capacity issues
 ```
 
 **2. Before BAZINGA** (MANDATORY)
 ```
 Skill(command: "velocity-tracker")
-cat coordination/project_metrics.json
+cat bazinga/project_metrics.json
 # Record final metrics for historical learning
 ```
 
@@ -549,7 +549,7 @@ cat coordination/project_metrics.json
 ```
 # Before spawning developers or adjusting parallelism
 Skill(command: "velocity-tracker")
-cat coordination/project_metrics.json
+cat bazinga/project_metrics.json
 # Check if team can handle more work
 ```
 
@@ -574,7 +574,7 @@ Skip all velocity-tracker invocations and proceed without metrics tracking.
 Checking project metrics...
 
 Skill(command: "velocity-tracker")
-[Read coordination/project_metrics.json after Skill completes]
+[Read bazinga/project_metrics.json after Skill completes]
 
 Current velocity: 12 (above historical avg 10.5) ✓
 Trend: improving
@@ -781,8 +781,8 @@ Recommendation: Split Group C into C1 and C2
 **Timeline Prediction Formula:**
 ```python
 # Use velocity tracker data
-current_velocity = [from coordination/project_metrics.json]
-historical_avg_velocity = [from coordination/historical_metrics.json]
+current_velocity = [from bazinga/project_metrics.json]
+historical_avg_velocity = [from bazinga/historical_metrics.json]
 
 # Calculate remaining work
 total_story_points = sum(all groups story_points)
@@ -839,7 +839,7 @@ Velocity Analysis:
 **Efficiency Metric:**
 ```python
 # For each developer-group pair
-actual_time_spent = [time from coordination logs]
+actual_time_spent = [time from bazinga logs]
 expected_time = story_points × avg_hours_per_point
 
 efficiency_ratio = actual_time_spent / expected_time
@@ -944,8 +944,8 @@ def check_quality_gates():
         }
 
 def check_security_gate():
-    # Read coordination/security_scan.json
-    scan_results = read_json("coordination/security_scan.json")
+    # Read bazinga/security_scan.json
+    scan_results = read_json("bazinga/security_scan.json")
 
     critical = scan_results.get("critical_count", 0)
     high = scan_results.get("high_count", 0)
@@ -960,8 +960,8 @@ def check_security_gate():
     return True, "Security gate passed"
 
 def check_coverage_gate():
-    # Read coordination/coverage_report.json
-    coverage = read_json("coordination/coverage_report.json")
+    # Read bazinga/coverage_report.json
+    coverage = read_json("bazinga/coverage_report.json")
 
     line_cov = coverage.get("line_coverage", 0)
     branch_cov = coverage.get("branch_coverage", 0)
@@ -1491,7 +1491,7 @@ Before sending BAZINGA:
 [Full response as shown above in Phase 6]
 
 ### State Updated
-coordination/pm_state.json updated with:
+bazinga/pm_state.json updated with:
 - Mode: parallel
 - Spec-Kit mode: true
 - 4 task groups mapped from 7 tasks
@@ -2293,7 +2293,7 @@ Don't include full history of every change. Focus on:
 ### If State File Missing
 
 ```
-If coordination/pm_state.json doesn't exist:
+If bazinga/pm_state.json doesn't exist:
 1. Initialize with default empty state
 2. Treat as first spawn
 3. Perform initial planning

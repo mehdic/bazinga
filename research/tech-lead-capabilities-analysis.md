@@ -562,7 +562,7 @@ This skill automatically activates when:
 
 ## Output Format
 
-Security scan results are saved to: `coordination/security_scan_results.json`
+Security scan results are saved to: `bazinga/security_scan_results.json`
 ```
 
 **scan.sh:**
@@ -594,17 +594,17 @@ case $LANG in
             echo "⚠️ bandit not installed. Installing..."
             pip install bandit --quiet
         fi
-        bandit -r . -f json -o coordination/security_scan.json -ll
+        bandit -r . -f json -o bazinga/security_scan.json -ll
         ;;
     javascript)
-        npm audit --json > coordination/security_scan.json
+        npm audit --json > bazinga/security_scan.json
         ;;
     go)
         if ! command -v gosec &> /dev/null; then
             echo "⚠️ gosec not installed. Installing..."
             go install github.com/securego/gosec/v2/cmd/gosec@latest
         fi
-        gosec -fmt json -out coordination/security_scan.json ./...
+        gosec -fmt json -out bazinga/security_scan.json ./...
         ;;
 esac
 
@@ -643,7 +643,7 @@ Auto-activate when:
 
 ## Output
 
-Saves to: `coordination/coverage_report.json`
+Saves to: `bazinga/coverage_report.json`
 ```
 
 ---
@@ -672,7 +672,7 @@ Auto-activate for all code reviews to check:
 
 ## Output
 
-Saves to: `coordination/lint_results.json`
+Saves to: `bazinga/lint_results.json`
 ```
 
 ---
@@ -714,19 +714,19 @@ Create `scripts/aggregate-analysis.sh`:
 #!/bin/bash
 # Aggregate all analysis results into one report for Tech Lead
 
-cat > coordination/analysis_summary.md <<EOF
+cat > bazinga/analysis_summary.md <<EOF
 # Code Analysis Summary
 
 ## Security Scan
-$(cat coordination/security_scan.json | jq -r '.results | length') issues found
+$(cat bazinga/security_scan.json | jq -r '.results | length') issues found
 
 ## Test Coverage
-$(cat coordination/coverage_report.json | jq -r '.totals.percent_covered')% coverage
+$(cat bazinga/coverage_report.json | jq -r '.totals.percent_covered')% coverage
 
 ## Linting
-$(cat coordination/lint_results.json | jq -r 'length') issues found
+$(cat bazinga/lint_results.json | jq -r 'length') issues found
 
-[Full details in coordination/ folder]
+[Full details in bazinga/ folder]
 EOF
 ```
 
@@ -755,12 +755,12 @@ The following Skills activate automatically:
 
 ```bash
 # Read aggregated summary
-cat coordination/analysis_summary.md
+cat bazinga/analysis_summary.md
 
 # Read detailed reports if needed
-cat coordination/security_scan.json
-cat coordination/coverage_report.json
-cat coordination/lint_results.json
+cat bazinga/security_scan.json
+cat bazinga/coverage_report.json
+cat bazinga/lint_results.json
 ```
 
 **Use automated findings to guide your manual review.**
@@ -858,7 +858,7 @@ Developer completes → Orchestrator spawns Tech Lead
                 - test-coverage runs
                 - lint-check runs
                     ↓
-                Tech Lead reads Skill outputs from coordination/
+                Tech Lead reads Skill outputs from bazinga/
                     ↓
                 Tech Lead performs manual review with context
                     ↓
