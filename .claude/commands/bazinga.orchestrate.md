@@ -163,35 +163,41 @@ Skill(command: "bazinga-db")
 
 **Wait for bazinga-db response with session list.**
 
-**Based on the response:**
+**NOW analyze the response you just received:**
+
+- Look at the session list returned by bazinga-db
+- Check the most recent session's status
+- Is the status "active" or "in_progress"?
+
+**If YES (active session found) → Follow Path A below**
+**If NO (no active sessions) → Follow Path B below**
 
 ---
 
 ### Path A: RESUME EXISTING SESSION
 
-**IF bazinga-db shows an active/in-progress session:**
+The bazinga-db response shows an active/in-progress session. **You MUST immediately proceed with these steps:**
 
-**1. Extract session ID from list:**
+**1. Extract and set SESSION_ID:**
 
 ```bash
 # Set SESSION_ID to the existing session from database
-SESSION_ID="[session_id from most recent active session]"
+SESSION_ID="bazinga_20251113_160528"  # Use the actual session_id from response
 ```
 
-**Example:** If list-sessions returned `bazinga_20251113_120000` with status `active`, then:
-```bash
-SESSION_ID="bazinga_20251113_120000"
-```
+**Do this NOW** - set the SESSION_ID variable to the session_id you just received from bazinga-db.
 
 **2. Display resume message:**
 
 ```
 🔄 **ORCHESTRATOR**: Resuming existing session
-📊 Session ID: $SESSION_ID
-📁 Status: [status from database]
+📊 Session ID: bazinga_20251113_160528
+📁 Status: active
 ```
 
-**3. Load state from database:**
+**3. Load PM state from database:**
+
+**You MUST now invoke bazinga-db again to get PM state.**
 
 Request to bazinga-db skill:
 ```
