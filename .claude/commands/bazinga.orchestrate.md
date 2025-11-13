@@ -19,7 +19,6 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
----
 
 ## Claude Code Multi-Agent Dev Team Overview
 
@@ -216,15 +215,40 @@ Output: "   - Use /bazinga.configure-testing to modify testing requirements"
 
 **FOURTH ACTION - Store Configuration References in Orchestrator State:**
 
-```python
-# Update orchestrator_state.json with references to both configs
-orch_state = read_json("coordination/orchestrator_state.json")
-orch_state["skills_config_loaded"] = True
-orch_state["active_skills_count"] = len(active_skills)
-orch_state["testing_config_loaded"] = True
-orch_state["testing_mode"] = testing_mode
-orch_state["qa_expert_enabled"] = qa_expert_enabled
-write_json("coordination/orchestrator_state.json", orch_state)
+**Get current orchestrator state from database:**
+```
+bazinga-db, please get the latest orchestrator state:
+
+Session ID: [current session_id]
+State Type: orchestrator
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Update the state with config information and save back:
+
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save the orchestrator state:
+
+Session ID: [current session_id]
+State Type: orchestrator
+State Data: {
+  ...existing state...,
+  "skills_config_loaded": true,
+  "active_skills_count": [count of active skills],
+  "testing_config_loaded": true,
+  "testing_mode": "[testing_mode]",
+  "qa_expert_enabled": [qa_expert_enabled]
+}
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 **FIFTH ACTION - Run Build Baseline Check (always):**
@@ -287,32 +311,36 @@ fi
 1. If script created new files:
    Output: "📁 **ORCHESTRATOR**: Coordination environment initialized"
 
-2. If files already existed:
-   Output: "📂 **ORCHESTRATOR**: Found existing session, loading state..."
-   Read existing session state from coordination/pm_state.json
+2. If session already exists in database:
+   Output: "📂 **ORCHESTRATOR**: Found existing session in database, loading state..."
+   Query existing session state from database using bazinga-db skill
    Continue from previous state
 
 3. Output: "🚀 **ORCHESTRATOR**: Ready to begin orchestration"
 ```
 
-**Expected Folder Structure (created by script):**
+**Database Storage:**
 
-```bash
-coordination/
-├── pm_state.json              # PM's persistent state
-├── group_status.json          # Per-group progress tracking
-├── orchestrator_state.json    # Orchestrator's state
-├── .gitignore                 # Excludes state files from git
-└── messages/                  # Inter-agent message passing
-    ├── dev_to_qa.json
-    ├── qa_to_techlead.json
-    └── techlead_to_dev.json
+All orchestration state is now stored in SQLite database at `coordination/bazinga.db`:
 
-docs/
-└── orchestration-log.md       # Complete interaction log
+```
+Database Tables:
+├── sessions                   # Session metadata (start/end times, mode, status)
+├── orchestration_logs         # Agent interaction logs (replaces orchestration-log.md)
+├── state_snapshots            # PM/orchestrator state snapshots (replaces JSON files)
+├── task_groups                # Task group tracking (replaces group_status.json)
+├── token_usage                # Token consumption tracking
+├── skill_outputs              # Skill results storage
+└── configuration              # System configuration
+
+Benefits:
+- ✅ Concurrent-safe (no file corruption in parallel mode)
+- ✅ ACID transactions
+- ✅ Fast indexed queries for dashboard
+- ✅ Single source of truth
 ```
 
-**Note:** The init script handles all file creation with proper timestamps and session IDs. See `.claude/scripts/init-orchestration.sh` for details.
+**Note:** The database is automatically initialized by bazinga-db skill on first use.
 
 ---
 
@@ -355,13 +383,22 @@ End: BAZINGA detected from PM
 📋 **ORCHESTRATOR**: Phase 1 - Spawning Project Manager to analyze requirements...
 ```
 
-### Step 1.1: Read PM State
+### Step 1.1: Get PM State from Database
 
+**Request to bazinga-db skill:**
 ```
-state = read_file("coordination/pm_state.json")
+bazinga-db, please get the latest PM state:
+
+Session ID: [current session_id]
+State Type: pm
 ```
 
-If file doesn't exist or is empty, use default empty state.
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The skill will return the latest PM state from the database, or null if this is the first iteration.
 
 ### Step 1.2: Spawn PM with Context
 
@@ -1094,12 +1131,22 @@ ELSE IF result == "FAIL":
 tech_lead_base = read_file("agents/techlead.md")
 ```
 
-**Step 2: Read group_status.json for revision count**
-```python
-group_status = read_file("coordination/group_status.json")
-group_id = "main"  # or whatever the current group ID is
-revision_count = group_status.get(group_id, {}).get("revision_count", 0)
+**Step 2: Get task group from database for revision count**
+
+**Request to bazinga-db skill:**
 ```
+bazinga-db, please get task group information:
+
+Session ID: [current session_id]
+Group ID: [current group_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Parse the returned task group data to extract `revision_count` (defaults to 0 if not found).
 
 **Step 3: Determine Model and Security Scan Mode**
 ```python
@@ -1352,7 +1399,7 @@ You are the PROJECT MANAGER.
 
 **PREVIOUS STATE:**
 ```json
-{read from pm_state.json}
+{latest PM state from database - query using bazinga-db skill}
 ```
 
 **NEW INFORMATION:**
@@ -1387,14 +1434,14 @@ cat coordination/project_metrics.json
 Continue with:
 ```
 **YOUR JOB:**
-1. Read pm_state.json
-2. Update completed_groups
+1. Get latest PM state from database using bazinga-db skill
+2. Update completed_groups in database
 3. Check if ALL work complete
 4. Make decision:
    - All complete? → Send BAZINGA (include metrics summary if velocity-tracker ran)
    - More work? → Assign next groups
 
-**STATE FILE:** coordination/pm_state.json
+**STATE LOCATION:** Database (query via bazinga-db skill)
 
 **CRITICAL:** If everything is complete, include the word "BAZINGA" in your response.
 
@@ -1846,10 +1893,23 @@ ELSE IF result == "FAIL":
 
 For each QA that passes, determine model based on revision count:
 
+**Request to bazinga-db skill:**
+```
+bazinga-db, please get task group information:
+
+Session ID: [current session_id]
+Group ID: [group_id for this specific group]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Extract `revision_count` from the returned task group data (defaults to 0).
+
 ```python
-# Read revision count for this group
-group_status = read_file("coordination/group_status.json")
-revision_count = group_status.get(group_id, {}).get("revision_count", 0)
+# Use revision_count from database query above
 
 # Model escalation at revision 3+
 if revision_count >= 3:
@@ -1992,7 +2052,7 @@ You are the PROJECT MANAGER.
 
 **PREVIOUS STATE:**
 ```json
-{read from pm_state.json}
+{latest PM state from database - query using bazinga-db skill}
 ```
 
 **NEW INFORMATION:**
@@ -2030,13 +2090,13 @@ cat coordination/project_metrics.json
 Continue with:
 ```
 **YOUR JOB:**
-1. Read pm_state.json
-2. Update completed_groups
+1. Get latest PM state from database using bazinga-db skill
+2. Update completed_groups in database
 3. Check if more work needed:
    - Phase 2 pending? → Assign next batch
    - All phases complete? → Send BAZINGA (include metrics summary if velocity-tracker ran)
 
-**STATE FILE:** coordination/pm_state.json
+**STATE LOCATION:** Database (query via bazinga-db skill)
 
 **CRITICAL:** If everything is complete, include "BAZINGA" in your response.
 
@@ -2219,25 +2279,62 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 
 ---
 
-## State File Management
+## State Management from Database
 
 ### Reading State
 
-Before spawning PM or when making decisions:
+Before spawning PM or when making decisions, query state from database:
 
+**Request to bazinga-db skill:**
 ```
-pm_state = read_file("coordination/pm_state.json")
-group_status = read_file("coordination/group_status.json")
-orch_state = read_file("coordination/orchestrator_state.json")
+bazinga-db, please get the latest PM state:
+
+Session ID: [current session_id]
+State Type: pm
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+For orchestrator state:
+```
+bazinga-db, please get the latest orchestrator state:
+
+Session ID: [current session_id]
+State Type: orchestrator
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+For task groups (replaces group_status.json):
+```
+bazinga-db, please get all task groups:
+
+Session ID: [current session_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 ### Updating Orchestrator State
 
-After each major decision, update orchestrator_state.json:
+After each major decision, save orchestrator state to database:
 
-```json
-{
-  "session_id": "session_...",
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save the orchestrator state:
+
+Session ID: [current session_id]
+State Type: orchestrator
+State Data: {
+  "session_id": "[session_id]",
   "current_phase": "developer_working | qa_testing | tech_review | pm_checking",
   "active_agents": [
     {"agent_type": "developer", "group_id": "A", "spawned_at": "..."}
@@ -2257,26 +2354,32 @@ After each major decision, update orchestrator_state.json:
 }
 ```
 
-### Tracking Group Status
-
-Update group_status.json as groups progress:
-
-```json
-{
-  "A": {
-    "group_id": "A",
-    "status": "complete",
-    "iterations": {"developer": 2, "qa": 1, "tech_lead": 1},
-    "duration_minutes": 15,
-    ...
-  },
-  "B": {
-    "group_id": "B",
-    "status": "qa_testing",
-    ...
-  }
-}
+**Then invoke:**
 ```
+Skill(command: "bazinga-db")
+```
+
+### Updating Task Group Status
+
+Update task group status in database as groups progress:
+
+**Request to bazinga-db skill:**
+```
+bazinga-db, please update task group:
+
+Group ID: [group_id]
+Status: [pending|in_progress|completed|failed]
+Assigned To: [agent_id]
+Revision Count: [increment if needed]
+Last Review Status: [APPROVED|CHANGES_REQUESTED]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+This replaces the old group_status.json file with database operations.
 
 ---
 
@@ -2373,27 +2476,39 @@ IF group.review_attempts > 3:
 
 When PM sends BAZINGA:
 
-### Step 1: Aggregate All Metrics
+### Step 1: Aggregate All Metrics from Database
 
-Read all state files and Skills results:
+Get complete dashboard snapshot from database (single efficient query):
 
-```python
-# Read state files
-pm_state = read_file("coordination/pm_state.json")
-group_status = read_file("coordination/group_status.json")
-orch_state = read_file("coordination/orchestrator_state.json")
+**Request to bazinga-db skill:**
+```
+bazinga-db, please provide dashboard snapshot:
 
-# Read Skills results (if they exist)
-security_scan = safe_read_json("coordination/security_scan.json")
-coverage_report = safe_read_json("coordination/coverage_report.json")
-lint_results = safe_read_json("coordination/lint_results.json")
-velocity_tracker = safe_read_json("coordination/project_metrics.json")
-codebase_analysis = safe_read_json("coordination/codebase_analysis.json")
-test_patterns = safe_read_json("coordination/test_patterns.json")
-api_contract = safe_read_json("coordination/api_contract_results.json")
-db_migration = safe_read_json("coordination/db_migration_results.json")
-pattern_miner = safe_read_json("coordination/pattern_insights.json")
-quality_dashboard = safe_read_json("coordination/quality_dashboard.json")
+Session ID: [current session_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+The dashboard snapshot returns:
+- pm_state: Latest PM state
+- orch_state: Latest orchestrator state
+- task_groups: All task groups with their statuses
+- token_usage: Token consumption breakdown
+- recent_logs: Last 10 interactions
+
+For skill outputs, query individually:
+
+```
+bazinga-db, please get skill output:
+
+Session ID: [current session_id]
+Skill Name: security_scan
+```
+
+Repeat for each skill (test_coverage, lint_check, velocity_tracker, etc.)
 
 # Aggregate Skills usage
 skills_used = []
@@ -2612,7 +2727,33 @@ orch_state["status"] = "completed"
 orch_state["end_time"] = end_time
 orch_state["duration_minutes"] = duration_minutes
 orch_state["completion_report"] = report_filename
-write_json("coordination/orchestrator_state.json", orch_state)
+
+**Save final orchestrator state to database:**
+```
+bazinga-db, please save the orchestrator state:
+
+Session ID: [current session_id]
+State Type: orchestrator
+State Data: [orch_state with completed status]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Also update session status in database:**
+```
+bazinga-db, please update session status:
+
+Session ID: [current session_id]
+Status: completed
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
 # Log final entry
 append_to_log("docs/orchestration-log.md", f"""
