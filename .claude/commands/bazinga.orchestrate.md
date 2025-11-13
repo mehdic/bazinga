@@ -71,13 +71,6 @@ Examples:
 - 🚫 **Glob/Grep** - (spawn agents to search)
 - 🚫 **Write** - (all state is in database, not files)
 
-**🚨 DO NOT READ DEPRECATED FILES:**
-- ❌ `coordination/pm_state.json` (use bazinga-db skill instead)
-- ❌ `coordination/orchestrator_state.json` (use bazinga-db skill instead)
-- ❌ `coordination/group_status.json` (use bazinga-db skill instead)
-- ❌ `coordination/next_session_task_list.md` (use bazinga-db skill instead)
-- ❌ `docs/orchestration-log.md` (use bazinga-db skill instead)
-
 ---
 
 ## 🚨 ROLE DRIFT PREVENTION: Pre-Response Check
@@ -1415,7 +1408,6 @@ Agent ID: [identifier]
 
 **FORBIDDEN:**
 ❌ Write (all state is in database)
-❌ Read deprecated files (pm_state.json, group_status.json, etc.)
 
 **Golden Rule:**
 When in doubt, spawn an agent. NEVER do the work yourself.
