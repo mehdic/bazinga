@@ -33,7 +33,6 @@ clients = []
 BASE_DIR = Path(__file__).parent.parent
 COORDINATION_DIR = BASE_DIR / 'coordination'
 DOCS_DIR = BASE_DIR / 'docs'
-SESSIONS_DIR = COORDINATION_DIR / 'sessions'
 ARCHIVE_DIR = COORDINATION_DIR / 'archive'
 CONFIG_DIR = COORDINATION_DIR
 DB_PATH = COORDINATION_DIR / 'bazinga.db'
@@ -431,24 +430,6 @@ def save_dashboard_config(config):
     with open(config_file, 'w') as f:
         json.dump(config, f, indent=2)
 
-def save_session_snapshot(session_data):
-    """Save a session snapshot for history."""
-    SESSIONS_DIR.mkdir(exist_ok=True)
-
-    session_id = session_data.get('session_id', f"session_{int(time.time())}")
-    timestamp = datetime.now().isoformat()
-
-    snapshot = {
-        'session_id': session_id,
-        'timestamp': timestamp,
-        'data': session_data,
-        'status': session_data.get('status', 'unknown')
-    }
-
-    session_file = SESSIONS_DIR / f"{session_id}.json"
-    with open(session_file, 'w') as f:
-        json.dump(snapshot, f, indent=2)
-
 @app.route('/api/config', methods=['GET', 'POST'])
 def dashboard_config():
     """Get or update dashboard configuration."""
@@ -466,50 +447,68 @@ def dashboard_config():
 @app.route('/api/sessions/search', methods=['POST'])
 def search_sessions():
     """Search sessions by content, date, status."""
+    global db
+
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
+
     try:
         query = request.json.get('query', '')
         filters = request.json.get('filters', {})
 
+        # Build SQL query with filters
+        sql = "SELECT * FROM sessions WHERE 1=1"
+        params = []
+
+        # Apply status filter
+        if filters.get('status'):
+            sql += " AND status = ?"
+            params.append(filters['status'])
+
+        # Apply date range filters
+        if filters.get('date_from'):
+            sql += " AND created_at >= ?"
+            params.append(filters['date_from'])
+
+        if filters.get('date_to'):
+            sql += " AND created_at <= ?"
+            params.append(filters['date_to'])
+
+        # Execute query
+        all_sessions = db.query(sql, params)
+
+        # Apply text search if query provided
         sessions = []
+        for session_data in all_sessions:
+            if query:
+                # Search in original requirements and session metadata
+                searchable = json.dumps({
+                    'session_id': session_data.get('session_id'),
+                    'requirements': session_data.get('original_requirements'),
+                    'mode': session_data.get('mode'),
+                    'status': session_data.get('status')
+                }).lower()
 
-        # Load all session files
-        if SESSIONS_DIR.exists():
-            for session_file in SESSIONS_DIR.glob('*.json'):
-                try:
-                    with open(session_file, 'r') as f:
-                        session = json.load(f)
-
-                    # Apply filters
-                    if filters.get('status') and session.get('status') != filters['status']:
-                        continue
-
-                    if filters.get('date_from'):
-                        session_date = datetime.fromisoformat(session.get('timestamp', ''))
-                        filter_date = datetime.fromisoformat(filters['date_from'])
-                        if session_date < filter_date:
-                            continue
-
-                    if filters.get('date_to'):
-                        session_date = datetime.fromisoformat(session.get('timestamp', ''))
-                        filter_date = datetime.fromisoformat(filters['date_to'])
-                        if session_date > filter_date:
-                            continue
-
-                    # Search in content
-                    if query:
-                        session_str = json.dumps(session).lower()
-                        if query.lower() not in session_str:
-                            continue
-
-                    sessions.append(session)
-                except:
+                if query.lower() not in searchable:
                     continue
+
+            # Format session for frontend
+            sessions.append({
+                'session_id': session_data.get('session_id'),
+                'status': session_data.get('status'),
+                'mode': session_data.get('mode'),
+                'timestamp': session_data.get('created_at'),
+                'created_at': session_data.get('created_at'),
+                'end_time': session_data.get('end_time'),
+                'original_requirements': session_data.get('original_requirements')
+            })
 
         # Sort by timestamp, newest first
         sessions.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
         return jsonify({'sessions': sessions, 'count': len(sessions)})
     except Exception as e:
+        print(f"⚠️  Error searching sessions: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/<session_id>', methods=['GET', 'DELETE'])
