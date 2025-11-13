@@ -1,228 +1,167 @@
 ---
 name: pattern-miner
 description: Mine historical data for patterns and predictive insights
-category: analytics
-execution_time: 15-20s
+version: 1.0.0
+allowed-tools: [Bash, Read]
 ---
 
 # Pattern Miner Skill
 
-## Overview
+You are the pattern-miner skill. When invoked, you analyze historical project data to identify recurring patterns, predict future issues, and provide data-driven recommendations.
 
-The **pattern-miner** Skill analyzes historical project data to identify recurring patterns, predict future issues, and provide data-driven recommendations for estimation and planning.
+## When to Invoke This Skill
 
-**Purpose:** Learn from past runs to make better predictions and avoid repeating mistakes.
+**Invoke this skill when:**
+- After 5+ completed project runs (need historical data)
+- PM is estimating new tasks (to apply learned multipliers)
+- Recurring issues detected (to identify patterns)
+- Planning phase of new projects (to use predictive insights)
+- Post-mortem analysis (to extract lessons learned)
 
-## When to Use
+**Do NOT invoke when:**
+- First or second project run (insufficient data)
+- Historical data unavailable or corrupted
+- Emergency situations requiring fast action
+- User explicitly requests to skip pattern analysis
 
-- **After creating task groups** - Adjust estimates based on historical patterns
-- **Before major features** - Predict effort based on similar past features
-- **Weekly retrospectives** - Identify systemic issues
-- **Quarterly planning** - Understand team's actual velocity patterns
+---
 
-## What It Analyzes
+## Your Task
 
-| Source | Patterns Extracted |
-|--------|-------------------|
-| **historical_metrics.json** | Velocity patterns, cycle time trends, revision rates by task type |
-| **tech_debt.json** | Recurring issues, problem modules, common failure modes |
-| **pm_state.json** (past runs) | Task type durations, parallelization effectiveness |
-| **coordination logs** | Developer efficiency patterns, common bottlenecks |
+When invoked:
+1. Execute the pattern mining script
+2. Read the generated insights report
+3. Return a summary to the calling agent
 
-## Pattern Types Detected
+---
 
-### 1. Task Duration Patterns
-- "Database tasks always take 2.5x initial estimate" (85% confidence)
-- "Authentication features require 3 revisions on average"
-- "API integrations complete faster than expected (0.7x estimate)"
+## Step 1: Execute Pattern Mining Script
 
-### 2. Module Risk Patterns
-- "Payment module has 80% revision rate (high risk)"
-- "Auth module always requires security review"
-- "Frontend changes rarely need QA iterations"
+Use the **Bash** tool to run the pre-built pattern mining script:
 
-### 3. Team Velocity Patterns
-- "Team velocity increases 20% after first week of project"
-- "Parallel mode with 3+ developers shows diminishing returns"
-- "Friday deployments have 2x higher rollback rate"
-
-### 4. Quality Patterns
-- "Coverage drops correlate with rushed features (r=0.85)"
-- "Security issues cluster in user input handling"
-- "Lint violations spike during feature freeze"
-
-## Output Format
-
-```json
-{
-  "timestamp": "2024-11-08T12:00:00Z",
-  "total_runs_analyzed": 25,
-  "patterns_detected": [
-    {
-      "pattern_id": "db_task_overrun",
-      "pattern": "database_tasks_overrun",
-      "category": "estimation",
-      "confidence": 0.85,
-      "occurrences": 12,
-      "description": "Database-related tasks take 2.5x longer than estimated",
-      "evidence": {
-        "avg_estimate": 5.0,
-        "avg_actual": 12.5,
-        "variance": 2.3
-      },
-      "recommendation": "Multiply database task estimates by 2.5x",
-      "impact": "high"
-    },
-    {
-      "pattern_id": "auth_security_review",
-      "pattern": "auth_requires_security_review",
-      "category": "process",
-      "confidence": 1.0,
-      "occurrences": 8,
-      "description": "Authentication tasks always require security review (100%)",
-      "recommendation": "Plan for security review in auth task timeline",
-      "impact": "medium"
-    }
-  ],
-  "lessons_learned": [
-    "Payment processing features have 80% revision rate - break into smaller tasks",
-    "Parallel mode with >3 developers shows coordination overhead (diminishing returns)",
-    "Integration tests catch 90% of bugs that slip past unit tests"
-  ],
-  "predictions_for_current_project": [
-    {
-      "task_group": "C",
-      "prediction": "Group C (payment processing) likely needs +30% time based on pattern 'payment_module_revisions'",
-      "confidence": 0.78,
-      "recommendation": "Add buffer to Group C estimate"
-    }
-  ],
-  "estimation_adjustments": {
-    "database_tasks": {
-      "multiplier": 2.5,
-      "confidence": 0.85
-    },
-    "authentication": {
-      "multiplier": 1.5,
-      "confidence": 0.90,
-      "note": "Include security review time"
-    },
-    "api_integration": {
-      "multiplier": 0.7,
-      "confidence": 0.75,
-      "note": "Usually faster than expected"
-    }
-  },
-  "risk_indicators": [
-    {
-      "indicator": "revision_count > 3",
-      "probability": 0.85,
-      "outcome": "Requires tech lead escalation"
-    },
-    {
-      "indicator": "story_points > 8",
-      "probability": 0.70,
-      "outcome": "Should be split into smaller tasks"
-    }
-  ]
-}
-```
-
-## Pattern Confidence Levels
-
-| Confidence | Meaning | Action |
-|------------|---------|--------|
-| 0.90-1.00 | Very High | Apply automatically |
-| 0.75-0.89 | High | Apply with PM review |
-| 0.60-0.74 | Medium | Suggest as option |
-| 0.00-0.59 | Low | Informational only |
-
-## Pattern Categories
-
-1. **Estimation** - Task duration patterns
-2. **Process** - Workflow patterns (e.g., always needs review)
-3. **Quality** - Defect and revision patterns
-4. **Risk** - Failure mode patterns
-5. **Team** - Velocity and efficiency patterns
-
-## Usage Example
-
-**In PM agent:**
 ```bash
-# After creating task groups, refine estimates with patterns
-/pattern-miner
-
-# Read predictions
-cat coordination/pattern_insights.json
-
-# Apply adjustments
-PATTERN_MULTIPLIER=$(jq -r '.estimation_adjustments.database_tasks.multiplier' coordination/pattern_insights.json)
-
-if [ "$PATTERN_MULTIPLIER" != "null" ]; then
-    # Adjust database task estimate
-    NEW_ESTIMATE=$(echo "$ORIGINAL_ESTIMATE * $PATTERN_MULTIPLIER" | bc)
-    echo "Adjusted database task estimate: $ORIGINAL_ESTIMATE → $NEW_ESTIMATE (${PATTERN_MULTIPLIER}x multiplier)"
-fi
-
-# Check predictions for current groups
-jq -r '.predictions_for_current_project[] | "⚠️  \(.prediction)"' coordination/pattern_insights.json
+bash .claude/skills/pattern-miner/mine.sh
 ```
 
-## Pattern Detection Algorithm
+This script will:
+- Read `coordination/historical_metrics.json`
+- Extract task type patterns (database, auth, API, etc.)
+- Calculate estimation multipliers by task type
+- Detect 99% rule violation patterns
+- Generate predictions for current project
+- Create `coordination/pattern_insights.json`
+
+---
+
+## Step 2: Read Generated Report
+
+Use the **Read** tool to read:
+
+```bash
+coordination/pattern_insights.json
+```
+
+Extract key information:
+- `patterns_detected` - Array of identified patterns with confidence scores
+- `estimation_adjustments` - Recommended multipliers by task type
+- `predictions_for_current_project` - Forecasts for pending tasks
+- `risk_indicators` - Probability of escalation/failure
+- `lessons_learned` - Top insights from historical data
+
+---
+
+## Step 3: Return Summary
+
+Return a concise summary to the calling agent:
 
 ```
-For each task type:
-1. Group historical tasks by type (database, auth, API, etc.)
-2. Calculate avg_actual_time / avg_estimated_time ratio
-3. If ratio consistently >1.2 or <0.8 across ≥5 occurrences:
-   → Pattern detected
-4. Calculate confidence based on:
-   - Number of occurrences (more = higher confidence)
-   - Variance (lower = higher confidence)
-   - Recency (recent data weighted more)
+Pattern Mining Results:
+- Analyzed: {count} historical runs
+- Patterns detected: {count} (High confidence: {count})
+
+Top patterns:
+1. {pattern}: {description} (confidence: {percentage}%)
+2. {pattern}: {description} (confidence: {percentage}%)
+3. {pattern}: {description} (confidence: {percentage}%)
+
+Estimation adjustments:
+- {task_type}: Use {multiplier}x multiplier (based on {count} tasks)
+
+Predictions for current project:
+- {prediction}
+
+Details saved to: coordination/pattern_insights.json
 ```
 
-## Benefits
+---
 
-✅ **Data-driven estimates** - Stop guessing, use historical data  
-✅ **Avoid recurring mistakes** - Learn from past patterns  
-✅ **Proactive risk management** - Predict issues before they happen  
-✅ **Continuous improvement** - Estimation accuracy improves over time  
-✅ **Team-specific insights** - Patterns unique to your team's velocity
+## Example Invocation
 
-## Performance
+**Scenario: Estimating Database Migration Task**
 
-- **Execution time:** 15-20 seconds
-- **Dependencies:** jq (graceful fallback if not available)
-- **Minimum data:** 5 historical runs for meaningful patterns
-- **Output:** `coordination/pattern_insights.json`
+Input: PM analyzing historical data before estimating new database migration
 
-## Platform Support
-
-- ✅ Linux/macOS (bash)
-- ✅ Windows (PowerShell)
-
-## Related Skills
-
-- **velocity-tracker** - Provides historical metrics input
-- **quality-dashboard** - Uses pattern insights for predictions
-
-## Example Patterns
-
-**Real-world patterns detected:**
+Expected output:
 ```
-Pattern: database_migrations_underestimated
-Confidence: 0.88
-Occurrences: 15/17 database tasks
-Recommendation: Use 2.5x multiplier for DB tasks
+Pattern Mining Results:
+- Analyzed: 12 historical runs
+- Patterns detected: 8 (High confidence: 5)
 
-Pattern: friday_deployments_risky
-Confidence: 0.92
-Occurrences: 11/12 Friday deploys had issues
-Recommendation: Avoid Friday deployments
+Top patterns:
+1. Database tasks: Take 2.5x longer than estimated (confidence: 85%)
+2. Authentication tasks: High revision rate (3.2 avg) (confidence: 78%)
+3. 99% rule violations: 80% occur in tasks >5 story points (confidence: 92%)
 
-Pattern: parallel_mode_diminishing_returns
-Confidence: 0.81
-Occurrences: 8/10 runs with >3 developers
-Recommendation: Cap parallelism at 3 developers
+Estimation adjustments:
+- Database tasks: Use 2.5x multiplier (based on 15 historical tasks)
+- Auth tasks: Use 1.8x multiplier (based on 9 historical tasks)
+
+Predictions for current project:
+- Task G004 (database migration): Likely needs +150% time buffer
+- High risk of escalation if not broken into smaller tasks
+
+Details saved to: coordination/pattern_insights.json
 ```
+
+**Scenario: Insufficient Data**
+
+Input: Pattern mining on 2nd project run
+
+Expected output:
+```
+Pattern Mining Results:
+- Analyzed: 2 historical runs
+- Patterns detected: 0
+
+Insufficient historical data. Need at least 5 completed runs for reliable pattern detection.
+
+Current data will be recorded for future analysis.
+
+Details saved to: coordination/pattern_insights.json
+```
+
+---
+
+## Error Handling
+
+**If no historical data:**
+- Return: "No historical data found. Pattern mining requires at least 5 completed runs."
+
+**If data corrupted:**
+- Script attempts to parse available data
+- Returns partial results with warning
+
+**If current PM state not found:**
+- Skip prediction generation
+- Still provide general patterns and adjustments
+
+---
+
+## Notes
+
+- The script handles all pattern detection algorithms
+- Supports both bash (Linux/Mac) and PowerShell (Windows)
+- Minimum 5 runs required for reliable patterns
+- Confidence scores indicate pattern reliability
+- Patterns improve over time as more data collected
+- Focuses on actionable insights (estimation multipliers, risk indicators)

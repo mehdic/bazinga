@@ -1,188 +1,205 @@
 ---
 name: quality-dashboard
 description: Unified project health dashboard aggregating all quality metrics
-category: analytics
-execution_time: 10-15s
+version: 1.0.0
+allowed-tools: [Bash, Read]
 ---
 
 # Quality Dashboard Skill
 
-## Overview
+You are the quality-dashboard skill. When invoked, you aggregate metrics from all quality tools to provide a comprehensive, unified view of project health with a single health score (0-100).
 
-The **quality-dashboard** Skill provides a comprehensive, unified view of project health by aggregating metrics from all quality tools (security scans, test coverage, linting) and project metrics (velocity, cycle time).
+## When to Invoke This Skill
 
-**Purpose:** Give PM and users a single health score (0-100) with trend analysis and anomaly detection.
+**Invoke this skill when:**
+- After running security-scan, test-coverage, and lint-check
+- Before final code review or deployment
+- PM needs overall project health status
+- Generating status reports for stakeholders
+- Checking if quality gates pass
 
-## When to Use
+**Do NOT invoke when:**
+- Quality tools haven't run yet (no metrics available)
+- Emergency hotfixes (skip quality dashboard)
+- Work-in-progress code not ready for review
 
-- **Before major decisions** - Check overall health before proceeding
-- **Before BAZINGA** - Final health check before declaring complete
-- **After significant changes** - See impact of changes on quality
-- **Weekly/milestone reviews** - Track quality trends over time
+---
 
-## What It Analyzes
+## Your Task
 
-| Source | Metrics Extracted |
-|--------|-------------------|
-| **security_scan.json** | Critical/high/medium vulnerability counts, trend |
-| **coverage_report.json** | Line/branch coverage percentages, trend |
-| **lint_results.json** | Issue counts by severity, trend |
-| **project_metrics.json** | Velocity, cycle time, completion %, revision rate |
-| **historical_metrics.json** | Historical averages for trend comparison |
+When invoked:
+1. Execute the quality dashboard aggregation script
+2. Read the generated dashboard report
+3. Return a summary to the calling agent
 
-## Output Format
+---
 
-```json
-{
-  "overall_health_score": 85,
-  "health_level": "good",
-  "timestamp": "2024-11-08T12:00:00Z",
-  "metrics": {
-    "security": {
-      "score": 90,
-      "critical_issues": 0,
-      "high_issues": 1,
-      "medium_issues": 5,
-      "trend": "improving"
-    },
-    "coverage": {
-      "score": 80,
-      "line_coverage": 75,
-      "branch_coverage": 68,
-      "uncovered_files": ["payment.py", "auth.py"],
-      "trend": "stable"
-    },
-    "lint": {
-      "score": 85,
-      "total_issues": 23,
-      "high_severity": 2,
-      "medium_severity": 8,
-      "low_severity": 13,
-      "trend": "improving"
-    },
-    "velocity": {
-      "score": 95,
-      "current": 12,
-      "historical_avg": 10.5,
-      "trend": "improving"
-    },
-    "quality_trend": "improving"
-  },
-  "anomalies": [
-    "Security score dropped 15 points from last run",
-    "Coverage decreased in auth module (45% -> 38%)"
-  ],
-  "recommendations": [
-    "Address 1 high-severity security issue before deployment",
-    "Add tests for auth module (coverage: 38% -> target: 70%)",
-    "Fix 2 high-severity lint issues in payment.py"
-  ],
-  "quality_gates_status": {
-    "security": "passed",
-    "coverage": "failed",
-    "lint": "passed"
-  }
-}
-```
+## Step 1: Execute Quality Dashboard Script
 
-## Health Score Calculation
+Use the **Bash** tool to run the pre-built dashboard script:
 
-```
-Overall Score = (security_score × 0.35) + (coverage_score × 0.30) + 
-                (lint_score × 0.20) + (velocity_score × 0.15)
-
-Where each component score is 0-100:
-
-security_score:
-  - critical_vulns = 0: 100 points
-  - critical_vulns > 0: 0 points
-  - Deduct 10 points per high vulnerability
-  - Deduct 2 points per medium vulnerability
-
-coverage_score:
-  - line_coverage as percentage (e.g., 75% = 75 points)
-  - Branch coverage bonus: if >65%, add 5 points
-
-lint_score:
-  - Start at 100
-  - Deduct 10 points per high-severity issue
-  - Deduct 2 points per medium-severity issue
-  - Deduct 0.5 points per low-severity issue
-
-velocity_score:
-  - current > historical_avg: 100 points
-  - current = historical_avg: 80 points
-  - current < historical_avg: (current/historical) × 80
-```
-
-## Health Levels
-
-| Score Range | Level | Meaning |
-|-------------|-------|---------|
-| 90-100 | Excellent | Production-ready, high quality |
-| 75-89 | Good | Minor issues, safe to deploy with review |
-| 60-74 | Fair | Multiple issues, needs improvement before deploy |
-| 40-59 | Poor | Significant quality concerns, do not deploy |
-| 0-39 | Critical | Severe quality issues, immediate action required |
-
-## Trend Detection
-
-Compares current metrics to previous run (if available):
-
-- **Improving**: Score increased by >5 points
-- **Stable**: Score changed by ≤5 points
-- **Declining**: Score decreased by >5 points
-
-## Anomaly Detection
-
-Flags issues like:
-- Security score dropped >10 points
-- Coverage decreased in any file by >10%
-- Lint issues increased >50%
-- Velocity dropped below 50% of historical
-
-## Usage Example
-
-**In PM agent:**
 ```bash
-# Before BAZINGA decision
-/quality-dashboard
-
-# Read results
-cat coordination/quality_dashboard.json
-
-# Check overall health
-health_score=$(jq -r '.overall_health_score' coordination/quality_dashboard.json)
-
-if [ "$health_score" -lt 75 ]; then
-    echo "Health score too low ($health_score/100) - cannot send BAZINGA"
-    echo "Recommendations:"
-    jq -r '.recommendations[]' coordination/quality_dashboard.json
-fi
+bash .claude/skills/quality-dashboard/dashboard.sh
 ```
 
-## Benefits
+This script will:
+- Read `coordination/security_scan.json`
+- Read `coordination/coverage_report.json`
+- Read `coordination/lint_results.json`
+- Read `coordination/project_metrics.json`
+- Calculate component scores (0-100 for each)
+- Compute overall health score (weighted average)
+- Detect trends by comparing to previous run
+- Identify anomalies
+- Generate `coordination/quality_dashboard.json`
 
-✅ **Single unified view** - No need to check 4+ separate files  
-✅ **Trend analysis** - See if quality improving or declining  
-✅ **Anomaly detection** - Catch regressions automatically  
-✅ **Actionable recommendations** - Know exactly what to fix  
-✅ **Historical comparison** - Track progress over time
+---
 
-## Performance
+## Step 2: Read Generated Report
 
-- **Execution time:** 10-15 seconds
-- **Dependencies:** jq (graceful fallback if not available)
-- **Output:** `coordination/quality_dashboard.json`
+Use the **Read** tool to read:
 
-## Platform Support
+```bash
+coordination/quality_dashboard.json
+```
 
-- ✅ Linux/macOS (bash)
-- ✅ Windows (PowerShell)
+Extract key information:
+- `overall_health_score` - Single score 0-100
+- `health_level` - excellent/good/fair/poor/critical
+- `metrics.security.score` - Security component score
+- `metrics.coverage.score` - Coverage component score
+- `metrics.lint.score` - Lint component score
+- `metrics.velocity.score` - Velocity component score
+- `quality_gates_status` - passed/failed for each gate
+- `anomalies` - Detected issues
+- `recommendations` - Action items
 
-## Related Skills
+---
 
-- **security-scan** - Provides security metrics input
-- **test-coverage** - Provides coverage metrics input
-- **lint-check** - Provides linting metrics input
-- **velocity-tracker** - Provides project metrics input
+## Step 3: Return Summary
+
+Return a concise summary to the calling agent:
+
+```
+Quality Dashboard Summary:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Overall Health: {score}/100 ({level})
+Trend: {overall_trend}
+
+Component Scores:
+- Security:  {score}/100 [{trend}]
+- Coverage:  {score}/100 [{trend}]
+- Lint:      {score}/100 [{trend}]
+- Velocity:  {score}/100 [{trend}]
+
+Quality Gates:
+- Security: {passed/failed}
+- Coverage: {passed/failed}
+- Lint:     {passed/failed}
+
+{If anomalies:}
+⚠️  Anomalies Detected:
+- {anomaly}
+
+Top Recommendations:
+1. {recommendation}
+2. {recommendation}
+3. {recommendation}
+
+Details saved to: coordination/quality_dashboard.json
+```
+
+---
+
+## Example Invocation
+
+**Scenario: Healthy Project**
+
+Input: PM requesting overall health status after all quality checks
+
+Expected output:
+```
+Quality Dashboard Summary:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Overall Health: 92/100 (excellent)
+Trend: improving
+
+Component Scores:
+- Security:  100/100 [stable]
+- Coverage:  94/100 [improving]
+- Lint:      95/100 [stable]
+- Velocity:  80/100 [improving]
+
+Quality Gates:
+- Security: passed ✅
+- Coverage: passed ✅
+- Lint:     passed ✅
+
+Top Recommendations:
+1. Continue current practices
+2. Coverage improved by 12% this iteration
+
+Details saved to: coordination/quality_dashboard.json
+```
+
+**Scenario: Quality Issues Detected**
+
+Input: PM checking health after detecting test failures
+
+Expected output:
+```
+Quality Dashboard Summary:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Overall Health: 58/100 (fair)
+Trend: declining
+
+Component Scores:
+- Security:  70/100 [declining]
+- Coverage:  62/100 [declining]
+- Lint:      45/100 [declining]
+- Velocity:  55/100 [stable]
+
+Quality Gates:
+- Security: failed ❌ (3 high issues)
+- Coverage: failed ❌ (below 70%)
+- Lint:     failed ❌ (12 errors)
+
+⚠️  Anomalies Detected:
+- Security score dropped 25 points from last run
+- Coverage decreased in auth module (82% -> 62%)
+- Lint errors increased by 150%
+
+Top Recommendations:
+1. Address 3 high-severity security issues before deployment
+2. Add tests for auth module (20% coverage drop)
+3. Fix 12 linting errors
+
+Details saved to: coordination/quality_dashboard.json
+```
+
+---
+
+## Error Handling
+
+**If all metric files missing:**
+- Return: "Cannot generate dashboard - no quality metrics found. Run security-scan, test-coverage, and lint-check first."
+
+**If only some metrics missing:**
+- Calculate health score with available metrics
+- Note: "Incomplete data: {missing components}"
+- Adjust weights accordingly
+
+**If previous dashboard not found:**
+- Skip trend detection
+- Note: "No baseline for trend comparison (first run)"
+
+---
+
+## Notes
+
+- The script handles all aggregation and scoring logic
+- Supports both bash (Linux/Mac) and PowerShell (Windows)
+- Health score is weighted: Security (35%), Coverage (30%), Lint (20%), Velocity (15%)
+- Quality gates are minimum standards for deployment
+- Trends require at least 2 runs to detect
+- Anomaly detection catches regressions early

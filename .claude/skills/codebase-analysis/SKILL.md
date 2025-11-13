@@ -1,190 +1,184 @@
+---
+name: codebase-analysis
+description: Analyze codebase to find similar features, reusable utilities, and architectural patterns
+version: 1.0.0
+allowed-tools: [Bash, Read]
+---
+
 # Codebase Analysis Skill
 
-**Type:** Model-invoked analysis tool
-**Purpose:** Analyze codebase to find similar features, reusable utilities, and architectural patterns
-**Complexity:** Medium (10-20 seconds runtime)
+You are the codebase-analysis skill. When invoked with a task description, you analyze the existing codebase to find similar features, reusable utilities, and architectural patterns.
 
-## What This Skill Does
+## When to Invoke This Skill
 
-Before implementing a new feature, this Skill analyzes the existing codebase to help developers:
+**Invoke this skill when:**
+- Before starting new feature development
+- Developer needs to find similar existing code
+- Looking for reusable utilities or patterns
+- Understanding codebase architecture
+- Avoiding duplicate implementations
 
-1. **Find Similar Features**: Identify existing code that solves similar problems
-2. **Discover Reusable Utilities**: Locate helper functions, services, and utilities
-3. **Understand Architectural Patterns**: Detect patterns like service layer, repository, factory
-4. **Follow Project Conventions**: Extract coding conventions and best practices
+**Do NOT invoke when:**
+- Implementing completely novel features with no precedent
+- Working in greenfield projects with no existing code
+- Fixing typos or documentation
+- Emergency bug fixes (skip analysis to save time)
 
-## Usage
+---
 
-```bash
-/codebase-analysis "Implement password reset endpoint"
-```
+## Your Task
 
-## Output
+When invoked:
+1. Execute the codebase analysis script with task description
+2. Read the generated analysis report
+3. Return a summary to the calling agent
 
-**File:** `coordination/codebase_analysis.json`
+---
 
-```json
-{
-  "task": "Implement password reset endpoint",
-  "similar_features": [
-    {
-      "file": "user_registration.py",
-      "similarity_score": 0.85,
-      "patterns": ["email validation", "token generation", "service layer"],
-      "key_functions": ["generate_token()", "send_email()"]
-    }
-  ],
-  "reusable_utilities": [
-    {"name": "EmailService", "file": "utils/email.py", "functions": ["send_email()"]},
-    {"name": "TokenGenerator", "file": "utils/tokens.py", "functions": ["generate_token()"]}
-  ],
-  "architectural_patterns": [
-    "Service layer pattern (services/)",
-    "Repository pattern (repositories/)",
-    "Factory pattern (factories/)"
-  ],
-  "suggested_approach": "Create PasswordResetService in services/, use existing EmailService and TokenGenerator",
-  "conventions": [
-    "All business logic goes in services/",
-    "Use error_response() for errors from utils/responses.py",
-    "80% test coverage minimum"
-  ]
-}
-```
+## Step 1: Execute Codebase Analysis Script
 
-## How It Works
-
-### Step 1: Extract Keywords
-
-Extract relevant keywords from the task description:
-- Task: "Implement password reset endpoint"
-- Keywords: ["password", "reset", "endpoint", "email", "token", "auth"]
-
-### Step 2: Find Similar Files
-
-Search codebase for files containing similar functionality:
-- Use grep to find keyword matches
-- Use text similarity (TF-IDF, cosine similarity) to rank files
-- Return top 5 most similar files
-
-### Step 3: Detect Utilities
-
-Scan common utility directories:
-- `utils/`, `lib/`, `helpers/`, `services/`, `common/`
-- Extract class/function names
-- Match utilities relevant to keywords
-
-### Step 4: Identify Patterns
-
-Analyze directory structure and imports:
-- Service layer: `services/` directory
-- Repository: `repositories/` or `repos/` directory
-- Factory: Files ending in `_factory.py`
-- Dependency injection: Constructor patterns
-
-### Step 5: Extract Conventions
-
-Parse existing code to find conventions:
-- Test coverage requirements (from pytest.ini, jest.config.js)
-- Error handling patterns (common error response functions)
-- Code style (from analysis of existing files)
-
-### Step 6: Generate Suggestion
-
-Based on analysis, suggest implementation approach:
-- Which patterns to follow
-- Which utilities to reuse
-- Where to place new code
-- How to structure implementation
-
-## Implementation
-
-The Skill is implemented in Python and runs as an external tool invoked by the model.
-
-**Files:**
-- `analyze.py`: Main analysis orchestrator
-- `similarity.py`: Text similarity functions (TF-IDF, cosine)
-- `patterns.py`: Pattern detection logic
-
-**Runtime:** 10-20 seconds depending on codebase size
-
-**Languages Supported:** All (language-agnostic analysis)
-
-## When to Use
-
-✅ **Use this Skill when:**
-- Implementing a new feature
-- Unfamiliar with codebase structure
-- Want to follow existing patterns
-- Need to find reusable utilities
-
-❌ **Don't use when:**
-- Task is trivial (e.g., fixing typo)
-- Already familiar with implementation approach
-- Time is critical and task is small
-
-## Example Workflow
+Use the **Bash** tool to run the pre-built analysis script with the task description:
 
 ```bash
-# Developer receives task
-Task: "Implement password reset endpoint"
-
-# Developer invokes Skill
-/codebase-analysis "Implement password reset endpoint"
-
-# Skill analyzes codebase (10-20 seconds)
-# Writes results to coordination/codebase_analysis.json
-
-# Developer reads results
-cat coordination/codebase_analysis.json
-
-# Developer sees:
-# - Similar feature: user_registration.py
-# - Utilities: EmailService, TokenGenerator
-# - Pattern: Service layer
-# - Suggestion: Create PasswordResetService
-
-# Developer implements following patterns
-# Reuses EmailService and TokenGenerator
-# Creates PasswordResetService in services/
-# Follows existing conventions
+python3 .claude/skills/codebase-analysis/analyze.py --task "{task_description}"
 ```
 
-## Benefits
+This script will:
+- Extract keywords from task description
+- Find similar existing features
+- Discover reusable utilities
+- Identify architectural patterns
+- Extract project conventions
+- Generate `coordination/codebase_analysis.json`
 
-**Without Skill:**
-- Developer implements from scratch → 45 minutes
-- Misses existing utilities → duplicates code
-- Uses wrong patterns → gets changes requested in review
-- **Total:** 60-90 minutes with revision
+---
 
-**With Skill:**
-- Skill finds utilities → saves 15 minutes
-- Follows existing patterns → passes review first time
-- Reuses code → cleaner implementation
-- **Total:** 30-40 minutes
+## Step 2: Read Generated Report
 
-**ROI:** 8x (40% time savings, 90% fewer revisions)
+Use the **Read** tool to read:
 
-## Technical Details
+```bash
+coordination/codebase_analysis.json
+```
 
-**Dependencies:**
-- Python 3.8+
-- scikit-learn (for TF-IDF)
-- Standard library (ast, os, re, json)
+Extract key information:
+- `similar_features` - Existing code to reference
+- `reusable_utilities` - Functions/classes to reuse
+- `architectural_patterns` - Project patterns to follow
+- `suggested_approach` - Implementation guidance
+- `conventions` - Code style and standards
 
-**Performance:**
-- Small codebase (<100 files): 5-10 seconds
-- Medium codebase (100-500 files): 10-15 seconds
-- Large codebase (500+ files): 15-25 seconds
+---
 
-**Limitations:**
-- Text-based similarity (doesn't execute code)
-- Best for codebases with clear structure
-- May miss implicit patterns
+## Step 3: Return Summary
 
-## Integration
+Return a concise summary to the calling agent:
 
-This Skill is configurable via `/configure-skills` command.
+```
+Codebase Analysis:
+- Similar features found: {count}
+- Reusable utilities: {count}
 
-When marked as 'mandatory' in skills_config.json, the Orchestrator injects this Skill into Developer prompt before implementation begins.
+Most similar: {file} (similarity: {score})
+
+Reusable utilities:
+- {utility1}: {description}
+- {utility2}: {description}
+
+Architectural patterns:
+- {pattern1}
+- {pattern2}
+
+Suggested approach:
+{approach}
+
+Details saved to: coordination/codebase_analysis.json
+```
+
+---
+
+## Example Invocation
+
+**Scenario: Implementing Password Reset**
+
+Input: Developer needs to implement password reset endpoint
+
+Expected output:
+```
+Codebase Analysis:
+- Similar features found: 3
+- Reusable utilities: 5
+
+Most similar: auth/login.py (similarity: 0.82)
+
+Reusable utilities:
+- EmailService (utils/email.py): Send templated emails
+- TokenGenerator (utils/crypto.py): Generate secure tokens
+- UserValidator (utils/validators.py): Validate email addresses
+
+Architectural patterns:
+- Service layer pattern (services/ directory)
+- Repository pattern for database access
+- JWT authentication
+
+Suggested approach:
+1. Create PasswordResetService in services/ (following service layer pattern)
+2. Reuse EmailService from utils/email.py
+3. Reuse TokenGenerator from utils/crypto.py
+4. Follow existing auth patterns in auth/login.py
+5. Add tests with 80% coverage target
+
+Details saved to: coordination/codebase_analysis.json
+```
+
+**Scenario: No Similar Features Found**
+
+Input: Implementing completely new payment integration
+
+Expected output:
+```
+Codebase Analysis:
+- Similar features found: 0
+- Reusable utilities: 2
+
+No similar payment features found in codebase.
+
+Reusable utilities:
+- ApiClient (utils/http.py): HTTP client wrapper
+- ConfigLoader (utils/config.py): Load environment config
+
+Architectural patterns:
+- Service layer pattern
+- Dependency injection
+
+Suggested approach:
+1. Implement from scratch following project patterns
+2. Create PaymentService in services/
+3. Reuse ApiClient for external API calls
+4. Add comprehensive tests (no existing payment tests to reference)
+
+Details saved to: coordination/codebase_analysis.json
+```
+
+---
+
+## Error Handling
+
+**If no similar features found:**
+- Return: "No similar features found. Suggest implementing from scratch following project patterns."
+
+**If no utilities found:**
+- Return: "No reusable utilities found. Developer may need to create new utility functions."
+
+**If codebase structure unclear:**
+- Return: "Could not detect clear architectural patterns. Analyze manually."
+
+---
+
+## Notes
+
+- The script handles all similarity matching and pattern detection
+- Focuses on high similarity matches (>0.7)
+- Prioritizes reusable code to avoid duplication
+- Respects existing patterns for consistency
+- Includes test patterns in analysis
