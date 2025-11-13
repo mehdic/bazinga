@@ -146,14 +146,37 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**Check for existing sessions:**
+**Check user's intent:**
 
-First, invoke bazinga-db skill to check for recent sessions:
+**First, analyze what the user asked for:**
+
+User said: "[user's message from $ARGUMENTS]"
+
+**Does the user want to RESUME an existing session?**
+- Keywords: "resume", "continue", "keep going", "carry on", "finish", "complete"
+- If user message contains these → They want to RESUME
+
+**OR does the user have a NEW task?**
+- User describes a new feature/fix/implementation
+- No resume keywords
+- If this → They want a NEW SESSION
+
+**Decision:**
+- User wants to RESUME → Follow **Path A** below
+- User wants NEW task → Follow **Path B** below (skip session check, create new)
+
+**Simple rule:** Check user's intent FIRST. Most users give new tasks and should get new sessions.
+
+---
+
+**IF user wants to RESUME (Path A):**
+
+Invoke bazinga-db skill to get the most recent session:
 
 Request to bazinga-db skill:
 ```
 bazinga-db, please list the most recent sessions (limit 5).
-I need to check if there's an active session to resume.
+I need to find the latest session to resume.
 ```
 
 Then invoke:
@@ -163,13 +186,9 @@ Skill(command: "bazinga-db")
 
 **Wait for bazinga-db response with session list.**
 
-**NOW analyze the response you just received:**
+**IF list is empty:** Tell user "No sessions found to resume" and ask them to provide a new task.
 
-- Did list-sessions return any sessions?
-- **If YES** (list has at least 1 session) → Follow **Path A: RESUME** below
-- **If NO** (empty list, no sessions) → Follow **Path B: CREATE NEW** below
-
-**Simple rule:** If sessions exist, resume the most recent one (first in list). Only create new if no sessions exist.
+**IF list has sessions:** Use the first session (most recent).
 
 ---
 
