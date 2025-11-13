@@ -352,11 +352,47 @@ else
     echo "✓ coordination/.gitignore already exists"
 fi
 
+# Initialize database
+echo ""
+echo "🗄️  Initializing BAZINGA database..."
+DB_PATH="coordination/bazinga.db"
+DB_INIT_SCRIPT=".claude/skills/bazinga-db/scripts/init_db.py"
+DB_CLI_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+
+if [ -f "$DB_PATH" ]; then
+    echo "✓ Database already exists"
+else
+    if [ -f "$DB_INIT_SCRIPT" ]; then
+        echo "📝 Creating database schema..."
+        python3 "$DB_INIT_SCRIPT" "$DB_PATH"
+
+        if [ $? -eq 0 ]; then
+            echo "✅ Database initialized successfully"
+
+            # Create session in database
+            echo "📝 Creating session in database..."
+            python3 "$DB_CLI_SCRIPT" --db "$DB_PATH" create-session "$SESSION_ID" "simple" "Orchestration session" 2>/dev/null
+
+            if [ $? -eq 0 ]; then
+                echo "✅ Session created in database: $SESSION_ID"
+            else
+                echo "⚠️  Warning: Could not create session in database"
+            fi
+        else
+            echo "⚠️  Warning: Database initialization failed"
+        fi
+    else
+        echo "⚠️  Warning: Database initialization script not found"
+        echo "   Database will be auto-initialized on first use"
+    fi
+fi
+
 echo ""
 echo "✅ Initialization complete!"
 echo ""
 echo "📊 Created structure:"
 echo "   coordination/"
+echo "   ├── bazinga.db            (SQLite database - primary storage)"
 echo "   ├── pm_state.json"
 echo "   ├── group_status.json"
 echo "   ├── orchestrator_state.json"
@@ -371,6 +407,8 @@ echo "   docs/"
 echo "   └── orchestration-log.md"
 echo ""
 echo "🚀 Ready for orchestration!"
+echo "📊 Session ID: $SESSION_ID"
+echo "🗄️  Database: coordination/bazinga.db"
 echo ""
 
 # Check if dashboard server is running and start if needed
