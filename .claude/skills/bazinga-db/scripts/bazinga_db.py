@@ -23,8 +23,23 @@ class BazingaDB:
     def _ensure_db_exists(self):
         """Ensure database exists, create if not."""
         if not Path(self.db_path).exists():
-            print(f"Database not found at {self.db_path}. Run init_db.py first.", file=sys.stderr)
-            sys.exit(1)
+            print(f"Database not found at {self.db_path}. Auto-initializing...", file=sys.stderr)
+            # Auto-initialize the database
+            script_dir = Path(__file__).parent
+            init_script = script_dir / "init_db.py"
+
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, str(init_script), self.db_path],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
+                sys.exit(1)
+
+            print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get database connection with proper settings."""

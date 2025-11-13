@@ -33,7 +33,6 @@ clients = []
 BASE_DIR = Path(__file__).parent.parent
 COORDINATION_DIR = BASE_DIR / 'coordination'
 DOCS_DIR = BASE_DIR / 'docs'
-SESSIONS_DIR = COORDINATION_DIR / 'sessions'
 ARCHIVE_DIR = COORDINATION_DIR / 'archive'
 CONFIG_DIR = COORDINATION_DIR
 DB_PATH = COORDINATION_DIR / 'bazinga.db'
@@ -431,24 +430,6 @@ def save_dashboard_config(config):
     with open(config_file, 'w') as f:
         json.dump(config, f, indent=2)
 
-def save_session_snapshot(session_data):
-    """Save a session snapshot for history."""
-    SESSIONS_DIR.mkdir(exist_ok=True)
-
-    session_id = session_data.get('session_id', f"session_{int(time.time())}")
-    timestamp = datetime.now().isoformat()
-
-    snapshot = {
-        'session_id': session_id,
-        'timestamp': timestamp,
-        'data': session_data,
-        'status': session_data.get('status', 'unknown')
-    }
-
-    session_file = SESSIONS_DIR / f"{session_id}.json"
-    with open(session_file, 'w') as f:
-        json.dump(snapshot, f, indent=2)
-
 @app.route('/api/config', methods=['GET', 'POST'])
 def dashboard_config():
     """Get or update dashboard configuration."""
@@ -466,132 +447,235 @@ def dashboard_config():
 @app.route('/api/sessions/search', methods=['POST'])
 def search_sessions():
     """Search sessions by content, date, status."""
+    global db
+
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
+
     try:
         query = request.json.get('query', '')
         filters = request.json.get('filters', {})
 
+        # Build SQL query with filters
+        sql = "SELECT * FROM sessions WHERE 1=1"
+        params = []
+
+        # Apply status filter
+        if filters.get('status'):
+            sql += " AND status = ?"
+            params.append(filters['status'])
+
+        # Apply date range filters
+        if filters.get('date_from'):
+            sql += " AND created_at >= ?"
+            params.append(filters['date_from'])
+
+        if filters.get('date_to'):
+            sql += " AND created_at <= ?"
+            params.append(filters['date_to'])
+
+        # Execute query
+        all_sessions = db.query(sql, params)
+
+        # Apply text search if query provided
         sessions = []
+        for session_data in all_sessions:
+            if query:
+                # Search in original requirements and session metadata
+                searchable = json.dumps({
+                    'session_id': session_data.get('session_id'),
+                    'requirements': session_data.get('original_requirements'),
+                    'mode': session_data.get('mode'),
+                    'status': session_data.get('status')
+                }).lower()
 
-        # Load all session files
-        if SESSIONS_DIR.exists():
-            for session_file in SESSIONS_DIR.glob('*.json'):
-                try:
-                    with open(session_file, 'r') as f:
-                        session = json.load(f)
-
-                    # Apply filters
-                    if filters.get('status') and session.get('status') != filters['status']:
-                        continue
-
-                    if filters.get('date_from'):
-                        session_date = datetime.fromisoformat(session.get('timestamp', ''))
-                        filter_date = datetime.fromisoformat(filters['date_from'])
-                        if session_date < filter_date:
-                            continue
-
-                    if filters.get('date_to'):
-                        session_date = datetime.fromisoformat(session.get('timestamp', ''))
-                        filter_date = datetime.fromisoformat(filters['date_to'])
-                        if session_date > filter_date:
-                            continue
-
-                    # Search in content
-                    if query:
-                        session_str = json.dumps(session).lower()
-                        if query.lower() not in session_str:
-                            continue
-
-                    sessions.append(session)
-                except:
+                if query.lower() not in searchable:
                     continue
+
+            # Format session for frontend
+            sessions.append({
+                'session_id': session_data.get('session_id'),
+                'status': session_data.get('status'),
+                'mode': session_data.get('mode'),
+                'timestamp': session_data.get('created_at'),
+                'created_at': session_data.get('created_at'),
+                'end_time': session_data.get('end_time'),
+                'original_requirements': session_data.get('original_requirements')
+            })
 
         # Sort by timestamp, newest first
         sessions.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
         return jsonify({'sessions': sessions, 'count': len(sessions)})
     except Exception as e:
+        print(f"⚠️  Error searching sessions: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/<session_id>', methods=['GET', 'DELETE'])
 def manage_session(session_id):
     """Get or delete a specific session."""
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+    global db
 
     if request.method == 'GET':
-        if not session_file.exists():
-            return jsonify({'error': 'Session not found'}), 404
+        if not db or not DB_PATH.exists():
+            return jsonify({'error': 'Database not available'}), 500
 
         try:
-            with open(session_file, 'r') as f:
-                session = json.load(f)
-            return jsonify(session)
+            # Get session data from database
+            session_data = db.get_session(session_id)
+            if not session_data:
+                return jsonify({'error': 'Session not found'}), 404
+
+            # Get full snapshot with all related data
+            snapshot = db.get_dashboard_snapshot(session_id)
+
+            # Build response in expected format
+            response = {
+                'session_id': session_id,
+                'mode': session_data.get('mode'),
+                'status': session_data.get('status'),
+                'created_at': session_data.get('created_at'),
+                'end_time': session_data.get('end_time'),
+                'original_requirements': session_data.get('original_requirements'),
+                'orchestrator_state': snapshot.get('orchestrator_state'),
+                'pm_state': snapshot.get('pm_state'),
+                'task_groups': snapshot.get('task_groups', []),
+                'logs': snapshot.get('recent_logs', []),
+                'token_usage': snapshot.get('token_usage')
+            }
+
+            return jsonify(response)
         except Exception as e:
+            print(f"⚠️  Error getting session {session_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': str(e)}), 500
 
     elif request.method == 'DELETE':
-        if not session_file.exists():
-            return jsonify({'error': 'Session not found'}), 404
+        if not db or not DB_PATH.exists():
+            return jsonify({'error': 'Database not available'}), 500
 
         try:
-            session_file.unlink()
+            # Delete session from database
+            session_data = db.get_session(session_id)
+            if not session_data:
+                return jsonify({'error': 'Session not found'}), 404
+
+            # Update session status to 'deleted' instead of hard delete
+            db.update_session_status(session_id, 'deleted')
             return jsonify({'success': True, 'message': 'Session deleted'})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/<session_id>/archive', methods=['POST'])
 def archive_session(session_id):
-    """Archive a session."""
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+    """Archive a session (mark as archived in database)."""
+    global db
 
-    if not session_file.exists():
-        return jsonify({'error': 'Session not found'}), 404
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
 
     try:
-        ARCHIVE_DIR.mkdir(exist_ok=True)
-        archive_file = ARCHIVE_DIR / f"{session_id}.json"
-        shutil.move(str(session_file), str(archive_file))
+        # Check if session exists
+        session_data = db.get_session(session_id)
+        if not session_data:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Update session status to 'archived'
+        db.update_session_status(session_id, 'archived')
+
         return jsonify({'success': True, 'message': 'Session archived'})
     except Exception as e:
+        print(f"⚠️  Error archiving session: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/<session_id>/export', methods=['GET'])
 def export_session(session_id):
-    """Export session data."""
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+    """Export session data from database."""
+    global db
 
-    if not session_file.exists():
-        return jsonify({'error': 'Session not found'}), 404
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
 
     try:
-        with open(session_file, 'r') as f:
-            session = json.load(f)
+        # Get session data from database
+        session_data = db.get_session(session_id)
+        if not session_data:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Get full snapshot with all related data
+        snapshot = db.get_dashboard_snapshot(session_id)
+
+        # Build complete export
+        export_data = {
+            'session': session_data,
+            'orchestrator_state': snapshot.get('orchestrator_state'),
+            'pm_state': snapshot.get('pm_state'),
+            'task_groups': snapshot.get('task_groups', []),
+            'logs': snapshot.get('recent_logs', []),
+            'token_usage': snapshot.get('token_usage'),
+            'exported_at': datetime.now().isoformat()
+        }
 
         export_format = request.args.get('format', 'json')
 
         if export_format == 'json':
-            return jsonify(session)
+            return jsonify(export_data)
         else:
             return jsonify({'error': 'Unsupported format'}), 400
     except Exception as e:
+        print(f"⚠️  Error exporting session: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sessions/compare', methods=['POST'])
 def compare_sessions():
-    """Compare two sessions."""
+    """Compare two sessions from database."""
+    global db
+
+    if not db or not DB_PATH.exists():
+        return jsonify({'error': 'Database not available'}), 500
+
     try:
         session1_id = request.json.get('session1')
         session2_id = request.json.get('session2')
 
-        session1_file = SESSIONS_DIR / f"{session1_id}.json"
-        session2_file = SESSIONS_DIR / f"{session2_id}.json"
+        # Get both sessions from database
+        session1_data = db.get_session(session1_id)
+        session2_data = db.get_session(session2_id)
 
-        if not session1_file.exists() or not session2_file.exists():
+        if not session1_data or not session2_data:
             return jsonify({'error': 'One or both sessions not found'}), 404
 
-        with open(session1_file, 'r') as f:
-            session1 = json.load(f)
-        with open(session2_file, 'r') as f:
-            session2 = json.load(f)
+        # Get snapshots for both sessions
+        snapshot1 = db.get_dashboard_snapshot(session1_id)
+        snapshot2 = db.get_dashboard_snapshot(session2_id)
+
+        # Build session objects for comparison
+        session1 = {
+            'session_id': session1_id,
+            'data': {
+                'status': session1_data.get('status'),
+                'mode': session1_data.get('mode'),
+                'created_at': session1_data.get('created_at'),
+                'end_time': session1_data.get('end_time'),
+                'group_status': {'task_groups': snapshot1.get('task_groups', [])},
+                'pm_state': snapshot1.get('pm_state'),
+                'token_usage': snapshot1.get('token_usage')
+            }
+        }
+
+        session2 = {
+            'session_id': session2_id,
+            'data': {
+                'status': session2_data.get('status'),
+                'mode': session2_data.get('mode'),
+                'created_at': session2_data.get('created_at'),
+                'end_time': session2_data.get('end_time'),
+                'group_status': {'task_groups': snapshot2.get('task_groups', [])},
+                'pm_state': snapshot2.get('pm_state'),
+                'token_usage': snapshot2.get('token_usage')
+            }
+        }
 
         # Generate comparison
         comparison = {
@@ -602,6 +686,9 @@ def compare_sessions():
 
         return jsonify(comparison)
     except Exception as e:
+        print(f"⚠️  Error comparing sessions: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 def generate_session_diff(session1, session2):
