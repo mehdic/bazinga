@@ -250,15 +250,20 @@ Database ready for orchestration. Session is active and ready to receive logs an
 
 Input: Orchestrator completed PM spawn, needs to log the interaction
 
-Request parameters:
-- session_id: "sess_abc123"
-- agent_type: "pm"
-- content: "Task breakdown created: 3 groups (group_a, group_b, group_c)..."
-- iteration: 1
+Request from orchestrator:
+```
+bazinga-db, please log this PM interaction:
+
+Session ID: sess_abc123
+Agent Type: pm
+Content: Task breakdown created: 3 groups (group_a, group_b, group_c). Group A will handle auth, Group B will handle API, Group C will handle UI components.
+Iteration: 1
+Agent ID: pm_main
+```
 
 Expected output:
 ```
-✓ Logged PM interaction for session sess_abc123
+✓ Logged PM interaction for session sess_abc123 (iteration 1)
 
 Database operation successful.
 ```
@@ -269,10 +274,25 @@ Database operation successful.
 
 Input: PM completed task breakdown, needs to save PM state
 
-Request parameters:
-- session_id: "sess_abc123"
-- state_type: "pm"
-- state_data: `{"iteration": 1, "mode": "parallel", "task_groups": [...]}`
+Request from PM:
+```
+bazinga-db, please save the PM state:
+
+Session ID: sess_abc123
+State Type: pm
+State Data: {
+  "iteration": 1,
+  "mode": "parallel",
+  "task_groups": [
+    {"id": "group_a", "name": "Authentication", "status": "pending"},
+    {"id": "group_b", "name": "API Backend", "status": "pending"},
+    {"id": "group_c", "name": "UI Components", "status": "pending"}
+  ],
+  "completed_groups": [],
+  "in_progress_groups": [],
+  "pending_groups": ["group_a", "group_b", "group_c"]
+}
+```
 
 Expected output:
 ```
@@ -287,8 +307,12 @@ PM state snapshot stored in database.
 
 Input: Dashboard needs complete session overview
 
-Request parameters:
-- session_id: "sess_abc123"
+Request:
+```
+bazinga-db, please provide dashboard snapshot:
+
+Session ID: sess_abc123
+```
 
 Expected output:
 ```
