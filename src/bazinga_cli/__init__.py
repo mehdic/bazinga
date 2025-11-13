@@ -192,9 +192,27 @@ class BazingaSetup:
                     console.print(f"  ✓ Copied {skill_dir.name}/SKILL.md")
                     copied_count += 1
 
-                # Copy appropriate script file (.sh/.ps1) or Python files (.py)
+                # Copy all subdirectories and their contents (scripts/, references/, etc.)
+                for item in skill_dir.iterdir():
+                    if item.is_dir():
+                        # Recursively copy entire subdirectory
+                        dest_subdir = dest_skill_dir / item.name
+                        if dest_subdir.exists():
+                            shutil.rmtree(dest_subdir)
+                        shutil.copytree(item, dest_subdir)
+
+                        # Make Python and shell scripts executable
+                        for script_file in dest_subdir.rglob("*"):
+                            if script_file.is_file():
+                                if script_file.suffix in [".py", ".sh"] and os.name != 'nt':
+                                    script_file.chmod(0o755)
+
+                        console.print(f"  ✓ Copied {skill_dir.name}/{item.name}/")
+                        copied_count += 1
+
+                # Copy other files in skill root (Python, shell scripts, LICENSE, etc.)
                 for script_file in skill_dir.glob("*"):
-                    if script_file.is_file():
+                    if script_file.is_file() and script_file.name != "SKILL.md":
                         # Copy Python files (for Python-based Skills)
                         if script_file.suffix == ".py":
                             dest = dest_skill_dir / script_file.name
@@ -219,6 +237,13 @@ class BazingaSetup:
 
                                 console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
                                 copied_count += 1
+
+                        # Copy other files (LICENSE.txt, README.md, etc.)
+                        elif script_file.suffix in [".txt", ".md"] and script_file.name not in ["SKILL.md", "README.md"]:
+                            dest = dest_skill_dir / script_file.name
+                            shutil.copy2(script_file, dest)
+                            console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
+                            copied_count += 1
 
         return copied_count > 0
 
