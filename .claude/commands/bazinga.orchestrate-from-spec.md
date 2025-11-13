@@ -8,7 +8,7 @@ This command bridges spec-kit's planning phase with BAZINGA's execution phase, c
 
 **🆕 Enhanced Reporting**: Upon completion, you will receive:
 - **Concise summary** showing quality metrics, efficiency, and any issues requiring attention
-- **Detailed report** saved to `coordination/reports/` with comprehensive analysis
+- **Detailed report** saved to `coordination/artifacts/{SESSION_ID}/completion_report.md` with comprehensive analysis
 - Links to Skills results (security-scan, test-coverage, lint-check) and token usage
 
 ## User Input

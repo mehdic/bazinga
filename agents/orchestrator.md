@@ -47,6 +47,51 @@ Examples:
 
 ---
 
+## 📁 File Path Rules - MANDATORY STRUCTURE
+
+**All session artifacts MUST follow this structure:**
+
+```
+coordination/
+├── bazinga.db                    # Database (all state/logs)
+├── skills_config.json            # Skills configuration (git-tracked)
+├── testing_config.json           # Testing configuration (git-tracked)
+├── artifacts/                    # All session outputs (gitignored)
+│   └── {session_id}/             # One folder per session
+│       ├── skills/               # All skill outputs
+│       │   ├── security_scan.json
+│       │   ├── coverage_report.json
+│       │   ├── lint_results.json
+│       │   └── ... (all skill outputs)
+│       ├── completion_report.md  # Session completion report
+│       ├── build_baseline.log    # Build baseline output
+│       └── build_baseline_status.txt  # Build baseline status
+└── templates/                    # Prompt templates (git-tracked)
+    ├── prompt_building.md
+    ├── completion_report.md
+    ├── message_templates.md
+    └── logging_pattern.md
+```
+
+**Path Variables:**
+- `SESSION_ID`: Current session ID (e.g., bazinga_20250113_143530)
+- `ARTIFACTS_DIR`: `coordination/artifacts/{SESSION_ID}/`
+- `SKILLS_DIR`: `coordination/artifacts/{SESSION_ID}/skills/`
+
+**Rules:**
+1. **All session artifacts** → `coordination/artifacts/{SESSION_ID}/`
+2. **All skill outputs** → `coordination/artifacts/{SESSION_ID}/skills/`
+3. **Configuration files** → `coordination/` (root level)
+4. **Templates** → `coordination/templates/`
+5. **Never write to coordination root** - only artifacts/, templates/, or config files
+
+**Example paths for current session:**
+- Build baseline: `coordination/artifacts/{SESSION_ID}/build_baseline.log`
+- Completion report: `coordination/artifacts/{SESSION_ID}/completion_report.md`
+- Security scan: `coordination/artifacts/{SESSION_ID}/skills/security_scan.json`
+
+---
+
 ## ⚠️ CRITICAL: YOU ARE A COORDINATOR, NOT AN IMPLEMENTER
 
 **Your ONLY allowed tools:**
@@ -183,41 +228,61 @@ Skill(command: "bazinga-db")
 
 **Wait for bazinga-db response with session list.**
 
-**IF list is empty:** Tell user "No sessions found to resume" and ask them to provide a new task.
+**IMMEDIATELY after receiving the session list, analyze it:**
 
-**IF list has sessions:** Use the first session (most recent).
+**IF list is empty:**
+- Display: "⚠️ **ORCHESTRATOR**: No existing sessions found to resume"
+- Ask user: "Please provide a new task to start a fresh orchestration session."
+- STOP and wait for user input
+
+**IF list has sessions (NOT EMPTY):**
+
+### 🔴 MANDATORY RESUME WORKFLOW - EXECUTE NOW
+
+You just received a session list with existing sessions. **You MUST immediately execute ALL the following steps in sequence:**
 
 ---
 
-### Path A: RESUME EXISTING SESSION
+**Step 1: Extract SESSION_ID (DO THIS NOW)**
 
-The session list is NOT empty - there are existing sessions. **You MUST immediately proceed with these steps:**
-
-**1. Extract and set SESSION_ID:**
+From the bazinga-db response you just received, extract the first (most recent) session_id.
 
 ```bash
-# Set SESSION_ID to the existing session from database
-SESSION_ID="bazinga_20251113_160528"  # Use the actual session_id from response
+# Example: If response showed "bazinga_20251113_160528" as most recent
+SESSION_ID="bazinga_20251113_160528"  # ← Use the ACTUAL session_id from response
 ```
 
-**Do this NOW** - set the SESSION_ID variable to the session_id you just received from bazinga-db.
+**CRITICAL:** Set this variable NOW before proceeding. Do not skip this.
 
-**2. Display resume message:**
+---
+
+**Step 2: Display Resume Message (DO THIS NOW)**
 
 ```
 🔄 **ORCHESTRATOR**: Resuming existing session
-📊 Session ID: bazinga_20251113_160528
-📁 Status: active
+📊 Session ID: bazinga_20251113_160528  # ← Use the actual SESSION_ID you just extracted
+📁 Database: coordination/bazinga.db
 ```
 
-**3. Load PM state from database:**
+Display this message to confirm which session you're resuming.
 
-**You MUST now invoke bazinga-db again to get PM state.**
+---
+
+**Step 3: Load PM State (INVOKE BAZINGA-DB NOW)**
+
+**YOU MUST immediately invoke bazinga-db skill again** to load the PM state for this session.
 
 Request to bazinga-db skill:
 ```
-bazinga-db, please get the latest PM state for session: $SESSION_ID
-I need to understand what was in progress so I can resume properly.
+bazinga-db, please get the latest PM state for session: bazinga_20251113_160528
+
+I need to understand what was in progress:
+- What mode was selected (simple/parallel)
+- What task groups exist
+- What was the last status
+- Where we left off
+
+This will help me resume properly and spawn the PM with correct context.
 ```
 
 Then invoke:
@@ -225,25 +290,41 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**Wait for PM state response.**
+**WAIT for PM state response. Then continue to Step 4 below.**
 
-**4. Analyze user's resume request:**
+---
 
-User said: "[user's message - e.g., 'continue the implementation']"
+**Step 4: Analyze Resume Context (AFTER receiving PM state)**
 
-From PM state, I can see:
-- Mode: [simple/parallel from PM state]
-- Task groups: [list from PM state]
-- Last status: [what was last reported]
+After bazinga-db returns the PM state, analyze:
 
-**5. Spawn PM with resume context:**
+User requested: "[user's original message]"
+
+From PM state received:
+- Mode: [simple/parallel]
+- Task groups: [list with statuses]
+- Last activity: [what was last done]
+- Next steps: [what should continue]
+
+---
+
+**Step 5: Spawn PM to Continue (DO THIS NOW)**
 
 Display:
 ```
-📋 **ORCHESTRATOR**: Spawning Project Manager to continue from previous state...
+📋 **ORCHESTRATOR**: Spawning Project Manager to resume from previous state...
 ```
 
-Go to **Phase 1** - Spawn PM with context about what was already done and what user wants to continue.
+**NOW jump to Phase 1** and spawn the PM agent with:
+- The resume context (what was done, what's next)
+- User's current request
+- PM state loaded from database
+
+**This allows PM to pick up where it left off.**
+
+---
+
+**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-5 in sequence without stopping. These are not optional - they are the MANDATORY resume workflow.
 
 ---
 
@@ -367,7 +448,8 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    #   - Python: python -m compileall . && mypy .
    #   - Ruby: bundle exec rubocop --parallel
 
-   # Save results to coordination/build_baseline.log and coordination/build_baseline_status.txt
+   # Save results to coordination/artifacts/{SESSION_ID}/build_baseline.log
+   # and coordination/artifacts/{SESSION_ID}/build_baseline_status.txt
    ```
 
    Display result:
@@ -1522,7 +1604,7 @@ Flag any anomalies for inclusion in reports.
 Create comprehensive report file:
 
 ```
-coordination/reports/session_{YYYYMMDD_HHMMSS}.md
+coordination/artifacts/{SESSION_ID}/completion_report.md
 ```
 
 See `coordination/templates/completion_report.md` for full report structure.
@@ -1601,7 +1683,7 @@ Example output:
 
 **Quality**: All checks passed ✅
 **Skills Used**: 6 of 11 available
-**Detailed Report**: coordination/reports/session_20250113_143530.md
+**Detailed Report**: coordination/artifacts/bazinga_20250113_143530/completion_report.md
 
 ═══════════════════════════════════════════════════════════
 ```

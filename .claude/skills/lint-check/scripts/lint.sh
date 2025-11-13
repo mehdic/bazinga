@@ -10,8 +10,38 @@ set +e
 
 echo "📋 Code Linting Starting..."
 
-# Create coordination directory if it doesn't exist
-mkdir -p coordination
+# Get current session ID from database
+get_current_session_id() {
+    local db_path="coordination/bazinga.db"
+    if [ ! -f "$db_path" ]; then
+        echo "bazinga_default"
+        return
+    fi
+
+    local session_id=$(python3 -c "
+import sqlite3
+try:
+    conn = sqlite3.connect('$db_path')
+    cursor = conn.execute('SELECT session_id FROM sessions ORDER BY created_at DESC LIMIT 1')
+    row = cursor.fetchone()
+    if row:
+        print(row[0])
+    else:
+        print('bazinga_default')
+    conn.close()
+except:
+    print('bazinga_default')
+" 2>/dev/null || echo "bazinga_default")
+
+    echo "$session_id"
+}
+
+SESSION_ID=$(get_current_session_id)
+OUTPUT_DIR="coordination/artifacts/$SESSION_ID/skills"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_FILE="$OUTPUT_DIR/lint_results.json"
+
+echo "📁 Output directory: $OUTPUT_DIR"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
@@ -78,7 +108,7 @@ check_tool_or_skip() {
             # Lite mode: Skip gracefully with warning
             echo "⚠️  $tool_name not installed - skipping in lite mode"
             echo "   Install with: $install_cmd"
-            cat > coordination/lint_results.json << EOF
+            cat > $OUTPUT_FILE << EOF
 {
   "status": "skipped",
   "language": "$LANG",
@@ -92,7 +122,7 @@ EOF
         else
             # Advanced mode: Fail if tool not available
             echo "❌ $tool_name required but not installed"
-            cat > coordination/lint_results.json << EOF
+            cat > $OUTPUT_FILE << EOF
 {
   "status": "error",
   "language": "$LANG",
@@ -260,10 +290,10 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata
 if command_exists "jq"; then
     jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"tool\": \"$TOOL\"}" \
-        coordination/lint_results_raw.json > coordination/lint_results.json
+        coordination/lint_results_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
-    cat > coordination/lint_results.json <<EOF
+    cat > $OUTPUT_FILE <<EOF
 {
   "timestamp": "$TIMESTAMP",
   "language": "$LANG",
@@ -277,15 +307,15 @@ fi
 rm -f coordination/lint_results_raw.json 2>/dev/null || true
 
 echo "✅ Linting complete"
-echo "📁 Results saved to: coordination/lint_results.json"
+echo "📁 Results saved to: $OUTPUT_FILE"
 
 # Display summary if jq available
 if command_exists "jq" && [ "$TOOL" != "none" ]; then
     if [ "$LANG" = "python" ] && [ "$TOOL" = "ruff" ]; then
-        ISSUE_COUNT=$(jq '. | length' coordination/lint_results.json 2>/dev/null || echo "0")
+        ISSUE_COUNT=$(jq '. | length' $OUTPUT_FILE 2>/dev/null || echo "0")
         echo "📊 Issues found: $ISSUE_COUNT"
     elif [ "$LANG" = "go" ]; then
-        ISSUE_COUNT=$(jq '.Issues | length // 0' coordination/lint_results.json 2>/dev/null || echo "0")
+        ISSUE_COUNT=$(jq '.Issues | length // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
         echo "📊 Issues found: $ISSUE_COUNT"
     fi
 fi

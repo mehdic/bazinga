@@ -47,7 +47,7 @@ This script will:
 - Detect project language (Python, JavaScript, Go, Ruby, Java)
 - Run appropriate linter (ruff/pylint, eslint, golangci-lint, rubocop, checkstyle/pmd)
 - Parse results and categorize by severity
-- Generate `coordination/lint_results.json`
+- Generate `coordination/artifacts/{SESSION_ID}/skills/lint_results.json`
 
 ---
 
@@ -56,7 +56,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/lint_results.json
+coordination/artifacts/{SESSION_ID}/skills/lint_results.json
 ```
 
 Extract key information:
@@ -85,7 +85,7 @@ Top issues:
 2. {file}:{line} - {message}
 3. {file}:{line} - {message}
 
-Details saved to: coordination/lint_results.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/lint_results.json
 ```
 
 ---
@@ -110,7 +110,7 @@ Top issues:
 2. payment.py:89 - Function too complex (complexity: 15) (C901)
 3. user.py:23 - Line too long (102 > 88 characters) (E501)
 
-Details saved to: coordination/lint_results.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/lint_results.json
 ```
 
 **Scenario: Clean Code**
@@ -128,7 +128,7 @@ Lint Check Report:
 
 Code quality: Excellent! No errors or warnings.
 
-Details saved to: coordination/lint_results.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/lint_results.json
 ```
 
 ---

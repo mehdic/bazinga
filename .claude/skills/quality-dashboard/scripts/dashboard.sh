@@ -9,15 +9,47 @@ BLUE=$'\033[0;34m'
 CYAN=$'\033[0;36m'
 NC=$'\033[0m'  # No Color
 
+# Get current session ID from database
+get_current_session_id() {
+    local db_path="coordination/bazinga.db"
+    if [ ! -f "$db_path" ]; then
+        echo "bazinga_default"
+        return
+    fi
+
+    local session_id=$(python3 -c "
+import sqlite3
+try:
+    conn = sqlite3.connect('$db_path')
+    cursor = conn.execute('SELECT session_id FROM sessions ORDER BY created_at DESC LIMIT 1')
+    row = cursor.fetchone()
+    if row:
+        print(row[0])
+    else:
+        print('bazinga_default')
+    conn.close()
+except:
+    print('bazinga_default')
+" 2>/dev/null || echo "bazinga_default")
+
+    echo "$session_id"
+}
+
+SESSION_ID=$(get_current_session_id)
+
 # Directories
 COORD_DIR="coordination"
-SECURITY_FILE="${COORD_DIR}/security_scan.json"
-COVERAGE_FILE="${COORD_DIR}/coverage_report.json"
-LINT_FILE="${COORD_DIR}/lint_results.json"
-METRICS_FILE="${COORD_DIR}/project_metrics.json"
-HISTORICAL_FILE="${COORD_DIR}/historical_metrics.json"
-DASHBOARD_FILE="${COORD_DIR}/quality_dashboard.json"
-PREVIOUS_DASHBOARD="${COORD_DIR}/quality_dashboard_previous.json"
+SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
+SECURITY_FILE="${SKILLS_DIR}/security_scan.json"
+COVERAGE_FILE="${SKILLS_DIR}/coverage_report.json"
+LINT_FILE="${SKILLS_DIR}/lint_results.json"
+METRICS_FILE="${SKILLS_DIR}/project_metrics.json"
+HISTORICAL_FILE="${SKILLS_DIR}/historical_metrics.json"
+DASHBOARD_FILE="${SKILLS_DIR}/quality_dashboard.json"
+PREVIOUS_DASHBOARD="${SKILLS_DIR}/quality_dashboard_previous.json"
+
+mkdir -p "$SKILLS_DIR"
+echo "📁 Output directory: $SKILLS_DIR"
 
 echo "📊 Quality Dashboard"
 echo "=================================================="
