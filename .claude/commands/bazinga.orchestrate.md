@@ -171,14 +171,27 @@ Skill(command: "bazinga-db")
 
 **IF bazinga-db shows an active/in-progress session:**
 
-Display:
+**1. Extract session ID from list:**
+
+```bash
+# Set SESSION_ID to the existing session from database
+SESSION_ID="[session_id from most recent active session]"
 ```
-🔄 **ORCHESTRATOR**: Found existing session - resuming orchestration
-📊 Session ID: [existing_session_id]
+
+**Example:** If list-sessions returned `bazinga_20251113_120000` with status `active`, then:
+```bash
+SESSION_ID="bazinga_20251113_120000"
+```
+
+**2. Display resume message:**
+
+```
+🔄 **ORCHESTRATOR**: Resuming existing session
+📊 Session ID: $SESSION_ID
 📁 Status: [status from database]
 ```
 
-**Skip to Phase 1** - The database already has the session, configs, and state. Go directly to spawning PM.
+**3. Skip to Phase 1** - Do NOT create new session. Do NOT generate new timestamp. Use the existing SESSION_ID variable and go directly to spawning PM.
 
 ---
 
