@@ -515,25 +515,55 @@ def search_sessions():
 @app.route('/api/sessions/<session_id>', methods=['GET', 'DELETE'])
 def manage_session(session_id):
     """Get or delete a specific session."""
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+    global db
 
     if request.method == 'GET':
-        if not session_file.exists():
-            return jsonify({'error': 'Session not found'}), 404
+        if not db or not DB_PATH.exists():
+            return jsonify({'error': 'Database not available'}), 500
 
         try:
-            with open(session_file, 'r') as f:
-                session = json.load(f)
-            return jsonify(session)
+            # Get session data from database
+            session_data = db.get_session(session_id)
+            if not session_data:
+                return jsonify({'error': 'Session not found'}), 404
+
+            # Get full snapshot with all related data
+            snapshot = db.get_dashboard_snapshot(session_id)
+
+            # Build response in expected format
+            response = {
+                'session_id': session_id,
+                'mode': session_data.get('mode'),
+                'status': session_data.get('status'),
+                'created_at': session_data.get('created_at'),
+                'end_time': session_data.get('end_time'),
+                'original_requirements': session_data.get('original_requirements'),
+                'orchestrator_state': snapshot.get('orchestrator_state'),
+                'pm_state': snapshot.get('pm_state'),
+                'task_groups': snapshot.get('task_groups', []),
+                'logs': snapshot.get('recent_logs', []),
+                'token_usage': snapshot.get('token_usage')
+            }
+
+            return jsonify(response)
         except Exception as e:
+            print(f"⚠️  Error getting session {session_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': str(e)}), 500
 
     elif request.method == 'DELETE':
-        if not session_file.exists():
-            return jsonify({'error': 'Session not found'}), 404
+        if not db or not DB_PATH.exists():
+            return jsonify({'error': 'Database not available'}), 500
 
         try:
-            session_file.unlink()
+            # Delete session from database
+            session_data = db.get_session(session_id)
+            if not session_data:
+                return jsonify({'error': 'Session not found'}), 404
+
+            # Update session status to 'deleted' instead of hard delete
+            db.update_session_status(session_id, 'deleted')
             return jsonify({'success': True, 'message': 'Session deleted'})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
