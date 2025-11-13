@@ -491,22 +491,35 @@ Task(
 
 ### Step 3.1: Monitor Progress
 
-While orchestration runs, you can monitor:
+While orchestration runs, you can monitor progress by invoking the bazinga-db skill:
 
-```bash
-# Watch tasks.md for checkmark updates
-watch -n 2 "cat {FEATURE_DIR}/tasks.md | grep '\[x\]' | wc -l"
+**To check orchestration logs:**
 
-# Check orchestration logs from database
-python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py \
-  --db /home/user/bazinga/coordination/bazinga.db \
-  stream-logs "{session_id}" 20 0
-
-# Check PM state
-cat coordination/pm_state.json | jq '.completed_groups'
+Request to bazinga-db skill:
+```
+bazinga-db, please stream recent logs for session {session_id}.
+Show me the last 20 log entries.
 ```
 
-**Note:** Orchestration logs are now stored in the database (bazinga.db) instead of orchestration-log.md for better concurrency and performance.
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**To check PM state:**
+
+Request to bazinga-db skill:
+```
+bazinga-db, please get the PM state for session {session_id}.
+I need to see the current status and task groups.
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**Note:** All orchestration data is stored in coordination/bazinga.db. Use the bazinga-db skill to query it instead of direct bash commands.
 
 ### Step 3.2: Handle Completion
 

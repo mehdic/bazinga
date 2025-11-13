@@ -87,6 +87,15 @@ class BazingaDB:
         conn.close()
         return dict(row) if row else None
 
+    def list_sessions(self, limit: int = 10) -> List[Dict]:
+        """List recent sessions ordered by created_at (most recent first)."""
+        conn = self._get_connection()
+        rows = conn.execute("""
+            SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?
+        """, (limit,)).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
     # ==================== LOG OPERATIONS ====================
 
     def log_interaction(self, session_id: str, agent_type: str, content: str,
@@ -361,6 +370,10 @@ def main():
     try:
         if cmd == 'create-session':
             db.create_session(cmd_args[0], cmd_args[1], cmd_args[2])
+        elif cmd == 'list-sessions':
+            limit = int(cmd_args[0]) if len(cmd_args) > 0 else 10
+            sessions = db.list_sessions(limit)
+            print(json.dumps(sessions, indent=2))
         elif cmd == 'log-interaction':
             db.log_interaction(cmd_args[0], cmd_args[1], cmd_args[2],
                              int(cmd_args[3]) if len(cmd_args) > 3 else None,

@@ -58,17 +58,18 @@ Examples:
 
 **Your ONLY allowed tools:**
 - ✅ **Task** - Spawn agents
-- ✅ **Skill** - Invoke bazinga-db skill for database logging (replaces file-based logging)
-- ✅ **Write** - ONLY for managing state files (coordination/*.json)
-- ✅ **Read** - ONLY for reading state files (coordination/*.json)
+- ✅ **Skill** - MANDATORY: Invoke bazinga-db skill for database operations (replaces file-based logging)
+- ✅ **Read** - ONLY for reading configuration files:
+  - `coordination/skills_config.json` (skills configuration)
+  - `coordination/testing_config.json` (testing configuration)
+- ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
 **FORBIDDEN tools for implementation:**
 - 🚫 **Read** - (for code files - spawn agents to read code)
 - 🚫 **Edit** - (spawn agents to edit)
-- 🚫 **Bash** - (spawn agents to run commands)
+- 🚫 **Bash** - (for running tests, builds, or implementation work - spawn agents)
 - 🚫 **Glob/Grep** - (spawn agents to search)
-
-**Exception:** You CAN use Read to read state files in `coordination/` folder for coordination purposes.
+- 🚫 **Write** - (all state is in database, not files)
 
 ---
 
@@ -145,12 +146,89 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**Check if already initialized:**
-```bash
-[ -f "coordination/bazinga.db" ] && echo "Session may exist in database"
+**Check for existing sessions:**
+
+First, invoke bazinga-db skill to check for recent sessions:
+
+Request to bazinga-db skill:
+```
+bazinga-db, please list the most recent sessions (limit 5).
+I need to check if there's an active session to resume.
 ```
 
-**IF NEW session:**
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**Wait for bazinga-db response with session list.**
+
+**Based on the response:**
+
+---
+
+### Path A: RESUME EXISTING SESSION
+
+**IF bazinga-db shows an active/in-progress session:**
+
+**1. Extract session ID from list:**
+
+```bash
+# Set SESSION_ID to the existing session from database
+SESSION_ID="[session_id from most recent active session]"
+```
+
+**Example:** If list-sessions returned `bazinga_20251113_120000` with status `active`, then:
+```bash
+SESSION_ID="bazinga_20251113_120000"
+```
+
+**2. Display resume message:**
+
+```
+🔄 **ORCHESTRATOR**: Resuming existing session
+📊 Session ID: $SESSION_ID
+📁 Status: [status from database]
+```
+
+**3. Load state from database:**
+
+Request to bazinga-db skill:
+```
+bazinga-db, please get the latest PM state for session: $SESSION_ID
+I need to understand what was in progress so I can resume properly.
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**Wait for PM state response.**
+
+**4. Analyze user's resume request:**
+
+User said: "[user's message - e.g., 'continue the implementation']"
+
+From PM state, I can see:
+- Mode: [simple/parallel from PM state]
+- Task groups: [list from PM state]
+- Last status: [what was last reported]
+
+**5. Spawn PM with resume context:**
+
+Display:
+```
+📋 **ORCHESTRATOR**: Spawning Project Manager to continue from previous state...
+```
+
+Go to **Phase 1** - Spawn PM with context about what was already done and what user wants to continue.
+
+---
+
+### Path B: CREATE NEW SESSION
+
+**IF no active sessions found OR user explicitly requested new session:**
 
 1. **Generate session ID:**
    ```bash
@@ -1255,8 +1333,8 @@ Example output:
 
 ## Skills Used
 
-{Read all Skills result files and summarize which ran}
-{Parse coordination/*.json files for Skills results}
+{Query bazinga-db skill for skill outputs from this session}
+{Get skill results from skill_outputs table in database}
 
 **Skills Invoked**: {count} of 11 available
 {FOR each Skill that ran}:
@@ -1402,8 +1480,11 @@ Agent ID: [identifier]
 **Your ONLY tools:**
 ✅ Task (spawn agents)
 ✅ **Skill (bazinga-db for logging - MANDATORY after every agent response)**
-✅ Write (state files in coordination/*.json only)
-✅ Read (ONLY for coordination state files, not code)
+✅ Read (ONLY for coordination/skills_config.json and coordination/testing_config.json)
+✅ Bash (ONLY for initialization - session ID, database check)
+
+**FORBIDDEN:**
+❌ Write (all state is in database)
 
 **Golden Rule:**
 When in doubt, spawn an agent. NEVER do the work yourself.

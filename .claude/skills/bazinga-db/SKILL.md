@@ -56,6 +56,7 @@ No manual initialization needed - just invoke the skill and it handles everythin
 Extract from the calling agent's request:
 
 **Operation type:**
+- "list sessions" / "recent sessions" / "show sessions" → list-sessions
 - "create session" / "new session" / "initialize session" → create-session
 - "log interaction" / "save log" → log-interaction
 - "save PM state" / "save orchestrator state" → save-state
@@ -88,6 +89,12 @@ Extract from the calling agent's request:
 Use the **Bash** tool to run the appropriate command:
 
 ### Session Management
+
+**List recent sessions:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" list-sessions [limit]
+```
+Returns JSON array of recent sessions (default 10, ordered by created_at DESC).
 
 **Create new session:**
 ```bash
