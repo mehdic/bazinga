@@ -1540,6 +1540,30 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
 
+    # Remove deprecated commands (old names without bazinga. prefix)
+    console.print("\n[bold cyan]3.1. Removing deprecated commands[/bold cyan]")
+    deprecated_commands = [
+        "orchestrate.md",
+        "orchestrate-from-spec.md",
+        "configure-skills.md",
+        "configure-testing.md",
+    ]
+    commands_dir = target_dir / ".claude" / "commands"
+    if commands_dir.exists():
+        removed_count = 0
+        for cmd in deprecated_commands:
+            cmd_path = commands_dir / cmd
+            if cmd_path.exists():
+                cmd_path.unlink()
+                removed_count += 1
+                console.print(f"  ✓ Removed deprecated /{cmd.replace('.md', '')}")
+        if removed_count == 0:
+            console.print("  [dim]No deprecated commands found[/dim]")
+        else:
+            console.print(f"  [green]✓ Removed {removed_count} deprecated command(s)[/green]")
+    else:
+        console.print("  [yellow]⚠️  Commands directory not found[/yellow]")
+
     # Update skills (preserve script type)
     console.print(f"\n[bold cyan]4. Updating skills ({script_type.upper()})[/bold cyan]")
     if setup.copy_skills(target_dir, script_type):
