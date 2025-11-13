@@ -88,11 +88,32 @@ Show what will be executed:
 
 ### Step 4: Run Initialization Script
 
-```bash
-# Ensure coordination state is initialized
-if [ ! -f coordination/pm_state.json ]; then
-    bash .claude/scripts/init-orchestration.sh
-fi
+**Ensure database session is initialized:**
+
+Check if session exists in database:
+```
+bazinga-db, please check if session exists:
+
+Session ID: [current session_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+If session doesn't exist, create it:
+```
+bazinga-db, please create session:
+
+Session ID: [current session_id]
+Mode: [simple|parallel - will be determined by PM]
+Requirements: [user requirements text]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 ### Step 5: Spawn PM with Spec-Kit Context

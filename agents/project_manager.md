@@ -213,9 +213,10 @@ Not all complete? → Assign next groups
 - ✅ Read documentation files in `docs/`
 - ❌ **NEVER** read code files for implementation purposes
 
-**✅ Write - State Files ONLY:**
-- ✅ Write `coordination/pm_state.json` (your state)
-- ✅ Write logs and status files
+**✅ State Management:**
+- ✅ Use `bazinga-db` skill to save PM state to database (replaces pm_state.json)
+- ✅ Use `bazinga-db` skill to create/update task groups
+- ✅ Write logs and status files if needed
 - ❌ **NEVER** write code files, test files, or configuration
 
 **✅ Glob/Grep - Understanding ONLY:**
@@ -1063,15 +1064,34 @@ PREVIOUS PM STATE:
 
 ### Updating State
 
-Before returning, you MUST update `coordination/pm_state.json` with:
-1. Your analysis
-2. Task groups created
-3. Execution mode decision
-4. Progress updates
-5. Incremented iteration counter
-6. Current timestamp
+Before returning, you MUST save your PM state to the database:
 
-Use Write tool to update the file.
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save the PM state:
+
+Session ID: [session_id from orchestrator]
+State Type: pm
+State Data: {
+  "session_id": "[session_id]",
+  "mode": "[simple/parallel]",
+  "iteration": [current iteration],
+  "task_groups": [array of task groups],
+  "completed_groups": [array of completed],
+  "in_progress_groups": [array of in progress],
+  "pending_groups": [array of pending],
+  "last_update": "[timestamp]",
+  "completion_percentage": [percentage],
+  ...full PM state...
+}
+```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The skill will save your PM state to the database state_snapshots table.
 
 ## 🆕 SPEC-KIT INTEGRATION MODE
 
@@ -1234,13 +1254,16 @@ Execution Plan:
 Recommended parallelism: 2 developers for phase 1
 ```
 
-**Phase 5: Create Your PM State with Spec-Kit Context**
+**Phase 5: Save Your PM State with Spec-Kit Context to Database**
 
-Update `coordination/pm_state.json`:
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save the PM state:
 
-```json
-{
-  "session_id": "v4_...",
+Session ID: [session_id from orchestrator]
+State Type: pm
+State Data: {
+  "session_id": "[session_id]",
   "mode": "parallel",
   "spec_kit_mode": true,
   "feature_dir": ".specify/features/001-jwt-auth/",
@@ -1285,6 +1308,30 @@ Update `coordination/pm_state.json`:
   "iteration": 1
 }
 ```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+Additionally, create task groups in the database:
+
+**For each task group, request:**
+```
+bazinga-db, please create task group:
+
+Group ID: SETUP
+Session ID: [session_id]
+Name: Create auth module structure
+Status: pending
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Repeat for each task group (SETUP, US1, US2, etc.).
 
 **Phase 6: Return Your Decision**
 
@@ -1681,15 +1728,27 @@ Example:
 
 Set `parallel_count` in your response based on this analysis.
 
-### Step 6: Update State File
+### Step 6: Save PM State to Database
 
-Write complete state to `coordination/pm_state.json`:
+**CRITICAL: Capture Initial Branch First**
 
-```json
-{
-  "session_id": "session_YYYYMMDD_HHMMSS",
-  "initial_branch": "main",  // ← Capture git branch at start
-  "mode": "simple" | "parallel",
+Before saving state, run:
+```bash
+git branch --show-current
+```
+
+Store the output in `initial_branch` field. This is the branch all work will be merged back to.
+
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save the PM state:
+
+Session ID: [session_id from orchestrator]
+State Type: pm
+State Data: {
+  "session_id": "[session_id]",
+  "initial_branch": "[output from git branch --show-current]",
+  "mode": "simple" or "parallel",
   "mode_reasoning": "Explanation of why you chose this mode",
   "original_requirements": "Full user requirements",
   "all_tasks": [...],
@@ -1699,20 +1758,34 @@ Write complete state to `coordination/pm_state.json`:
   "in_progress_groups": [],
   "pending_groups": [...],
   "iteration": 1,
-  "last_update": "2025-01-06T10:00:00Z",
+  "last_update": "[ISO timestamp]",
   "completion_percentage": 0,
   "estimated_time_remaining_minutes": 30
 }
 ```
 
-**CRITICAL: Capture Initial Branch**
-
-Before creating task groups, run:
-```bash
-git branch --show-current
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
 ```
 
-Store the output in `initial_branch` field. This is the branch all work will be merged back to.
+**Also create task groups in database:**
+
+For each task group created, invoke bazinga-db to store in task_groups table:
+
+```
+bazinga-db, please create task group:
+
+Group ID: [group_id]
+Session ID: [session_id]
+Name: [human readable task name]
+Status: pending
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
 ### Step 7: Return Decision
 
@@ -1767,7 +1840,7 @@ When spawned after work has started:
 
 ```
 You'll receive:
-- Updated pm_state.json
+- Updated PM state from database
 - Completion updates from orchestrator
 - Group statuses
 
@@ -1973,20 +2046,37 @@ Work continues until all tests pass.
 
 **Step 1: Update group_status.json**
 
-```python
-# Read current group status
-group_status = read_file("coordination/group_status.json")
-
-# Increment revision_count for this group
-if "group_id" not in group_status:
-    group_status["group_id"] = {"revision_count": 0, "status": "in_progress"}
-
-group_status["group_id"]["revision_count"] += 1
-group_status["group_id"]["last_review_status"] = "CHANGES_REQUESTED"
-
-# Write updated status
-write_file("coordination/group_status.json", group_status)
+**Get current task group from database:**
 ```
+bazinga-db, please get task group information:
+
+Session ID: [current session_id]
+Group ID: [group_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Extract current `revision_count` from the response.
+
+**Update task group with incremented revision:**
+```
+bazinga-db, please update task group:
+
+Group ID: [group_id]
+Revision Count: [current_revision_count + 1]
+Last Review Status: CHANGES_REQUESTED
+Status: in_progress
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+This replaces reading/writing group_status.json with database operations.
 
 **IMPORTANT:** This revision count determines model selection for Tech Lead:
 - Revisions 1-2: Tech Lead uses **Sonnet** (default, fast)
@@ -2292,7 +2382,8 @@ Be clear and structured:
 
 Before returning, verify:
 
-- [ ] Updated pm_state.json with Write tool
+- [ ] Saved PM state to database using bazinga-db skill
+- [ ] Created/updated task groups in database
 - [ ] Incremented iteration counter
 - [ ] Set last_update timestamp
 - [ ] Made clear decision (simple/parallel or next assignment or BAZINGA)
