@@ -162,18 +162,17 @@ Skill(command: "bazinga-db")
 
 **NOW analyze the response you just received:**
 
-- Look at the session list returned by bazinga-db
-- Check the most recent session's status
-- Is the status "active" or "in_progress"?
+- Did list-sessions return any sessions?
+- **If YES** (list has at least 1 session) → Follow **Path A: RESUME** below
+- **If NO** (empty list, no sessions) → Follow **Path B: CREATE NEW** below
 
-**If YES (active session found) → Follow Path A below**
-**If NO (no active sessions) → Follow Path B below**
+**Simple rule:** If sessions exist, resume the most recent one (first in list). Only create new if no sessions exist.
 
 ---
 
 ### Path A: RESUME EXISTING SESSION
 
-The bazinga-db response shows an active/in-progress session. **You MUST immediately proceed with these steps:**
+The session list is NOT empty - there are existing sessions. **You MUST immediately proceed with these steps:**
 
 **1. Extract and set SESSION_ID:**
 
