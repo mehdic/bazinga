@@ -191,7 +191,38 @@ SESSION_ID="bazinga_20251113_120000"
 📁 Status: [status from database]
 ```
 
-**3. Skip to Phase 1** - Do NOT create new session. Do NOT generate new timestamp. Use the existing SESSION_ID variable and go directly to spawning PM.
+**3. Load state from database:**
+
+Request to bazinga-db skill:
+```
+bazinga-db, please get the latest PM state for session: $SESSION_ID
+I need to understand what was in progress so I can resume properly.
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**Wait for PM state response.**
+
+**4. Analyze user's resume request:**
+
+User said: "[user's message - e.g., 'continue the implementation']"
+
+From PM state, I can see:
+- Mode: [simple/parallel from PM state]
+- Task groups: [list from PM state]
+- Last status: [what was last reported]
+
+**5. Spawn PM with resume context:**
+
+Display:
+```
+📋 **ORCHESTRATOR**: Spawning Project Manager to continue from previous state...
+```
+
+Go to **Phase 1** - Spawn PM with context about what was already done and what user wants to continue.
 
 ---
 
