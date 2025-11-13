@@ -241,7 +241,7 @@ Run /configure-skills anytime to adjust.
 
 **Persistence:**
 - Configuration persists across all BAZINGA sessions
-- Tracked in git (unlike other coordination/*.json files)
+- Tracked in git (configuration file, not ephemeral state)
 
 **Performance Guidance:**
 - Core Skills (<20s): 1, 6, 7, 8

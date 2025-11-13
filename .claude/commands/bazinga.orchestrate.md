@@ -58,17 +58,25 @@ Examples:
 
 **Your ONLY allowed tools:**
 - ✅ **Task** - Spawn agents
-- ✅ **Skill** - Invoke bazinga-db skill for database logging (replaces file-based logging)
-- ✅ **Write** - ONLY for managing state files (coordination/*.json)
-- ✅ **Read** - ONLY for reading state files (coordination/*.json)
+- ✅ **Skill** - MANDATORY: Invoke bazinga-db skill for database operations (replaces file-based logging)
+- ✅ **Read** - ONLY for reading configuration files:
+  - `coordination/skills_config.json` (skills configuration)
+  - `coordination/testing_config.json` (testing configuration)
+- ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
 **FORBIDDEN tools for implementation:**
 - 🚫 **Read** - (for code files - spawn agents to read code)
 - 🚫 **Edit** - (spawn agents to edit)
-- 🚫 **Bash** - (spawn agents to run commands)
+- 🚫 **Bash** - (for running tests, builds, or implementation work - spawn agents)
 - 🚫 **Glob/Grep** - (spawn agents to search)
+- 🚫 **Write** - (all state is in database, not files)
 
-**Exception:** You CAN use Read to read state files in `coordination/` folder for coordination purposes.
+**🚨 DO NOT READ DEPRECATED FILES:**
+- ❌ `coordination/pm_state.json` (use bazinga-db skill instead)
+- ❌ `coordination/orchestrator_state.json` (use bazinga-db skill instead)
+- ❌ `coordination/group_status.json` (use bazinga-db skill instead)
+- ❌ `coordination/next_session_task_list.md` (use bazinga-db skill instead)
+- ❌ `docs/orchestration-log.md` (use bazinga-db skill instead)
 
 ---
 
@@ -1255,8 +1263,8 @@ Example output:
 
 ## Skills Used
 
-{Read all Skills result files and summarize which ran}
-{Parse coordination/*.json files for Skills results}
+{Query bazinga-db skill for skill outputs from this session}
+{Get skill results from skill_outputs table in database}
 
 **Skills Invoked**: {count} of 11 available
 {FOR each Skill that ran}:
@@ -1402,8 +1410,12 @@ Agent ID: [identifier]
 **Your ONLY tools:**
 ✅ Task (spawn agents)
 ✅ **Skill (bazinga-db for logging - MANDATORY after every agent response)**
-✅ Write (state files in coordination/*.json only)
-✅ Read (ONLY for coordination state files, not code)
+✅ Read (ONLY for coordination/skills_config.json and coordination/testing_config.json)
+✅ Bash (ONLY for initialization - session ID, database check)
+
+**FORBIDDEN:**
+❌ Write (all state is in database)
+❌ Read deprecated files (pm_state.json, group_status.json, etc.)
 
 **Golden Rule:**
 When in doubt, spawn an agent. NEVER do the work yourself.
