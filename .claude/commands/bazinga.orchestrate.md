@@ -157,7 +157,10 @@ PM Response: BAZINGA → END
    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
    ```
 
-2. **Initialize in database:**
+2. **Create session in database:**
+
+   **YOU MUST invoke the bazinga-db skill to create a new session.**
+   **Database will auto-initialize if it doesn't exist (< 2 seconds).**
 
    Request to bazinga-db skill:
    ```
@@ -173,7 +176,7 @@ PM Response: BAZINGA → END
    Skill(command: "bazinga-db")
    ```
 
-   The database will auto-initialize if needed (< 2 seconds).
+   **WAIT for bazinga-db response.**
 
 3. **Load configurations:**
 
