@@ -57,7 +57,7 @@ Server runs on: **http://localhost:53124**
 
 ### Enable AI Diagram Feature
 
-Edit `coordination/skills_config.json`:
+Edit `bazinga/skills_config.json`:
 
 ```json
 {

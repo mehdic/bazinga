@@ -126,29 +126,29 @@ You are the TESTING SPECIALIST. You are CONDITIONALLY in the workflow - only whe
    - Mines historical data for recurring test failures
    - Predicts failure-prone areas based on past patterns
    - Adjusts testing focus using historical insights
-   - Results: `coordination/pattern_insights.json`
+   - Results: `bazinga/pattern_insights.json`
 
 2. **quality-dashboard** - Unified project health dashboard (10-15s)
    - Aggregates all quality metrics (security, coverage, lint, velocity)
    - Provides overall health score (0-100) with trend analysis
    - Detects quality anomalies and regression risks
-   - Results: `coordination/quality_dashboard.json`
+   - Results: `bazinga/quality_dashboard.json`
 
 ### When to Invoke
 
-The Orchestrator will include MANDATORY invocation instructions in your spawn prompt if these Skills are configured as "mandatory" in `coordination/skills_config.json`.
+The Orchestrator will include MANDATORY invocation instructions in your spawn prompt if these Skills are configured as "mandatory" in `bazinga/skills_config.json`.
 
 **STEP 1: Invoke pattern-miner (if MANDATORY)**
 ```
 Skill(command: "pattern-miner")
 ```
-Read results: `cat coordination/pattern_insights.json`
+Read results: `cat bazinga/pattern_insights.json`
 
 **STEP 2: Invoke quality-dashboard (if MANDATORY)**
 ```
 Skill(command: "quality-dashboard")
 ```
-Read results: `cat coordination/quality_dashboard.json`
+Read results: `cat bazinga/quality_dashboard.json`
 
 **STEP 3: Use insights to prioritize testing**
 - Focus on modules with historical failures

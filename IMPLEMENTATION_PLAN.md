@@ -82,7 +82,7 @@ elif profile == "custom":
 
 ```bash
 # NEW: Create lite profile by default
-cat > coordination/skills_config.json << 'EOF'
+cat > bazinga/skills_config.json << 'EOF'
 {
   "_metadata": {
     "profile": "lite",
@@ -117,7 +117,7 @@ EOF
 
 ---
 
-### 2.3 Testing Config (`coordination/testing_config.json`)
+### 2.3 Testing Config (`bazinga/testing_config.json`)
 
 **Current:** Created by init script
 
@@ -146,11 +146,11 @@ EOF
 # Check if required tool is installed
 if ! command -v [tool] &> /dev/null; then
     # Load profile
-    PROFILE=$(jq -r '._metadata.profile // "lite"' coordination/skills_config.json 2>/dev/null || echo "lite")
+    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
 
     if [ "$PROFILE" = "lite" ]; then
         # Lite mode: Warn but don't fail
-        cat > coordination/[output].json << EOF
+        cat > bazinga/[output].json << EOF
 {
   "status": "skipped",
   "reason": "[tool] not installed",
@@ -162,7 +162,7 @@ EOF
         exit 0
     else
         # Advanced mode: User explicitly enabled, so fail
-        cat > coordination/[output].json << EOF
+        cat > bazinga/[output].json << EOF
 {
   "status": "error",
   "reason": "[tool] required but not installed",
@@ -376,7 +376,7 @@ Change your BAZINGA configuration profile.
 
 ## Current Profile
 
-[Read from coordination/skills_config.json -> _metadata.profile]
+[Read from bazinga/skills_config.json -> _metadata.profile]
 
 ## Available Profiles
 
@@ -402,7 +402,7 @@ Change your BAZINGA configuration profile.
 
 ## Select Profile
 
-[Instructions for updating coordination/skills_config.json and testing_config.json]
+[Instructions for updating bazinga/skills_config.json and testing_config.json]
 
 ## Apply Profile
 

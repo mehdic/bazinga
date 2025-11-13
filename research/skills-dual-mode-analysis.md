@@ -342,7 +342,7 @@ if basic_scan.has_critical_issues:
 
 ```python
 # Read revision count
-group_status = read_file("coordination/group_status.json")
+group_status = read_file("bazinga/group_status.json")
 revision_count = group_status.get(group_id, {}).get("revision_count", 0)
 
 # Determine security scan mode
@@ -451,17 +451,17 @@ case $MODE in
                 if ! command -v bandit &> /dev/null; then
                     pip install bandit --quiet
                 fi
-                bandit -r . -f json -o coordination/security_scan.json -ll
+                bandit -r . -f json -o bazinga/security_scan.json -ll
                 ;;
             javascript)
                 # Basic: High severity only
-                npm audit --audit-level=high --json > coordination/security_scan.json
+                npm audit --audit-level=high --json > bazinga/security_scan.json
                 ;;
             go)
                 if ! command -v gosec &> /dev/null; then
                     go install github.com/securego/gosec/v2/cmd/gosec@latest
                 fi
-                gosec -severity high -fmt json -out coordination/security_scan.json ./...
+                gosec -severity high -fmt json -out bazinga/security_scan.json ./...
                 ;;
         esac
 
@@ -482,25 +482,25 @@ case $MODE in
                 fi
 
                 # Run bandit (all severities)
-                bandit -r . -f json -o coordination/bandit_full.json
+                bandit -r . -f json -o bazinga/bandit_full.json
 
                 # Run semgrep (comprehensive patterns)
-                semgrep --config=auto --json -o coordination/semgrep.json
+                semgrep --config=auto --json -o bazinga/semgrep.json
 
                 # Combine results
-                jq -s '.[0] + .[1]' coordination/bandit_full.json coordination/semgrep.json > coordination/security_scan.json
+                jq -s '.[0] + .[1]' bazinga/bandit_full.json bazinga/semgrep.json > bazinga/security_scan.json
                 ;;
 
             javascript)
                 # Advanced: Full npm audit + eslint security
-                npm audit --json > coordination/npm_audit.json
+                npm audit --json > bazinga/npm_audit.json
 
                 if npm list | grep -q eslint-plugin-security; then
-                    npx eslint . --plugin security --format json > coordination/eslint_security.json
+                    npx eslint . --plugin security --format json > bazinga/eslint_security.json
                 fi
 
                 # Combine
-                jq -s '.[0] + .[1]' coordination/npm_audit.json coordination/eslint_security.json > coordination/security_scan.json
+                jq -s '.[0] + .[1]' bazinga/npm_audit.json bazinga/eslint_security.json > bazinga/security_scan.json
                 ;;
 
             go)
@@ -508,7 +508,7 @@ case $MODE in
                     go install github.com/securego/gosec/v2/cmd/gosec@latest
                 fi
                 # All severities
-                gosec -fmt json -out coordination/security_scan.json ./...
+                gosec -fmt json -out bazinga/security_scan.json ./...
                 ;;
         esac
 
@@ -523,9 +523,9 @@ esac
 
 # Parse results and add metadata
 jq ". + {\"scan_mode\": \"$MODE\", \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" \
-    coordination/security_scan.json > coordination/security_scan_final.json
+    bazinga/security_scan.json > bazinga/security_scan_final.json
 
-mv coordination/security_scan_final.json coordination/security_scan.json
+mv bazinga/security_scan_final.json bazinga/security_scan.json
 
 echo "📊 Scan mode: $MODE"
 ```
@@ -643,10 +643,10 @@ bandit -r . -f json -o full_results.json
 # On first review (revision < 2): Filter to high/medium
 if [ $revision_count -lt 2 ]; then
     jq 'select(.issue_severity=="HIGH" or .issue_severity=="MEDIUM")' \
-        full_results.json > coordination/security_scan.json
+        full_results.json > bazinga/security_scan.json
 else
     # Show all
-    cp full_results.json coordination/security_scan.json
+    cp full_results.json bazinga/security_scan.json
 fi
 ```
 

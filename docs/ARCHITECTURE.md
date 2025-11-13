@@ -154,8 +154,8 @@ Tech Lead status: CHANGES_REQUESTED
 - Never ask user questions (full autonomy)
 
 **Tool Usage**:
-- Read: ONLY coordination/*.json state files
-- Write: ONLY coordination/*.json state files
+- Read: ONLY bazinga/*.json state files
+- Write: ONLY bazinga/*.json state files
 - Glob/Grep: Understanding codebase structure only
 - Bash: Analysis only, never run tests
 - FORBIDDEN: Edit, NotebookEdit
@@ -622,7 +622,7 @@ PM decides → Next assignment OR BAZINGA
 
 **Purpose**: PM's planning and progress tracking
 
-**Location**: `coordination/pm_state.json`
+**Location**: `bazinga/pm_state.json`
 
 **Schema**:
 ```json
@@ -645,7 +645,7 @@ PM decides → Next assignment OR BAZINGA
 
 **Purpose**: Individual task group detailed status
 
-**Location**: `coordination/group_status.json`
+**Location**: `bazinga/group_status.json`
 
 **Schema**:
 ```json
@@ -672,7 +672,7 @@ PM decides → Next assignment OR BAZINGA
 
 **Purpose**: Orchestrator's routing and spawn history
 
-**Location**: `coordination/orchestrator_state.json`
+**Location**: `bazinga/orchestrator_state.json`
 
 **Schema**:
 ```json
@@ -702,7 +702,7 @@ PM decides → Next assignment OR BAZINGA
 **Purpose**: Idempotent setup of coordination environment
 
 **Features**:
-- Creates `coordination/` folder structure
+- Creates `bazinga/` folder structure
 - Initializes all state JSON files
 - Generates unique session IDs with timestamps
 - Creates `.gitignore` to exclude state files
@@ -717,7 +717,7 @@ PM decides → Next assignment OR BAZINGA
 ```
 🔄 Initializing Claude Code Multi-Agent Dev Team orchestration system...
 📅 Session ID: session_20250107_120000
-📁 Creating coordination/ folder structure...
+📁 Creating bazinga/ folder structure...
 📝 Creating pm_state.json...
 📝 Creating group_status.json...
 📝 Creating orchestrator_state.json...
@@ -807,8 +807,8 @@ Tool restrictions prevent agents from doing work outside their role.
 ### PM Tool Restrictions
 
 **ALLOWED**:
-- Read `coordination/*.json` (state files)
-- Write `coordination/*.json` (state files)
+- Read `bazinga/*.json` (state files)
+- Write `bazinga/*.json` (state files)
 - Glob/Grep (understanding codebase structure)
 - Bash (analysis only, e.g., `ls` to check structure)
 

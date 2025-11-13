@@ -39,7 +39,7 @@ Successfully implemented 3 Claude Code Skills for Tech Lead automation with inte
 **Features:**
 - Auto-installs missing tools
 - Mode controlled via `SECURITY_SCAN_MODE` environment variable
-- Output: `coordination/security_scan.json`
+- Output: `bazinga/security_scan.json`
 - Multi-language support (Python, JavaScript, Go, Ruby)
 
 **Progressive Escalation:**
@@ -65,7 +65,7 @@ Revision 2+:  Advanced scan (comprehensive)
 - Go: `go test -coverprofile`
 - Reports line/branch coverage
 - Identifies files <80% coverage
-- Output: `coordination/coverage_report.json`
+- Output: `bazinga/coverage_report.json`
 
 **Features:**
 - Auto-detects test framework
@@ -88,7 +88,7 @@ Revision 2+:  Advanced scan (comprehensive)
 - JavaScript: `eslint`
 - Go: `golangci-lint`
 - Ruby: `rubocop`
-- Output: `coordination/lint_results.json`
+- Output: `bazinga/lint_results.json`
 
 **Features:**
 - Prefers fast tools (ruff over pylint)
@@ -119,7 +119,7 @@ Updated Tech Lead spawn (lines 573-697):
 tech_lead_base = read_file("agents/techlead.md")
 
 # Step 2: Get current context
-revision_count = read_json("coordination/group_status.json")[group_id]["revision_count"]
+revision_count = read_json("bazinga/group_status.json")[group_id]["revision_count"]
 
 # Step 3: Determine escalation
 model = "opus" if revision_count >= 3 else "sonnet"
@@ -133,7 +133,7 @@ tech_lead_full_prompt = tech_lead_base + f"""
 
 1. Export mode: export SECURITY_SCAN_MODE={scan_mode}
 2. Security-scan Skill will auto-run
-3. Read results: cat coordination/security_scan.json
+3. Read results: cat bazinga/security_scan.json
 ...
 """
 
@@ -230,7 +230,7 @@ export SECURITY_SCAN_MODE=advanced
 
 ### Expected Outputs
 
-All Skills output to `coordination/*.json`:
+All Skills output to `bazinga/*.json`:
 - `security_scan.json`
 - `coverage_report.json`
 - `lint_results.json`

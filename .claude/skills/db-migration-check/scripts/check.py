@@ -73,7 +73,7 @@ except ImportError as e:
             "impact": "Database migration safety check was skipped. Review migrations manually before deploying.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
@@ -86,7 +86,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
@@ -258,7 +258,7 @@ def main():
     result = check_migrations()
 
     # Write output
-    output_dir = Path("coordination")
+    output_dir = Path("bazinga")
     output_dir.mkdir(exist_ok=True)
 
     output_file = output_dir / "db_migration_check.json"

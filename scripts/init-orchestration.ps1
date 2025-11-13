@@ -16,12 +16,12 @@ Write-Host "📅 Session ID: $SESSION_ID" -ForegroundColor Cyan
 
 # Ensure all required directories exist (New-Item -Force is idempotent - safe to run multiple times)
 Write-Host "📁 Ensuring directory structure exists..." -ForegroundColor Yellow
-New-Item -ItemType Directory -Path "coordination\messages" -Force | Out-Null
-New-Item -ItemType Directory -Path "coordination\reports" -Force | Out-Null
+New-Item -ItemType Directory -Path "bazinga\messages" -Force | Out-Null
+New-Item -ItemType Directory -Path "bazinga\reports" -Force | Out-Null
 New-Item -ItemType Directory -Path "docs" -Force | Out-Null
 
 # Initialize pm_state.json
-if (-not (Test-Path "coordination\pm_state.json")) {
+if (-not (Test-Path "bazinga\pm_state.json")) {
     Write-Host "📝 Creating pm_state.json..." -ForegroundColor Yellow
     @"
 {
@@ -35,13 +35,13 @@ if (-not (Test-Path "coordination\pm_state.json")) {
   "iteration": 0,
   "last_update": "$TIMESTAMP"
 }
-"@ | Out-File -FilePath "coordination\pm_state.json" -Encoding UTF8
+"@ | Out-File -FilePath "bazinga\pm_state.json" -Encoding UTF8
 } else {
     Write-Host "✓ pm_state.json already exists" -ForegroundColor Gray
 }
 
 # Initialize group_status.json
-if (-not (Test-Path "coordination\group_status.json")) {
+if (-not (Test-Path "bazinga\group_status.json")) {
     Write-Host "📝 Creating group_status.json..." -ForegroundColor Yellow
     @"
 {
@@ -54,13 +54,13 @@ if (-not (Test-Path "coordination\group_status.json")) {
     }
   }
 }
-"@ | Out-File -FilePath "coordination\group_status.json" -Encoding UTF8
+"@ | Out-File -FilePath "bazinga\group_status.json" -Encoding UTF8
 } else {
     Write-Host "✓ group_status.json already exists" -ForegroundColor Gray
 }
 
 # Initialize orchestrator_state.json
-if (-not (Test-Path "coordination\orchestrator_state.json")) {
+if (-not (Test-Path "bazinga\orchestrator_state.json")) {
     Write-Host "📝 Creating orchestrator_state.json..." -ForegroundColor Yellow
     @"
 {
@@ -74,13 +74,13 @@ if (-not (Test-Path "coordination\orchestrator_state.json")) {
   "start_time": "$TIMESTAMP",
   "last_update": "$TIMESTAMP"
 }
-"@ | Out-File -FilePath "coordination\orchestrator_state.json" -Encoding UTF8
+"@ | Out-File -FilePath "bazinga\orchestrator_state.json" -Encoding UTF8
 } else {
     Write-Host "✓ orchestrator_state.json already exists" -ForegroundColor Gray
 }
 
 # Initialize skills_config.json
-if (-not (Test-Path "coordination\skills_config.json")) {
+if (-not (Test-Path "bazinga\skills_config.json")) {
     Write-Host "📝 Creating skills_config.json..." -ForegroundColor Yellow
     @"
 {
@@ -113,16 +113,16 @@ if (-not (Test-Path "coordination\skills_config.json")) {
     ]
   }
 }
-"@ | Out-File -FilePath "coordination\skills_config.json" -Encoding UTF8
+"@ | Out-File -FilePath "bazinga\skills_config.json" -Encoding UTF8
 } else {
     Write-Host "✓ skills_config.json already exists" -ForegroundColor Gray
 }
 
 # Initialize message files
 $MESSAGE_FILES = @(
-    "coordination\messages\dev_to_qa.json",
-    "coordination\messages\qa_to_techlead.json",
-    "coordination\messages\techlead_to_dev.json"
+    "bazinga\messages\dev_to_qa.json",
+    "bazinga\messages\qa_to_techlead.json",
+    "bazinga\messages\techlead_to_dev.json"
 )
 
 foreach ($msg_file in $MESSAGE_FILES) {
@@ -157,8 +157,8 @@ This file tracks all agent interactions during orchestration.
 }
 
 # Create .gitignore for coordination folder if it doesn't exist
-if (-not (Test-Path "coordination\.gitignore")) {
-    Write-Host "📝 Creating coordination\.gitignore..." -ForegroundColor Yellow
+if (-not (Test-Path "bazinga\.gitignore")) {
+    Write-Host "📝 Creating bazinga\.gitignore..." -ForegroundColor Yellow
     @"
 # Coordination state files are temporary and should not be committed
 *.json
@@ -168,16 +168,16 @@ if (-not (Test-Path "coordination\.gitignore")) {
 
 # Keep the folder structure
 !.gitignore
-"@ | Out-File -FilePath "coordination\.gitignore" -Encoding UTF8
+"@ | Out-File -FilePath "bazinga\.gitignore" -Encoding UTF8
 } else {
-    Write-Host "✓ coordination\.gitignore already exists" -ForegroundColor Gray
+    Write-Host "✓ bazinga\.gitignore already exists" -ForegroundColor Gray
 }
 
 Write-Host ""
 Write-Host "✅ Initialization complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "📊 Created structure:" -ForegroundColor Cyan
-Write-Host "   coordination\"
+Write-Host "   bazinga\"
 Write-Host "   ├── pm_state.json"
 Write-Host "   ├── group_status.json"
 Write-Host "   ├── orchestrator_state.json"

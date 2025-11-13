@@ -145,7 +145,7 @@ python3 .claude/skills/skill-name/script-name.py
 
 This script will:
 - [What it does - bullet points]
-- Generate `coordination/output-file.json`
+- Generate `bazinga/output-file.json`
 
 ---
 
@@ -154,7 +154,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/output-file.json
+bazinga/output-file.json
 ```
 
 Extract key information:
@@ -360,7 +360,7 @@ python3 .claude/skills/skill-name/script-name.py --help
 **Check:**
 - What parameters it needs
 - What output file it generates
-- Where it writes the output (usually `coordination/`)
+- Where it writes the output (usually `bazinga/`)
 
 ### Step 4: Create "When to Invoke" Section
 
@@ -465,7 +465,7 @@ python3 .claude/skills/skill-name/script-name.py [--args if needed]
 
 This script will:
 - [What it does - list key operations]
-- Generate `coordination/output-file.json`
+- Generate `bazinga/output-file.json`
 
 ---
 
@@ -474,7 +474,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/output-file.json
+bazinga/output-file.json
 ```
 
 Extract key information:
@@ -498,7 +498,7 @@ Issues:
 - {issue 1}
 - {issue 2}
 
-Details saved to: coordination/output-file.json
+Details saved to: bazinga/output-file.json
 ```
 
 ---
@@ -665,7 +665,7 @@ This script will:
 - Detect project language (Python, JavaScript, Go, Java)
 - Auto-install required tools if needed
 - Run coverage analysis
-- Generate `coordination/coverage_report.json`
+- Generate `bazinga/coverage_report.json`
 
 ---
 
@@ -674,7 +674,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/coverage_report.json
+bazinga/coverage_report.json
 ```
 
 Extract key information:
@@ -692,7 +692,7 @@ Test Coverage Report:
 - Overall coverage: {percentage}%
 - Files below 80% threshold: {count}
 
-Details saved to: coordination/coverage_report.json
+Details saved to: bazinga/coverage_report.json
 ```
 
 ---
@@ -712,7 +712,7 @@ Test Coverage Report:
   - auth.py: 68% coverage
   - payment.py: 52% coverage
 
-Details saved to: coordination/coverage_report.json
+Details saved to: bazinga/coverage_report.json
 ```
 
 ---
@@ -801,7 +801,7 @@ cd /path/to/project
 bash .claude/skills/skill-name/script-name.sh
 
 # Check the output
-cat coordination/output-file.json
+cat bazinga/output-file.json
 ```
 
 ---

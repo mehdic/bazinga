@@ -376,7 +376,7 @@ Before Developer starts coding, run analysis:
 - Suggest architectural approach
 - Show conventions and standards
 
-**Output:** `coordination/codebase_analysis.json`
+**Output:** `bazinga/codebase_analysis.json`
 
 ```json
 {
@@ -440,7 +440,7 @@ Before Developer writes tests, analyze existing tests:
 - Show example tests for similar code
 - Suggest test structure and coverage targets
 
-**Output:** `coordination/test_patterns.json`
+**Output:** `bazinga/test_patterns.json`
 
 ```json
 {

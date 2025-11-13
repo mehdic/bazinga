@@ -44,20 +44,20 @@ switch ($LANG) {
         if (Test-CommandExists "ruff") {
             $TOOL = "ruff"
             Write-Host "  Running ruff..." -ForegroundColor Gray
-            ruff check . --output-format=json > coordination\lint_results_raw.json 2>$null
+            ruff check . --output-format=json > bazinga\lint_results_raw.json 2>$null
             if (-not $?) {
-                '[]' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '[]' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } elseif (Test-CommandExists "pylint") {
             $TOOL = "pylint"
             Write-Host "  Running pylint..." -ForegroundColor Gray
-            pylint --output-format=json **/*.py > coordination\lint_results_raw.json 2>$null
+            pylint --output-format=json **/*.py > bazinga\lint_results_raw.json 2>$null
             if (-not $?) {
-                '[]' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '[]' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } else {
             Write-Host "⚠️  No Python linter found. Install: pip install ruff" -ForegroundColor Yellow
-            '[]' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            '[]' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
         }
     }
 
@@ -66,13 +66,13 @@ switch ($LANG) {
         if ((Test-Path "node_modules\.bin\eslint") -or (Test-Path "node_modules\.bin\eslint.cmd") -or (Test-CommandExists "eslint")) {
             $TOOL = "eslint"
             Write-Host "  Running eslint..." -ForegroundColor Gray
-            npx eslint . --format json > coordination\lint_results_raw.json 2>$null
+            npx eslint . --format json > bazinga\lint_results_raw.json 2>$null
             if (-not $?) {
-                '[]' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '[]' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } else {
             Write-Host "⚠️  eslint not found. Install: npm install --save-dev eslint" -ForegroundColor Yellow
-            '[]' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            '[]' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
         }
     }
 
@@ -81,13 +81,13 @@ switch ($LANG) {
         if (Test-CommandExists "golangci-lint") {
             $TOOL = "golangci-lint"
             Write-Host "  Running golangci-lint..." -ForegroundColor Gray
-            golangci-lint run --out-format json > coordination\lint_results_raw.json 2>$null
+            golangci-lint run --out-format json > bazinga\lint_results_raw.json 2>$null
             if (-not $?) {
-                '{"Issues":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '{"Issues":[]}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } else {
             Write-Host "⚠️  golangci-lint not found. Install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest" -ForegroundColor Yellow
-            '{"Issues":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            '{"Issues":[]}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
         }
     }
 
@@ -96,13 +96,13 @@ switch ($LANG) {
         if (Test-CommandExists "rubocop") {
             $TOOL = "rubocop"
             Write-Host "  Running rubocop..." -ForegroundColor Gray
-            rubocop --format json > coordination\lint_results_raw.json 2>$null
+            rubocop --format json > bazinga\lint_results_raw.json 2>$null
             if (-not $?) {
-                '{"files":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '{"files":[]}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } else {
             Write-Host "⚠️  rubocop not found. Install: gem install rubocop" -ForegroundColor Yellow
-            '{"files":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            '{"files":[]}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
         }
     }
 
@@ -119,14 +119,14 @@ switch ($LANG) {
 
                 # Consolidate results (Checkstyle XML + PMD XML)
                 if ((Test-Path "target\checkstyle-result.xml") -or (Test-Path "target\pmd.xml")) {
-                    '{"tool":"checkstyle+pmd","checkstyle":"target/checkstyle-result.xml","pmd":"target/pmd.xml"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                    '{"tool":"checkstyle+pmd","checkstyle":"target/checkstyle-result.xml","pmd":"target/pmd.xml"}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
                 } else {
-                    '{"issues":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                    '{"issues":[]}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
                 }
             } else {
                 Write-Host "❌ Maven not found for Java project" -ForegroundColor Red
                 $TOOL = "none"
-                '{"error":"Maven not found"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '{"error":"Maven not found"}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } elseif ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts")) {
             $GRADLE_CMD = if (Test-Path ".\gradlew.bat") { ".\gradlew.bat" } elseif (Test-CommandExists "gradle") { "gradle" } else { $null }
@@ -141,25 +141,25 @@ switch ($LANG) {
 
                 # Consolidate results (Checkstyle XML + PMD XML)
                 if ((Test-Path "build\reports\checkstyle\main.xml") -or (Test-Path "build\reports\pmd\main.xml")) {
-                    '{"tool":"checkstyle+pmd","checkstyle":"build/reports/checkstyle/main.xml","pmd":"build/reports/pmd/main.xml"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                    '{"tool":"checkstyle+pmd","checkstyle":"build/reports/checkstyle/main.xml","pmd":"build/reports/pmd/main.xml"}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
                 } else {
-                    '{"issues":[]}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                    '{"issues":[]}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
                 }
             } else {
                 Write-Host "❌ Gradle not found for Java project" -ForegroundColor Red
                 $TOOL = "none"
-                '{"error":"Gradle not found"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+                '{"error":"Gradle not found"}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
             }
         } else {
             Write-Host "❌ No Maven or Gradle build file found" -ForegroundColor Red
             $TOOL = "none"
-            '{"error":"No build file"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+            '{"error":"No build file"}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
         }
     }
 
     default {
         Write-Host "❌ Unknown language. Cannot run linting." -ForegroundColor Red
-        '{"error":"Unknown language"}' | Out-File -FilePath "coordination\lint_results_raw.json" -Encoding UTF8
+        '{"error":"Unknown language"}' | Out-File -FilePath "bazinga\lint_results_raw.json" -Encoding UTF8
     }
 }
 
@@ -167,7 +167,7 @@ switch ($LANG) {
 $TIMESTAMP = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 # Read raw results
-$rawResults = Get-Content "coordination\lint_results_raw.json" -Raw
+$rawResults = Get-Content "bazinga\lint_results_raw.json" -Raw
 
 # Create final report with metadata
 @"
@@ -177,10 +177,10 @@ $rawResults = Get-Content "coordination\lint_results_raw.json" -Raw
   "tool": "$TOOL",
   "raw_results": $rawResults
 }
-"@ | Out-File -FilePath "coordination\lint_results.json" -Encoding UTF8
+"@ | Out-File -FilePath "bazinga\lint_results.json" -Encoding UTF8
 
 # Clean up
-Remove-Item "coordination\lint_results_raw.json" -ErrorAction SilentlyContinue
+Remove-Item "bazinga\lint_results_raw.json" -ErrorAction SilentlyContinue
 
 Write-Host "✅ Linting complete" -ForegroundColor Green
-Write-Host "📁 Results saved to: coordination\lint_results.json" -ForegroundColor Cyan
+Write-Host "📁 Results saved to: bazinga\lint_results.json" -ForegroundColor Cyan

@@ -22,7 +22,7 @@ Skills are automated analysis tools that agents invoke to validate code quality,
 **Key Points:**
 - Skills run automatically during agent workflows
 - Each Skill focuses on a specific problem
-- Results are saved to `coordination/` for agent access
+- Results are saved to `bazinga/` for agent access
 - Skills can be enabled or disabled based on your workflow
 
 **💡 Profiles:** BAZINGA has two main modes:
@@ -153,7 +153,7 @@ These three Skills are enabled by default in lite mode and run automatically:
 - **What it does**: Runs language-specific linters to find style violations, complexity issues, and anti-patterns
 - **Time**: 5-10 seconds
 - **When to use**: On every code review (enabled by default)
-- **Output**: `coordination/lint_results.json`
+- **Output**: `bazinga/lint_results.json`
 
 **Example output:**
 ```json
@@ -185,7 +185,7 @@ These three Skills are enabled by default in lite mode and run automatically:
   - **Basic** (revision < 2): Fast scan, high/medium severity only
   - **Advanced** (revision >= 2): Comprehensive scan, all severities
 - **When to use**: Before approving any code (enabled by default)
-- **Output**: `coordination/security_scan.json`
+- **Output**: `bazinga/security_scan.json`
 
 **Example output (basic mode):**
 ```json
@@ -220,7 +220,7 @@ These three Skills are enabled by default in lite mode and run automatically:
 - **What it does**: Measures line and branch coverage, identifies untested code
 - **Time**: 10-20 seconds
 - **When to use**: After developers add/fix tests (enabled by default)
-- **Output**: `coordination/coverage_report.json`
+- **Output**: `bazinga/coverage_report.json`
 
 **Example output:**
 ```json
@@ -260,7 +260,7 @@ These Skills are disabled by default but provide deeper analysis. Enable them fo
 - **What it does**: Finds similar features, reusable utilities, and architectural patterns
 - **Time**: 15-30 seconds
 - **When to use**: At start of complex features to understand existing solutions
-- **Output**: `coordination/codebase_patterns.json`
+- **Output**: `bazinga/codebase_patterns.json`
 
 **Problem it solves:**
 ```
@@ -300,7 +300,7 @@ Result: Duplicated code, inconsistent patterns, extra bugs
 - **What it does**: Extracts test framework, fixtures, naming conventions, helper utilities
 - **Time**: 15-30 seconds
 - **When to use**: Before writing new tests
-- **Output**: `coordination/test_patterns.json`
+- **Output**: `bazinga/test_patterns.json`
 
 **Problem it solves:**
 ```
@@ -332,7 +332,7 @@ Result: Tests are harder to maintain, patterns not consistent
 - **What it does**: Compares OpenAPI specs, detects breaking changes (removed endpoints, changed types)
 - **Time**: 10-20 seconds
 - **When to use**: Before deploying API changes
-- **Output**: `coordination/contract_diff.json`
+- **Output**: `bazinga/contract_diff.json`
 
 **Problem it solves:**
 ```
@@ -375,7 +375,7 @@ Result: Angry users, production incident, expensive fix
 - **What it does**: Detects dangerous operations (locks, rewrites) and suggests safe alternatives
 - **Time**: 10-20 seconds
 - **When to use**: Before deploying migrations
-- **Output**: `coordination/migration_analysis.json`
+- **Output**: `bazinga/migration_analysis.json`
 
 **Problem it solves:**
 ```
@@ -425,7 +425,7 @@ Safe alternative: Add column without lock, then backfill
 - **What it does**: Mines historical data to identify recurring patterns, predict effort, detect risks
 - **Time**: 15-20 seconds
 - **When to use**: For retrospectives and historical learning
-- **Output**: `coordination/pattern_insights.json`
+- **Output**: `bazinga/pattern_insights.json`
 
 **Problem it solves:**
 ```
@@ -471,7 +471,7 @@ Next estimate: 10 hours → Set expectation correctly
 - **What it does**: Aggregates all quality metrics (security, coverage, lint, velocity) into one health score
 - **Time**: 10-15 seconds
 - **When to use**: Before major decisions, before BAZINGA, weekly reviews
-- **Output**: `coordination/quality_dashboard.json`
+- **Output**: `bazinga/quality_dashboard.json`
 
 **Problem it solves:**
 ```
@@ -705,7 +705,7 @@ Clear signal: Fix coverage before shipping
 
 ### Skills Configuration File
 
-Configuration is persisted in `coordination/skills_config.json`:
+Configuration is persisted in `bazinga/skills_config.json`:
 
 ```json
 {
@@ -823,7 +823,7 @@ Tech Lead receives code for review
 
 ### Persistence Across Sessions
 
-- Configuration is **automatically saved** to `coordination/skills_config.json`
+- Configuration is **automatically saved** to `bazinga/skills_config.json`
 - Configuration **persists across all BAZINGA sessions**
 - Use `/bazinga.configure-skills` anytime to adjust
 - Configuration is **tracked in git** (safe to commit)
@@ -947,7 +947,7 @@ bazinga check
 **Solution:**
 ```bash
 # Verify configuration exists
-cat coordination/skills_config.json
+cat bazinga/skills_config.json
 
 # Reset to defaults
 /bazinga.configure-skills
@@ -961,7 +961,7 @@ cat coordination/skills_config.json
 **Enable different configurations:**
 
 1. Run with Fast configuration
-2. Note results in `coordination/` files
+2. Note results in `bazinga/` files
 3. Change to Advanced configuration
 4. Run again and compare
 

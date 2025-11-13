@@ -368,7 +368,7 @@ A: Run `/bazinga.configure-skills` and deselect skills you don't want.
 A: PM may have detected dependencies or high file overlap. Check PM's reasoning in output.
 
 **Q: Build failing**
-A: Check `coordination/build_baseline.log`. BAZINGA tracks baseline vs. final build status.
+A: Check `bazinga/build_baseline.log`. BAZINGA tracks baseline vs. final build status.
 
 ---
 
@@ -381,7 +381,7 @@ your-project/
 │   ├── commands/              # Slash commands
 │   ├── scripts/               # Utility scripts
 │   └── skills/                # Analysis tools (10 Skills)
-├── coordination/              # State files (auto-generated, gitignored)
+├── bazinga/              # State files (auto-generated, gitignored)
 │   ├── pm_state.json         # PM planning and progress
 │   ├── group_status.json     # Individual task status
 │   ├── orchestrator_state.json # Routing state

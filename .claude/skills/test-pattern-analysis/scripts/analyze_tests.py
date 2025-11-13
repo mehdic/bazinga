@@ -80,7 +80,7 @@ except ImportError as e:
             "impact": "Test pattern analysis was skipped. Tests can still be written manually.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
@@ -93,7 +93,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
@@ -350,7 +350,7 @@ def main():
     result = analyze_test_suite(test_path, task_description)
 
     # Write output
-    output_dir = Path("coordination")
+    output_dir = Path("bazinga")
     output_dir.mkdir(exist_ok=True)
 
     output_file = output_dir / "test_patterns.json"

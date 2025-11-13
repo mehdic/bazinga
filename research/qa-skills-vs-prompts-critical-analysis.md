@@ -151,7 +151,7 @@ Scans for leaked credentials using TruffleHog.
 - When reviewing security-sensitive changes
 
 ## Output
-- coordination/secrets_found.json
+- bazinga/secrets_found.json
 ```
 
 **QA Expert Prompt Enhancement:**
@@ -212,7 +212,7 @@ ONLY if all preflight checks pass, proceed with full test suite.
 
 1. **Analyze Coverage** (already exists)
    - Invoke: /test-coverage skill
-   - Reads: coordination/coverage_report.json
+   - Reads: bazinga/coverage_report.json
 
 2. **Validate Thresholds**
    - Minimum line coverage: 80%
@@ -282,8 +282,8 @@ Analyzes test result history to identify and track flaky tests.
 - Generates alerts for action items
 
 ## Output
-- coordination/flaky_tests.json
-- coordination/flaky_test_report.md
+- bazinga/flaky_tests.json
+- bazinga/flaky_test_report.md
 ```
 
 **Verdict:** ✅ **NEW SUPERPOWERS SKILL: flaky-test-detector**
@@ -336,7 +336,7 @@ Automated visual comparison using Playwright screenshots.
 - Baseline screenshots in .visual-regression/baselines/
 
 ## Output
-- coordination/visual_diff_report.json
+- bazinga/visual_diff_report.json
 - .visual-regression/diffs/ (diff images)
 ```
 
@@ -427,7 +427,7 @@ Automated tools catch ~30-40% of a11y issues.
 Manual testing still required for full WCAG compliance.
 
 ## Output
-- coordination/accessibility_report.json
+- bazinga/accessibility_report.json
 ```
 
 **Verdict:** ✅ **NEW SUPERPOWERS SKILL: accessibility-testing**
@@ -483,7 +483,7 @@ Use via command for:
 - Comprehensive: Full analysis (~10-30 min)
 
 ## Output
-- coordination/mutation_report.json
+- bazinga/mutation_report.json
 ```
 
 **Plus a command:**
@@ -534,7 +534,7 @@ Runs integration tests with timing instrumentation.
 Compares against historical baseline (if exists).
 Reports anomalies (>2x slower than baseline).
 
-Output: coordination/performance_profile.json
+Output: bazinga/performance_profile.json
 ```
 
 **QA Expert decides what to do with results:**
@@ -545,7 +545,7 @@ Output: coordination/performance_profile.json
 
 IF superpowers mode enabled:
   - Invoke: /performance-profiler skill
-  - Review: coordination/performance_profile.json
+  - Review: bazinga/performance_profile.json
   - IF regressions detected (>2x baseline):
     - Warn in report
     - Flag for developer review
@@ -623,7 +623,7 @@ Use via command for:
 - Stress test: Breaking point (10-30 min)
 
 ## Output
-- coordination/load_test_results.json
+- bazinga/load_test_results.json
 ```
 
 **Verdict:** ✅ **NEW SKILL: load-testing (command-triggered, not default or superpowers)**

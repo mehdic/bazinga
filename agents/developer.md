@@ -528,11 +528,11 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 1. **lint-check** - Code quality linting
    - Runs language-appropriate linters (Python: ruff, JS: eslint, Go: golangci-lint)
    - Checks style, complexity, best practices
-   - Results: `coordination/lint_results.json`
+   - Results: `bazinga/lint_results.json`
 
 2. **test-coverage** (optional) - Test coverage analysis
    - Reports line/branch coverage
-   - Results: `coordination/coverage_report.json`
+   - Results: `bazinga/coverage_report.json`
 
 ### When to Use Skills
 
@@ -542,7 +542,7 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 Skill(command: "lint-check")
 
 # Read results and fix all issues before proceeding
-cat coordination/lint_results.json
+cat bazinga/lint_results.json
 ```
 
 **Best Practice**:
@@ -637,7 +637,7 @@ Always test your implementation:
    Skill(command: "lint-check")
 
    # Read results:
-   cat coordination/lint_results.json
+   cat bazinga/lint_results.json
    ```
 
 2. **Fix ALL lint issues** - Don't commit with lint errors

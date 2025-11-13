@@ -85,7 +85,7 @@ Current orchestration can consume significant token budgets in long-running sess
 🚨 **ORCHESTRATOR**: Token usage at 96% - emergency mode activated
    Saving state and creating handoff document for next session...
 
-   ✅ State saved to coordination/
+   ✅ State saved to bazinga/
    📄 Handoff: docs/session-handoff.md
 
    To resume: @orchestrator Resume from previous session
@@ -144,8 +144,8 @@ Current orchestration can consume significant token budgets in long-running sess
 **Option 2: Review and restart**
 ```bash
 # Review state files
-cat coordination/pm_state.json
-cat coordination/group_status.json
+cat bazinga/pm_state.json
+cat bazinga/group_status.json
 
 # Then invoke orchestrator with context
 @orchestrator Continue orchestration - check coordination files for state
@@ -153,17 +153,17 @@ cat coordination/group_status.json
 
 ## Files Modified
 
-- coordination/pm_state.json (updated)
-- coordination/group_status.json (updated)
-- coordination/orchestrator_state.json (updated)
+- bazinga/pm_state.json (updated)
+- bazinga/group_status.json (updated)
+- bazinga/orchestrator_state.json (updated)
 - docs/orchestration-log.md (complete log available)
 
 ## State Files Preserved
 
 All state files have been saved and are ready for next session:
-- ✅ coordination/pm_state.json
-- ✅ coordination/group_status.json
-- ✅ coordination/orchestrator_state.json
+- ✅ bazinga/pm_state.json
+- ✅ bazinga/group_status.json
+- ✅ bazinga/orchestrator_state.json
 - ✅ docs/orchestration-log.md
 
 ## Next Session Strategy
@@ -278,7 +278,7 @@ elif token_mode == "wrap-up":
 
 - `agents/orchestrator.md` - Main orchestration logic
 - `agents/pm.md` - Project manager decision logic
-- `coordination/orchestrator_state.json` - Would need token_usage field
+- `bazinga/orchestrator_state.json` - Would need token_usage field
 - `docs/session-handoff.md` - Template for handoff documents
 
 ## References

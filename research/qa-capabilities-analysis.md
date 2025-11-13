@@ -336,7 +336,7 @@ Track flaky tests over time, escalate if not fixed
 # When a test is flaky (passes on retry)
 
 # Step 1: Record flaky test
-flaky_db = load_json("coordination/flaky_tests.json")
+flaky_db = load_json("bazinga/flaky_tests.json")
 flaky_db.record(
     test_name="test_user_login",
     failure_count=1,
@@ -350,7 +350,7 @@ if flaky_db.get_failure_count("test_user_login") > 3:
     alert_developer("CHRONIC FLAKY TEST: test_user_login - Must fix root cause")
 
 # Step 3: Generate flaky test report
-save_json("coordination/flaky_test_report.json", flaky_db.summary())
+save_json("bazinga/flaky_test_report.json", flaky_db.summary())
 ```
 
 **Benefits:**
@@ -369,7 +369,7 @@ save_json("coordination/flaky_test_report.json", flaky_db.summary())
 - ✅✅ Flaky tests are tech debt
 - ✅ Tracking creates accountability
 - ✅ Low overhead, high value
-- ⚠️ Requires persistent storage (coordination/*.json)
+- ⚠️ Requires persistent storage (bazinga/*.json)
 
 **Verdict:** IMPLEMENT IMMEDIATELY
 
@@ -382,7 +382,7 @@ save_json("coordination/flaky_test_report.json", flaky_db.summary())
 **What it does:**
 Screenshot comparison for UI changes (catches CSS bugs, layout shifts)
 
-**Output:** `coordination/visual_regression_report.json`
+**Output:** `bazinga/visual_regression_report.json`
 
 **Tools:**
 - Playwright (built-in screenshot support)
@@ -684,7 +684,7 @@ Test on real iOS/Android devices (BrowserStack, AWS Device Farm)
 - Reduce Tech Lead rejections by 30%
 
 **4. Flaky Test Tracking** (3 hours)
-- Record flaky tests in coordination/flaky_tests.json
+- Record flaky tests in bazinga/flaky_tests.json
 - Alert on chronic flaky tests (3+ occurrences)
 - Create accountability
 
@@ -952,7 +952,7 @@ trufflehog git file://. --since-commit HEAD~1 --json
 coverage_report = run_skill("test-coverage")
 
 # Step 2: Parse results
-coverage_data = parse_json("coordination/coverage_report.json")
+coverage_data = parse_json("bazinga/coverage_report.json")
 
 # Step 3: Validate against thresholds
 issues = []
@@ -1027,7 +1027,7 @@ if result.has_failures():
             )
 
 # Step 3: Load flaky test database
-flaky_db = load_json("coordination/flaky_tests.json") or {}
+flaky_db = load_json("bazinga/flaky_tests.json") or {}
 
 # Step 4: Check for chronic flaky tests
 for test_name, data in flaky_db.items():
@@ -1049,7 +1049,7 @@ Action required: Developer to investigate and fix
         send_alert(alert)
 
 # Step 5: Save updated database
-save_json("coordination/flaky_tests.json", flaky_db)
+save_json("bazinga/flaky_tests.json", flaky_db)
 
 # Step 6: Generate summary report
 generate_flaky_report()

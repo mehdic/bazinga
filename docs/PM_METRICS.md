@@ -201,7 +201,7 @@ Developer: (10 min) → Tests pass, feature complete
 
 ### Velocity Tracker Metrics
 
-Every run, BAZINGA tracks these metrics in `coordination/project_metrics.json`:
+Every run, BAZINGA tracks these metrics in `bazinga/project_metrics.json`:
 
 ```json
 {

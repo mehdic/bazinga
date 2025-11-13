@@ -74,7 +74,7 @@ except ImportError as e:
             "impact": "Codebase analysis was skipped.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
@@ -87,7 +87,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("coordination").mkdir(exist_ok=True)
+        Path("bazinga").mkdir(exist_ok=True)
         with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
@@ -107,7 +107,7 @@ def find_code_files(root_dir: str = ".", exclude_dirs: List[str] = None) -> List
     if exclude_dirs is None:
         exclude_dirs = [
             ".git", "node_modules", "venv", "__pycache__", ".pytest_cache",
-            "build", "dist", ".next", ".cache", "coordination", "docs"
+            "build", "dist", ".next", ".cache", "bazinga", "docs"
         ]
 
     code_extensions = {
@@ -393,7 +393,7 @@ def main():
     result = analyze_codebase(task_description)
 
     # Write output
-    output_dir = Path("coordination")
+    output_dir = Path("bazinga")
     output_dir.mkdir(exist_ok=True)
 
     output_file = output_dir / "codebase_analysis.json"

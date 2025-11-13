@@ -83,7 +83,7 @@ bazinga/
 2. **All skill outputs** → `bazinga/artifacts/{SESSION_ID}/skills/`
 3. **Configuration files** → `bazinga/` (root level)
 4. **Templates** → `bazinga/templates/`
-5. **Never write to coordination root** - only artifacts/, templates/, or config files
+5. **Never write to bazinga root** - only artifacts/, templates/, or config files
 
 **Example paths for current session:**
 - Build baseline: `bazinga/artifacts/{SESSION_ID}/build_baseline.log`

@@ -7,7 +7,7 @@ Validate that Skills are now being invoked during orchestration after the fix.
 
 ### Before Fix (Broken)
 - 0 skills executed in 277 tasks
-- No coordination/*.json result files created
+- No bazinga/*.json result files created
 - Agents received {IF} pseudocode blocks literally
 - README promised "mandatory quality gates" but none ran
 
@@ -15,7 +15,7 @@ Validate that Skills are now being invoked during orchestration after the fix.
 - ✅ Developer invokes: lint-check
 - ✅ Tech Lead invokes: security-scan, lint-check, test-coverage
 - ✅ PM invokes: velocity-tracker
-- ✅ Result files created: coordination/lint_results.json, security_scan.json, etc.
+- ✅ Result files created: bazinga/lint_results.json, security_scan.json, etc.
 - ✅ Skills appear in final BAZINGA report
 
 ## Test Task
@@ -40,10 +40,10 @@ Run minimal orchestration:
 
 1. **Skills Execution Count**: > 0 (not 0/277 like before)
 2. **Result Files Created**:
-   - [ ] coordination/lint_results.json
-   - [ ] coordination/security_scan.json
-   - [ ] coordination/coverage_report.json
-   - [ ] coordination/project_metrics.json
+   - [ ] bazinga/lint_results.json
+   - [ ] bazinga/security_scan.json
+   - [ ] bazinga/coverage_report.json
+   - [ ] bazinga/project_metrics.json
 
 3. **Skills Appear in Agent Reports**:
    - [ ] Developer report mentions "lint-check executed"
@@ -60,22 +60,22 @@ After orchestration completes:
 
 ```bash
 # Check if result files exist
-ls -lh coordination/*.json
+ls -lh bazinga/*.json
 
 # Count how many Skills result files were created
-ls coordination/*_results.json coordination/*_scan.json coordination/*_report.json coordination/*_metrics.json 2>/dev/null | wc -l
+ls bazinga/*_results.json bazinga/*_scan.json bazinga/*_report.json bazinga/*_metrics.json 2>/dev/null | wc -l
 
 # Read lint results
-cat coordination/lint_results.json
+cat bazinga/lint_results.json
 
 # Read security scan results
-cat coordination/security_scan.json
+cat bazinga/security_scan.json
 
 # Read coverage report
-cat coordination/coverage_report.json
+cat bazinga/coverage_report.json
 
 # Read velocity metrics
-cat coordination/project_metrics.json
+cat bazinga/project_metrics.json
 ```
 
 ## Expected Output

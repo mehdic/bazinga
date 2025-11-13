@@ -64,7 +64,7 @@ Add testing configuration with three modes:
 
 ### 1. Skill Selection & Configuration System
 
-**Primary Configuration File:** `/coordination/skills_config.json`
+**Primary Configuration File:** `/bazinga/skills_config.json`
 
 **Current State:**
 ```json
@@ -160,7 +160,7 @@ Location: `agents/orchestrator.md:700-850`
 
 **Conditional Spawning Logic:**
 ```python
-skills_config = read_json("coordination/skills_config.json")
+skills_config = read_json("bazinga/skills_config.json")
 qa_skills = skills_config["qa_expert"]
 
 # Check if pattern-miner or quality-dashboard are mandatory
@@ -178,22 +178,22 @@ IF qa_skills["pattern-miner"] == "mandatory" OR
 Created by: `scripts/init-orchestration.sh`
 
 **Permanent Configuration:**
-- `/coordination/skills_config.json` - Skills enable/disable (TRACKED IN GIT)
+- `/bazinga/skills_config.json` - Skills enable/disable (TRACKED IN GIT)
 
 **Temporary State Files** (not tracked in git):
-- `/coordination/pm_state.json` - PM's persistent state
-- `/coordination/group_status.json` - Per-group progress
-- `/coordination/orchestrator_state.json` - Orchestrator state
-- `/coordination/messages/*.json` - Inter-agent messages
+- `/bazinga/pm_state.json` - PM's persistent state
+- `/bazinga/group_status.json` - Per-group progress
+- `/bazinga/orchestrator_state.json` - Orchestrator state
+- `/bazinga/messages/*.json` - Inter-agent messages
 
 **Skills Results:**
-- `coordination/lint_results.json`
-- `coordination/coverage_report.json`
-- `coordination/security_scan.json`
-- `coordination/codebase_analysis_results.json`
-- `coordination/test_pattern_results.json`
-- `coordination/pattern_insights.json`
-- `coordination/quality_dashboard.json`
+- `bazinga/lint_results.json`
+- `bazinga/coverage_report.json`
+- `bazinga/security_scan.json`
+- `bazinga/codebase_analysis_results.json`
+- `bazinga/test_pattern_results.json`
+- `bazinga/pattern_insights.json`
+- `bazinga/quality_dashboard.json`
 
 ---
 
@@ -250,7 +250,7 @@ Tests Created? (integration/contract/E2E)
 
 **Pattern 1: Mandatory vs Disabled Skills**
 
-Location: `/coordination/skills_config.json`
+Location: `/bazinga/skills_config.json`
 
 Current pattern:
 ```json
@@ -290,8 +290,8 @@ Example:
 
 **Pattern 4: Skills Results Storage**
 
-All Skills write JSON to `coordination/` with standardized format:
-- `coordination/<skill>_results.json` or `coordination/<skill>_report.json`
+All Skills write JSON to `bazinga/` with standardized format:
+- `bazinga/<skill>_results.json` or `bazinga/<skill>_report.json`
 - Includes timestamp, tool used, findings, suggestions
 - Agents read and process results before continuing
 
@@ -515,7 +515,7 @@ Balanced approach with three testing levels:
 
 ```bash
 # Create/update testing framework configuration
-cat > coordination/testing_config.json << 'EOF'
+cat > bazinga/testing_config.json << 'EOF'
 {
   "_testing_framework": {
     "enabled": true,
@@ -575,7 +575,7 @@ You are configuring the BAZINGA testing framework. This controls how much testin
 
 Read and display:
 ```bash
-cat coordination/testing_config.json | jq '._testing_framework'
+cat bazinga/testing_config.json | jq '._testing_framework'
 ```
 
 ## Testing Modes
@@ -658,7 +658,7 @@ Ask the user which preset they want:
 
 ## Update Configuration
 
-Use Write tool to update `coordination/testing_config.json` with the selected preset.
+Use Write tool to update `bazinga/testing_config.json` with the selected preset.
 
 ## ⚠️ Important Warnings
 
@@ -700,7 +700,7 @@ Add after loading `skills_config.json`:
 3. **Load Testing Framework Configuration:**
 
 ```bash
-testing_config=$(cat coordination/testing_config.json)
+testing_config=$(cat bazinga/testing_config.json)
 testing_enabled=$(echo "$testing_config" | jq -r '._testing_framework.enabled')
 testing_mode=$(echo "$testing_config" | jq -r '._testing_framework.mode')
 qa_enabled=$(echo "$testing_config" | jq -r '._testing_framework.qa_workflow.enable_qa_expert')
@@ -764,8 +764,8 @@ Wrap QA spawning in conditional:
 **Read developer status and testing config:**
 
 ```bash
-dev_status=$(cat coordination/messages/developer_to_orchestrator.json | jq -r '.status')
-qa_enabled=$(cat coordination/testing_config.json | jq -r '._testing_framework.qa_workflow.enable_qa_expert')
+dev_status=$(cat bazinga/messages/developer_to_orchestrator.json | jq -r '.status')
+qa_enabled=$(cat bazinga/testing_config.json | jq -r '._testing_framework.qa_workflow.enable_qa_expert')
 ```
 
 **Routing Decision:**
@@ -783,7 +783,7 @@ IF dev_status == "READY_FOR_QA" AND qa_enabled == true:
 
 ELIF dev_status == "READY_FOR_QA" AND qa_enabled == false:
     # Testing disabled - route directly to Tech Lead
-    WRITE coordination/messages/orchestrator_to_developer.json:
+    WRITE bazinga/messages/orchestrator_to_developer.json:
     {
         "message": "Testing framework disabled - routing directly to Tech Lead",
         "bypassed_qa": true,
@@ -812,7 +812,7 @@ ELIF dev_status == "READY_FOR_REVIEW":
 **Before starting work, understand the testing requirements:**
 
 ```bash
-testing_config=$(cat coordination/testing_config.json | jq '._testing_framework')
+testing_config=$(cat bazinga/testing_config.json | jq '._testing_framework')
 testing_mode=$(echo "$testing_config" | jq -r '.mode')
 qa_enabled=$(echo "$testing_config" | jq -r '.qa_workflow.enable_qa_expert')
 unit_tests_required=$(echo "$testing_config" | jq -r '.pre_commit_validation.unit_tests')
@@ -877,9 +877,9 @@ Update routing logic:
 
 **Read testing configuration:**
 ```bash
-testing_mode=$(cat coordination/testing_config.json | jq -r '._testing_framework.mode')
-qa_enabled=$(cat coordination/testing_config.json | jq -r '._testing_framework.qa_workflow.enable_qa_expert')
-auto_route_to_qa=$(cat coordination/testing_config.json | jq -r '._testing_framework.qa_workflow.auto_route_to_qa')
+testing_mode=$(cat bazinga/testing_config.json | jq -r '._testing_framework.mode')
+qa_enabled=$(cat bazinga/testing_config.json | jq -r '._testing_framework.qa_workflow.enable_qa_expert')
+auto_route_to_qa=$(cat bazinga/testing_config.json | jq -r '._testing_framework.qa_workflow.auto_route_to_qa')
 ```
 
 **Routing Logic:**
@@ -891,7 +891,7 @@ IF testing_mode in ["disabled", "minimal"] OR qa_enabled == false:
     next_agent = "Tech Lead"
     reason = "Testing framework disabled or QA workflow skipped"
 
-    WRITE coordination/messages/developer_to_orchestrator.json:
+    WRITE bazinga/messages/developer_to_orchestrator.json:
     {
         "status": "READY_FOR_REVIEW",
         "next_step": "Route to Tech Lead",
@@ -906,7 +906,7 @@ ELIF testing_mode == "full" AND created_integration_tests == true AND qa_enabled
     status = "READY_FOR_QA"
     next_agent = "QA Expert"
 
-    WRITE coordination/messages/developer_to_orchestrator.json:
+    WRITE bazinga/messages/developer_to_orchestrator.json:
     {
         "status": "READY_FOR_QA",
         "next_step": "Route to QA Expert",
@@ -920,7 +920,7 @@ ELIF testing_mode == "full" AND created_integration_tests == false:
     status = "READY_FOR_REVIEW"
     next_agent = "Tech Lead"
 
-    WRITE coordination/messages/developer_to_orchestrator.json:
+    WRITE bazinga/messages/developer_to_orchestrator.json:
     {
         "status": "READY_FOR_REVIEW",
         "next_step": "Route to Tech Lead",
@@ -961,8 +961,8 @@ Make test-coverage skill conditional:
 
 **Read testing configuration:**
 ```bash
-testing_mode=$(cat coordination/testing_config.json | jq -r '._testing_framework.mode')
-test_coverage_skill=$(cat coordination/skills_config.json | jq -r '.tech_lead."test-coverage"')
+testing_mode=$(cat bazinga/testing_config.json | jq -r '._testing_framework.mode')
+test_coverage_skill=$(cat bazinga/skills_config.json | jq -r '.tech_lead."test-coverage"')
 ```
 
 **Run applicable skills:**
@@ -979,7 +979,7 @@ test_coverage_skill=$(cat coordination/skills_config.json | jq -r '.tech_lead."t
    Skill(command: "test-coverage")
    ```
 
-   Read and analyze `coordination/coverage_report.json`
+   Read and analyze `bazinga/coverage_report.json`
 {ENDIF}
 
 {IF testing_mode != "full"}
@@ -1006,7 +1006,7 @@ You are ONLY spawned when:
 **Testing Configuration Awareness:**
 
 ```bash
-testing_config=$(cat coordination/testing_config.json | jq '._testing_framework')
+testing_config=$(cat bazinga/testing_config.json | jq '._testing_framework')
 ```
 
 If testing framework is in "minimal" or "disabled" mode, you will NOT be spawned.

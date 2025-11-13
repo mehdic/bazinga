@@ -31,11 +31,11 @@ clients = []
 
 # Base paths
 BASE_DIR = Path(__file__).parent.parent
-COORDINATION_DIR = BASE_DIR / 'coordination'
+BAZINGA_DIR = BASE_DIR / 'bazinga'
 DOCS_DIR = BASE_DIR / 'docs'
-ARCHIVE_DIR = COORDINATION_DIR / 'archive'
-CONFIG_DIR = COORDINATION_DIR
-DB_PATH = COORDINATION_DIR / 'bazinga.db'
+ARCHIVE_DIR = BAZINGA_DIR / 'archive'
+CONFIG_DIR = BAZINGA_DIR
+DB_PATH = BAZINGA_DIR / 'bazinga.db'
 
 # Initialize database connection
 db = None
@@ -75,7 +75,7 @@ class CoordinationWatcher(FileSystemEventHandler):
         # Broadcast update to all clients
         try:
             print(f"📡 Broadcasting database update")
-            data = load_coordination_data()
+            data = load_bazinga_data()
             broadcast_to_clients(data)
             print(f"✅ Broadcasted successfully (clients: {len(clients)})")
         except Exception as e:
@@ -126,7 +126,7 @@ def get_current_session_id():
         print(f"⚠️  Error getting current session: {e}")
         return None
 
-def load_coordination_data():
+def load_bazinga_data():
     """Load all coordination state from database."""
     global db
 
@@ -288,7 +288,7 @@ def serve_static(path):
 @app.route('/api/data')
 def get_data():
     """Get all coordination data."""
-    data = load_coordination_data()
+    data = load_bazinga_data()
     return jsonify(data)
 
 @app.route('/api/log')
@@ -316,7 +316,7 @@ def generate_ai_diagram():
 
     try:
         # Get current state
-        data = load_coordination_data()
+        data = load_bazinga_data()
 
         # Get API key from environment
         api_key = os.environ.get('ANTHROPIC_API_KEY')
@@ -724,7 +724,7 @@ def generate_session_diff(session1, session2):
 def get_timeline():
     """Get timeline data for agent execution visualization."""
     try:
-        data = load_coordination_data()
+        data = load_bazinga_data()
         log = load_orchestration_log()
         timeline = []
 
@@ -884,7 +884,7 @@ def websocket(ws):
     try:
         # Send initial data
         print(f"📤 Sending initial data to client...")
-        data = load_coordination_data()
+        data = load_bazinga_data()
         ws.send(json.dumps(data))
         print(f"✅ Initial data sent successfully")
 
@@ -906,15 +906,15 @@ def websocket(ws):
 
 def start_file_watcher():
     """Start watching database file for changes."""
-    if not COORDINATION_DIR.exists():
-        print(f"⚠️  Coordination folder not found: {COORDINATION_DIR}")
+    if not BAZINGA_DIR.exists():
+        print(f"⚠️  Coordination folder not found: {BAZINGA_DIR}")
         print("   Dashboard will start, but won't receive updates.")
         return
 
     print(f"\n{'='*60}")
     print(f"🔍 Setting up database watcher...")
     print(f"{'='*60}")
-    print(f"📁 Watching directory: {COORDINATION_DIR.absolute()}")
+    print(f"📁 Watching directory: {BAZINGA_DIR.absolute()}")
     print(f"📊 Database file: {DB_PATH.name}")
 
     if DB_PATH.exists():
@@ -924,7 +924,7 @@ def start_file_watcher():
 
     event_handler = CoordinationWatcher()
     observer = Observer()
-    observer.schedule(event_handler, str(COORDINATION_DIR), recursive=False)
+    observer.schedule(event_handler, str(BAZINGA_DIR), recursive=False)
     observer.start()
     print(f"✅ Database watcher started successfully")
     print(f"{'='*60}\n")
@@ -941,7 +941,7 @@ def main():
     print("=" * 60)
     print(f"📡 Server: http://localhost:{port}")
     print(f"🌐 Dashboard: http://localhost:{port}/")
-    print(f"📁 Coordination: {COORDINATION_DIR}")
+    print(f"📁 Coordination: {BAZINGA_DIR}")
     print(f"🗄️  Database: {DB_PATH}")
     print("=" * 60)
 
