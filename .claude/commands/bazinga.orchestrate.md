@@ -145,25 +145,35 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**FIRST ACTION - Run Initialization Script:**
+**FIRST ACTION - Initialize Database Session:**
 
-**IMPORTANT:** Run this synchronously (do NOT use run_in_background). The script completes in 1-2 seconds.
+Create a new orchestration session in the database. The database will be automatically initialized by the bazinga-db skill on first use.
 
+**Generate session ID:**
 ```bash
-# This script creates all required coordination files if they don't exist
-# Safe to run multiple times (idempotent)
-bash .claude/scripts/init-orchestration.sh
+SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
 ```
 
-**What this script does (completes in ~1-2 seconds):**
-- Creates `coordination/` folder structure if it doesn't exist
-- Initializes all state files (pm_state.json, group_status.json, orchestrator_state.json, skills_config.json, testing_config.json)
-- Creates message exchange files
-- Initializes orchestration log
-- Starts dashboard server in background (if not already running)
-- Skips files that already exist (idempotent)
+**Request to bazinga-db skill:**
+```
+bazinga-db, please create a new orchestration session:
 
-**After the script completes, proceed immediately to SECOND ACTION.**
+Session ID: $SESSION_ID
+Mode: [will be determined by PM]
+Requirements: [User's requirements from input]
+```
+
+**Then invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+The bazinga-db skill will:
+- Automatically initialize the database if it doesn't exist (< 2 seconds)
+- Create the new session record
+- Return confirmation
+
+**After session is created, proceed immediately to SECOND ACTION.**
 
 **SECOND ACTION - Read Skills Configuration:**
 
