@@ -56,6 +56,7 @@ No manual initialization needed - just invoke the skill and it handles everythin
 Extract from the calling agent's request:
 
 **Operation type:**
+- "create session" / "new session" / "initialize session" → create-session
 - "log interaction" / "save log" → log-interaction
 - "save PM state" / "save orchestrator state" → save-state
 - "get state" / "retrieve state" → get-state
@@ -85,6 +86,26 @@ Extract from the calling agent's request:
 ## Step 2: Execute Database Command
 
 Use the **Bash** tool to run the appropriate command:
+
+### Session Management
+
+**Create new session:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
+  "<session_id>" \
+  "<mode>" \
+  "<requirements>"
+```
+
+Example:
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
+  "bazinga_20250113_143530" \
+  "simple" \
+  "User's requirements for this orchestration"
+```
+
+**IMPORTANT:** This command will auto-initialize the database if it doesn't exist. No separate initialization needed!
 
 ### Common Operations
 
@@ -144,16 +165,18 @@ SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
 
 ## Step 3: Return Formatted Response
 
-**For write operations:**
-Return concise confirmation:
+**For successful operations:**
+
+Write operations - return concise confirmation:
 ```
+✓ Session created: bazinga_20250113_143530
+✓ Database auto-initialized at coordination/bazinga.db
 ✓ Logged PM interaction (iteration 1)
 ✓ Saved orchestrator state
 ✓ Updated task group: group_a → completed
 ```
 
-**For read operations:**
-Use the **Read** tool if needed to parse JSON, then format for readability:
+Read operations - format for readability:
 ```
 Current PM State (as of [timestamp]):
 - Mode: parallel
@@ -162,6 +185,36 @@ Current PM State (as of [timestamp]):
 
 [Formatted data]
 ```
+
+**For failed operations:**
+
+ALWAYS capture and return the full error output from bash commands:
+```
+❌ Database operation failed
+
+Command:
+python3 /path/to/bazinga_db.py --db /path/to/bazinga.db create-session ...
+
+Error Output:
+[Full stderr from the command]
+
+Exit Code: [code]
+
+Possible causes:
+- Database file permission denied
+- Invalid session_id format
+- Missing init_db.py script
+- Python dependencies not installed
+- Disk space full
+
+The orchestrator MUST see this error to diagnose the issue.
+```
+
+**Error detection:**
+- Check bash command exit code (non-zero = failure)
+- Capture both stdout and stderr
+- Include command that failed
+- Return detailed error message to calling agent
 
 **For errors:**
 Provide actionable guidance:
