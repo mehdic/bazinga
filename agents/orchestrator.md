@@ -379,570 +379,71 @@ ELSE IF PM chose "parallel":
 ---
 ## Phase 2A: Simple Mode Execution
 
-**UI Message:** Output when entering Phase 2A:
+**UI Message:**
 ```
 🚀 **ORCHESTRATOR**: Phase 2A - Starting simple mode execution
 ```
 
-### Step 2A.0: Prepare Code Context (Before Spawning Developer)
+### Step 2A.0: Prepare Code Context
 
 **UI Message:**
 ```
 🔍 **ORCHESTRATOR**: Analyzing codebase for similar patterns and utilities...
 ```
 
-**Extract keywords from task:**
-```python
-task_description = PM's task group details
-keywords = extract_keywords(task_description)
-# Example: "Implement password reset" → ["password", "reset", "endpoint", "email"]
-```
+Extract keywords from PM's task description and find similar files (limit to top 3). Read common utility directories (utils/, helpers/, lib/, services/).
 
-**Find similar files (simple heuristic):**
-```python
-similar_files = []
-for file in list_files("."):
-    if any(keyword in file.lower() for keyword in keywords):
-        similar_files.append(file)
-
-# Limit to top 3 most relevant
-similar_files = similar_files[:3]
-```
-
-**Build context section:**
-```python
-code_context = f"""
-
-═══════════════════════════════════════════
-📚 CODEBASE CONTEXT (Similar Code & Utilities)
-═══════════════════════════════════════════
-
-"""
-
-# Add similar files
-for file in similar_files:
-    content = read_first_50_lines(file)
-    code_context += f"**Similar code: {file}**\n```\n{content}\n```\n\n"
-
-# Add common utilities (if they exist)
-common_utils = ["utils/", "helpers/", "lib/", "services/"]
-for util_dir in common_utils:
-    if exists(util_dir):
-        code_context += f"**Available utilities in {util_dir}/**\n"
-        code_context += list_files(util_dir) + "\n\n"
-
-code_context += "═══════════════════════════════════════════\n\n"
-```
+Build code context section with similar files and available utilities for developer prompt.
 
 ### Step 2A.1: Spawn Single Developer
 
-**UI Message:** Output before spawning:
+**UI Message:**
 ```
 👨‍💻 **ORCHESTRATOR**: Spawning Developer for implementation...
 ```
 
-**CRITICAL: Build Developer Prompt with Skills Configuration**
+Build developer prompt using `coordination/templates/prompt_building.md`:
+- Base: Role, group (main), mode (Simple)
+- Code context from Step 2A.0
+- Testing framework section (from testing_config.json)
+- Advanced skills section (from skills_config.json):
+  - Skill(command: "codebase-analysis")
+  - Skill(command: "test-pattern-analysis")
+  - Skill(command: "lint-check")
+  - Skill(command: "api-contract-validation")
+  - Skill(command: "db-migration-check")
+  Reference skill SKILL.md files for details
+- Mandatory workflow with skill invocations:
+  - BEFORE implementing: Skill(command: "codebase-analysis")
+  - BEFORE writing tests: Skill(command: "test-pattern-analysis")
+  - BEFORE reporting: Skill(command: "lint-check")
+  - IF API changes: Skill(command: "api-contract-validation")
+  - IF migration changes: Skill(command: "db-migration-check")
+- Report format
 
-**Step 1: Read Skills Configuration**
-```bash
-cat coordination/skills_config.json
+See `agents/developer.md` for full developer agent definition.
+
+**Spawn:**
 ```
-
-Store the configuration values:
-- `lint_check_mandatory` = true/false (check if developer.lint-check == "mandatory")
-- `codebase_analysis_mandatory` = true/false
-- `test_pattern_analysis_mandatory` = true/false
-- `api_contract_validation_mandatory` = true/false
-- `db_migration_check_mandatory` = true/false
-
-**Step 1.5: Read Testing Framework Configuration**
-```bash
-cat coordination/testing_config.json
-```
-
-Store the testing framework configuration values:
-- `testing_mode` = "full" | "minimal" | "disabled"
-- `testing_enabled` = true/false
-- `qa_expert_enabled` = true/false
-- `lint_check_required` = true/false (from pre_commit_validation.lint_check)
-- `unit_tests_required` = true/false (from pre_commit_validation.unit_tests)
-- `build_check_required` = true/false (from pre_commit_validation.build_check)
-
-**Step 2: Build Base Prompt**
-
-Start with base prompt:
-```
-You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
-
-**GROUP:** main
-**MODE:** Simple (you're the only developer)
-
-[INSERT code_context here - similar files, utilities]
-
-**REQUIREMENTS:**
-[INSERT PM's task group details]
-[INSERT User's original requirements]
-
-**TESTING FRAMEWORK CONFIGURATION:**
-**Mode:** {testing_mode}  # full | minimal | disabled
-**QA Expert:** {qa_expert_enabled}  # Will QA Expert review your work?
-
-{IF testing_mode == "disabled"}
-⚠️  **TESTING FRAMEWORK DISABLED (Prototyping Mode)**
-- Only lint checks are required
-- No test implementation needed
-- You will route directly to Tech Lead (skip QA)
-- Focus on rapid iteration
-{ENDIF}
-
-{IF testing_mode == "minimal"}
-📋 **MINIMAL TESTING MODE (Fast Development)**
-- Lint checks + unit tests required
-- No integration/contract/E2E tests needed
-- You will route directly to Tech Lead (skip QA Expert)
-- Focus on fast iteration with basic quality checks
-{ENDIF}
-
-{IF testing_mode == "full"}
-✅ **FULL TESTING MODE (Production Quality)**
-- All test types may be required
-- QA Expert will review if you create integration/contract/E2E tests
-- Route to QA Expert if integration tests exist, else Tech Lead
-- Standard BAZINGA workflow applies
-{ENDIF}
-
-**Pre-Commit Validation Requirements:**
-- Lint Check: {lint_check_required}
-- Unit Tests: {unit_tests_required}
-- Build Check: {build_check_required}
-
-**Use /bazinga.configure-testing to view or modify testing requirements**
-```
-
-**Step 3: Add Skills Section (if ANY advanced skills are mandatory)**
-
-IF `codebase_analysis_mandatory OR test_pattern_analysis_mandatory OR api_contract_validation_mandatory OR db_migration_check_mandatory` is true:
-
-Add this section to prompt:
-```
-═══════════════════════════════════════════
-⚡ ADVANCED SKILLS ACTIVE
-═══════════════════════════════════════════
-
-You have access to the following Skills (configured via /configure-skills):
-
-[For each mandatory advanced skill, add its documentation]
-```
-
-Then for EACH mandatory skill, add:
-
-IF `codebase_analysis_mandatory`:
-```
-1. **Codebase Analysis Skill**: Run BEFORE coding
-   Skill(command: "codebase-analysis")
-   Returns: Similar features, utilities, architectural patterns
-```
-
-IF `test_pattern_analysis_mandatory`:
-```
-2. **Test Pattern Analysis Skill**: Run BEFORE writing tests
-   Skill(command: "test-pattern-analysis")
-   Returns: Test framework, fixtures, patterns, suggestions
-```
-
-IF `api_contract_validation_mandatory`:
-```
-3. **API Contract Validation Skill**: Run BEFORE committing API changes
-   Skill(command: "api-contract-validation")
-   Returns: Breaking changes, safe changes, recommendations
-```
-
-IF `db_migration_check_mandatory`:
-```
-4. **DB Migration Check Skill**: Run BEFORE committing migrations
-   Skill(command: "db-migration-check")
-   Returns: Dangerous operations, safe alternatives, impact analysis
-```
-
-End with:
-```
-USE THESE SKILLS for better implementation quality!
-═══════════════════════════════════════════
-```
-
-**Step 4: Add Mandatory Workflow Section**
-
-Start with:
-```
-**MANDATORY WORKFLOW:**
-
-BEFORE Implementing:
-1. Review codebase context above
-```
-
-IF `codebase_analysis_mandatory`, add:
-```
-2. **INVOKE Codebase Analysis Skill (MANDATORY):**
-   Skill(command: "codebase-analysis")
-   Read results: cat coordination/codebase_analysis_results.json
-   Use patterns found to guide implementation
-```
-
-Continue with:
-```
-During Implementation:
-3. Implement the COMPLETE solution
-4. Write unit tests
-```
-
-IF `test_pattern_analysis_mandatory`, add:
-```
-5. **INVOKE Test Pattern Analysis Skill (MANDATORY):**
-   Skill(command: "test-pattern-analysis")
-   Read results: cat coordination/test_pattern_results.json
-   Follow test patterns found
-```
-
-Continue with:
-```
-BEFORE Reporting READY_FOR_QA:
-6. Run ALL unit tests - MUST pass 100%
-```
-
-IF `lint_check_mandatory`, add:
-```
-7. **INVOKE lint-check Skill (MANDATORY):**
-   Skill(command: "lint-check")
-   Read results: cat coordination/lint_results.json
-   FIX ALL ISSUES before proceeding
-```
-
-Continue with:
-```
-8. Run build check - MUST succeed
-```
-
-IF `api_contract_validation_mandatory`, add:
-```
-9. **INVOKE API Contract Validation (MANDATORY if API changes):**
-   Skill(command: "api-contract-validation")
-   Read results: cat coordination/api_contract_results.json
-```
-
-IF `db_migration_check_mandatory`, add:
-```
-10. **INVOKE DB Migration Check (MANDATORY if migration changes):**
-    Skill(command: "db-migration-check")
-    Read results: cat coordination/db_migration_results.json
-```
-
-End with:
-```
-ONLY THEN:
-11. Commit to branch: [branch_name]
-12. Report: READY_FOR_QA
-
-**YOUR JOB:**
-1. Follow mandatory workflow above
-2. Implement complete solution
-3. Ensure ALL checks pass before reporting
-
-**REPORT FORMAT:**
-## Implementation Complete
-
-**Summary:** [One sentence]
-
-**Files Modified:**
-- file1.py (created/modified)
-- file2.py (created/modified)
-
-**Branch:** [branch_name]
-
-**Commits:**
-- abc123: Description
-
-**Unit Tests:**
-- Total: X
-- Passing: X
-- Failing: 0
-
-**Skills Executed:**
-[List each Skill that ran: lint-check, codebase-analysis, etc.]
-
-**Status:** READY_FOR_QA
-
-START IMPLEMENTING NOW.
-```
-
-**Step 5: Call Task Tool with Built Prompt**
-
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "Developer implementing main task group",
-  prompt: [THE PROMPT YOU BUILT IN STEPS 2-4]
-)
+Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt])
 ```
 
 ### Step 2A.2: Receive Developer Response
 
-**UI Message:** Output after receiving response:
+**UI Message:**
 ```
 📨 **ORCHESTRATOR**: Received status from Developer: [STATUS]
 ```
 
-Examples:
-- "📨 **ORCHESTRATOR**: Received status from Developer: READY_FOR_QA"
-- "📨 **ORCHESTRATOR**: Received status from Developer: BLOCKED"
-
-**🔴 CRITICAL - LOG THIS INTERACTION TO DATABASE:**
-
-IMMEDIATELY invoke the **bazinga-db skill** to log this interaction:
-
-**Request to bazinga-db skill:**
+**Log developer interaction:**
 ```
 bazinga-db, please log this developer interaction:
 
-Session ID: [current session_id]
+Session ID: [session_id]
 Agent Type: developer
-Content: [Full Developer response text]
-Iteration: [current iteration number]
-Agent ID: developer_1
-```
-
-**Then invoke the skill:**
-```
-Skill(command: "bazinga-db")
-```
-
-The bazinga-db skill will read your request above and handle database storage automatically.
-
-**⚠️ MANDATORY: Log BEFORE proceeding to next step!**
-
-Developer returns status: READY_FOR_QA / BLOCKED / INCOMPLETE
-
-### Step 2A.3: Route Developer Response
-
-**🚨 ROLE CHECK BEFORE ROUTING:**
-```
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-```
-
-**⚠️ ANTI-PATTERN WARNING:**
-- ❌ DO NOT tell developer what to do next
-- ❌ DO NOT give implementation instructions
-- ❌ DO NOT skip to PM or next phase
-- ✅ LOOK UP response in Decision Table (Section: Routing Decision Table)
-- ✅ SPAWN the agent specified in table
-
-**UI Messages:** Output routing decision:
-```
-IF status == "READY_FOR_QA":
-    # Check testing configuration first
-    testing_config = read_json("coordination/testing_config.json")
-    qa_expert_enabled = testing_config["_testing_framework"]["qa_workflow"]["enable_qa_expert"]
-    testing_mode = testing_config["_testing_framework"]["mode"]
-
-    IF qa_expert_enabled == true:
-        Output: "✅ **ORCHESTRATOR**: Developer complete - forwarding to QA Expert for testing..."
-        → Spawn QA Expert (Step 2A.4)
-    ELSE:
-        Output: "ℹ️  **ORCHESTRATOR**: QA Expert disabled (testing mode: {testing_mode})"
-        Output: "   Routing directly to Tech Lead for review..."
-        → Spawn Tech Lead (Step 2A.5) with note: "QA_SKIPPED: Testing framework in {testing_mode} mode"
-
-ELSE IF status == "BLOCKED":
-    Output: "⚠️ **ORCHESTRATOR**: Developer blocked - forwarding to Tech Lead for unblocking..."
-    → Spawn Tech Lead for unblocking
-    → Tech Lead provides solutions
-    Output: "🔄 **ORCHESTRATOR**: Forwarding Tech Lead's solution back to Developer..."
-    → Spawn Developer again with solutions
-
-ELSE IF status == "INCOMPLETE":
-    Output: "⚠️ **ORCHESTRATOR**: Developer needs guidance - forwarding to Tech Lead..."
-    → Spawn Tech Lead for guidance
-    → Tech Lead provides direction
-    Output: "🔄 **ORCHESTRATOR**: Forwarding Tech Lead's guidance back to Developer..."
-    → Spawn Developer again with guidance
-```
-
-### Step 2A.4: Spawn QA Expert
-
-**UI Message:** Output before spawning:
-```
-🧪 **ORCHESTRATOR**: Spawning QA Expert to run integration, contract, and e2e tests...
-```
-
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "QA Expert testing main group",
-  prompt: """
-You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
-
-**GROUP:** main
-
-**DEVELOPER HANDOFF:**
-{Full developer response}
-
-**BRANCH:** {branch_name}
-
-**SKILLS CONFIGURATION:**
-
-{Read skills_config.json to determine which Skills are active for QA Expert}
-skills_config = read_json("coordination/skills_config.json")
-qa_skills = skills_config["qa_expert"]
-
-{IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}:
-═══════════════════════════════════════════
-⚡ ADVANCED SKILLS ACTIVE
-═══════════════════════════════════════════
-
-BEFORE running tests, you MUST invoke quality analysis Skills:
-
-{IF qa_skills["pattern-miner"] == "mandatory"}:
-**STEP 1: Invoke pattern-miner (MANDATORY)**
-```
-Skill(command: "pattern-miner")
-```
-Read results: `cat coordination/pattern_insights.json`
-Use insights to identify high-risk areas from historical failures
-{END IF}
-
-{IF qa_skills["quality-dashboard"] == "mandatory"}:
-**STEP 2: Invoke quality-dashboard (MANDATORY)**
-```
-Skill(command: "quality-dashboard")
-```
-Read results: `cat coordination/quality_dashboard.json`
-Get baseline health score and quality trends
-{END IF}
-
-**STEP 3: Prioritize testing based on insights**
-- Focus on modules with historical test failures
-- Extra scrutiny for declining quality areas
-- Validate fixes for recurring issues
-
-═══════════════════════════════════════════
-{END IF}
-
-**YOUR JOB:**
-{IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}:
-1. Run mandatory quality analysis Skills FIRST
-2. Use insights to prioritize testing focus
-3. Checkout branch: git checkout {branch_name}
-{ELSE}:
-1. Checkout branch: git checkout {branch_name}
-{END IF}
-4. Run Integration Tests
-5. Run Contract Tests
-6. Run E2E Tests
-7. Aggregate results
-8. Report PASS or FAIL
-
-**REPORT FORMAT:**
-
-## QA Expert: Test Results - [PASS/FAIL]
-
-{IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}:
-### Quality Analysis
-{IF qa_skills["pattern-miner"] == "mandatory"}:
-**Pattern Insights:** [Summary from pattern-miner]
-{END IF}
-{IF qa_skills["quality-dashboard"] == "mandatory"}:
-**Health Score:** [Score from quality-dashboard]
-**Risk Areas:** [Areas flagged for extra testing]
-{END IF}
-
-{END IF}
-
-### Test Summary
-**Integration Tests:** X/Y passed
-**Contract Tests:** X/Y passed
-**E2E Tests:** X/Y passed
-**Total:** X/Y passed
-
-[If PASS]: Ready for Tech Lead review
-[If FAIL]: Detailed failures with fix suggestions
-
-START {IF qa_skills["pattern-miner"] == "mandatory" OR qa_skills["quality-dashboard"] == "mandatory"}QUALITY ANALYSIS AND {END IF}TESTING NOW.
-  """
-)
-```
-
-### Step 2A.5: Route QA Response
-
-**🚨 ROLE CHECK BEFORE ROUTING:**
-```
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-```
-
-**⚠️ ANTI-PATTERN WARNING:**
-- ❌ DO NOT tell developer how to fix tests
-- ❌ DO NOT skip Tech Lead review if tests pass
-- ✅ LOOK UP response in Decision Table
-- ✅ SPAWN the agent specified in table
-
-**UI Message:** Output after receiving QA response:
-```
-📨 **ORCHESTRATOR**: Received test results from QA Expert: [PASS/FAIL]
-```
-
-**🔴 CRITICAL - LOG THIS INTERACTION TO DATABASE:**
-
-IMMEDIATELY invoke the **bazinga-db skill** to log this interaction:
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please log this QA interaction:
-
-Session ID: [current session_id]
-Agent Type: qa
-Content: [Full QA response text]
-Iteration: [current iteration number]
-Agent ID: qa_expert
-```
-
-**Then invoke the skill:**
-```
-Skill(command: "bazinga-db")
-```
-
-The bazinga-db skill will read your request above and handle database storage automatically.
-
-**⚠️ MANDATORY: Log BEFORE routing based on test results!**
-
-**UI Messages:** Output routing decision:
-```
-IF result == "PASS":
-    Output: "✅ **ORCHESTRATOR**: All tests passed - forwarding to Tech Lead for code review..."
-    → Spawn Tech Lead for review (Step 2A.6)
-
-ELSE IF result == "FAIL":
-    Output: "❌ **ORCHESTRATOR**: Tests failed - forwarding failures back to Developer for fixes..."
-    → Spawn Developer with QA failures
-    → Developer fixes issues
-    Output: "🔄 **ORCHESTRATOR**: Developer fixed issues - sending back to QA Expert for re-testing..."
-    → Loop back to QA (Step 2A.4)
-```
-
-### Step 2A.6: Spawn Tech Lead for Review
-
-**HYBRID APPROACH: Read Tech Lead File + Inject Skill Logic**
-
-**Step 1: Read Tech Lead base instructions**
-```python
-tech_lead_base = read_file("agents/techlead.md")
-```
-
-**Step 2: Get task group from database for revision count**
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please get task group information:
-
-Session ID: [current session_id]
-Group ID: [current group_id]
+Content: [Developer response]
+Iteration: [iteration]
+Agent ID: dev_main
 ```
 
 **Then invoke:**
@@ -950,375 +451,199 @@ Group ID: [current group_id]
 Skill(command: "bazinga-db")
 ```
 
-Parse the returned task group data to extract `revision_count` (defaults to 0 if not found).
+### Step 2A.3: Route Developer Response
 
-**Step 3: Determine Model and Security Scan Mode**
-```python
-# Model escalation at revision 3+
-if revision_count >= 3:
-    model_to_use = "opus"
-    model_reason = f"(Revision #{revision_count} - Using Opus for persistent issue)"
-else:
-    model_to_use = "sonnet"
-    model_reason = f"(Revision #{revision_count} - Using Sonnet)"
+**IF Developer reports READY_FOR_QA:**
+- Check testing_config.json for qa_expert_enabled
+- IF QA enabled → Proceed to Step 2A.4 (Spawn QA)
+- IF QA disabled → Skip to Step 2A.6 (Spawn Tech Lead)
 
-# Security scan mode escalation at revision 2+
-if revision_count >= 2:
-    scan_mode = "advanced"
-    scan_description = "comprehensive, all severities"
-else:
-    scan_mode = "basic"
-    scan_description = "fast, high/medium severity"
+**IF Developer reports BLOCKED or INCOMPLETE:**
+- Provide specific feedback
+- Respawn developer with guidance
+- Track revision count in database
+- Escalate if >2 revisions
+
+### Step 2A.4: Spawn QA Expert
+
+**UI Message:**
+```
+🧪 **ORCHESTRATOR**: Spawning QA Expert for testing validation...
 ```
 
-**UI Message:** Output before spawning:
-```
-👔 **ORCHESTRATOR**: Spawning Tech Lead for code quality review...
-{IF revision_count >= 2}:
-    🔍 **ORCHESTRATOR**: Using advanced security scan (revision #{revision_count})...
-{IF revision_count >= 3}:
-    ⚡ **ORCHESTRATOR**: Escalating to Opus model (revision #{revision_count}) for deeper analysis...
-```
+Build QA prompt with developer's changes and test requirements.
 
-**Step 4: Read Skills Configuration for Tech Lead**
-```bash
-cat coordination/skills_config.json
+See `agents/qa_expert.md` for full QA agent definition.
+
+**Spawn:**
+```
+Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA prompt])
 ```
 
-Store configuration values:
-- `security_scan_mandatory` = true/false (check if tech_lead.security-scan == "mandatory")
-- `lint_check_mandatory` = true/false (check if tech_lead.lint-check == "mandatory")
-- `test_coverage_mandatory` = true/false (check if tech_lead.test-coverage == "mandatory")
-
-**Step 5: Build Skills Section for Tech Lead Prompt**
-
-Start building the skills section:
+**After QA completes, invoke quality skills:**
 
 ```
-═══════════════════════════════════════════════════════════
-**MANDATORY: RUN QUALITY SKILLS BEFORE REVIEW**
-═══════════════════════════════════════════════════════════
+pattern-miner, please analyze test patterns
+```
+**Then invoke:**
+```
+Skill(command: "pattern-miner")
 ```
 
-IF `security_scan_mandatory` is true, add:
 ```
-**STEP 1: Export scan mode for security-scan**
-export SECURITY_SCAN_MODE={scan_mode}
-
-**STEP 2: Invoke security-scan Skill (MANDATORY)**
-
-YOU MUST explicitly invoke the security-scan Skill:
-Skill(command: "security-scan")
-
-Wait for Skill to complete. This runs security scanners in {scan_mode} mode:
-- Mode: {scan_mode}
-- What it scans: {scan_description}
-- Time: {"5-10 seconds" if scan_mode == "basic" else "30-60 seconds"}
-
-**STEP 3: Read security scan results**
-cat coordination/security_scan.json
+quality-dashboard, please generate snapshot
+```
+**Then invoke:**
+```
+Skill(command: "quality-dashboard")
 ```
 
-IF `lint_check_mandatory` is true, add:
+**Log QA interaction:**
 ```
-**STEP 4: Invoke lint-check Skill (MANDATORY)**
+bazinga-db, please log this QA interaction:
 
-YOU MUST explicitly invoke the lint-check Skill:
-Skill(command: "lint-check")
-
-Wait for Skill to complete (3-10 seconds).
-
-**STEP 5: Read lint check results**
-cat coordination/lint_results.json
+Session ID: [session_id]
+Agent Type: qa_expert
+Content: [QA response]
+Iteration: [iteration]
+Agent ID: qa_main
 ```
 
-IF `test_coverage_mandatory` is true, add:
-```
-**STEP 6: Invoke test-coverage Skill (MANDATORY if tests exist)**
-
-If tests were modified or added, invoke test-coverage Skill:
-Skill(command: "test-coverage")
-
-Then read results:
-cat coordination/coverage_report.json 2>/dev/null || true
-```
-
-Then add:
-```
-**STEP 7: Use automated findings to guide your manual review**
-
-Review all Skill results BEFORE doing manual code review.
-
-═══════════════════════════════════════════════════════════
-```
-
-**Step 6: Build Enhanced Analysis Section (if revision >= 3)**
-
-IF `revision_count >= 3`, add:
-```
-⚠️ **ENHANCED ANALYSIS REQUIRED (OPUS MODEL)**
-
-This code has been revised {revision_count} times. Persistent issues detected.
-
-**Extra thorough review required:**
-- Look for subtle bugs or design flaws
-- Verify edge cases are handled
-- Check for architectural issues
-- Consider if the approach itself needs rethinking
-- Deep dive into security scan findings
-- Review historical patterns for this code area
-
-═══════════════════════════════════════════════════════════
-```
-
-**Step 7: Construct Full Tech Lead Prompt**
-
-```python
-tech_lead_full_prompt = tech_lead_base + f"""
-
-═══════════════════════════════════════════════════════════
-**CURRENT REVIEW CONTEXT - REVISION #{revision_count}**
-═══════════════════════════════════════════════════════════
-
-**Group ID:** {group_id}
-**Revision Count:** {revision_count}
-**Security Scan Mode:** {scan_mode} ({scan_description})
-**Model:** {model_to_use}
-
-**FILES TO REVIEW:**
-{list of modified files}
-
-**DEVELOPER IMPLEMENTATION:**
-{developer_summary}
-
-**QA TEST RESULTS (if applicable):**
-{qa_results}
-
-**BRANCH:** {branch_name}
-
-{skills_section_you_built_in_step_5}
-
-{enhanced_analysis_section_if_revision_3_plus}
-
-**NOW: START SECURITY SCAN AND REVIEW**
-"""
-
-# Spawn Tech Lead with combined prompt
-Task(
-  subagent_type: "general-purpose",
-  model: model_to_use,
-  description: f"Tech Lead reviewing {group_id} (revision {revision_count})",
-  prompt: tech_lead_full_prompt
-)
-
-# IMPORTANT: Model selection is per-agent only
-# The orchestrator continues using sonnet (default) after spawning tech lead
-# Only the tech lead agent uses the model specified above
-```
-
-**⚠️ CRITICAL: Model Scope**
-The `model: model_to_use` parameter above applies ONLY to the Tech Lead agent you just spawned.
-YOU (the orchestrator) continue using your default model (Sonnet 4.5).
-All future agent spawns use Sonnet 4.5 unless explicitly specified otherwise.
-
-### Step 2A.7: Route Tech Lead Response
-
-**🚨 ROLE CHECK BEFORE ROUTING:**
-```
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-```
-
-**⚠️ ANTI-PATTERN WARNING:**
-- ❌ DO NOT assign next work yourself (PM decides)
-- ❌ DO NOT tell developer what to fix
-- ❌ DO NOT skip PM check if approved
-- ✅ LOOK UP response in Decision Table
-- ✅ SPAWN PM if approved, spawn Developer if changes requested
-
-**UI Message:** Output after receiving Tech Lead response:
-```
-📨 **ORCHESTRATOR**: Received review from Tech Lead: [APPROVED/CHANGES_REQUESTED]
-```
-
-**🔴 CRITICAL - LOG THIS INTERACTION TO DATABASE:**
-
-IMMEDIATELY invoke the **bazinga-db skill** to log this interaction:
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please log this tech lead interaction:
-
-Session ID: [current session_id]
-Agent Type: tech_lead
-Content: [Full Tech Lead response text]
-Iteration: [current iteration number]
-Agent ID: tech_lead
-```
-
-**Then invoke the skill:**
+**Then invoke:**
 ```
 Skill(command: "bazinga-db")
 ```
 
-The bazinga-db skill will read your request above and handle database storage automatically.
+### Step 2A.5: Route QA Response
 
-**⚠️ MANDATORY: Log BEFORE updating group status and routing!**
+**IF QA approves:**
+- Proceed to Step 2A.6 (Spawn Tech Lead)
 
-**UI Messages:** Output routing decision:
+**IF QA requests changes:**
+- Respawn developer with QA feedback
+- Track revision count
+- Escalate if >2 revisions
+
+### Step 2A.6: Spawn Tech Lead for Review
+
+**UI Message:**
 ```
-IF decision == "APPROVED":
-    Output: "✅ **ORCHESTRATOR**: Code approved by Tech Lead - updating status and forwarding to PM for final check..."
-    → Update group_status.json (mark complete)
-    → Spawn PM for final check (Step 2A.8)
-
-ELSE IF decision == "CHANGES_REQUESTED":
-    Output: "⚠️ **ORCHESTRATOR**: Changes requested - forwarding feedback to Developer..."
-    → Spawn Developer with tech lead feedback
-    → Developer addresses issues
-    Output: "🔄 **ORCHESTRATOR**: Developer addressed changes - sending back to QA Expert..."
-    → Loop back to QA (Step 2A.4)
+👔 **ORCHESTRATOR**: Spawning Tech Lead for code review...
 ```
+
+Build Tech Lead prompt with implementation details and review requirements.
+
+See `agents/techlead.md` for full Tech Lead agent definition.
+
+**Spawn:**
+```
+Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [TL prompt])
+```
+
+**After Tech Lead review, invoke validation skills:**
+
+```
+security-scan, please scan changes
+```
+**Then invoke:**
+```
+Skill(command: "security-scan")
+```
+
+```
+lint-check, please check code quality
+```
+**Then invoke:**
+```
+Skill(command: "lint-check")
+```
+
+```
+test-coverage, please analyze coverage
+```
+**Then invoke:**
+```
+Skill(command: "test-coverage")
+```
+
+**Log Tech Lead interaction:**
+```
+bazinga-db, please log this tech_lead interaction:
+
+Session ID: [session_id]
+Agent Type: tech_lead
+Content: [Tech Lead response]
+Iteration: [iteration]
+Agent ID: techlead_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+### Step 2A.7: Route Tech Lead Response
+
+**IF Tech Lead approves:**
+- Proceed to Step 2A.8 (Spawn PM for final check)
+
+**IF Tech Lead requests changes:**
+- Respawn appropriate agent (developer or QA) with feedback
+- Track revision count
+- Escalate if >2 revisions
 
 ### Step 2A.8: Spawn PM for Final Check
 
-**UI Message:** Output before spawning:
+**UI Message:**
 ```
-📋 **ORCHESTRATOR**: Spawning PM to check if all work is complete...
-```
-
-**CRITICAL: Build PM Prompt with Skills Configuration**
-
-**Step 1: Read Skills Configuration**
-```bash
-cat coordination/skills_config.json
+🧠 **ORCHESTRATOR**: Spawning PM for final assessment...
 ```
 
-Store configuration value:
-- `velocity_tracker_mandatory` = true/false (check if pm.velocity-tracker == "mandatory")
+Build PM prompt with complete implementation summary and quality metrics.
 
-**Step 2: Build Base PM Prompt**
-
+**Spawn:**
 ```
-You are the PROJECT MANAGER.
-
-**PREVIOUS STATE:**
-```json
-{latest PM state from database - query using bazinga-db skill}
+Task(subagent_type="general-purpose", description="PM final assessment", prompt=[PM prompt])
 ```
 
-**NEW INFORMATION:**
-Main group has been APPROVED by Tech Lead.
+**Track velocity:**
 ```
-
-**Step 3: Add Velocity Tracker Section (if mandatory)**
-
-IF `velocity_tracker_mandatory` is true, add:
+velocity-tracker, please analyze completion metrics
 ```
-**MANDATORY: Track Velocity and Metrics**
-
-BEFORE making your final decision, you MUST track project metrics:
-
-**STEP 1: Invoke velocity-tracker Skill (MANDATORY)**
+**Then invoke:**
+```
 Skill(command: "velocity-tracker")
-
-Wait for Skill to complete (3-5 seconds).
-
-**STEP 2: Read velocity metrics**
-cat coordination/project_metrics.json
-
-**STEP 3: Use metrics to inform your decision**
-- Check current velocity vs baseline
-- Identify any 99% rule violations (stuck tasks)
-- Note any concerning trends
-- Include metrics summary in your response
 ```
 
-**Step 4: Complete PM Prompt**
-
-Continue with:
+**Log PM interaction:**
 ```
-**YOUR JOB:**
-1. Get latest PM state from database using bazinga-db skill
-2. Update completed_groups in database
-3. Check if ALL work complete
-4. Make decision:
-   - All complete? → Send BAZINGA (include metrics summary if velocity-tracker ran)
-   - More work? → Assign next groups
+bazinga-db, please log this PM interaction:
 
-**STATE LOCATION:** Database (query via bazinga-db skill)
-
-**CRITICAL:** If everything is complete, include the word "BAZINGA" in your response.
-
-START YOUR CHECK NOW.
+Session ID: [session_id]
+Agent Type: pm
+Content: [PM response]
+Iteration: [iteration]
+Agent ID: pm_final
 ```
 
-**Step 5: Call Task Tool with Built Prompt**
-
+**Then invoke:**
 ```
-Task(
-  subagent_type: "general-purpose",
-  description: "PM final completion check",
-  prompt: [THE PROMPT YOU BUILT IN STEPS 2-4]
-)
+Skill(command: "bazinga-db")
 ```
 
 ### Step 2A.9: Check for BAZINGA
 
-**UI Message:** Output after receiving PM response:
-```
-📨 **ORCHESTRATOR**: Received response from PM...
-```
+**IF PM sends BAZINGA:**
+- Proceed to Completion phase
 
-**🚨 CRITICAL: BAZINGA Detection and Final Report Generation**
+**IF PM requests changes:**
+- Identify what needs rework
+- Respawn from appropriate stage
+- Track iteration count in database
 
-```
-IF PM response contains "BAZINGA":
-    Output: "🎉 **ORCHESTRATOR**: BAZINGA received from PM - All work complete!"
-
-    ⚠️ **MANDATORY NEXT STEP: Generate Final Report**
-
-    You MUST execute the comprehensive final report generation workflow.
-    This is NOT optional. Do NOT just celebrate and stop.
-
-    **ANTI-PATTERN ❌:**
-    - ❌ Output "Workflow complete!" and stop
-    - ❌ Forward PM's message to user and stop
-    - ❌ Just say "BAZINGA!" and exit
-
-    **CORRECT FLOW ✅:**
-    - ✅ Detect BAZINGA keyword in PM response
-    - ✅ Execute "## Completion" section (lines 1997-2318)
-    - ✅ Aggregate all metrics, Skills results, state files
-    - ✅ Generate and display comprehensive final report
-    - ✅ THEN end workflow
-
-    **ACTION REQUIRED:**
-    Jump to "## Completion" section below and execute ALL 5 steps:
-    1. Step 1: Aggregate All Metrics (read all state files, Skills results)
-    2. Step 2: Detect Anomalies (find issues needing attention)
-    3. Step 3: Generate Detailed Report (write to coordination/reports/)
-    4. Step 4: Update State Files (mark orchestration complete)
-    5. Step 5: Display Concise Report (the 50+ line summary to user)
-
-    → GO TO "## Completion" section NOW ⬇️
-
-ELSE IF PM assigns more work:
-    Output: "🔄 **ORCHESTRATOR**: PM assigned additional work - continuing workflow..."
-    → Extract next assignments
-    → Loop back to spawn developers
-```
-
-**⚠️ ENFORCEMENT CHECK:**
-
-Before ending workflow, ask yourself:
-- "Did I execute all 5 steps from the Completion section?"
-- "Did I display the comprehensive report with Skills Used, Quality Overview, Efficiency metrics?"
-- "Did I create the detailed report file in coordination/reports/?"
-
-If answer is NO to any → You forgot to execute the Completion section → GO BACK AND DO IT NOW
+**IMPORTANT:** All agent prompts follow `coordination/templates/prompt_building.md`. All database logging follows `coordination/templates/logging_pattern.md`.
 
 ---
-
 ## Phase 2B: Parallel Mode Execution
 
 **UI Message:** Output when entering Phase 2B:
