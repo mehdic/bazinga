@@ -51,7 +51,11 @@ Examples:
 
 **Your ONLY allowed tools:**
 - ✅ **Task** - Spawn agents
-- ✅ **Skill** - Invoke bazinga-db skill for database logging (replaces file-based logging)
+- ✅ **Skill** - MANDATORY: Invoke bazinga-db skill for:
+  - Database initialization (Step 2 - REQUIRED)
+  - Logging ALL agent interactions (after EVERY agent response - REQUIRED)
+  - State management (orchestrator/PM/task groups - REQUIRED)
+  - All database operations (replaces file-based logging)
 - ✅ **Write** - ONLY for managing state files (coordination/*.json)
 - ✅ **Read** - ONLY for reading state files (coordination/*.json)
 
@@ -150,7 +154,12 @@ PM Response: BAZINGA → END
    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
    ```
 
-2. **Initialize in database:**
+2. **Create session in database:**
+
+   ### 🔴 MANDATORY SESSION CREATION - CANNOT BE SKIPPED
+
+   **YOU MUST invoke the bazinga-db skill to create a new session.**
+   **Database will auto-initialize if it doesn't exist (< 2 seconds).**
 
    Request to bazinga-db skill:
    ```
@@ -166,7 +175,24 @@ PM Response: BAZINGA → END
    Skill(command: "bazinga-db")
    ```
 
-   The database will auto-initialize if needed (< 2 seconds).
+   **WAIT for bazinga-db response.**
+
+   **REQUIRED OUTPUT - You MUST display the session creation result:**
+   ```
+   ✅ **ORCHESTRATOR**: Session created in database
+   📊 Session ID: [session_id]
+   📁 Database: coordination/bazinga.db
+   💾 Status: [created/ready] (database auto-initialized if needed)
+   ```
+
+   **IF bazinga-db skill fails or returns error: STOP. Cannot proceed without session.**
+
+   **Validation:**
+   - ✓ [ ] bazinga-db skill was invoked
+   - ✓ [ ] Session creation result displayed
+   - ✓ [ ] Session ID confirmed
+
+   **IF ANY CHECKBOX UNCHECKED: Session creation FAILED. Cannot proceed.**
 
 3. **Load configurations:**
 
@@ -184,6 +210,10 @@ PM Response: BAZINGA → END
    See `coordination/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
 4. **Store config references in database:**
+
+   ### 🔴 MANDATORY: Store configuration in database
+
+   **YOU MUST invoke bazinga-db skill to save orchestrator state.**
 
    Get current orchestrator state:
    ```
@@ -217,6 +247,17 @@ PM Response: BAZINGA → END
    ```
    Skill(command: "bazinga-db")
    ```
+
+   **REQUIRED OUTPUT - Display confirmation:**
+   ```
+   ✅ **ORCHESTRATOR**: Configuration stored in database
+   ```
+
+   **Validation:**
+   - ✓ [ ] bazinga-db skill invoked twice (get + save)
+   - ✓ [ ] Confirmation message displayed
+
+   **IF VALIDATION FAILS: Configuration not persisted. Cannot proceed.**
 
 5. **Run build baseline check:**
 
@@ -262,12 +303,33 @@ All state stored in SQLite database at `coordination/bazinga.db`:
 Output the following verification to confirm initialization:
 
 ```
+═══════════════════════════════════════════
+INITIALIZATION VERIFICATION
+═══════════════════════════════════════════
+
 ✓ [ ] Session ID generated: [show session_id]
-✓ [ ] Database initialized (bazinga-db invoked)
+✓ [ ] Session created in database: [show status from Step 2]
+     - bazinga-db skill invoked? [YES/NO]
+     - Session creation message displayed? [YES/NO]
+     - Database file exists? [YES/NO]
 ✓ [ ] Skills configuration loaded and displayed
 ✓ [ ] Testing configuration loaded and displayed
-✓ [ ] Config stored in database
+✓ [ ] Config stored in database (bazinga-db invoked)
 ```
+
+**1. SESSION CREATION VERIFICATION - PROVE bazinga-db WAS INVOKED:**
+
+YOU MUST have displayed this message in Step 2:
+```
+✅ **ORCHESTRATOR**: Session created in database
+📊 Session ID: [session_id]
+📁 Database: coordination/bazinga.db
+💾 Status: [created/ready] (database auto-initialized if needed)
+```
+
+**IF YOU DID NOT DISPLAY THE ABOVE MESSAGE: Session creation FAILED. Go back to Step 2.**
+
+**2. CONFIGURATION VERIFICATION - PROVE configs were read:**
 
 **YOU MUST display the contents of BOTH configuration files to prove you read them:**
 
@@ -281,13 +343,15 @@ Output the following verification to confirm initialization:
 
 **IF YOU CANNOT DISPLAY BOTH CONFIG FILES: STOP. Go back to Step 3 and read them.**
 
-**Validation Rules:**
+**VALIDATION RULES:**
+- ❌ If you did NOT display session creation message → Initialization FAILED
+- ❌ If you did NOT invoke bazinga-db skill in Step 2 → Initialization FAILED
 - ❌ If you did NOT output both config files → Initialization FAILED
 - ❌ If "🎯 ORCHESTRATOR: Skills configuration loaded" was NOT displayed → Initialization FAILED
 - ❌ If "🧪 ORCHESTRATOR: Testing framework configuration loaded" was NOT displayed → Initialization FAILED
-- ✅ If ALL messages displayed AND both configs output → Initialization PASSED
+- ✅ If ALL messages displayed AND session created AND both configs output → Initialization PASSED
 
-**ONLY AFTER displaying both config files may you proceed to Phase 1.**
+**ONLY AFTER all validation rules pass may you proceed to Phase 1.**
 
 ---
 
@@ -1524,15 +1588,18 @@ Lint: ⚠️ 3 warnings remain (5 errors fixed)
 ## Key Principles to Remember
 
 1. **You coordinate, never implement** - Only use Task, Skill (bazinga-db), and Write (for state files only)
-2. **PM decides mode** - Always spawn PM first, respect their decision
-3. **Parallel = one message** - Spawn multiple developers in ONE message
-4. **Independent routing** - Each group flows through dev→QA→tech lead independently
-5. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-6. **State files = memory** - Always pass state to agents for context
-7. **🔴 LOG EVERYTHING TO DATABASE** - MANDATORY: Invoke bazinga-db skill after EVERY agent interaction (no exceptions!)
-8. **Track per-group** - Update group_status.json as groups progress
-9. **Display progress** - Keep user informed with clear messages
-10. **Check for BAZINGA** - Only end workflow when PM says BAZINGA
+2. **🔴 SESSION MUST BE CREATED** - MANDATORY: Invoke bazinga-db skill in Step 2 to create session. Database auto-initializes if needed. Display confirmation message. Cannot proceed without session.
+3. **🔴 CONFIGS MUST BE LOADED** - MANDATORY: Read and display skills_config.json and testing_config.json contents during initialization. Cannot proceed without configs.
+4. **🔴 PROMPTS MUST FOLLOW TEMPLATE** - MANDATORY: Build ALL agent prompts using prompt_building.md. Include skill invocations. Validate before spawning.
+5. **PM decides mode** - Always spawn PM first, respect their decision
+6. **Parallel = one message** - Spawn multiple developers in ONE message
+7. **Independent routing** - Each group flows through dev→QA→tech lead independently
+8. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
+9. **State files = memory** - Always pass state to agents for context
+10. **🔴 LOG EVERYTHING TO DATABASE** - MANDATORY: Invoke bazinga-db skill after EVERY agent interaction (no exceptions!)
+11. **Track per-group** - Update group_status.json as groups progress
+12. **Display progress** - Keep user informed with clear messages
+13. **Check for BAZINGA** - Only end workflow when PM says BAZINGA
 
 ---
 

@@ -56,6 +56,7 @@ No manual initialization needed - just invoke the skill and it handles everythin
 Extract from the calling agent's request:
 
 **Operation type:**
+- "create session" / "new session" / "initialize session" → create-session
 - "log interaction" / "save log" → log-interaction
 - "save PM state" / "save orchestrator state" → save-state
 - "get state" / "retrieve state" → get-state
@@ -85,6 +86,18 @@ Extract from the calling agent's request:
 ## Step 2: Execute Database Command
 
 Use the **Bash** tool to run the appropriate command:
+
+### Session Management
+
+**Create new session:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
+  "<session_id>" \
+  "<mode>" \
+  "<requirements>"
+```
+
+**IMPORTANT:** This command will auto-initialize the database if it doesn't exist. No separate initialization needed!
 
 ### Common Operations
 
@@ -144,16 +157,18 @@ SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
 
 ## Step 3: Return Formatted Response
 
-**For write operations:**
-Return concise confirmation:
+**For successful operations:**
+
+Write operations - return concise confirmation:
 ```
+✓ Session created: bazinga_20250113_143530
+✓ Database auto-initialized at coordination/bazinga.db
 ✓ Logged PM interaction (iteration 1)
 ✓ Saved orchestrator state
 ✓ Updated task group: group_a → completed
 ```
 
-**For read operations:**
-Use the **Read** tool if needed to parse JSON, then format for readability:
+Read operations - format for readability:
 ```
 Current PM State (as of [timestamp]):
 - Mode: parallel
@@ -162,6 +177,36 @@ Current PM State (as of [timestamp]):
 
 [Formatted data]
 ```
+
+**For failed operations:**
+
+ALWAYS capture and return the full error output from bash commands:
+```
+❌ Database operation failed
+
+Command:
+python3 /path/to/bazinga_db.py --db /path/to/bazinga.db create-session ...
+
+Error Output:
+[Full stderr from the command]
+
+Exit Code: [code]
+
+Possible causes:
+- Database file permission denied
+- Invalid session_id format
+- Missing init_db.py script
+- Python dependencies not installed
+- Disk space full
+
+The orchestrator MUST see this error to diagnose the issue.
+```
+
+**Error detection:**
+- Check bash command exit code (non-zero = failure)
+- Capture both stdout and stderr
+- Include command that failed
+- Return detailed error message to calling agent
 
 **For errors:**
 Provide actionable guidance:
@@ -178,33 +223,76 @@ Proceed with initialization?
 
 ## Example Invocation
 
-**Scenario 1: Orchestrator Logging PM Interaction**
+**Scenario 1: Orchestrator Creating New Session**
 
-Input: Orchestrator completed PM spawn, needs to log the interaction
+Input: Orchestrator starting new orchestration, needs to initialize session in database
 
-Request parameters:
-- session_id: "sess_abc123"
-- agent_type: "pm"
-- content: "Task breakdown created: 3 groups (group_a, group_b, group_c)..."
-- iteration: 1
+Request from orchestrator:
+```
+bazinga-db, please create a new orchestration session:
+
+Session ID: bazinga_20250113_143530
+Mode: simple
+Requirements: Add user authentication with OAuth2 support
+```
 
 Expected output:
 ```
-✓ Logged PM interaction for session sess_abc123
+✓ Database auto-initialized at coordination/bazinga.db
+✓ Session created: bazinga_20250113_143530
+
+Database ready for orchestration. Session is active and ready to receive logs and state.
+```
+
+---
+
+**Scenario 2: Orchestrator Logging PM Interaction**
+
+Input: Orchestrator completed PM spawn, needs to log the interaction
+
+Request from orchestrator:
+```
+bazinga-db, please log this PM interaction:
+
+Session ID: sess_abc123
+Agent Type: pm
+Content: Task breakdown created: 3 groups (group_a, group_b, group_c). Group A will handle auth, Group B will handle API, Group C will handle UI components.
+Iteration: 1
+Agent ID: pm_main
+```
+
+Expected output:
+```
+✓ Logged PM interaction for session sess_abc123 (iteration 1)
 
 Database operation successful.
 ```
 
 ---
 
-**Scenario 2: PM Saving State**
+**Scenario 3: PM Saving State**
 
 Input: PM completed task breakdown, needs to save PM state
 
-Request parameters:
-- session_id: "sess_abc123"
-- state_type: "pm"
-- state_data: `{"iteration": 1, "mode": "parallel", "task_groups": [...]}`
+Request from PM:
+```
+bazinga-db, please save the PM state:
+
+Session ID: sess_abc123
+State Type: pm
+State Data: {
+  "iteration": 1,
+  "mode": "parallel",
+  "task_groups": [
+    {"id": "group_a", "name": "Authentication", "status": "pending"},
+    {"id": "group_b", "name": "API Backend", "status": "pending"},
+    {"id": "group_c", "name": "UI Components", "status": "pending"}
+  ],
+  "completed_groups": [],
+  "in_progress_groups": [],
+  "pending_groups": ["group_a", "group_b", "group_c"]
+}
+```
 
 Expected output:
 ```
@@ -215,12 +303,16 @@ PM state snapshot stored in database.
 
 ---
 
-**Scenario 3: Dashboard Requesting Data**
+**Scenario 4: Dashboard Requesting Data**
 
 Input: Dashboard needs complete session overview
 
-Request parameters:
-- session_id: "sess_abc123"
+Request:
+```
+bazinga-db, please provide dashboard snapshot:
+
+Session ID: sess_abc123
+```
 
 Expected output:
 ```
@@ -247,7 +339,7 @@ Full data available in returned JSON object.
 
 ---
 
-**Scenario 4: First Invocation (Database Not Initialized)**
+**Scenario 5: Error Scenario (Permission Denied)**
 
 Input: Agent tries to log interaction but database doesn't exist
 
