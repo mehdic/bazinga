@@ -1564,6 +1564,28 @@ def update(
     else:
         console.print("  [yellow]⚠️  Commands directory not found[/yellow]")
 
+    # Remove deprecated state files (migrated to database)
+    console.print("\n[bold cyan]3.2. Removing deprecated state files[/bold cyan]")
+    deprecated_state_files = [
+        ("coordination/pm_state.json", "PM state (now in database)"),
+        ("coordination/orchestrator_state.json", "Orchestrator state (now in database)"),
+        ("coordination/group_status.json", "Task groups (now in database)"),
+        ("coordination/next_session_task_list.md", "Task list (now in database)"),
+        ("docs/orchestration-log.md", "Logs (now in database)"),
+    ]
+    removed_count = 0
+    for file_path, description in deprecated_state_files:
+        full_path = target_dir / file_path
+        if full_path.exists():
+            full_path.unlink()
+            removed_count += 1
+            console.print(f"  ✓ Removed {description}: {file_path}")
+    if removed_count == 0:
+        console.print("  [dim]No deprecated state files found[/dim]")
+    else:
+        console.print(f"  [green]✓ Removed {removed_count} deprecated file(s)[/green]")
+        console.print("  [dim]All state is now in coordination/bazinga.db[/dim]")
+
     # Update skills (preserve script type)
     console.print(f"\n[bold cyan]4. Updating skills ({script_type.upper()})[/bold cyan]")
     if setup.copy_skills(target_dir, script_type):

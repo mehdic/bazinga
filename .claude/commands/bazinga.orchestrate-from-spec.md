@@ -502,8 +502,10 @@ python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py \
   --db /home/user/bazinga/coordination/bazinga.db \
   stream-logs "{session_id}" 20 0
 
-# Check PM state
-cat coordination/pm_state.json | jq '.completed_groups'
+# Check PM state from database
+python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py \
+  --db /home/user/bazinga/coordination/bazinga.db \
+  get-state "{session_id}" pm
 ```
 
 **Note:** Orchestration logs are now stored in the database (bazinga.db) instead of orchestration-log.md for better concurrency and performance.
