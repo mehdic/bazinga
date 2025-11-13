@@ -72,3 +72,7 @@ bazinga/
 # BAZINGA artifacts (session outputs - always gitignored)
 bazinga/artifacts/
 bazinga/bazinga.db*
+
+# Old coordination folder (deprecated - renamed to bazinga/)
+coordination/
+!coordination/templates/
