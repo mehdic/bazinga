@@ -2046,20 +2046,37 @@ Work continues until all tests pass.
 
 **Step 1: Update group_status.json**
 
-```python
-# Read current group status
-group_status = read_file("coordination/group_status.json")
-
-# Increment revision_count for this group
-if "group_id" not in group_status:
-    group_status["group_id"] = {"revision_count": 0, "status": "in_progress"}
-
-group_status["group_id"]["revision_count"] += 1
-group_status["group_id"]["last_review_status"] = "CHANGES_REQUESTED"
-
-# Write updated status
-write_file("coordination/group_status.json", group_status)
+**Get current task group from database:**
 ```
+bazinga-db, please get task group information:
+
+Session ID: [current session_id]
+Group ID: [group_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Extract current `revision_count` from the response.
+
+**Update task group with incremented revision:**
+```
+bazinga-db, please update task group:
+
+Group ID: [group_id]
+Revision Count: [current_revision_count + 1]
+Last Review Status: CHANGES_REQUESTED
+Status: in_progress
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+This replaces reading/writing group_status.json with database operations.
 
 **IMPORTANT:** This revision count determines model selection for Tech Lead:
 - Revisions 1-2: Tech Lead uses **Sonnet** (default, fast)
