@@ -10,8 +10,38 @@ set +e
 
 echo "🧪 Test Coverage Analysis Starting..."
 
-# Create coordination directory if it doesn't exist
-mkdir -p coordination
+# Get current session ID from database
+get_current_session_id() {
+    local db_path="coordination/bazinga.db"
+    if [ ! -f "$db_path" ]; then
+        echo "bazinga_default"
+        return
+    fi
+
+    local session_id=$(python3 -c "
+import sqlite3
+try:
+    conn = sqlite3.connect('$db_path')
+    cursor = conn.execute('SELECT session_id FROM sessions ORDER BY created_at DESC LIMIT 1')
+    row = cursor.fetchone()
+    if row:
+        print(row[0])
+    else:
+        print('bazinga_default')
+    conn.close()
+except:
+    print('bazinga_default')
+" 2>/dev/null || echo "bazinga_default")
+
+    echo "$session_id"
+}
+
+SESSION_ID=$(get_current_session_id)
+OUTPUT_DIR="coordination/artifacts/$SESSION_ID/skills"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_FILE="$OUTPUT_DIR/coverage_report.json"
+
+echo "📁 Output directory: $OUTPUT_DIR"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
@@ -50,7 +80,7 @@ check_tool_or_skip() {
             # Lite mode: Skip gracefully with warning
             echo "⚠️  $tool_name not installed - skipping in lite mode"
             echo "   Install with: $install_cmd"
-            cat > coordination/coverage_report.json << EOF
+            cat > $OUTPUT_FILE << EOF
 {
   "status": "skipped",
   "language": "$LANG",
@@ -64,7 +94,7 @@ EOF
         else
             # Advanced mode: Fail if tool not available
             echo "❌ $tool_name required but not installed"
-            cat > coordination/coverage_report.json << EOF
+            cat > $OUTPUT_FILE << EOF
 {
   "status": "error",
   "language": "$LANG",
@@ -88,7 +118,7 @@ case $LANG in
         if ! python -c "import pytest_cov" 2>/dev/null; then
             if [ "$PROFILE" = "lite" ]; then
                 echo "⚠️  pytest-cov not installed - skipping in lite mode"
-                echo '{"status":"skipped","reason":"pytest-cov not installed"}' > coordination/coverage_report.json
+                echo '{"status":"skipped","reason":"pytest-cov not installed"}' > $OUTPUT_FILE
                 exit 0
             fi
         fi
@@ -230,10 +260,10 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata
 if command_exists "jq"; then
     jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\"}" \
-        coordination/coverage_report_raw.json > coordination/coverage_report.json
+        coordination/coverage_report_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
-    cat > coordination/coverage_report.json <<EOF
+    cat > $OUTPUT_FILE <<EOF
 {
   "timestamp": "$TIMESTAMP",
   "language": "$LANG",
@@ -246,15 +276,15 @@ fi
 rm -f coordination/coverage_report_raw.json coordination/jest-results.json 2>/dev/null || true
 
 echo "✅ Coverage analysis complete"
-echo "📁 Results saved to: coordination/coverage_report.json"
+echo "📁 Results saved to: $OUTPUT_FILE"
 
 # Display summary if jq available
 if command_exists "jq"; then
     if [ "$LANG" = "python" ]; then
-        COVERAGE=$(jq -r '.totals.percent_covered // 0' coordination/coverage_report.json 2>/dev/null || echo "0")
+        COVERAGE=$(jq -r '.totals.percent_covered // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
         echo "📊 Overall coverage: $COVERAGE%"
     elif [ "$LANG" = "go" ] || [ "$LANG" = "java" ]; then
-        COVERAGE=$(jq -r '.coverage // 0' coordination/coverage_report.json 2>/dev/null || echo "0")
+        COVERAGE=$(jq -r '.coverage // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
         echo "📊 Overall coverage: $COVERAGE%"
     fi
 fi

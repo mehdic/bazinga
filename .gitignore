@@ -66,3 +66,9 @@ Thumbs.db
 coordination/
 !coordination/.gitignore
 !coordination/templates/
+!coordination/skills_config.json
+!coordination/testing_config.json
+
+# Coordination artifacts (session outputs - always gitignored)
+coordination/artifacts/
+coordination/bazinga.db*

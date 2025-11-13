@@ -49,7 +49,7 @@ This script will:
 - Identify common fixtures and test utilities
 - Extract test naming conventions
 - Find similar tests for reference
-- Generate `coordination/test_patterns.json`
+- Generate `coordination/artifacts/{SESSION_ID}/skills/test_patterns.json`
 
 ---
 
@@ -58,7 +58,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/test_patterns.json
+coordination/artifacts/{SESSION_ID}/skills/test_patterns.json
 ```
 
 Extract key information:
@@ -93,7 +93,7 @@ Similar tests to reference:
 - {file1}: {test_name}
 - {file2}: {test_name}
 
-Details saved to: coordination/test_patterns.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/test_patterns.json
 ```
 
 ---
@@ -128,7 +128,7 @@ Reusable fixtures:
 - test_user (conftest.py): Create test user in database
 - mock_email_service (conftest.py): Mock email sending
 
-Details saved to: coordination/test_patterns.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/test_patterns.json
 ```
 
 **Scenario: No Tests Found**
@@ -150,7 +150,7 @@ Recommendations:
 4. Target 80% code coverage
 5. Create conftest.py for shared fixtures
 
-Details saved to: coordination/test_patterns.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/test_patterns.json
 ```
 
 ---

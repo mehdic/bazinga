@@ -51,7 +51,7 @@ This script will:
 - Compute overall health score (weighted average)
 - Detect trends by comparing to previous run
 - Identify anomalies
-- Generate `coordination/quality_dashboard.json`
+- Generate `coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json`
 
 ---
 
@@ -60,7 +60,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/quality_dashboard.json
+coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 Extract key information:
@@ -106,7 +106,7 @@ Top Recommendations:
 2. {recommendation}
 3. {recommendation}
 
-Details saved to: coordination/quality_dashboard.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 ---
@@ -139,7 +139,7 @@ Top Recommendations:
 1. Continue current practices
 2. Coverage improved by 12% this iteration
 
-Details saved to: coordination/quality_dashboard.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 **Scenario: Quality Issues Detected**
@@ -174,7 +174,7 @@ Top Recommendations:
 2. Add tests for auth module (20% coverage drop)
 3. Fix 12 linting errors
 
-Details saved to: coordination/quality_dashboard.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 ---

@@ -5,9 +5,42 @@ set +e  # Don't exit on error for graceful degradation
 # Full implementation would include ML-based clustering, but this version
 # provides basic statistical analysis and pattern detection
 
+# Get current session ID from database
+get_current_session_id() {
+    local db_path="coordination/bazinga.db"
+    if [ ! -f "$db_path" ]; then
+        echo "bazinga_default"
+        return
+    fi
+
+    local session_id=$(python3 -c "
+import sqlite3
+try:
+    conn = sqlite3.connect('$db_path')
+    cursor = conn.execute('SELECT session_id FROM sessions ORDER BY created_at DESC LIMIT 1')
+    row = cursor.fetchone()
+    if row:
+        print(row[0])
+    else:
+        print('bazinga_default')
+    conn.close()
+except:
+    print('bazinga_default')
+" 2>/dev/null || echo "bazinga_default")
+
+    echo "$session_id"
+}
+
+SESSION_ID=$(get_current_session_id)
+
 COORD_DIR="coordination"
-HISTORICAL_FILE="${COORD_DIR}/historical_metrics.json"
-PATTERN_FILE="${COORD_DIR}/pattern_insights.json"
+SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
+mkdir -p "$SKILLS_DIR"
+
+HISTORICAL_FILE="${SKILLS_DIR}/historical_metrics.json"
+PATTERN_FILE="${SKILLS_DIR}/pattern_insights.json"
+
+echo "📁 Output directory: $SKILLS_DIR"
 
 echo "🔍 Pattern Miner - Analyzing historical data..."
 echo "=================================================="

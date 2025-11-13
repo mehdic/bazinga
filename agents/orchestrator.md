@@ -47,6 +47,51 @@ Examples:
 
 ---
 
+## 📁 File Path Rules - MANDATORY STRUCTURE
+
+**All session artifacts MUST follow this structure:**
+
+```
+coordination/
+├── bazinga.db                    # Database (all state/logs)
+├── skills_config.json            # Skills configuration (git-tracked)
+├── testing_config.json           # Testing configuration (git-tracked)
+├── artifacts/                    # All session outputs (gitignored)
+│   └── {session_id}/             # One folder per session
+│       ├── skills/               # All skill outputs
+│       │   ├── security_scan.json
+│       │   ├── coverage_report.json
+│       │   ├── lint_results.json
+│       │   └── ... (all skill outputs)
+│       ├── completion_report.md  # Session completion report
+│       ├── build_baseline.log    # Build baseline output
+│       └── build_baseline_status.txt  # Build baseline status
+└── templates/                    # Prompt templates (git-tracked)
+    ├── prompt_building.md
+    ├── completion_report.md
+    ├── message_templates.md
+    └── logging_pattern.md
+```
+
+**Path Variables:**
+- `SESSION_ID`: Current session ID (e.g., bazinga_20250113_143530)
+- `ARTIFACTS_DIR`: `coordination/artifacts/{SESSION_ID}/`
+- `SKILLS_DIR`: `coordination/artifacts/{SESSION_ID}/skills/`
+
+**Rules:**
+1. **All session artifacts** → `coordination/artifacts/{SESSION_ID}/`
+2. **All skill outputs** → `coordination/artifacts/{SESSION_ID}/skills/`
+3. **Configuration files** → `coordination/` (root level)
+4. **Templates** → `coordination/templates/`
+5. **Never write to coordination root** - only artifacts/, templates/, or config files
+
+**Example paths for current session:**
+- Build baseline: `coordination/artifacts/{SESSION_ID}/build_baseline.log`
+- Completion report: `coordination/artifacts/{SESSION_ID}/completion_report.md`
+- Security scan: `coordination/artifacts/{SESSION_ID}/skills/security_scan.json`
+
+---
+
 ## ⚠️ CRITICAL: YOU ARE A COORDINATOR, NOT AN IMPLEMENTER
 
 **Your ONLY allowed tools:**
@@ -367,7 +412,8 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    #   - Python: python -m compileall . && mypy .
    #   - Ruby: bundle exec rubocop --parallel
 
-   # Save results to coordination/build_baseline.log and coordination/build_baseline_status.txt
+   # Save results to coordination/artifacts/{SESSION_ID}/build_baseline.log
+   # and coordination/artifacts/{SESSION_ID}/build_baseline_status.txt
    ```
 
    Display result:
@@ -1522,7 +1568,7 @@ Flag any anomalies for inclusion in reports.
 Create comprehensive report file:
 
 ```
-coordination/reports/session_{YYYYMMDD_HHMMSS}.md
+coordination/artifacts/{SESSION_ID}/completion_report.md
 ```
 
 See `coordination/templates/completion_report.md` for full report structure.
@@ -1601,7 +1647,7 @@ Example output:
 
 **Quality**: All checks passed ✅
 **Skills Used**: 6 of 11 available
-**Detailed Report**: coordination/reports/session_20250113_143530.md
+**Detailed Report**: coordination/artifacts/bazinga_20250113_143530/completion_report.md
 
 ═══════════════════════════════════════════════════════════
 ```

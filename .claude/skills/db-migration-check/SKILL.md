@@ -49,7 +49,7 @@ This script will:
 - Parse SQL operations
 - Detect dangerous patterns (table locks, data loss risks)
 - Suggest safe alternatives
-- Generate `coordination/db_migration_check.json`
+- Generate `coordination/artifacts/{SESSION_ID}/skills/db_migration_check.json`
 
 ---
 
@@ -58,7 +58,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/db_migration_check.json
+coordination/artifacts/{SESSION_ID}/skills/db_migration_check.json
 ```
 
 Extract key information:
@@ -90,7 +90,7 @@ Top recommendations:
 1. {recommendation}
 2. {recommendation}
 
-Details saved to: coordination/db_migration_check.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/db_migration_check.json
 ```
 
 ---
@@ -118,7 +118,7 @@ Top recommendations:
 1. For ADD COLUMN: Add as NULL first, backfill in batches, then add DEFAULT
 2. For CREATE INDEX: Use CREATE INDEX CONCURRENTLY to avoid locks
 
-Details saved to: coordination/db_migration_check.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/db_migration_check.json
 ```
 
 **Scenario: All Migrations Safe**
@@ -140,7 +140,7 @@ Safe migrations: 2
 
 All migrations follow zero-downtime best practices.
 
-Details saved to: coordination/db_migration_check.json
+Details saved to: coordination/artifacts/{SESSION_ID}/skills/db_migration_check.json
 ```
 
 ---

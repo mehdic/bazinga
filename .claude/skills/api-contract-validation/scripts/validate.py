@@ -8,15 +8,41 @@ Usage:
     python validate.py
 
 Output:
-    coordination/api_contract_validation.json
+    coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 """
 
 import os
 import sys
 import json
+import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+
+# Get current session ID from database
+def get_current_session_id():
+    """Get the most recent session ID from the database."""
+    db_path = "coordination/bazinga.db"
+    if not os.path.exists(db_path):
+        return "bazinga_default"
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.execute("SELECT session_id FROM sessions ORDER BY created_at DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row[0]
+        return "bazinga_default"
+    except:
+        return "bazinga_default"
+
+SESSION_ID = get_current_session_id()
+OUTPUT_DIR = Path(f"coordination/artifacts/{SESSION_ID}/skills")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_FILE = OUTPUT_DIR / "api_contract_validation.json"
+
+print(f"📁 Output directory: {OUTPUT_DIR}")
 
 # Load profile for graceful degradation
 def load_profile():
@@ -47,7 +73,7 @@ except ImportError as e:
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         Path("coordination").mkdir(exist_ok=True)
-        with open("coordination/api_contract_validation.json", "w") as f:
+        with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
     else:
@@ -60,7 +86,7 @@ except ImportError as e:
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         Path("coordination").mkdir(exist_ok=True)
-        with open("coordination/api_contract_validation.json", "w") as f:
+        with open("OUTPUT_FILE", "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
 

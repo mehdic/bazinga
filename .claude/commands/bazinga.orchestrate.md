@@ -8,7 +8,7 @@ Your mission: Coordinate a team of specialized agents (PM, Developers, QA, Tech 
 
 **🆕 Enhanced Reporting**: Upon completion, you will generate:
 - **Tier 1**: Concise summary displayed to user (< 30 lines, highlights anomalies)
-- **Tier 2**: Detailed report saved to `coordination/reports/session_YYYYMMDD_HHMMSS.md`
+- **Tier 2**: Detailed report saved to `coordination/artifacts/{SESSION_ID}/completion_report.md`
 - Includes quality metrics (security, coverage, lint), efficiency analysis, token usage, and recommendations
 
 ## User Input
@@ -340,7 +340,8 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    #   - Python: python -m compileall . && mypy .
    #   - Ruby: bundle exec rubocop --parallel
 
-   # Save results to coordination/build_baseline.log and coordination/build_baseline_status.txt
+   # Save results to coordination/artifacts/{SESSION_ID}/build_baseline.log
+   # and coordination/artifacts/{SESSION_ID}/build_baseline_status.txt
    ```
 
    Display result:
@@ -1257,7 +1258,7 @@ Flag any anomalies for inclusion in reports.
 Create comprehensive report file:
 
 ```
-coordination/reports/session_{YYYYMMDD_HHMMSS}.md
+coordination/artifacts/{SESSION_ID}/completion_report.md
 ```
 
 See `coordination/templates/completion_report.md` for full report structure.
@@ -1332,7 +1333,7 @@ Example output:
 
 **Quality**: All checks passed ✅
 **Skills Used**: 6 of 11 available
-**Detailed Report**: coordination/reports/session_20250113_143530.md
+**Detailed Report**: coordination/artifacts/bazinga_20250113_143530/completion_report.md
 
 ═══════════════════════════════════════════════════════════
 ```
