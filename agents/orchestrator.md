@@ -131,219 +131,125 @@ PM Response: BAZINGA → END
 
 ## Initialization (First Run Only)
 
-### Step 0: Check and Initialize
+### Step 0: Initialize Session
 
-**UI Message:** Output at start:
+**Display start message:**
 ```
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**FIRST ACTION - Initialize Database Session:**
-
-Create a new orchestration session in the database. The database will be automatically initialized by the bazinga-db skill on first use.
-
-**Generate session ID:**
+**Check if already initialized:**
 ```bash
-SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+[ -f "coordination/bazinga.db" ] && echo "Session may exist in database"
 ```
 
-**Request to bazinga-db skill:**
+**IF NEW session:**
+
+1. **Generate session ID:**
+   ```bash
+   SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+   ```
+
+2. **Initialize in database:**
+
+   Request to bazinga-db skill:
+   ```
+   bazinga-db, please create a new orchestration session:
+
+   Session ID: $SESSION_ID
+   Mode: [will be determined by PM]
+   Requirements: [User's requirements from input]
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+   The database will auto-initialize if needed (< 2 seconds).
+
+3. **Load configurations:**
+
+   ```bash
+   # Read active skills configuration
+   cat coordination/skills_config.json
+
+   # Read testing framework configuration
+   cat coordination/testing_config.json
+   ```
+
+   Display: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
+   Display: "🧪 **ORCHESTRATOR**: Testing framework configuration loaded"
+
+   See `coordination/templates/prompt_building.md` for how these configs are used to build agent prompts.
+
+4. **Store config references in database:**
+
+   Get current orchestrator state:
+   ```
+   bazinga-db, please get the latest orchestrator state:
+
+   Session ID: [current session_id]
+   State Type: orchestrator
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+   Update state with config information and save:
+   ```
+   bazinga-db, please save the orchestrator state:
+
+   Session ID: [current session_id]
+   State Type: orchestrator
+   State Data: {
+     "skills_config_loaded": true,
+     "active_skills_count": [count from config],
+     "testing_config_loaded": true,
+     "testing_mode": "[mode from config]",
+     "qa_expert_enabled": [boolean from config]
+   }
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+5. **Run build baseline check:**
+
+   Display: "🔨 **ORCHESTRATOR**: Running baseline build check..."
+
+   ```bash
+   # Detect project language (check for package.json, go.mod, pom.xml, requirements.txt, Gemfile, etc.)
+   # Run appropriate build command based on detected language:
+   #   - JS/TS: npm run build || tsc --noEmit && npm run build
+   #   - Go: go build ./...
+   #   - Java: mvn compile || gradle compileJava
+   #   - Python: python -m compileall . && mypy .
+   #   - Ruby: bundle exec rubocop --parallel
+
+   # Save results to coordination/build_baseline.log and coordination/build_baseline_status.txt
+   ```
+
+   Display result:
+   - If successful: "✅ **ORCHESTRATOR**: Baseline build successful"
+   - If errors: "⚠️ **ORCHESTRATOR**: Baseline build has errors (will track if Developer introduces NEW errors)"
+   - If unknown: "ℹ️ **ORCHESTRATOR**: Could not detect build system, skipping build check"
+
+**After initialization:**
 ```
-bazinga-db, please create a new orchestration session:
-
-Session ID: $SESSION_ID
-Mode: [will be determined by PM]
-Requirements: [User's requirements from input]
-```
-
-**Then invoke the skill:**
-```
-Skill(command: "bazinga-db")
-```
-
-The bazinga-db skill will:
-- Automatically initialize the database if it doesn't exist (< 2 seconds)
-- Create the new session record
-- Return confirmation
-
-**After session is created, proceed immediately to SECOND ACTION.**
-
-**SECOND ACTION - Read Skills Configuration:**
-
-```python
-# Read skills_config.json to determine which Skills are active
-# This file is created during installation and can be modified via /bazinga.configure-skills
-skills_config = read_json("coordination/skills_config.json")
-
-# Count active Skills
-active_skills = []
-for agent_type, agent_skills in skills_config.items():
-    if agent_type == "_metadata":
-        continue
-    for skill_name, status in agent_skills.items():
-        if status == "mandatory":
-            active_skills.append(f"{agent_type}:{skill_name}")
-
-Output: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
-Output: f"   - Active Skills: {len(active_skills)}"
-Output: "   - Use /bazinga.configure-skills to modify configuration"
-```
-
-**THIRD ACTION - Load Testing Framework Configuration:**
-
-```python
-# Read testing_config.json to determine testing requirements
-# This file controls whether QA Expert is spawned and what validation is required
-testing_config = read_json("coordination/testing_config.json")
-testing_framework = testing_config["_testing_framework"]
-
-# Extract key settings
-testing_mode = testing_framework["mode"]  # "full" | "minimal" | "disabled"
-testing_enabled = testing_framework["enabled"]  # true | false
-qa_expert_enabled = testing_framework["qa_workflow"]["enable_qa_expert"]
-auto_route_to_qa = testing_framework["qa_workflow"]["auto_route_to_qa"]
-
-# Extract pre-commit validation requirements
-lint_check_required = testing_framework["pre_commit_validation"]["lint_check"]
-unit_tests_required = testing_framework["pre_commit_validation"]["unit_tests"]
-build_check_required = testing_framework["pre_commit_validation"]["build_check"]
-
-Output: "🧪 **ORCHESTRATOR**: Testing framework configuration loaded"
-Output: f"   - Testing Mode: {testing_mode.upper()}"
-Output: f"   - QA Expert: {'ENABLED' if qa_expert_enabled else 'DISABLED'}"
-if testing_mode == "disabled":
-    Output: "   ⚠️  Warning: Testing framework in DISABLED mode (prototyping only)"
-Output: "   - Use /bazinga.configure-testing to modify testing requirements"
-```
-
-**FOURTH ACTION - Store Configuration References in Orchestrator State:**
-
-**Get current orchestrator state from database:**
-```
-bazinga-db, please get the latest orchestrator state:
-
-Session ID: [current session_id]
-State Type: orchestrator
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-Update the state with config information and save back:
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please save the orchestrator state:
-
-Session ID: [current session_id]
-State Type: orchestrator
-State Data: {
-  ...existing state...,
-  "skills_config_loaded": true,
-  "active_skills_count": [count of active skills],
-  "testing_config_loaded": true,
-  "testing_mode": "[testing_mode]",
-  "qa_expert_enabled": [qa_expert_enabled]
-}
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**FIFTH ACTION - Run Build Baseline Check (always):**
-
-```bash
-# Detect project language and run appropriate build
-Output: "🔨 **ORCHESTRATOR**: Running baseline build check..."
-
-# Language detection (check for marker files)
-if [ -f "package.json" ]; then
-    LANG="javascript"
-    BUILD_CMD="npm run build"
-elif [ -f "tsconfig.json" ]; then
-    LANG="typescript"
-    BUILD_CMD="tsc --noEmit && npm run build"
-elif [ -f "go.mod" ]; then
-    LANG="go"
-    BUILD_CMD="go build ./..."
-elif [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
-    LANG="java"
-    BUILD_CMD="mvn compile || gradle compileJava"
-elif [ -f "requirements.txt" ] || [ -f "setup.py" ]; then
-    LANG="python"
-    BUILD_CMD="python -m compileall . && mypy . || true"
-elif [ -f "Gemfile" ]; then
-    LANG="ruby"
-    BUILD_CMD="bundle exec rubocop --parallel"
-else
-    LANG="unknown"
-    BUILD_CMD=""
-fi
-
-# Run build if language detected
-if [ -n "$BUILD_CMD" ]; then
-    $BUILD_CMD > coordination/build_baseline.log 2>&1
-    echo $? > coordination/build_baseline_status.txt
-
-    BUILD_STATUS=$(cat coordination/build_baseline_status.txt)
-    if [ $BUILD_STATUS -eq 0 ]; then
-        Output: "✅ **ORCHESTRATOR**: Baseline build successful"
-    else:
-        Output: "⚠️ **ORCHESTRATOR**: Baseline build has errors (see coordination/build_baseline.log)"
-        Output: "   This is OK - we'll track if Developer introduces NEW errors"
-    fi
-else
-    Output: "ℹ️ **ORCHESTRATOR**: Could not detect build system, skipping build check"
-fi
-```
-
-**FIFTH ACTION - Skip App Startup Check:**
-
-```bash
-# NOTE: App startup checking has been removed
-# It was not implemented as a Skill and added unnecessary complexity
-# If needed, it can be re-added as a proper Skill in the future
-```
-
-**After initialization completes:**
-```
-1. If script created new files:
-   Output: "📁 **ORCHESTRATOR**: Coordination environment initialized"
-
-2. If session already exists in database:
-   Output: "📂 **ORCHESTRATOR**: Found existing session in database, loading state..."
-   Query existing session state from database using bazinga-db skill
-   Continue from previous state
-
-3. Output: "🚀 **ORCHESTRATOR**: Ready to begin orchestration"
+🚀 **ORCHESTRATOR**: Ready to begin orchestration
 ```
 
 **Database Storage:**
 
-All orchestration state is now stored in SQLite database at `coordination/bazinga.db`:
-
-```
-Database Tables:
-├── sessions                   # Session metadata (start/end times, mode, status)
-├── orchestration_logs         # Agent interaction logs (replaces orchestration-log.md)
-├── state_snapshots            # PM/orchestrator state snapshots (replaces JSON files)
-├── task_groups                # Task group tracking (replaces group_status.json)
-├── token_usage                # Token consumption tracking
-├── skill_outputs              # Skill results storage
-└── configuration              # System configuration
-
-Benefits:
-- ✅ Concurrent-safe (no file corruption in parallel mode)
-- ✅ ACID transactions
-- ✅ Fast indexed queries for dashboard
-- ✅ Single source of truth
-```
-
-**Note:** The database is automatically initialized by bazinga-db skill on first use.
+All state stored in SQLite database at `coordination/bazinga.db`:
+- **Tables:** sessions, orchestration_logs, state_snapshots, task_groups, token_usage, skill_outputs, configuration
+- **Benefits:** Concurrent-safe, ACID transactions, fast indexed queries
+- **Details:** See `.claude/skills/bazinga-db/SKILL.md` for complete schema
 
 ---
 
@@ -381,7 +287,7 @@ End: BAZINGA detected from PM
 
 ## Phase 1: Spawn Project Manager
 
-**UI Message:** Output before starting Phase 1:
+**UI Message:**
 ```
 📋 **ORCHESTRATOR**: Phase 1 - Spawning Project Manager to analyze requirements...
 ```
@@ -396,186 +302,81 @@ Session ID: [current session_id]
 State Type: pm
 ```
 
-**Then invoke the skill:**
+**Then invoke:**
 ```
 Skill(command: "bazinga-db")
 ```
 
-The skill will return the latest PM state from the database, or null if this is the first iteration.
+Returns latest PM state or null if first iteration.
 
 ### Step 1.2: Spawn PM with Context
 
-**UI Message:** Output before spawning:
+**UI Message:**
 ```
 🔄 **ORCHESTRATOR**: Sending requirements to Project Manager for mode decision...
 ```
 
+Build PM prompt with:
+- Previous state (PM's "memory")
+- User's requirements from conversation
+- Task: Analyze requirements, decide mode (SIMPLE/PARALLEL), create task groups
+
+See `agents/project_manager.md` for full PM agent definition.
+
+**Spawn:**
 ```
 Task(
   subagent_type: "general-purpose",
   description: "PM analyzing requirements and deciding execution mode",
-  prompt: """
-You are the PROJECT MANAGER in a Claude Code Multi-Agent Dev Team orchestration system.
-
-Your job: Analyze requirements, decide execution mode (simple vs parallel), create task groups, and track progress.
-
-**PREVIOUS STATE:**
-```json
-{state}
-```
-
-**NEW REQUIREMENTS:**
-{user's message/requirements from the conversation}
-
-**YOUR TASKS:**
-
-1. Analyze requirements:
-   - Count distinct features
-   - Check file/module overlap
-   - Identify dependencies
-   - Evaluate complexity
-
-2. Decide execution mode:
-   - SIMPLE MODE: 1 feature OR high overlap OR critical dependencies
-   - PARALLEL MODE: 2-4 independent features with low overlap
-
-3. Create task groups:
-   - Simple: 1 group with all tasks
-   - Parallel: 2-4 groups, each independent
-
-4. Decide parallelism count (if parallel):
-   - Consider actual benefit vs coordination overhead
-   - Max 4, but not mandatory - choose optimal count
-
-5. Update state file:
-   - Write updated state to coordination/pm_state.json
-   - Include mode, task_groups, reasoning
-
-6. Return decision:
-   - Mode chosen
-   - Task groups created
-   - Next action for orchestrator
-
-**STATE FILE LOCATION:** coordination/pm_state.json
-
-START YOUR ANALYSIS NOW.
-  """
+  prompt: [PM prompt with state and requirements]
 )
 ```
 
-**Key Points:**
-- Always include previous state in prompt (PM's "memory")
-- PM reads the reference prompt file for detailed instructions
-- PM updates state file before returning
-- PM returns clear decision for orchestrator
+PM returns decision with:
+- Mode chosen (SIMPLE/PARALLEL)
+- Task groups created
+- Execution plan
+- Next action for orchestrator
 
 ### Step 1.3: Receive PM Decision
 
-**UI Message:** Output after receiving PM response:
+**UI Message:**
 ```
 📨 **ORCHESTRATOR**: Received decision from PM: [MODE] mode with [N] developer(s)
 ```
 
-Example outputs:
-- "📨 **ORCHESTRATOR**: Received decision from PM: SIMPLE mode with 1 developer"
-- "📨 **ORCHESTRATOR**: Received decision from PM: PARALLEL mode with 3 developers"
-
-**🔴 CRITICAL - LOG THIS INTERACTION TO DATABASE:**
-
-After receiving PM response, IMMEDIATELY invoke the **bazinga-db skill** to log this interaction:
-
-**Request to bazinga-db skill:**
+**Log PM interaction to database:**
 ```
 bazinga-db, please log this PM interaction:
 
-Session ID: [current session_id from init]
+Session ID: [current session_id]
 Agent Type: pm
-Content: [Full PM response text]
+Content: [Full PM response]
 Iteration: 1
 Agent ID: pm_main
 ```
 
-**Then invoke the skill:**
+**Then invoke:**
 ```
 Skill(command: "bazinga-db")
 ```
 
-The bazinga-db skill will read your request above and handle database storage automatically. This replaces file-based logging and prevents race conditions.
+See `coordination/templates/message_templates.md` for PM response format examples.
 
-**⚠️ YOU MUST LOG EVERY AGENT INTERACTION TO DATABASE - This is not optional!**
-**⚠️ NEVER skip this step - Database logging is MANDATORY after EVERY agent spawn!**
+### Step 1.4: Route Based on Mode
 
-PM will return something like:
-
-```markdown
-## PM Decision: PARALLEL MODE
-
-### Analysis
-- Features: 3 (JWT auth, user registration, password reset)
-- File overlap: LOW
-- Dependencies: Password reset depends on auth
-- Recommended parallelism: 2 developers (auth+reg parallel, reset in phase 2)
-
-### Task Groups Created
-
-**Group A: JWT Authentication**
-- Tasks: Token generation, validation
-- Files: auth.py, middleware.py
-- Branch: feature/group-A-jwt-auth
-- Can parallel: YES
-
-**Group B: User Registration**
-- Tasks: Registration endpoint
-- Files: users.py
-- Branch: feature/group-B-user-reg
-- Can parallel: YES
-
-**Group C: Password Reset**
-- Tasks: Reset flow
-- Files: password_reset.py
-- Branch: feature/group-C-pwd-reset
-- Can parallel: NO (depends on A)
-
-### Execution Plan
-Phase 1: Groups A, B (parallel, 2 developers)
-Phase 2: Group C (after A complete)
-
-### Next Action
-Orchestrator should spawn 2 developers for groups: A, B
-```
-
-### Step 1.4: Log PM Decision
-
-```
-Append to docs/orchestration-log.md:
-
-## [TIMESTAMP] Iteration 1 - Project Manager (Mode Selection)
-
-### Prompt Sent:
-[Full PM prompt]
-
-### PM Response:
-[Full PM response]
-
-### Orchestrator Decision:
-PM chose [mode]. Spawning [N] developer(s) for group(s): [IDs]
-```
-
-### Step 1.5: Route Based on Mode
-
-**UI Message:** Output routing decision:
+**UI Message:**
 ```
 IF PM chose "simple":
     Output: "👉 **ORCHESTRATOR**: Routing to Phase 2A (Simple Mode - single developer workflow)"
-    → Go to Phase 2A (Simple Mode)
+    → Go to Phase 2A
 
 ELSE IF PM chose "parallel":
     Output: "👉 **ORCHESTRATOR**: Routing to Phase 2B (Parallel Mode - [N] developers working concurrently)"
-    → Go to Phase 2B (Parallel Mode)
+    → Go to Phase 2B
 ```
 
 ---
-
 ## Phase 2A: Simple Mode Execution
 
 **UI Message:** Output when entering Phase 2A:
@@ -1527,733 +1328,239 @@ If answer is NO to any → You forgot to execute the Completion section → GO B
 
 ### Step 2B.0: Prepare Code Context for Each Group
 
-**Before spawning parallel developers, prepare code context for EACH group.**
+For each group in PM's execution plan, prepare code context (same pattern as Step 2A.0 but per-group):
+- Extract keywords from task description
+- Find similar files (limit to top 3)
+- Read common utility directories
+- Build code context block for this group
 
-**For each group in groups_to_spawn:**
-
-```python
-# Extract keywords from task description
-group = PM.task_groups[group_id]
-task_description = group["description"] + " " + group["requirements"]
-keywords = extract_keywords(task_description)
-
-# Find similar files
-similar_files = []
-for file in list_files("."):
-    if any(keyword in file.lower() for keyword in keywords):
-        similar_files.append(file)
-
-# Limit to top 3 most relevant
-similar_files = similar_files[:3]
-
-# Read common utility directories
-utility_dirs = ["utils/", "lib/", "helpers/", "services/", "common/"]
-utility_files = []
-for dir in utility_dirs:
-    if exists(dir):
-        utility_files.extend(list_files(dir))
-
-# Build code context for this group
-group_code_context = """
-═══════════════════════════════════════════
-📚 CODEBASE CONTEXT (Similar Code & Utilities)
-═══════════════════════════════════════════
-
-## Similar Features
-"""
-
-for file in similar_files:
-    content_snippet = read_file_snippet(file, lines=30)
-    group_code_context += f"""
-**File: {file}**
-```
-{content_snippet}
-```
-"""
-
-group_code_context += """
-## Available Utilities
-
-"""
-for util_file in utility_files:
-    group_code_context += f"- {util_file}\n"
-
-# Store for this group
-code_contexts[group_id] = group_code_context
-```
+Store each group's code context separately for use in developer prompts.
 
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
-**UI Message:** Output before spawning (show count):
+**UI Message:**
 ```
 👨‍💻 **ORCHESTRATOR**: Spawning [N] developers in parallel for groups: [list groups]
 ```
 
-Example: "👨‍💻 **ORCHESTRATOR**: Spawning 3 developers in parallel for groups: A, B, C"
-
-**CRITICAL:** Spawn ALL developers in ONE message (for true parallelism).
+**CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
 
 ```
-// Extract groups from PM decision
-groups_to_spawn = PM.execution_plan.phase_1  // e.g., ["A", "B", "C"]
-
-// Spawn all in ONE message:
-
-Task(
-  subagent_type: "general-purpose",
-  description: "Developer implementing Group A",
-  prompt: [Developer prompt for Group A with code context]
-)
-
-Task(
-  subagent_type: "general-purpose",
-  description: "Developer implementing Group B",
-  prompt: [Developer prompt for Group B with code context]
-)
-
-Task(
-  subagent_type: "general-purpose",
-  description: "Developer implementing Group C",
-  prompt: [Developer prompt for Group C with code context]
-)
-
-// Up to 4 developers max
+Task(subagent_type: "general-purpose", description: "Developer Group A", prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", description: "Developer Group B", prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", description: "Developer Group C", prompt: [Group C prompt])
+... up to 4 developers max
 ```
 
-**Developer Prompt Template** (customize per group):
+**Developer Prompt Structure** (per group):
 
-```
-You are a DEVELOPER in a Claude Code Multi-Agent Dev Team orchestration system.
+Build each prompt using `coordination/templates/prompt_building.md`:
+- Base: Role, group ID, mode (Parallel), branch name
+- Code context for this group
+- Testing framework section (from testing_config.json)
+- Advanced skills section (from skills_config.json):
+  - Skill(command: "codebase-analysis")
+  - Skill(command: "test-pattern-analysis")
+  - Skill(command: "lint-check")
+  - Skill(command: "api-contract-validation")
+  - Skill(command: "db-migration-check")
+  Reference skill SKILL.md files for details
+- Mandatory workflow with skill invocations
+- Report format
 
-**GROUP:** {group_id}
-**MODE:** Parallel (working alongside {N-1} other developers)
-
-**YOUR GROUP:**
-{PM's task group details for this group}
-
-**YOUR BRANCH:** feature/group-{group_id}-{name}
-
-{code_contexts[group_id]}
-
-═══════════════════════════════════════════
-⚡ SKILLS CONFIGURATION
-═══════════════════════════════════════════
-
-{Read skills_config.json to determine which Skills are active for Developer}
-skills_config = read_json("coordination/skills_config.json")
-dev_skills = skills_config["developer"]
-
-Available Skills:
-{IF dev_skills["lint-check"] == "mandatory"}:
-- Lint Check: Skill(command: "lint-check")
-  Outputs: coordination/lint_results.json
-{END IF}
-
-{IF dev_skills["codebase-analysis"] == "mandatory"}:
-- Codebase Analysis: Skill(command: "codebase-analysis")
-  Outputs: coordination/codebase_analysis.json
-{END IF}
-
-{IF dev_skills["test-pattern-analysis"] == "mandatory"}:
-- Test Pattern Analysis: Skill(command: "test-pattern-analysis")
-  Outputs: coordination/test_patterns.json
-{END IF}
-
-{IF dev_skills["api-contract-validation"] == "mandatory"}:
-- API Contract Validation: Skill(command: "api-contract-validation")
-  Outputs: coordination/api_contract_validation.json
-{END IF}
-
-{IF dev_skills["db-migration-check"] == "mandatory"}:
-- DB Migration Check: Skill(command: "db-migration-check")
-  Outputs: coordination/db_migration_check.json
-{END IF}
-
-═══════════════════════════════════════════
-
-**MANDATORY WORKFLOW:**
-
-BEFORE Implementing:
-1. Review codebase context above
-{IF dev_skills["codebase-analysis"] == "mandatory"}:
-2. **INVOKE Codebase Analysis (MANDATORY):**
-   Skill(command: "codebase-analysis")
-   Read: coordination/codebase_analysis.json
-{END IF}
-
-During Implementation:
-3. Create branch: git checkout -b {branch_name}
-4. Implement COMPLETE solution for your group
-5. Write unit tests
-{IF dev_skills["test-pattern-analysis"] == "mandatory"}:
-6. **INVOKE Test Pattern Analysis (MANDATORY):**
-   Skill(command: "test-pattern-analysis")
-   Read: coordination/test_patterns.json
-{END IF}
-
-BEFORE Reporting READY_FOR_QA:
-7. Run ALL unit tests - MUST pass 100%
-{IF dev_skills["lint-check"] == "mandatory"}:
-8. **INVOKE lint-check (MANDATORY):**
-   Skill(command: "lint-check")
-   Read: coordination/lint_results.json
-   FIX ALL ISSUES before proceeding
-{END IF}
-9. Run build check - MUST succeed
-{IF dev_skills["api-contract-validation"] == "mandatory"}:
-10. **INVOKE API Contract Validation (MANDATORY if API changes):**
-    Skill(command: "api-contract-validation")
-    Read: coordination/api_contract_validation.json
-{END IF}
-{IF dev_skills["db-migration-check"] == "mandatory"}:
-11. **INVOKE DB Migration Check (MANDATORY if migration changes):**
-    Skill(command: "db-migration-check")
-    Read: coordination/db_migration_check.json
-{END IF}
-
-ONLY THEN:
-13. Commit to YOUR branch: {branch_name}
-14. Report: READY_FOR_QA
-
-**IMPORTANT:**
-- Work ONLY on your assigned files
-- Don't modify files from other groups
-- Commit to YOUR branch only
-
-**YOUR JOB:**
-1. Follow mandatory workflow above
-2. Implement complete solution for Group {group_id}
-3. Ensure ALL checks pass before reporting
-
-**REPORT FORMAT:**
-## Implementation Complete - Group {group_id}
-
-**Group:** {group_id}
-**Summary:** [One sentence]
-
-**Files Modified:**
-- file1.py (created/modified)
-- file2.py (created/modified)
-
-**Branch:** {branch_name}
-
-**Commits:**
-- abc123: Description
-
-**Unit Tests:**
-- Total: X
-- Passing: X
-- Failing: 0
-
-**Status:** READY_FOR_QA
-
-[If blocked or incomplete, use Status: BLOCKED or INCOMPLETE and explain]
-
-START IMPLEMENTING NOW.
-```
+See `coordination/templates/message_templates.md` for standard prompt format.
 
 ### Step 2B.2: Receive All Developer Responses
 
-**UI Message:** Output as each developer responds:
+**UI Message** (per developer):
 ```
 📨 **ORCHESTRATOR**: Received status from Developer (Group [X]): [STATUS]
 ```
 
-Example: "📨 **ORCHESTRATOR**: Received status from Developer (Group A): READY_FOR_QA"
+**For EACH developer response:**
 
-**🔴 CRITICAL - LOG EACH DEVELOPER INTERACTION TO DATABASE:**
-
-For EACH developer response, IMMEDIATELY invoke the **bazinga-db skill** to log:
-
-**Request to bazinga-db skill:**
+Log to database (see `coordination/templates/logging_pattern.md`):
 ```
 bazinga-db, please log this developer interaction:
 
 Session ID: [current session_id]
 Agent Type: developer
-Content: [Full Developer response text]
-Iteration: [current iteration number]
-Agent ID: developer_[X] (where X is group number: 1, 2, 3, or 4)
+Content: [Full developer response]
+Iteration: [iteration]
+Agent ID: dev_group_[X]
 ```
 
-**Then invoke the skill:**
-```
-Skill(command: "bazinga-db")
-```
-
-The bazinga-db skill will read your request above and handle database storage automatically.
-
-**⚠️ Log EACH developer separately - don't batch!**
-
-You'll receive N responses (one from each developer).
-
-**Track each independently** - don't wait for all to finish before proceeding.
-
-### Step 2B.3: Route Each Developer Response Independently
-
-**UI Messages:** Output routing decision for each group:
-
-For EACH developer response:
-
-```
-IF status == "READY_FOR_QA":
-    Output: "✅ **ORCHESTRATOR**: Group [X] complete - forwarding to QA Expert..."
-    → Spawn QA Expert for that group
-
-ELSE IF status == "BLOCKED":
-    Output: "⚠️ **ORCHESTRATOR**: Group [X] blocked - forwarding to Tech Lead for unblocking..."
-    → Spawn Tech Lead to unblock that developer
-    → When unblocked, respawn that developer
-    Output: "🔄 **ORCHESTRATOR**: Forwarding unblocking solution back to Developer (Group [X])..."
-
-ELSE IF status == "INCOMPLETE":
-    Output: "⚠️ **ORCHESTRATOR**: Group [X] needs guidance - forwarding to Tech Lead..."
-    → Spawn Tech Lead for guidance
-    Output: "🔄 **ORCHESTRATOR**: Forwarding guidance back to Developer (Group [X])..."
-    → Respawn that developer with guidance
-```
-
-**Important:** Each group flows independently. Don't wait for Group A to finish before starting QA for Group B.
-
-### Step 2B.4: Spawn QA Expert (Per Group)
-
-**UI Message:** Output before spawning each QA:
-```
-🧪 **ORCHESTRATOR**: Spawning QA Expert for Group [X]...
-```
-
-For each developer that returns READY_FOR_QA:
-
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "QA Expert testing Group {group_id}",
-  prompt: """
-You are a QA EXPERT in a Claude Code Multi-Agent Dev Team orchestration system.
-
-**GROUP:** {group_id}
-
-**DEVELOPER HANDOFF:**
-{Full developer response for this group}
-
-**BRANCH:** {branch_name}
-
-[Same QA prompt as simple mode, but specific to this group]
-
-START TESTING NOW.
-  """
-)
-```
-
-### Step 2B.5: Route QA Response (Per Group)
-
-**UI Message:** Output after receiving each QA response:
-```
-📨 **ORCHESTRATOR**: Received test results from QA Expert (Group [X]): [PASS/FAIL]
-```
-
-**🔴 CRITICAL - LOG EACH QA INTERACTION TO DATABASE:**
-
-For EACH QA response, IMMEDIATELY invoke the **bazinga-db skill** to log:
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please log this QA interaction:
-
-Session ID: [current session_id]
-Agent Type: qa
-Content: [Full QA response text]
-Iteration: [current iteration number]
-Agent ID: qa_group_[X] (where X is group identifier: a, b, c, or d)
-```
-
-**Then invoke the skill:**
+Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
 
-The bazinga-db skill will read your request above and handle database storage automatically.
+### Step 2B.3-2B.7: Route Each Group Independently
 
-**⚠️ Log EACH QA separately - track per group!**
+**For EACH group independently, follow the same routing workflow as Phase 2A:**
 
-**UI Messages:** Output routing decision for each group:
+The routing chain for each group is:
+**Developer** → **QA Expert** (if applicable) → **Tech Lead** → **PM final check**
 
-For each QA response:
+**Specifically, for each group:**
 
-```
-IF result == "PASS":
-    Output: "✅ **ORCHESTRATOR**: Group [X] tests passed - forwarding to Tech Lead for review..."
-    → Spawn Tech Lead for that group
+1. **Route Developer Response** (Step 2B.3):
+   - IF status is READY_FOR_QA → Proceed to QA (Step 2B.4) or Tech Lead (skip QA based on testing config)
+   - IF status is BLOCKED/INCOMPLETE → Provide feedback, respawn developer (track revisions)
 
-ELSE IF result == "FAIL":
-    Output: "❌ **ORCHESTRATOR**: Group [X] tests failed - forwarding back to Developer..."
-    → Spawn Developer for that group with failures
-    Output: "🔄 **ORCHESTRATOR**: Developer fixed Group [X] - sending back to QA..."
-    → Loop that group back through QA
-```
+2. **Spawn QA Expert** (Step 2B.4) - IF qa_expert_enabled:
+   - Build QA prompt (similar to Phase 2A but for this group's files)
+   - Spawn: `Task(subagent_type="general-purpose", description="QA Group [X]", prompt=[QA prompt])`
 
-### Step 2B.6: Spawn Tech Lead (Per Group)
+   **After QA completes, invoke quality skills:**
 
-For each QA that passes, determine model based on revision count:
+   ```
+   pattern-miner, please analyze test patterns for Group [X]
+   ```
+   Then invoke:
+   ```
+   Skill(command: "pattern-miner")
+   ```
 
-**Request to bazinga-db skill:**
-```
-bazinga-db, please get task group information:
+   ```
+   quality-dashboard, please generate snapshot for Group [X]
+   ```
+   Then invoke:
+   ```
+   Skill(command: "quality-dashboard")
+   ```
 
-Session ID: [current session_id]
-Group ID: [group_id for this specific group]
-```
+   **Log QA response:**
+   ```
+   bazinga-db, please log this QA interaction:
 
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
+   Session ID: [session_id]
+   Agent Type: qa_expert
+   Content: [QA response]
+   Iteration: [iteration]
+   Agent ID: qa_group_[X]
+   ```
 
-Extract `revision_count` from the returned task group data (defaults to 0).
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
 
-```python
-# Use revision_count from database query above
+3. **Route QA Response** (Step 2B.5):
+   - IF QA approves → Proceed to Tech Lead (Step 2B.6)
+   - IF QA requests changes → Respawn developer with QA feedback (track revisions)
 
-# Model escalation at revision 3+
-if revision_count >= 3:
-    model_to_use = "opus"
-    model_reason = f"(Revision #{revision_count} - Using Opus for persistent issue)"
-else:
-    model_to_use = "sonnet"
-    model_reason = f"(Revision #{revision_count} - Using Sonnet)"
-```
+4. **Spawn Tech Lead** (Step 2B.6):
+   - Build Tech Lead prompt (review for this group's files)
+   - Spawn: `Task(subagent_type="general-purpose", description="Tech Lead Group [X]", prompt=[TL prompt])`
 
-**UI Messages:** Output before spawning each Tech Lead:
-```
-👔 **ORCHESTRATOR**: Spawning Tech Lead to review Group [X]...
-{IF revision_count >= 3}:
-    ⚡ **ORCHESTRATOR**: Escalating to Opus model (revision #{revision_count}) for deeper analysis...
-{IF revision_count >= 2}:
-    🔍 **ORCHESTRATOR**: Using advanced security scan (revision #{revision_count})...
-```
+   **After Tech Lead review, invoke validation skills:**
 
-For each QA that passes:
+   ```
+   security-scan, please scan changes for Group [X]
+   ```
+   Then invoke:
+   ```
+   Skill(command: "security-scan")
+   ```
 
-```
-Task(
-  subagent_type: "general-purpose",
-  model: model_to_use,
-  description: f"Tech Lead reviewing Group {group_id} (revision {revision_count})",
-  prompt: f"""
-You are a TECH LEAD in a Claude Code Multi-Agent Dev Team orchestration system.
+   ```
+   lint-check, please check code quality for Group [X]
+   ```
+   Then invoke:
+   ```
+   Skill(command: "lint-check")
+   ```
 
-**GROUP:** {group_id}
-**REVISION:** {revision_count}
-**MODEL:** {model_to_use}
+   ```
+   test-coverage, please analyze coverage for Group [X]
+   ```
+   Then invoke:
+   ```
+   Skill(command: "test-coverage")
+   ```
 
-{IF revision_count >= 3}:
-⚠️ **ENHANCED ANALYSIS REQUIRED (OPUS MODEL)**
+   **Log Tech Lead response:**
+   ```
+   bazinga-db, please log this tech_lead interaction:
 
-This code has been revised {revision_count} times. Persistent issues detected.
-Apply extra thorough review - look for subtle bugs, edge cases, architectural issues.
+   Session ID: [session_id]
+   Agent Type: tech_lead
+   Content: [Tech Lead response]
+   Iteration: [iteration]
+   Agent ID: techlead_group_[X]
+   ```
 
-**CONTEXT:**
-- Developer: {{dev summary}}
-- QA: ALL PASS ({{test counts}})
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
 
-**FILES:** {{list}}
-**BRANCH:** {{branch_name}}
+5. **Route Tech Lead Response** (Step 2B.7):
+   - IF Tech Lead approves → Mark group as COMPLETE
+   - IF Tech Lead requests changes → Respawn appropriate agent (developer or QA) with feedback (track revisions)
 
-**IMPORTANT:** Do NOT send BAZINGA. That's PM's job.
+**IMPORTANT:** Track revision counts per group in database. Escalate if >2 revisions.
 
-[Same tech lead prompt as simple mode with Skills based on revision_count]
-
-START REVIEW NOW.
-  """
-)
-
-# IMPORTANT: Model selection is per-agent only
-# The orchestrator continues using sonnet (default) after spawning tech lead
-# Only the tech lead agent uses the model specified above
-```
-
-**⚠️ CRITICAL: Model Scope**
-The `model: model_to_use` parameter above applies ONLY to the Tech Lead agent you just spawned.
-YOU (the orchestrator) continue using your default model (Sonnet 4.5).
-All future agent spawns use Sonnet 4.5 unless explicitly specified otherwise.
-
-### Step 2B.7: Route Tech Lead Response (Per Group)
-
-**UI Message:** Output after receiving each Tech Lead response:
-```
-📨 **ORCHESTRATOR**: Received review from Tech Lead (Group [X]): [APPROVED/CHANGES_REQUESTED]
-```
-
-**🔴 CRITICAL - LOG EACH TECH LEAD INTERACTION TO DATABASE:**
-
-For EACH Tech Lead response, IMMEDIATELY invoke the **bazinga-db skill** to log:
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please log this tech lead interaction:
-
-Session ID: [current session_id]
-Agent Type: tech_lead
-Content: [Full Tech Lead response text]
-Iteration: [current iteration number]
-Agent ID: tech_lead_group_[X] (where X is group identifier: a, b, c, or d)
-```
-
-**Then invoke the skill:**
-```
-Skill(command: "bazinga-db")
-```
-
-The bazinga-db skill will read your request above and handle database storage automatically.
-
-**⚠️ Log EACH Tech Lead separately - track per group!**
-
-**UI Messages:** Output routing decision for each group:
-
-For each tech lead response:
-
-```
-IF decision == "APPROVED":
-    Output: "✅ **ORCHESTRATOR**: Group [X] approved - updating status..."
-    → Update group_status.json (mark that group complete)
-    → Check if ALL assigned groups are complete
-    → If ALL complete:
-        Output: "🎯 **ORCHESTRATOR**: All groups approved - forwarding to PM for final check..."
-        Spawn PM (Step 2B.8)
-    → If NOT all complete:
-        Output: "⏳ **ORCHESTRATOR**: Waiting for remaining groups to complete..."
-        Continue waiting
-
-ELSE IF decision == "CHANGES_REQUESTED":
-    Output: "⚠️ **ORCHESTRATOR**: Group [X] needs changes - forwarding back to Developer..."
-    → Spawn Developer for that group with feedback
-    Output: "🔄 **ORCHESTRATOR**: Developer addressed Group [X] changes - sending to QA..."
-    → Loop that group back through QA → Tech Lead
-```
+All agent prompts follow same pattern as Phase 2A (see `coordination/templates/prompt_building.md`).
 
 ### Step 2B.8: Spawn PM When All Groups Complete
 
-**UI Message:** Output before spawning PM:
-```
-📋 **ORCHESTRATOR**: All groups complete - spawning PM to check if more work needed...
-```
+**WAIT until ALL groups have Tech Lead approval.**
 
-**CRITICAL: Build PM Prompt with Skills Configuration (Parallel Mode)**
-
-**Step 1: Read Skills Configuration**
-```bash
-cat coordination/skills_config.json
+**UI Message:**
+```
+🧠 **ORCHESTRATOR**: All groups complete. Spawning PM for overall assessment...
 ```
 
-Store configuration value:
-- `velocity_tracker_mandatory` = true/false (check if pm.velocity-tracker == "mandatory")
+Build PM prompt with:
+- Session context
+- All group results and commit summaries
+- Overall status check request
 
-**Step 2: Build Base PM Prompt**
+Spawn: `Task(subagent_type="general-purpose", description="PM overall assessment", prompt=[PM prompt])`
 
+**Log PM response:**
 ```
-You are the PROJECT MANAGER.
+bazinga-db, please log this PM interaction:
 
-**PREVIOUS STATE:**
-```json
-{latest PM state from database - query using bazinga-db skill}
-```
-
-**NEW INFORMATION:**
-All groups in current phase have been APPROVED:
-- Group A: APPROVED ✅
-- Group B: APPROVED ✅
-- Group C: APPROVED ✅
+Session ID: [session_id]
+Agent Type: pm
+Content: [PM response]
+Iteration: [iteration]
+Agent ID: pm_parallel_final
 ```
 
-**Step 3: Add Velocity Tracker Section (if mandatory)**
-
-IF `velocity_tracker_mandatory` is true, add:
+Then invoke:
 ```
-**MANDATORY: Track Velocity and Metrics**
+Skill(command: "bazinga-db")
+```
 
-BEFORE making your final decision, you MUST track project metrics:
+**Track velocity metrics:**
+```
+velocity-tracker, please analyze parallel mode completion:
 
-**STEP 1: Invoke velocity-tracker Skill (MANDATORY)**
+Session ID: [session_id]
+Groups Completed: [N]
+Total Time: [duration]
+```
+
+Then invoke:
+```
 Skill(command: "velocity-tracker")
-
-Wait for Skill to complete (3-5 seconds).
-
-**STEP 2: Read velocity metrics**
-cat coordination/project_metrics.json
-
-**STEP 3: Use metrics to inform your decision**
-- Check current velocity vs baseline
-- Identify any 99% rule violations (stuck tasks)
-- Note any concerning trends
-- Include metrics summary in your response
-```
-
-**Step 4: Complete PM Prompt**
-
-Continue with:
-```
-**YOUR JOB:**
-1. Get latest PM state from database using bazinga-db skill
-2. Update completed_groups in database
-3. Check if more work needed:
-   - Phase 2 pending? → Assign next batch
-   - All phases complete? → Send BAZINGA (include metrics summary if velocity-tracker ran)
-
-**STATE LOCATION:** Database (query via bazinga-db skill)
-
-**CRITICAL:** If everything is complete, include "BAZINGA" in your response.
-
-START YOUR CHECK NOW.
-```
-
-**Step 5: Call Task Tool with Built Prompt**
-
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "PM checking completion status",
-  prompt: [THE PROMPT YOU BUILT IN STEPS 2-4]
-)
 ```
 
 ### Step 2B.9: Route PM Response
 
-**UI Message:** Output after receiving PM response:
-```
-📨 **ORCHESTRATOR**: Received response from PM...
-```
+**IF PM sends BAZINGA:**
+- Proceed to Completion phase
 
-**🚨 CRITICAL: BAZINGA Detection and Final Report Generation (Parallel Mode)**
-
-```
-IF PM response contains "BAZINGA":
-    Output: "🎉 **ORCHESTRATOR**: BAZINGA received from PM - All work complete!"
-
-    ⚠️ **MANDATORY NEXT STEP: Generate Final Report**
-
-    You MUST execute the comprehensive final report generation workflow.
-    This is NOT optional. Do NOT just celebrate and stop.
-
-    **ANTI-PATTERN ❌:**
-    - ❌ Output "Workflow complete!" and stop
-    - ❌ Forward PM's message to user and stop
-    - ❌ Just say "BAZINGA!" and exit
-
-    **CORRECT FLOW ✅:**
-    - ✅ Detect BAZINGA keyword in PM response
-    - ✅ Execute "## Completion" section (lines 1997-2318)
-    - ✅ Aggregate all metrics, Skills results, state files
-    - ✅ Generate and display comprehensive final report
-    - ✅ THEN end workflow
-
-    **ACTION REQUIRED:**
-    Jump to "## Completion" section below and execute ALL 5 steps:
-    1. Step 1: Aggregate All Metrics (read all state files, Skills results)
-    2. Step 2: Detect Anomalies (find issues needing attention)
-    3. Step 3: Generate Detailed Report (write to coordination/reports/)
-    4. Step 4: Update State Files (mark orchestration complete)
-    5. Step 5: Display Concise Report (the 50+ line summary to user)
-
-    → GO TO "## Completion" section NOW ⬇️
-
-ELSE IF PM assigns next batch:
-    Output: "🔄 **ORCHESTRATOR**: PM assigned next batch of work - continuing with [N] more groups..."
-    → Extract next groups
-    → Loop back to Step 2B.1 with new groups
-```
-
-**⚠️ ENFORCEMENT CHECK:**
-
-Before ending workflow, ask yourself:
-- "Did I execute all 5 steps from the Completion section?"
-- "Did I display the comprehensive report with Skills Used, Quality Overview, Efficiency metrics?"
-- "Did I create the detailed report file in coordination/reports/?"
-
-If answer is NO to any → You forgot to execute the Completion section → GO BACK AND DO IT NOW
+**IF PM requests changes:**
+- Identify which groups need rework
+- Respawn those groups from appropriate stage
+- Track iteration count in database
 
 ---
-
-## 🎯 ROUTING DECISION TABLE (MANDATORY LOOKUP)
-
-**🔴 CRITICAL:** When you receive an agent response, you MUST:
-1. Output role check: `🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.`
-2. Look up the response type in this table
-3. Follow the EXACT action specified (spawn the next agent)
-4. NEVER deviate, NEVER skip steps, NEVER directly instruct
-
-### Decision Table
-
-| Agent | Response Type | MANDATORY Action | ❌ DO NOT |
-|-------|---------------|-----------------|-----------|
-| **PM** | Mode: "simple" | Spawn 1 Developer (Phase 2A) | ❌ Don't analyze yourself |
-| **PM** | Mode: "parallel" | Spawn N Developers (Phase 2B) | ❌ Don't plan yourself |
-| **Developer** | Status: "READY_FOR_QA" | Spawn QA Expert | ❌ Don't tell dev what to do next |
-| **Developer** | Status: "BLOCKED" | Spawn Tech Lead (unblock) | ❌ Don't solve problem yourself |
-| **Developer** | Status: "INCOMPLETE" | Spawn Tech Lead (guidance) | ❌ Don't give guidance yourself |
-| **QA Expert** | Result: "PASS" | Spawn Tech Lead (review) | ❌ Don't skip to next phase |
-| **QA Expert** | Result: "FAIL" | Spawn Developer (fix issues) | ❌ Don't tell dev how to fix |
-| **Tech Lead** | Decision: "APPROVED" | Update state → Spawn PM | ❌ Don't assign next work yourself |
-| **Tech Lead** | Decision: "CHANGES_REQUESTED" | Spawn Developer (revise) | ❌ Don't implement changes yourself |
-| **PM** | Contains "BAZINGA" | Execute Completion section (Steps 1-5) → Generate final report → END WORKFLOW ✅ | ❌ Don't stop without generating report |
-| **PM** | Assigns more work | Spawn Developers per PM instructions | ❌ Don't modify PM's plan |
-
-### Anti-Pattern Detection
-
-**❌ FORBIDDEN PATTERNS (Role Drift):**
-
-```
-Developer: Phase 1 complete
-Orchestrator: Now implement Phase 2...  ← WRONG! You're directly instructing
-```
-
-```
-QA: Tests failed
-Orchestrator: Fix the bug in auth.py...  ← WRONG! You're telling dev what to do
-```
-
-```
-Tech Lead: Approved
-Orchestrator: Let's move on to feature Y...  ← WRONG! PM decides next work
-```
-
-**✅ CORRECT PATTERNS (Coordinator):**
-
-```
-Developer: Phase 1 complete with READY_FOR_QA
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-📨 **ORCHESTRATOR**: Received from Developer: READY_FOR_QA
-👉 **ORCHESTRATOR**: Forwarding to QA Expert...
-[Spawns QA Expert]
-```
-
-```
-QA: Tests PASS
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-📨 **ORCHESTRATOR**: Received from QA: PASS
-👉 **ORCHESTRATOR**: Forwarding to Tech Lead for review...
-[Spawns Tech Lead]
-```
-
-### Quick Reference Chain
-
-```
-PM (mode) → Developer(s)
-  ↓
-Developer (READY_FOR_QA) → QA Expert
-  ↓
-QA (PASS) → Tech Lead
-  ↓
-Tech Lead (APPROVED) → PM
-  ↓
-PM (BAZINGA) → END
-PM (more work) → Developer(s)
-```
-
-**Remember:** You are a MESSAGE ROUTER. You look up the response, you spawn the next agent. That's it.
-
----
-
-## Logging to Database
 
 **🔴 CRITICAL - DATABASE LOGGING IS MANDATORY:**
 
@@ -2479,9 +1786,9 @@ IF group.review_attempts > 3:
 
 When PM sends BAZINGA:
 
-### Step 1: Aggregate All Metrics from Database
+### Step 1: Get Dashboard Snapshot
 
-Get complete dashboard snapshot from database (single efficient query):
+Query complete metrics from database:
 
 **Request to bazinga-db skill:**
 ```
@@ -2496,248 +1803,54 @@ Skill(command: "bazinga-db")
 ```
 
 The dashboard snapshot returns:
-- pm_state: Latest PM state
-- orch_state: Latest orchestrator state
-- task_groups: All task groups with their statuses
-- token_usage: Token consumption breakdown
-- recent_logs: Last 10 interactions
-
-For skill outputs, query individually:
-
-```
-bazinga-db, please get skill output:
-
-Session ID: [current session_id]
-Skill Name: security_scan
-```
-
-Repeat for each skill (test_coverage, lint_check, velocity_tracker, etc.)
-
-# Aggregate Skills usage
-skills_used = []
-if security_scan:
-    skills_used.append({
-        "name": "security-scan",
-        "status": security_scan.get("status", "unknown"),
-        "summary": f"{len(security_scan.get('results', []))} findings"
-    })
-if coverage_report:
-    avg_cov = coverage_report.get("summary", {}).get("line_coverage", 0)
-    skills_used.append({
-        "name": "test-coverage",
-        "status": coverage_report.get("status", "unknown"),
-        "summary": f"{avg_cov}% average coverage"
-    })
-if lint_results:
-    total_issues = len(lint_results.get("results", []))
-    skills_used.append({
-        "name": "lint-check",
-        "status": lint_results.get("status", "unknown"),
-        "summary": f"{total_issues} issues found"
-    })
-if velocity_tracker:
-    velocity = velocity_tracker.get("current_run", {}).get("velocity", 0)
-    skills_used.append({
-        "name": "velocity-tracker",
-        "status": "success",
-        "summary": f"{velocity} points completed"
-    })
-if codebase_analysis:
-    patterns = len(codebase_analysis.get("patterns_found", []))
-    skills_used.append({
-        "name": "codebase-analysis",
-        "status": codebase_analysis.get("status", "unknown"),
-        "summary": f"Found {patterns} patterns"
-    })
-if test_patterns:
-    framework = test_patterns.get("framework", "unknown")
-    skills_used.append({
-        "name": "test-pattern-analysis",
-        "status": test_patterns.get("status", "unknown"),
-        "summary": f"Framework: {framework}"
-    })
-if api_contract:
-    changes = len(api_contract.get("breaking_changes", []))
-    skills_used.append({
-        "name": "api-contract-validation",
-        "status": api_contract.get("status", "unknown"),
-        "summary": f"{changes} breaking changes"
-    })
-if db_migration:
-    risks = len(db_migration.get("dangerous_operations", []))
-    skills_used.append({
-        "name": "db-migration-check",
-        "status": db_migration.get("status", "unknown"),
-        "summary": f"{risks} risky operations"
-    })
-if pattern_miner:
-    insights = len(pattern_miner.get("patterns", []))
-    skills_used.append({
-        "name": "pattern-miner",
-        "status": pattern_miner.get("status", "unknown"),
-        "summary": f"{insights} patterns identified"
-    })
-if quality_dashboard:
-    score = quality_dashboard.get("health_score", 0)
-    skills_used.append({
-        "name": "quality-dashboard",
-        "status": quality_dashboard.get("status", "unknown"),
-        "summary": f"Health score: {score}/100"
-    })
-
-# Read baseline health checks
-build_baseline_status = safe_read_file("coordination/build_baseline_status.txt")
-build_final_status = safe_read_file("coordination/build_final_status.txt")
-
-# Calculate metrics
-end_time = current_timestamp()
-start_time = orch_state["start_time"]
-duration_minutes = calculate_duration(start_time, end_time)
-
-# Aggregate across all groups
-total_groups = len(group_status)
-groups_data = []
-for group_id, group_info in group_status.items():
-    if group_id.startswith("_"):  # Skip metadata keys
-        continue
-    groups_data.append({
-        "id": group_id,
-        "revision_count": group_info.get("revision_count", 0),
-        "iterations": group_info.get("iterations", {}),
-        "duration": group_info.get("duration_minutes", 0)
-    })
-
-# Calculate quality metrics
-security_issues = aggregate_security_issues(security_scan)
-coverage_avg = calculate_avg_coverage(coverage_report)
-lint_issues = aggregate_lint_issues(lint_results)
-
-# Calculate efficiency metrics
-first_time_approvals = count_groups_with_revision(groups_data, 0)
-approval_rate = (first_time_approvals / total_groups * 100) if total_groups > 0 else 0
-groups_escalated_opus = count_groups_with_revision(groups_data, 3, ">=")
-groups_escalated_scan = count_groups_with_revision(groups_data, 2, ">=")
-
-# Token usage
-token_usage = orch_state.get("token_usage", {})
-total_tokens = token_usage.get("total_estimated", 0)
-estimated_cost = estimate_cost(total_tokens, groups_escalated_opus)
-
-# Build health metrics
-build_baseline_passed = build_baseline_status and build_baseline_status.strip() == "0"
-build_final_passed = build_final_status and build_final_status.strip() == "0"
-build_health = {
-    "baseline": "✅ Pass" if build_baseline_passed else "❌ Fail",
-    "final": "✅ Pass" if build_final_passed else "❌ Fail",
-    "regression": not build_baseline_passed and build_final_passed  # Fixed during development
-}
-```
+- pm_state, orch_state, task_groups
+- token_usage, recent_logs
+- All skill outputs (security_scan, test_coverage, lint_check, velocity_tracker, etc.)
 
 ### Step 2: Detect Anomalies
 
-Identify issues that need attention:
+Check for issues requiring attention:
+- High revision counts (> 2)
+- Coverage gaps (< 80%)
+- Unresolved security issues
+- Build health regressions
+- Excessive token usage
 
-```python
-anomalies = []
+Flag any anomalies for inclusion in reports.
 
-# High revision counts (struggled groups)
-for group in groups_data:
-    if group["revision_count"] >= 3:
-        anomalies.append({
-            "type": "high_revisions",
-            "group_id": group["id"],
-            "revision_count": group["revision_count"],
-            "message": f"Group {group['id']}: Required {group['revision_count']} revisions"
-        })
-
-# Coverage gaps
-if coverage_report:
-    for file_path, coverage in coverage_report.get("files_below_threshold", {}).items():
-        anomalies.append({
-            "type": "coverage_gap",
-            "file": file_path,
-            "coverage": coverage,
-            "message": f"{file_path}: {coverage}% coverage (below threshold)"
-        })
-
-# Security issues (if any remain unresolved - this should be rare)
-if security_scan:
-    critical = security_scan.get("critical_issues", 0)
-    high = security_scan.get("high_issues", 0)
-    if critical > 0 or high > 0:
-        anomalies.append({
-            "type": "security",
-            "critical": critical,
-            "high": high,
-            "message": f"Security: {critical} critical, {high} high severity issues"
-        })
-
-# Build health regressions
-if build_health["regression"]:
-    anomalies.append({
-        "type": "build_regression",
-        "message": "Build was failing at baseline but is now passing",
-        "details": f"Baseline: {build_health['baseline']}, Final: {build_health['final']}",
-        "recommendation": "Verify build fixes were intentional"
-    })
-
-if not build_final_passed and build_baseline_passed:
-    anomalies.append({
-        "type": "build_broken",
-        "message": "Build was passing but is now broken",
-        "details": f"Baseline: {build_health['baseline']}, Final: {build_health['final']}",
-        "recommendation": "CRITICAL: Fix build before deployment"
-    })
-```
-
-### Step 3: Generate Detailed Report (Tier 2)
+### Step 3: Generate Detailed Report
 
 Create comprehensive report file:
 
-```python
-# Generate session filename
-report_filename = f"coordination/reports/session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-
-detailed_report = generate_detailed_report({
-    "session_id": orch_state["session_id"],
-    "mode": pm_state["mode"],
-    "duration_minutes": duration_minutes,
-    "start_time": start_time,
-    "end_time": end_time,
-    "groups": groups_data,
-    "security": security_issues,
-    "coverage": coverage_avg,
-    "lint": lint_issues,
-    "build_health": build_health,
-    "token_usage": token_usage,
-    "efficiency": {
-        "approval_rate": approval_rate,
-        "opus_escalations": groups_escalated_opus,
-        "scan_escalations": groups_escalated_scan
-    },
-    "anomalies": anomalies
-})
-
-# Write detailed report to file
-write_file(report_filename, detailed_report)
+```
+coordination/reports/session_{YYYYMMDD_HHMMSS}.md
 ```
 
-### Step 4: Update State Files
+See `coordination/templates/completion_report.md` for full report structure.
 
-```python
-# Update orchestrator_state.json
-orch_state["status"] = "completed"
-orch_state["end_time"] = end_time
-orch_state["duration_minutes"] = duration_minutes
-orch_state["completion_report"] = report_filename
+Report includes:
+- Session summary (mode, duration, groups)
+- Quality metrics (security, coverage, lint, build)
+- Efficiency metrics (approval rate, escalations)
+- Task groups breakdown
+- Skills usage summary
+- Anomalies detected
+- Token usage & cost estimate
 
-**Save final orchestrator state to database:**
+### Step 4: Update Database
+
+**Save final orchestrator state:**
 ```
 bazinga-db, please save the orchestrator state:
 
 Session ID: [current session_id]
 State Type: orchestrator
-State Data: [orch_state with completed status]
+State Data: {
+  "status": "completed",
+  "end_time": [timestamp],
+  "duration_minutes": [duration],
+  "completion_report": [report_filename]
+}
 ```
 
 **Then invoke:**
@@ -2745,12 +1858,13 @@ State Data: [orch_state with completed status]
 Skill(command: "bazinga-db")
 ```
 
-**Also update session status in database:**
+**Update session status:**
 ```
 bazinga-db, please update session status:
 
 Session ID: [current session_id]
 Status: completed
+End Time: [timestamp]
 ```
 
 **Then invoke:**
@@ -2758,28 +1872,38 @@ Status: completed
 Skill(command: "bazinga-db")
 ```
 
-# Log final entry
-append_to_log("docs/orchestration-log.md", f"""
-## [{end_time}] Orchestration Complete
-
-**Status**: BAZINGA received from PM
-**Duration**: {duration_minutes} minutes
-**Groups completed**: {total_groups}
-**Detailed report**: {report_filename}
-
----
-""")
-```
-
-### Step 5: Display Concise Report (Tier 1)
+### Step 5: Display Concise Report
 
 Output to user (keep under 30 lines):
 
-```markdown
+See `coordination/templates/completion_report.md` for Tier 1 report format.
+
+Display includes:
+- Mode, duration, groups completed
+- Quality overview (security, coverage, lint, build)
+- Skills used summary
+- Efficiency metrics (approval rate, escalations)
+- Anomalies (if any)
+- Link to detailed report file
+
+Example output:
+```
 ═══════════════════════════════════════════════════════════
 ✅ BAZINGA - Orchestration Complete!
 ═══════════════════════════════════════════════════════════
 
+**Mode**: SIMPLE (1 developer)
+**Duration**: 12 minutes
+**Groups**: 1/1 completed ✅
+
+**Quality**: All checks passed ✅
+**Skills Used**: 6 of 11 available
+**Detailed Report**: coordination/reports/session_20250113_143530.md
+
+═══════════════════════════════════════════════════════════
+```
+
+---
 ## Summary
 
 **Mode**: {mode} ({num_developers} developer(s))
