@@ -304,32 +304,36 @@ fi
 1. If script created new files:
    Output: "📁 **ORCHESTRATOR**: Coordination environment initialized"
 
-2. If files already existed:
-   Output: "📂 **ORCHESTRATOR**: Found existing session, loading state..."
-   Read existing session state from coordination/pm_state.json
+2. If session already exists in database:
+   Output: "📂 **ORCHESTRATOR**: Found existing session in database, loading state..."
+   Query existing session state from database using bazinga-db skill
    Continue from previous state
 
 3. Output: "🚀 **ORCHESTRATOR**: Ready to begin orchestration"
 ```
 
-**Expected Folder Structure (created by script):**
+**Database Storage:**
 
-```bash
-coordination/
-├── pm_state.json              # PM's persistent state
-├── group_status.json          # Per-group progress tracking
-├── orchestrator_state.json    # Orchestrator's state
-├── .gitignore                 # Excludes state files from git
-└── messages/                  # Inter-agent message passing
-    ├── dev_to_qa.json
-    ├── qa_to_techlead.json
-    └── techlead_to_dev.json
+All orchestration state is now stored in SQLite database at `coordination/bazinga.db`:
 
-docs/
-└── orchestration-log.md       # Complete interaction log
+```
+Database Tables:
+├── sessions                   # Session metadata (start/end times, mode, status)
+├── orchestration_logs         # Agent interaction logs (replaces orchestration-log.md)
+├── state_snapshots            # PM/orchestrator state snapshots (replaces JSON files)
+├── task_groups                # Task group tracking (replaces group_status.json)
+├── token_usage                # Token consumption tracking
+├── skill_outputs              # Skill results storage
+└── configuration              # System configuration
+
+Benefits:
+- ✅ Concurrent-safe (no file corruption in parallel mode)
+- ✅ ACID transactions
+- ✅ Fast indexed queries for dashboard
+- ✅ Single source of truth
 ```
 
-**Note:** The init script handles all file creation with proper timestamps and session IDs. See `.claude/scripts/init-orchestration.sh` for details.
+**Note:** The database is automatically initialized by bazinga-db skill on first use.
 
 ---
 
@@ -1388,7 +1392,7 @@ You are the PROJECT MANAGER.
 
 **PREVIOUS STATE:**
 ```json
-{read from pm_state.json}
+{latest PM state from database - query using bazinga-db skill}
 ```
 
 **NEW INFORMATION:**
@@ -1423,14 +1427,14 @@ cat coordination/project_metrics.json
 Continue with:
 ```
 **YOUR JOB:**
-1. Read pm_state.json
-2. Update completed_groups
+1. Get latest PM state from database using bazinga-db skill
+2. Update completed_groups in database
 3. Check if ALL work complete
 4. Make decision:
    - All complete? → Send BAZINGA (include metrics summary if velocity-tracker ran)
    - More work? → Assign next groups
 
-**STATE FILE:** coordination/pm_state.json
+**STATE LOCATION:** Database (query via bazinga-db skill)
 
 **CRITICAL:** If everything is complete, include the word "BAZINGA" in your response.
 
@@ -2041,7 +2045,7 @@ You are the PROJECT MANAGER.
 
 **PREVIOUS STATE:**
 ```json
-{read from pm_state.json}
+{latest PM state from database - query using bazinga-db skill}
 ```
 
 **NEW INFORMATION:**
@@ -2079,13 +2083,13 @@ cat coordination/project_metrics.json
 Continue with:
 ```
 **YOUR JOB:**
-1. Read pm_state.json
-2. Update completed_groups
+1. Get latest PM state from database using bazinga-db skill
+2. Update completed_groups in database
 3. Check if more work needed:
    - Phase 2 pending? → Assign next batch
    - All phases complete? → Send BAZINGA (include metrics summary if velocity-tracker ran)
 
-**STATE FILE:** coordination/pm_state.json
+**STATE LOCATION:** Database (query via bazinga-db skill)
 
 **CRITICAL:** If everything is complete, include "BAZINGA" in your response.
 
