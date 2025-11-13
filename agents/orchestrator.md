@@ -143,12 +143,45 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**Check if already initialized:**
-```bash
-[ -f "coordination/bazinga.db" ] && echo "Session may exist in database"
+**Check for existing sessions:**
+
+First, invoke bazinga-db skill to check for recent sessions:
+
+Request to bazinga-db skill:
+```
+bazinga-db, please list the most recent sessions (limit 5).
+I need to check if there's an active session to resume.
 ```
 
-**IF NEW session:**
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**Wait for bazinga-db response with session list.**
+
+**Based on the response:**
+
+---
+
+### Path A: RESUME EXISTING SESSION
+
+**IF bazinga-db shows an active/in-progress session:**
+
+Display:
+```
+🔄 **ORCHESTRATOR**: Found existing session - resuming orchestration
+📊 Session ID: [existing_session_id]
+📁 Status: [status from database]
+```
+
+**Skip to Phase 1** - The database already has the session, configs, and state. Go directly to spawning PM.
+
+---
+
+### Path B: CREATE NEW SESSION
+
+**IF no active sessions found OR user explicitly requested new session:**
 
 1. **Generate session ID:**
    ```bash
