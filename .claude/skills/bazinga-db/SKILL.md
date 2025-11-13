@@ -21,9 +21,9 @@ You are the bazinga-db skill. When invoked, you handle database operations for t
 - Replacing file writes to `coordination/*.json` or `docs/orchestration-log.md`
 
 **Do NOT invoke when:**
-- Database not initialized yet (initialize first with `init_db.py`)
 - Requesting read-only file operations (use Read tool directly)
 - No session_id context available
+- Working with non-orchestration data
 
 ---
 
@@ -44,13 +44,10 @@ DB_SCRIPT="/home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py"
 DB_PATH="/home/user/bazinga/coordination/bazinga.db"
 ```
 
-**First-time initialization:**
-If database doesn't exist, initialize it:
-```bash
-python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/init_db.py "$DB_PATH"
-```
+**Auto-initialization:**
+The database will be automatically initialized on first use (< 2 seconds). The script detects if the database doesn't exist and runs the initialization automatically, creating all tables with proper indexes and WAL mode for concurrency.
 
-This creates all tables with proper indexes and WAL mode for concurrency.
+No manual initialization needed - just invoke the skill and it handles everything.
 
 ---
 
