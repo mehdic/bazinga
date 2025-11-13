@@ -1184,9 +1184,12 @@ def init(
         "disabled": "Prototyping mode (lint only)"
     }
 
-    config_commands = "[dim]Customize:\n"
-    config_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
-    config_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
+    bazinga_commands = "[bold]BAZINGA Commands:[/bold]\n"
+    bazinga_commands += "[dim]  • /bazinga.orchestrate           (start orchestration)\n"
+    bazinga_commands += "  • /bazinga.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
+    bazinga_commands += "[dim]Customize:\n"
+    bazinga_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
+    bazinga_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
 
     # Determine next steps message based on whether project was created
     if project_name:
@@ -1204,7 +1207,7 @@ def init(
             f"{next_steps}\n\n"
             "[bold]Example:[/bold]\n"
             "  @orchestrator implement user authentication with JWT\n\n"
-            f"{config_commands}",
+            f"{bazinga_commands}",
             title="🎉 Installation Complete",
             border_style="green",
         )
