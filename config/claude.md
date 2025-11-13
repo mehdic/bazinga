@@ -173,11 +173,57 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 
 ---
 
+## 🔴 CRITICAL: Orchestrator File Synchronization
+
+**When updating the orchestrator agent, you MUST update BOTH files:**
+
+1. **agents/orchestrator.md** - The agent definition (Task tool invocation)
+2. **.claude/commands/bazinga.orchestrate.md** - The slash command version
+
+### ✅ REQUIRED SYNC PROCEDURE
+
+After making ANY changes to `agents/orchestrator.md`:
+
+```bash
+# Copy the body (from line 15 onwards) to the command file
+tail -n +15 agents/orchestrator.md > /tmp/orchestrator_body.txt
+
+# Preserve the command-specific header (first 21 lines)
+head -n 21 .claude/commands/bazinga.orchestrate.md > /tmp/command_header.txt
+
+# Combine header + body
+cat /tmp/command_header.txt /tmp/orchestrator_body.txt > .claude/commands/bazinga.orchestrate.md
+```
+
+### Verify Synchronization
+
+```bash
+# Check Skill invocation counts match
+echo "orchestrator.md: $(grep -c 'Skill(command: "bazinga-db")' agents/orchestrator.md)"
+echo "bazinga.orchestrate.md: $(grep -c 'Skill(command: "bazinga-db")' .claude/commands/bazinga.orchestrate.md)"
+
+# Verify bodies are identical (should output: 0)
+diff -u <(tail -n +15 agents/orchestrator.md) <(tail -n +22 .claude/commands/bazinga.orchestrate.md) | wc -l
+```
+
+### Why Both Files Must Match
+
+- **Same orchestration logic** - Both use identical workflow and state management
+- **Same database operations** - Both invoke bazinga-db skill identically
+- **Same agent coordination** - Both spawn PM, developers, QA, tech lead identically
+- **Only difference** - Headers for their respective contexts (agent vs command)
+
+**❌ DO NOT manually edit bazinga.orchestrate.md** - Always sync from orchestrator.md
+
+**✅ Single source of truth:** `agents/orchestrator.md` → sync to → `.claude/commands/bazinga.orchestrate.md`
+
+---
+
 ## Key Principles
 
 1. **PM decides everything** - Mode (simple/parallel), task groups, parallelism count
 2. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-3. **State files = memory** - Agents use JSON files to remember context across spawns
+3. **Database = memory** - All state stored in SQLite database (coordination/bazinga.db) via bazinga-db skill
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
 
