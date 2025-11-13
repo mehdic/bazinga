@@ -40,7 +40,7 @@ When invoked:
 Use the **Bash** tool to run the pre-built coverage script:
 
 ```bash
-bash .claude/skills/test-coverage/coverage.sh
+bash .claude/skills/test-coverage/scripts/coverage.sh
 ```
 
 This script will:

@@ -40,7 +40,7 @@ When invoked:
 Use the **Bash** tool to run the pre-built security scanning script:
 
 ```bash
-bash .claude/skills/security-scan/scan.sh
+bash .claude/skills/security-scan/scripts/scan.sh
 ```
 
 The script automatically determines scan mode:

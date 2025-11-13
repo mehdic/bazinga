@@ -40,7 +40,7 @@ When invoked:
 Use the **Bash** tool to run the pre-built linting script:
 
 ```bash
-bash .claude/skills/lint-check/lint.sh
+bash .claude/skills/lint-check/scripts/lint.sh
 ```
 
 This script will:
