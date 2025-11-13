@@ -1,6 +1,6 @@
 ---
 name: bazinga-db
-description: Database operations for BAZINGA orchestration system. This skill should be used when agents need to save or retrieve orchestration state, logs, task groups, token usage, or skill outputs. Replaces file-based storage with concurrent-safe SQLite database. Use instead of writing to coordination/*.json files or docs/orchestration-log.md.
+description: Database operations for BAZINGA orchestration system. This skill should be used when agents need to save or retrieve orchestration state, logs, task groups, token usage, or skill outputs. Replaces file-based storage with concurrent-safe SQLite database. Use instead of writing to bazinga/*.json files or docs/orchestration-log.md.
 version: 1.0.0
 allowed-tools: [Bash, Read]
 ---
@@ -18,7 +18,7 @@ You are the bazinga-db skill. When invoked, you handle database operations for t
 - Any agent needs to save skill outputs (security scan, coverage, lint results)
 - Dashboard needs to query orchestration data
 - Any agent mentions "save to database", "query database", or "bazinga-db"
-- Replacing file writes to `coordination/*.json` or `docs/orchestration-log.md`
+- Replacing file writes to `bazinga/*.json` or `docs/orchestration-log.md`
 
 **Do NOT invoke when:**
 - Requesting read-only file operations (use Read tool directly)
@@ -41,7 +41,7 @@ When invoked:
 **Database paths:**
 ```bash
 DB_SCRIPT="/home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py"
-DB_PATH="/home/user/bazinga/coordination/bazinga.db"
+DB_PATH="/home/user/bazinga/bazinga/bazinga.db"
 ```
 
 **Auto-initialization:**
@@ -169,7 +169,7 @@ SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
 Write operations - return concise confirmation:
 ```
 ✓ Session created: bazinga_20250113_143530
-✓ Database auto-initialized at coordination/bazinga.db
+✓ Database auto-initialized at bazinga/bazinga.db
 ✓ Logged PM interaction (iteration 1)
 ✓ Saved orchestrator state
 ✓ Updated task group: group_a → completed
@@ -245,7 +245,7 @@ Requirements: Add user authentication with OAuth2 support
 
 Expected output:
 ```
-✓ Database auto-initialized at coordination/bazinga.db
+✓ Database auto-initialized at bazinga/bazinga.db
 ✓ Session created: bazinga_20250113_143530
 
 Database ready for orchestration. Session is active and ready to receive logs and state.
@@ -352,7 +352,7 @@ Input: Agent tries to log interaction but database doesn't exist
 
 Expected output:
 ```
-❌ Database not found at: coordination/bazinga.db
+❌ Database not found at: bazinga/bazinga.db
 
 I can initialize the database now. This will:
 - Create 8 tables with proper indexes

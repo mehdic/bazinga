@@ -12,7 +12,7 @@ python3 /path/to/bazinga_db.py --db /path/to/bazinga.db <command> [arguments...]
 For brevity, examples below use:
 ```bash
 $DB_SCRIPT = /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py
-$DB_PATH = /home/user/bazinga/coordination/bazinga.db
+$DB_PATH = /home/user/bazinga/bazinga/bazinga.db
 ```
 
 ---
@@ -386,7 +386,7 @@ When using from Claude Code's Bash tool:
 ```bash
 # Set up variables
 DB_SCRIPT="/home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py"
-DB_PATH="/home/user/bazinga/coordination/bazinga.db"
+DB_PATH="/home/user/bazinga/bazinga/bazinga.db"
 SESSION_ID="bazinga_20250112_143022"
 
 # Example: Log interaction and update state in one command chain
@@ -405,7 +405,7 @@ The `BazingaDB` class can be imported directly:
 ```python
 from bazinga_db import BazingaDB
 
-db = BazingaDB('/home/user/bazinga/coordination/bazinga.db')
+db = BazingaDB('/home/user/bazinga/bazinga/bazinga.db')
 
 # Query logs
 logs = db.get_logs('bazinga_123', limit=10, agent_type='developer')

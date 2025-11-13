@@ -49,7 +49,7 @@ This script will:
 - Compare specs to detect breaking changes
 - Identify safe changes
 - Generate recommendations
-- Create `coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json`
+- Create `bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json`
 
 ---
 
@@ -58,7 +58,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
+bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 ```
 
 Extract key information:
@@ -90,7 +90,7 @@ Top recommendations:
 1. {recommendation}
 2. {recommendation}
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 ```
 
 ---
@@ -119,7 +119,7 @@ Top recommendations:
 2. Add "email" field back or create new versioned endpoint
 3. Deprecate with 410 Gone status before complete removal
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 ```
 
 **Scenario: First Run (Baseline Created)**
@@ -135,7 +135,7 @@ API Contract Validation:
 Baseline created from current API specification.
 Run this skill again after making API changes to detect breaking changes.
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 ```
 
 **Scenario: All Safe Changes**
@@ -158,7 +158,7 @@ Safe changes: 4
 
 All changes are backward-compatible.
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/api_contract_validation.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/api_contract_validation.json
 ```
 
 ---

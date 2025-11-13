@@ -48,7 +48,7 @@ This script will:
 - Auto-install required tools (pytest-cov, jest, etc.) if needed
 - Run coverage analysis
 - Parse results
-- Generate `coordination/artifacts/{SESSION_ID}/skills/coverage_report.json`
+- Generate `bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json`
 
 ---
 
@@ -57,7 +57,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/coverage_report.json
+bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json
 ```
 
 Extract key information:
@@ -79,7 +79,7 @@ Test Coverage Report:
   - {file1}: {percentage}% coverage
   - {file2}: {percentage}% coverage
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/coverage_report.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json
 ```
 
 ---
@@ -99,7 +99,7 @@ Test Coverage Report:
   - auth.py: 68% coverage (uncovered lines: 45-52, 89-103)
   - payment.py: 52% coverage (uncovered lines: 23, 45-78)
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/coverage_report.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json
 ```
 
 **Scenario: Full Coverage Achieved**
@@ -113,7 +113,7 @@ Test Coverage Report:
 - Files below 80% threshold: 0 files
 - All critical code paths covered
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/coverage_report.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json
 ```
 
 ---

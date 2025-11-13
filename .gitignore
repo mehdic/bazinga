@@ -62,13 +62,13 @@ env/
 .DS_Store
 Thumbs.db
 
-# Coordination files (gitignored by default in installed projects)
-coordination/
-!coordination/.gitignore
-!coordination/templates/
-!coordination/skills_config.json
-!coordination/testing_config.json
+# BAZINGA state files (gitignored by default in installed projects)
+bazinga/
+!bazinga/.gitignore
+!bazinga/templates/
+!bazinga/skills_config.json
+!bazinga/testing_config.json
 
-# Coordination artifacts (session outputs - always gitignored)
-coordination/artifacts/
-coordination/bazinga.db*
+# BAZINGA artifacts (session outputs - always gitignored)
+bazinga/artifacts/
+bazinga/bazinga.db*

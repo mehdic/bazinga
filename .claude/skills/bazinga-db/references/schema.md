@@ -7,7 +7,7 @@ This document provides complete reference documentation for the BAZINGA database
 - **Engine**: SQLite 3
 - **Journal Mode**: WAL (Write-Ahead Logging) for better concurrency
 - **Foreign Keys**: Enabled for referential integrity
-- **Location**: `/home/user/bazinga/coordination/bazinga.db`
+- **Location**: `/home/user/bazinga/bazinga/bazinga.db`
 
 ## Tables Overview
 

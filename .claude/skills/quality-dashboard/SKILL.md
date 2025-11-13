@@ -43,15 +43,15 @@ bash .claude/skills/quality-dashboard/dashboard.sh
 ```
 
 This script will:
-- Read `coordination/security_scan.json`
-- Read `coordination/coverage_report.json`
-- Read `coordination/lint_results.json`
-- Read `coordination/project_metrics.json`
+- Read `bazinga/security_scan.json`
+- Read `bazinga/coverage_report.json`
+- Read `bazinga/lint_results.json`
+- Read `bazinga/project_metrics.json`
 - Calculate component scores (0-100 for each)
 - Compute overall health score (weighted average)
 - Detect trends by comparing to previous run
 - Identify anomalies
-- Generate `coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json`
+- Generate `bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json`
 
 ---
 
@@ -60,7 +60,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 Extract key information:
@@ -106,7 +106,7 @@ Top Recommendations:
 2. {recommendation}
 3. {recommendation}
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 ---
@@ -139,7 +139,7 @@ Top Recommendations:
 1. Continue current practices
 2. Coverage improved by 12% this iteration
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 **Scenario: Quality Issues Detected**
@@ -174,7 +174,7 @@ Top Recommendations:
 2. Add tests for auth module (20% coverage drop)
 3. Fix 12 linting errors
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 ---

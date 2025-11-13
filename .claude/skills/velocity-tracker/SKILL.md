@@ -44,13 +44,13 @@ bash .claude/skills/velocity-tracker/track.sh
 ```
 
 This script will:
-- Read `coordination/pm_state.json`
+- Read `bazinga/pm_state.json`
 - Calculate current velocity and cycle times
 - Compare against historical metrics
 - Detect trends (improving/stable/declining)
 - Identify 99% rule violations
-- Generate `coordination/artifacts/{SESSION_ID}/skills/project_metrics.json`
-- Update `coordination/artifacts/{SESSION_ID}/skills/historical_metrics.json`
+- Generate `bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json`
+- Update `bazinga/artifacts/{SESSION_ID}/skills/historical_metrics.json`
 
 ---
 
@@ -59,7 +59,7 @@ This script will:
 Use the **Read** tool to read the generated report:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/project_metrics.json
+bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 Extract key information:
@@ -92,7 +92,7 @@ Top Recommendations:
 2. {recommendation 2}
 3. {recommendation 3}
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/project_metrics.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 ---
@@ -115,7 +115,7 @@ Top Recommendations:
 1. Current velocity exceeds historical average - good progress
 2. Estimated remaining time: 3.5 hours
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/project_metrics.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 **Scenario 2: 99% Rule Violation Detected**
@@ -138,7 +138,7 @@ Top Recommendations:
 2. Velocity below average - may need task breakdown
 3. Database tasks pattern: taking 2.5x estimate
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/project_metrics.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 ---
@@ -147,7 +147,7 @@ Details saved to: coordination/artifacts/{SESSION_ID}/skills/project_metrics.jso
 
 **If script fails:**
 - Check the script output for error messages
-- Verify `coordination/pm_state.json` exists
+- Verify `bazinga/pm_state.json` exists
 - Return error message to calling agent
 
 **If no completed groups:**

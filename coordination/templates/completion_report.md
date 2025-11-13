@@ -4,7 +4,7 @@
 
 Generate report filename:
 ```
-coordination/reports/session_{YYYYMMDD_HHMMSS}.md
+bazinga/reports/session_{YYYYMMDD_HHMMSS}.md
 ```
 
 Query dashboard snapshot from database (contains all metrics):
@@ -65,7 +65,7 @@ Keep under 30 lines:
 - **lint-check**: ✅ Success - 12 issues fixed
 - **test-coverage**: ✅ Success - 87.5% average coverage
 
-📁 **Detailed results**: See `coordination/` folder for full JSON outputs
+📁 **Detailed results**: See `bazinga/` folder for full JSON outputs
 
 ## Efficiency
 

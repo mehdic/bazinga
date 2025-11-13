@@ -44,12 +44,12 @@ bash .claude/skills/pattern-miner/mine.sh
 ```
 
 This script will:
-- Read `coordination/historical_metrics.json`
+- Read `bazinga/historical_metrics.json`
 - Extract task type patterns (database, auth, API, etc.)
 - Calculate estimation multipliers by task type
 - Detect 99% rule violation patterns
 - Generate predictions for current project
-- Create `coordination/artifacts/{SESSION_ID}/skills/pattern_insights.json`
+- Create `bazinga/artifacts/{SESSION_ID}/skills/pattern_insights.json`
 
 ---
 
@@ -58,7 +58,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-coordination/artifacts/{SESSION_ID}/skills/pattern_insights.json
+bazinga/artifacts/{SESSION_ID}/skills/pattern_insights.json
 ```
 
 Extract key information:
@@ -90,7 +90,7 @@ Estimation adjustments:
 Predictions for current project:
 - {prediction}
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/pattern_insights.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/pattern_insights.json
 ```
 
 ---
@@ -120,7 +120,7 @@ Predictions for current project:
 - Task G004 (database migration): Likely needs +150% time buffer
 - High risk of escalation if not broken into smaller tasks
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/pattern_insights.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/pattern_insights.json
 ```
 
 **Scenario: Insufficient Data**
@@ -137,7 +137,7 @@ Insufficient historical data. Need at least 5 completed runs for reliable patter
 
 Current data will be recorded for future analysis.
 
-Details saved to: coordination/artifacts/{SESSION_ID}/skills/pattern_insights.json
+Details saved to: bazinga/artifacts/{SESSION_ID}/skills/pattern_insights.json
 ```
 
 ---

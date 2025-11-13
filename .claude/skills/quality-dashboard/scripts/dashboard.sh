@@ -11,7 +11,7 @@ NC=$'\033[0m'  # No Color
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="coordination/bazinga.db"
+    local db_path="bazinga/bazinga.db"
     if [ ! -f "$db_path" ]; then
         echo "bazinga_default"
         return
@@ -38,7 +38,7 @@ except:
 SESSION_ID=$(get_current_session_id)
 
 # Directories
-COORD_DIR="coordination"
+COORD_DIR="bazinga"
 SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
 SECURITY_FILE="${SKILLS_DIR}/security_scan.json"
 COVERAGE_FILE="${SKILLS_DIR}/coverage_report.json"
@@ -432,4 +432,4 @@ if [ ${#RECOMMENDATIONS[@]} -gt 0 ]; then
 fi
 
 echo
-echo "📄 Full dashboard: coordination/quality_dashboard.json"
+echo "📄 Full dashboard: bazinga/quality_dashboard.json"
