@@ -143,14 +143,37 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**Check for existing sessions:**
+**Check user's intent:**
 
-First, invoke bazinga-db skill to check for recent sessions:
+**First, analyze what the user asked for:**
+
+User said: "[user's message]"
+
+**Does the user want to RESUME an existing session?**
+- Keywords: "resume", "continue", "keep going", "carry on", "finish", "complete"
+- If user message contains these → They want to RESUME
+
+**OR does the user have a NEW task?**
+- User describes a new feature/fix/implementation
+- No resume keywords
+- If this → They want a NEW SESSION
+
+**Decision:**
+- User wants to RESUME → Follow **Path A** below
+- User wants NEW task → Follow **Path B** below (skip session check, create new)
+
+**Simple rule:** Check user's intent FIRST. Most users give new tasks and should get new sessions.
+
+---
+
+**IF user wants to RESUME (Path A):**
+
+Invoke bazinga-db skill to get the most recent session:
 
 Request to bazinga-db skill:
 ```
 bazinga-db, please list the most recent sessions (limit 5).
-I need to check if there's an active session to resume.
+I need to find the latest session to resume.
 ```
 
 Then invoke:
@@ -160,35 +183,36 @@ Skill(command: "bazinga-db")
 
 **Wait for bazinga-db response with session list.**
 
-**Based on the response:**
+**IF list is empty:** Tell user "No sessions found to resume" and ask them to provide a new task.
+
+**IF list has sessions:** Use the first session (most recent).
 
 ---
 
 ### Path A: RESUME EXISTING SESSION
 
-**IF bazinga-db shows an active/in-progress session:**
+The session list is NOT empty - there are existing sessions. **You MUST immediately proceed with these steps:**
 
-**1. Extract session ID from list:**
+**1. Extract and set SESSION_ID:**
 
 ```bash
 # Set SESSION_ID to the existing session from database
-SESSION_ID="[session_id from most recent active session]"
+SESSION_ID="bazinga_20251113_160528"  # Use the actual session_id from response
 ```
 
-**Example:** If list-sessions returned `bazinga_20251113_120000` with status `active`, then:
-```bash
-SESSION_ID="bazinga_20251113_120000"
-```
+**Do this NOW** - set the SESSION_ID variable to the session_id you just received from bazinga-db.
 
 **2. Display resume message:**
 
 ```
 🔄 **ORCHESTRATOR**: Resuming existing session
-📊 Session ID: $SESSION_ID
-📁 Status: [status from database]
+📊 Session ID: bazinga_20251113_160528
+📁 Status: active
 ```
 
-**3. Load state from database:**
+**3. Load PM state from database:**
+
+**You MUST now invoke bazinga-db again to get PM state.**
 
 Request to bazinga-db skill:
 ```
@@ -291,33 +315,24 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
 
    ### 🔴 MANDATORY: Store configuration in database
 
-   **YOU MUST invoke bazinga-db skill to save orchestrator state.**
+   **YOU MUST invoke bazinga-db skill to save orchestrator initial state.**
 
-   Get current orchestrator state:
-   ```
-   bazinga-db, please get the latest orchestrator state:
-
-   Session ID: [current session_id]
-   State Type: orchestrator
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db")
-   ```
-
-   Update state with config information and save:
+   Request to bazinga-db skill:
    ```
    bazinga-db, please save the orchestrator state:
 
    Session ID: [current session_id]
    State Type: orchestrator
    State Data: {
+     "session_id": "[current session_id]",
+     "current_phase": "initialization",
      "skills_config_loaded": true,
-     "active_skills_count": [count from config],
+     "active_skills_count": [count from skills_config.json],
      "testing_config_loaded": true,
-     "testing_mode": "[mode from config]",
-     "qa_expert_enabled": [boolean from config]
+     "testing_mode": "[mode from testing_config.json]",
+     "qa_expert_enabled": [boolean from testing_config.json],
+     "iteration": 0,
+     "total_spawns": 0
    }
    ```
 
@@ -326,13 +341,15 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    Skill(command: "bazinga-db")
    ```
 
+   **WAIT for confirmation.** Database will save the initial orchestrator state.
+
    **REQUIRED OUTPUT - Display confirmation:**
    ```
    ✅ **ORCHESTRATOR**: Configuration stored in database
    ```
 
    **Validation:**
-   - ✓ [ ] bazinga-db skill invoked twice (get + save)
+   - ✓ [ ] bazinga-db skill invoked
    - ✓ [ ] Confirmation message displayed
 
    **IF VALIDATION FAILS: Configuration not persisted. Cannot proceed.**
@@ -1272,49 +1289,48 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 
 ---
 
-## State Management from Database
+## State Management from Database - REFERENCE
+
+**⚠️ IMPORTANT:** These are **separate operations** you perform at different times. Do NOT execute them all in sequence! Only use the operation you need at that moment.
 
 ### Reading State
 
-Before spawning PM or when making decisions, query state from database:
+**When you need PM state** (before spawning PM):
 
-**Request to bazinga-db skill:**
+Request to bazinga-db skill:
 ```
-bazinga-db, please get the latest PM state:
-
-Session ID: [current session_id]
-State Type: pm
+bazinga-db, please get the latest PM state for session [current session_id]
 ```
 
-**Then invoke:**
+Then invoke: `Skill(command: "bazinga-db")`
+
+Wait for response. Returns PM state or null if first iteration.
+
+---
+
+**When you need orchestrator state** (to check current phase):
+
+Request to bazinga-db skill:
 ```
-Skill(command: "bazinga-db")
+bazinga-db, please get the latest orchestrator state for session [current session_id]
 ```
 
-For orchestrator state:
-```
-bazinga-db, please get the latest orchestrator state:
+Then invoke: `Skill(command: "bazinga-db")`
 
-Session ID: [current session_id]
-State Type: orchestrator
-```
+Wait for response. Returns orchestrator state or null if first time.
 
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
+---
 
-For task groups (replaces group_status.json):
-```
-bazinga-db, please get all task groups:
+**When you need task groups** (to check progress):
 
-Session ID: [current session_id]
+Request to bazinga-db skill:
+```
+bazinga-db, please get all task groups for session [current session_id]
 ```
 
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
+Then invoke: `Skill(command: "bazinga-db")`
+
+Wait for response. Returns array of task groups.
 
 ### Updating Orchestrator State
 
@@ -1541,7 +1557,11 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**Update session status:**
+**WAIT for confirmation.** Orchestrator state saved to database.
+
+**Now update session status:**
+
+Request to bazinga-db skill:
 ```
 bazinga-db, please update session status:
 
