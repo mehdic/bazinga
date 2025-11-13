@@ -310,7 +310,11 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    Skill(command: "bazinga-db")
    ```
 
-   Update state with config information and save:
+   **WAIT for bazinga-db response.** It will return current state or empty if first time.
+
+   **Now update state with config information and save:**
+
+   Request to bazinga-db skill:
    ```
    bazinga-db, please save the orchestrator state:
 

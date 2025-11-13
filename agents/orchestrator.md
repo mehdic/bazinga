@@ -317,7 +317,9 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
 
    **YOU MUST invoke bazinga-db skill to save orchestrator state.**
 
-   Get current orchestrator state:
+   **First, get current orchestrator state:**
+
+   Request to bazinga-db skill:
    ```
    bazinga-db, please get the latest orchestrator state:
 
@@ -330,7 +332,11 @@ Go to **Phase 1** - Spawn PM with context about what was already done and what u
    Skill(command: "bazinga-db")
    ```
 
-   Update state with config information and save:
+   **WAIT for bazinga-db response.** It will return current state or empty if first time.
+
+   **Now update state with config information and save:**
+
+   Request to bazinga-db skill:
    ```
    bazinga-db, please save the orchestrator state:
 
@@ -1300,9 +1306,11 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 
 ### Reading State
 
-Before spawning PM or when making decisions, query state from database:
+Before spawning PM or when making decisions, query state from database.
 
-**Request to bazinga-db skill:**
+**To get PM state:**
+
+Request to bazinga-db skill:
 ```
 bazinga-db, please get the latest PM state:
 
@@ -1310,12 +1318,18 @@ Session ID: [current session_id]
 State Type: pm
 ```
 
-**Then invoke:**
+Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
 
-For orchestrator state:
+**WAIT for response.** Returns PM state or null if first iteration.
+
+---
+
+**To get orchestrator state:**
+
+Request to bazinga-db skill:
 ```
 bazinga-db, please get the latest orchestrator state:
 
@@ -1323,22 +1337,30 @@ Session ID: [current session_id]
 State Type: orchestrator
 ```
 
-**Then invoke:**
+Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
 
-For task groups (replaces group_status.json):
+**WAIT for response.** Returns orchestrator state or null if first time.
+
+---
+
+**To get task groups:**
+
+Request to bazinga-db skill:
 ```
 bazinga-db, please get all task groups:
 
 Session ID: [current session_id]
 ```
 
-**Then invoke:**
+Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for response.** Returns array of task groups.
 
 ### Updating Orchestrator State
 
@@ -1565,7 +1587,11 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**Update session status:**
+**WAIT for confirmation.** Orchestrator state saved to database.
+
+**Now update session status:**
+
+Request to bazinga-db skill:
 ```
 bazinga-db, please update session status:
 
