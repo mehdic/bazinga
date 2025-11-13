@@ -65,3 +65,4 @@ Thumbs.db
 # Coordination files (gitignored by default in installed projects)
 coordination/
 !coordination/.gitignore
+!coordination/templates/
