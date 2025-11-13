@@ -97,14 +97,6 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
   "<requirements>"
 ```
 
-Example:
-```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
-  "bazinga_20250113_143530" \
-  "simple" \
-  "User's requirements for this orchestration"
-```
-
 **IMPORTANT:** This command will auto-initialize the database if it doesn't exist. No separate initialization needed!
 
 ### Common Operations
@@ -231,7 +223,30 @@ Proceed with initialization?
 
 ## Example Invocation
 
-**Scenario 1: Orchestrator Logging PM Interaction**
+**Scenario 1: Orchestrator Creating New Session**
+
+Input: Orchestrator starting new orchestration, needs to initialize session in database
+
+Request from orchestrator:
+```
+bazinga-db, please create a new orchestration session:
+
+Session ID: bazinga_20250113_143530
+Mode: simple
+Requirements: Add user authentication with OAuth2 support
+```
+
+Expected output:
+```
+✓ Database auto-initialized at coordination/bazinga.db
+✓ Session created: bazinga_20250113_143530
+
+Database ready for orchestration. Session is active and ready to receive logs and state.
+```
+
+---
+
+**Scenario 2: Orchestrator Logging PM Interaction**
 
 Input: Orchestrator completed PM spawn, needs to log the interaction
 
@@ -250,7 +265,7 @@ Database operation successful.
 
 ---
 
-**Scenario 2: PM Saving State**
+**Scenario 3: PM Saving State**
 
 Input: PM completed task breakdown, needs to save PM state
 
@@ -268,7 +283,7 @@ PM state snapshot stored in database.
 
 ---
 
-**Scenario 3: Dashboard Requesting Data**
+**Scenario 4: Dashboard Requesting Data**
 
 Input: Dashboard needs complete session overview
 
@@ -300,7 +315,7 @@ Full data available in returned JSON object.
 
 ---
 
-**Scenario 4: First Invocation (Database Not Initialized)**
+**Scenario 5: Error Scenario (Permission Denied)**
 
 Input: Agent tries to log interaction but database doesn't exist
 
