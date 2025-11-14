@@ -783,7 +783,24 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt built using above process])
 ```
 
+**🔴 CRITICAL: WAIT FOR DEVELOPER TO COMPLETE**
+
+After spawning the Developer agent, you MUST wait for the Task tool to complete and return the Developer's response. DO NOT proceed until you receive the Developer's full response.
+
+The Developer may take several minutes to:
+- Analyze code
+- Invoke mandatory skills
+- Implement changes
+- Run tests
+- Report status
+
+**WAIT for the complete Developer response before proceeding to Step 2A.2.**
+
+---
+
 ### Step 2A.2: Receive Developer Response
+
+**AFTER receiving the Developer's complete response:**
 
 **UI Message:**
 ```
@@ -907,6 +924,16 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA Expert prompt built using above process])
 ```
 
+**🔴 CRITICAL: WAIT FOR QA EXPERT TO COMPLETE**
+
+After spawning the QA Expert, you MUST wait for the Task tool to complete and return the QA Expert's response. DO NOT proceed until you receive the full response.
+
+**WAIT for the complete QA Expert response before proceeding.**
+
+---
+
+**AFTER receiving the QA Expert's response:**
+
 **Log QA interaction:**
 ```
 bazinga-db, please log this QA interaction:
@@ -922,6 +949,10 @@ Agent ID: qa_main
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for bazinga-db confirmation before proceeding.**
+
+---
 
 ### Step 2A.5: Route QA Response
 
@@ -1026,6 +1057,16 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [Tech Lead prompt built using above process])
 ```
 
+**🔴 CRITICAL: WAIT FOR TECH LEAD TO COMPLETE**
+
+After spawning the Tech Lead, you MUST wait for the Task tool to complete and return the Tech Lead's response. DO NOT proceed until you receive the full response.
+
+**WAIT for the complete Tech Lead response before proceeding.**
+
+---
+
+**AFTER receiving the Tech Lead's response:**
+
 **Log Tech Lead interaction:**
 ```
 bazinga-db, please log this tech_lead interaction:
@@ -1041,6 +1082,10 @@ Agent ID: techlead_main
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for bazinga-db confirmation before proceeding.**
+
+---
 
 ### Step 2A.7: Route Tech Lead Response
 
@@ -1066,6 +1111,16 @@ Build PM prompt with complete implementation summary and quality metrics.
 Task(subagent_type="general-purpose", description="PM final assessment", prompt=[PM prompt])
 ```
 
+**🔴 CRITICAL: WAIT FOR PM TO COMPLETE**
+
+After spawning the PM, you MUST wait for the Task tool to complete and return the PM's response. DO NOT proceed until you receive the full response.
+
+**WAIT for the complete PM response before proceeding.**
+
+---
+
+**AFTER receiving the PM's response:**
+
 **Track velocity:**
 ```
 velocity-tracker, please analyze completion metrics
@@ -1074,6 +1129,8 @@ velocity-tracker, please analyze completion metrics
 ```
 Skill(command: "velocity-tracker")
 ```
+
+**WAIT for velocity-tracker response.**
 
 **Log PM interaction:**
 ```
@@ -1090,6 +1147,8 @@ Agent ID: pm_final
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for bazinga-db confirmation before proceeding.**
 
 ### Step 2A.9: Check for BAZINGA
 
