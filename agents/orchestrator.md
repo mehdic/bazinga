@@ -230,7 +230,6 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
 **Wait for bazinga-db response with session list.**
 
