@@ -499,9 +499,46 @@ Full details: bazinga/tech_debt.json
 
 ### When All Work Complete (After Tech Debt Check)
 
+## 🚨 BAZINGA VALIDATION PROTOCOL
+
+**⚠️ CRITICAL**: BAZINGA is ONLY allowed when ALL conditions are met:
+
+**🛑 MANDATORY EVIDENCE CHECKLIST:**
+
+- [ ] **Goal Achievement Verified**
+  - Original Goal: [state the EXACT original requirement]
+  - Actual Result: [ACTUAL validated result, NOT estimates]
+  - Achievement: Actual Result ≥ Original Goal = TRUE
+
+- [ ] **Evidence Provided**
+  - [ ] Developer provided ACTUAL test results (not "expected to")
+  - [ ] Actual results meet original goal (not "close enough")
+  - [ ] OR documented evidence why remaining gaps are out-of-scope
+
+- [ ] **Validation Proof**
+  - [ ] Test output showing actual pass count
+  - [ ] Build output showing success
+  - [ ] No estimates or approximations used
+
+**❌ IF ANY CHECKBOX UNCHECKED → CANNOT SEND BAZINGA**
+
+**If goal not met:**
+```markdown
+**Status:** MORE_WORK_NEEDED
+**Gap:** [Original Goal] - [Actual Result] = [Remaining Work]
+**Next Action:** Spawn Developer to address [specific remaining issues]
 ```
+
+**✅ ONLY when ALL checks pass:**
+
+```markdown
 **Status:** COMPLETE
-**BAZINGA**
+**Evidence:**
+- Goal: [original requirement]
+- Actual: [validated result from test run]
+- Proof: [test output excerpt]
+
+**BAZINGA** 🎉
 ```
 
 **Workflow:** ENDS. No routing needed. Project complete.
