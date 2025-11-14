@@ -1193,9 +1193,9 @@ def init(
 
     # Determine next steps message based on whether project was created
     if project_name:
-        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: @orchestrator <your request>"
+        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: /bazinga.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
     else:
-        next_steps = "  1. Open with Claude Code\n  2. Use: @orchestrator <your request>"
+        next_steps = "  1. Open with Claude Code\n  2. Use: /bazinga.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
 
     console.print(
         Panel.fit(
@@ -1206,7 +1206,8 @@ def init(
             "[bold]Next steps:[/bold]\n"
             f"{next_steps}\n\n"
             "[bold]Example:[/bold]\n"
-            "  @orchestrator implement user authentication with JWT\n\n"
+            "  /bazinga.orchestrate implement user authentication with JWT\n"
+            "  [dim](or: @orchestrator implement user authentication with JWT)[/dim]\n\n"
             f"{bazinga_commands}",
             title="🎉 Installation Complete",
             border_style="green",
@@ -1734,7 +1735,8 @@ def update(
         success_message += "  • [cyan]bazinga update[/cyan] (run again to complete update)\n"
 
     success_message += "  • Review updated agent definitions if needed\n"
-    success_message += "  • Continue using: @orchestrator <your request>"
+    success_message += "  • Continue using: /bazinga.orchestrate <your request>\n"
+    success_message += "    [dim](or @orchestrator if you prefer)[/dim]"
 
     console.print(
         Panel.fit(
