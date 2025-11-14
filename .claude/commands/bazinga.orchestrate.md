@@ -227,7 +227,7 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **Wait for bazinga-db response with session list.**
@@ -294,7 +294,7 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **WAIT for PM state response. Then continue to Step 4 below.**
@@ -365,7 +365,7 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
    **WAIT for bazinga-db response.**
@@ -432,7 +432,7 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
    **WAIT for confirmation.** Database will save the initial orchestrator state.
@@ -599,7 +599,7 @@ State Type: pm
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 Returns latest PM state or null if first iteration.
@@ -656,7 +656,7 @@ Agent ID: pm_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 See `bazinga/templates/message_templates.md` for PM response format examples.
@@ -842,7 +842,7 @@ Agent ID: dev_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 ### Step 2A.3: Route Developer Response
@@ -972,7 +972,7 @@ Agent ID: qa_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **WAIT for bazinga-db confirmation before proceeding.**
@@ -1108,7 +1108,7 @@ Agent ID: techlead_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **WAIT for bazinga-db confirmation before proceeding.**
@@ -1176,7 +1176,7 @@ Agent ID: pm_final
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **WAIT for bazinga-db confirmation before proceeding.**
@@ -1312,7 +1312,7 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 ### Step 2B.3-2B.7: Route Each Group Independently
@@ -1373,7 +1373,7 @@ The routing chain for each group is:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 3. **Route QA Response** (Step 2B.5):
@@ -1425,7 +1425,7 @@ The routing chain for each group is:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 5. **Route Tech Lead Response** (Step 2B.7):
@@ -1484,7 +1484,7 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **Track velocity metrics:**
@@ -1556,7 +1556,7 @@ bazinga-db, please get the latest PM state for session [current session_id]
 Then invoke: `Skill(command: "bazinga-db")`
 
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 Wait for response. Returns PM state or null if first iteration.
 
@@ -1572,7 +1572,7 @@ bazinga-db, please get the latest orchestrator state for session [current sessio
 Then invoke: `Skill(command: "bazinga-db")`
 
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 Wait for response. Returns orchestrator state or null if first time.
 
@@ -1588,7 +1588,7 @@ bazinga-db, please get all task groups for session [current session_id]
 Then invoke: `Skill(command: "bazinga-db")`
 
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 Wait for response. Returns array of task groups.
 
@@ -1628,7 +1628,7 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 ### Updating Task Group Status
@@ -1651,7 +1651,7 @@ Last Review Status: [APPROVED|CHANGES_REQUESTED]
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 This replaces the old group_status.json file with database operations.
@@ -1767,7 +1767,7 @@ Session ID: [current session_id]
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 The dashboard snapshot returns:
@@ -1826,7 +1826,7 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 **WAIT for confirmation.** Orchestrator state saved to database.
@@ -1847,7 +1847,7 @@ End Time: [timestamp]
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 ### Step 5: Display Concise Report
