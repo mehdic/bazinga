@@ -1322,9 +1322,12 @@ def check():
         console.print("    bazinga init --here")
 
 
-def update_cli() -> bool:
+def update_cli(branch: Optional[str] = None) -> bool:
     """
     Update the BAZINGA CLI itself by pulling latest changes and reinstalling.
+
+    Args:
+        branch: Optional git branch to pull from (e.g., "develop", "feature/xyz")
 
     Returns True if update was successful, False otherwise.
     """
@@ -1359,14 +1362,47 @@ def update_cli() -> bool:
                     console.print("  [dim]Not a git repository, skipping git pull[/dim]")
                 else:
                     # Pull latest changes
-                    console.print("  [dim]Pulling latest changes...[/dim]")
-                    pull_result = subprocess.run(
-                        ["git", "pull"],
-                        cwd=bazinga_repo,
-                        capture_output=True,
-                        text=True,
-                        check=False
-                    )
+                    if branch:
+                        console.print(f"  [dim]Fetching and checking out branch: {branch}...[/dim]")
+                        # Fetch the branch first
+                        fetch_result = subprocess.run(
+                            ["git", "fetch", "origin", branch],
+                            cwd=bazinga_repo,
+                            capture_output=True,
+                            text=True,
+                            check=False
+                        )
+                        if fetch_result.returncode != 0:
+                            console.print(f"  [yellow]Warning: git fetch failed: {fetch_result.stderr}[/yellow]")
+
+                        # Checkout the branch
+                        checkout_result = subprocess.run(
+                            ["git", "checkout", branch],
+                            cwd=bazinga_repo,
+                            capture_output=True,
+                            text=True,
+                            check=False
+                        )
+                        if checkout_result.returncode != 0:
+                            console.print(f"  [yellow]Warning: git checkout failed: {checkout_result.stderr}[/yellow]")
+
+                        # Pull the latest changes for this branch
+                        pull_result = subprocess.run(
+                            ["git", "pull", "origin", branch],
+                            cwd=bazinga_repo,
+                            capture_output=True,
+                            text=True,
+                            check=False
+                        )
+                    else:
+                        console.print("  [dim]Pulling latest changes...[/dim]")
+                        pull_result = subprocess.run(
+                            ["git", "pull"],
+                            cwd=bazinga_repo,
+                            capture_output=True,
+                            text=True,
+                            check=False
+                        )
 
                     if pull_result.returncode != 0:
                         console.print(f"  [yellow]Warning: git pull failed: {pull_result.stderr}[/yellow]")
@@ -1393,9 +1429,13 @@ def update_cli() -> bool:
                 return was_updated
             else:
                 # Not an editable install, try upgrading from PyPI or git
-                console.print("  [dim]Upgrading from git repository...[/dim]")
+                git_url = f"git+https://github.com/mehdic/bazinga.git@{branch}" if branch else "git+https://github.com/mehdic/bazinga.git"
+                if branch:
+                    console.print(f"  [dim]Upgrading from git repository (branch: {branch})...[/dim]")
+                else:
+                    console.print("  [dim]Upgrading from git repository...[/dim]")
                 upgrade_result = subprocess.run(
-                    ["pip", "install", "--upgrade", "git+https://github.com/mehdic/bazinga.git"],
+                    ["pip", "install", "--upgrade", git_url],
                     capture_output=True,
                     text=True,
                     check=False
@@ -1427,9 +1467,13 @@ def update_cli() -> bool:
         )
 
         if uv_check.returncode == 0 and "bazinga-cli" in uv_check.stdout:
-            console.print("  [dim]Found uv tool installation, checking for updates...[/dim]")
+            git_url = f"git+https://github.com/mehdic/bazinga.git@{branch}" if branch else "git+https://github.com/mehdic/bazinga.git"
+            if branch:
+                console.print(f"  [dim]Found uv tool installation, updating from branch: {branch}...[/dim]")
+            else:
+                console.print("  [dim]Found uv tool installation, checking for updates...[/dim]")
             uv_upgrade = subprocess.run(
-                ["uv", "tool", "install", "--force", "bazinga-cli", "--from", "git+https://github.com/mehdic/bazinga.git"],
+                ["uv", "tool", "install", "--force", "bazinga-cli", "--from", git_url],
                 capture_output=True,
                 text=True,
                 check=False
@@ -1466,6 +1510,9 @@ def update(
     force: bool = typer.Option(
         False, "--force", "-f", help="Skip confirmation prompts"
     ),
+    branch: Optional[str] = typer.Option(
+        None, "--branch", "-b", help="Git branch to update from (e.g., 'develop', 'feature/xyz')"
+    ),
 ):
     """
     Update BAZINGA components in the current project.
@@ -1473,6 +1520,14 @@ def update(
     Updates the BAZINGA CLI itself and project components (agents, scripts,
     commands, skills) to the latest versions while preserving coordination
     state files and existing configuration.
+
+    By default, updates from the main branch. Use --branch to test changes
+    from a specific branch before they're merged to main.
+
+    Examples:
+      bazinga update                           # Update from main branch
+      bazinga update --branch develop          # Test changes from develop branch
+      bazinga update --branch feature/new-fix  # Test a specific feature branch
     """
     print_banner()
 
@@ -1487,8 +1542,9 @@ def update(
         raise typer.Exit(1)
 
     if not force:
+        branch_info = f" (from branch: {branch})" if branch else ""
         console.print(
-            "\n[yellow]This will update:[/yellow]\n"
+            f"\n[yellow]This will update{branch_info}:[/yellow]\n"
             "  • BAZINGA CLI (pull latest & reinstall)\n"
             "  • Agent definitions (.claude/agents/)\n"
             "  • Scripts (.claude/scripts/)\n"
@@ -1505,8 +1561,11 @@ def update(
     console.print("\n[bold]Updating BAZINGA...[/bold]\n")
 
     # Step 0: Update the CLI itself
-    console.print("[bold cyan]0. Updating BAZINGA CLI[/bold cyan]")
-    cli_was_updated = update_cli()
+    if branch:
+        console.print(f"[bold cyan]0. Updating BAZINGA CLI (branch: {branch})[/bold cyan]")
+    else:
+        console.print("[bold cyan]0. Updating BAZINGA CLI[/bold cyan]")
+    cli_was_updated = update_cli(branch)
     if cli_was_updated:
         console.print("  [green]✓ CLI updated[/green]")
     else:
