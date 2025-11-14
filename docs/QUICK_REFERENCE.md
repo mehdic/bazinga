@@ -44,7 +44,8 @@ bazinga init my-project --testing full --skills all
 ### 1. Start Orchestration
 
 ```bash
-@orchestrator implement user authentication with JWT
+/bazinga.orchestrate implement user authentication with JWT
+# (or: @orchestrator implement user authentication with JWT)
 ```
 
 ### 2. What Happens
@@ -73,7 +74,7 @@ Project state is tracked in `bazinga/*.json` files:
 ### Single Feature (Simple)
 
 ```bash
-@orchestrator fix password reset bug
+/bazinga.orchestrate fix password reset bug
 ```
 
 **Flow:** PM → 1 Developer → Tech Lead → BAZINGA
@@ -84,7 +85,7 @@ Project state is tracked in `bazinga/*.json` files:
 ### Multiple Features (Parallel)
 
 ```bash
-@orchestrator implement JWT auth, user registration, and password reset
+/bazinga.orchestrate implement JWT auth, user registration, and password reset
 ```
 
 **Flow:** PM → 3 Developers (parallel) → Tech Lead → BAZINGA
@@ -95,7 +96,7 @@ Project state is tracked in `bazinga/*.json` files:
 ### Large Project
 
 ```bash
-@orchestrator build blog platform with posts, comments, tags, and search
+/bazinga.orchestrate build blog platform with posts, comments, tags, and search
 ```
 
 **Flow:** PM → 4 Developers (parallel, 2 phases) → Tech Lead → BAZINGA
@@ -318,7 +319,7 @@ your-project/
 ### Example 1: Authentication System
 
 ```bash
-@orchestrator implement authentication with JWT tokens, refresh tokens, and password reset
+/bazinga.orchestrate implement authentication with JWT tokens, refresh tokens, and password reset
 ```
 
 **PM Decision:** 3 independent tasks → 3 developers in parallel
@@ -335,7 +336,7 @@ your-project/
 ### Example 2: Bug Fix
 
 ```bash
-@orchestrator fix bug where users can't upload files larger than 10MB
+/bazinga.orchestrate fix bug where users can't upload files larger than 10MB
 ```
 
 **PM Decision:** 1 task → 1 developer
@@ -349,7 +350,7 @@ your-project/
 ### Example 3: Refactoring
 
 ```bash
-@orchestrator refactor database layer to use repository pattern
+/bazinga.orchestrate refactor database layer to use repository pattern
 ```
 
 **PM Decision:** High file overlap → 1 developer (parallel risky)

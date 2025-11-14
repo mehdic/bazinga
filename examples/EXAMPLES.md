@@ -10,8 +10,9 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-@orchestrator implement JWT authentication with token generation and validation
+/bazinga.orchestrate implement JWT authentication with token generation and validation
 ```
+(or: `@orchestrator implement JWT authentication with token generation and validation`)
 
 **What Happens:**
 
@@ -122,7 +123,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-@orchestrator refactor the error handling in the authentication middleware for better clarity
+/bazinga.orchestrate refactor the error handling in the authentication middleware for better clarity
 ```
 
 **What Happens:**
@@ -192,7 +193,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-@orchestrator implement three features: JWT authentication, user registration, and password reset
+/bazinga.orchestrate implement three features: JWT authentication, user registration, and password reset
 ```
 
 **What Happens:**
@@ -286,7 +287,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-@orchestrator implement rate limiting on the authentication endpoint
+/bazinga.orchestrate implement rate limiting on the authentication endpoint
 ```
 
 **What Happens:**
@@ -469,7 +470,7 @@ PM continues autonomously until BAZINGA.
 You can guide PM by being specific:
 
 ```
-@orchestrator implement these as separate task groups:
+/bazinga.orchestrate implement these as separate task groups:
 1. JWT authentication (auth.py)
 2. User registration (users.py)
 3. Password reset (password_reset.py)
@@ -482,7 +483,7 @@ PM will respect your guidance while applying its decision logic.
 ### Forcing Simple Mode
 
 ```
-@orchestrator implement JWT auth (please use simple sequential mode)
+/bazinga.orchestrate implement JWT auth (please use simple sequential mode)
 ```
 
 PM will likely honor this request.
@@ -490,7 +491,7 @@ PM will likely honor this request.
 ### Requesting More Tests
 
 ```
-@orchestrator implement JWT auth with comprehensive integration, contract, and E2E tests
+/bazinga.orchestrate implement JWT auth with comprehensive integration, contract, and E2E tests
 ```
 
 Developer will create all test types, ensuring QA involvement.
