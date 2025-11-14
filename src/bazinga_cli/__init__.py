@@ -1322,6 +1322,20 @@ def check():
         console.print("    bazinga init --here")
 
 
+def get_bazinga_git_url(branch: Optional[str] = None) -> str:
+    """
+    Construct the git URL for installing/updating BAZINGA CLI.
+
+    Args:
+        branch: Optional git branch to install from (e.g., "develop", "feature/xyz")
+
+    Returns:
+        Formatted git URL for pip/uv installation
+    """
+    base_url = "git+https://github.com/mehdic/bazinga.git"
+    return f"{base_url}@{branch}" if branch else base_url
+
+
 def update_cli(branch: Optional[str] = None) -> bool:
     """
     Update the BAZINGA CLI itself by pulling latest changes and reinstalling.
@@ -1429,7 +1443,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                 return was_updated
             else:
                 # Not an editable install, try upgrading from PyPI or git
-                git_url = f"git+https://github.com/mehdic/bazinga.git@{branch}" if branch else "git+https://github.com/mehdic/bazinga.git"
+                git_url = get_bazinga_git_url(branch)
                 if branch:
                     console.print(f"  [dim]Upgrading from git repository (branch: {branch})...[/dim]")
                 else:
@@ -1467,7 +1481,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
         )
 
         if uv_check.returncode == 0 and "bazinga-cli" in uv_check.stdout:
-            git_url = f"git+https://github.com/mehdic/bazinga.git@{branch}" if branch else "git+https://github.com/mehdic/bazinga.git"
+            git_url = get_bazinga_git_url(branch)
             if branch:
                 console.print(f"  [dim]Found uv tool installation, updating from branch: {branch}...[/dim]")
             else:
