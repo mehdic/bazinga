@@ -255,8 +255,9 @@ All new orchestrations using the updated bazinga-db will automatically:
 - Check that the session was created first
 
 ### "Invalid agent_type"
-- Use only: pm, developer, qa, tech_lead, orchestrator
+- Use only: pm, developer, qa_expert, techlead, orchestrator
 - Check for typos in agent type
+- Note: Use 'techlead' (not 'tech_lead') to match the agent filename
 
 ### "Failed to verify log insertion"
 - Database may be corrupted

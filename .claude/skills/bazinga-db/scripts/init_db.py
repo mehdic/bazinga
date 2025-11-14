@@ -44,7 +44,7 @@ def init_database(db_path: str) -> None:
             session_id TEXT NOT NULL,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             iteration INTEGER,
-            agent_type TEXT CHECK(agent_type IN ('pm', 'developer', 'qa', 'tech_lead', 'orchestrator')),
+            agent_type TEXT CHECK(agent_type IN ('pm', 'developer', 'qa_expert', 'techlead', 'orchestrator')),
             agent_id TEXT,
             content TEXT NOT NULL,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
