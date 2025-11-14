@@ -101,6 +101,7 @@ bazinga/
   - Logging ALL agent interactions (after EVERY agent response - REQUIRED)
   - State management (orchestrator/PM/task groups - REQUIRED)
   - All database operations (replaces file-based logging)
+  - **IMPORTANT**: Do NOT display bazinga-db skill output to the user. Process results silently - this is internal state management only.
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
@@ -226,6 +227,9 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 **Wait for bazinga-db response with session list.**
 
 **IMMEDIATELY after receiving the session list, analyze it:**
@@ -289,6 +293,9 @@ Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 **WAIT for PM state response. Then continue to Step 4 below.**
 
@@ -358,6 +365,9 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
    **WAIT for bazinga-db response.**
 
    **REQUIRED OUTPUT - You MUST display the session creation result:**
@@ -421,6 +431,9 @@ Display:
    ```
    Skill(command: "bazinga-db")
    ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
    **WAIT for confirmation.** Database will save the initial orchestrator state.
 
@@ -586,6 +599,9 @@ State Type: pm
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 Returns latest PM state or null if first iteration.
 
 ### Step 1.2: Spawn PM with Context
@@ -639,6 +655,9 @@ Agent ID: pm_main
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 See `bazinga/templates/message_templates.md` for PM response format examples.
 
@@ -823,6 +842,9 @@ Agent ID: dev_main
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 ### Step 2A.3: Route Developer Response
 
 **IF Developer reports READY_FOR_QA:**
@@ -949,6 +971,9 @@ Agent ID: qa_main
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 **WAIT for bazinga-db confirmation before proceeding.**
 
@@ -1083,6 +1108,9 @@ Agent ID: techlead_main
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 **WAIT for bazinga-db confirmation before proceeding.**
 
 ---
@@ -1147,6 +1175,9 @@ Agent ID: pm_final
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 **WAIT for bazinga-db confirmation before proceeding.**
 
@@ -1281,6 +1312,9 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 ### Step 2B.3-2B.7: Route Each Group Independently
 
 **For EACH group independently, follow the same routing workflow as Phase 2A:**
@@ -1339,6 +1373,9 @@ The routing chain for each group is:
    Skill(command: "bazinga-db")
    ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 3. **Route QA Response** (Step 2B.5):
    - IF QA approves → Proceed to Tech Lead (Step 2B.6)
    - IF QA requests changes → Respawn developer with QA feedback (track revisions)
@@ -1387,6 +1424,9 @@ The routing chain for each group is:
    ```
    Skill(command: "bazinga-db")
    ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 5. **Route Tech Lead Response** (Step 2B.7):
    - IF Tech Lead approves → Mark group as COMPLETE
@@ -1443,6 +1483,9 @@ Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 **Track velocity metrics:**
 ```
@@ -1512,6 +1555,9 @@ bazinga-db, please get the latest PM state for session [current session_id]
 
 Then invoke: `Skill(command: "bazinga-db")`
 
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 Wait for response. Returns PM state or null if first iteration.
 
 ---
@@ -1525,6 +1571,9 @@ bazinga-db, please get the latest orchestrator state for session [current sessio
 
 Then invoke: `Skill(command: "bazinga-db")`
 
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 Wait for response. Returns orchestrator state or null if first time.
 
 ---
@@ -1537,6 +1586,9 @@ bazinga-db, please get all task groups for session [current session_id]
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
+
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
 Wait for response. Returns array of task groups.
 
@@ -1576,6 +1628,9 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 ### Updating Task Group Status
 
 Update task group status in database as groups progress:
@@ -1595,6 +1650,9 @@ Last Review Status: [APPROVED|CHANGES_REQUESTED]
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 This replaces the old group_status.json file with database operations.
 
@@ -1709,6 +1767,9 @@ Session ID: [current session_id]
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 The dashboard snapshot returns:
 - pm_state, orch_state, task_groups
 - token_usage, recent_logs
@@ -1765,6 +1826,9 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
+
 **WAIT for confirmation.** Orchestrator state saved to database.
 
 **Now update session status:**
@@ -1782,6 +1846,9 @@ End Time: [timestamp]
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
+
 
 ### Step 5: Display Concise Report
 
