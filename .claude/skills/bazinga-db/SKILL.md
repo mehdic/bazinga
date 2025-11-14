@@ -63,6 +63,8 @@ Extract from the calling agent's request:
 - "get state" / "retrieve state" → get-state
 - "create task group" → create-task-group
 - "update task group" / "mark complete" → update-task-group
+- "get task groups" / "get all task groups" → get-task-groups
+- "update session status" → update-session-status
 - "log tokens" / "track token usage" → log-tokens
 - "save skill output" → save-skill-output
 - "dashboard snapshot" / "get dashboard data" → dashboard-snapshot
@@ -151,6 +153,22 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" update-task-group \
   [--assigned_to "<agent_id>"] \
   [--revision_count <N>]
 ```
+
+**Get task groups:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" get-task-groups \
+  "<session_id>" \
+  [status]
+```
+Returns JSON array of task groups for the session. Optional status filter (pending, in_progress, completed, failed).
+
+**Update session status:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" update-session-status \
+  "<session_id>" \
+  "<status>"
+```
+Updates session status (active, completed, failed). Auto-sets end_time for completed/failed.
 
 **Dashboard snapshot:**
 ```bash

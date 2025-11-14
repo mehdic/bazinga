@@ -494,6 +494,15 @@ def main():
             skill_name = cmd_args[1]
             output_data = json.loads(cmd_args[2])
             db.save_skill_output(session_id, skill_name, output_data)
+        elif cmd == 'get-task-groups':
+            session_id = cmd_args[0]
+            status = cmd_args[1] if len(cmd_args) > 1 else None
+            result = db.get_task_groups(session_id, status)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'update-session-status':
+            session_id = cmd_args[0]
+            status = cmd_args[1]
+            db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
             group_id = cmd_args[0]
             session_id = cmd_args[1]
