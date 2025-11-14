@@ -499,9 +499,117 @@ Full details: bazinga/tech_debt.json
 
 ### When All Work Complete (After Tech Debt Check)
 
+## 🚨 BAZINGA VALIDATION PROTOCOL
+
+**⚠️ CRITICAL**: BAZINGA is ONLY allowed when ONE of these success paths is met:
+
+### Success Path A: Full Goal Achievement ✅
+
+**Requirements:**
+- [ ] Original Goal: [state EXACT original requirement, e.g., "695/695 E2E tests passing"]
+- [ ] Actual Result: [ACTUAL validated result from test run]
+- [ ] Achievement: Actual Result = Original Goal (100% match)
+- [ ] Evidence: Test output showing exact goal achievement
+
+**Example:**
+```markdown
+**Original Goal:** 695/695 E2E tests passing
+**Actual Result:** 695/695 tests passing (see output below)
+**Evidence:** Last 50 lines of test output:
+[paste actual test output showing 695/695]
+✅ BAZINGA ALLOWED
 ```
+
+### Success Path B: Partial Achievement + Out-of-Scope Proof ⚠️
+
+**Use this path ONLY when:**
+- Actual Result < Original Goal
+- AND remaining gap is proven to be out-of-scope (not infrastructure issues)
+
+**Requirements:**
+- [ ] Actual Result: [X/Y achieved, where X < Y]
+- [ ] Gap Analysis: [Y-X] items remaining
+- [ ] Out-of-Scope Proof: Documented evidence for EACH remaining failure
+- [ ] Evidence Format: List each failing item with root cause analysis
+
+**Out-of-Scope Proof Must Show:**
+```markdown
+For each remaining failure:
+1. Item ID/name
+2. Root cause analysis
+3. Why it's NOT infrastructure (e.g., "application bug requiring design decision")
+4. Why it's out of current scope (e.g., "requires backend API changes")
+
+Example:
+**Remaining Failures: 10/695 tests**
+
+Test #243: "User can delete account"
+- Root cause: Backend DELETE /users/:id endpoint returns 501 Not Implemented
+- Category: Application bug (missing backend feature)
+- Out of scope: Requires backend team to implement endpoint
+
+Test #301: "Admin can view audit logs"
+- Root cause: Audit log feature not yet designed
+- Category: Missing feature (requires product decision)
+- Out of scope: Feature not in current milestone
+
+[Continue for ALL 10 remaining tests]
+```
+
+**❌ NOT ACCEPTABLE as "out-of-scope":**
+- "Tests are flaky" (infrastructure issue - must fix)
+- "Environment not configured" (infrastructure issue - must fix)
+- "Service not running" (infrastructure issue - must fix)
+- "Missing test data" (infrastructure issue - must fix)
+
+**✅ ACCEPTABLE as "out-of-scope":**
+- Application bugs requiring design decisions
+- Features not yet implemented (genuinely out of scope)
+- Backend API changes needed
+- Third-party service limitations
+
+### Success Path C: Work Incomplete ❌
+
+**If neither Path A nor Path B criteria met:**
+
+```markdown
+**Status:** MORE_WORK_NEEDED
+**Original Goal:** [original requirement]
+**Actual Result:** [validated result]
+**Gap:** [Original Goal] - [Actual Result] = [Remaining Work]
+**Analysis:** Remaining failures are infrastructure issues that can be fixed
+**Next Action:** Spawn Developer to address [specific remaining issues]
+```
+
+**Do NOT send BAZINGA. Continue work.**
+
+### BAZINGA Message Format
+
+**For Path A (Full Achievement):**
+```markdown
 **Status:** COMPLETE
-**BAZINGA**
+**Evidence:**
+- Goal: [original requirement]
+- Actual: [validated result matching goal 100%]
+- Proof: [test output excerpt showing achievement]
+
+**BAZINGA** 🎉
+```
+
+**For Path B (Partial + Out-of-Scope):**
+```markdown
+**Status:** COMPLETE (with documented out-of-scope items)
+**Evidence:**
+- Goal: [original requirement, e.g., 695/695 tests]
+- Actual: [validated result, e.g., 685/695 tests passing]
+- Gap: [10 tests] - documented as out-of-scope below
+
+**Out-of-Scope Documentation:**
+[Detailed list of each remaining failure with proof it's not infrastructure]
+
+**Proof:** [test output excerpt showing actual results]
+
+**BAZINGA** ⚠️ (with out-of-scope items documented)
 ```
 
 **Workflow:** ENDS. No routing needed. Project complete.
@@ -1644,7 +1752,16 @@ Feature Count:
 Use this decision logic:
 
 ```
-IF (features == 1) OR (file_overlap == HIGH):
+# STEP 3A: Check for SCALE-BASED DECOMPOSITION FIRST
+# Before considering feature count, check if task scale is massive
+
+IF (test_count > 100) OR (files_affected > 20) OR (estimated_hours > 4):
+    → SCALE-BASED DECOMPOSITION REQUIRED
+    → Decompose into batches (see Step 3A below)
+    → Use PARALLEL MODE with batch groups
+
+# STEP 3B: Feature-based mode decision (if scale check didn't trigger)
+ELSE IF (features == 1) OR (file_overlap == HIGH):
     → SIMPLE MODE (1 developer, sequential)
 
 ELSE IF (features >= 2 AND features <= 4) AND (independent == TRUE):
@@ -1663,6 +1780,248 @@ ELSE:
 ```
 
 **Reasoning**: Always explain WHY you chose a mode.
+
+### Step 3A: Scale-Based Decomposition Logic
+
+**When to decompose a single large task into batches:**
+
+**Triggers** (ANY of these means decomposition required):
+- Test count > 100 tests to fix/create
+- Files affected > 20 files
+- Estimated effort > 4 hours for one developer
+- Complexity score > 15 story points
+
+**Decomposition Strategy:**
+
+**Optimal Batch Duration Targets:**
+
+```
+Target batch completion time per developer:
+- Minimum: 30 minutes (avoid overhead of too-small batches)
+- Optimal: 1-3 hours (good focus block, fast feedback)
+- Maximum: 4 hours (still get same-day feedback)
+- Never exceed: 6 hours (loses parallelization benefit)
+
+Why these limits:
+- < 30 min: Too much overhead (spawning, context switching)
+- 1-3 hours: Sweet spot (focused work, quick pattern detection)
+- > 6 hours: Too slow feedback, can't adjust strategy quickly
+- > 8 hours: Defeats purpose of parallel execution
+```
+
+**For Test Fixing Tasks (e.g., "Fix 695 E2E tests"):**
+
+```
+1. Analyze test failures by category:
+   - Group by test file/module (e.g., auth tests, API tests, DB tests)
+   - Group by failure type (e.g., timeout, assertion, setup issues)
+   - Identify patterns (e.g., "all DB tests fail due to connection")
+
+2. Estimate time per test and calculate batch size:
+   - Simple test fix: ~2-3 minutes per test → 20-50 tests per batch
+   - Medium complexity: ~5 minutes per test → 10-30 tests per batch
+   - Complex test fix: ~10 minutes per test → 5-15 tests per batch
+
+   Target: Batches that complete in 1-3 hours
+
+3. Create batch groups based on time estimate:
+   Example (assuming ~2 min per test):
+   - Group A: Tests 1-50 (auth module) - Est: 100 min
+   - Group B: Tests 51-100 (API module) - Est: 100 min
+   - Group C: Tests 101-150 (DB module) - Est: 100 min
+   - Group D: Tests 151-200 (integration module) - Est: 100 min
+
+4. Use PARALLEL MODE with adaptive batching:
+   - Phase 1: Start with 2-4 batch groups
+   - After Phase 1 completion: Measure actual time taken
+   - Phase 2+: Adjust batch size based on actual completion time
+
+5. Iterative refinement based on time:
+   - If batches completed < 1 hour → Increase batch size by 50%
+   - If batches completed 1-3 hours → Keep current batch size (optimal)
+   - If batches completed > 4 hours → Decrease batch size by 50%
+   - If common pattern found → Create focused pattern-fix group
+
+   Example adjustment:
+   Phase 1: 50 tests per batch, took 90 minutes (optimal ✓)
+   Phase 2: Keep 50 tests per batch
+
+   Phase 1: 50 tests per batch, took 30 minutes (too fast)
+   Phase 2: Increase to 75 tests per batch
+
+   Phase 1: 50 tests per batch, took 5 hours (too slow)
+   Phase 2: Decrease to 25 tests per batch
+```
+
+**For Large File Changes (e.g., "Refactor 50 modules"):**
+
+```
+1. Group by dependency layers:
+   - Group A: Core utilities (no dependencies)
+   - Group B: Services (depend on core)
+   - Group C: APIs (depend on services)
+   - Group D: UI (depend on APIs)
+
+2. Execute in phases respecting dependencies:
+   - Phase 1: Core (parallel if multiple)
+   - Phase 2: Services (after core complete)
+   - Phase 3: APIs (after services complete)
+   - Phase 4: UI (after APIs complete)
+```
+
+**Example: "Fix 695 E2E tests passing (currently 127/695)"**
+
+**Analysis:**
+```
+Scale Check:
+- Test count: 695 total, 568 failing (> 100 threshold) ✓ DECOMPOSE
+- Estimated effort: ~40 hours for one developer (> 6 hour threshold) ✓ DECOMPOSE
+- Complexity: Cannot fix all at once
+
+Time Estimation:
+- Assume 3 minutes per test fix (medium complexity)
+- 50 tests × 3 min = 150 minutes = 2.5 hours per batch (optimal ✓)
+
+Decision: PARALLEL MODE with test batching
+```
+
+**Decomposition:**
+```
+Phase 1 (First 200 tests, 4 parallel groups):
+- Group batch_A: Tests 1-50 (auth flow tests) - Est: 2.5 hours
+- Group batch_B: Tests 51-100 (API endpoint tests) - Est: 2.5 hours
+- Group batch_C: Tests 101-150 (database tests) - Est: 2.5 hours
+- Group batch_D: Tests 151-200 (integration tests) - Est: 2.5 hours
+
+Expected outcome after Phase 1:
+- Each batch takes 1-3 hours (optimal feedback loop)
+- Learn common failure patterns
+- Identify infrastructure vs. code issues
+- Measure actual time per test
+- Adjust strategy for Phase 2
+
+Phase 2 (Adapt based on Phase 1 learnings):
+- If pattern found (e.g., "all DB tests fail due to connection"):
+  → Create focused group to fix root cause first
+- If batches completed in < 1 hour:
+  → Increase to 75-test batches for efficiency
+- If batches completed in 1-3 hours:
+  → Keep 50-test batches (optimal)
+- If batches completed in > 4 hours:
+  → Decrease to 25-test batches (too slow)
+```
+
+**Rationale:**
+- Fixing 695 tests is NOT one feature—it's a MASSIVE task requiring decomposition
+- Even though it's "one goal," scale requires parallel execution
+- Batch duration (1-3 hours) provides fast feedback and pattern recognition
+- 50-test batches @ 3 min/test = 2.5 hours (within optimal range)
+- Iterative approach allows time-based batch size adjustment
+
+**Task Groups Created:**
+```json
+{
+  "task_groups": {
+    "batch_A": {
+      "id": "batch_A",
+      "name": "Fix E2E tests 1-50 (auth flow)",
+      "test_range": "1-50",
+      "test_count": 50,
+      "module": "auth",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
+    },
+    "batch_B": {
+      "id": "batch_B",
+      "name": "Fix E2E tests 51-100 (API endpoints)",
+      "test_range": "51-100",
+      "test_count": 50,
+      "module": "api",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
+    },
+    "batch_C": {
+      "id": "batch_C",
+      "name": "Fix E2E tests 101-150 (database tests)",
+      "test_range": "101-150",
+      "test_count": 50,
+      "module": "database",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
+    },
+    "batch_D": {
+      "id": "batch_D",
+      "name": "Fix E2E tests 151-200 (integration tests)",
+      "test_range": "151-200",
+      "test_count": 50,
+      "module": "integration",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
+    }
+  }
+}
+```
+
+**Mode Decision Output:**
+```markdown
+## PM Decision: PARALLEL MODE (Scale-Based Decomposition)
+
+### Scale Analysis
+- Total tests: 695
+- Failing tests: 568
+- Estimated effort: ~40 hours (one developer) - EXCEEDS 6-hour threshold
+- **Trigger**: Test count > 100 AND estimated hours > 6
+
+### Time-Based Batch Sizing
+**Calculation:**
+- Estimated time per test: 3 minutes (medium complexity)
+- Target batch duration: 1-3 hours (optimal feedback loop)
+- Batch size: 50 tests × 3 min = 150 min (2.5 hours) ✓ OPTIMAL
+
+### Decomposition Strategy
+Breaking into time-optimized batches of 50 tests per group.
+
+**Phase 1**: 4 groups (tests 1-200, ~2.5 hours each)
+- Group batch_A: Tests 1-50 (auth flow) - Est: 2.5 hours
+- Group batch_B: Tests 51-100 (API endpoints) - Est: 2.5 hours
+- Group batch_C: Tests 101-150 (database operations) - Est: 2.5 hours
+- Group batch_D: Tests 151-200 (integration tests) - Est: 2.5 hours
+
+**Why this batch duration:**
+- 2.5 hours = optimal range (1-3 hours target)
+- Fast feedback loop for pattern detection
+- Parallel execution: 4 developers working simultaneously
+- Total Phase 1 time: ~2.5 hours (vs 10 hours sequential)
+- Can adjust batch size based on actual completion time
+
+### Execution Plan
+**Phase 1**: Spawn 4 developers for first 200 tests (Est: 2.5 hours)
+**After Phase 1**:
+- Measure actual time taken
+- If < 1 hour → Increase to 75-test batches
+- If 1-3 hours → Keep 50-test batches (optimal)
+- If > 4 hours → Decrease to 25-test batches
+**Phase 2+**: Continue with time-adjusted batch size
+
+### Next Action
+Orchestrator should spawn 4 developers in parallel for groups: batch_A, batch_B, batch_C, batch_D
+```
 
 ### Step 4: Create Task Groups
 

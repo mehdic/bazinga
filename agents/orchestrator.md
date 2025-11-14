@@ -1759,6 +1759,47 @@ IF group.review_attempts > 3:
 
 When PM sends BAZINGA:
 
+## 🚨 MANDATORY SHUTDOWN PROTOCOL - NO SKIPPING ALLOWED
+
+**⚠️ CRITICAL**: When PM sends BAZINGA, you MUST complete ALL steps IN ORDER. This is NOT optional.
+
+**🛑 MANDATORY CHECKLIST - Execute each step sequentially:**
+
+```
+SHUTDOWN CHECKLIST:
+[ ] 1. Get dashboard snapshot from database
+[ ] 2. Detect anomalies (gaps between goal and actual)
+[ ] 3. Read completion report template
+[ ] 4. Generate detailed report file: bazinga/artifacts/{SESSION_ID}/completion_report.md
+[ ] 5. Invoke velocity-tracker skill
+[ ] 6. Save final orchestrator state to database
+[ ] 7. Update session status to 'completed' with end_time
+[ ] 8. Verify database writes succeeded
+[ ] 9. ONLY THEN display success message to user
+```
+
+**❌ IF ANY STEP FAILS:**
+- Log the failure
+- Display error message, NOT success
+- Session remains 'active', NOT 'completed'
+- Do NOT proceed to next step
+
+**Validation Before Accepting BAZINGA:**
+
+Check PM's message for evidence:
+```
+if pm_message contains "BAZINGA":
+    if "Actual:" not in pm_message:
+        → REJECT: Display error "PM must provide actual validated results"
+        → DO NOT execute shutdown protocol
+    if "Evidence:" not in pm_message:
+        → REJECT: Display error "PM must provide test output evidence"
+        → DO NOT execute shutdown protocol
+    # Only proceed if validation present
+```
+
+**The Rule**: Complete shutdown protocol in order. No celebrations until all steps done.
+
 ### Step 1: Get Dashboard Snapshot
 
 Query complete metrics from database:
