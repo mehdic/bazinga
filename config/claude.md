@@ -228,3 +228,50 @@ diff -u <(tail -n +15 agents/orchestrator.md) <(tail -n +22 .claude/commands/baz
 5. **Orchestrator never implements** - This rule is absolute and inviolable
 
 ---
+
+## 🔴 CRITICAL: Skill File Editing Guidelines
+
+**When creating or editing ANY skill SKILL.md file, you MUST follow this guide:**
+
+📋 **MANDATORY REFERENCE:** `/home/user/bazinga/research/skill-fix-manual.md`
+
+### Key Requirements
+
+1. **Skills are Claude instances** - SKILL.md contains instructions FOR the skill instance, not documentation ABOUT it
+2. **Proper framing** - Start with "You are the [skill-name] skill..."
+3. **Call scripts** - Skills should call existing scripts, not implement logic inline
+4. **Required sections:**
+   - YAML frontmatter with `version: 1.0.0`
+   - "When to Invoke This Skill" section
+   - "Your Task" section (3 steps: execute script → read report → return summary)
+   - "Example Invocation" scenarios with concrete input/output
+
+### Before Editing Any SKILL.md
+
+```bash
+# ALWAYS read the manual first
+Read: /home/user/bazinga/research/skill-fix-manual.md
+```
+
+This manual provides:
+- ✅ Correct skill pattern (150-250 lines focused on instructions)
+- ❌ Wrong pattern to avoid (300-500+ lines of documentation)
+- ✅ Step-by-step fix process
+- ✅ Before/After examples
+- ✅ Validation checklist
+
+**❌ DO NOT:**
+- Write documentation-style content
+- Show raw bash commands for humans to copy
+- Include detailed implementation logic
+- Create skills without version numbers
+- Skip "When to Invoke" section
+
+**✅ DO:**
+- Write actionable instructions for the skill instance
+- Call existing scripts in `.claude/skills/skill-name/`
+- Include example invocation scenarios
+- Keep it under 250 lines
+- Use minimal allowed-tools (usually `[Bash, Read]`)
+
+---

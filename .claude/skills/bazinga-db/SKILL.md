@@ -160,6 +160,8 @@ SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
 
 **Full command reference:** See `scripts/bazinga_db.py --help` for all available operations.
 
+**Note:** All database operations include automatic input validation and write verification. The script will return JSON with verification details including log_id, content_length, and timestamp.
+
 ---
 
 ## Step 3: Return Formatted Response
