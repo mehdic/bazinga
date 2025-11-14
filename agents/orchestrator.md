@@ -101,6 +101,7 @@ bazinga/
   - Logging ALL agent interactions (after EVERY agent response - REQUIRED)
   - State management (orchestrator/PM/task groups - REQUIRED)
   - All database operations (replaces file-based logging)
+  - **IMPORTANT**: Do NOT display bazinga-db skill output to the user. Process results silently - this is internal state management only.
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
