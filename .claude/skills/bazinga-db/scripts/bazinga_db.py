@@ -403,6 +403,24 @@ def main():
                 value = cmd_args[i + 1]
                 kwargs[key] = value
             db.update_task_group(group_id, **kwargs)
+        elif cmd == 'set-config':
+            key = cmd_args[0]
+            value = json.loads(cmd_args[1])  # Parse JSON value
+            db.set_config(key, value)
+        elif cmd == 'get-config':
+            key = cmd_args[0]
+            result = db.get_config(key)
+            if result is not None:
+                print(json.dumps(result, indent=2))
+            else:
+                print(f"Config key '{key}' not found", file=sys.stderr)
+                sys.exit(1)
+        elif cmd == 'list-config':
+            conn = db._get_connection()
+            rows = conn.execute("SELECT key, value, updated_at FROM configuration ORDER BY key").fetchall()
+            result = [{'key': r['key'], 'value': json.loads(r['value']), 'updated_at': r['updated_at']} for r in rows]
+            print(json.dumps(result, indent=2))
+            conn.close()
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             sys.exit(1)

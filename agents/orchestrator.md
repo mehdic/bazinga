@@ -406,9 +406,61 @@ Display:
 
    See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
-4. **Store config references in database:**
+4. **Store configuration metadata in database:**
 
-   ### 🔴 MANDATORY: Store configuration in database
+   ### 🔴 MANDATORY: Initialize configuration table
+
+   **YOU MUST invoke bazinga-db skill to store configuration metadata.**
+
+   **First, store skills configuration:**
+
+   Request to bazinga-db skill:
+   ```
+   bazinga-db, please set configuration:
+
+   Key: skills_config
+   Value: {
+     "path": "bazinga/skills_config.json",
+     "last_loaded": "[current ISO timestamp]",
+     "profile": "[profile from skills_config.json _metadata.profile]",
+     "mandatory_count": [count of mandatory skills across all agents]
+   }
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+   **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+   **Second, store testing configuration:**
+
+   Request to bazinga-db skill:
+   ```
+   bazinga-db, please set configuration:
+
+   Key: testing_config
+   Value: {
+     "path": "bazinga/testing_config.json",
+     "last_loaded": "[current ISO timestamp]",
+     "mode": "[mode from testing_config.json]",
+     "qa_enabled": [boolean from testing_config.json]
+   }
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+   **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+   Display: "✅ **ORCHESTRATOR**: Configuration metadata stored in database"
+
+5. **Store orchestrator initial state:**
+
+   ### 🔴 MANDATORY: Store orchestrator state
 
    **YOU MUST invoke bazinga-db skill to save orchestrator initial state.**
 
