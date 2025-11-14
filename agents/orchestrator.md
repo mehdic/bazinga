@@ -371,7 +371,6 @@ Display:
 **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
 
-   **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
    **WAIT for bazinga-db response.**
 
