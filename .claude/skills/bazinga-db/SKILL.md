@@ -67,18 +67,13 @@ Extract from the calling agent's request:
 - "save skill output" → save-skill-output
 - "dashboard snapshot" / "get dashboard data" → dashboard-snapshot
 - "stream logs" / "recent logs" → stream-logs
-- "set config" / "set configuration" / "store config" → set-config
-- "get config" / "get configuration" / "load config" → get-config
-- "list config" / "show all config" → list-config
 
 **Required parameters:**
-- session_id (almost always required, NOT required for config operations)
+- session_id (almost always required)
 - agent_type (for logs, tokens)
 - content (for logs)
 - state_type (for state operations: pm, orchestrator, group_status)
 - state_data (JSON object)
-- key (for config operations: set-config, get-config)
-- value (JSON object for set-config)
 
 **Optional parameters:**
 - iteration
@@ -162,41 +157,6 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" update-task-group \
 SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
   "<session_id>")
 ```
-
-### Configuration Management
-
-**Set configuration value:**
-```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" set-config \
-  "<key>" \
-  '<json_value>'
-```
-
-Example:
-```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" set-config skills_config \
-  '{"path": "bazinga/skills_config.json", "profile": "lite", "mandatory_count": 3}'
-```
-
-**Get configuration value:**
-```bash
-CONFIG=$(python3 "$DB_SCRIPT" --db "$DB_PATH" get-config "<key>")
-```
-
-Returns JSON value or error if key not found.
-
-**List all configuration:**
-```bash
-ALL_CONFIG=$(python3 "$DB_SCRIPT" --db "$DB_PATH" list-config)
-```
-
-Returns JSON array of all configuration entries with keys, values, and timestamps.
-
-**Configuration keys used by orchestrator:**
-- `skills_config` - Skills configuration metadata (path, profile, mandatory_count)
-- `testing_config` - Testing configuration metadata (path, mode, qa_enabled)
-- `orchestrator_defaults` - User preferences (default_mode, max_parallel_developers)
-- `project_metadata` - Project info (name, description, created_at)
 
 **Full command reference:** See `scripts/bazinga_db.py --help` for all available operations.
 
