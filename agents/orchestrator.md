@@ -1187,7 +1187,9 @@ Store each group's code context separately for use in developer prompts.
 👨‍💻 **ORCHESTRATOR**: Spawning [N] developers in parallel for groups: [list groups]
 ```
 
-**CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
+**🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
+
+When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
 ```
 Task(subagent_type: "general-purpose", description: "Developer Group A", prompt: [Group A prompt])
@@ -1195,6 +1197,8 @@ Task(subagent_type: "general-purpose", description: "Developer Group B", prompt:
 Task(subagent_type: "general-purpose", description: "Developer Group C", prompt: [Group C prompt])
 ... up to 4 developers max
 ```
+
+**DO NOT spawn them in separate messages** - that would make them run sequentially, defeating the purpose of parallel mode.
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
@@ -1236,6 +1240,25 @@ Same workflow as Simple Mode, but include group-specific branch name
 
 See `bazinga/templates/message_templates.md` for standard prompt format.
 See `agents/developer.md` for full developer agent definition.
+
+**🔴 CRITICAL: WAIT FOR ALL DEVELOPERS TO COMPLETE**
+
+After spawning all developers in parallel (in ONE message), you MUST wait for ALL Task tools to complete and return their responses. DO NOT proceed until you receive ALL developer responses.
+
+The developers will execute in parallel, but you must still wait for the complete set of responses before proceeding to Step 2B.2.
+
+Each Developer may take several minutes to:
+- Analyze their assigned code group
+- Invoke mandatory skills (security-scan, lint-check, test-coverage, etc.)
+- Implement changes
+- Run tests
+- Report status
+
+**WAIT for ALL developer responses before proceeding to Step 2B.2.**
+
+---
+
+**AFTER receiving ALL developer responses:**
 
 ### Step 2B.2: Receive All Developer Responses
 
