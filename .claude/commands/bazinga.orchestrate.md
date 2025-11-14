@@ -491,6 +491,26 @@ Display:
    - If errors: "⚠️ **ORCHESTRATOR**: Baseline build has errors (will track if Developer introduces NEW errors)"
    - If unknown: "ℹ️ **ORCHESTRATOR**: Could not detect build system, skipping build check"
 
+6. **Start dashboard if not running:**
+
+   Display: "📊 **ORCHESTRATOR**: Checking dashboard status..."
+
+   ```bash
+   # Check if dashboard is running
+   if [ -f /tmp/bazinga-dashboard.pid ] && kill -0 $(cat /tmp/bazinga-dashboard.pid) 2>/dev/null; then
+       echo "Dashboard already running"
+   else
+       # Start dashboard in background
+       bash scripts/start-dashboard.sh &
+       sleep 1
+       echo "Dashboard started"
+   fi
+   ```
+
+   Display result:
+   - If already running: "✅ **ORCHESTRATOR**: Dashboard already running"
+   - If started: "✅ **ORCHESTRATOR**: Dashboard started at http://localhost:53124"
+
 **After initialization:**
 ```
 🚀 **ORCHESTRATOR**: Ready to begin orchestration
