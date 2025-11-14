@@ -1511,7 +1511,7 @@ def update(
         False, "--force", "-f", help="Skip confirmation prompts"
     ),
     branch: Optional[str] = typer.Option(
-        None, "--branch", "-b", help="Git branch to update from (e.g., 'develop', 'feature/xyz')"
+        None, "-b", help="Git branch to update from (e.g., 'develop', 'feature/xyz')"
     ),
 ):
     """
@@ -1521,13 +1521,13 @@ def update(
     commands, skills) to the latest versions while preserving coordination
     state files and existing configuration.
 
-    By default, updates from the main branch. Use --branch to test changes
+    By default, updates from the main branch. Use -b to test changes
     from a specific branch before they're merged to main.
 
     Examples:
-      bazinga update                           # Update from main branch
-      bazinga update --branch develop          # Test changes from develop branch
-      bazinga update --branch feature/new-fix  # Test a specific feature branch
+      bazinga update                    # Update from main branch
+      bazinga update -b develop         # Test changes from develop branch
+      bazinga update -b feature/new-fix # Test a specific feature branch
     """
     print_banner()
 
