@@ -1425,7 +1425,33 @@ def update_cli(branch: Optional[str] = None) -> bool:
                         console.print("  [dim]Already up to date[/dim]")
                     else:
                         console.print("  [dim]Pulled latest changes[/dim]")
-                        was_updated = True
+
+                        # Check if CLI code itself was updated (not just content files)
+                        # We only want to warn/return True if files in src/ changed
+                        diff_result = subprocess.run(
+                            ["git", "diff", "--name-only", "HEAD@{1}", "HEAD"],
+                            cwd=bazinga_repo,
+                            capture_output=True,
+                            text=True,
+                            check=False
+                        )
+
+                        if diff_result.returncode == 0:
+                            changed_files = diff_result.stdout.strip().split('\n')
+                            # Check if any changed files are in src/ (CLI code)
+                            cli_files_changed = any(
+                                f.startswith('src/') for f in changed_files if f
+                            )
+
+                            if cli_files_changed:
+                                console.print("  [dim]CLI code was updated[/dim]")
+                                was_updated = True
+                            else:
+                                console.print("  [dim]Only content files were updated (agents, scripts, etc.)[/dim]")
+                                was_updated = False
+                        else:
+                            # If we can't determine what changed, assume CLI was updated (conservative)
+                            was_updated = True
 
                 # Only reinstall if there were updates
                 if was_updated:
