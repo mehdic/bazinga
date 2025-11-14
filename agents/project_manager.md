@@ -1722,6 +1722,22 @@ ELSE:
 
 **Decomposition Strategy:**
 
+**Optimal Batch Duration Targets:**
+
+```
+Target batch completion time per developer:
+- Minimum: 30 minutes (avoid overhead of too-small batches)
+- Optimal: 1-3 hours (good focus block, fast feedback)
+- Maximum: 4 hours (still get same-day feedback)
+- Never exceed: 6 hours (loses parallelization benefit)
+
+Why these limits:
+- < 30 min: Too much overhead (spawning, context switching)
+- 1-3 hours: Sweet spot (focused work, quick pattern detection)
+- > 6 hours: Too slow feedback, can't adjust strategy quickly
+- > 8 hours: Defeats purpose of parallel execution
+```
+
 **For Test Fixing Tasks (e.g., "Fix 695 E2E tests"):**
 
 ```
@@ -1730,22 +1746,40 @@ ELSE:
    - Group by failure type (e.g., timeout, assertion, setup issues)
    - Identify patterns (e.g., "all DB tests fail due to connection")
 
-2. Create batch groups of 10-50 tests each:
-   - Group A: Tests 1-50 (auth module)
-   - Group B: Tests 51-100 (API module)
-   - Group C: Tests 101-150 (DB module)
-   - Group D: Tests 151-200 (integration module)
-   - Continue until all tests assigned
+2. Estimate time per test and calculate batch size:
+   - Simple test fix: ~2-3 minutes per test → 20-50 tests per batch
+   - Medium complexity: ~5 minutes per test → 10-30 tests per batch
+   - Complex test fix: ~10 minutes per test → 5-15 tests per batch
 
-3. Use PARALLEL MODE with adaptive batching:
+   Target: Batches that complete in 1-3 hours
+
+3. Create batch groups based on time estimate:
+   Example (assuming ~2 min per test):
+   - Group A: Tests 1-50 (auth module) - Est: 100 min
+   - Group B: Tests 51-100 (API module) - Est: 100 min
+   - Group C: Tests 101-150 (DB module) - Est: 100 min
+   - Group D: Tests 151-200 (integration module) - Est: 100 min
+
+4. Use PARALLEL MODE with adaptive batching:
    - Phase 1: Start with 2-4 batch groups
-   - After Phase 1 completion: Analyze patterns
-   - Phase 2+: Adjust batch size based on learnings
+   - After Phase 1 completion: Measure actual time taken
+   - Phase 2+: Adjust batch size based on actual completion time
 
-4. Iterative refinement:
-   - If developers finish batches quickly → Increase batch size
-   - If developers struggle → Decrease batch size
-   - If common pattern found → Create pattern-fix group
+5. Iterative refinement based on time:
+   - If batches completed < 1 hour → Increase batch size by 50%
+   - If batches completed 1-3 hours → Keep current batch size (optimal)
+   - If batches completed > 4 hours → Decrease batch size by 50%
+   - If common pattern found → Create focused pattern-fix group
+
+   Example adjustment:
+   Phase 1: 50 tests per batch, took 90 minutes (optimal ✓)
+   Phase 2: Keep 50 tests per batch
+
+   Phase 1: 50 tests per batch, took 30 minutes (too fast)
+   Phase 2: Increase to 75 tests per batch
+
+   Phase 1: 50 tests per batch, took 5 hours (too slow)
+   Phase 2: Decrease to 25 tests per batch
 ```
 
 **For Large File Changes (e.g., "Refactor 50 modules"):**
@@ -1770,8 +1804,12 @@ ELSE:
 ```
 Scale Check:
 - Test count: 695 total, 568 failing (> 100 threshold) ✓ DECOMPOSE
-- Estimated effort: ~40 hours for one developer (> 4 hour threshold) ✓ DECOMPOSE
+- Estimated effort: ~40 hours for one developer (> 6 hour threshold) ✓ DECOMPOSE
 - Complexity: Cannot fix all at once
+
+Time Estimation:
+- Assume 3 minutes per test fix (medium complexity)
+- 50 tests × 3 min = 150 minutes = 2.5 hours per batch (optimal ✓)
 
 Decision: PARALLEL MODE with test batching
 ```
@@ -1779,30 +1817,35 @@ Decision: PARALLEL MODE with test batching
 **Decomposition:**
 ```
 Phase 1 (First 200 tests, 4 parallel groups):
-- Group A: Tests 1-50 (auth flow tests)
-- Group B: Tests 51-100 (API endpoint tests)
-- Group C: Tests 101-150 (database tests)
-- Group D: Tests 151-200 (integration tests)
+- Group batch_A: Tests 1-50 (auth flow tests) - Est: 2.5 hours
+- Group batch_B: Tests 51-100 (API endpoint tests) - Est: 2.5 hours
+- Group batch_C: Tests 101-150 (database tests) - Est: 2.5 hours
+- Group batch_D: Tests 151-200 (integration tests) - Est: 2.5 hours
 
 Expected outcome after Phase 1:
+- Each batch takes 1-3 hours (optimal feedback loop)
 - Learn common failure patterns
 - Identify infrastructure vs. code issues
+- Measure actual time per test
 - Adjust strategy for Phase 2
 
 Phase 2 (Adapt based on Phase 1 learnings):
 - If pattern found (e.g., "all DB tests fail due to connection"):
   → Create focused group to fix root cause first
-- If tests are independent:
-  → Continue with 50-test batches
-- If developers finished quickly:
+- If batches completed in < 1 hour:
   → Increase to 75-test batches for efficiency
+- If batches completed in 1-3 hours:
+  → Keep 50-test batches (optimal)
+- If batches completed in > 4 hours:
+  → Decrease to 25-test batches (too slow)
 ```
 
 **Rationale:**
 - Fixing 695 tests is NOT one feature—it's a MASSIVE task requiring decomposition
 - Even though it's "one goal," scale requires parallel execution
-- Batch size (10-50) is manageable for developers
-- Iterative approach allows pattern recognition and strategy adjustment
+- Batch duration (1-3 hours) provides fast feedback and pattern recognition
+- 50-test batches @ 3 min/test = 2.5 hours (within optimal range)
+- Iterative approach allows time-based batch size adjustment
 
 **Task Groups Created:**
 ```json
@@ -1817,7 +1860,9 @@ Phase 2 (Adapt based on Phase 1 learnings):
       "batch_phase": 1,
       "can_parallel": true,
       "depends_on": [],
-      "estimated_effort_minutes": 60
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
     },
     "batch_B": {
       "id": "batch_B",
@@ -1828,7 +1873,35 @@ Phase 2 (Adapt based on Phase 1 learnings):
       "batch_phase": 1,
       "can_parallel": true,
       "depends_on": [],
-      "estimated_effort_minutes": 60
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
+    },
+    "batch_C": {
+      "id": "batch_C",
+      "name": "Fix E2E tests 101-150 (database tests)",
+      "test_range": "101-150",
+      "test_count": 50,
+      "module": "database",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
+    },
+    "batch_D": {
+      "id": "batch_D",
+      "name": "Fix E2E tests 151-200 (integration tests)",
+      "test_range": "151-200",
+      "test_count": 50,
+      "module": "integration",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 150,
+      "estimated_time_per_test_minutes": 3,
+      "target_completion_hours": "1-3"
     }
   }
 }
@@ -1841,28 +1914,39 @@ Phase 2 (Adapt based on Phase 1 learnings):
 ### Scale Analysis
 - Total tests: 695
 - Failing tests: 568
-- Estimated effort: ~40 hours (one developer)
-- **Trigger**: Test count > 100 threshold
+- Estimated effort: ~40 hours (one developer) - EXCEEDS 6-hour threshold
+- **Trigger**: Test count > 100 AND estimated hours > 6
+
+### Time-Based Batch Sizing
+**Calculation:**
+- Estimated time per test: 3 minutes (medium complexity)
+- Target batch duration: 1-3 hours (optimal feedback loop)
+- Batch size: 50 tests × 3 min = 150 min (2.5 hours) ✓ OPTIMAL
 
 ### Decomposition Strategy
-Breaking into manageable batches of 50 tests per group.
+Breaking into time-optimized batches of 50 tests per group.
 
-**Phase 1**: 4 groups (tests 1-200)
-- Group batch_A: Tests 1-50 (auth flow)
-- Group batch_B: Tests 51-100 (API endpoints)
-- Group batch_C: Tests 101-150 (database operations)
-- Group batch_D: Tests 151-200 (integration tests)
+**Phase 1**: 4 groups (tests 1-200, ~2.5 hours each)
+- Group batch_A: Tests 1-50 (auth flow) - Est: 2.5 hours
+- Group batch_B: Tests 51-100 (API endpoints) - Est: 2.5 hours
+- Group batch_C: Tests 101-150 (database operations) - Est: 2.5 hours
+- Group batch_D: Tests 151-200 (integration tests) - Est: 2.5 hours
 
-**Why batching:**
-- 50 tests per developer is manageable (60-90 min)
-- Parallel execution reduces total time from days to hours
-- Allows pattern recognition after first batch
-- Can adjust strategy based on learnings
+**Why this batch duration:**
+- 2.5 hours = optimal range (1-3 hours target)
+- Fast feedback loop for pattern detection
+- Parallel execution: 4 developers working simultaneously
+- Total Phase 1 time: ~2.5 hours (vs 10 hours sequential)
+- Can adjust batch size based on actual completion time
 
 ### Execution Plan
-Phase 1: Spawn 4 developers for first 200 tests
-After Phase 1: Review patterns, adjust batch size
-Phase 2+: Continue with adapted strategy
+**Phase 1**: Spawn 4 developers for first 200 tests (Est: 2.5 hours)
+**After Phase 1**:
+- Measure actual time taken
+- If < 1 hour → Increase to 75-test batches
+- If 1-3 hours → Keep 50-test batches (optimal)
+- If > 4 hours → Decrease to 25-test batches
+**Phase 2+**: Continue with time-adjusted batch size
 
 ### Next Action
 Orchestrator should spawn 4 developers in parallel for groups: batch_A, batch_B, batch_C, batch_D
