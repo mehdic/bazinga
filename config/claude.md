@@ -175,47 +175,45 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 
 ## 🔴 CRITICAL: Orchestrator File Synchronization
 
-**When updating the orchestrator agent, you MUST update BOTH files:**
+**These files MUST be kept IDENTICAL:**
 
 1. **agents/orchestrator.md** - The agent definition (Task tool invocation)
 2. **.claude/commands/bazinga.orchestrate.md** - The slash command version
 
 ### ✅ REQUIRED SYNC PROCEDURE
 
-After making ANY changes to `agents/orchestrator.md`:
+After making ANY changes to either file, copy to the other:
 
 ```bash
-# Copy the body (from line 15 onwards) to the command file
-tail -n +15 agents/orchestrator.md > /tmp/orchestrator_body.txt
+# When updating orchestrator, copy to both locations:
+cp agents/orchestrator.md .claude/commands/bazinga.orchestrate.md
 
-# Preserve the command-specific header (first 21 lines)
-head -n 21 .claude/commands/bazinga.orchestrate.md > /tmp/command_header.txt
-
-# Combine header + body
-cat /tmp/command_header.txt /tmp/orchestrator_body.txt > .claude/commands/bazinga.orchestrate.md
+# OR if you edited the command file:
+cp .claude/commands/bazinga.orchestrate.md agents/orchestrator.md
 ```
 
 ### Verify Synchronization
 
 ```bash
-# Check Skill invocation counts match
-echo "orchestrator.md: $(grep -c 'Skill(command: "bazinga-db")' agents/orchestrator.md)"
-echo "bazinga.orchestrate.md: $(grep -c 'Skill(command: "bazinga-db")' .claude/commands/bazinga.orchestrate.md)"
-
-# Verify bodies are identical (should output: 0)
-diff -u <(tail -n +15 agents/orchestrator.md) <(tail -n +22 .claude/commands/bazinga.orchestrate.md) | wc -l
+# Verify files are identical (should output: "Files are identical")
+diff -q agents/orchestrator.md .claude/commands/bazinga.orchestrate.md && echo "✓ Files are identical"
 ```
 
-### Why Both Files Must Match
+### Why Both Files Must Be Identical
 
 - **Same orchestration logic** - Both use identical workflow and state management
-- **Same database operations** - Both invoke bazinga-db skill identically
+- **Same database operations** - Both invoke bazinga-db skill identically at same points
 - **Same agent coordination** - Both spawn PM, developers, QA, tech lead identically
-- **Only difference** - Headers for their respective contexts (agent vs command)
+- **Same state persistence** - Both have mandatory database persistence checkpoints
+- **NO differences** - Files are now completely identical (no header variations)
 
-**❌ DO NOT manually edit bazinga.orchestrate.md** - Always sync from orchestrator.md
+**Recent critical updates (ensure both files have these):**
+- Mandatory database operations section (lines 68-114)
+- PM state verification with fallback (Step 1.4, lines 685-738)
+- Enhanced orchestrator state saves (lines 1679-1724)
+- Final state checkpoint (lines 1991-2046)
 
-**✅ Single source of truth:** `agents/orchestrator.md` → sync to → `.claude/commands/bazinga.orchestrate.md`
+**⚠️ IMPORTANT:** Edit one, sync to the other. Always verify they're identical after changes.
 
 ---
 
