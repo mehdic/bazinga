@@ -1580,7 +1580,7 @@ The routing chain for each group is:
    bazinga-db, please log this techlead interaction:
 
    Session ID: [session_id]
-   Agent Type: tech_lead
+   Agent Type: techlead
    Content: [Tech Lead response]
    Iteration: [iteration]
    Agent ID: techlead_group_[X]
