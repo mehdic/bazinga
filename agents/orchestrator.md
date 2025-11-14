@@ -727,9 +727,10 @@ Developer Skills Status:
 - db-migration-check: [mandatory/disabled]
 ```
 
-**2. Build prompt sections (following prompt_building.md template):**
+**2. Build prompt sections (following agents/developer.md):**
 
 Include these sections in order:
+- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
 - ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
 - ✓ Group assignment (main)
 - ✓ Mode (Simple)
@@ -886,9 +887,10 @@ QA Expert Skills Status:
 - quality-dashboard: [mandatory/disabled]
 ```
 
-**2. Build QA Expert prompt following prompt_building.md template:**
+**2. Build QA Expert prompt following agents/qa_expert.md:**
 
 Include these sections:
+- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
 - ✓ Role definition (QA Expert in Claude Code Multi-Agent Dev Team)
 - ✓ Developer changes summary and test requirements
 - ✓ Testing framework section (from testing_config.json)
@@ -1018,9 +1020,10 @@ Tech Lead Skills Status:
 - test-coverage: [mandatory/disabled]
 ```
 
-**2. Build Tech Lead prompt following prompt_building.md template:**
+**2. Build Tech Lead prompt following agents/techlead.md:**
 
 Include these sections:
+- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
 - ✓ Role definition (Tech Lead in Claude Code Multi-Agent Dev Team)
 - ✓ Group assignment and implementation summary
 - ✓ Testing framework section (from testing_config.json)
@@ -1247,6 +1250,7 @@ Task(subagent_type: "general-purpose", description: "Developer Group C", prompt:
 **1. Check skills_config.json for developer mandatory skills** (same as Simple Mode)
 
 **2. Build prompt sections for THIS group:**
+- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
 - ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
 - ✓ Group assignment (specific group ID: A, B, C, etc.)
 - ✓ Mode (Parallel)
