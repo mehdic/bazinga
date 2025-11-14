@@ -65,6 +65,55 @@ Examples:
 
 ---
 
+## ⚠️ MANDATORY DATABASE OPERATIONS
+
+**CRITICAL: You MUST invoke the bazinga-db skill at these required points:**
+
+### Required Database Operations
+
+1. **At Initialization (Step 0, Path B):**
+   - MUST invoke bazinga-db to save initial orchestrator state
+   - MUST include skills_config, testing_config, and phase info
+   - MUST wait for confirmation before proceeding
+
+2. **After Receiving PM Decision (Step 1.3):**
+   - MUST invoke bazinga-db to log PM interaction
+   - MUST wait for confirmation
+
+3. **After Verifying PM State (Step 1.4):**
+   - MUST invoke bazinga-db to query task groups
+   - If empty, MUST create task groups from PM response (Step 1.4b)
+
+4. **After Each Agent Spawn:**
+   - MUST invoke bazinga-db to update orchestrator state
+   - MUST record agent type, iteration, and phase
+
+5. **After Each Agent Response:**
+   - MUST invoke bazinga-db to log agent interaction
+   - MUST update orchestrator state with new phase/status
+
+6. **After Updating Task Group Status:**
+   - MUST invoke bazinga-db to update task group records
+   - MUST record status changes, assignments, and review results
+
+7. **At Completion (Phase 3, Step 4):**
+   - MUST invoke bazinga-db to save final orchestrator state
+   - MUST invoke bazinga-db to update session status to 'completed'
+
+### Why This Matters
+
+- **Dashboard** queries database to display orchestration status and progress
+- **Session Resumption** requires orchestrator state to continue from where it left off
+- **Progress Tracking** requires task group records to show current status
+- **Audit Trail** depends on all interactions being logged
+- **Metrics** need state snapshots to calculate velocity and performance
+
+### Verification
+
+After each bazinga-db skill invocation, you should see a confirmation response. If you don't see confirmation or see an error, retry the invocation before proceeding.
+
+---
+
 ## 📁 File Path Rules - MANDATORY STRUCTURE
 
 **All session artifacts MUST follow this structure:**
@@ -1678,7 +1727,14 @@ Wait for response. Returns array of task groups.
 
 ### Updating Orchestrator State
 
-After each major decision, save orchestrator state to database:
+**⚠️ MANDATORY: Save orchestrator state after each major decision**
+
+Major decisions include:
+- After spawning any agent (developer, QA, tech lead, PM)
+- After routing based on PM mode decision
+- After receiving agent responses (developer, QA, tech lead)
+- Before and after phase transitions
+- After updating task group statuses
 
 **Request to bazinga-db skill:**
 ```
@@ -1712,7 +1768,9 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**CRITICAL:** You MUST invoke bazinga-db skill here. This is not optional. The dashboard and session resumption depend on orchestrator state being persisted.
+
+**Wait for confirmation.** You should see a response confirming the orchestrator state was saved. If you see an error, retry the invocation.
 
 
 ### Updating Task Group Status
@@ -1932,7 +1990,13 @@ Report includes:
 
 ### Step 4: Update Database
 
-**Save final orchestrator state:**
+**⚠️ MANDATORY: Save final orchestrator state and update session**
+
+This step has TWO required sub-steps that MUST both be completed:
+
+#### Sub-step 4.1: Save Final Orchestrator State
+
+**Request to bazinga-db skill:**
 ```
 bazinga-db, please save the orchestrator state:
 
@@ -1942,7 +2006,10 @@ State Data: {
   "status": "completed",
   "end_time": [timestamp],
   "duration_minutes": [duration],
-  "completion_report": [report_filename]
+  "completion_report": [report_filename],
+  "current_phase": "completion",
+  "iteration": [final iteration count],
+  "total_spawns": [total agent spawns]
 }
 ```
 
@@ -1951,14 +2018,11 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Wait for confirmation.** You should see a response confirming the orchestrator state was saved.
 
+#### Sub-step 4.2: Update Session Status to Completed
 
-**WAIT for confirmation.** Orchestrator state saved to database.
-
-**Now update session status:**
-
-Request to bazinga-db skill:
+**Request to bazinga-db skill:**
 ```
 bazinga-db, please update session status:
 
@@ -1972,7 +2036,14 @@ End Time: [timestamp]
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Wait for confirmation.** You should see a response confirming the session status was updated.
+
+**Verification Checkpoint:**
+- ✅ Orchestrator final state saved (1 invocation)
+- ✅ Session status updated to 'completed' (1 invocation)
+- ✅ Both invocations returned success responses
+
+**CRITICAL:** You MUST complete both database operations before proceeding to Step 5. The dashboard and metrics depend on this final state being persisted.
 
 
 ### Step 5: Display Concise Report
