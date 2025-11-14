@@ -2025,6 +2025,40 @@ Orchestrator should spawn 4 developers in parallel for groups: batch_A, batch_B,
 
 ### Step 4: Create Task Groups
 
+**⚠️ MANDATORY: Read Task Group Size Limits FIRST before creating any groups**
+
+**CRITICAL RULES - Apply BEFORE creating groups:**
+
+1. **Max 3 sequential steps per task group**
+   - If task has >3 steps → MUST break into separate groups
+   - Example: "Do A, then B, then C, then D" → Group 1 (A,B), Group 2 (C,D)
+
+2. **Max 3 hours (180 minutes) per task group**
+   - Target: 1-3 hours (optimal feedback loop)
+   - If estimate >3 hours → MUST decompose
+
+3. **Phases = Separate Groups**
+   - If you think "Phase 1, Phase 2, Phase 3" → Create 3 groups
+   - Phases are sequential by definition → Groups can have dependencies
+
+4. **Clear completion criteria per group**
+   - Each group must have verifiable output
+   - Cannot have criteria like "continue to next phase"
+   - Must be testable: "Tests passing", "Feature works", "Bug fixed"
+
+**Violation Detection:**
+- Multiple "Phase N" in description → Split into groups (one per phase)
+- More than 2 "then" statements → Too many sequential steps
+- Estimated time >180 min → Decompose via batching
+- "Run 695 tests" (8 hours) → Use time-based batching (50-test groups = 2.5 hours each)
+
+**Examples of violations:**
+❌ "Run tests, analyze failures, fix issues, validate fixes" → 4 phases, split into 4 groups
+❌ "Establish baseline for 695 tests" → Too large, use batching (50-test groups)
+❌ "Research solution, implement, test, document" → Split into 2 groups (research+impl, test+doc)
+
+---
+
 **For SIMPLE MODE:**
 
 Create 1 task group containing all tasks:
@@ -2073,132 +2107,6 @@ Create 2-4 task groups, each independent:
 ```
 
 **Important**: Groups must be truly independent (different files) to allow safe parallel execution.
-
-### Step 4A: Task Group Size Limits (MANDATORY)
-
-**⚠️ CRITICAL: Each task group must be independently completable and verifiable.**
-
-**FORBIDDEN: Multi-phase tasks in a single group**
-
-❌ **WRONG** (monolithic task with phases):
-```json
-{
-  "id": "main",
-  "name": "E2E Test Infrastructure Validation and Completion",
-  "phases": [
-    "Phase 1: Run full test suite (30 min)",
-    "Phase 2: Analyze failures",
-    "Phase 3: Fix issues",
-    "Phase 4: Final validation"
-  ],
-  "estimated_effort_minutes": 240
-}
-```
-**Why wrong**: 4 sequential phases, cannot verify completion until all done, developer stuck for 4 hours.
-
-✅ **CORRECT** (decomposed into independent groups):
-```json
-{
-  "id": "validation_1",
-  "name": "Run baseline E2E test suite",
-  "acceptance_criteria": "Report X/695 tests passing with evidence",
-  "estimated_effort_minutes": 60,
-  "can_parallel": false
-},
-{
-  "id": "fix_auth_infra",
-  "name": "Fix auth infrastructure issues",
-  "depends_on": ["validation_1"],
-  "acceptance_criteria": "Auth tests passing, infrastructure stable",
-  "estimated_effort_minutes": 90,
-  "can_parallel": true
-},
-{
-  "id": "fix_api_infra",
-  "name": "Fix API infrastructure issues",
-  "depends_on": ["validation_1"],
-  "acceptance_criteria": "API tests passing, services auto-start",
-  "estimated_effort_minutes": 90,
-  "can_parallel": true
-},
-{
-  "id": "validation_final",
-  "name": "Run final validation and document remaining issues",
-  "depends_on": ["fix_auth_infra", "fix_api_infra"],
-  "acceptance_criteria": "Y/695 tests passing OR documented out-of-scope failures",
-  "estimated_effort_minutes": 60,
-  "can_parallel": false
-}
-```
-
-**MANDATORY RULES:**
-
-1. **Max 3 sequential steps per task group**
-   - If task has >3 steps → MUST break into separate groups
-   - Example: "Do A, then B, then C, then D" → Group 1 (A,B), Group 2 (C,D)
-
-2. **Max 3 hours per task group**
-   - Target: 1-3 hours (optimal feedback loop)
-   - If estimate >3 hours → MUST decompose
-
-3. **Phases = Separate Groups**
-   - If you think "Phase 1, Phase 2, Phase 3" → Create 3 groups
-   - Phases are sequential by definition → Groups can have dependencies
-
-4. **Clear completion criteria per group**
-   - Each group must have verifiable output
-   - Cannot have criteria like "continue to next phase"
-   - Must be testable: "Tests passing", "Feature works", "Bug fixed"
-
-**Detection:**
-```python
-if task_description.contains("Phase 1") and task_description.contains("Phase 2"):
-    → VIOLATION: Multi-phase task detected
-    → Action: Break into separate groups (one per phase)
-
-if task_description.contains("then") more than 2 times:
-    → VIOLATION: Too many sequential steps
-    → Action: Group related steps, create multiple groups
-
-if estimated_effort_minutes > 180:
-    → VIOLATION: Task too large
-    → Action: Decompose by time-based batching
-```
-
-**Examples of violations:**
-
-❌ "Run tests, analyze failures, fix issues, validate fixes" → 4 phases, split into 4 groups
-❌ "Implement auth, then user mgmt, then admin panel" → Use parallel mode with 3 groups
-❌ "Fix 695 tests" (8 hours) → Use scale-based batching (50-test groups)
-❌ "Research solution, implement, test, document" → Split into 2 groups (research+impl, test+doc)
-
-**Enforcement in your decision:**
-
-When creating task groups, check EACH group:
-1. Count phases/steps (max 3)
-2. Check estimated time (max 3 hours)
-3. Verify completion criteria (must be testable)
-4. If any violated → Decompose further
-
-**Your response must show:**
-```markdown
-### Task Group Validation
-
-Checking each group against size limits:
-
-**Group validation_1:**
-- Steps: 1 (run tests) ✓
-- Est time: 60 min ✓
-- Completion: "X/695 tests passing" (verifiable) ✓
-- **VALID**
-
-**Group main:** ❌ INVALID
-- Steps: 4 (run, analyze, fix, validate) ✗ MAX 3
-- Est time: 240 min ✗ MAX 180
-- Contains phases: ✗ Must decompose
-
-→ Decomposing group "main" into 4 independent groups
-```
 
 ### Step 5: Adaptive Parallelism
 
