@@ -1091,6 +1091,9 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+
 The skill will save your PM state to the database state_snapshots table.
 
 ## 🆕 SPEC-KIT INTEGRATION MODE
@@ -1314,6 +1317,9 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+
 Additionally, create task groups in the database:
 
 **For each task group, request:**
@@ -1330,6 +1336,9 @@ Status: pending
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
 
 Repeat for each task group (SETUP, US1, US2, etc.).
 
@@ -1769,6 +1778,9 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+
 **Also create task groups in database:**
 
 For each task group created, invoke bazinga-db to store in task_groups table:
@@ -1786,6 +1798,9 @@ Status: pending
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
 
 ### Step 7: Return Decision
 
@@ -2059,6 +2074,9 @@ Group ID: [group_id]
 Skill(command: "bazinga-db")
 ```
 
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+
 Extract current `revision_count` from the response.
 
 **Update task group with incremented revision:**
@@ -2075,6 +2093,9 @@ Status: in_progress
 ```
 Skill(command: "bazinga-db")
 ```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
 
 This replaces reading/writing group_status.json with database operations.
 
