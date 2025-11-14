@@ -616,9 +616,27 @@ Returns latest PM state or null if first iteration.
 ```
 
 Build PM prompt with:
+- **Session ID: [current session_id]** ← CRITICAL: PM needs this to save state to database
 - Previous state (PM's "memory")
 - User's requirements from conversation
 - Task: Analyze requirements, decide mode (SIMPLE/PARALLEL), create task groups
+
+**Example PM prompt structure:**
+```
+You are the Project Manager. Your session context:
+
+**Session ID:** [current session_id]
+**Iteration:** [current iteration number]
+**Previous State:** [PM state from database, or null if first iteration]
+
+**User Requirements:**
+[User's original request]
+
+**Your Task:**
+Analyze requirements, decide execution mode (SIMPLE/PARALLEL), create task groups, and save your state to database using the session ID above.
+
+See agents/project_manager.md for complete instructions.
+```
 
 See `agents/project_manager.md` for full PM agent definition.
 
@@ -627,7 +645,7 @@ See `agents/project_manager.md` for full PM agent definition.
 Task(
   subagent_type: "general-purpose",
   description: "PM analyzing requirements and deciding execution mode",
-  prompt: [PM prompt with state and requirements]
+  prompt: [PM prompt with session_id, state, and requirements as shown above]
 )
 ```
 
