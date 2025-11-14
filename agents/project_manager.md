@@ -1681,7 +1681,16 @@ Feature Count:
 Use this decision logic:
 
 ```
-IF (features == 1) OR (file_overlap == HIGH):
+# STEP 3A: Check for SCALE-BASED DECOMPOSITION FIRST
+# Before considering feature count, check if task scale is massive
+
+IF (test_count > 100) OR (files_affected > 20) OR (estimated_hours > 4):
+    → SCALE-BASED DECOMPOSITION REQUIRED
+    → Decompose into batches (see Step 3A below)
+    → Use PARALLEL MODE with batch groups
+
+# STEP 3B: Feature-based mode decision (if scale check didn't trigger)
+ELSE IF (features == 1) OR (file_overlap == HIGH):
     → SIMPLE MODE (1 developer, sequential)
 
 ELSE IF (features >= 2 AND features <= 4) AND (independent == TRUE):
@@ -1700,6 +1709,164 @@ ELSE:
 ```
 
 **Reasoning**: Always explain WHY you chose a mode.
+
+### Step 3A: Scale-Based Decomposition Logic
+
+**When to decompose a single large task into batches:**
+
+**Triggers** (ANY of these means decomposition required):
+- Test count > 100 tests to fix/create
+- Files affected > 20 files
+- Estimated effort > 4 hours for one developer
+- Complexity score > 15 story points
+
+**Decomposition Strategy:**
+
+**For Test Fixing Tasks (e.g., "Fix 695 E2E tests"):**
+
+```
+1. Analyze test failures by category:
+   - Group by test file/module (e.g., auth tests, API tests, DB tests)
+   - Group by failure type (e.g., timeout, assertion, setup issues)
+   - Identify patterns (e.g., "all DB tests fail due to connection")
+
+2. Create batch groups of 10-50 tests each:
+   - Group A: Tests 1-50 (auth module)
+   - Group B: Tests 51-100 (API module)
+   - Group C: Tests 101-150 (DB module)
+   - Group D: Tests 151-200 (integration module)
+   - Continue until all tests assigned
+
+3. Use PARALLEL MODE with adaptive batching:
+   - Phase 1: Start with 2-4 batch groups
+   - After Phase 1 completion: Analyze patterns
+   - Phase 2+: Adjust batch size based on learnings
+
+4. Iterative refinement:
+   - If developers finish batches quickly → Increase batch size
+   - If developers struggle → Decrease batch size
+   - If common pattern found → Create pattern-fix group
+```
+
+**For Large File Changes (e.g., "Refactor 50 modules"):**
+
+```
+1. Group by dependency layers:
+   - Group A: Core utilities (no dependencies)
+   - Group B: Services (depend on core)
+   - Group C: APIs (depend on services)
+   - Group D: UI (depend on APIs)
+
+2. Execute in phases respecting dependencies:
+   - Phase 1: Core (parallel if multiple)
+   - Phase 2: Services (after core complete)
+   - Phase 3: APIs (after services complete)
+   - Phase 4: UI (after APIs complete)
+```
+
+**Example: "Fix 695 E2E tests passing (currently 127/695)"**
+
+**Analysis:**
+```
+Scale Check:
+- Test count: 695 total, 568 failing (> 100 threshold) ✓ DECOMPOSE
+- Estimated effort: ~40 hours for one developer (> 4 hour threshold) ✓ DECOMPOSE
+- Complexity: Cannot fix all at once
+
+Decision: PARALLEL MODE with test batching
+```
+
+**Decomposition:**
+```
+Phase 1 (First 200 tests, 4 parallel groups):
+- Group A: Tests 1-50 (auth flow tests)
+- Group B: Tests 51-100 (API endpoint tests)
+- Group C: Tests 101-150 (database tests)
+- Group D: Tests 151-200 (integration tests)
+
+Expected outcome after Phase 1:
+- Learn common failure patterns
+- Identify infrastructure vs. code issues
+- Adjust strategy for Phase 2
+
+Phase 2 (Adapt based on Phase 1 learnings):
+- If pattern found (e.g., "all DB tests fail due to connection"):
+  → Create focused group to fix root cause first
+- If tests are independent:
+  → Continue with 50-test batches
+- If developers finished quickly:
+  → Increase to 75-test batches for efficiency
+```
+
+**Rationale:**
+- Fixing 695 tests is NOT one feature—it's a MASSIVE task requiring decomposition
+- Even though it's "one goal," scale requires parallel execution
+- Batch size (10-50) is manageable for developers
+- Iterative approach allows pattern recognition and strategy adjustment
+
+**Task Groups Created:**
+```json
+{
+  "task_groups": {
+    "batch_A": {
+      "id": "batch_A",
+      "name": "Fix E2E tests 1-50 (auth flow)",
+      "test_range": "1-50",
+      "test_count": 50,
+      "module": "auth",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 60
+    },
+    "batch_B": {
+      "id": "batch_B",
+      "name": "Fix E2E tests 51-100 (API endpoints)",
+      "test_range": "51-100",
+      "test_count": 50,
+      "module": "api",
+      "batch_phase": 1,
+      "can_parallel": true,
+      "depends_on": [],
+      "estimated_effort_minutes": 60
+    }
+  }
+}
+```
+
+**Mode Decision Output:**
+```markdown
+## PM Decision: PARALLEL MODE (Scale-Based Decomposition)
+
+### Scale Analysis
+- Total tests: 695
+- Failing tests: 568
+- Estimated effort: ~40 hours (one developer)
+- **Trigger**: Test count > 100 threshold
+
+### Decomposition Strategy
+Breaking into manageable batches of 50 tests per group.
+
+**Phase 1**: 4 groups (tests 1-200)
+- Group batch_A: Tests 1-50 (auth flow)
+- Group batch_B: Tests 51-100 (API endpoints)
+- Group batch_C: Tests 101-150 (database operations)
+- Group batch_D: Tests 151-200 (integration tests)
+
+**Why batching:**
+- 50 tests per developer is manageable (60-90 min)
+- Parallel execution reduces total time from days to hours
+- Allows pattern recognition after first batch
+- Can adjust strategy based on learnings
+
+### Execution Plan
+Phase 1: Spawn 4 developers for first 200 tests
+After Phase 1: Review patterns, adjust batch size
+Phase 2+: Continue with adapted strategy
+
+### Next Action
+Orchestrator should spawn 4 developers in parallel for groups: batch_A, batch_B, batch_C, batch_D
+```
 
 ### Step 4: Create Task Groups
 
