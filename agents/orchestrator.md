@@ -229,9 +229,6 @@ Skill(command: "bazinga-db")
 
 **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
-
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
-
 **Wait for bazinga-db response with session list.**
 
 **IMMEDIATELY after receiving the session list, analyze it:**
@@ -295,9 +292,6 @@ Then invoke:
 ```
 Skill(command: "bazinga-db")
 ```
-
-**IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
-
 
 **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
@@ -370,9 +364,6 @@ Display:
    ```
 
 **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
-
-
-   **IMPORTANT:** Process bazinga-db response silently - do not display database output to user.
 
    **WAIT for bazinga-db response.**
 
