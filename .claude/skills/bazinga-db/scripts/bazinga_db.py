@@ -99,16 +99,55 @@ class BazingaDB:
     # ==================== LOG OPERATIONS ====================
 
     def log_interaction(self, session_id: str, agent_type: str, content: str,
-                       iteration: Optional[int] = None, agent_id: Optional[str] = None) -> None:
-        """Log an agent interaction."""
+                       iteration: Optional[int] = None, agent_id: Optional[str] = None) -> Dict[str, Any]:
+        """Log an agent interaction with validation."""
+        # Validate inputs
+        if not session_id or not session_id.strip():
+            raise ValueError("session_id cannot be empty")
+        if not agent_type or not agent_type.strip():
+            raise ValueError("agent_type cannot be empty")
+        if not content or not content.strip():
+            raise ValueError("content cannot be empty")
+        if agent_type not in ['pm', 'developer', 'qa', 'tech_lead', 'orchestrator']:
+            raise ValueError(f"Invalid agent_type: {agent_type}")
+
         conn = self._get_connection()
-        conn.execute("""
-            INSERT INTO orchestration_logs (session_id, iteration, agent_type, agent_id, content)
-            VALUES (?, ?, ?, ?, ?)
-        """, (session_id, iteration, agent_type, agent_id, content))
-        conn.commit()
-        conn.close()
-        print(f"✓ Logged {agent_type} interaction")
+        try:
+            cursor = conn.execute("""
+                INSERT INTO orchestration_logs (session_id, iteration, agent_type, agent_id, content)
+                VALUES (?, ?, ?, ?, ?)
+            """, (session_id, iteration, agent_type, agent_id, content))
+            log_id = cursor.lastrowid
+            conn.commit()
+
+            # Verify the insert by reading it back
+            verify = conn.execute("""
+                SELECT id, session_id, agent_type, LENGTH(content) as content_length, timestamp
+                FROM orchestration_logs WHERE id = ?
+            """, (log_id,)).fetchone()
+
+            if not verify:
+                raise RuntimeError(f"Failed to verify log insertion for log_id={log_id}")
+
+            result = {
+                'success': True,
+                'log_id': log_id,
+                'session_id': verify['session_id'],
+                'agent_type': verify['agent_type'],
+                'content_length': verify['content_length'],
+                'timestamp': verify['timestamp'],
+                'iteration': iteration,
+                'agent_id': agent_id
+            }
+
+            print(f"✓ Logged {agent_type} interaction (log_id={log_id}, {result['content_length']} chars)")
+            return result
+
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to log {agent_type} interaction: {str(e)}")
+        finally:
+            conn.close()
 
     def get_logs(self, session_id: str, limit: int = 50, offset: int = 0,
                  agent_type: Optional[str] = None, since: Optional[str] = None) -> List[Dict]:
@@ -375,9 +414,11 @@ def main():
             sessions = db.list_sessions(limit)
             print(json.dumps(sessions, indent=2))
         elif cmd == 'log-interaction':
-            db.log_interaction(cmd_args[0], cmd_args[1], cmd_args[2],
+            result = db.log_interaction(cmd_args[0], cmd_args[1], cmd_args[2],
                              int(cmd_args[3]) if len(cmd_args) > 3 else None,
                              cmd_args[4] if len(cmd_args) > 4 else None)
+            # Output verification data as JSON
+            print(json.dumps(result, indent=2))
         elif cmd == 'save-state':
             state_data = json.loads(cmd_args[2])
             db.save_state(cmd_args[0], cmd_args[1], state_data)
