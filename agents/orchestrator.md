@@ -615,28 +615,13 @@ Returns latest PM state or null if first iteration.
 🔄 **ORCHESTRATOR**: Sending requirements to Project Manager for mode decision...
 ```
 
-Build PM prompt with:
-- **Session ID: [current session_id]** ← CRITICAL: PM needs this to save state to database
-- Previous state (PM's "memory")
+Build PM prompt by reading `agents/project_manager.md` and including:
+- **Session ID from Step 0** - [current session_id created in Step 0]
+- Previous PM state from Step 1.1
 - User's requirements from conversation
-- Task: Analyze requirements, decide mode (SIMPLE/PARALLEL), create task groups
+- Task: Analyze requirements, decide mode, create task groups
 
-**Example PM prompt structure:**
-```
-You are the Project Manager. Your session context:
-
-**Session ID:** [current session_id]
-**Iteration:** [current iteration number]
-**Previous State:** [PM state from database, or null if first iteration]
-
-**User Requirements:**
-[User's original request]
-
-**Your Task:**
-Analyze requirements, decide execution mode (SIMPLE/PARALLEL), create task groups, and save your state to database using the session ID above.
-
-See agents/project_manager.md for complete instructions.
-```
+**CRITICAL**: You must include the session_id in PM's spawn prompt so PM can invoke bazinga-db skill.
 
 See `agents/project_manager.md` for full PM agent definition.
 
@@ -645,7 +630,7 @@ See `agents/project_manager.md` for full PM agent definition.
 Task(
   subagent_type: "general-purpose",
   description: "PM analyzing requirements and deciding execution mode",
-  prompt: [PM prompt with session_id, state, and requirements as shown above]
+  prompt: [Full PM prompt from agents/project_manager.md with session_id context]
 )
 ```
 
