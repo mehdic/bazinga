@@ -11,7 +11,8 @@ BAZINGA coordinates teams of AI agents to build software in parallel. While trad
 ## See It In Action
 
 ```bash
-@orchestrator implement JWT authentication, user registration, and password reset
+/bazinga.orchestrate implement JWT authentication, user registration, and password reset
+# (or: @orchestrator implement JWT authentication, user registration, and password reset)
 ```
 
 **What happens:**
@@ -45,12 +46,14 @@ PM: "BAZINGA! All features complete in 18 minutes"
 # Option 1: Create new project
 uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
 cd my-project
-@orchestrator implement user authentication with JWT
+/bazinga.orchestrate implement user authentication with JWT
 
 # Option 2: Initialize in current directory
 cd your-existing-project
 uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
-@orchestrator implement user authentication with JWT
+/bazinga.orchestrate implement user authentication with JWT
+
+# Note: You can also use @orchestrator instead of /bazinga.orchestrate if you prefer
 ```
 
 That's it. No configuration needed. BAZINGA automatically:
@@ -174,7 +177,7 @@ Automated tool installation during setup (optional).
 ### Single Feature (Simple Mode)
 
 ```bash
-@orchestrator fix bug where users can't reset password
+/bazinga.orchestrate fix bug where users can't reset password
 ```
 
 **Flow:** PM → 1 Developer → Tech Lead → BAZINGA
@@ -183,7 +186,7 @@ Automated tool installation during setup (optional).
 ### Multiple Features (Parallel Mode)
 
 ```bash
-@orchestrator implement REST API with auth, user management, and admin endpoints
+/bazinga.orchestrate implement REST API with auth, user management, and admin endpoints
 ```
 
 **Flow:** PM → 3 Developers (parallel) → Tech Lead reviews all → BAZINGA
@@ -192,7 +195,7 @@ Automated tool installation during setup (optional).
 ### Large Project
 
 ```bash
-@orchestrator build a blog platform with posts, comments, tags, and search
+/bazinga.orchestrate build a blog platform with posts, comments, tags, and search
 ```
 
 **Flow:** PM → 4 Developers (parallel, 2 phases) → QA tests → Tech Lead → BAZINGA
@@ -286,7 +289,8 @@ You: "wait, did dev finish? let me check state files..."
 ### After BAZINGA
 
 ```
-You: "@orchestrator implement auth, user management, and admin dashboard"
+You: "/bazinga.orchestrate implement auth, user management, and admin dashboard"
+# (or: @orchestrator implement auth, user management, and admin dashboard)
 ```
 
 **Result:** Done. PM handled everything. You stay in flow.
