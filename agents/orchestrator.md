@@ -783,7 +783,24 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt built using above process])
 ```
 
+**🔴 CRITICAL: WAIT FOR DEVELOPER TO COMPLETE**
+
+After spawning the Developer agent, you MUST wait for the Task tool to complete and return the Developer's response. DO NOT proceed until you receive the Developer's full response.
+
+The Developer may take several minutes to:
+- Analyze code
+- Invoke mandatory skills
+- Implement changes
+- Run tests
+- Report status
+
+**WAIT for the complete Developer response before proceeding to Step 2A.2.**
+
+---
+
 ### Step 2A.2: Receive Developer Response
+
+**AFTER receiving the Developer's complete response:**
 
 **UI Message:**
 ```
@@ -907,6 +924,16 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA Expert prompt built using above process])
 ```
 
+**🔴 CRITICAL: WAIT FOR QA EXPERT TO COMPLETE**
+
+After spawning the QA Expert, you MUST wait for the Task tool to complete and return the QA Expert's response. DO NOT proceed until you receive the full response.
+
+**WAIT for the complete QA Expert response before proceeding.**
+
+---
+
+**AFTER receiving the QA Expert's response:**
+
 **Log QA interaction:**
 ```
 bazinga-db, please log this QA interaction:
@@ -922,6 +949,10 @@ Agent ID: qa_main
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for bazinga-db confirmation before proceeding.**
+
+---
 
 ### Step 2A.5: Route QA Response
 
@@ -1026,6 +1057,16 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [Tech Lead prompt built using above process])
 ```
 
+**🔴 CRITICAL: WAIT FOR TECH LEAD TO COMPLETE**
+
+After spawning the Tech Lead, you MUST wait for the Task tool to complete and return the Tech Lead's response. DO NOT proceed until you receive the full response.
+
+**WAIT for the complete Tech Lead response before proceeding.**
+
+---
+
+**AFTER receiving the Tech Lead's response:**
+
 **Log Tech Lead interaction:**
 ```
 bazinga-db, please log this tech_lead interaction:
@@ -1041,6 +1082,10 @@ Agent ID: techlead_main
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for bazinga-db confirmation before proceeding.**
+
+---
 
 ### Step 2A.7: Route Tech Lead Response
 
@@ -1066,6 +1111,16 @@ Build PM prompt with complete implementation summary and quality metrics.
 Task(subagent_type="general-purpose", description="PM final assessment", prompt=[PM prompt])
 ```
 
+**🔴 CRITICAL: WAIT FOR PM TO COMPLETE**
+
+After spawning the PM, you MUST wait for the Task tool to complete and return the PM's response. DO NOT proceed until you receive the full response.
+
+**WAIT for the complete PM response before proceeding.**
+
+---
+
+**AFTER receiving the PM's response:**
+
 **Track velocity:**
 ```
 velocity-tracker, please analyze completion metrics
@@ -1074,6 +1129,8 @@ velocity-tracker, please analyze completion metrics
 ```
 Skill(command: "velocity-tracker")
 ```
+
+**WAIT for velocity-tracker response.**
 
 **Log PM interaction:**
 ```
@@ -1090,6 +1147,8 @@ Agent ID: pm_final
 ```
 Skill(command: "bazinga-db")
 ```
+
+**WAIT for bazinga-db confirmation before proceeding.**
 
 ### Step 2A.9: Check for BAZINGA
 
@@ -1128,7 +1187,9 @@ Store each group's code context separately for use in developer prompts.
 👨‍💻 **ORCHESTRATOR**: Spawning [N] developers in parallel for groups: [list groups]
 ```
 
-**CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
+**🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
+
+When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
 ```
 Task(subagent_type: "general-purpose", description: "Developer Group A", prompt: [Group A prompt])
@@ -1136,6 +1197,8 @@ Task(subagent_type: "general-purpose", description: "Developer Group B", prompt:
 Task(subagent_type: "general-purpose", description: "Developer Group C", prompt: [Group C prompt])
 ... up to 4 developers max
 ```
+
+**DO NOT spawn them in separate messages** - that would make them run sequentially, defeating the purpose of parallel mode.
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
@@ -1177,6 +1240,25 @@ Same workflow as Simple Mode, but include group-specific branch name
 
 See `bazinga/templates/message_templates.md` for standard prompt format.
 See `agents/developer.md` for full developer agent definition.
+
+**🔴 CRITICAL: WAIT FOR ALL DEVELOPERS TO COMPLETE**
+
+After spawning all developers in parallel (in ONE message), you MUST wait for ALL Task tools to complete and return their responses. DO NOT proceed until you receive ALL developer responses.
+
+The developers will execute in parallel, but you must still wait for the complete set of responses before proceeding to Step 2B.2.
+
+Each Developer may take several minutes to:
+- Analyze their assigned code group
+- Invoke mandatory skills (security-scan, lint-check, test-coverage, etc.)
+- Implement changes
+- Run tests
+- Report status
+
+**WAIT for ALL developer responses before proceeding to Step 2B.2.**
+
+---
+
+**AFTER receiving ALL developer responses:**
 
 ### Step 2B.2: Receive All Developer Responses
 
@@ -1229,6 +1311,22 @@ The routing chain for each group is:
 
    Spawn: `Task(subagent_type="general-purpose", description="QA Group [X]", prompt=[QA prompt built using Step 2A.4 process])`
 
+   **🔴 CRITICAL: WAIT FOR QA EXPERT TO COMPLETE**
+
+   After spawning the QA Expert for this group, you MUST wait for the Task tool to complete and return the QA Expert's response. DO NOT proceed until you receive the QA Expert's full response.
+
+   The QA Expert may take several minutes to:
+   - Review test results and code quality
+   - Invoke mandatory skills (if configured)
+   - Verify acceptance criteria
+   - Provide approval or feedback
+
+   **WAIT for the complete QA Expert response before proceeding.**
+
+   ---
+
+   **AFTER receiving the QA Expert's response:**
+
    **Log QA response:**
    ```
    bazinga-db, please log this QA interaction:
@@ -1261,6 +1359,22 @@ The routing chain for each group is:
    - Validate prompt before spawning
 
    Spawn: `Task(subagent_type="general-purpose", description="Tech Lead Group [X]", prompt=[Tech Lead prompt built using Step 2A.6 process])`
+
+   **🔴 CRITICAL: WAIT FOR TECH LEAD TO COMPLETE**
+
+   After spawning the Tech Lead for this group, you MUST wait for the Task tool to complete and return the Tech Lead's response. DO NOT proceed until you receive the Tech Lead's full response.
+
+   The Tech Lead may take several minutes to:
+   - Review code quality and architecture
+   - Invoke mandatory skills (if configured)
+   - Check for technical debt and security issues
+   - Provide approval or feedback
+
+   **WAIT for the complete Tech Lead response before proceeding.**
+
+   ---
+
+   **AFTER receiving the Tech Lead's response:**
 
    **Log Tech Lead response:**
    ```
@@ -1301,6 +1415,22 @@ Build PM prompt with:
 - Overall status check request
 
 Spawn: `Task(subagent_type="general-purpose", description="PM overall assessment", prompt=[PM prompt])`
+
+**🔴 CRITICAL: WAIT FOR PM TO COMPLETE**
+
+After spawning the PM, you MUST wait for the Task tool to complete and return the PM's response. DO NOT proceed until you receive the PM's full response.
+
+The PM may take several minutes to:
+- Review all group completion reports
+- Analyze overall project health
+- Check velocity metrics
+- Provide final assessment and next steps
+
+**WAIT for the complete PM response before proceeding.**
+
+---
+
+**AFTER receiving the PM's response:**
 
 **Log PM response:**
 ```
