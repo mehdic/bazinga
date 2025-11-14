@@ -50,18 +50,62 @@ class BazingaDB:
 
     # ==================== SESSION OPERATIONS ====================
 
-    def create_session(self, session_id: str, mode: str, requirements: str) -> None:
-        """Create a new session."""
+    def create_session(self, session_id: str, mode: str, requirements: str) -> Dict[str, Any]:
+        """Create a new session with validation."""
+        # Validate inputs
+        if not session_id or not session_id.strip():
+            raise ValueError("session_id cannot be empty")
+        if mode not in ['simple', 'parallel']:
+            raise ValueError(f"Invalid mode: {mode}. Must be 'simple' or 'parallel'")
+        if not requirements or not requirements.strip():
+            raise ValueError("requirements cannot be empty")
+
         conn = self._get_connection()
         try:
-            conn.execute("""
+            cursor = conn.execute("""
                 INSERT INTO sessions (session_id, mode, original_requirements, status)
                 VALUES (?, ?, ?, 'active')
             """, (session_id, mode, requirements))
             conn.commit()
+
+            # Verify the insert by reading it back
+            verify = conn.execute("""
+                SELECT session_id, mode, status, start_time, created_at
+                FROM sessions WHERE session_id = ?
+            """, (session_id,)).fetchone()
+
+            if not verify:
+                raise RuntimeError(f"Failed to verify session creation for {session_id}")
+
+            result = {
+                'success': True,
+                'session_id': verify['session_id'],
+                'mode': verify['mode'],
+                'status': verify['status'],
+                'start_time': verify['start_time'],
+                'created_at': verify['created_at']
+            }
+
             print(f"✓ Session created: {session_id}")
-        except sqlite3.IntegrityError:
-            print(f"✓ Session already exists: {session_id}")
+            return result
+
+        except sqlite3.IntegrityError as e:
+            error_msg = str(e).lower()
+            if "unique constraint" in error_msg or "primary key" in error_msg:
+                # Session already exists - return existing session info
+                existing = conn.execute("""
+                    SELECT session_id, mode, status, start_time, created_at
+                    FROM sessions WHERE session_id = ?
+                """, (session_id,)).fetchone()
+
+                if existing:
+                    print(f"✓ Session already exists: {session_id}")
+                    return dict(existing)
+                else:
+                    raise RuntimeError(f"Session reported as existing but not found: {session_id}")
+            else:
+                # Other integrity error (e.g., foreign key, check constraint)
+                raise RuntimeError(f"Database constraint violation: {e}")
         finally:
             conn.close()
 
@@ -408,7 +452,9 @@ def main():
 
     try:
         if cmd == 'create-session':
-            db.create_session(cmd_args[0], cmd_args[1], cmd_args[2])
+            result = db.create_session(cmd_args[0], cmd_args[1], cmd_args[2])
+            # Output verification data as JSON
+            print(json.dumps(result, indent=2))
         elif cmd == 'list-sessions':
             limit = int(cmd_args[0]) if len(cmd_args) > 0 else 10
             sessions = db.list_sessions(limit)

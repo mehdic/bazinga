@@ -164,28 +164,68 @@ SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
 
 ---
 
-## Step 3: Return Formatted Response
+## Step 3: Return Response to Calling Agent
+
+**CRITICAL: Return ONLY the raw command output - NO additional formatting or commentary!**
+
+The calling agent (orchestrator, PM, etc.) will parse the data and make decisions automatically. Do NOT add:
+- ❌ Explanatory text like "Found 2 sessions"
+- ❌ Analysis like "This is the session to resume"
+- ❌ Formatted summaries
+- ❌ Recommendations or next steps
 
 **For successful operations:**
 
-Write operations - return concise confirmation:
-```
-✓ Session created: bazinga_20250113_143530
-✓ Database auto-initialized at bazinga/bazinga.db
-✓ Logged PM interaction (iteration 1)
-✓ Saved orchestrator state
-✓ Updated task group: group_a → completed
+Simply echo the bash command output directly:
+```bash
+# The script already outputs JSON or formatted data
+# Just return it as-is without additional commentary
+[Raw output from bazinga_db.py script]
 ```
 
-Read operations - format for readability:
-```
-Current PM State (as of [timestamp]):
-- Mode: parallel
-- Iteration: 5
-- Task Groups: 3 (2 completed, 1 in progress)
+**For failed operations:**
 
-[Formatted data]
+Return ONLY the error output:
 ```
+Error: [exact error message from stderr]
+```
+
+**Examples:**
+
+❌ WRONG (too verbose):
+```
+✓ Recent sessions retrieved
+
+Found 2 active sessions:
+- Session 1: bazinga_123 (most recent)
+- Session 2: bazinga_456
+
+Recommendation: Resume session bazinga_123
+```
+
+✅ CORRECT (minimal):
+```json
+[
+  {
+    "session_id": "bazinga_123",
+    "start_time": "2025-01-14 10:00:00",
+    "status": "active",
+    "mode": "simple"
+  },
+  {
+    "session_id": "bazinga_456",
+    "start_time": "2025-01-13 15:30:00",
+    "status": "active",
+    "mode": "parallel"
+  }
+]
+```
+
+**Why minimal output?**
+- Orchestrator needs to parse data programmatically
+- Verbose text causes orchestrator to pause and wait
+- Calling agent will format data for user if needed
+- Faster execution (no time spent on formatting)
 
 **For failed operations:**
 
