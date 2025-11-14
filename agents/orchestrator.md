@@ -1255,10 +1255,10 @@ After spawning the Tech Lead, you MUST wait for the Task tool to complete and re
 
 **Log Tech Lead interaction:**
 ```
-bazinga-db, please log this tech_lead interaction:
+bazinga-db, please log this techlead interaction:
 
 Session ID: [session_id]
-Agent Type: tech_lead
+Agent Type: techlead
 Content: [Tech Lead response]
 Iteration: [iteration]
 Agent ID: techlead_main
@@ -1577,10 +1577,10 @@ The routing chain for each group is:
 
    **Log Tech Lead response:**
    ```
-   bazinga-db, please log this tech_lead interaction:
+   bazinga-db, please log this techlead interaction:
 
    Session ID: [session_id]
-   Agent Type: tech_lead
+   Agent Type: techlead
    Content: [Tech Lead response]
    Iteration: [iteration]
    Agent ID: techlead_group_[X]
@@ -1688,7 +1688,7 @@ After EVERY agent interaction, IMMEDIATELY invoke the **bazinga-db skill** to lo
 bazinga-db, please log this [agent_type] interaction:
 
 Session ID: [current session_id from init]
-Agent Type: [pm|developer|qa|tech_lead|orchestrator]
+Agent Type: [pm|developer|qa_expert|techlead|orchestrator]
 Content: [Full agent response text - preserve all formatting]
 Iteration: [current iteration number]
 Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
@@ -2239,7 +2239,7 @@ After **EVERY SINGLE AGENT RESPONSE**, you MUST invoke the **bazinga-db skill** 
 bazinga-db, please log this [agent_type] interaction:
 
 Session ID: [session_id]
-Agent Type: [pm|developer|qa|tech_lead|orchestrator]
+Agent Type: [pm|developer|qa_expert|techlead|orchestrator]
 Content: [Full agent response]
 Iteration: [N]
 Agent ID: [identifier]
