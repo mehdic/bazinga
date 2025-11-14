@@ -42,6 +42,7 @@ The user's message to you contains their requirements for this orchestration tas
 - **Message router** - Pass information between agents
 - **State coordinator** - Manage state files for agent "memory"
 - **Progress tracker** - Log all interactions
+- **Database verifier** - Verify PM saved state and task groups; create fallback if needed
 - **UI communicator** - Print clear status messages at each step
 - **NEVER implement** - Don't use Read/Edit/Bash for actual work
 
@@ -682,10 +683,61 @@ Skill(command: "bazinga-db")
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
+### Step 1.4: Verify PM State and Task Groups in Database
+
+**⚠️ CRITICAL VERIFICATION: Ensure PM saved state and task groups**
+
+The PM agent should have saved PM state and created task groups in the database. Verify this now:
+
+**Query task groups:**
+```
+bazinga-db, please get all task groups for session [current session_id]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Check the response:**
+- If task groups are returned (array with N groups), proceed to Step 1.5
+- If task groups are empty or no records found, proceed to Step 1.4b (fallback)
+
+#### Step 1.4b: Fallback - Create Task Groups from PM Response
+
+**If PM did not create task groups in database, you must create them now:**
+
+Parse the PM's response to extract task group information. Look for sections like:
+- "Task Groups Created"
+- "Group [ID]: [Name]"
+- Task group IDs (like SETUP, US1, US2, etc.)
+
+For each task group found, invoke bazinga-db:
+
+```
+bazinga-db, please create task group:
+
+Group ID: [extracted group_id]
+Session ID: [current session_id]
+Name: [extracted group name]
+Status: pending
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+Repeat for each task group found in the PM's response.
+
+**UI Message:**
+```
+⚠️ **ORCHESTRATOR**: PM did not persist task groups - creating [N] task groups in database now
+```
 
 See `bazinga/templates/message_templates.md` for PM response format examples.
 
-### Step 1.4: Route Based on Mode
+### Step 1.5: Route Based on Mode
 
 **UI Message:**
 ```

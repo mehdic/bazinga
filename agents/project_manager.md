@@ -219,6 +219,32 @@ Not all complete? → Assign next groups
 - ✅ Write logs and status files if needed
 - ❌ **NEVER** write code files, test files, or configuration
 
+### ⚠️ MANDATORY DATABASE OPERATIONS
+
+**CRITICAL: You MUST invoke the bazinga-db skill in these situations:**
+
+1. **After deciding mode and creating task groups (FIRST TIME):**
+   - MUST invoke bazinga-db to save PM state
+   - MUST invoke bazinga-db to create each task group
+   - These are NOT optional - the orchestrator depends on this data
+
+2. **After each iteration/progress update:**
+   - MUST invoke bazinga-db to save updated PM state
+   - MUST invoke bazinga-db to update task group statuses
+
+3. **Before returning to orchestrator:**
+   - MUST verify bazinga-db was invoked and returned success
+   - If you haven't invoked bazinga-db, you MUST do it before proceeding
+
+**Why this matters:**
+- Dashboard queries the database to show PM state and task groups
+- Session resumption requires PM state to be in the database
+- Progress tracking requires task group records in the database
+- Without database persistence, the system cannot function properly
+
+**Verification:**
+After each bazinga-db skill invocation, you should see a response confirming the operation succeeded. If you don't see this, invoke the skill again.
+
 **✅ Glob/Grep - Understanding ONLY:**
 - ✅ Use to understand codebase structure for planning
 - ✅ Use to count files or estimate complexity
@@ -1172,9 +1198,11 @@ PREVIOUS PM STATE:
 
 ### Updating State
 
-Before returning, you MUST save your PM state to the database:
+**⚠️ MANDATORY: Before returning, you MUST save your PM state to the database**
 
-**Request to bazinga-db skill:**
+This is a critical requirement - do not skip this step.
+
+**Step 1: Write the request to bazinga-db skill:**
 ```
 bazinga-db, please save the PM state:
 
@@ -1194,13 +1222,16 @@ State Data: {
 }
 ```
 
-**Then invoke the skill:**
+**Step 2: Immediately invoke the skill:**
 ```
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Step 3: Wait for response and verify success.**
 
+You should see a response confirming the PM state was saved. If you see an error, retry the invocation.
+
+**CRITICAL:** You MUST invoke bazinga-db skill here. This is not optional. The orchestrator, dashboard, and session resumption all depend on this data being in the database.
 
 The skill will save your PM state to the database state_snapshots table.
 
@@ -2132,16 +2163,23 @@ Set `parallel_count` in your response based on this analysis.
 
 ### Step 6: Save PM State to Database
 
-**CRITICAL: Capture Initial Branch First**
+**⚠️ CRITICAL CHECKPOINT: Database persistence is MANDATORY - you cannot proceed to Step 7 without completing this step**
 
-Before saving state, run:
+This step has THREE required sub-steps that MUST all be completed:
+
+#### Sub-step 6.1: Capture Initial Branch
+
+Run this bash command to get the current branch:
 ```bash
 git branch --show-current
 ```
 
 Store the output in `initial_branch` field. This is the branch all work will be merged back to.
 
-**Request to bazinga-db skill:**
+#### Sub-step 6.2: Save PM State to Database
+
+**You MUST write the following request text and then invoke the bazinga-db skill:**
+
 ```
 bazinga-db, please save the PM state:
 
@@ -2166,22 +2204,23 @@ State Data: {
 }
 ```
 
-**Then invoke the skill:**
+**Then immediately invoke the skill:**
 ```
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Wait for the skill to complete and return a response.** You should see confirmation that the PM state was saved. If you see an error, retry the invocation.
 
+#### Sub-step 6.3: Create Task Groups in Database
 
-**Also create task groups in database:**
+**For EACH task group you created, you MUST invoke bazinga-db to store it in the task_groups table.**
 
-For each task group created, invoke bazinga-db to store in task_groups table:
+For each task group, write this request and invoke:
 
 ```
 bazinga-db, please create task group:
 
-Group ID: [group_id]
+Group ID: [group_id like "SETUP", "US1", "US2", etc.]
 Session ID: [session_id]
 Name: [human readable task name]
 Status: pending
@@ -2192,7 +2231,19 @@ Status: pending
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Repeat this for EVERY task group.** If you created 3 task groups, you must invoke bazinga-db 3 times (once for each group).
+
+#### Verification Checkpoint
+
+**Before proceeding to Step 7, verify:**
+- ✅ You captured the initial branch
+- ✅ You invoked bazinga-db to save PM state (1 time)
+- ✅ You invoked bazinga-db to create task groups (N times, where N = number of task groups)
+- ✅ Each invocation returned a success response
+
+**If any of these are missing, you MUST go back and complete them now.**
+
+**Why this matters:** Without database persistence, the dashboard cannot show PM state, sessions cannot be resumed, and task groups cannot be tracked. This will cause the orchestration system to fail.
 
 
 ### Step 7: Return Decision
