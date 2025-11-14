@@ -44,7 +44,7 @@ bash .claude/skills/velocity-tracker/track.sh
 ```
 
 This script will:
-- Read `bazinga/pm_state.json`
+- Read PM state from database (`bazinga/bazinga.db`)
 - Calculate current velocity and cycle times
 - Compare against historical metrics
 - Detect trends (improving/stable/declining)
@@ -147,7 +147,7 @@ Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
 
 **If script fails:**
 - Check the script output for error messages
-- Verify `bazinga/pm_state.json` exists
+- Verify database `bazinga/bazinga.db` exists and contains PM state
 - Return error message to calling agent
 
 **If no completed groups:**

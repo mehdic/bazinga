@@ -36,7 +36,10 @@ COORD_DIR="bazinga"
 SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
 mkdir -p "$SKILLS_DIR"
 
-# Note: PM_STATE is now read from database via bazinga-db skill
+# Database paths
+DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_PATH="${COORD_DIR}/bazinga.db"
+
 METRICS_FILE="${SKILLS_DIR}/project_metrics.json"
 HISTORICAL_FILE="${SKILLS_DIR}/historical_metrics.json"
 
@@ -107,8 +110,13 @@ extract_json() {
     fi
 }
 
+# Fetch PM state from database
+echo "📁 Reading PM state from database..."
+
+PM_STATE_JSON=$(python3 "$DB_SCRIPT" --db "$DB_PATH" get-state "$SESSION_ID" "pm" 2>/dev/null)
+
 # Check if PM state exists
-if [ ! -f "$PM_STATE" ]; then
+if [ -z "$PM_STATE_JSON" ] || [ "$PM_STATE_JSON" = "null" ] || [ "$PM_STATE_JSON" = "{}" ]; then
     echo -e "${YELLOW}⚠️  No PM state found - this is the first run${NC}"
     echo ""
     echo "Creating initial metrics structure..."
@@ -126,7 +134,12 @@ EOF
     exit 0
 fi
 
-echo "📁 Reading PM state..."
+# Create a temporary file to store PM state for jq processing
+PM_STATE_TEMP=$(mktemp)
+echo "$PM_STATE_JSON" > "$PM_STATE_TEMP"
+PM_STATE="$PM_STATE_TEMP"
+
+echo "✓ PM state loaded from database"
 
 # Calculate current metrics
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -324,3 +337,8 @@ fi
 
 echo ""
 echo "📄 Full metrics: $METRICS_FILE"
+
+# Clean up temporary PM state file
+if [ -f "$PM_STATE_TEMP" ]; then
+    rm -f "$PM_STATE_TEMP"
+fi
