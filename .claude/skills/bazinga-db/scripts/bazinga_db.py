@@ -441,7 +441,7 @@ def main():
     parser = argparse.ArgumentParser(description='BAZINGA Database Client')
     parser.add_argument('--db', required=True, help='Database path')
     parser.add_argument('command', help='Command to execute')
-    parser.add_argument('args', nargs='*', help='Command arguments')
+    parser.add_argument('args', nargs=argparse.REMAINDER, help='Command arguments')
 
     args = parser.parse_args()
     db = BazingaDB(args.db)
@@ -516,6 +516,9 @@ def main():
             for i in range(1, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 value = cmd_args[i + 1]
+                # Convert revision_count to int if present
+                if key == 'revision_count':
+                    value = int(value)
                 kwargs[key] = value
             db.update_task_group(group_id, **kwargs)
         else:
