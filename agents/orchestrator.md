@@ -256,7 +256,46 @@ PM Response: BAZINGA → END
 🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
 ```
 
-**Check user's intent:**
+**MANDATORY: Check previous session status FIRST (before checking user intent)**
+
+Invoke bazinga-db skill to check the most recent session status:
+
+Request to bazinga-db skill:
+```
+bazinga-db, please list the most recent sessions (limit 1).
+I need to check if the previous session is still active or completed.
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+
+**WAIT for bazinga-db response.**
+
+**After receiving the session list, check the status:**
+
+**IF list is empty (no previous sessions):**
+- This is the FIRST session ever
+- Decision: Follow **Path B** (create new session)
+- SKIP the user intent analysis below
+
+**IF list has sessions:**
+- Check the most recent session's status field
+- **IF status = "completed":**
+  - Previous session is finished
+  - Decision: Follow **Path B** (create new session)
+  - SKIP the user intent analysis below
+  - **DO NOT try to resume a completed session**
+- **IF status = "active" or "running":**
+  - Previous session is still in progress
+  - Proceed to user intent analysis below
+
+---
+
+**Check user's intent (ONLY if previous session is active/running):**
 
 **First, analyze what the user asked for:**
 
@@ -275,39 +314,13 @@ User said: "[user's message]"
 - User wants to RESUME → Follow **Path A** below
 - User wants NEW task → Follow **Path B** below (skip session check, create new)
 
-**Simple rule:** Check user's intent FIRST. Most users give new tasks and should get new sessions.
+**Simple rule:** Check previous session status FIRST. If completed, always create new. Otherwise, check user's intent.
 
 ---
 
 **IF user wants to RESUME (Path A):**
 
-Invoke bazinga-db skill to get the most recent session:
-
-Request to bazinga-db skill:
-```
-bazinga-db, please list the most recent sessions (limit 5).
-I need to find the latest session to resume.
-```
-
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
-
-
-**Wait for bazinga-db response with session list.**
-
-**IMMEDIATELY after receiving the session list, analyze it:**
-
-**IF list is empty:**
-- Display: "⚠️ **ORCHESTRATOR**: No existing sessions found to resume"
-- Ask user: "Please provide a new task to start a fresh orchestration session."
-- STOP and wait for user input
-
-**IF list has sessions (NOT EMPTY):**
+**Use the session info already retrieved in Step 0** (you already invoked bazinga-db and received the most recent session).
 
 ### 🔴 MANDATORY RESUME WORKFLOW - EXECUTE NOW
 
