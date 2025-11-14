@@ -482,6 +482,13 @@ def main():
             by = cmd_args[1] if len(cmd_args) > 1 else 'agent_type'
             result = db.get_token_summary(cmd_args[0], by)
             print(json.dumps(result, indent=2))
+        elif cmd == 'create-task-group':
+            group_id = cmd_args[0]
+            session_id = cmd_args[1]
+            name = cmd_args[2]
+            status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
+            assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
+            db.create_task_group(group_id, session_id, name, status, assigned_to)
         elif cmd == 'update-task-group':
             group_id = cmd_args[0]
             kwargs = {}
