@@ -478,10 +478,29 @@ def main():
         elif cmd == 'dashboard-snapshot':
             result = db.get_dashboard_snapshot(cmd_args[0])
             print(json.dumps(result, indent=2))
+        elif cmd == 'log-tokens':
+            session_id = cmd_args[0]
+            agent_type = cmd_args[1]
+            tokens = int(cmd_args[2])
+            agent_id = cmd_args[3] if len(cmd_args) > 3 else None
+            db.log_tokens(session_id, agent_type, tokens, agent_id)
+            print(f"✓ Logged {tokens} tokens for {agent_type}")
         elif cmd == 'token-summary':
             by = cmd_args[1] if len(cmd_args) > 1 else 'agent_type'
             result = db.get_token_summary(cmd_args[0], by)
             print(json.dumps(result, indent=2))
+        elif cmd == 'save-skill-output':
+            session_id = cmd_args[0]
+            skill_name = cmd_args[1]
+            output_data = json.loads(cmd_args[2])
+            db.save_skill_output(session_id, skill_name, output_data)
+        elif cmd == 'create-task-group':
+            group_id = cmd_args[0]
+            session_id = cmd_args[1]
+            name = cmd_args[2]
+            status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
+            assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
+            db.create_task_group(group_id, session_id, name, status, assigned_to)
         elif cmd == 'update-task-group':
             group_id = cmd_args[0]
             kwargs = {}
