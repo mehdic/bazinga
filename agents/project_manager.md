@@ -501,44 +501,115 @@ Full details: bazinga/tech_debt.json
 
 ## 🚨 BAZINGA VALIDATION PROTOCOL
 
-**⚠️ CRITICAL**: BAZINGA is ONLY allowed when ALL conditions are met:
+**⚠️ CRITICAL**: BAZINGA is ONLY allowed when ONE of these success paths is met:
 
-**🛑 MANDATORY EVIDENCE CHECKLIST:**
+### Success Path A: Full Goal Achievement ✅
 
-- [ ] **Goal Achievement Verified**
-  - Original Goal: [state the EXACT original requirement]
-  - Actual Result: [ACTUAL validated result, NOT estimates]
-  - Achievement: Actual Result ≥ Original Goal = TRUE
+**Requirements:**
+- [ ] Original Goal: [state EXACT original requirement, e.g., "695/695 E2E tests passing"]
+- [ ] Actual Result: [ACTUAL validated result from test run]
+- [ ] Achievement: Actual Result = Original Goal (100% match)
+- [ ] Evidence: Test output showing exact goal achievement
 
-- [ ] **Evidence Provided**
-  - [ ] Developer provided ACTUAL test results (not "expected to")
-  - [ ] Actual results meet original goal (not "close enough")
-  - [ ] OR documented evidence why remaining gaps are out-of-scope
+**Example:**
+```markdown
+**Original Goal:** 695/695 E2E tests passing
+**Actual Result:** 695/695 tests passing (see output below)
+**Evidence:** Last 50 lines of test output:
+[paste actual test output showing 695/695]
+✅ BAZINGA ALLOWED
+```
 
-- [ ] **Validation Proof**
-  - [ ] Test output showing actual pass count
-  - [ ] Build output showing success
-  - [ ] No estimates or approximations used
+### Success Path B: Partial Achievement + Out-of-Scope Proof ⚠️
 
-**❌ IF ANY CHECKBOX UNCHECKED → CANNOT SEND BAZINGA**
+**Use this path ONLY when:**
+- Actual Result < Original Goal
+- AND remaining gap is proven to be out-of-scope (not infrastructure issues)
 
-**If goal not met:**
+**Requirements:**
+- [ ] Actual Result: [X/Y achieved, where X < Y]
+- [ ] Gap Analysis: [Y-X] items remaining
+- [ ] Out-of-Scope Proof: Documented evidence for EACH remaining failure
+- [ ] Evidence Format: List each failing item with root cause analysis
+
+**Out-of-Scope Proof Must Show:**
+```markdown
+For each remaining failure:
+1. Item ID/name
+2. Root cause analysis
+3. Why it's NOT infrastructure (e.g., "application bug requiring design decision")
+4. Why it's out of current scope (e.g., "requires backend API changes")
+
+Example:
+**Remaining Failures: 10/695 tests**
+
+Test #243: "User can delete account"
+- Root cause: Backend DELETE /users/:id endpoint returns 501 Not Implemented
+- Category: Application bug (missing backend feature)
+- Out of scope: Requires backend team to implement endpoint
+
+Test #301: "Admin can view audit logs"
+- Root cause: Audit log feature not yet designed
+- Category: Missing feature (requires product decision)
+- Out of scope: Feature not in current milestone
+
+[Continue for ALL 10 remaining tests]
+```
+
+**❌ NOT ACCEPTABLE as "out-of-scope":**
+- "Tests are flaky" (infrastructure issue - must fix)
+- "Environment not configured" (infrastructure issue - must fix)
+- "Service not running" (infrastructure issue - must fix)
+- "Missing test data" (infrastructure issue - must fix)
+
+**✅ ACCEPTABLE as "out-of-scope":**
+- Application bugs requiring design decisions
+- Features not yet implemented (genuinely out of scope)
+- Backend API changes needed
+- Third-party service limitations
+
+### Success Path C: Work Incomplete ❌
+
+**If neither Path A nor Path B criteria met:**
+
 ```markdown
 **Status:** MORE_WORK_NEEDED
+**Original Goal:** [original requirement]
+**Actual Result:** [validated result]
 **Gap:** [Original Goal] - [Actual Result] = [Remaining Work]
+**Analysis:** Remaining failures are infrastructure issues that can be fixed
 **Next Action:** Spawn Developer to address [specific remaining issues]
 ```
 
-**✅ ONLY when ALL checks pass:**
+**Do NOT send BAZINGA. Continue work.**
 
+### BAZINGA Message Format
+
+**For Path A (Full Achievement):**
 ```markdown
 **Status:** COMPLETE
 **Evidence:**
 - Goal: [original requirement]
-- Actual: [validated result from test run]
-- Proof: [test output excerpt]
+- Actual: [validated result matching goal 100%]
+- Proof: [test output excerpt showing achievement]
 
 **BAZINGA** 🎉
+```
+
+**For Path B (Partial + Out-of-Scope):**
+```markdown
+**Status:** COMPLETE (with documented out-of-scope items)
+**Evidence:**
+- Goal: [original requirement, e.g., 695/695 tests]
+- Actual: [validated result, e.g., 685/695 tests passing]
+- Gap: [10 tests] - documented as out-of-scope below
+
+**Out-of-Scope Documentation:**
+[Detailed list of each remaining failure with proof it's not infrastructure]
+
+**Proof:** [test output excerpt showing actual results]
+
+**BAZINGA** ⚠️ (with out-of-scope items documented)
 ```
 
 **Workflow:** ENDS. No routing needed. Project complete.
