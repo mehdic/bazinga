@@ -273,7 +273,7 @@ Skill(command: "bazinga-db")
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
-**WAIT for bazinga-db response.**
+
 
 **After receiving the session list, check the status:**
 
@@ -380,7 +380,7 @@ Skill(command: "bazinga-db")
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
-**WAIT for PM state response. Then continue to Step 4 below.**
+
 
 ---
 
@@ -452,7 +452,7 @@ Display:
 
 
 
-   **WAIT for bazinga-db response.**
+   
 
    **REQUIRED OUTPUT - You MUST display the session creation result:**
    ```
@@ -519,7 +519,7 @@ Display:
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
-   **WAIT for confirmation.** Database will save the initial orchestrator state.
+   
 
    **REQUIRED OUTPUT - Display confirmation:**
    ```
@@ -1114,7 +1114,7 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
-**WAIT for bazinga-db confirmation before proceeding.**
+
 
 ---
 
@@ -1244,7 +1244,7 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
-**WAIT for bazinga-db confirmation before proceeding.**
+
 
 ---
 
@@ -1284,7 +1284,7 @@ velocity-tracker, please analyze completion metrics
 Skill(command: "velocity-tracker")
 ```
 
-**WAIT for velocity-tracker response.**
+
 
 **Log PM interaction:**
 ```
@@ -1305,7 +1305,7 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
-**WAIT for bazinga-db confirmation before proceeding.**
+
 
 ### Step 2A.9: Check for BAZINGA
 
@@ -1527,7 +1527,7 @@ All agent prompts follow same pattern as Phase 2A (see `bazinga/templates/prompt
 
 ### Step 2B.8: Spawn PM When All Groups Complete
 
-**WAIT until ALL groups have Tech Lead approval.**
+
 
 **UI Message:**
 ```
@@ -1634,7 +1634,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
-Wait for response. Returns PM state or null if first iteration.
+ Returns PM state or null if first iteration.
 
 ---
 
@@ -1650,7 +1650,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
-Wait for response. Returns orchestrator state or null if first time.
+ Returns orchestrator state or null if first time.
 
 ---
 
@@ -1666,7 +1666,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
-Wait for response. Returns array of task groups.
+ Returns array of task groups.
 
 ### Updating Orchestrator State
 
@@ -1713,7 +1713,6 @@ Skill(command: "bazinga-db")
 
 **CRITICAL:** You MUST invoke bazinga-db skill here. This is not optional. The dashboard and session resumption depend on orchestrator state being persisted.
 
-**Wait for confirmation.** You should see a response confirming the orchestrator state was saved. If you see an error, retry the invocation.
 
 
 ### Updating Task Group Status
@@ -1961,7 +1960,6 @@ State Data: {
 Skill(command: "bazinga-db")
 ```
 
-**Wait for confirmation.** You should see a response confirming the orchestrator state was saved.
 
 #### Sub-step 4.2: Update Session Status to Completed
 
@@ -1979,7 +1977,6 @@ End Time: [timestamp]
 Skill(command: "bazinga-db")
 ```
 
-**Wait for confirmation.** You should see a response confirming the session status was updated.
 
 **Verification Checkpoint:**
 - ✅ Orchestrator final state saved (1 invocation)
