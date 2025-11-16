@@ -424,9 +424,11 @@ Display:
    bazinga-db, please create a new orchestration session:
 
    Session ID: $SESSION_ID
-   Mode: [will be determined by PM]
+   Mode: simple
    Requirements: [User's requirements from input]
    ```
+
+   **Note:** Mode is initially set to "simple" as a default. The PM will analyze requirements and may update this to "parallel" if multiple independent tasks are detected.
 
    Then invoke:
    ```
