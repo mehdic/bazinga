@@ -145,10 +145,11 @@ if [ ! -f "bazinga/skills_config.json" ]; then
     "created": "$TIMESTAMP",
     "last_updated": "$TIMESTAMP",
     "configuration_notes": [
-      "MANDATORY: Skill will be automatically invoked by the agent",
-      "DISABLED: Skill will not be invoked",
+      "MANDATORY: Skill will be automatically invoked by the agent (always runs)",
+      "OPTIONAL: Skill can be invoked by agent if needed (framework-driven, not automatic)",
+      "DISABLED: Skill will not be invoked (not available to agent)",
       "Use /bazinga.configure-skills to modify this configuration interactively",
-      "LITE PROFILE: 3 core skills (security-scan, lint-check, test-coverage)",
+      "LITE PROFILE: 3 mandatory core skills + optional framework skills",
       "ADVANCED PROFILE: All 10 skills enabled - use --profile advanced during init"
     ]
   },
@@ -163,8 +164,8 @@ if [ ! -f "bazinga/skills_config.json" ]; then
     "security-scan": "mandatory",
     "lint-check": "mandatory",
     "test-coverage": "mandatory",
-    "codebase-analysis": "disabled",
-    "pattern-miner": "disabled",
+    "codebase-analysis": "optional",
+    "pattern-miner": "optional",
     "test-pattern-analysis": "disabled"
   },
   "qa_expert": {

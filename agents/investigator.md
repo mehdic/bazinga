@@ -60,7 +60,25 @@ Tech Lead has performed initial analysis and identified this as a complex proble
 ITERATION [N]:
 
 STEP 1: Analyze Current State
-→ Review hypothesis matrix
+→ **FIRST: Validate Input Data**
+   IF hypothesis_matrix is empty OR null:
+     Status: BLOCKED
+     Blocker: "Tech Lead provided no hypotheses. Need at least 1 hypothesis to investigate."
+     Return immediately (cannot proceed)
+
+   IF hypothesis_matrix has invalid format (missing likelihood, evidence, etc.):
+     Attempt to parse and normalize:
+       - Missing likelihood → Assign "Medium (50%)"
+       - Missing evidence → Assign "None provided yet"
+     IF still cannot parse:
+       Status: BLOCKED
+       Blocker: "Cannot parse hypothesis matrix. Expected format: [Hypothesis | Likelihood | Evidence]"
+       Return immediately
+
+   IF hypothesis_matrix is valid:
+     → Proceed with analysis
+
+→ Review hypothesis matrix (validated above)
 → Review previous iteration results (if any)
 → Review Developer diagnostic results (if any)
 → Invoke Skills if needed (codebase-analysis, pattern-miner)

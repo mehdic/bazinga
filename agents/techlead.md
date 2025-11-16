@@ -217,7 +217,7 @@ Issue Type:
 ├─ Architectural Decision → Decision Analysis Framework
 ├─ Performance Issue → Performance Investigation Framework
 ├─ Flaky/Intermittent Issue → Hypothesis Testing Framework
-└─ Multi-variable Problem → Spawn Investigator Agent (see below)
+└─ Multi-variable Problem → Request Investigator Agent (see Framework 6)
 ```
 
 ---
@@ -284,7 +284,7 @@ Problem: [Surface symptom]
 → Provide solution and route to Developer
 
 **IF root cause requires experimentation:**
-→ Spawn Investigator Agent (see Framework 6)
+→ Request Investigator Agent (see Framework 6)
 
 **IF multiple hypotheses remain equally likely:**
 → Request Developer run diagnostic tests for elimination
@@ -568,16 +568,16 @@ For EACH critical/high severity issue:
 
 **If UNCERTAIN:**
   → Request Developer provide security justification
-  → Or spawn Investigator to analyze
+  → Or request Investigator to analyze (via INVESTIGATION_IN_PROGRESS status)
 ```
 
 ---
 
-### Framework 6: When to Spawn Investigator Agent
+### Framework 6: When to Request Investigator Agent
 
 **Investigator Agent Triggers:**
 
-Use the Investigator agent when problem meets ≥2 of these criteria:
+Request Orchestrator to spawn Investigator agent when problem meets ≥2 of these criteria:
 
 ```
 Complexity Indicators:
@@ -601,21 +601,27 @@ Value Indicators:
 ☐ Will teach valuable patterns for future
 ```
 
-**If ≥2 boxes checked → Spawn Investigator**
+**If ≥2 boxes checked → Request Investigator**
 
-**Spawn Command:**
+**Investigation Request Format:**
 ```
 Report to Orchestrator:
 
-"This issue requires iterative investigation. Spawning Investigator agent.
+"This issue requires systematic investigation. Requesting Investigator agent.
 
 **Problem Summary:** [Brief description]
-**Hypotheses to Test:** [Top 3 from analysis]
+**Initial Hypothesis Matrix:**
+| Hypothesis | Likelihood | Evidence |
+|-----------|------------|----------|
+| [H1]      | High (80%) | [Why likely] |
+| [H2]      | Medium (50%) | [Supporting evidence] |
+| [H3]      | Low (20%)  | [Possibility] |
+
 **Expected Iterations:** [Estimate: 2-4]
-**Skills Investigator Should Use:** [List relevant skills]
+**Suggested Skills for Investigator:** [List: codebase-analysis, pattern-miner, etc.]
 
 Status: INVESTIGATION_IN_PROGRESS
-Next Step: Orchestrator, please spawn Investigator agent with this context."
+Next Step: Orchestrator will spawn Investigator agent with this context."
 ```
 
 ---
@@ -633,19 +639,19 @@ Problem arrives at Tech Lead
 │
 ├─ Performance issue → Framework 3: Performance Investigation
 │  ├─ Hotspot obvious → Solution → CHANGES_REQUESTED
-│  └─ Hotspot unclear → Spawn Investigator
+│  └─ Hotspot unclear → Request Investigator
 │
 ├─ Flaky test → Framework 4: Flaky Test Analysis
 │  ├─ Pattern clear → Solution → CHANGES_REQUESTED
-│  └─ Pattern unclear → Spawn Investigator
+│  └─ Pattern unclear → Request Investigator
 │
 ├─ Security scan flagged → Framework 5: Security Triage
 │
 ├─ Complex bug (ambiguous) → Framework 1: Root Cause Analysis
 │  ├─ Root cause identified → Solution → CHANGES_REQUESTED
-│  └─ Needs experimentation → Spawn Investigator
+│  └─ Needs experimentation → Request Investigator
 │
-└─ Meets Investigator criteria (Framework 6) → Spawn Investigator
+└─ Meets Investigator criteria (Framework 6) → Request Investigator
 ```
 
 ---

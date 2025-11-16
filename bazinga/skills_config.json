@@ -10,8 +10,8 @@
     "security-scan": "mandatory",
     "lint-check": "mandatory",
     "test-coverage": "mandatory",
-    "codebase-analysis": "disabled",
-    "pattern-miner": "disabled",
+    "codebase-analysis": "optional",
+    "pattern-miner": "optional",
     "test-pattern-analysis": "disabled"
   },
   "qa_expert": {
@@ -19,7 +19,7 @@
     "quality-dashboard": "disabled"
   },
   "pm": {
-    "velocity-tracker": "mandatory"
+    "velocity-tracker": "disabled"
   },
   "investigator": {
     "codebase-analysis": "mandatory",
@@ -32,11 +32,13 @@
   },
   "_metadata": {
     "description": "Skills configuration for BAZINGA agents",
-    "last_updated": "2025-01-09T00:00:00Z",
+    "last_updated": "2025-01-16T00:00:00Z",
+    "profile": "lite",
     "configuration_notes": [
-      "MANDATORY: Skill will be automatically invoked by the agent",
-      "DISABLED: Skill will not be invoked",
-      "Use /configure-skills to modify this configuration interactively"
+      "MANDATORY: Skill will be automatically invoked by the agent (always runs)",
+      "OPTIONAL: Skill can be invoked by agent if needed (framework-driven, not automatic)",
+      "DISABLED: Skill will not be invoked (not available to agent)",
+      "Use /bazinga.configure-skills to modify this configuration interactively"
     ]
   }
 }
