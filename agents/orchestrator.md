@@ -1249,14 +1249,16 @@ Skill(command: "bazinga-db")
 
 ---
 
-### Step 2A.6b: Handle Investigation Request (NEW)
+### Step 2A.6b: Investigation Loop Management (NEW - CRITICAL)
 
 **IF Tech Lead reports: INVESTIGATION_IN_PROGRESS**
+
+**⚠️ IMPORTANT:** Orchestrator manages investigation iterations. Investigator agents cannot "wait" or loop internally. Each iteration is a separate agent spawn.
 
 **UI Message:**
 ```
 🔍 **ORCHESTRATOR**: Tech Lead identified complex problem requiring investigation...
-🔬 **ORCHESTRATOR**: Spawning Investigator agent for systematic root cause analysis...
+🔬 **ORCHESTRATOR**: Starting investigation loop (max 5 iterations)...
 ```
 
 **Log Tech Lead request:**
@@ -1273,97 +1275,449 @@ Status: investigation_requested
 
 Then invoke: `Skill(command: "bazinga-db")`
 
+---
+
+#### Investigation Loop State Initialization
+
+**Initialize investigation state:**
+```yaml
+investigation_state:
+  group_id: [current_group_id]
+  session_id: [current_session_id]
+  branch: [developer's_feature_branch]
+  current_iteration: 0
+  max_iterations: 5
+  status: "in_progress"
+  problem_summary: [from Tech Lead]
+  hypothesis_matrix: [from Tech Lead]
+  suggested_skills: [from Tech Lead]
+  iterations_log: []
+  developer_results: null
+```
+
+**Save investigation state to database:**
+```
+bazinga-db, please save investigation state:
+
+Session ID: [session_id]
+Group ID: [group_id]
+State Type: investigation
+State Data: [investigation_state YAML above]
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+---
+
+#### Investigation Iteration Loop
+
+**WHILE investigation_state.status == "in_progress" AND investigation_state.current_iteration < investigation_state.max_iterations:**
+
+**Increment iteration counter:**
+```
+investigation_state.current_iteration += 1
+```
+
+**UI Message:**
+```
+🔬 **ORCHESTRATOR**: Investigation Iteration [N] of 5...
+```
+
+---
+
+##### Iteration Step 1: Spawn Investigator
+
 **Build Investigator Prompt:**
 
-Read `agents/investigator.md` and include:
-- **Session ID** - [current session_id]
-- **Group ID** - [current group_id]
-- **Branch** - [developer's feature branch]
-- Tech Lead's problem summary
-- Initial hypothesis matrix from Tech Lead
-- Suggested Skills to use
-- Developer's branch information
-- Investigation budget (max 5 iterations)
+Read `agents/investigator.md` and prepend session context:
+
+```
+---
+🔬 INVESTIGATION CONTEXT
+---
+Session ID: [investigation_state.session_id]
+Group ID: [investigation_state.group_id]
+Branch: [investigation_state.branch]
+Current Iteration: [investigation_state.current_iteration]
+Iterations Remaining: [5 - current_iteration]
+
+Problem Summary: [investigation_state.problem_summary]
+
+Initial Hypothesis Matrix: [investigation_state.hypothesis_matrix]
+
+Skills You Should Use: [investigation_state.suggested_skills]
+
+Previous Iteration Results (if iteration > 1):
+[investigation_state.iterations_log[previous iterations]]
+
+Developer Results from Previous Iteration (if available):
+[investigation_state.developer_results]
+---
+
+[REST OF agents/investigator.md content]
+```
 
 **Spawn Investigator:**
 ```
 Task(
   subagent_type: "general-purpose",
-  description: "Investigator deep-dive analysis",
-  prompt: [Full Investigator prompt from agents/investigator.md with context]
+  description: "Investigator iteration [N]",
+  prompt: [Investigator prompt built above]
 )
 ```
 
-**AFTER receiving Investigator's response:**
+---
 
-**Check Investigator status:**
+##### Iteration Step 2: Receive Investigator Response
 
-**IF Investigator reports: ROOT_CAUSE_FOUND**
-- Log investigator interaction to database
-- Update task group status: under_investigation → root_cause_identified
-- Spawn Tech Lead with Investigator's findings for validation
-- Tech Lead validates and makes final decision (APPROVED/CHANGES_REQUESTED)
-- Continue to Step 2A.7
-
-**IF Investigator reports: INVESTIGATION_INCOMPLETE**
-- Log investigator interaction
-- Update task group status
-- Spawn Tech Lead with partial findings
-- Tech Lead decides: Continue investigation OR Accept partial solution
-- Continue to Step 2A.7
-
-**IF Investigator reports: BLOCKED**
-- Log investigator interaction
-- Spawn PM to help resolve blocker or reprioritize
-
-**Database Logging:**
+**Log Investigator response:**
 ```
 bazinga-db, please log this investigator interaction:
 
 Session ID: [session_id]
 Agent Type: investigator
-Content: [Full Investigator report]
-Iteration: [iteration]
-Agent ID: investigator_[group_id]
+Content: [Full Investigator response]
+Iteration: [current_iteration]
+Agent ID: investigator_[group_id]_iter[N]
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Update task group status:**
-```
-bazinga-db, please update task group:
+**Parse Investigator action from response. Look for status markers:**
 
+---
+
+##### Iteration Step 3: Route Based on Investigator Action
+
+**ACTION 1: Investigator reports "ROOT_CAUSE_FOUND"**
+
+```
+Status: ROOT_CAUSE_FOUND
+Root Cause: [description]
+Confidence: [High/Medium]
+Recommended Solution: [solution]
+```
+
+**If found:**
+- Update investigation_state.status = "completed"
+- Update investigation_state.root_cause = [description]
+- Update investigation_state.solution = [solution]
+- Save investigation state to database
+- **EXIT LOOP** → Go to Step 2A.6c (Tech Lead validation)
+
+**UI Message:**
+```
+✅ **ORCHESTRATOR**: Root cause identified in iteration [N]! Proceeding to validation...
+```
+
+---
+
+**ACTION 2: Investigator reports "NEED_DEVELOPER_DIAGNOSTIC"**
+
+```
+Status: NEED_DEVELOPER_DIAGNOSTIC
+Hypothesis Being Tested: [hypothesis]
+Diagnostic Request:
+  - Add logging to: [file:line]
+  - Specific code changes: [code]
+  - Expected timeline: [X minutes]
+  - What to collect: [metrics/logs]
+```
+
+**If needs Developer:**
+
+**UI Message:**
+```
+🔧 **ORCHESTRATOR**: Investigator needs diagnostic code from Developer...
+👨‍💻 **ORCHESTRATOR**: Spawning Developer to add instrumentation...
+```
+
+**Build Developer Prompt:**
+
+Read `agents/developer.md` and prepend:
+
+```
+---
+🔬 DIAGNOSTIC REQUEST FROM INVESTIGATOR
+---
+Session ID: [session_id]
 Group ID: [group_id]
-Status: [root_cause_identified|investigation_incomplete|investigation_blocked]
-Investigation Iterations: [N]
-Last Activity: investigator_analysis
+Branch: [investigation_state.branch]
+Investigation Iteration: [current_iteration]
+
+The Investigator is systematically testing hypotheses to find the root cause.
+
+Current Hypothesis: [hypothesis]
+
+Your Task: Add diagnostic instrumentation (NOT a fix)
+
+Specific Changes Needed:
+[Investigator's diagnostic request details]
+
+IMPORTANT:
+- Make ONLY the diagnostic changes requested
+- Do NOT attempt to fix the root cause yet
+- Run the scenario to collect the requested data
+- Report the exact output/metrics
+
+Branch: [investigation_state.branch]
+Commit Message: "Add diagnostic logging for investigation iteration [N]"
+
+After changes:
+- Run the scenario that triggers the problem
+- Collect the requested metrics/logs
+- Report in format:
+
+**Diagnostic Results:**
+```
+[actual output/metrics]
+```
+
+Status: DIAGNOSTIC_COMPLETE
+---
+
+[REST OF agents/developer.md content]
+```
+
+**Spawn Developer:**
+```
+Task(
+  subagent_type: "general-purpose",
+  description: "Developer diagnostic for iteration [N]",
+  prompt: [Developer prompt built above]
+)
+```
+
+**After Developer responds:**
+
+**Log Developer response:**
+```
+bazinga-db, please log this developer interaction:
+
+Session ID: [session_id]
+Agent Type: developer
+Content: [Developer response with diagnostic results]
+Iteration: [current_iteration]
+Agent ID: developer_[group_id]_diagnostic[N]
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
 
-**After Investigator completes, spawn Tech Lead for validation:**
+**Extract diagnostic results from Developer response:**
+- Store in investigation_state.developer_results = [results]
+- Add to iteration log
+
+**Save updated investigation state:**
+```
+bazinga-db, please update investigation state:
+[updated state with developer results]
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Continue loop** (next iteration with Developer results)
+
+**UI Message:**
+```
+📊 **ORCHESTRATOR**: Diagnostic results received. Continuing investigation...
+```
+
+---
+
+**ACTION 3: Investigator reports "HYPOTHESIS_ELIMINATED"**
+
+```
+Status: HYPOTHESIS_ELIMINATED
+Hypothesis: [which one]
+Reason: [evidence]
+Next Hypothesis to Test: [next one]
+```
+
+**If hypothesis eliminated:**
+- Add to iterations_log
+- Clear developer_results (not needed for next hypothesis)
+- Save investigation state
+- **Continue loop** (test next hypothesis)
+
+**UI Message:**
+```
+❌ **ORCHESTRATOR**: Hypothesis eliminated. Testing next theory...
+```
+
+---
+
+**ACTION 4: Investigator reports "NEED_MORE_ANALYSIS"**
+
+```
+Status: NEED_MORE_ANALYSIS
+Reason: [why more analysis needed]
+Next Steps: [what Investigator will do]
+```
+
+**If needs more analysis:**
+- Add to iterations_log
+- Save investigation state
+- **Continue loop** (Investigator will analyze further)
+
+**UI Message:**
+```
+🔍 **ORCHESTRATOR**: Deeper analysis needed. Continuing investigation...
+```
+
+---
+
+**ACTION 5: Investigator reports "BLOCKED"**
+
+```
+Status: BLOCKED
+Blocker: [description]
+Recommendation: [what's needed to unblock]
+```
+
+**If blocked:**
+- Update investigation_state.status = "blocked"
+- Save investigation state
+- **EXIT LOOP**
+- Spawn PM to resolve blocker
+
+**UI Message:**
+```
+🛑 **ORCHESTRATOR**: Investigation blocked. Escalating to PM...
+```
+
+**Spawn PM:**
+```
+PM, investigation is blocked:
+Blocker: [description]
+Progress so far: [iterations_log]
+Recommendation: [what's needed]
+
+Please decide: Reprioritize OR Provide resources to unblock
+```
+
+---
+
+**END WHILE LOOP**
+
+**If loop exits due to max iterations reached:**
+
+**UI Message:**
+```
+⏱️ **ORCHESTRATOR**: Max iterations (5) reached. Investigation incomplete.
+📋 **ORCHESTRATOR**: Gathering partial findings...
+```
+
+**Update investigation state:**
+```
+investigation_state.status = "incomplete"
+investigation_state.partial_findings = [last Investigator analysis]
+```
+
+**Save investigation state:**
+```
+bazinga-db, please update investigation state:
+[state with status=incomplete]
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Proceed to Step 2A.6c with partial findings**
+
+---
+
+### Step 2A.6c: Tech Lead Validation of Investigation (NEW)
+
+**After investigation loop completes (root cause found OR incomplete):**
 
 **UI Message:**
 ```
 👔 **ORCHESTRATOR**: Spawning Tech Lead to validate investigation findings...
 ```
 
-**Build Tech Lead validation prompt:**
-- Include full Investigator report
-- Include root cause findings
-- Include recommended solution
-- Request Tech Lead validate and decide
+**Build Tech Lead Validation Prompt:**
+
+Read `agents/techlead.md` and prepend:
+
+```
+---
+🔬 INVESTIGATION RESULTS FOR VALIDATION
+---
+Session ID: [session_id]
+Group ID: [group_id]
+Investigation Status: [completed|incomplete]
+Total Iterations: [N]
+
+[IF status == "completed"]
+Root Cause Found:
+[investigation_state.root_cause]
+
+Confidence: [investigation_state.confidence]
+
+Evidence:
+[investigation_state.evidence]
+
+Recommended Solution:
+[investigation_state.solution]
+
+Iteration History:
+[investigation_state.iterations_log]
+
+Your Task:
+1. Validate the Investigator's logic and evidence
+2. Verify the root cause makes sense
+3. Review the recommended solution
+4. Make decision: APPROVED (accept solution) or CHANGES_REQUESTED (needs refinement)
+[ENDIF]
+
+[IF status == "incomplete"]
+Investigation Status: Incomplete after 5 iterations
+
+Progress Made:
+[investigation_state.iterations_log]
+
+Partial Findings:
+[investigation_state.partial_findings]
+
+Hypotheses Tested:
+[list of tested hypotheses and results]
+
+Your Task:
+1. Review progress and partial findings
+2. Decide:
+   - Accept partial solution (implement what we know)
+   - Continue investigation (spawn Investigator again with new approach)
+   - Escalate to PM for reprioritization
+[ENDIF]
+---
+
+[REST OF agents/techlead.md content]
+```
 
 **Spawn Tech Lead:**
 ```
 Task(
   subagent_type: "general-purpose",
   description: "Tech Lead validation of investigation",
-  prompt: [Tech Lead prompt with Investigator context]
+  prompt: [Tech Lead prompt built above]
 )
 ```
 
-**Tech Lead validates:**
+**After Tech Lead responds:**
+
+**Log Tech Lead validation:**
+```
+bazinga-db, please log this techlead interaction:
+
+Session ID: [session_id]
+Agent Type: techlead
+Content: [Tech Lead validation response]
+Iteration: [iteration]
+Agent ID: techlead_validation
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Tech Lead Decision:**
 - Reviews Investigator's logic
 - Checks evidence quality
 - Validates recommended solution

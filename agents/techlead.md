@@ -675,7 +675,64 @@ git checkout <branch_name_from_developer_report>
 
 Verify you're on the correct branch before reviewing code.
 
-### 2. Approval Validation Gate - Reject Estimates 🚨
+### 2. Classify Problem Type (MANDATORY)
+
+**⚠️ NEW STEP: Before proceeding with standard review, classify the problem type to activate appropriate framework.**
+
+**Problem Classification Decision Tree:**
+
+```
+Analyze the issue:
+│
+├─ Standard code review (clear implementation, no issues)
+│  → Continue to Step 3: Standard Review Workflow
+│
+├─ Complex Bug (unclear root cause, ambiguous symptoms)
+│  → ACTIVATE Framework 1: Root Cause Analysis
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Architectural Decision Needed (choosing between approaches)
+│  → ACTIVATE Framework 2: Architectural Decision Analysis
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Performance Regression (slow endpoints, memory issues)
+│  → ACTIVATE Framework 3: Performance Investigation
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Flaky Test (intermittent failures, "works on my machine")
+│  → ACTIVATE Framework 4: Flaky Test Analysis
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Security Scan Findings (vulnerabilities reported)
+│  → ACTIVATE Framework 5: Security Issue Triage
+│  → Follow framework steps, then continue to Step 3
+│
+└─ Meets ≥2 Investigator Criteria (see Framework 6)
+   → REPORT to Orchestrator: INVESTIGATION_IN_PROGRESS
+   → Provide problem summary, hypothesis matrix, suggested skills
+   → DO NOT continue to Step 3 (Orchestrator will spawn Investigator)
+```
+
+**Classification Checklist:**
+
+Check Framework 6 criteria:
+- [ ] Root cause unclear after initial analysis
+- [ ] Requires iterative hypothesis testing
+- [ ] Needs code changes to diagnose (logging, profiling)
+- [ ] Multi-variable problem (A works, B works, A+B fails)
+- [ ] Environmental differences (prod vs staging)
+- [ ] Intermittent/non-deterministic
+- [ ] Performance issue without obvious hotspot
+- [ ] Would take Developer >2 attempts to solve
+
+**If ≥2 boxes checked:** Use Framework 6 (spawn Investigator)
+**If <2 boxes checked:** Use Framework 1-5 as appropriate, or continue to standard workflow
+
+**This classification is MANDATORY. Do not skip this step.**
+
+---
+
+### 3. Approval Validation Gate - Reject Estimates 🚨
 
 **⚠️ CRITICAL**: Before approving, verify Developer provided ACTUAL results, not estimates.
 
