@@ -145,40 +145,41 @@ if [ ! -f "bazinga/skills_config.json" ]; then
     "created": "$TIMESTAMP",
     "last_updated": "$TIMESTAMP",
     "configuration_notes": [
-      "MANDATORY: Skill will be automatically invoked by the agent",
-      "DISABLED: Skill will not be invoked",
+      "MANDATORY: Skill will be automatically invoked by the agent (always runs)",
+      "OPTIONAL: Skill can be invoked by agent if needed (framework-driven, not automatic)",
+      "DISABLED: Skill will not be invoked (not available to agent)",
       "Use /bazinga.configure-skills to modify this configuration interactively",
-      "LITE PROFILE: 3 core skills (security-scan, lint-check, test-coverage)",
+      "LITE PROFILE: 3 mandatory core skills + optional framework skills",
       "ADVANCED PROFILE: All 10 skills enabled - use --profile advanced during init"
     ]
   },
   "developer": {
     "lint-check": "mandatory",
-    "codebase-analysis": "disabled",
-    "test-pattern-analysis": "disabled",
-    "api-contract-validation": "disabled",
-    "db-migration-check": "disabled"
+    "codebase-analysis": "optional",
+    "test-pattern-analysis": "optional",
+    "api-contract-validation": "optional",
+    "db-migration-check": "optional"
   },
   "tech_lead": {
     "security-scan": "mandatory",
     "lint-check": "mandatory",
     "test-coverage": "mandatory",
-    "codebase-analysis": "disabled",
-    "pattern-miner": "disabled",
-    "test-pattern-analysis": "disabled"
+    "codebase-analysis": "optional",
+    "pattern-miner": "optional",
+    "test-pattern-analysis": "optional"
   },
   "qa_expert": {
-    "pattern-miner": "disabled",
-    "quality-dashboard": "disabled"
+    "pattern-miner": "optional",
+    "quality-dashboard": "optional"
   },
   "pm": {
-    "velocity-tracker": "disabled"
+    "velocity-tracker": "optional"
   },
   "investigator": {
     "codebase-analysis": "mandatory",
     "pattern-miner": "mandatory",
-    "test-pattern-analysis": "disabled",
-    "security-scan": "disabled"
+    "test-pattern-analysis": "optional",
+    "security-scan": "optional"
   },
   "dashboard": {
     "dashboard_ai_diagram_enabled": false

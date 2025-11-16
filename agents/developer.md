@@ -525,14 +525,39 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 
 ### Available Skills
 
+The Orchestrator provides you with skills based on `bazinga/skills_config.json`:
+
+**Mandatory Skills (ALWAYS use):**
+
 1. **lint-check** - Code quality linting
    - Runs language-appropriate linters (Python: ruff, JS: eslint, Go: golangci-lint)
    - Checks style, complexity, best practices
    - Results: `bazinga/lint_results.json`
 
-2. **test-coverage** (optional) - Test coverage analysis
-   - Reports line/branch coverage
-   - Results: `bazinga/coverage_report.json`
+**Optional Skills (USE when needed):**
+
+2. **codebase-analysis** - Find similar code patterns
+   - Analyzes existing codebase for similar implementations
+   - Helps understand architectural patterns
+   - **When to use:** Implementing new features similar to existing ones
+   - Results: `bazinga/codebase_analysis.json`
+
+3. **test-pattern-analysis** - Learn from existing tests
+   - Analyzes test patterns in the codebase
+   - Shows how similar features are tested
+   - **When to use:** Writing tests for unfamiliar feature types
+   - Results: `bazinga/test_patterns.json`
+
+4. **api-contract-validation** - Detect breaking API changes
+   - Validates API contracts against existing specs
+   - Detects breaking changes
+   - **When to use:** Modifying APIs or endpoints
+   - Results: `bazinga/api_validation.json`
+
+5. **db-migration-check** - Validate database migrations
+   - Checks migration safety (locks, data loss, performance)
+   - **When to use:** Creating or modifying database migrations
+   - Results: `bazinga/migration_check.json`
 
 ### When to Use Skills
 
@@ -545,8 +570,24 @@ Skill(command: "lint-check")
 cat bazinga/lint_results.json
 ```
 
+**OPTIONAL - When Relevant**:
+```bash
+# Use codebase-analysis when implementing features similar to existing code
+Skill(command: "codebase-analysis")
+
+# Use api-contract-validation when modifying APIs
+Skill(command: "api-contract-validation")
+
+# Use db-migration-check when creating migrations
+Skill(command: "db-migration-check")
+
+# Use test-pattern-analysis when writing complex tests
+Skill(command: "test-pattern-analysis")
+```
+
 **Best Practice**:
 - Run lint-check BEFORE committing to catch issues early
+- Use optional skills when they add value to your implementation
 - Fix all lint issues while context is fresh
 - Only commit when lint-check is clean
 

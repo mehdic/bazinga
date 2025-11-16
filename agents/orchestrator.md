@@ -851,17 +851,17 @@ Build code context section with similar files and available utilities for develo
 
 **Step-by-Step Prompt Building Process:**
 
-**1. Check skills_config.json for developer mandatory skills:**
+**1. Check skills_config.json for developer skills:**
 
-From the skills_config.json you loaded during initialization, identify which developer skills have status = "mandatory":
+From the skills_config.json you loaded during initialization, identify which developer skills have status = "mandatory" or "optional":
 
 ```
 Developer Skills Status:
-- lint-check: [mandatory/disabled]
-- codebase-analysis: [mandatory/disabled]
-- test-pattern-analysis: [mandatory/disabled]
-- api-contract-validation: [mandatory/disabled]
-- db-migration-check: [mandatory/disabled]
+- lint-check: [mandatory/optional/disabled]
+- codebase-analysis: [mandatory/optional/disabled]
+- test-pattern-analysis: [mandatory/optional/disabled]
+- api-contract-validation: [mandatory/optional/disabled]
+- db-migration-check: [mandatory/optional/disabled]
 ```
 
 **2. Build prompt sections (following agents/developer.md):**
@@ -873,7 +873,7 @@ Include these sections in order:
 - ✓ Mode (Simple)
 - ✓ Code context from Step 2A.0
 - ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
 - ✓ Mandatory workflow steps (with Skill() invocations)
 - ✓ Report format
 
@@ -890,6 +890,22 @@ X. **[Skill Name]**: Run [WHEN]
    See: .claude/skills/[skill-name]/SKILL.md for details
 
 USE THESE SKILLS - They are MANDATORY!
+```
+
+**3b. For EACH optional skill, add to prompt:**
+
+```
+⚡ OPTIONAL SKILLS AVAILABLE
+
+The following Skills are available for use when needed:
+
+[FOR EACH skill where status = "optional"]:
+X. **[Skill Name]**: Use when [CONDITION]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+   When to use: [Context-specific guidance]
+
+These are OPTIONAL - invoke only when your workflow or task requires them.
 ```
 
 **4. Add MANDATORY WORKFLOW section:**
@@ -1000,14 +1016,14 @@ Skill(command: "bazinga-db")
 
 **YOU MUST include mandatory skills in QA Expert prompt.**
 
-**1. Check skills_config.json for qa_expert mandatory skills:**
+**1. Check skills_config.json for qa_expert skills:**
 
-From the skills_config.json you loaded during initialization, identify which qa_expert skills have status = "mandatory":
+From the skills_config.json you loaded during initialization, identify which qa_expert skills have status = "mandatory" or "optional":
 
 ```
 QA Expert Skills Status:
-- pattern-miner: [mandatory/disabled]
-- quality-dashboard: [mandatory/disabled]
+- pattern-miner: [mandatory/optional/disabled]
+- quality-dashboard: [mandatory/optional/disabled]
 ```
 
 **2. Build QA Expert prompt following agents/qa_expert.md:**
@@ -1017,7 +1033,7 @@ Include these sections:
 - ✓ Role definition (QA Expert in Claude Code Multi-Agent Dev Team)
 - ✓ Developer changes summary and test requirements
 - ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
 - ✓ Mandatory testing workflow with skill invocations
 - ✓ Report format
 
@@ -1034,6 +1050,22 @@ X. **[Skill Name]**: Run [WHEN]
    See: .claude/skills/[skill-name]/SKILL.md for details
 
 USE THESE SKILLS - They are MANDATORY!
+```
+
+**3b. For EACH optional skill, add to QA Expert prompt:**
+
+```
+⚡ OPTIONAL SKILLS AVAILABLE
+
+The following Skills are available for use when needed:
+
+[FOR EACH skill where status = "optional"]:
+X. **[Skill Name]**: Use when [CONDITION]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+   When to use: [Context-specific guidance]
+
+These are OPTIONAL - invoke only when your analysis requires them.
 ```
 
 **4. Add MANDATORY TESTING WORKFLOW to QA Expert prompt:**
@@ -1125,15 +1157,18 @@ Skill(command: "bazinga-db")
 
 **YOU MUST include mandatory skills in Tech Lead prompt.**
 
-**1. Check skills_config.json for tech_lead mandatory skills:**
+**1. Check skills_config.json for tech_lead skills:**
 
-From the skills_config.json you loaded during initialization, identify which tech_lead skills have status = "mandatory":
+From the skills_config.json you loaded during initialization, identify which tech_lead skills have status = "mandatory" or "optional":
 
 ```
 Tech Lead Skills Status:
-- security-scan: [mandatory/disabled]
-- lint-check: [mandatory/disabled]
-- test-coverage: [mandatory/disabled]
+- security-scan: [mandatory/optional/disabled]
+- lint-check: [mandatory/optional/disabled]
+- test-coverage: [mandatory/optional/disabled]
+- codebase-analysis: [mandatory/optional/disabled]
+- pattern-miner: [mandatory/optional/disabled]
+- test-pattern-analysis: [mandatory/optional/disabled]
 ```
 
 **2. Build Tech Lead prompt following agents/techlead.md:**
@@ -1143,7 +1178,7 @@ Include these sections:
 - ✓ Role definition (Tech Lead in Claude Code Multi-Agent Dev Team)
 - ✓ Group assignment and implementation summary
 - ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
 - ✓ Mandatory review workflow with skill invocations
 - ✓ Report format
 
@@ -1160,6 +1195,26 @@ X. **[Skill Name]**: Run [WHEN]
    See: .claude/skills/[skill-name]/SKILL.md for details
 
 USE THESE SKILLS - They are MANDATORY before approving!
+```
+
+**3b. For EACH optional skill, add to Tech Lead prompt:**
+
+```
+⚡ OPTIONAL SKILLS AVAILABLE
+
+The following Skills are available for use in specific frameworks:
+
+[FOR EACH skill where status = "optional"]:
+X. **[Skill Name]**: Use when [FRAMEWORK]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+
+**When to use optional skills:**
+- codebase-analysis: Framework 1 (Root Cause Analysis), Framework 2 (Architectural Decisions), Framework 3 (Performance Investigation)
+- pattern-miner: Framework 1 (Root Cause Analysis), Framework 3 (Performance Investigation - historical patterns)
+- test-pattern-analysis: Framework 4 (Flaky Test Analysis)
+
+These are OPTIONAL - invoke only when frameworks indicate they're needed.
 ```
 
 **4. Add MANDATORY REVIEW WORKFLOW to Tech Lead prompt:**
@@ -1312,9 +1367,27 @@ investigation_state.current_iteration += 1
 
 ##### Iteration Step 1: Spawn Investigator
 
-**Build Investigator Prompt:**
+**1. Check skills_config.json for investigator skills:**
 
-Read `agents/investigator.md` and prepend session context:
+From the skills_config.json you loaded during initialization, identify which investigator skills have status = "mandatory" or "optional":
+
+```
+Investigator Skills Status:
+- codebase-analysis: [mandatory/optional/disabled]
+- pattern-miner: [mandatory/optional/disabled]
+- test-pattern-analysis: [mandatory/optional/disabled]
+- security-scan: [mandatory/optional/disabled]
+```
+
+**2. Build Investigator Prompt:**
+
+Read `agents/investigator.md` and build prompt with these sections in order:
+
+A) **Investigation Context** (session state)
+B) **Skills Section** (mandatory + optional from config)
+C) **Rest of agents/investigator.md content**
+
+**Section A - Investigation Context:**
 
 ```
 ---
@@ -1330,24 +1403,67 @@ Problem Summary: [investigation_state.problem_summary]
 
 Initial Hypothesis Matrix: [investigation_state.hypothesis_matrix]
 
-Skills You Should Use: [investigation_state.suggested_skills]
-
 Previous Iteration Results (if iteration > 1):
 [investigation_state.iterations_log[previous iterations]]
 
 Developer Results from Previous Iteration (if available):
 [investigation_state.developer_results]
 ---
-
-[REST OF agents/investigator.md content]
 ```
 
-**Spawn Investigator:**
+**Section B - Skills Injection:**
+
+**3. For EACH mandatory skill, add to prompt:**
+
+```
+⚡ ADVANCED SKILLS ACTIVE
+
+You have access to the following mandatory Skills:
+
+[FOR EACH skill where status = "mandatory"]:
+X. **[Skill Name]**: [Description]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+
+Examples:
+- **Codebase Analysis**: Analyze codebase for similar patterns
+- **Pattern Miner**: Historical pattern analysis
+
+USE THESE SKILLS - They are MANDATORY for every investigation!
+```
+
+**3b. For EACH optional skill, add to prompt:**
+
+```
+⚡ OPTIONAL SKILLS AVAILABLE
+
+The following Skills are available for use when needed:
+
+[FOR EACH skill where status = "optional"]:
+X. **[Skill Name]**: Use when [CONDITION]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+   When to use: [Context-specific guidance]
+
+Examples:
+- **Test Pattern Analysis**: Use when investigating test-related issues or flaky tests
+- **Security Scan**: Use when hypothesis involves security vulnerabilities
+
+These are OPTIONAL - invoke only when investigation requires them.
+```
+
+**Section C - Rest of investigator.md:**
+
+```
+[REST OF agents/investigator.md content starting from "## Your Role" section]
+```
+
+**4. Spawn Investigator:**
 ```
 Task(
   subagent_type: "general-purpose",
   description: "Investigator iteration [N]",
-  prompt: [Investigator prompt built above]
+  prompt: [Investigator prompt built above with sections A + B + C]
 )
 ```
 

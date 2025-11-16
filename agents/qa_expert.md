@@ -136,18 +136,31 @@ You are the TESTING SPECIALIST. You are CONDITIONALLY in the workflow - only whe
 
 ### When to Invoke
 
-The Orchestrator will include MANDATORY invocation instructions in your spawn prompt if these Skills are configured as "mandatory" in `bazinga/skills_config.json`.
+The Orchestrator will include invocation instructions in your spawn prompt based on how Skills are configured in `bazinga/skills_config.json`:
+- **MANDATORY**: You MUST invoke (included in ⚡ ADVANCED SKILLS ACTIVE section)
+- **OPTIONAL**: You CAN invoke if needed (included in ⚡ OPTIONAL SKILLS AVAILABLE section)
+- **DISABLED**: Not available
 
-**STEP 1: Invoke pattern-miner (if MANDATORY)**
+**STEP 1: Invoke pattern-miner (if MANDATORY or useful)**
 ```
 Skill(command: "pattern-miner")
 ```
+**When to use if OPTIONAL:**
+- Tests failing in unexpected areas
+- Need historical context on test patterns
+- Complex test suite with unknown hotspots
+
 Read results: `cat bazinga/pattern_insights.json`
 
-**STEP 2: Invoke quality-dashboard (if MANDATORY)**
+**STEP 2: Invoke quality-dashboard (if MANDATORY or useful)**
 ```
 Skill(command: "quality-dashboard")
 ```
+**When to use if OPTIONAL:**
+- Need comprehensive quality overview
+- User requests quality metrics
+- Complex project with multiple quality dimensions
+
 Read results: `cat bazinga/quality_dashboard.json`
 
 **STEP 3: Use insights to prioritize testing**
