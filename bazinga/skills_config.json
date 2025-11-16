@@ -1,10 +1,10 @@
 {
   "developer": {
     "lint-check": "mandatory",
-    "codebase-analysis": "disabled",
-    "test-pattern-analysis": "disabled",
-    "api-contract-validation": "disabled",
-    "db-migration-check": "disabled"
+    "codebase-analysis": "optional",
+    "test-pattern-analysis": "optional",
+    "api-contract-validation": "optional",
+    "db-migration-check": "optional"
   },
   "tech_lead": {
     "security-scan": "mandatory",
@@ -12,20 +12,20 @@
     "test-coverage": "mandatory",
     "codebase-analysis": "optional",
     "pattern-miner": "optional",
-    "test-pattern-analysis": "disabled"
+    "test-pattern-analysis": "optional"
   },
   "qa_expert": {
-    "pattern-miner": "disabled",
-    "quality-dashboard": "disabled"
+    "pattern-miner": "optional",
+    "quality-dashboard": "optional"
   },
   "pm": {
-    "velocity-tracker": "disabled"
+    "velocity-tracker": "optional"
   },
   "investigator": {
     "codebase-analysis": "mandatory",
     "pattern-miner": "mandatory",
-    "test-pattern-analysis": "disabled",
-    "security-scan": "disabled"
+    "test-pattern-analysis": "optional",
+    "security-scan": "optional"
   },
   "dashboard": {
     "dashboard_ai_diagram_enabled": false

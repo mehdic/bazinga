@@ -5,8 +5,8 @@
 ### 1. Skills Configuration
 ✅ DONE:
 - Added "optional" status (can be used if needed, but not automatic)
-- Set Tech Lead's codebase-analysis and pattern-miner to "optional"
-- Fixed PM velocity-tracker to "disabled" (lite profile)
+- Changed all previously disabled skills to "optional" by default (lite profile)
+- All agents now have optional skills available when needed
 - Updated init script to match
 
 ### 2. Orchestrator Architecture Fixes

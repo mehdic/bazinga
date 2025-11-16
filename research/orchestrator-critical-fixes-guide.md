@@ -8,8 +8,9 @@ Optional skills support has been implemented in orchestrator. Remaining fixes ad
 
 1. **Skills Configuration** (bazinga/skills_config.json)
    - Added "optional" status for framework-driven skills
-   - Set Tech Lead's codebase-analysis and pattern-miner to "optional"
-   - Fixed PM velocity-tracker to "disabled" (lite profile)
+   - Changed all previously disabled skills to "optional" by default (lite profile)
+   - All 10 advanced skills are now optional and available when needed
+   - Users can still disable specific skills if desired
 
 2. **Init Script** (scripts/init-orchestration.sh)
    - Updated to match new skills config format
