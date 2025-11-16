@@ -751,6 +751,185 @@ Skill(command: "bazinga-db")
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
+### Step 1.3a: Handle PM Clarification Requests (if applicable)
+
+**Detection:** Check if PM response contains `PM Status: NEEDS_CLARIFICATION`
+
+**If NEEDS_CLARIFICATION is NOT present:** Skip to Step 1.4 (normal workflow)
+
+**If NEEDS_CLARIFICATION IS present:** Execute clarification workflow below
+
+#### Clarification Workflow
+
+**Step 1: Log Clarification Request**
+
+```
+bazinga-db, please log clarification request:
+
+Session ID: [current session_id]
+Request Type: pm_clarification
+Status: pending
+Content: [PM's clarification request section]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Step 2: Update Orchestrator State**
+
+```
+bazinga-db, please update orchestrator state:
+
+Session ID: [current session_id]
+State Data: {
+  "clarification_pending": true,
+  "clarification_requested_at": "[ISO timestamp]",
+  "phase": "awaiting_clarification"
+}
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Step 3: Surface Clarification to User**
+
+**UI Message:**
+```
+⚠️ **ORCHESTRATOR**: PM needs clarification to proceed
+
+[Display PM's full NEEDS_CLARIFICATION section, including:]
+- Blocker Type
+- Evidence of Exhaustion
+- Question
+- Options
+- Safe Fallback
+
+⏱️ **ORCHESTRATOR**: Waiting for your response (will auto-proceed with safe fallback in 5 minutes)
+
+Please provide your answer, or I will proceed with the fallback option.
+```
+
+**Step 4: Wait for User Response**
+
+- Set 5-minute timeout
+- User can respond with their choice (option a, b, or c)
+- Or specify custom answer
+
+**Step 5: Process Response**
+
+**If user responds within 5 minutes:**
+
+```
+📨 **ORCHESTRATOR**: Received clarification from user: [user's answer]
+🔄 **ORCHESTRATOR**: Forwarding clarification to PM...
+```
+
+Log user response:
+```
+bazinga-db, please update clarification request:
+
+Session ID: [current session_id]
+Status: resolved
+User Response: [user's answer]
+Resolved At: [ISO timestamp]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**If timeout (5 minutes, no response):**
+
+```
+⏱️ **ORCHESTRATOR**: Timeout reached - proceeding with PM's safe fallback option
+```
+
+Log timeout:
+```
+bazinga-db, please update clarification request:
+
+Session ID: [current session_id]
+Status: timeout
+User Response: timeout_assumed
+Resolved At: [ISO timestamp]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Step 6: Re-spawn PM with Answer**
+
+**UI Message:**
+```
+🔄 **ORCHESTRATOR**: Re-spawning PM to proceed with clarified requirements...
+```
+
+**Spawn PM again with:**
+
+```
+Task(
+  subagent_type="general-purpose",
+  description="PM planning with clarification",
+  prompt=f"""
+You are the Project Manager. You previously requested clarification and received this response:
+
+**Your Clarification Request:**
+[PM's original NEEDS_CLARIFICATION section]
+
+**User Response:**
+[user's answer OR "timeout - proceed with your safe fallback option"]
+
+**Your Task:**
+- Document this clarification in assumptions_made array
+- Proceed with planning based on the clarified requirements
+- Continue your normal planning workflow
+- Return your PM Decision (mode, task groups, execution plan)
+
+**Context:**
+{user_requirements}
+
+**Session Info:**
+- Session ID: {session_id}
+- Previous PM state: [if any]
+"""
+)
+```
+
+**Step 7: Receive PM Decision (Again)**
+
+- PM should now return normal decision (SIMPLE MODE or PARALLEL MODE)
+- Log this interaction to database (same as Step 1.3)
+- Update orchestrator state to clear clarification_pending flag:
+
+```
+bazinga-db, please update orchestrator state:
+
+Session ID: [current session_id]
+State Data: {
+  "clarification_pending": false,
+  "phase": "planning_complete"
+}
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Step 8: Continue to Step 1.4**
+
+- Proceed with normal workflow (verify PM state and task groups)
+- PM should have completed planning with clarification resolved
+
+---
+
 ### Step 1.4: Verify PM State and Task Groups in Database
 
 **⚠️ CRITICAL VERIFICATION: Ensure PM saved state and task groups**
