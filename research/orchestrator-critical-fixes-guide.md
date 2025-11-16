@@ -1,8 +1,8 @@
 # Orchestrator Critical Fixes Guide
 
-## Status: PENDING IMPLEMENTATION
+## Status: PARTIALLY IMPLEMENTED
 
-These fixes address the fundamental WHILE loop architecture issue and add missing workflows for the investigation system.
+Optional skills support has been implemented in orchestrator. Remaining fixes address the WHILE loop architecture issue and missing workflows for the investigation system.
 
 ## Fixes Completed ✅
 
@@ -24,6 +24,30 @@ These fixes address the fundamental WHILE loop architecture issue and add missin
    - Added hypothesis matrix validation in STEP 1
    - Handles empty, null, or malformed hypothesis matrices
    - Returns BLOCKED if cannot proceed
+
+5. **Orchestrator Optional Skills Support** (agents/orchestrator.md) - ✅ IMPLEMENTED
+   - Updated Developer prompt building (Step 2A.2) to check for "optional" status
+   - Updated QA Expert prompt building (Step 2A.4) to check for "optional" status
+   - Updated Tech Lead prompt building (Step 2A.6) to check for "optional" status
+   - Added "3b. For EACH optional skill" sections after mandatory skills
+   - Optional skills are injected with clear "OPTIONAL SKILLS AVAILABLE" header
+   - Tech Lead optional skills include framework guidance (when to use which skill)
+   - Skills configuration now supports 3 states: mandatory, optional, disabled
+
+**Implementation Details:**
+- Developer optional skills: Available when workflow requires them
+- QA Expert optional skills: Available when analysis requires them
+- Tech Lead optional skills: Available in specific frameworks
+  - codebase-analysis: Frameworks 1, 2, 3 (Root Cause, Architectural Decisions, Performance)
+  - pattern-miner: Frameworks 1, 3 (Root Cause, Performance - historical patterns)
+  - test-pattern-analysis: Framework 4 (Flaky Test Analysis)
+
+**How It Works:**
+1. Orchestrator reads skills_config.json during initialization
+2. For each agent spawn, checks skills with `status = "mandatory"` and `status = "optional"`
+3. Mandatory skills: Injected with "USE THESE SKILLS - They are MANDATORY!"
+4. Optional skills: Injected with "These are OPTIONAL - invoke only when [condition]"
+5. Agent receives both sets in prompt, knows which are mandatory and which are optional
 
 ## Fixes Needed in Orchestrator 🚧
 
