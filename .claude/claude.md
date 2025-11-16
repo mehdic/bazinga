@@ -173,47 +173,59 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 
 ---
 
-## 🔴 CRITICAL: Orchestrator File Synchronization
+## 🔴 CRITICAL: Orchestrator Development Workflow
 
-**These files MUST be kept IDENTICAL:**
+**Single Source of Truth:**
+- **agents/orchestrator.md** - The ONLY file you should edit for orchestration logic
+- **.claude/commands/bazinga.orchestrate.md** - AUTO-GENERATED (DO NOT EDIT DIRECTLY)
 
-1. **agents/orchestrator.md** - The agent definition (Task tool invocation)
-2. **.claude/commands/bazinga.orchestrate.md** - The slash command version
+### ✅ CORRECT WORKFLOW
 
-### ✅ REQUIRED SYNC PROCEDURE
+**When modifying orchestration logic:**
 
-After making ANY changes to either file, copy to the other:
+1. **Edit ONLY** `agents/orchestrator.md`
+2. **Commit** your changes normally
+3. **Pre-commit hook** automatically:
+   - Detects changes to `agents/orchestrator.md`
+   - Runs `scripts/build-slash-commands.sh`
+   - Rebuilds `.claude/commands/bazinga.orchestrate.md`
+   - Stages the generated file
 
+**Manual rebuild (if needed):**
 ```bash
-# When updating orchestrator, copy to both locations:
-cp agents/orchestrator.md .claude/commands/bazinga.orchestrate.md
-
-# OR if you edited the command file:
-cp .claude/commands/bazinga.orchestrate.md agents/orchestrator.md
+./scripts/build-slash-commands.sh
 ```
 
-### Verify Synchronization
+### ⚠️ FIRST-TIME SETUP REQUIRED
 
+**After cloning the repository, you MUST install git hooks:**
 ```bash
-# Verify files are identical (should output: "Files are identical")
-diff -q agents/orchestrator.md .claude/commands/bazinga.orchestrate.md && echo "✓ Files are identical"
+./scripts/install-hooks.sh
 ```
 
-### Why Both Files Must Be Identical
+This installs the pre-commit hook that enables automatic rebuilding. Without this step, the hook won't be active and you'll need to manually run the build script.
 
-- **Same orchestration logic** - Both use identical workflow and state management
-- **Same database operations** - Both invoke bazinga-db skill identically at same points
-- **Same agent coordination** - Both spawn PM, developers, QA, tech lead identically
-- **Same state persistence** - Both have mandatory database persistence checkpoints
-- **NO differences** - Files are now completely identical (no header variations)
+### ❌ DO NOT EDIT DIRECTLY
 
-**Recent critical updates (ensure both files have these):**
-- Mandatory database operations section (lines 68-114)
-- PM state verification with fallback (Step 1.4, lines 685-738)
-- Enhanced orchestrator state saves (lines 1679-1724)
-- Final state checkpoint (lines 1991-2046)
+**NEVER edit** `.claude/commands/bazinga.orchestrate.md` directly - your changes will be overwritten by the next commit!
 
-**⚠️ IMPORTANT:** Edit one, sync to the other. Always verify they're identical after changes.
+### Why This Pattern?
+
+**Problem:** The orchestrator must run **inline** (not as a spawned sub-agent) to provide real-time visibility of orchestration progress to the user.
+
+**Solution:**
+- `agents/orchestrator.md` - Source of truth for orchestration logic
+- Build script - Generates slash command from agent source
+- Pre-commit hook - Automatically rebuilds on changes
+- `.claude/commands/bazinga.orchestrate.md` - Generated file that runs inline
+
+This ensures:
+- ✅ Single source of truth (no manual synchronization)
+- ✅ Real-time orchestration visibility (inline execution)
+- ✅ Automatic consistency (pre-commit hook)
+- ✅ No duplication bugs
+
+**See:** `CONTRIBUTING.md` for complete development workflow documentation
 
 ---
 
