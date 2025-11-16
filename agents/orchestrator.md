@@ -36,7 +36,8 @@ The user's message to you contains their requirements for this orchestration tas
 1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA
 2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision)
 3. **QA Expert** - Runs integration/contract/e2e tests
-4. **Tech Lead** - Reviews code quality, approves groups
+4. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues
+5. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems (spawned by Tech Lead)
 
 **Your Role:**
 - **Message router** - Pass information between agents
@@ -1248,6 +1249,130 @@ Skill(command: "bazinga-db")
 
 ---
 
+### Step 2A.6b: Handle Investigation Request (NEW)
+
+**IF Tech Lead reports: INVESTIGATION_IN_PROGRESS**
+
+**UI Message:**
+```
+🔍 **ORCHESTRATOR**: Tech Lead identified complex problem requiring investigation...
+🔬 **ORCHESTRATOR**: Spawning Investigator agent for systematic root cause analysis...
+```
+
+**Log Tech Lead request:**
+```
+bazinga-db, please log this techlead interaction:
+
+Session ID: [session_id]
+Agent Type: techlead
+Content: [Tech Lead response with investigation request]
+Iteration: [iteration]
+Agent ID: techlead_main
+Status: investigation_requested
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Build Investigator Prompt:**
+
+Read `agents/investigator.md` and include:
+- **Session ID** - [current session_id]
+- **Group ID** - [current group_id]
+- **Branch** - [developer's feature branch]
+- Tech Lead's problem summary
+- Initial hypothesis matrix from Tech Lead
+- Suggested Skills to use
+- Developer's branch information
+- Investigation budget (max 5 iterations)
+
+**Spawn Investigator:**
+```
+Task(
+  subagent_type: "general-purpose",
+  description: "Investigator deep-dive analysis",
+  prompt: [Full Investigator prompt from agents/investigator.md with context]
+)
+```
+
+**AFTER receiving Investigator's response:**
+
+**Check Investigator status:**
+
+**IF Investigator reports: ROOT_CAUSE_FOUND**
+- Log investigator interaction to database
+- Update task group status: under_investigation → root_cause_identified
+- Spawn Tech Lead with Investigator's findings for validation
+- Tech Lead validates and makes final decision (APPROVED/CHANGES_REQUESTED)
+- Continue to Step 2A.7
+
+**IF Investigator reports: INVESTIGATION_INCOMPLETE**
+- Log investigator interaction
+- Update task group status
+- Spawn Tech Lead with partial findings
+- Tech Lead decides: Continue investigation OR Accept partial solution
+- Continue to Step 2A.7
+
+**IF Investigator reports: BLOCKED**
+- Log investigator interaction
+- Spawn PM to help resolve blocker or reprioritize
+
+**Database Logging:**
+```
+bazinga-db, please log this investigator interaction:
+
+Session ID: [session_id]
+Agent Type: investigator
+Content: [Full Investigator report]
+Iteration: [iteration]
+Agent ID: investigator_[group_id]
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Update task group status:**
+```
+bazinga-db, please update task group:
+
+Group ID: [group_id]
+Status: [root_cause_identified|investigation_incomplete|investigation_blocked]
+Investigation Iterations: [N]
+Last Activity: investigator_analysis
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**After Investigator completes, spawn Tech Lead for validation:**
+
+**UI Message:**
+```
+👔 **ORCHESTRATOR**: Spawning Tech Lead to validate investigation findings...
+```
+
+**Build Tech Lead validation prompt:**
+- Include full Investigator report
+- Include root cause findings
+- Include recommended solution
+- Request Tech Lead validate and decide
+
+**Spawn Tech Lead:**
+```
+Task(
+  subagent_type: "general-purpose",
+  description: "Tech Lead validation of investigation",
+  prompt: [Tech Lead prompt with Investigator context]
+)
+```
+
+**Tech Lead validates:**
+- Reviews Investigator's logic
+- Checks evidence quality
+- Validates recommended solution
+- Makes decision: APPROVED (solution good) or CHANGES_REQUESTED (needs refinement)
+
+**Route based on Tech Lead decision** (continue to Step 2A.7)
+
+---
+
 ### Step 2A.7: Route Tech Lead Response
 
 **IF Tech Lead approves:**
@@ -1257,6 +1382,10 @@ Skill(command: "bazinga-db")
 - Respawn appropriate agent (developer or QA) with feedback
 - Track revision count
 - Escalate if >2 revisions
+
+**IF Tech Lead requests investigation:**
+- Already handled in Step 2A.6b
+- Should not reach here (investigation spawned earlier)
 
 ### Step 2A.8: Spawn PM for Final Check
 
@@ -1520,6 +1649,11 @@ The routing chain for each group is:
 5. **Route Tech Lead Response** (Step 2B.7):
    - IF Tech Lead approves → Mark group as COMPLETE
    - IF Tech Lead requests changes → Respawn appropriate agent (developer or QA) with feedback (track revisions)
+   - IF Tech Lead requests investigation (INVESTIGATION_IN_PROGRESS) → Follow same pattern as Step 2A.6b:
+     * Spawn Investigator for this group
+     * Investigator performs systematic root cause analysis
+     * After investigation, Tech Lead validates findings
+     * Route based on validation result (APPROVED/CHANGES_REQUESTED)
 
 **IMPORTANT:** Track revision counts per group in database. Escalate if >2 revisions.
 
