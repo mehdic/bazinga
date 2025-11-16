@@ -85,13 +85,14 @@ This adds 2-4 minutes upfront but provides better decisions, fewer revisions, an
 
 ### The Team
 
-BAZINGA coordinates 5 specialized AI agents:
+BAZINGA coordinates 6 specialized AI agents:
 
 1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
 2. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
 3. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
-4. **Tech Lead** - Reviews code quality, security, architecture
-5. **Orchestrator** - Routes messages between agents, maintains workflow
+4. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
+5. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
+6. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
 
 ### The Workflow
 
@@ -109,7 +110,25 @@ Each developer:
   - Runs lint check
   - Measures coverage
     ↓
-Tech Lead reviews all work
+Tech Lead reviews → Classifies problem complexity
+    ↓
+    ├─ Simple (80%) → Standard review → Approve/Request changes
+    ├─ Complex (15%) → Apply framework → Approve/Request changes
+    │   • Root Cause Analysis (5 Whys + Hypothesis Matrix)
+    │   • Architectural Decision Analysis
+    │   • Performance Investigation
+    │   • Flaky Test Analysis
+    │   • Security Issue Triage
+    └─ Investigation Required (5%) → Spawn Investigator
+        ↓
+        Investigation Loop (max 5 iterations):
+          1. Investigator analyzes hypothesis matrix
+          2. Decides action (diagnostic code, testing, analysis)
+          3. May spawn Developer for diagnostic changes
+          4. Returns findings and updated hypotheses
+          5. Repeat until root cause found or blocked
+        ↓
+        Tech Lead validates findings
     ↓
 PM confirms → BAZINGA!
 ```
@@ -153,6 +172,53 @@ Every feature automatically gets:
 - **Target:** 80% coverage by default
 
 **Missing tools?** No problem. BAZINGA gracefully degrades—warns you but continues working.
+
+---
+
+## Advanced Problem-Solving Frameworks
+
+Tech Lead automatically classifies every code review and applies the appropriate problem-solving approach:
+
+### Tier 1: Standard Review (80%)
+Clear implementation, no issues → Standard code review workflow
+
+### Tier 2: Structured Frameworks (15%)
+Complex but single-hypothesis problems → Apply specialized framework:
+
+| Framework | When Used | Techniques |
+|-----------|-----------|------------|
+| **Root Cause Analysis** | Unclear bug origin | 5 Whys, Hypothesis Matrix (likelihood scoring) |
+| **Architectural Decision** | Choosing between approaches | Decision Matrix (weighted criteria) |
+| **Performance Investigation** | Slow endpoints, memory issues | Profiling, bottleneck analysis |
+| **Flaky Test Analysis** | Intermittent test failures | Race condition detection, timing analysis |
+| **Security Issue Triage** | Vulnerability findings | Severity assessment, exploit analysis |
+
+### Tier 3: Deep Investigation (5%)
+Multi-hypothesis problems with unclear root cause → Spawn Investigator agent:
+
+**Investigation Loop (max 5 iterations):**
+1. **Hypothesis Matrix** - Rank theories by likelihood (1-10 scale)
+2. **Action Selection** - Choose diagnostic strategy (code changes, testing, analysis)
+3. **Execute & Gather Evidence** - May spawn Developer for diagnostic code
+4. **Update Hypotheses** - Eliminate or confirm theories based on evidence
+5. **Repeat** - Until root cause found or investigation blocked
+
+**Triggers for Investigation (≥2 criteria required):**
+- Root cause unclear after initial analysis
+- Requires iterative hypothesis testing
+- Needs diagnostic code changes (logging, profiling)
+- Multi-variable problem (A works, B works, A+B fails)
+- Environmental differences (prod vs staging)
+- Intermittent/non-deterministic behavior
+- Performance issue without obvious hotspot
+- Would take Developer >2 attempts to solve
+
+**Investigation Actions:**
+- `ROOT_CAUSE_FOUND` - Investigation complete, solution identified
+- `NEED_DEVELOPER_DIAGNOSTIC` - Request diagnostic code changes
+- `HYPOTHESIS_ELIMINATED` - Theory disproven, continue with next
+- `NEED_MORE_ANALYSIS` - Deeper analysis required
+- `BLOCKED` - Cannot proceed, escalate to PM
 
 ---
 
@@ -240,17 +306,17 @@ BAZINGA works out of the box with sensible defaults. Want more control?
 ```
 
 **Core Skills** (always active):
-- `security-scan` - Vulnerability detection
-- `lint-check` - Code quality and style
-- `test-coverage` - Coverage analysis
+- `security-scan` - Vulnerability detection (Tech Lead)
+- `lint-check` - Code quality and style (Developer, Tech Lead)
+- `test-coverage` - Coverage analysis (Tech Lead)
+- `codebase-analysis` - Pattern extraction from similar code (Investigator)
+- `pattern-miner` - Historical pattern analysis (Investigator)
 
 **Advanced Skills** (opt-in):
 - `velocity-tracker` - PM metrics and velocity tracking
-- `codebase-analysis` - Pattern extraction from similar code
 - `test-pattern-analysis` - Test framework learning
 - `api-contract-validation` - Breaking change detection
 - `db-migration-check` - Migration safety analysis
-- `pattern-miner` - Historical pattern analysis
 - `quality-dashboard` - Unified health metrics
 
 ### CLI Options
@@ -278,6 +344,8 @@ bazinga update
 
 - **Parallel Developers** - 1-4 developers working simultaneously, automatically coordinated
 - **Adaptive Workflow** - PM decides parallelism based on task independence
+- **3-Tier Problem Solving** - Standard review (80%), structured frameworks (15%), deep investigation (5%)
+- **Advanced Investigation** - Systematic root cause analysis for complex multi-hypothesis problems
 - **Automatic Quality Gates** - Security scanning, linting, and test coverage built-in
 - **Model Escalation** - Automatically escalates from Sonnet to Opus at revision 3
 - **Graceful Degradation** - Works even with missing tools, warns but continues
@@ -397,18 +465,19 @@ A: Check `bazinga/build_baseline.log`. BAZINGA tracks baseline vs. final build s
 ```
 your-project/
 ├── .claude/
-│   ├── agents/                # Agent definitions (5 agents)
+│   ├── agents/                # Agent definitions (6 agents)
 │   ├── commands/              # Slash commands
 │   ├── scripts/               # Utility scripts
-│   └── skills/                # Analysis tools (10 Skills)
-├── bazinga/              # State files (auto-generated, gitignored)
-│   ├── pm_state.json         # PM planning and progress
-│   ├── group_status.json     # Individual task status
-│   ├── orchestrator_state.json # Routing state
-│   ├── security_scan.json    # Security findings
-│   ├── coverage_report.json  # Test coverage
-│   ├── lint_results.json     # Code quality issues
-│   └── testing_config.json   # Testing mode configuration
+│   └── skills/                # Analysis tools (Skills)
+├── bazinga/
+│   ├── skills_config.json    # Agent skills configuration (git-tracked)
+│   ├── pm_state.json         # PM planning and progress (auto-generated)
+│   ├── group_status.json     # Individual task status (auto-generated)
+│   ├── orchestrator_state.json # Routing state (auto-generated)
+│   ├── security_scan.json    # Security findings (auto-generated)
+│   ├── coverage_report.json  # Test coverage (auto-generated)
+│   ├── lint_results.json     # Code quality issues (auto-generated)
+│   └── testing_config.json   # Testing mode configuration (auto-generated)
 ├── .claude.md                 # Global configuration
 └── .git/                      # Git repository
 ```
@@ -450,16 +519,21 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 **Stable:**
 - ✅ Core orchestration workflow
 - ✅ Adaptive parallelism (1-4 developers)
+- ✅ 3-tier problem-solving (standard/frameworks/investigation)
+- ✅ Investigator agent with systematic root cause analysis
+- ✅ 6 problem-solving frameworks (Root Cause, Architecture, Performance, Flaky Tests, Security, Investigation)
+- ✅ Investigation loop management (max 5 iterations)
 - ✅ Role drift prevention
-- ✅ Core Skills (security, lint, coverage)
+- ✅ Core Skills (security, lint, coverage, codebase-analysis, pattern-miner)
 - ✅ Model escalation
 - ✅ Multi-language support (Python, JS, Go, Java, Ruby)
 
 **Advanced (opt-in):**
 - ⚡ Velocity tracking and PM metrics
-- ⚡ Pattern mining and quality dashboards
+- ⚡ Quality dashboards
 - ⚡ API contract validation
 - ⚡ Database migration safety checks
+- ⚡ Test pattern analysis
 
 ---
 

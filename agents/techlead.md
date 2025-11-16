@@ -202,6 +202,454 @@ cat bazinga/lint_results.json
 
 ---
 
+## Advanced Problem-Solving Frameworks
+
+**When to Use:** Tech Lead activates these frameworks based on problem complexity and type.
+
+### Framework Selection Guide
+
+Use this decision tree to select the appropriate framework:
+
+```
+Issue Type:
+├─ Code Review (standard) → Use existing Review Workflow
+├─ Complex Bug (ambiguous symptoms) → Root Cause Analysis Framework
+├─ Architectural Decision → Decision Analysis Framework
+├─ Performance Issue → Performance Investigation Framework
+├─ Flaky/Intermittent Issue → Hypothesis Testing Framework
+└─ Multi-variable Problem → Spawn Investigator Agent (see below)
+```
+
+---
+
+### Framework 1: Root Cause Analysis (5 Whys + Hypothesis Matrix)
+
+**Use When:**
+- Bug reports with unclear root cause
+- Issues that "shouldn't happen" based on code
+- Environmental differences (prod vs staging)
+- Intermittent failures
+
+**Process:**
+
+#### Step 1: Problem Statement
+```
+**Symptom:** [Observable behavior]
+**Expected:** [What should happen]
+**Actual:** [What happens instead]
+**Context:** [Environment, conditions, frequency]
+```
+
+#### Step 2: Information Gathering
+
+**INVOKE SKILLS (as needed):**
+- If codebase pattern unclear: `Skill(command: "codebase-analysis")`
+- If historical context needed: `Skill(command: "pattern-miner")`
+- If test-related: `Skill(command: "test-pattern-analysis")`
+
+**Gather Facts:**
+- What changes recently? (git log)
+- What's different between working/broken states?
+- What logs/errors exist?
+- What have we tried already?
+
+#### Step 3: Hypothesis Matrix
+
+Build a structured hypothesis table:
+
+| # | Hypothesis | Likelihood | Supporting Evidence | Contradicting Evidence | Test Method | Time to Test |
+|---|------------|-----------|-------------------|----------------------|-------------|--------------|
+| H1 | [Root cause theory] | High/Med/Low | [Facts supporting this] | [Facts against this] | [How to verify] | [Est. time] |
+| H2 | [Alternative theory] | High/Med/Low | [...] | [...] | [...] | [...] |
+| H3 | [Another theory] | High/Med/Low | [...] | [...] | [...] | [...] |
+
+**Prioritization:**
+- Sort by: Likelihood × Impact / Time to Test
+- Investigate highest priority first
+
+#### Step 4: 5 Whys Analysis (for top hypothesis)
+
+```
+Problem: [Surface symptom]
+  Why? [Immediate cause]
+    Why? [Deeper cause]
+      Why? [Even deeper]
+        Why? [Root cause approaching]
+          Why? [True root cause]
+```
+
+#### Step 5: Decision Point
+
+**IF root cause is clear from analysis:**
+→ Provide solution and route to Developer
+
+**IF root cause requires experimentation:**
+→ Spawn Investigator Agent (see Framework 6)
+
+**IF multiple hypotheses remain equally likely:**
+→ Request Developer run diagnostic tests for elimination
+
+---
+
+### Framework 2: Architectural Decision Analysis
+
+**Use When:**
+- Developer asks "Should we use X or Y?"
+- Choosing between design patterns
+- Technology/library selection
+- Refactoring approach decisions
+
+**Process:**
+
+#### Step 1: Extract Requirements
+
+**INVOKE SKILL:**
+```
+Skill(command: "codebase-analysis")
+```
+*Purpose: Understand current architecture, patterns, and constraints*
+
+**Document:**
+```
+**Decision:** [What we're choosing between]
+**Context:** [Why this decision is needed now]
+**Constraints:**
+  - Technical: [Existing tech stack, dependencies]
+  - Business: [Timeline, budget, team skill]
+  - Quality: [Performance, security, scalability needs]
+**Stakeholders:** [Who cares about this decision]
+```
+
+#### Step 2: Options Analysis
+
+For each option, document:
+
+```
+**Option [N]: [Name]**
+
+**Pros:**
+- [Benefit 1 with evidence]
+- [Benefit 2 with evidence]
+
+**Cons:**
+- [Drawback 1 with evidence]
+- [Drawback 2 with evidence]
+
+**Fits Current Architecture:** [How well? Evidence from codebase-analysis]
+**Team Familiarity:** [High/Medium/Low - check historical usage]
+**Migration Cost:** [Estimated effort]
+**Long-term Maintainability:** [Assessment]
+**Risk Level:** [High/Medium/Low with reasoning]
+```
+
+#### Step 3: Decision Matrix
+
+| Criterion | Weight | Option A Score | Option B Score | Option C Score |
+|-----------|--------|----------------|----------------|----------------|
+| Solves core problem | High (5) | [1-5] × 5 = X | [1-5] × 5 = Y | [1-5] × 5 = Z |
+| Team can implement | High (5) | ... | ... | ... |
+| Fits architecture | High (4) | ... | ... | ... |
+| Low migration cost | Medium (3) | ... | ... | ... |
+| Future flexibility | Medium (2) | ... | ... | ... |
+| **TOTAL** | | **[Sum]** | **[Sum]** | **[Sum]** |
+
+#### Step 4: Recommendation
+
+```
+**Recommended Option:** [Choice]
+
+**Rationale:**
+1. [Primary reason with evidence]
+2. [Secondary reason with evidence]
+3. [Supporting reason with evidence]
+
+**Implementation Plan:**
+1. [First step]
+2. [Second step]
+3. [Validation step]
+
+**Risks & Mitigations:**
+- Risk: [Potential issue] → Mitigation: [How to address]
+- Risk: [Another issue] → Mitigation: [How to address]
+
+**Fallback Plan:** [If this doesn't work, what's Plan B?]
+```
+
+---
+
+### Framework 3: Performance Investigation
+
+**Use When:**
+- Performance regressions
+- Slow endpoints/functions
+- Memory/CPU issues
+- Scalability concerns
+
+**Process:**
+
+#### Step 1: Establish Baseline
+
+**INVOKE SKILLS:**
+```
+Skill(command: "codebase-analysis")  # Find similar performant code
+Skill(command: "pattern-miner")      # Check historical performance issues
+```
+
+**Document:**
+```
+**Metric:** [Response time, memory, CPU, etc.]
+**Current:** [Actual measurement]
+**Expected/Previous:** [Baseline]
+**Regression:** [Difference and %]
+**When Started:** [When did this become slow?]
+```
+
+#### Step 2: Profile Hotspots
+
+**Request Developer provide:**
+- Profiling output (cProfile, flamegraph, etc.)
+- Query execution plans (if DB-related)
+- Network traces (if API-related)
+- Memory snapshots (if memory issue)
+
+**Analyze:**
+```
+**Top 3 Hotspots:**
+1. [Function/Component] - [% of time/memory]
+2. [Function/Component] - [% of time/memory]
+3. [Function/Component] - [% of time/memory]
+
+**Obvious Issues:**
+- [N+1 queries? List them]
+- [Unindexed DB columns? List them]
+- [Blocking I/O? Where?]
+- [Large object creation? What?]
+```
+
+#### Step 3: Hypothesis Generation
+
+| Hypothesis | Evidence | Fix Complexity | Expected Improvement |
+|------------|----------|----------------|---------------------|
+| [Cause 1] | [Why we think this] | High/Med/Low | [% improvement] |
+| [Cause 2] | [...] | [...] | [...] |
+
+#### Step 4: Solution Prioritization
+
+**Quick Wins (implement first):**
+- [Low effort, high impact fixes]
+
+**Strategic Fixes (implement after quick wins):**
+- [Medium effort, medium-high impact]
+
+**Future Optimizations (tech debt):**
+- [High effort, or premature optimization]
+
+---
+
+### Framework 4: Flaky Test Analysis
+
+**Use When:**
+- QA Expert reports FLAKY status
+- Tests pass sometimes, fail sometimes
+- "Works on my machine" issues
+
+**Process:**
+
+#### Step 1: Characterize Flakiness
+
+**INVOKE SKILL:**
+```
+Skill(command: "test-pattern-analysis")
+```
+
+**Document:**
+```
+**Test Name:** [Which test(s)]
+**Failure Rate:** [X out of Y runs fail]
+**Failure Pattern:**
+  - Random? [Truly random or conditions?]
+  - Time-based? [Morning vs evening, day of week?]
+  - Environment? [CI only? Specific OS?]
+  - Load-dependent? [Fails under parallel execution?]
+```
+
+#### Step 2: Common Flakiness Patterns
+
+Check systematically:
+
+```
+**Timing Issues:**
+- [ ] Sleep statements instead of wait-for conditions
+- [ ] Race conditions in async code
+- [ ] Hardcoded timeouts too short
+- [ ] No retry logic for network calls
+
+**State Issues:**
+- [ ] Tests not isolated (shared state)
+- [ ] Missing setup/teardown
+- [ ] Database not reset between tests
+- [ ] Global variables mutated
+
+**Environmental:**
+- [ ] File system dependencies
+- [ ] Network dependencies (external APIs)
+- [ ] Date/time dependencies (hardcoded dates)
+- [ ] Random data without seeding
+
+**Resource Issues:**
+- [ ] Port conflicts
+- [ ] File locks
+- [ ] Database connection pool exhaustion
+- [ ] Memory constraints
+```
+
+#### Step 3: Root Cause Identification
+
+**Use test-pattern-analysis results to find:**
+- Similar patterns in codebase
+- How other tests handle similar scenarios
+- Best practices being violated
+
+#### Step 4: Solution
+
+```
+**Root Cause:** [Specific issue found]
+
+**Fix:**
+```[language]
+[Code showing before/after]
+```
+
+**Validation:**
+- Run test 100 times to verify stability
+- Check no new flakiness introduced
+```
+
+---
+
+### Framework 5: Security Issue Triage
+
+**Use When:**
+- security-scan skill reports vulnerabilities
+- Security-related code changes
+- Authentication/authorization reviews
+
+**Process:**
+
+**Step 1: Review Security Scan Results**
+
+security-scan already ran automatically. Read results:
+```bash
+cat bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
+```
+
+**Step 2: Triage by Severity**
+
+For EACH critical/high severity issue:
+
+```
+**Issue #[N]: [Vulnerability Type]**
+**Location:** [File:line]
+**Severity:** [Critical/High/Medium/Low]
+**Description:** [What the scan found]
+
+**Validation:**
+- Is this a true positive? [Yes/No/Uncertain]
+- Is it exploitable in this context? [Analysis]
+- What's the attack vector? [Scenario]
+
+**If TRUE POSITIVE:**
+  → CHANGES_REQUESTED (block approval)
+  → Provide specific fix
+
+**If FALSE POSITIVE:**
+  → Document why it's safe
+  → Approve with explanation
+
+**If UNCERTAIN:**
+  → Request Developer provide security justification
+  → Or spawn Investigator to analyze
+```
+
+---
+
+### Framework 6: When to Spawn Investigator Agent
+
+**Investigator Agent Triggers:**
+
+Use the Investigator agent when problem meets ≥2 of these criteria:
+
+```
+Complexity Indicators:
+☐ Root cause unclear after initial analysis
+☐ Requires iterative hypothesis testing
+☐ Needs code changes to diagnose (add logging, profiling, etc.)
+☐ Multi-variable problem (A works, B works, A+B fails)
+☐ Environmental differences (prod vs staging vs local)
+☐ Intermittent/non-deterministic
+☐ Performance issue without obvious hotspot
+☐ Would take Developer >2 attempts to solve blindly
+
+Time Indicators:
+☐ Expected investigation time >30 minutes
+☐ Would benefit from systematic elimination
+☐ Historical similar issues took multiple iterations
+
+Value Indicators:
+☐ Blocking multiple developers
+☐ Production issue (high urgency)
+☐ Will teach valuable patterns for future
+```
+
+**If ≥2 boxes checked → Spawn Investigator**
+
+**Spawn Command:**
+```
+Report to Orchestrator:
+
+"This issue requires iterative investigation. Spawning Investigator agent.
+
+**Problem Summary:** [Brief description]
+**Hypotheses to Test:** [Top 3 from analysis]
+**Expected Iterations:** [Estimate: 2-4]
+**Skills Investigator Should Use:** [List relevant skills]
+
+Status: INVESTIGATION_IN_PROGRESS
+Next Step: Orchestrator, please spawn Investigator agent with this context."
+```
+
+---
+
+### Framework Decision Tree (Quick Reference)
+
+```
+Problem arrives at Tech Lead
+│
+├─ Standard code review (no issues) → Existing review workflow → APPROVE
+│
+├─ Clear bug with obvious fix → Standard workflow → CHANGES_REQUESTED
+│
+├─ Architectural question → Framework 2: Decision Analysis
+│
+├─ Performance issue → Framework 3: Performance Investigation
+│  ├─ Hotspot obvious → Solution → CHANGES_REQUESTED
+│  └─ Hotspot unclear → Spawn Investigator
+│
+├─ Flaky test → Framework 4: Flaky Test Analysis
+│  ├─ Pattern clear → Solution → CHANGES_REQUESTED
+│  └─ Pattern unclear → Spawn Investigator
+│
+├─ Security scan flagged → Framework 5: Security Triage
+│
+├─ Complex bug (ambiguous) → Framework 1: Root Cause Analysis
+│  ├─ Root cause identified → Solution → CHANGES_REQUESTED
+│  └─ Needs experimentation → Spawn Investigator
+│
+└─ Meets Investigator criteria (Framework 6) → Spawn Investigator
+```
+
+---
+
 ## Workflow
 
 ### 1. Understand Context
@@ -227,7 +675,64 @@ git checkout <branch_name_from_developer_report>
 
 Verify you're on the correct branch before reviewing code.
 
-### 2. Approval Validation Gate - Reject Estimates 🚨
+### 2. Classify Problem Type (MANDATORY)
+
+**⚠️ NEW STEP: Before proceeding with standard review, classify the problem type to activate appropriate framework.**
+
+**Problem Classification Decision Tree:**
+
+```
+Analyze the issue:
+│
+├─ Standard code review (clear implementation, no issues)
+│  → Continue to Step 3: Standard Review Workflow
+│
+├─ Complex Bug (unclear root cause, ambiguous symptoms)
+│  → ACTIVATE Framework 1: Root Cause Analysis
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Architectural Decision Needed (choosing between approaches)
+│  → ACTIVATE Framework 2: Architectural Decision Analysis
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Performance Regression (slow endpoints, memory issues)
+│  → ACTIVATE Framework 3: Performance Investigation
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Flaky Test (intermittent failures, "works on my machine")
+│  → ACTIVATE Framework 4: Flaky Test Analysis
+│  → Follow framework steps, then continue to Step 3
+│
+├─ Security Scan Findings (vulnerabilities reported)
+│  → ACTIVATE Framework 5: Security Issue Triage
+│  → Follow framework steps, then continue to Step 3
+│
+└─ Meets ≥2 Investigator Criteria (see Framework 6)
+   → REPORT to Orchestrator: INVESTIGATION_IN_PROGRESS
+   → Provide problem summary, hypothesis matrix, suggested skills
+   → DO NOT continue to Step 3 (Orchestrator will spawn Investigator)
+```
+
+**Classification Checklist:**
+
+Check Framework 6 criteria:
+- [ ] Root cause unclear after initial analysis
+- [ ] Requires iterative hypothesis testing
+- [ ] Needs code changes to diagnose (logging, profiling)
+- [ ] Multi-variable problem (A works, B works, A+B fails)
+- [ ] Environmental differences (prod vs staging)
+- [ ] Intermittent/non-deterministic
+- [ ] Performance issue without obvious hotspot
+- [ ] Would take Developer >2 attempts to solve
+
+**If ≥2 boxes checked:** Use Framework 6 (spawn Investigator)
+**If <2 boxes checked:** Use Framework 1-5 as appropriate, or continue to standard workflow
+
+**This classification is MANDATORY. Do not skip this step.**
+
+---
+
+### 3. Approval Validation Gate - Reject Estimates 🚨
 
 **⚠️ CRITICAL**: Before approving, verify Developer provided ACTUAL results, not estimates.
 
