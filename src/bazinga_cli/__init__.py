@@ -3,7 +3,8 @@
 BAZINGA CLI - Multi-Agent Orchestration System for Claude Code
 
 A sophisticated multi-agent orchestration system that coordinates autonomous
-development teams including Project Manager, Developers, QA Expert, and Tech Lead.
+development teams including Project Manager, Developers, QA Expert, Tech Lead,
+Investigator, and Requirements Engineer.
 """
 
 import os
@@ -944,7 +945,7 @@ def init(
     Initialize a new BAZINGA project with multi-agent orchestration.
 
     This will set up the complete multi-agent system including:
-    - Agent definitions (orchestrator, PM, developer, QA, tech lead)
+    - Agent definitions (orchestrator, PM, developer, QA, tech lead, investigator, requirements engineer)
     - Initialization scripts
     - Configuration files
     - Coordination state files
@@ -1186,6 +1187,7 @@ def init(
 
     bazinga_commands = "[bold]BAZINGA Commands:[/bold]\n"
     bazinga_commands += "[dim]  • /bazinga.orchestrate           (start orchestration)\n"
+    bazinga_commands += "  • /bazinga.orchestrate-advanced  (with requirements discovery)\n"
     bazinga_commands += "  • /bazinga.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
     bazinga_commands += "[dim]Customize:\n"
     bazinga_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
@@ -1218,7 +1220,7 @@ def init(
     console.print("\n[bold]Installed structure:[/bold]")
     tree = Table.grid(padding=(0, 2))
     tree.add_row("📁", ".claude/")
-    tree.add_row("  ", "├── agents/      [dim](orchestrator, PM, dev, QA, tech lead)[/dim]")
+    tree.add_row("  ", "├── agents/      [dim](7 agents: orchestrator, PM, dev, QA, tech lead, investigator, req engineer)[/dim]")
     tree.add_row("  ", "├── commands/    [dim](slash commands)[/dim]")
     tree.add_row("  ", "├── scripts/     [dim](initialization scripts)[/dim]")
     tree.add_row("  ", "└── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
@@ -1278,6 +1280,8 @@ def check():
             "developer.md",
             "qa_expert.md",
             "techlead.md",
+            "investigator.md",
+            "requirements_engineer.md",
         ]
         missing_agents = [
             agent for agent in required_agents if not (agents_dir / agent).exists()
@@ -1288,7 +1292,7 @@ def check():
                 ("Agent Files", False, f"Missing: {', '.join(missing_agents)}")
             )
         else:
-            checks.append(("Agent Files", True, "All 5 agents present"))
+            checks.append(("Agent Files", True, "All 7 agents present"))
 
         if bazinga_dir.exists():
             checks.append(("Coordination Files", True, "Initialized"))
@@ -1987,7 +1991,8 @@ def main_callback(
     BAZINGA - Multi-Agent Orchestration System for Claude Code.
 
     A sophisticated multi-agent system coordinating autonomous development teams
-    including Project Manager, Developers, QA Expert, and Tech Lead agents.
+    including Project Manager, Developers, QA Expert, Tech Lead, Investigator,
+    and Requirements Engineer agents.
     """
     if version_flag:
         console.print(f"[bold]BAZINGA CLI[/bold] version [cyan]{__version__}[/cyan]")

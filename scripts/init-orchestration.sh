@@ -162,7 +162,10 @@ if [ ! -f "bazinga/skills_config.json" ]; then
   "tech_lead": {
     "security-scan": "mandatory",
     "lint-check": "mandatory",
-    "test-coverage": "mandatory"
+    "test-coverage": "mandatory",
+    "codebase-analysis": "disabled",
+    "pattern-miner": "disabled",
+    "test-pattern-analysis": "disabled"
   },
   "qa_expert": {
     "pattern-miner": "disabled",
@@ -170,6 +173,12 @@ if [ ! -f "bazinga/skills_config.json" ]; then
   },
   "pm": {
     "velocity-tracker": "disabled"
+  },
+  "investigator": {
+    "codebase-analysis": "mandatory",
+    "pattern-miner": "mandatory",
+    "test-pattern-analysis": "disabled",
+    "security-scan": "disabled"
   },
   "dashboard": {
     "dashboard_ai_diagram_enabled": false
