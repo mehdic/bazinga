@@ -1368,9 +1368,27 @@ investigation_state.current_iteration += 1
 
 ##### Iteration Step 1: Spawn Investigator
 
-**Build Investigator Prompt:**
+**1. Check skills_config.json for investigator skills:**
 
-Read `agents/investigator.md` and prepend session context:
+From the skills_config.json you loaded during initialization, identify which investigator skills have status = "mandatory" or "optional":
+
+```
+Investigator Skills Status:
+- codebase-analysis: [mandatory/optional/disabled]
+- pattern-miner: [mandatory/optional/disabled]
+- test-pattern-analysis: [mandatory/optional/disabled]
+- security-scan: [mandatory/optional/disabled]
+```
+
+**2. Build Investigator Prompt:**
+
+Read `agents/investigator.md` and build prompt with these sections in order:
+
+A) **Investigation Context** (session state)
+B) **Skills Section** (mandatory + optional from config)
+C) **Rest of agents/investigator.md content**
+
+**Section A - Investigation Context:**
 
 ```
 ---
@@ -1386,24 +1404,67 @@ Problem Summary: [investigation_state.problem_summary]
 
 Initial Hypothesis Matrix: [investigation_state.hypothesis_matrix]
 
-Skills You Should Use: [investigation_state.suggested_skills]
-
 Previous Iteration Results (if iteration > 1):
 [investigation_state.iterations_log[previous iterations]]
 
 Developer Results from Previous Iteration (if available):
 [investigation_state.developer_results]
 ---
-
-[REST OF agents/investigator.md content]
 ```
 
-**Spawn Investigator:**
+**Section B - Skills Injection:**
+
+**3. For EACH mandatory skill, add to prompt:**
+
+```
+⚡ ADVANCED SKILLS ACTIVE
+
+You have access to the following mandatory Skills:
+
+[FOR EACH skill where status = "mandatory"]:
+X. **[Skill Name]**: [Description]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+
+Examples:
+- **Codebase Analysis**: Analyze codebase for similar patterns
+- **Pattern Miner**: Historical pattern analysis
+
+USE THESE SKILLS - They are MANDATORY for every investigation!
+```
+
+**3b. For EACH optional skill, add to prompt:**
+
+```
+⚡ OPTIONAL SKILLS AVAILABLE
+
+The following Skills are available for use when needed:
+
+[FOR EACH skill where status = "optional"]:
+X. **[Skill Name]**: Use when [CONDITION]
+   Skill(command: "[skill-name]")
+   See: .claude/skills/[skill-name]/SKILL.md for details
+   When to use: [Context-specific guidance]
+
+Examples:
+- **Test Pattern Analysis**: Use when investigating test-related issues or flaky tests
+- **Security Scan**: Use when hypothesis involves security vulnerabilities
+
+These are OPTIONAL - invoke only when investigation requires them.
+```
+
+**Section C - Rest of investigator.md:**
+
+```
+[REST OF agents/investigator.md content starting from "## Your Role" section]
+```
+
+**4. Spawn Investigator:**
 ```
 Task(
   subagent_type: "general-purpose",
   description: "Investigator iteration [N]",
-  prompt: [Investigator prompt built above]
+  prompt: [Investigator prompt built above with sections A + B + C]
 )
 ```
 

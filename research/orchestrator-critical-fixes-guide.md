@@ -30,6 +30,7 @@ Optional skills support has been implemented in orchestrator. Remaining fixes ad
    - Updated Developer prompt building (Step 2A.2) to check for "optional" status
    - Updated QA Expert prompt building (Step 2A.4) to check for "optional" status
    - Updated Tech Lead prompt building (Step 2A.6) to check for "optional" status
+   - **Updated Investigator prompt building (Step 2A.6b) to check for "optional" status** ✅ NEW
    - Added "3b. For EACH optional skill" sections after mandatory skills
    - Optional skills are injected with clear "OPTIONAL SKILLS AVAILABLE" header
    - Tech Lead optional skills include framework guidance (when to use which skill)
@@ -42,6 +43,11 @@ Optional skills support has been implemented in orchestrator. Remaining fixes ad
   - codebase-analysis: Frameworks 1, 2, 3 (Root Cause, Architectural Decisions, Performance)
   - pattern-miner: Frameworks 1, 3 (Root Cause, Performance - historical patterns)
   - test-pattern-analysis: Framework 4 (Flaky Test Analysis)
+- **Investigator optional skills**: Available during investigation loops ✅ NEW
+  - codebase-analysis: MANDATORY (always injected)
+  - pattern-miner: MANDATORY (always injected)
+  - test-pattern-analysis: OPTIONAL (test-related investigations)
+  - security-scan: OPTIONAL (security-related hypotheses)
 
 **How It Works:**
 1. Orchestrator reads skills_config.json during initialization
@@ -49,6 +55,7 @@ Optional skills support has been implemented in orchestrator. Remaining fixes ad
 3. Mandatory skills: Injected with "USE THESE SKILLS - They are MANDATORY!"
 4. Optional skills: Injected with "These are OPTIONAL - invoke only when [condition]"
 5. Agent receives both sets in prompt, knows which are mandatory and which are optional
+6. **Investigator receives skills dynamically from config (not from Tech Lead's suggested_skills)** ✅ NEW
 
 ## Fixes Needed in Orchestrator 🚧
 
