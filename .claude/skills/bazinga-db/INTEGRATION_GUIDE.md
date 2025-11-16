@@ -144,7 +144,7 @@ Bazinga-DB skill:
 
 ### Input Validation
 - `session_id`: Must be non-empty string
-- `agent_type`: Must be one of: `pm`, `developer`, `qa`, `tech_lead`, `orchestrator`
+- `agent_type`: Must be one of: `pm`, `developer`, `qa_expert`, `techlead`, `orchestrator`
 - `content`: Must be non-empty string (the agent response)
 - `iteration`: Optional integer
 - `agent_id`: Optional string
@@ -209,6 +209,33 @@ conn.close()
 ```
 
 ## Migration Path
+
+### For Existing Databases with Schema Inconsistency
+
+**Issue:** Some existing databases may have an older CHECK constraint that uses:
+- `'qa'` instead of `'qa_expert'`
+- `'tech_lead'` instead of `'techlead'`
+
+This causes errors like:
+```
+CHECK constraint failed: agent_type IN ('pm', 'developer', 'qa', 'tech_lead', 'orchestrator')
+```
+
+**Solution:** Run the migration script to update your database:
+
+```bash
+python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/migrate_agent_types.py \
+  /home/user/bazinga/bazinga/bazinga.db
+```
+
+This will:
+1. Update all existing `'qa'` records to `'qa_expert'`
+2. Update all existing `'tech_lead'` records to `'techlead'`
+3. Recreate the `orchestration_logs` table with the correct CHECK constraint
+4. Preserve all your existing data
+5. Recreate all indexes
+
+**Verification:** The script automatically verifies the migration completed successfully.
 
 ### For Existing Orchestrations
 
