@@ -63,6 +63,22 @@ That's it. No configuration needed. BAZINGA automatically:
 - ✅ Reviews code quality with Tech Lead
 - ✅ Escalates to more powerful models (Opus) for difficult problems
 
+### Advanced Mode (Optional)
+
+For complex or ambiguous requests, use the enhanced orchestration command:
+
+```bash
+/bazinga.orchestrate-advanced "improve our authentication system"
+```
+
+**What it does:**
+1. **Clarifies** ambiguous requests through interactive Q&A
+2. **Discovers** existing codebase infrastructure and patterns
+3. **Assesses** complexity, risks, and parallelization opportunities
+4. **Structures** enhanced requirements for the PM
+
+This adds 2-4 minutes upfront but provides better decisions, fewer revisions, and prevents issues by identifying risks early. Use for complex features, new architecture, or unclear requirements.
+
 ---
 
 ## How It Works
