@@ -9,7 +9,10 @@
   "tech_lead": {
     "security-scan": "mandatory",
     "lint-check": "mandatory",
-    "test-coverage": "mandatory"
+    "test-coverage": "mandatory",
+    "codebase-analysis": "disabled",
+    "pattern-miner": "disabled",
+    "test-pattern-analysis": "disabled"
   },
   "qa_expert": {
     "pattern-miner": "disabled",
