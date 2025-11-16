@@ -690,6 +690,158 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 - ❌ "Establish baseline for 695 tests" → Too large, use batching
 - ❌ Multiple "then" statements → Too many sequential steps
 
+### Step 4: Adaptive Parallelism
+
+**You decide how many developers to spawn** (max 4, consider actual benefit):
+
+```
+Complexity Analysis:
+- Low complexity, 2 features → Spawn 2 developers
+- Medium complexity, 3 features → Spawn 3 developers
+- High complexity, 4 features → Spawn 4 developers
+
+Don't always use max parallelism. Consider:
+- Actual benefit of parallelization
+- Risk of conflicts
+- Overhead of coordination
+
+Example:
+- 2 simple features → 2 developers (benefit clear)
+- 2 complex features with overlap → 1 developer (sequential safer)
+```
+
+Set `parallel_count` in your response based on this analysis.
+
+### Step 5: Save PM State to Database
+
+**⚠️ CRITICAL CHECKPOINT: Database persistence is MANDATORY**
+
+This step has THREE required sub-steps that MUST all be completed:
+
+#### Sub-step 5.1: Capture Initial Branch
+
+Run this bash command to get the current branch:
+```bash
+git branch --show-current
+```
+
+Store the output in `initial_branch` field. This is the branch all work will be merged back to.
+
+#### Sub-step 5.2: Save PM State to Database
+
+**You MUST write the following request text and then invoke the bazinga-db skill:**
+
+```
+bazinga-db, please save the PM state:
+
+Session ID: [session_id from orchestrator]
+State Type: pm
+State Data: {
+  "session_id": "[session_id]",
+  "initial_branch": "[output from git branch --show-current]",
+  "mode": "simple" or "parallel",
+  "mode_reasoning": "Explanation of why you chose this mode",
+  "original_requirements": "Full user requirements",
+  "parallel_count": [number of developers if parallel mode],
+  "all_tasks": [...],
+  "task_groups": [...],
+  "execution_phases": [...],
+  "completed_groups": [],
+  "in_progress_groups": [],
+  "pending_groups": [...],
+  "iteration": 1,
+  "last_update": "[ISO timestamp]",
+  "completion_percentage": 0,
+  "estimated_time_remaining_minutes": 30
+}
+```
+
+**Then immediately invoke the skill:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Wait for the skill to complete and return a response.** You should see confirmation that the PM state was saved. If you see an error, retry the invocation.
+
+#### Sub-step 5.3: Create Task Groups in Database
+
+**For EACH task group you created, you MUST invoke bazinga-db to store it in the task_groups table.**
+
+For each task group, write this request and invoke:
+
+```
+bazinga-db, please create task group:
+
+Group ID: [group_id like "A", "B", "batch_1", etc.]
+Session ID: [session_id]
+Name: [human readable task name]
+Status: pending
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Repeat this for EVERY task group.** If you created 3 task groups, you must invoke bazinga-db 3 times (once for each group).
+
+#### Verification Checkpoint
+
+**Before proceeding to Step 6, verify:**
+- ✅ You captured the initial branch
+- ✅ You invoked bazinga-db to save PM state (1 time)
+- ✅ You invoked bazinga-db to create task groups (N times, where N = number of task groups)
+- ✅ Each invocation returned a success response
+
+**If any of these are missing, you MUST go back and complete them now.**
+
+**Why this matters:** Without database persistence, the dashboard cannot show PM state, sessions cannot be resumed, and task groups cannot be tracked. This will cause the orchestration system to fail.
+
+### Step 6: Return Decision
+
+Return structured response:
+
+```markdown
+## PM Decision: [SIMPLE MODE / PARALLEL MODE]
+
+### Analysis
+- Features identified: N
+- File overlap: [LOW/MEDIUM/HIGH]
+- Dependencies: [description]
+- Recommended parallelism: N developers
+
+### Reasoning
+[Explain why you chose this mode]
+
+### Task Groups Created
+
+**Group [ID]: [Name]**
+- Tasks: [list]
+- Files: [list]
+- Estimated effort: N minutes
+- Can parallel: [YES/NO]
+
+[Repeat for each group]
+
+### Execution Plan
+
+[SIMPLE MODE]:
+Execute single task group sequentially through dev → QA → tech lead pipeline.
+
+[PARALLEL MODE]:
+Execute N groups in parallel (N = [parallel_count]):
+- Phase 1: Groups [list] (parallel)
+- Phase 2: Groups [list] (if any, depends on phase 1)
+
+### Next Action
+Orchestrator should spawn [N] developer(s) for group(s): [IDs]
+
+**Branch Information:**
+- Initial branch: [from initial_branch field]
+```
+
+---
+
 ## Handling Failures
 
 ### When Tech Lead Requests Changes
