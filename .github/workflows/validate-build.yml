@@ -1,0 +1,70 @@
+name: Validate Build Artifacts
+
+on:
+  pull_request:
+    paths:
+      - 'agents/orchestrator.md'
+      - '.claude/commands/bazinga.orchestrate.md'
+      - 'scripts/build-slash-commands.sh'
+  push:
+    branches:
+      - main
+    paths:
+      - 'agents/orchestrator.md'
+      - '.claude/commands/bazinga.orchestrate.md'
+      - 'scripts/build-slash-commands.sh'
+
+jobs:
+  validate-build:
+    name: Validate Generated Slash Commands
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build slash commands
+        run: |
+          echo "🔨 Running build script..."
+          ./scripts/build-slash-commands.sh
+
+      - name: Check for differences
+        run: |
+          echo "📋 Checking if generated files match committed versions..."
+
+          if ! git diff --exit-code .claude/commands/bazinga.orchestrate.md; then
+            echo ""
+            echo "❌ ERROR: Generated file differs from committed version"
+            echo ""
+            echo "The slash command file is out of sync with the agent source."
+            echo ""
+            echo "To fix this:"
+            echo "  1. Run: ./scripts/build-slash-commands.sh"
+            echo "  2. Commit the updated file"
+            echo ""
+            echo "OR install the pre-commit hook to automate this:"
+            echo "  ./scripts/install-hooks.sh"
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ Build artifacts are in sync"
+
+      - name: Verify build script works
+        run: |
+          echo "🧪 Testing build script idempotency..."
+
+          # Run build twice and ensure output is identical
+          ./scripts/build-slash-commands.sh > /dev/null
+          cp .claude/commands/bazinga.orchestrate.md /tmp/first-build.md
+
+          ./scripts/build-slash-commands.sh > /dev/null
+          cp .claude/commands/bazinga.orchestrate.md /tmp/second-build.md
+
+          if ! diff -q /tmp/first-build.md /tmp/second-build.md; then
+            echo "❌ ERROR: Build script is not idempotent"
+            echo "Running the build twice produced different outputs"
+            exit 1
+          fi
+
+          echo "✅ Build script is idempotent"

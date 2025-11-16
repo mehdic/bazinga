@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# Pre-commit hook to rebuild slash commands from agent source files
+# Ensures .claude/commands/ files stay in sync with agents/ source files
+
+# Get list of staged files
+STAGED_FILES=$(git diff --cached --name-only)
+
+# Check if orchestrator agent was modified
+if echo "$STAGED_FILES" | grep -q "^agents/orchestrator\.md$"; then
+    echo "🔨 Detected changes to agents/orchestrator.md"
+    echo "   Rebuilding slash commands..."
+
+    # Run build script
+    if ! ./scripts/build-slash-commands.sh; then
+        echo "❌ ERROR: Failed to build slash commands"
+        exit 1
+    fi
+
+    # Stage the generated file
+    git add .claude/commands/bazinga.orchestrate.md
+
+    echo "   ✅ Slash command rebuilt and staged"
+fi
+
+# Allow commit to proceed
+exit 0

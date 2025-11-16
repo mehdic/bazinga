@@ -4,6 +4,20 @@ Thank you for your interest in contributing to BAZINGA! This document provides g
 
 ---
 
+## First-Time Setup
+
+After cloning the repository, you **must** install git hooks to enable automatic build processes:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+This installs the pre-commit hook that automatically rebuilds slash commands when you modify agent source files.
+
+**⚠️ Without this step:** Your commits won't automatically sync `agents/orchestrator.md` with `.claude/commands/bazinga.orchestrate.md`, causing inconsistencies.
+
+---
+
 ## Development Workflow
 
 ### Modifying the Orchestrator
