@@ -131,6 +131,10 @@ Your workflow:
 
 ### Available Skills
 
+The Orchestrator provides you with skills based on `bazinga/skills_config.json`:
+
+**Mandatory Skills (ALWAYS use before approving):**
+
 1. **security-scan** - Security vulnerability detection
    - Automatically runs in basic (fast) or advanced (comprehensive) mode
    - Results: `bazinga/security_scan.json`
@@ -142,6 +146,20 @@ Your workflow:
 3. **lint-check** - Code quality linting
    - Style, complexity, best practices
    - Results: `bazinga/lint_results.json`
+
+**Optional Skills (USE in specific frameworks):**
+
+4. **codebase-analysis** - Find similar code patterns and architectural context
+   - **When to use:** Framework 1 (Root Cause), Framework 2 (Architecture), Framework 3 (Performance)
+   - Results: `bazinga/codebase_analysis.json`
+
+5. **pattern-miner** - Historical pattern analysis
+   - **When to use:** Framework 1 (Root Cause), Framework 3 (Performance patterns)
+   - Results: `bazinga/pattern_insights.json`
+
+6. **test-pattern-analysis** - Test pattern learning
+   - **When to use:** Framework 4 (Flaky Test Analysis)
+   - Results: `bazinga/test_patterns.json`
 
 ### Reading Skill Results
 

@@ -109,11 +109,16 @@ STEP 3: Return Action with Status Code
 
 ## Your Tools & Skills
 
-### Mandatory Skills Integration
+### Skills Available to You
 
-**You MUST use Skills strategically:**
+The Orchestrator will provide you with skills based on `bazinga/skills_config.json`:
+- **MANDATORY**: You MUST use these skills (⚡ ADVANCED SKILLS ACTIVE)
+- **OPTIONAL**: You CAN use if investigation needs them (⚡ OPTIONAL SKILLS AVAILABLE)
+- **DISABLED**: Not available
 
-1. **codebase-analysis** - INVOKE when:
+**Mandatory Skills (ALWAYS use):**
+
+1. **codebase-analysis** - INVOKE strategically when:
    - Need to find similar code patterns
    - Looking for how similar problems are solved
    - Understanding architectural context
@@ -121,7 +126,7 @@ STEP 3: Return Action with Status Code
    Skill(command: "codebase-analysis")
    ```
 
-2. **pattern-miner** - INVOKE when:
+2. **pattern-miner** - INVOKE strategically when:
    - Historical context would help
    - Similar issues might exist in past
    - Looking for recurring patterns
@@ -129,17 +134,22 @@ STEP 3: Return Action with Status Code
    Skill(command: "pattern-miner")
    ```
 
+**Optional Skills (USE if needed for investigation):**
+
 3. **test-pattern-analysis** - INVOKE when:
    - Test-related investigation
    - Understanding test patterns
    - Finding test anti-patterns
+   - Investigating flaky tests
    ```
    Skill(command: "test-pattern-analysis")
    ```
 
 4. **security-scan** - INVOKE when:
    - Security implications of hypothesis
+   - Investigating security-related bugs
    - Checking if fix introduces vulnerabilities
+   - Root cause might be security issue
    ```
    Skill(command: "security-scan")
    ```

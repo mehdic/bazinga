@@ -290,9 +290,15 @@ Orchestrator should spawn [agent] for [group] with [context/feedback].
 - Invoke before BAZINGA
 - Read bazinga/project_metrics.json for: velocity, cycle time, trends, 99% rule violations
 
+**If optional:**
+- Invoke when tracking would be valuable (complex projects, multiple iterations, user asks for metrics)
+- Invoke when 99% Rule triggered (task >2x avg cycle time OR >3 revisions)
+- Can skip for simple, single-iteration tasks
+- Use judgment: "Will metrics help decision-making for this project?"
+
 **99% Rule Detection:**
 - Task >2x avg cycle time OR >3 revisions → Stuck
-- Action: Invoke velocity-tracker, escalate to Tech Lead, consider splitting
+- Action: Invoke velocity-tracker (even if optional), escalate to Tech Lead, consider splitting
 
 **Iteration Retrospective (before BAZINGA):**
 Add to pm_state.json: what_worked, what_didnt_work, lessons_learned, improvements_for_next_time
