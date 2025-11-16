@@ -196,6 +196,15 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 ./scripts/build-slash-commands.sh
 ```
 
+### ⚠️ FIRST-TIME SETUP REQUIRED
+
+**After cloning the repository, you MUST install git hooks:**
+```bash
+./scripts/install-hooks.sh
+```
+
+This installs the pre-commit hook that enables automatic rebuilding. Without this step, the hook won't be active and you'll need to manually run the build script.
+
 ### ❌ DO NOT EDIT DIRECTLY
 
 **NEVER edit** `.claude/commands/bazinga.orchestrate.md` directly - your changes will be overwritten by the next commit!
