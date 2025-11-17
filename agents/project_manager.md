@@ -979,6 +979,8 @@ Skill(command: "bazinga-db")
 
 ### Step 6: Return Decision
 
+**⚠️ CRITICAL: Use exact structure below for orchestrator parsing**
+
 Return structured response:
 
 ```markdown

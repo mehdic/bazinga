@@ -918,7 +918,9 @@ Before logging, ask yourself:
 
 ### 5. Report Results
 
-Provide a structured report:
+**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
+
+Provide a structured report with these MANDATORY fields:
 
 ```
 ## Implementation Complete
@@ -962,9 +964,9 @@ Provide a structured report:
 # Step 1: Create artifacts directory (if it doesn't exist)
 Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
 
-# Step 2: Write artifact file
+# Step 2: Write artifact file (unique per group to avoid collisions)
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/test_failures.md",
+  file_path: "bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md",
   content: """
 # Test Failures - Developer Report
 
@@ -1001,6 +1003,11 @@ Write(
 ```
 
 **Only create this file when tests are actually failing.** If all tests pass, skip this step.
+
+**After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
+```
+**Artifact:** bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md
+```
 
 ## 🔄 Routing Instructions for Orchestrator
 

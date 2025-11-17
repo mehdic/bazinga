@@ -907,6 +907,8 @@ Give specific, actionable guidance with:
 
 ## Review Report Format
 
+**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
+
 ### When Approving
 
 ```

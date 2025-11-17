@@ -627,9 +627,14 @@ Operation → Check result → If error: Output capsule with error
 - **Audit Trail** depends on all interactions being logged
 - **Metrics** need state snapshots to calculate velocity and performance
 
-### Verification
+### Verification & Error Handling
 
-After each bazinga-db skill invocation, you should see a confirmation response. If you don't see confirmation or see an error, retry the invocation before proceeding.
+**For initialization operations (Steps 1-3 above):**
+- If bazinga-db fails: Output error capsule per §Error Handling and cannot proceed
+
+**For workflow logging (Steps 4-7 above):**
+- If bazinga-db fails: Log warning but continue workflow (don't block on logging failure)
+- Note: Logging failures may prevent session resume, but shouldn't stop current orchestration
 
 ---
 
@@ -1797,7 +1802,7 @@ IF status = PASS:
 IF status = FAIL:
   → Use "QA Tests Failing" template:
   ```
-  ⚠️ Group {id} QA failed | {failed_count}/{total} tests failing ({failure_summary}) | Developer fixing → See artifacts/{SESSION_ID}/qa_failures.md
+  ⚠️ Group {id} QA failed | {failed_count}/{total} tests failing ({failure_summary}) | Developer fixing → See artifacts/{SESSION_ID}/qa_failures_group_{id}.md
   ```
 
 IF status = BLOCKED:
@@ -2839,7 +2844,7 @@ The routing chain for each group is:
 
    **Construct and output capsule:**
    - PASS: `✅ Group {id} tests passing | {tests}, {coverage}%, {quality} | Approved → Tech lead`
-   - FAIL: `⚠️ Group {id} QA failed | {failures} | Developer fixing → See artifacts/{SESSION_ID}/qa_failures.md`
+   - FAIL: `⚠️ Group {id} QA failed | {failures} | Developer fixing → See artifacts/{SESSION_ID}/qa_failures_group_{id}.md`
 
    **Step 2: Log QA response:**
    ```

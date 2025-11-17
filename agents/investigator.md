@@ -831,6 +831,11 @@ Write(
 
 **Create this file whenever investigation completes** (whether root cause found or not).
 
+**After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
+```
+**Artifact:** bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+```
+
 ## Investigation Limits
 
 **Stop investigating and report if:**

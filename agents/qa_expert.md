@@ -664,9 +664,9 @@ After fixes, QA will retest.
 # Step 1: Create artifacts directory (if it doesn't exist)
 Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
 
-# Step 2: Write artifact file
+# Step 2: Write artifact file (unique per group to avoid collisions)
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/qa_failures.md",
+  file_path: "bazinga/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md",
   content: """
 # QA Test Failures
 
@@ -715,6 +715,11 @@ Write(
 ```
 
 **Only create this file when tests are actually failing.** If all tests pass, skip this step.
+
+**After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
+```
+**Artifact:** bazinga/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md
+```
 
 ---
 
@@ -877,7 +882,9 @@ When tests fail, provide:
 
 ## Output Format
 
-Always use this structure:
+**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
+
+Always use this structure with MANDATORY fields:
 
 ```markdown
 ## QA Expert: Test Results - [PASS / FAIL / BLOCKED / FLAKY]
