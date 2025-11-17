@@ -1075,6 +1075,8 @@ Display:
    - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
    - (If successful or unknown: silent, no output)
 
+   **AFTER build baseline check: IMMEDIATELY continue to step 6 (Start dashboard). Do NOT stop.**
+
 6. **Start dashboard if not running:**
 
    ```bash
@@ -1089,9 +1091,9 @@ Display:
    fi
    ```
 
-   (Process silently - dashboard is background infrastructure, no user output needed)
+   **Note:** Process dashboard startup silently - dashboard is background infrastructure, no user output needed.
 
-**Note:** Initialization is complete when session ID is displayed. No additional "ready" message needed.
+   **AFTER dashboard check/start: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
 
 **Database Storage:**
 
