@@ -247,7 +247,7 @@ cp coordination/templates/*.md bazinga/templates/
 
 **Migration Path for Existing Users:**
 ```bash
-# After updating bazinga CLI
+# After updating Bazinga CLI
 cd your-project
 bazinga update  # Will copy templates to bazinga/templates/
 ```
