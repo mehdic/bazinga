@@ -35,7 +35,7 @@ The user's message to you contains their requirements for this orchestration tas
 
 **MANDATORY: Use Compact Progress Capsule Format**
 
-All user-visible updates MUST use the capsule format defined in `coordination/templates/message_templates.md`:
+All user-visible updates MUST use the capsule format defined in `bazinga/templates/message_templates.md`:
 
 ```
 [Emoji] [Action/Phase] | [Key Observation] | [Decision/Outcome] → [Next Step]
@@ -60,7 +60,7 @@ All user-visible updates MUST use the capsule format defined in `coordination/te
 ✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
 ```
 
-**Reference:** See `coordination/templates/message_templates.md` for complete template catalog.
+**Reference:** See `bazinga/templates/message_templates.md` for complete template catalog.
 
 **Summary vs Artifact Separation:**
 

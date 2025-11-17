@@ -248,6 +248,46 @@ class BazingaSetup:
 
         return copied_count > 0
 
+    def copy_templates(self, target_dir: Path) -> bool:
+        """
+        Copy coordination templates to target bazinga/templates directory.
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if templates were copied successfully, False otherwise
+        """
+        templates_dir = target_dir / "bazinga" / "templates"
+        templates_dir.mkdir(parents=True, exist_ok=True)
+
+        source_templates = self.source_dir / "bazinga" / "templates"
+        if not source_templates.exists():
+            # Fallback to coordination/templates if bazinga/templates doesn't exist
+            source_templates = self.source_dir / "coordination" / "templates"
+            if not source_templates.exists():
+                console.print("[yellow]⚠️  No templates found in source[/yellow]")
+                return False
+
+        copied_count = 0
+        for template_file in source_templates.glob("*.md"):
+            try:
+                # SECURITY: Validate filename doesn't contain path traversal
+                safe_filename = PathValidator.validate_filename(template_file.name)
+                dest = templates_dir / safe_filename
+
+                # SECURITY: Ensure destination is within templates_dir
+                PathValidator.ensure_within_directory(dest, templates_dir)
+
+                shutil.copy2(template_file, dest)
+                console.print(f"  ✓ Copied {safe_filename}")
+                copied_count += 1
+            except SecurityError as e:
+                console.print(f"[red]✗ Skipping unsafe file {template_file.name}: {e}[/red]")
+                continue
+
+        return copied_count > 0
+
     def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:
         """
         Setup global configuration, merging with existing .claude.md if present.
@@ -1087,7 +1127,11 @@ def init(
         else:
             console.print("  [yellow]⚠️  Dashboard not found in source[/yellow]")
 
-        console.print("\n[bold cyan]7. Initializing coordination files[/bold cyan]")
+        console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
+        if not setup.copy_templates(target_dir):
+            console.print("[yellow]⚠️  No templates found[/yellow]")
+
+        console.print("\n[bold cyan]8. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
         # Update testing configuration if not default
@@ -1156,12 +1200,12 @@ def init(
         install_analysis_tools(target_dir, detected_language, force)
 
     # Install dashboard dependencies
-    console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
+    console.print("\n[bold cyan]9. Installing dashboard dependencies[/bold cyan]")
     install_dashboard_dependencies(target_dir, force)
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
-        console.print("\n[bold cyan]9. Initializing git repository[/bold cyan]")
+        console.print("\n[bold cyan]10. Initializing git repository[/bold cyan]")
         try:
             subprocess.run(
                 ["git", "init"],
@@ -1741,8 +1785,15 @@ def update(
     else:
         console.print("  [yellow]⚠️  Dashboard not found in source[/yellow]")
 
+    # Update templates
+    console.print("\n[bold cyan]7. Updating templates[/bold cyan]")
+    if setup.copy_templates(target_dir):
+        console.print("  [green]✓ Templates updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  No templates found[/yellow]")
+
     # Update dashboard dependencies
-    console.print("\n[bold cyan]7. Installing dashboard dependencies[/bold cyan]")
+    console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
     install_dashboard_dependencies(target_dir, force)
 
     # Success message
