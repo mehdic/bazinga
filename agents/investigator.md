@@ -765,6 +765,69 @@ Skill(command: "bazinga-db")
 **Next Step:** Tech Lead should validate findings and route to Developer for fix
 ```
 
+### 4.1. Artifact Writing for Investigation Reports
+
+**After completing investigation**, write a detailed artifact file for orchestrator reference:
+
+```bash
+# Create artifact file at: bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md",
+  content: """
+# Investigation Report - Group {GROUP_ID}
+
+**Session:** {SESSION_ID}
+**Group:** {GROUP_ID}
+**Date:** {TIMESTAMP}
+**Total Iterations:** {N}
+**Status:** {ROOT_CAUSE_FOUND|INCOMPLETE|BLOCKED|EXHAUSTED}
+
+## Problem Statement
+{Original issue from Tech Lead}
+
+## Root Cause
+{What you found - detailed explanation}
+
+**Confidence Level:** {High/Medium/Low} ({percentage}%)
+
+## Investigation Path
+
+### Iteration 1
+- **Hypothesis Tested:** {H1}
+- **Action Taken:** {what you did}
+- **Result:** {what happened}
+- **Conclusion:** {eliminated/confirmed/inconclusive}
+
+### Iteration 2
+- **Hypothesis Tested:** {H2}
+- **Action Taken:** {what you did}
+- **Result:** {what happened}
+- **Conclusion:** {eliminated/confirmed/inconclusive}
+
+{Continue for all iterations}
+
+## Evidence
+{Compelling proof - logs, test results, measurements}
+
+## Recommended Fix
+{Specific solution with code examples or approach}
+
+## Additional Insights
+{Patterns learned, similar issues to watch for}
+
+## Skills Used
+- **codebase-analysis:** {findings}
+- **pattern-miner:** {findings}
+- {other skills}: {findings}
+
+## Next Steps
+{What should happen next - usually Developer implements fix}
+"""
+)
+```
+
+**Create this file whenever investigation completes** (whether root cause found or not).
+
 ## Investigation Limits
 
 **Stop investigating and report if:**

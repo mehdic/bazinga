@@ -656,6 +656,63 @@ Tests FAILED for Group [ID]: [Name]
 After fixes, QA will retest.
 ```
 
+### 4.1. Artifact Writing for QA Failures
+
+**If any tests fail**, write a detailed artifact file for orchestrator reference:
+
+```bash
+# Create artifact file at: bazinga/artifacts/{SESSION_ID}/qa_failures.md
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/qa_failures.md",
+  content: """
+# QA Test Failures
+
+**Session:** {SESSION_ID}
+**Group:** {GROUP_ID}
+**Date:** {TIMESTAMP}
+
+## Summary
+{Total tests run}, {count} failures across integration/contract/E2E tests
+
+## Failed Tests
+
+### Integration Failures
+
+#### {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Impact:** {Critical/High/Medium}
+- **Fix Required:** {specific fix needed}
+
+### Contract Failures
+
+#### {contract_name}
+- **Location:** {file}:{line}
+- **Error:** {violation description}
+- **Impact:** {Critical/High/Medium}
+- **Fix Required:** {specific fix needed}
+
+### E2E Failures
+
+#### {scenario_name}
+- **Step Failed:** {which step}
+- **Expected:** {expected behavior}
+- **Actual:** {actual behavior}
+- **Fix Required:** {specific fix needed}
+
+## Full Test Output
+```
+{paste complete test run output here}
+```
+
+## Recommendation
+{Summary of what developer needs to fix}
+"""
+)
+```
+
+**Only create this file when tests are actually failing.** If all tests pass, skip this step.
+
 ---
 
 ## Special Cases

@@ -954,6 +954,51 @@ Provide a structured report:
 **Next Step:** [See routing instructions below - depends on whether tests exist]
 ```
 
+### 5.1. Artifact Writing for Test Failures
+
+**If tests are failing (Failing: Z > 0)**, write a detailed artifact file for orchestrator reference:
+
+```bash
+# Create artifact file at: bazinga/artifacts/{SESSION_ID}/test_failures.md
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/test_failures.md",
+  content: """
+# Test Failures - Developer Report
+
+**Session:** {SESSION_ID}
+**Group:** {GROUP_ID}
+**Date:** {TIMESTAMP}
+
+## Summary
+{Brief summary of what's failing and why}
+
+## Failing Tests
+
+### Test 1: {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Root Cause:** {analysis}
+- **Fix Required:** {what needs to be done}
+
+### Test 2: {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Root Cause:** {analysis}
+- **Fix Required:** {what needs to be done}
+
+## Full Test Output
+```
+{paste full test run output here}
+```
+
+## Next Steps
+{Your plan to fix the failures}
+"""
+)
+```
+
+**Only create this file when tests are actually failing.** If all tests pass, skip this step.
+
 ## 🔄 Routing Instructions for Orchestrator
 
 **CRITICAL:** Always tell the orchestrator where to route your response next. This prevents workflow drift.
