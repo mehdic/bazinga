@@ -290,13 +290,13 @@ class BazingaSetup:
 
     def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:
         """
-        Setup global configuration, merging with existing .claude.md if present.
+        Setup global configuration, merging with existing config if present.
 
         Strategy:
-        1. Check if .claude.md or .claude/.claude.md exists in target
+        1. Check if config exists in target (supports multiple locations for backwards compatibility)
         2. If exists and is_update=True, replace old BAZINGA section with new one
         3. If exists and is_update=False, append if not present
-        4. If doesn't exist, create new .claude.md with our content
+        4. If doesn't exist, create new .claude/CLAUDE.md with our content
 
         Args:
             target_dir: Target directory for installation
@@ -413,10 +413,12 @@ class BazingaSetup:
                 console.print(f"  ✓ Merged BAZINGA config into existing {existing_config_path.name}")
                 return True
         else:
-            # No existing config, create new one
-            dest_config = target_dir / ".claude.md"
+            # No existing config, create new one in .claude directory
+            claude_dir = target_dir / ".claude"
+            claude_dir.mkdir(parents=True, exist_ok=True)
+            dest_config = claude_dir / "CLAUDE.md"
             shutil.copy2(source_config, dest_config)
-            console.print(f"  ✓ Created .claude.md with BAZINGA config")
+            console.print(f"  ✓ Created .claude/CLAUDE.md with BAZINGA config")
             return True
 
     def _replace_bazinga_section(self, content: str, new_bazinga_section: str) -> Optional[str]:
@@ -1267,9 +1269,9 @@ def init(
     tree.add_row("  ", "├── agents/      [dim](7 agents: orchestrator, PM, dev, QA, tech lead, investigator, req engineer)[/dim]")
     tree.add_row("  ", "├── commands/    [dim](slash commands)[/dim]")
     tree.add_row("  ", "├── scripts/     [dim](initialization scripts)[/dim]")
-    tree.add_row("  ", "└── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
-    tree.add_row("📁", "bazinga/    [dim](state files for agent coordination)[/dim]")
-    tree.add_row("📄", ".claude.md       [dim](global configuration)[/dim]")
+    tree.add_row("  ", "├── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
+    tree.add_row("  ", "└── CLAUDE.md    [dim](global configuration)[/dim]")
+    tree.add_row("📁", "bazinga/         [dim](state files for agent coordination)[/dim]")
     console.print(tree)
 
     # Track installation (anonymous telemetry)
@@ -1302,14 +1304,17 @@ def check():
     cwd = Path.cwd()
     claude_dir = cwd / ".claude"
     agents_dir = claude_dir / "agents"
-    config_file = cwd / ".claude.md"
+    # Check for config in new location (.claude/CLAUDE.md) or old location (.claude.md) for backwards compatibility
+    config_file_new = claude_dir / "CLAUDE.md"
+    config_file_old = cwd / ".claude.md"
+    config_exists = config_file_new.exists() or config_file_old.exists()
     bazinga_dir = cwd / "bazinga"
 
     bazinga_installed = all(
         [
             claude_dir.exists(),
             agents_dir.exists(),
-            config_file.exists(),
+            config_exists,
             (agents_dir / "orchestrator.md").exists(),
         ]
     )
