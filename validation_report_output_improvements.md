@@ -204,7 +204,7 @@ Operation → Check result → If error: Output capsule with error
 Orchestrator can now link to these artifacts in compact capsules:
 
 ```
-⚠️ Group C QA failed | 3/15 tests failing (auth edge cases) → See artifacts/bazinga_123/qa_failures.md | Developer fixing
+⚠️ Group C QA failed | 3/15 tests failing (auth edge cases) → See bazinga/artifacts/{SESSION_ID}/qa_failures.md | Developer fixing
 ```
 
 **Impact:**
@@ -259,7 +259,7 @@ grep -c "**ORCHESTRATOR**:" agents/orchestrator.md
 ```
 📋 Planning complete | Single-group execution: {task_summary} | Starting development
 🔨 Group {id} implementing | {files_created/modified}, {tests_added} ({coverage}% coverage) | {current_status}
-✅ Group {id} tests passing | {test_results}, {coverage}% coverage, {quality_signals} | Approved → Tech lead review
+✅ Group {id} tests passing | {test_results}, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
 ❌ Build failed | {error_type} in {location} | Cannot proceed - fix required → {action}
 ```
 

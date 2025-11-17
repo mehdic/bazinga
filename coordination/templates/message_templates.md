@@ -123,12 +123,12 @@ These are the standard message formats for displaying orchestration progress to 
 
 ### QA Pass
 ```
-✅ Group {id} tests passing | {test_results}, {coverage}% coverage, {quality_signals} | Approved → Tech lead review
+✅ Group {id} tests passing | {test_results}, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
 ```
 
 **Examples:**
 ```
-✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech lead review
+✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech Lead review
 
 ✅ Group B tests passing | 15/15 tests passed, 88% coverage, no vulnerabilities | Approved → Code review
 ```
@@ -140,9 +140,9 @@ These are the standard message formats for displaying orchestration progress to 
 
 **Examples:**
 ```
-⚠️ Group B QA failed | 3/15 tests failing (auth edge cases) → See artifacts/bazinga_123/qa_failures.md | Developer fixing
+⚠️ Group B QA failed | 3/15 tests failing (auth edge cases) → See bazinga/artifacts/{SESSION_ID}/qa_failures.md | Developer fixing
 
-⚠️ Group C QA failed | 5 tests timeout (performance regression) → See artifacts/bazinga_123/qa_failures.md | Investigating
+⚠️ Group C QA failed | 5 tests timeout (performance regression) → See bazinga/artifacts/{SESSION_ID}/qa_failures.md | Investigating
 ```
 
 ---
@@ -216,7 +216,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Examples:**
 ```
-⚠️ Group C security scan | 1 high (SQL injection), 2 medium (XSS) | Developer addressing → See artifacts/bazinga_123/skills/security_scan.json
+⚠️ Group C security scan | 1 high (SQL injection), 2 medium (XSS) | Developer addressing → See bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
 
 ⚠️ Group A security scan | 3 low severity issues (hardcoded strings) | Quick fixes applied → Re-scanning
 ```
@@ -228,7 +228,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Example:**
 ```
-⚠️ Group C coverage gaps | 2 files below 80% (password_reset: 72%, validators: 75%) → See artifacts/bazinga_123/skills/coverage_report.json | Adding tests
+⚠️ Group C coverage gaps | 2 files below 80% (password_reset: 72%, validators: 75%) → See bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json | Adding tests
 ```
 
 ### Lint Issues
@@ -238,7 +238,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Example:**
 ```
-⚠️ Group B linting issues | 12 issues (5 errors, 7 warnings) → See artifacts/bazinga_123/skills/lint_results.json | Auto-fixing
+⚠️ Group B linting issues | 12 issues (5 errors, 7 warnings) → See bazinga/artifacts/{SESSION_ID}/skills/lint_results.json | Auto-fixing
 ```
 
 ### Build Failure
@@ -258,7 +258,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Example:**
 ```
-⚠️ Tests failed in Group B | 3/15 auth edge cases failing | Developer fixing → See artifacts/bazinga_123/test_failures.md
+⚠️ Tests failed in Group B | 3/15 auth edge cases failing | Developer fixing → See bazinga/artifacts/{SESSION_ID}/test_failures.md
 ```
 
 ### Iteration Loop Detected
@@ -385,14 +385,16 @@ When detail exceeds 3 lines, use summary + link:
 [Emoji] [Summary] → See [artifact_path]
 
 Examples:
-⚠️ 12 linting issues found in Group B (5 errors, 7 warnings) → See artifacts/bazinga_123/skills/lint_results.json
-⚠️ Coverage gaps in 2 files (password_reset: 72%, validators: 75%) → See artifacts/bazinga_123/skills/coverage_report.json
-🔬 Investigation findings: 3 hypotheses, 12 diagnostic tests → See artifacts/bazinga_123/investigation_group_c.md
+⚠️ 12 linting issues found in Group B (5 errors, 7 warnings) → See bazinga/artifacts/{SESSION_ID}/skills/lint_results.json
+⚠️ Coverage gaps in 2 files (password_reset: 72%, validators: 75%) → See bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json
+🔬 Investigation findings: 3 hypotheses, 12 diagnostic tests → See bazinga/artifacts/{SESSION_ID}/investigation_group_c.md
 ```
 
 ---
 
 ## Agent Report Format (Internal - Orchestrator Parses)
+
+**IMPORTANT:** These structures show the **ideal data points** the orchestrator will attempt to parse from agent responses. Agents output free-form text; the orchestrator uses best-effort pattern matching to extract these fields. These are NOT mandatory output formats - agents can respond naturally and the parsing logic will adapt (see Phase 2 implementation in agents/orchestrator.md for parsing details).
 
 Agents return structured data. Orchestrator extracts key info and transforms to capsule for user.
 
@@ -428,12 +430,12 @@ recommendation: APPROVE_FOR_REVIEW | REQUEST_CHANGES
 
 If PASS:
 ```
-✅ Group {id} tests passing | {passed}/{run} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech lead review
+✅ Group {id} tests passing | {passed}/{run} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
 ```
 
 If FAIL:
 ```
-⚠️ Group {id} QA failed | {failed}/{run} tests failing ({failure_summary}) | Developer fixing → See artifacts/{session}/qa_failures.md
+⚠️ Group {id} QA failed | {failed}/{run} tests failing ({failure_summary}) | Developer fixing → See bazinga/artifacts/{session}/qa_failures.md
 ```
 
 ### Tech Lead Report Structure
@@ -507,7 +509,7 @@ If NEEDS_CLARIFICATION:
 - ✅ - Success / approval / tests passing
 - ⚠️ - Warning / issue detected / needs attention
 - ❌ - Critical failure / blocker
-- 👔 - Tech lead review
+- 👔 - Tech Lead review
 - 🔬 - Investigation / deep analysis / escalation
 - 📊 - Status summary / metrics
 
@@ -526,8 +528,8 @@ If NEEDS_CLARIFICATION:
 🔨 Group B implementing | user_service.py + validators.py created, 15 tests added (88% coverage) | Tests passing → QA review
 🔨 Group C implementing | password_reset.py + email_service.py created, 9 tests added (78% coverage) | Tests passing → QA review
 
-✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech lead review
-✅ Group B tests passing | 15/15 tests passed, 88% coverage, security clear | Approved → Tech lead review
+✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech Lead review
+✅ Group B tests passing | 15/15 tests passed, 88% coverage, security clear | Approved → Tech Lead review
 ⚠️ Group C QA failed | Coverage below threshold (78% vs 80% target) | Adding edge case tests
 
 ✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
@@ -535,11 +537,11 @@ If NEEDS_CLARIFICATION:
 
 🔨 Group C complete | Added 4 edge case tests, coverage now 85% | Ready → QA re-test
 
-✅ Group C tests passing | 13/13 tests passed, 85% coverage, security clear | Approved → Tech lead review
+✅ Group C tests passing | 13/13 tests passed, 85% coverage, security clear | Approved → Tech Lead review
 
-⚠️ Group C security scan | 1 high (SQL injection in password_reset.py:45) | Fixing with parameterized queries → See artifacts/bazinga_123/skills/security_scan.json
+⚠️ Group C security scan | 1 high (SQL injection in password_reset.py:45) | Fixing with parameterized queries → See bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
 
-🔨 Group C complete | SQL injection fixed, re-scanned clean | Ready → Tech lead re-review
+🔨 Group C complete | SQL injection fixed, re-scanned clean | Ready → Tech Lead re-review
 
 ✅ Group C approved | Security clear, coverage 85%, all quality gates passed | Complete (3/3 groups)
 

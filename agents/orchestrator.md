@@ -217,7 +217,7 @@ Files but no test count:
 **Capsule construction (PASS):**
 
 ```
-✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech lead review
+✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
 ```
 
 **Capsule construction (FAIL):**
@@ -238,7 +238,7 @@ If missing:
 
 Full pass:
 ```
-✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech lead review
+✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech Lead review
 ```
 
 Minimal pass:
@@ -1795,7 +1795,7 @@ Use §QA Expert Response Parsing (lines 178-257) to extract:
 IF status = PASS:
   → Use "QA Tests Passing" template:
   ```
-  ✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech lead review
+  ✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
   ```
 
 IF status = FAIL:
@@ -2842,7 +2842,7 @@ The routing chain for each group is:
    Use §QA Expert Response Parsing to extract status, tests, coverage, quality signals.
 
    **Construct and output capsule:**
-   - PASS: `✅ Group {id} tests passing | {tests}, {coverage}%, {quality} | Approved → Tech lead`
+   - PASS: `✅ Group {id} tests passing | {tests}, {coverage}%, {quality} | Approved → Tech Lead`
    - FAIL: `⚠️ Group {id} QA failed | {failures} | Developer fixing → See artifacts/{SESSION_ID}/qa_failures_group_{id}.md`
 
    **Step 2: Log QA response:**
