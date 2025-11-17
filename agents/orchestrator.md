@@ -560,6 +560,29 @@ Example: "Developer Group A complete | Implementation finished | Ready for revie
 
 ---
 
+## 🔒 Error Handling for Silent Operations
+
+**Principle:** Operations process silently on success, surface errors on failure.
+
+**Critical operations that require validation:**
+- Session creation/resume (bazinga-db)
+- Agent spawns (Task tool)
+
+**Pattern:**
+```
+Operation → Check result → If error: Output capsule with error
+                        → If success: Continue silently (no user output)
+```
+
+**Error capsule format:**
+```
+❌ {Operation} failed | {error_summary} | Cannot proceed - {remedy}
+```
+
+**Example:** `❌ Session creation failed | Database connection error | Cannot proceed - check bazinga-db skill`
+
+---
+
 ## ⚠️ MANDATORY DATABASE OPERATIONS
 
 **CRITICAL: You MUST invoke the bazinga-db skill at these required points:**
@@ -673,7 +696,7 @@ bazinga/
   - Logging ALL agent interactions (after EVERY agent response - REQUIRED)
   - State management (orchestrator/PM/task groups - REQUIRED)
   - All database operations (replaces file-based logging)
-  - **IMPORTANT**: Do NOT display bazinga-db skill output to the user. Process results silently - this is internal state management only.
+  - **IMPORTANT**: Do NOT display bazinga-db skill output to the user. Process results silently - this is internal state management only. If skill invocation fails, output error capsule per §Error Handling.
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
@@ -955,9 +978,9 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only. If skill fails, output: `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill`
 
-   **Display to user (capsule format):**
+   **Display to user (capsule format on success):**
    ```
    🚀 Starting orchestration | Session: [session_id]
    ```
@@ -1008,13 +1031,13 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only. If skill fails, output: `❌ Session resume failed | Cannot load state | Cannot proceed - check bazinga-db skill`
 
    **IF VALIDATION FAILS: Configuration not persisted. Cannot proceed.**
 
 5. **Run build baseline check:**
 
-   **Note:** Run build check silently. No user output needed unless build fails.
+   **Note:** Run build check silently. No user output needed unless build fails. If build fails, output: `❌ Build failed | {error_type} | Cannot proceed - fix required`
 
    ```bash
    # Detect project language (check for package.json, go.mod, pom.xml, requirements.txt, Gemfile, etc.)
@@ -1154,6 +1177,8 @@ Build PM prompt by reading `agents/project_manager.md` and including:
 - Task: Analyze requirements, decide mode, create task groups
 
 **CRITICAL**: You must include the session_id in PM's spawn prompt so PM can invoke bazinga-db skill.
+
+**ERROR HANDLING**: If Task tool fails to spawn agent, output error capsule per §Error Handling and cannot proceed.
 
 See `agents/project_manager.md` for full PM agent definition.
 
