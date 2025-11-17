@@ -702,7 +702,7 @@ bazinga/
   - Logging ALL agent interactions (after EVERY agent response - REQUIRED)
   - State management (orchestrator/PM/task groups - REQUIRED)
   - All database operations (replaces file-based logging)
-  - **IMPORTANT**: Do NOT display bazinga-db skill output to the user. Process results silently - this is internal state management only. If skill invocation fails, output error capsule per §Error Handling.
+  - **IMPORTANT**: Do NOT display raw bazinga-db skill output to user (confirmations, JSON responses, etc.). Verify operation succeeded, then IMMEDIATELY continue to next workflow step. If skill invocation fails, output error capsule per §Error Handling and STOP.
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
@@ -807,9 +807,9 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, extract the session list data, but don't show raw skill output to user.
 
-
+**AFTER receiving the session list: IMMEDIATELY analyze the response and continue workflow. Do NOT stop.**
 
 **After receiving the session list, check the status:**
 
@@ -909,12 +909,9 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Extract PM state from response, but don't show raw skill output to user.
 
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
-
+**AFTER receiving PM state: IMMEDIATELY continue to Step 4 (Analyze Resume Context). Do NOT stop.**
 
 ---
 
@@ -984,14 +981,22 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only. If skill fails, output: `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill`
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data.
+
+   **What "process silently" means:**
+   - ✅ DO: Verify the skill succeeded
+   - ✅ DO: Extract the session_id from response
+   - ❌ DON'T: Show raw skill output to user
+   - ❌ DON'T: Show "Session created in database ✓" confirmations
 
    **Display to user (capsule format on success):**
    ```
    🚀 Starting orchestration | Session: [session_id]
    ```
 
-   **IF bazinga-db skill fails or returns error: STOP. Cannot proceed without session.**
+   **IF bazinga-db skill fails or returns error:** Output `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill` and STOP.
+
+   **AFTER successful session creation: IMMEDIATELY continue to step 3 (Load configurations). Do NOT stop.**
 
 3. **Load configurations:**
 
@@ -1003,7 +1008,9 @@ Display:
    cat bazinga/testing_config.json
    ```
 
-   **Note:** Process configurations silently. No user output needed for config loading - it's internal setup.
+   **Note:** Read configurations using Read tool, but don't show Read tool output to user - it's internal setup.
+
+   **AFTER reading configs: IMMEDIATELY continue to step 4 (Store config in database). Do NOT stop.**
 
    See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
@@ -1037,9 +1044,16 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only. If skill fails, output: `❌ Session resume failed | Cannot load state | Cannot proceed - check bazinga-db skill`
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data.
 
-   **IF VALIDATION FAILS: Configuration not persisted. Cannot proceed.**
+   **What "process silently" means:**
+   - ✅ DO: Verify the skill succeeded
+   - ❌ DON'T: Show raw skill output to user
+   - ❌ DON'T: Show "Config saved ✓" confirmations
+
+   **IF skill fails:** Output `❌ Config save failed | Cannot proceed` and STOP.
+
+   **AFTER successful config save: IMMEDIATELY continue to step 5 (Build baseline check). Do NOT stop.**
 
 5. **Run build baseline check:**
 
@@ -1062,6 +1076,8 @@ Display:
    - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
    - (If successful or unknown: silent, no output)
 
+   **AFTER build baseline check: IMMEDIATELY continue to step 6 (Start dashboard). Do NOT stop.**
+
 6. **Start dashboard if not running:**
 
    ```bash
@@ -1076,9 +1092,9 @@ Display:
    fi
    ```
 
-   (Process silently - dashboard is background infrastructure, no user output needed)
+   **Note:** Process dashboard startup silently - dashboard is background infrastructure, no user output needed.
 
-**Note:** Initialization is complete when session ID is displayed. No additional "ready" message needed.
+   **AFTER dashboard check/start: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
 
 **Database Storage:**
 
@@ -1109,7 +1125,20 @@ Confirm internally that:
 🚀 Starting orchestration | Session: [session_id]
 ```
 
-**ONLY AFTER internal validation passes may you proceed to Phase 1.**
+**🔴 CRITICAL: AFTER internal validation passes, you MUST IMMEDIATELY proceed to Phase 1.**
+
+**DO NOT:**
+- ❌ Stop and wait for user input
+- ❌ Pause for any reason
+- ❌ Ask what to do next
+
+**YOU MUST:**
+- ✅ IMMEDIATELY jump to Phase 1 (Spawn Project Manager)
+- ✅ Display the Phase 1 capsule message
+- ✅ Spawn the PM agent
+- ✅ Keep the workflow moving
+
+**Stopping here is WRONG. Continue to Phase 1 NOW.**
 
 ---
 
@@ -1167,8 +1196,9 @@ State Type: pm
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Extract PM state from response, but don't show raw skill output to user.
 
+**AFTER loading PM state: IMMEDIATELY continue to Step 1.2 (Spawn PM with Context). Do NOT stop.**
 
 Returns latest PM state or null if first iteration.
 
@@ -1223,7 +1253,9 @@ Agent ID: pm_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+
+**AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
 ### Step 1.3a: Handle PM Clarification Requests (if applicable)
 
@@ -1649,8 +1681,9 @@ Agent ID: dev_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
+**AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
 
 ### Step 2A.3: Route Developer Response
 
