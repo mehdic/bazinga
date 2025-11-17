@@ -73,6 +73,6 @@ bazinga/
 bazinga/artifacts/
 bazinga/bazinga.db*
 
-# Old coordination folder (deprecated - renamed to bazinga/)
+# Coordination folder (legacy - templates now in bazinga/templates/)
 coordination/
 !coordination/templates/

@@ -64,3 +64,4 @@ packages = ["src/bazinga_cli"]
 ".claude/skills" = "share/bazinga_cli/.claude/skills"
 "dashboard" = "share/bazinga_cli/dashboard"
 "research" = "share/bazinga_cli/research"
+"bazinga/templates" = "share/bazinga_cli/bazinga/templates"

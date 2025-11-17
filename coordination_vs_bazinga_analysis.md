@@ -1,15 +1,81 @@
-# Coordination vs Bazinga Folder Analysis
+# Coordination vs Bazinga Folder Migration - COMPLETED
 
 **Date:** 2025-11-17
-**Purpose:** Clarify the difference between coordination/ and bazinga/ folders
+**Status:** ✅ Migration completed - templates moved to bazinga/
+**Purpose:** Document the migration from coordination/ to bazinga/ folder structure
 
 ---
 
-## TL;DR - No Issue Found ✅
+## TL;DR - Migration Completed ✅
 
-The `coordination/` and `bazinga/` folders serve **different purposes** and should **both exist**. This is not a rename situation - they coexist intentionally.
+Templates have been **migrated from coordination/ to bazinga/**. Both folders exist in the repo but client projects only use bazinga/.
 
 ---
+
+## Migration Summary
+
+### What Changed
+
+**Before Migration:**
+- Templates in: `coordination/templates/`
+- Agents referenced: `coordination/templates/message_templates.md`
+- CLI: Did NOT copy templates to client projects
+- Client projects: Had no templates folder
+
+**After Migration:**
+- Templates in: `bazinga/templates/` (primary location)
+- Agents reference: `bazinga/templates/message_templates.md`
+- CLI: Copies templates to client `bazinga/templates/` during init/update
+- Client projects: Have complete `bazinga/templates/` folder
+
+### Files Modified
+
+1. **bazinga/templates/** - Created with all template files
+2. **agents/orchestrator.md** - Updated references (2 locations)
+3. **.claude/commands/bazinga.orchestrate.md** - Rebuilt automatically
+4. **.gitignore** - Updated comments
+5. **src/bazinga_cli/__init__.py** - Added copy_templates() method
+6. **pyproject.toml** - Added bazinga/templates to distribution
+7. **scripts/init-orchestration.sh** - Added template copying logic
+8. **Documentation** - Updated all references
+
+### Folder Structure (Repo)
+
+Both folders exist in the repo for backward compatibility:
+
+```
+bazinga/
+├── skills_config.json
+└── templates/          ← PRIMARY LOCATION
+    ├── completion_report.md
+    ├── logging_pattern.md
+    ├── message_templates.md
+    └── prompt_building.md
+
+coordination/
+├── skills_config.json (legacy)
+└── templates/          ← BACKUP/LEGACY
+    └── (same files)
+```
+
+### Folder Structure (Client Projects)
+
+Client projects only get bazinga/:
+
+```
+bazinga/
+├── skills_config.json
+├── testing_config.json
+└── templates/          ← Copied during bazinga init/update
+    ├── completion_report.md
+    ├── logging_pattern.md
+    ├── message_templates.md
+    └── prompt_building.md
+```
+
+---
+
+## Original Analysis (Pre-Migration)
 
 ## Folder Purposes
 
