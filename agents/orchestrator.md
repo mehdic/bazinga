@@ -1594,9 +1594,40 @@ Task(subagent_type: "general-purpose", description: "Developer implementation", 
 
 **AFTER receiving the Developer's complete response:**
 
-Process developer response internally (no verbose status message needed).
+**Step 1: Parse response and output capsule to user**
 
-**Log developer interaction:**
+Use §Developer Response Parsing (lines 96-175) to extract:
+- **Status** (READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL)
+- **Files** created/modified
+- **Tests** added (count)
+- **Coverage** percentage
+- **Summary** of work
+
+**Step 2: Select and construct capsule based on status**
+
+IF status = READY_FOR_QA OR READY_FOR_REVIEW:
+  → Use "Developer Work Complete" template:
+  ```
+  🔨 Group {id} complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
+  ```
+
+IF status = PARTIAL:
+  → Use "Work in Progress" template:
+  ```
+  🔨 Group {id} implementing | {what's done} | {current_status}
+  ```
+
+IF status = BLOCKED:
+  → Use "Blocker" template:
+  ```
+  ⚠️ Group {id} blocked | {blocker_description} | Investigating
+  ```
+
+**Apply fallbacks:** If data missing, use generic descriptions (see §Developer Response Parsing line 152-157)
+
+**Step 3: Output capsule to user**
+
+**Step 4: Log developer interaction:**
 ```
 bazinga-db, please log this developer interaction:
 
@@ -1745,7 +1776,40 @@ Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA
 
 **AFTER receiving the QA Expert's response:**
 
-**Log QA interaction:**
+**Step 1: Parse response and output capsule to user**
+
+Use §QA Expert Response Parsing (lines 178-257) to extract:
+- **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
+- **Tests** passed/total
+- **Coverage** percentage
+- **Failed tests** (if any)
+- **Quality signals** (security, performance)
+
+**Step 2: Select and construct capsule based on status**
+
+IF status = PASS:
+  → Use "QA Tests Passing" template:
+  ```
+  ✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech lead review
+  ```
+
+IF status = FAIL:
+  → Use "QA Tests Failing" template:
+  ```
+  ⚠️ Group {id} QA failed | {failed_count}/{total} tests failing ({failure_summary}) | Developer fixing → See artifacts/{SESSION_ID}/qa_failures.md
+  ```
+
+IF status = BLOCKED:
+  → Use "Blocker" template:
+  ```
+  ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
+  ```
+
+**Apply fallbacks:** If data missing, use generic descriptions (see §QA Expert Response Parsing line 236-251)
+
+**Step 3: Output capsule to user**
+
+**Step 4: Log QA interaction:**
 ```
 bazinga-db, please log this QA interaction:
 
@@ -1900,7 +1964,46 @@ Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: 
 
 **AFTER receiving the Tech Lead's response:**
 
-**Log Tech Lead interaction:**
+**Step 1: Parse response and output capsule to user**
+
+Use §Tech Lead Response Parsing (lines 261-330) to extract:
+- **Decision** (APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS)
+- **Security issues** count
+- **Lint issues** count
+- **Architecture concerns**
+- **Quality assessment**
+
+**Step 2: Select and construct capsule based on decision**
+
+IF decision = APPROVED:
+  → Use "Tech Lead Approved" template:
+  ```
+  ✅ Group {id} approved | Security: {security_count} issues, Lint: {lint_count} issues, {architecture_assessment} | Complete
+  ```
+
+IF decision = CHANGES_REQUESTED:
+  → Use "Tech Lead Requests Changes" template:
+  ```
+  ⚠️ Group {id} needs changes | {issue_summary} | Developer fixing → See feedback
+  ```
+
+IF decision = SPAWN_INVESTIGATOR:
+  → Use "Investigation Needed" template:
+  ```
+  🔬 Group {id} needs investigation | {problem_summary} | Spawning investigator
+  ```
+
+IF decision = ESCALATE_TO_OPUS:
+  → Use "Escalation" template:
+  ```
+  ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
+  ```
+
+**Apply fallbacks:** If data missing, use generic descriptions (see §Tech Lead Response Parsing line 309-327)
+
+**Step 3: Output capsule to user**
+
+**Step 4: Log Tech Lead interaction:**
 ```
 bazinga-db, please log this techlead interaction:
 
@@ -2509,7 +2612,40 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 
 **AFTER receiving the PM's response:**
 
-**Track velocity:**
+**Step 1: Parse response and output capsule to user**
+
+Use §PM Response Parsing (lines 340-431) to extract:
+- **Decision** (BAZINGA, CONTINUE, CLARIFICATION_NEEDED, REQUIRES_CHANGES)
+- **Assessment** of current state
+- **Feedback** (if requesting changes)
+- **Next actions** (if continuing)
+
+**Step 2: Select and construct capsule based on decision**
+
+IF decision = BAZINGA:
+  → Use "Completion" template:
+  ```
+  ✅ BAZINGA - Orchestration Complete!
+  [Show final report in next step]
+  ```
+
+IF decision = CONTINUE or REQUIRES_CHANGES:
+  → Use "PM Assessment" template:
+  ```
+  📋 PM check | {assessment_summary} | {feedback_summary} → {next_action}
+  ```
+
+IF decision = CLARIFICATION_NEEDED:
+  → Use "Clarification" template:
+  ```
+  ⚠️ PM needs clarification | {question_summary} | Awaiting response
+  ```
+
+**Apply fallbacks:** If data missing, use generic descriptions (see §PM Response Parsing line 404-428)
+
+**Step 3: Output capsule to user**
+
+**Step 4: Track velocity:**
 ```
 velocity-tracker, please analyze completion metrics
 ```
@@ -2635,11 +2771,20 @@ See `agents/developer.md` for full developer agent definition.
 
 ### Step 2B.2: Receive All Developer Responses
 
-Process developer responses internally (individual group status will be shown via capsules as they complete workflow).
-
 **For EACH developer response:**
 
-Log to database (see `bazinga/templates/logging_pattern.md`):
+**Step 1: Parse response and output capsule to user**
+
+Use §Developer Response Parsing (lines 96-175) to extract status, files, tests, coverage, summary.
+
+**Step 2: Construct and output capsule** (same templates as Step 2A.2):
+- READY_FOR_QA/REVIEW: `🔨 Group {id} complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
+- PARTIAL: `🔨 Group {id} implementing | {what's done} | {current_status}`
+- BLOCKED: `⚠️ Group {id} blocked | {blocker} | Investigating`
+
+**Step 3: Output capsule to user**
+
+**Step 4: Log to database** (see `bazinga/templates/logging_pattern.md`):
 ```
 bazinga-db, please log this developer interaction:
 
@@ -2687,7 +2832,15 @@ The routing chain for each group is:
 
    **AFTER receiving the QA Expert's response:**
 
-   **Log QA response:**
+   **Step 1: Parse response and output capsule** (same as Step 2A.4)
+
+   Use §QA Expert Response Parsing to extract status, tests, coverage, quality signals.
+
+   **Construct and output capsule:**
+   - PASS: `✅ Group {id} tests passing | {tests}, {coverage}%, {quality} | Approved → Tech lead`
+   - FAIL: `⚠️ Group {id} QA failed | {failures} | Developer fixing → See artifacts/{SESSION_ID}/qa_failures.md`
+
+   **Step 2: Log QA response:**
    ```
    bazinga-db, please log this QA interaction:
 
@@ -2726,7 +2879,16 @@ The routing chain for each group is:
 
    **AFTER receiving the Tech Lead's response:**
 
-   **Log Tech Lead response:**
+   **Step 1: Parse response and output capsule** (same as Step 2A.6)
+
+   Use §Tech Lead Response Parsing to extract decision, security/lint issues, architecture assessment.
+
+   **Construct and output capsule:**
+   - APPROVED: `✅ Group {id} approved | Security: {count}, Lint: {count}, {architecture} | Complete`
+   - CHANGES_REQUESTED: `⚠️ Group {id} needs changes | {issues} | Developer fixing`
+   - SPAWN_INVESTIGATOR: `🔬 Group {id} needs investigation | {problem} | Spawning investigator`
+
+   **Step 2: Log Tech Lead response:**
    ```
    bazinga-db, please log this techlead interaction:
 
@@ -2912,7 +3074,16 @@ Spawn: `Task(subagent_type="general-purpose", description="PM overall assessment
 
 **AFTER receiving the PM's response:**
 
-**Log PM response:**
+**Step 1: Parse response and output capsule** (same as Step 2A.8)
+
+Use §PM Response Parsing to extract decision, assessment, feedback.
+
+**Construct and output capsule:**
+- BAZINGA: `✅ BAZINGA - Orchestration Complete!` [show final report in next step]
+- CONTINUE/REQUIRES_CHANGES: `📋 PM check | {assessment} | {feedback} → {next_action}`
+- CLARIFICATION_NEEDED: `⚠️ PM needs clarification | {question} | Awaiting response`
+
+**Step 2: Log PM response:**
 ```
 bazinga-db, please log this PM interaction:
 
@@ -2931,7 +3102,7 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
-**Track velocity metrics:**
+**Step 3: Track velocity metrics:**
 ```
 velocity-tracker, please analyze parallel mode completion:
 

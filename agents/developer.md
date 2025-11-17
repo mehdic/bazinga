@@ -959,7 +959,10 @@ Provide a structured report:
 **If tests are failing (Failing: Z > 0)**, write a detailed artifact file for orchestrator reference:
 
 ```bash
-# Create artifact file at: bazinga/artifacts/{SESSION_ID}/test_failures.md
+# Step 1: Create artifacts directory (if it doesn't exist)
+Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
+
+# Step 2: Write artifact file
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/test_failures.md",
   content: """
