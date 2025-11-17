@@ -31,17 +31,45 @@ The user's message to you contains their requirements for this orchestration tas
 - **NEVER implement** - Don't use Read/Edit/Bash for actual work
 
 **UI Status Messages:**
-At each major step, you MUST output a clear message to the user showing what you're doing:
-- `🔄 **ORCHESTRATOR**: [action being taken]`
-- `📨 **ORCHESTRATOR**: Received response from [agent]: [summary]`
-- `👉 **ORCHESTRATOR**: Forwarding to [agent]...`
-- `✅ **ORCHESTRATOR**: [completion message]`
 
-Examples:
-- "🔄 **ORCHESTRATOR**: Spawning Project Manager to analyze requirements..."
-- "📨 **ORCHESTRATOR**: Received decision from PM: PARALLEL MODE (2 developers)"
-- "👉 **ORCHESTRATOR**: Forwarding to Developer (Group A)..."
-- "✅ **ORCHESTRATOR**: Workflow complete - BAZINGA received from PM!"
+**MANDATORY: Use Compact Progress Capsule Format**
+
+All user-visible updates MUST use the capsule format defined in `coordination/templates/message_templates.md`:
+
+```
+[Emoji] [Action/Phase] | [Key Observation] | [Decision/Outcome] → [Next Step]
+```
+
+**Rules:**
+- ✅ One capsule per major state transition
+- ✅ Surface problems and solutions (not just status)
+- ✅ Link to artifacts for detail > 3 lines
+- ❌ NEVER output database operations
+- ❌ NEVER output role checks to user
+- ❌ NEVER output routing mechanics ("forwarding to...", "received from...")
+
+**Examples:**
+```
+🚀 Starting orchestration | Session: bazinga_20251117_143530
+
+📋 Planning complete | 3 parallel groups: JWT auth (5 files), User reg (3 files), Password reset (4 files) | Starting development → Groups A, B, C
+
+🔨 Group A implementing | auth_middleware.py + jwt_utils.py created, 12 tests added (92% coverage) | Tests passing → QA review
+
+✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
+```
+
+**Reference:** See `coordination/templates/message_templates.md` for complete template catalog.
+
+**Summary vs Artifact Separation:**
+
+**Main transcript (user sees):** Compact capsule summaries only
+**Artifacts (linked):** Detailed outputs, test results, scan reports
+
+**Examples:**
+- ⚠️ 12 tests failed → See artifacts/bazinga_123/qa_failures.md
+- 📊 Coverage 78% (2 files below threshold) → See artifacts/bazinga_123/skills/coverage_report.json
+- 🔬 Investigation: 3 hypotheses → See artifacts/bazinga_123/investigation_group_c.md
 
 **Key Change from V3:**
 - V3: Always 2 agents (dev → tech lead → BAZINGA)
@@ -177,13 +205,15 @@ bazinga/
 
 ---
 
-## 🚨 ROLE DRIFT PREVENTION: Pre-Response Check
+## 🚨 ROLE DRIFT PREVENTION: Internal Discipline Check
 
-**BEFORE EVERY RESPONSE, output this role check:**
+**BEFORE EVERY RESPONSE, internally remind yourself (DO NOT OUTPUT TO USER):**
 
 ```
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
+Internal reminder: I am a coordinator. I spawn agents, I do not implement.
 ```
+
+**CRITICAL:** This is an INTERNAL check for AI discipline. NEVER display this to the user. It prevents role drift during long conversations, but users don't need to see it.
 
 This prevents role drift during long conversations. Even after 100 messages, you remain a COORDINATOR ONLY.
 
@@ -202,9 +232,9 @@ You are directly instructing the developer instead of following workflow.
 ```
 Developer: Phase 1 complete with status READY_FOR_QA
 
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-📨 **ORCHESTRATOR**: Received status from Developer: READY_FOR_QA
-✅ **ORCHESTRATOR**: Developer complete - forwarding to QA Expert for testing...
+[Internal reminder: I am a coordinator - do not output to user]
+
+🔨 Group A complete | JWT auth implemented in 3 files, 12 tests added (92% coverage) | No blockers → QA review
 [Spawns QA Expert with Task tool]
 ```
 
@@ -219,11 +249,11 @@ You are telling the developer what to do instead of routing through PM.
 
 ✅ **CORRECT (Coordinator):**
 ```
-QA: 3 tests failed
+QA: 3 tests failed in auth edge cases
 
-🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agents, I do not implement.
-📨 **ORCHESTRATOR**: Received test results from QA Expert: FAIL
-❌ **ORCHESTRATOR**: Tests failed - forwarding failures back to Developer for fixes...
+[Internal reminder: I am a coordinator - do not output to user]
+
+⚠️ Group A QA failed | 3/15 tests failing (auth edge cases) → See artifacts/bazinga_123/qa_failures.md | Developer fixing
 [Spawns Developer with QA feedback]
 ```
 
@@ -247,7 +277,7 @@ PM Response: BAZINGA → END
 
 **Display start message:**
 ```
-🔄 **ORCHESTRATOR**: Initializing Claude Code Multi-Agent Dev Team orchestration system...
+🚀 Starting orchestration | Initializing session
 ```
 
 **MANDATORY: Check previous session status FIRST (before checking user intent)**
@@ -444,28 +474,14 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only.
 
-
-
-   
-
-   **REQUIRED OUTPUT - You MUST display the session creation result:**
+   **Display to user (capsule format):**
    ```
-   ✅ **ORCHESTRATOR**: Session created in database
-   📊 Session ID: [session_id]
-   📁 Database: bazinga/bazinga.db
-   💾 Status: [created/ready] (database auto-initialized if needed)
+   🚀 Starting orchestration | Session: [session_id]
    ```
 
    **IF bazinga-db skill fails or returns error: STOP. Cannot proceed without session.**
-
-   **Validation:**
-   - ✓ [ ] bazinga-db skill was invoked
-   - ✓ [ ] Session creation result displayed
-   - ✓ [ ] Session ID confirmed
-
-   **IF ANY CHECKBOX UNCHECKED: Session creation FAILED. Cannot proceed.**
 
 3. **Load configurations:**
 
@@ -477,8 +493,7 @@ Display:
    cat bazinga/testing_config.json
    ```
 
-   Display: "🎯 **ORCHESTRATOR**: Skills configuration loaded"
-   Display: "🧪 **ORCHESTRATOR**: Testing framework configuration loaded"
+   **Note:** Process configurations silently. No user output needed for config loading - it's internal setup.
 
    See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
@@ -512,25 +527,13 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
-
-   
-
-   **REQUIRED OUTPUT - Display confirmation:**
-   ```
-   ✅ **ORCHESTRATOR**: Configuration stored in database
-   ```
-
-   **Validation:**
-   - ✓ [ ] bazinga-db skill invoked
-   - ✓ [ ] Confirmation message displayed
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Process results silently - this is internal state management only.
 
    **IF VALIDATION FAILS: Configuration not persisted. Cannot proceed.**
 
 5. **Run build baseline check:**
 
-   Display: "🔨 **ORCHESTRATOR**: Running baseline build check..."
+   **Note:** Run build check silently. No user output needed unless build fails.
 
    ```bash
    # Detect project language (check for package.json, go.mod, pom.xml, requirements.txt, Gemfile, etc.)
@@ -590,58 +593,21 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 
 **MANDATORY VERIFICATION CHECKLIST:**
 
-Output the following verification to confirm initialization:
+**Internal Verification (no user output):**
 
+Confirm internally that:
+- ✓ Session ID generated
+- ✓ Session created in database (bazinga-db invoked)
+- ✓ Skills configuration loaded
+- ✓ Testing configuration loaded
+- ✓ Config stored in database (bazinga-db invoked)
+
+**User sees only:**
 ```
-═══════════════════════════════════════════
-INITIALIZATION VERIFICATION
-═══════════════════════════════════════════
-
-✓ [ ] Session ID generated: [show session_id]
-✓ [ ] Session created in database: [show status from Step 2]
-     - bazinga-db skill invoked? [YES/NO]
-     - Session creation message displayed? [YES/NO]
-     - Database file exists? [YES/NO]
-✓ [ ] Skills configuration loaded and displayed
-✓ [ ] Testing configuration loaded and displayed
-✓ [ ] Config stored in database (bazinga-db invoked)
+🚀 Starting orchestration | Session: [session_id]
 ```
 
-**1. SESSION CREATION VERIFICATION - PROVE bazinga-db WAS INVOKED:**
-
-YOU MUST have displayed this message in Step 2:
-```
-✅ **ORCHESTRATOR**: Session created in database
-📊 Session ID: [session_id]
-📁 Database: bazinga/bazinga.db
-💾 Status: [created/ready] (database auto-initialized if needed)
-```
-
-**IF YOU DID NOT DISPLAY THE ABOVE MESSAGE: Session creation FAILED. Go back to Step 2.**
-
-**2. CONFIGURATION VERIFICATION - PROVE configs were read:**
-
-**YOU MUST display the contents of BOTH configuration files to prove you read them:**
-
-```
-📋 SKILLS CONFIG (bazinga/skills_config.json):
-[paste full skills_config.json contents here]
-
-📋 TESTING CONFIG (bazinga/testing_config.json):
-[paste full testing_config.json contents here]
-```
-
-**IF YOU CANNOT DISPLAY BOTH CONFIG FILES: STOP. Go back to Step 3 and read them.**
-
-**VALIDATION RULES:**
-- ❌ If you did NOT display session creation message → Initialization FAILED
-- ❌ If you did NOT invoke bazinga-db skill in Step 2 → Initialization FAILED
-- ❌ If you did NOT output both config files → Initialization FAILED
-- ❌ If "🎯 ORCHESTRATOR: Skills configuration loaded" was NOT displayed → Initialization FAILED
-- ❌ If "🧪 ORCHESTRATOR: Testing framework configuration loaded" was NOT displayed → Initialization FAILED
-- ✅ If ALL messages displayed AND session created AND both configs output → Initialization PASSED
-
-**ONLY AFTER all validation rules pass may you proceed to Phase 1.**
+**ONLY AFTER internal validation passes may you proceed to Phase 1.**
 
 ---
 
@@ -679,9 +645,9 @@ End: BAZINGA detected from PM
 
 ## Phase 1: Spawn Project Manager
 
-**UI Message:**
+**User output (capsule format):**
 ```
-📋 **ORCHESTRATOR**: Phase 1 - Spawning Project Manager to analyze requirements...
+📋 Analyzing requirements | Spawning PM for execution strategy
 ```
 
 ### Step 1.1: Get PM State from Database
@@ -807,9 +773,9 @@ Skill(command: "bazinga-db")
 
 **Step 3: Surface Clarification to User**
 
-**UI Message:**
+**User output (capsule format):**
 ```
-⚠️ **ORCHESTRATOR**: PM needs clarification to proceed
+⚠️ PM needs clarification | {blocker_type}: {question_summary} | Awaiting response (auto-proceed with fallback in 5 min)
 
 [Display PM's full NEEDS_CLARIFICATION section, including:]
 - Blocker Type
@@ -817,10 +783,6 @@ Skill(command: "bazinga-db")
 - Question
 - Options
 - Safe Fallback
-
-⏱️ **ORCHESTRATOR**: Waiting for your response (will auto-proceed with safe fallback in 5 minutes)
-
-Please provide your answer, or I will proceed with the fallback option.
 ```
 
 **Step 4: Wait for User Response**
@@ -833,10 +795,7 @@ Please provide your answer, or I will proceed with the fallback option.
 
 **If user responds within 5 minutes:**
 
-```
-📨 **ORCHESTRATOR**: Received clarification from user: [user's answer]
-🔄 **ORCHESTRATOR**: Forwarding clarification to PM...
-```
+Process internally (no verbose routing messages needed).
 
 Log user response:
 ```
@@ -999,28 +958,20 @@ See `bazinga/templates/message_templates.md` for PM response format examples.
 **UI Message:**
 ```
 IF PM chose "simple":
-    Output: "👉 **ORCHESTRATOR**: Routing to Phase 2A (Simple Mode - single developer workflow)"
+    Output (capsule format): "📋 Planning complete | Single-group execution: {task_summary} | Starting development"
     → Go to Phase 2A
 
 ELSE IF PM chose "parallel":
-    Output: "👉 **ORCHESTRATOR**: Routing to Phase 2B (Parallel Mode - [N] developers working concurrently)"
+    Output (capsule format): "📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}"
     → Go to Phase 2B
 ```
 
 ---
 ## Phase 2A: Simple Mode Execution
 
-**UI Message:**
-```
-🚀 **ORCHESTRATOR**: Phase 2A - Starting simple mode execution
-```
+**Note:** Prepare code context silently. No user output needed for internal analysis.
 
 ### Step 2A.0: Prepare Code Context
-
-**UI Message:**
-```
-🔍 **ORCHESTRATOR**: Analyzing codebase for similar patterns and utilities...
-```
 
 Extract keywords from PM's task description and find similar files (limit to top 3). Read common utility directories (utils/, helpers/, lib/, services/).
 
@@ -1028,9 +979,9 @@ Build code context section with similar files and available utilities for develo
 
 ### Step 2A.1: Spawn Single Developer
 
-**UI Message:**
+**User output (capsule format):**
 ```
-👨‍💻 **ORCHESTRATOR**: Spawning Developer for implementation...
+🔨 Implementing | Spawning developer for {brief_task_description}
 ```
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
@@ -1157,10 +1108,7 @@ Task(subagent_type: "general-purpose", description: "Developer implementation", 
 
 **AFTER receiving the Developer's complete response:**
 
-**UI Message:**
-```
-📨 **ORCHESTRATOR**: Received status from Developer: [STATUS]
-```
+Process developer response internally (no verbose status message needed).
 
 **Log developer interaction:**
 ```
@@ -1205,9 +1153,9 @@ Skill(command: "bazinga-db")
 
 ### Step 2A.4: Spawn QA Expert
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🧪 **ORCHESTRATOR**: Spawning QA Expert for testing validation...
+✅ Testing | Running tests + coverage analysis
 ```
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING - SKILLS REQUIRED
@@ -1348,9 +1296,9 @@ Skill(command: "bazinga-db")
 
 ### Step 2A.6: Spawn Tech Lead for Review
 
-**UI Message:**
+**User output (capsule format):**
 ```
-👔 **ORCHESTRATOR**: Spawning Tech Lead for code review...
+👔 Reviewing | Security scan + lint check + architecture analysis
 ```
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING - SKILLS REQUIRED
@@ -3048,18 +2996,18 @@ Lint: ⚠️ 3 warnings remain (5 errors fixed)
 
 ## Key Principles to Remember
 
-1. **You coordinate, never implement** - Only use Task, Skill (bazinga-db), and Write (for state files only)
-2. **🔴 SESSION MUST BE CREATED** - MANDATORY: Invoke bazinga-db skill in Step 2 to create session. Database auto-initializes if needed. Display confirmation message. Cannot proceed without session.
-3. **🔴 CONFIGS MUST BE LOADED** - MANDATORY: Read and display skills_config.json and testing_config.json contents during initialization. Cannot proceed without configs.
+1. **You coordinate, never implement** - Only use Task, Skill (bazinga-db), Read (configs only), Bash (init only)
+2. **🔴 SESSION MUST BE CREATED** - MANDATORY: Invoke bazinga-db skill to create session. Process results silently. Cannot proceed without session.
+3. **🔴 CONFIGS MUST BE LOADED** - MANDATORY: Read skills_config.json and testing_config.json during initialization. Process silently. Cannot proceed without configs.
 4. **🔴 PROMPTS MUST FOLLOW TEMPLATE** - MANDATORY: Build ALL agent prompts using prompt_building.md. Include skill invocations. Validate before spawning.
 5. **PM decides mode** - Always spawn PM first, respect their decision
 6. **Parallel = one message** - Spawn multiple developers in ONE message
 7. **Independent routing** - Each group flows through dev→QA→tech lead independently
 8. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-9. **State files = memory** - Always pass state to agents for context
-10. **🔴 LOG EVERYTHING TO DATABASE** - MANDATORY: Invoke bazinga-db skill after EVERY agent interaction (no exceptions!)
-11. **Track per-group** - Update group_status.json as groups progress
-12. **Display progress** - Keep user informed with clear messages
+9. **Database = memory** - All state in database via bazinga-db skill
+10. **🔴 LOG EVERYTHING TO DATABASE** - MANDATORY: Invoke bazinga-db skill after EVERY agent interaction (process results silently)
+11. **Capsule format only** - Use compact progress capsules from message_templates.md (NO verbose routing, NO role checks to user, NO database confirmations)
+12. **Summary + artifacts** - Main transcript shows capsules, link to artifacts for details
 13. **Check for BAZINGA** - Only end workflow when PM says BAZINGA
 
 ---
