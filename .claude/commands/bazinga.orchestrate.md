@@ -1672,20 +1672,40 @@ Task(
 
 ##### Iteration Step 2: Receive Investigator Response
 
-**Log Investigator response:**
+**🔴 CRITICAL - READ THE AGENT RESPONSE:**
+
+The Task tool returns the FULL Investigator response. This IS the Investigator's analysis.
+
+**DO NOT:**
+- ❌ Ignore the response
+- ❌ Think it's "just a log ID"
+- ❌ "Take direct action" yourself
+- ❌ Skip parsing the Investigator's findings
+
+**YOU MUST:**
+- ✅ Read the FULL response from the Task tool result
+- ✅ Parse the Investigator's status (ROOT_CAUSE_FOUND, NEED_DEVELOPER_DIAGNOSTIC, etc.)
+- ✅ Extract the relevant details (diagnosis, hypothesis, next steps)
+- ✅ Use this information to route to the next action
+
+**If the response is unclear:**
+- Re-spawn the Investigator with clarification request
+- DO NOT improvise a solution yourself
+
+**After reading the full response, log it:**
 ```
 bazinga-db, please log this investigator interaction:
 
 Session ID: [session_id]
 Agent Type: investigator
-Content: [Full Investigator response]
+Content: [Full Investigator response from Task tool]
 Iteration: [current_iteration]
 Agent ID: investigator_[group_id]_iter[N]
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Parse Investigator action from response. Look for status markers:**
+**Parse Investigator action from response (that you just read above). Look for status markers:**
 
 ---
 
@@ -2407,20 +2427,40 @@ All agent prompts follow same pattern as Phase 2A (see `bazinga/templates/prompt
 
 4. **After Investigator responds:**
 
-   **Log Investigator interaction:**
+   **🔴 CRITICAL - READ THE AGENT RESPONSE:**
+
+   The Task tool returns the FULL agent response. This IS the Investigator's report.
+
+   **DO NOT:**
+   - ❌ Ignore the response
+   - ❌ Think it's "just a log ID"
+   - ❌ "Take direct action" yourself
+   - ❌ Skip using the agent's recommendations
+
+   **YOU MUST:**
+   - ✅ Read the FULL response from the Task tool result
+   - ✅ Parse the Investigator's diagnosis and solution
+   - ✅ Extract the "Next Action for Orchestrator" section
+   - ✅ Follow the Investigator's recommendations exactly
+
+   **If the response is unclear or missing:**
+   - Re-spawn the Investigator with a clarification request
+   - DO NOT improvise a solution yourself
+
+   **After reading the Investigator's full response, log it:**
    ```
    bazinga-db, please log this investigator interaction:
 
    Session ID: [session_id]
    Agent Type: investigator
-   Content: [Investigator response]
+   Content: [Full Investigator response from Task tool]
    Iteration: [iteration]
    Agent ID: investigator_blocker_[group_id]
    ```
 
    Then invoke: `Skill(command: "bazinga-db")`
 
-5. **Route based on Investigator's recommendation:**
+5. **Route based on Investigator's recommendation (from the response you just read):**
 
    - **If "spawn_developer":** Spawn Developer with Investigator's instructions to fix the blocker
    - **If "update_environment":** Execute the commands/changes needed (may spawn Developer or use Bash if simple setup)
