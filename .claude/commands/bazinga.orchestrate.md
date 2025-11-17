@@ -369,9 +369,7 @@ SESSION_ID="bazinga_20251113_160528"  # ← Use the ACTUAL session_id from respo
 **Step 2: Display Resume Message (DO THIS NOW)**
 
 ```
-🔄 **ORCHESTRATOR**: Resuming existing session
-📊 Session ID: bazinga_20251113_160528  # ← Use the actual SESSION_ID you just extracted
-📁 Database: bazinga/bazinga.db
+🔄 Resuming session | Session: {session_id} | Continuing from previous state
 ```
 
 Display this message to confirm which session you're resuming.
@@ -427,7 +425,7 @@ From PM state received:
 
 Display:
 ```
-📋 **ORCHESTRATOR**: Spawning Project Manager to resume from previous state...
+📋 Resuming workflow | Spawning PM to continue from {last_phase}
 ```
 
 **NOW jump to Phase 1** and spawn the PM agent with:
@@ -549,14 +547,11 @@ Display:
    # and bazinga/artifacts/{SESSION_ID}/build_baseline_status.txt
    ```
 
-   Display result:
-   - If successful: "✅ **ORCHESTRATOR**: Baseline build successful"
-   - If errors: "⚠️ **ORCHESTRATOR**: Baseline build has errors (will track if Developer introduces NEW errors)"
-   - If unknown: "ℹ️ **ORCHESTRATOR**: Could not detect build system, skipping build check"
+   Display result (only if errors):
+   - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
+   - (If successful or unknown: silent, no output)
 
 6. **Start dashboard if not running:**
-
-   Display: "📊 **ORCHESTRATOR**: Checking dashboard status..."
 
    ```bash
    # Check if dashboard is running
@@ -570,14 +565,9 @@ Display:
    fi
    ```
 
-   Display result:
-   - If already running: "✅ **ORCHESTRATOR**: Dashboard already running"
-   - If started: "✅ **ORCHESTRATOR**: Dashboard started at http://localhost:53124"
+   (Process silently - dashboard is background infrastructure, no user output needed)
 
-**After initialization:**
-```
-🚀 **ORCHESTRATOR**: Ready to begin orchestration
-```
+**Note:** Initialization is complete when session ID is displayed. No additional "ready" message needed.
 
 **Database Storage:**
 
@@ -673,10 +663,7 @@ Returns latest PM state or null if first iteration.
 
 ### Step 1.2: Spawn PM with Context
 
-**UI Message:**
-```
-🔄 **ORCHESTRATOR**: Sending requirements to Project Manager for mode decision...
-```
+Process internally (PM spawn is already announced in earlier capsule - no additional routing message needed).
 
 Build PM prompt by reading `agents/project_manager.md` and including:
 - **Session ID from Step 0** - [current session_id created in Step 0]
@@ -705,10 +692,7 @@ PM returns decision with:
 
 ### Step 1.3: Receive PM Decision
 
-**UI Message:**
-```
-📨 **ORCHESTRATOR**: Received decision from PM: [MODE] mode with [N] developer(s)
-```
+Process PM response internally (no verbose status message needed - mode decision will be shown in next capsule).
 
 **Log PM interaction to database:**
 ```
@@ -816,7 +800,7 @@ Skill(command: "bazinga-db")
 **If timeout (5 minutes, no response):**
 
 ```
-⏱️ **ORCHESTRATOR**: Timeout reached - proceeding with PM's safe fallback option
+⏱️ Clarification timeout | No response after 5min | Proceeding with PM's safe fallback option
 ```
 
 Log timeout:
@@ -836,10 +820,7 @@ Skill(command: "bazinga-db")
 
 **Step 6: Re-spawn PM with Answer**
 
-**UI Message:**
-```
-🔄 **ORCHESTRATOR**: Re-spawning PM to proceed with clarified requirements...
-```
+Process internally (no verbose status message needed - PM will proceed with planning).
 
 **Spawn PM again with:**
 
@@ -947,10 +928,7 @@ Skill(command: "bazinga-db")
 
 Repeat for each task group found in the PM's response.
 
-**UI Message:**
-```
-⚠️ **ORCHESTRATOR**: PM did not persist task groups - creating [N] task groups in database now
-```
+Process internally (creating task groups from PM response - no user output needed for database sync).
 
 See `bazinga/templates/message_templates.md` for PM response format examples.
 
@@ -1444,10 +1422,9 @@ Skill(command: "bazinga-db")
 
 **⚠️ IMPORTANT:** Orchestrator manages investigation iterations. Investigator agents cannot "wait" or loop internally. Each iteration is a separate agent spawn.
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🔍 **ORCHESTRATOR**: Tech Lead identified complex problem requiring investigation...
-🔬 **ORCHESTRATOR**: Starting investigation loop (max 5 iterations)...
+🔬 Investigation needed | Tech Lead identified complex issue requiring deep analysis | Starting investigation (max 5 iterations)
 ```
 
 **Log Tech Lead request:**
@@ -1507,9 +1484,9 @@ Then invoke: `Skill(command: "bazinga-db")`
 investigation_state.current_iteration += 1
 ```
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🔬 **ORCHESTRATOR**: Investigation Iteration [N] of 5...
+🔬 Investigation iteration {N}/5 | {hypothesis_being_tested} | Testing hypothesis
 ```
 
 ---
@@ -1675,9 +1652,9 @@ Recommended Solution: [solution]
 - Save investigation state to database
 - **EXIT LOOP** → Go to Step 2A.6c (Tech Lead validation)
 
-**UI Message:**
+**User output (capsule format):**
 ```
-✅ **ORCHESTRATOR**: Root cause identified in iteration [N]! Proceeding to validation...
+✅ Root cause found | {root_cause_summary} identified in iteration {N} | Proceeding to Tech Lead validation
 ```
 
 ---
@@ -1696,10 +1673,9 @@ Diagnostic Request:
 
 **If needs Developer:**
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🔧 **ORCHESTRATOR**: Investigator needs diagnostic code from Developer...
-👨‍💻 **ORCHESTRATOR**: Spawning Developer to add instrumentation...
+🔬 Diagnostic instrumentation needed | Adding logging to test {hypothesis} | Developer instrumenting code
 ```
 
 **Build Developer Prompt:**
@@ -1787,9 +1763,9 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Continue loop** (next iteration with Developer results)
 
-**UI Message:**
+**User output (capsule format):**
 ```
-📊 **ORCHESTRATOR**: Diagnostic results received. Continuing investigation...
+🔬 Diagnostic data collected | {brief_summary_of_results} | Continuing investigation
 ```
 
 ---
@@ -1809,9 +1785,9 @@ Next Hypothesis to Test: [next one]
 - Save investigation state
 - **Continue loop** (test next hypothesis)
 
-**UI Message:**
+**User output (capsule format):**
 ```
-❌ **ORCHESTRATOR**: Hypothesis eliminated. Testing next theory...
+🔬 Hypothesis eliminated | {eliminated_hypothesis} ruled out by evidence | Testing next theory
 ```
 
 ---
@@ -1829,9 +1805,9 @@ Next Steps: [what Investigator will do]
 - Save investigation state
 - **Continue loop** (Investigator will analyze further)
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🔍 **ORCHESTRATOR**: Deeper analysis needed. Continuing investigation...
+🔬 Deeper analysis needed | Refining investigation scope | Continuing investigation
 ```
 
 ---
@@ -1850,9 +1826,9 @@ Recommendation: [what's needed to unblock]
 - **EXIT LOOP**
 - Spawn PM to resolve blocker
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🛑 **ORCHESTRATOR**: Investigation blocked. Escalating to PM...
+🛑 Investigation blocked | {blocker_description} | Escalating to PM for resolution
 ```
 
 **Spawn PM:**
@@ -1871,10 +1847,9 @@ Please decide: Reprioritize OR Provide resources to unblock
 
 **If loop exits due to max iterations reached:**
 
-**UI Message:**
+**User output (capsule format):**
 ```
-⏱️ **ORCHESTRATOR**: Max iterations (5) reached. Investigation incomplete.
-📋 **ORCHESTRATOR**: Gathering partial findings...
+⏱️ Investigation timeout | Max 5 iterations reached | Gathering partial findings for Tech Lead review
 ```
 
 **Update investigation state:**
@@ -1899,9 +1874,9 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **After investigation loop completes (root cause found OR incomplete):**
 
-**UI Message:**
+**User output (capsule format):**
 ```
-👔 **ORCHESTRATOR**: Spawning Tech Lead to validate investigation findings...
+👔 Validating investigation | Tech Lead reviewing {root_cause OR partial_findings} | Assessing solution quality
 ```
 
 **Build Tech Lead Validation Prompt:**
@@ -2015,10 +1990,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 ### Step 2A.8: Spawn PM for Final Check
 
-**UI Message:**
-```
-🧠 **ORCHESTRATOR**: Spawning PM for final assessment...
-```
+Process internally (PM will assess completion - no verbose spawn message needed).
 
 Build PM prompt with complete implementation summary and quality metrics.
 
@@ -2080,10 +2052,7 @@ Skill(command: "bazinga-db")
 ---
 ## Phase 2B: Parallel Mode Execution
 
-**UI Message:** Output when entering Phase 2B:
-```
-🚀 **ORCHESTRATOR**: Phase 2B - Starting parallel mode execution with [N] developers
-```
+**Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
 
 ### Step 2B.0: Prepare Code Context for Each Group
 
@@ -2097,10 +2066,7 @@ Store each group's code context separately for use in developer prompts.
 
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
-**UI Message:**
-```
-👨‍💻 **ORCHESTRATOR**: Spawning [N] developers in parallel for groups: [list groups]
-```
+Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
 
 **🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
 
@@ -2162,10 +2128,7 @@ See `agents/developer.md` for full developer agent definition.
 
 ### Step 2B.2: Receive All Developer Responses
 
-**UI Message** (per developer):
-```
-📨 **ORCHESTRATOR**: Received status from Developer (Group [X]): [STATUS]
-```
+Process developer responses internally (individual group status will be shown via capsules as they complete workflow).
 
 **For EACH developer response:**
 
@@ -2303,9 +2266,9 @@ All agent prompts follow same pattern as Phase 2A (see `bazinga/templates/prompt
 
 **When to use this step:** If Step 2B.7 detects ANY groups with status='blocked', immediately execute this step.
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🛑 **ORCHESTRATOR**: Detected [N] blocked group(s). Spawning Investigator to resolve blockers...
+🛑 Blocked groups detected | {N} group(s) blocked: {group_ids} | Spawning Investigator to resolve blockers
 ```
 
 **For EACH blocked group:**
@@ -2427,9 +2390,9 @@ All agent prompts follow same pattern as Phase 2A (see `bazinga/templates/prompt
 
 
 
-**UI Message:**
+**User output (capsule format):**
 ```
-🧠 **ORCHESTRATOR**: All groups complete. Spawning PM for overall assessment...
+✅ All groups complete | {N}/{N} groups approved, all quality gates passed | Final PM check → BAZINGA
 ```
 
 Build PM prompt with:
