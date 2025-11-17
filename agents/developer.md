@@ -918,7 +918,9 @@ Before logging, ask yourself:
 
 ### 5. Report Results
 
-Provide a structured report:
+**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
+
+Provide a structured report with these MANDATORY fields:
 
 ```
 ## Implementation Complete
@@ -952,6 +954,59 @@ Provide a structured report:
 
 **Status:** [READY_FOR_QA if tests exist] / [READY_FOR_REVIEW if no tests]
 **Next Step:** [See routing instructions below - depends on whether tests exist]
+```
+
+### 5.1. Artifact Writing for Test Failures
+
+**If tests are failing (Failing: Z > 0)**, write a detailed artifact file for orchestrator reference:
+
+```bash
+# Step 1: Create artifacts directory (if it doesn't exist)
+Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
+
+# Step 2: Write artifact file (unique per group to avoid collisions)
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md",
+  content: """
+# Test Failures - Developer Report
+
+**Session:** {SESSION_ID}
+**Group:** {GROUP_ID}
+**Date:** {TIMESTAMP}
+
+## Summary
+{Brief summary of what's failing and why}
+
+## Failing Tests
+
+### Test 1: {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Root Cause:** {analysis}
+- **Fix Required:** {what needs to be done}
+
+### Test 2: {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Root Cause:** {analysis}
+- **Fix Required:** {what needs to be done}
+
+## Full Test Output
+```
+{paste full test run output here}
+```
+
+## Next Steps
+{Your plan to fix the failures}
+"""
+)
+```
+
+**Only create this file when tests are actually failing.** If all tests pass, skip this step.
+
+**After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
+```
+**Artifact:** bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md
 ```
 
 ## 🔄 Routing Instructions for Orchestrator
