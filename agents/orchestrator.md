@@ -1830,10 +1830,9 @@ Agent ID: qa_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
-
-
+**AFTER logging QA response: IMMEDIATELY continue to Step 2A.5 (Route QA Response). Do NOT stop.**
 
 ---
 
@@ -2024,10 +2023,9 @@ Agent ID: techlead_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
-
-
+**AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
 ---
 
