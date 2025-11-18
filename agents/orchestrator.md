@@ -815,18 +815,18 @@ Skill(command: "bazinga-db")
 **IF list is empty (no previous sessions):**
 - This is the FIRST session ever
 - Decision: Follow **Path B** (create new session)
-- SKIP the user intent analysis below
+- **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
 
 **IF list has sessions:**
 - Check the most recent session's status field
 - **IF status = "completed":**
   - Previous session is finished
   - Decision: Follow **Path B** (create new session)
-  - SKIP the user intent analysis below
   - **DO NOT try to resume a completed session**
+  - **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
 - **IF status = "active" or "running":**
   - Previous session is still in progress
-  - Proceed to user intent analysis below
+  - **IMMEDIATELY proceed to user intent analysis below. Do NOT stop.**
 
 ---
 
@@ -846,10 +846,12 @@ User said: "[user's message]"
 - If this → They want a NEW SESSION
 
 **Decision:**
-- User wants to RESUME → Follow **Path A** below
-- User wants NEW task → Follow **Path B** below (skip session check, create new)
+- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 856). Do NOT stop.**
+- User wants NEW task → **IMMEDIATELY jump to Path B below (line 951). Do NOT stop.**
 
 **Simple rule:** Check previous session status FIRST. If completed, always create new. Otherwise, check user's intent.
+
+**🔴 CRITICAL: After making the decision, you MUST IMMEDIATELY jump to the chosen path. Do NOT stop here.**
 
 ---
 
@@ -1234,9 +1236,35 @@ PM returns decision with:
 
 ### Step 1.3: Receive PM Decision
 
-Process PM response internally (no verbose status message needed - mode decision will be shown in next capsule).
+**Step 1: Parse PM response and output capsule to user**
 
-**Log PM interaction to database:**
+Use §PM Response Parsing (lines 362-449) to extract:
+- **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
+- **Mode** (SIMPLE, PARALLEL)
+- **Task groups** (if mode decision)
+- **Assessment** (if continue/bazinga)
+
+**Step 2: Construct and output capsule based on status**
+
+IF status = initial mode decision (PM's first response):
+  → Use "Planning complete" template (lines 401-408):
+  ```
+  📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
+  ```
+  OR
+  ```
+  📋 Planning complete | Single-group execution: {task_summary} | Starting development
+  ```
+
+IF status = NEEDS_CLARIFICATION:
+  → Use clarification template (line 427)
+
+IF status = BAZINGA or CONTINUE:
+  → Use appropriate template (lines 411-421)
+
+**Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
+
+**Step 3: Log PM interaction to database:**
 ```
 bazinga-db, please log this PM interaction:
 
@@ -1260,7 +1288,9 @@ Skill(command: "bazinga-db")
 
 **Detection:** Check if PM response contains `PM Status: NEEDS_CLARIFICATION`
 
-**If NEEDS_CLARIFICATION is NOT present:** Skip to Step 1.4 (normal workflow)
+**If NEEDS_CLARIFICATION is NOT present:**
+- PM has made a decision (SIMPLE or PARALLEL mode)
+- **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
 
 **If NEEDS_CLARIFICATION IS present:** Execute clarification workflow below
 
@@ -1863,10 +1893,9 @@ Agent ID: qa_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
-
-
+**AFTER logging QA response: IMMEDIATELY continue to Step 2A.5 (Route QA Response). Do NOT stop.**
 
 ---
 
@@ -2057,10 +2086,9 @@ Agent ID: techlead_main
 Skill(command: "bazinga-db")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
-
-
+**AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
 ---
 
@@ -2277,6 +2305,10 @@ Agent ID: investigator_[group_id]_iter[N]
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+
+**AFTER logging Investigator response: IMMEDIATELY continue to Step 3 (Route Based on Investigator Action). Do NOT stop.**
 
 **Parse Investigator action from response (that you just read above). Look for status markers:**
 
