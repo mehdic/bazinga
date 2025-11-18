@@ -1236,9 +1236,35 @@ PM returns decision with:
 
 ### Step 1.3: Receive PM Decision
 
-Process PM response internally (no verbose status message needed - mode decision will be shown in next capsule).
+**Step 1: Parse PM response and output capsule to user**
 
-**Log PM interaction to database:**
+Use §PM Response Parsing (lines 362-449) to extract:
+- **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
+- **Mode** (SIMPLE, PARALLEL)
+- **Task groups** (if mode decision)
+- **Assessment** (if continue/bazinga)
+
+**Step 2: Construct and output capsule based on status**
+
+IF status = initial mode decision (PM's first response):
+  → Use "Planning complete" template (lines 401-408):
+  ```
+  📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
+  ```
+  OR
+  ```
+  📋 Planning complete | Single-group execution: {task_summary} | Starting development
+  ```
+
+IF status = NEEDS_CLARIFICATION:
+  → Use clarification template (line 427)
+
+IF status = BAZINGA or CONTINUE:
+  → Use appropriate template (lines 411-421)
+
+**Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
+
+**Step 3: Log PM interaction to database:**
 ```
 bazinga-db, please log this PM interaction:
 
@@ -1262,7 +1288,9 @@ Skill(command: "bazinga-db")
 
 **Detection:** Check if PM response contains `PM Status: NEEDS_CLARIFICATION`
 
-**If NEEDS_CLARIFICATION is NOT present:** Skip to Step 1.4 (normal workflow)
+**If NEEDS_CLARIFICATION is NOT present:**
+- PM has made a decision (SIMPLE or PARALLEL mode)
+- **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
 
 **If NEEDS_CLARIFICATION IS present:** Execute clarification workflow below
 
