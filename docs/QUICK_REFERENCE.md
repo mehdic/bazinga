@@ -306,7 +306,7 @@ your-project/
 │   ├── security_scan.json    # Security findings
 │   ├── coverage_report.json  # Coverage data
 │   └── lint_results.json     # Lint issues
-├── .claude.md                 # Global configuration
+├── .claude/claude.md          # Global configuration
 └── .git/                      # Git repository
 ```
 

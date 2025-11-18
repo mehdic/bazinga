@@ -296,13 +296,13 @@ class BazingaSetup:
         1. Check if config exists in target (supports multiple locations for backwards compatibility)
         2. If exists and is_update=True, replace old BAZINGA section with new one
         3. If exists and is_update=False, append if not present
-        4. If doesn't exist, create new .claude/CLAUDE.md with our content
+        4. If doesn't exist, create new .claude/claude.md with our content
 
         Args:
             target_dir: Target directory for installation
             is_update: If True, replaces existing BAZINGA config with new version
         """
-        source_config = self.source_dir / "config" / "claude.md"
+        source_config = self.source_dir / ".claude" / "claude.md"
         if not source_config.exists():
             return False
 
@@ -324,12 +324,12 @@ class BazingaSetup:
             # Fallback: use everything after line 7
             bazinga_config_section = '\n'.join(bazinga_lines[7:])
 
-        # Check for existing .claude.md in project root or .claude/ directory
+        # Check for existing config in .claude/ directory or project root (backwards compatibility)
         # Check multiple variations (case-insensitive)
         possible_filenames = [
-            ".claude.md",    # Recommended format
-            "claude.md",     # Without dot
-            "CLAUDE.md",     # Uppercase without dot
+            "claude.md",     # Recommended format (lowercase, without dot prefix)
+            "CLAUDE.md",     # Uppercase variant
+            ".claude.md",    # Old format with dot
             ".CLAUDE.md",    # Uppercase with dot
         ]
 
@@ -416,9 +416,9 @@ class BazingaSetup:
             # No existing config, create new one in .claude directory
             claude_dir = target_dir / ".claude"
             claude_dir.mkdir(parents=True, exist_ok=True)
-            dest_config = claude_dir / "CLAUDE.md"
+            dest_config = claude_dir / "claude.md"
             shutil.copy2(source_config, dest_config)
-            console.print(f"  ✓ Created .claude/CLAUDE.md with BAZINGA config")
+            console.print(f"  ✓ Created .claude/claude.md with BAZINGA config")
             return True
 
     def _replace_bazinga_section(self, content: str, new_bazinga_section: str) -> Optional[str]:
@@ -1270,7 +1270,7 @@ def init(
     tree.add_row("  ", "├── commands/    [dim](slash commands)[/dim]")
     tree.add_row("  ", "├── scripts/     [dim](initialization scripts)[/dim]")
     tree.add_row("  ", "├── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
-    tree.add_row("  ", "└── CLAUDE.md    [dim](global configuration)[/dim]")
+    tree.add_row("  ", "└── claude.md    [dim](global configuration)[/dim]")
     tree.add_row("📁", "bazinga/         [dim](state files for agent coordination)[/dim]")
     console.print(tree)
 
@@ -1304,10 +1304,11 @@ def check():
     cwd = Path.cwd()
     claude_dir = cwd / ".claude"
     agents_dir = claude_dir / "agents"
-    # Check for config in new location (.claude/CLAUDE.md) or old location (.claude.md) for backwards compatibility
-    config_file_new = claude_dir / "CLAUDE.md"
-    config_file_old = cwd / ".claude.md"
-    config_exists = config_file_new.exists() or config_file_old.exists()
+    # Check for config in new location (.claude/claude.md) or old locations for backwards compatibility
+    config_file_new = claude_dir / "claude.md"
+    config_file_old1 = claude_dir / "CLAUDE.md"  # Uppercase variant
+    config_file_old2 = cwd / ".claude.md"  # Root location
+    config_exists = config_file_new.exists() or config_file_old1.exists() or config_file_old2.exists()
     bazinga_dir = cwd / "bazinga"
 
     bazinga_installed = all(
@@ -1644,7 +1645,7 @@ def update(
             "  • Scripts (.claude/scripts/)\n"
             "  • Commands (.claude/commands/)\n"
             "  • Skills (.claude/skills/)\n"
-            "  • Configuration (.claude.md - merged if needed)\n\n"
+            "  • Configuration (.claude/claude.md - merged if needed)\n\n"
             "[dim]Coordination files will NOT be modified[/dim]\n"
         )
         confirm = typer.confirm("Continue with update?")

@@ -478,7 +478,7 @@ your-project/
 │   ├── coverage_report.json  # Test coverage (auto-generated)
 │   ├── lint_results.json     # Code quality issues (auto-generated)
 │   └── testing_config.json   # Testing mode configuration (auto-generated)
-├── .claude.md                 # Global configuration
+├── .claude/claude.md          # Global configuration
 └── .git/                      # Git repository
 ```
 
