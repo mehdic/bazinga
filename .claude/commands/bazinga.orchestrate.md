@@ -816,18 +816,18 @@ Skill(command: "bazinga-db")
 **IF list is empty (no previous sessions):**
 - This is the FIRST session ever
 - Decision: Follow **Path B** (create new session)
-- SKIP the user intent analysis below
+- **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
 
 **IF list has sessions:**
 - Check the most recent session's status field
 - **IF status = "completed":**
   - Previous session is finished
   - Decision: Follow **Path B** (create new session)
-  - SKIP the user intent analysis below
   - **DO NOT try to resume a completed session**
+  - **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
 - **IF status = "active" or "running":**
   - Previous session is still in progress
-  - Proceed to user intent analysis below
+  - **IMMEDIATELY proceed to user intent analysis below. Do NOT stop.**
 
 ---
 
@@ -847,10 +847,12 @@ User said: "[user's message]"
 - If this → They want a NEW SESSION
 
 **Decision:**
-- User wants to RESUME → Follow **Path A** below
-- User wants NEW task → Follow **Path B** below (skip session check, create new)
+- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 856). Do NOT stop.**
+- User wants NEW task → **IMMEDIATELY jump to Path B below (line 951). Do NOT stop.**
 
 **Simple rule:** Check previous session status FIRST. If completed, always create new. Otherwise, check user's intent.
+
+**🔴 CRITICAL: After making the decision, you MUST IMMEDIATELY jump to the chosen path. Do NOT stop here.**
 
 ---
 
