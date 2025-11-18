@@ -2307,6 +2307,10 @@ Agent ID: investigator_[group_id]_iter[N]
 
 Then invoke: `Skill(command: "bazinga-db")`
 
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+
+**AFTER logging Investigator response: IMMEDIATELY continue to Step 3 (Route Based on Investigator Action). Do NOT stop.**
+
 **Parse Investigator action from response (that you just read above). Look for status markers:**
 
 ---
