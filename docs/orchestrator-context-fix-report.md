@@ -132,7 +132,7 @@ Example workflow:
 cat bazinga/project_context.json
 
 # For complex tasks, run analysis
-Skill(skill: "codebase-analysis")
+Skill(command: "codebase-analysis")
 cat bazinga/codebase_analysis.json
 ```
 
