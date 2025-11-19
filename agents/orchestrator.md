@@ -2687,7 +2687,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 **Step 1: Parse response and output capsule to user**
 
 Use §PM Response Parsing (lines 340-431) to extract:
-- **Decision** (BAZINGA, CONTINUE, CLARIFICATION_NEEDED, REQUIRES_CHANGES)
+- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
 - **Next actions** (if continuing)
@@ -2701,13 +2701,13 @@ IF decision = BAZINGA:
   [Show final report in next step]
   ```
 
-IF decision = CONTINUE or REQUIRES_CHANGES:
+IF decision = CONTINUE:
   → Use "PM Assessment" template:
   ```
   📋 PM check | {assessment_summary} | {feedback_summary} → {next_action}
   ```
 
-IF decision = CLARIFICATION_NEEDED:
+IF decision = NEEDS_CLARIFICATION:
   → Use "Clarification" template:
   ```
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
@@ -3154,8 +3154,8 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 
 **Construct and output capsule:**
 - BAZINGA: `✅ BAZINGA - Orchestration Complete!` [show final report in next step]
-- CONTINUE/REQUIRES_CHANGES: `📋 PM check | {assessment} | {feedback} → {next_action}`
-- CLARIFICATION_NEEDED: `⚠️ PM needs clarification | {question} | Awaiting response`
+- CONTINUE: `📋 PM check | {assessment} | {feedback} → {next_action}`
+- NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
 
 **Step 2: Log PM response:**
 ```
