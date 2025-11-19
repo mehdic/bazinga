@@ -145,6 +145,68 @@ This prevents concurrent sessions from overwriting each other's results.
 
 ---
 
+## Known Limitations
+
+### File Scanning Limit
+
+**Limitation:** Similarity search examines maximum **1,000 source files** per analysis.
+
+**Why it exists:**
+- Performance: Keeps analysis time under 30 seconds
+- Resource constraints: Prevents memory/CPU exhaustion
+- Practical: Most relevant code is in first 1,000 files scanned
+
+**Impact on large repositories (>1K files):**
+
+| Project Size | Files Examined | Potential Issue |
+|--------------|----------------|-----------------|
+| <1,000 files | All files | No impact ✅ |
+| 1,000-5,000 files | First 1,000 | May miss deep directories 🟡 |
+| >5,000 files | First 1,000 | Significant portions skipped 🔴 |
+
+**Traversal order:**
+- Uses `os.walk(".")` which typically scans in lexical (alphabetical) order by directory
+- Directories earlier in alphabet scanned first (e.g., `.github/`, `agents/`, `docs/`)
+- Deep or late-alphabet directories may be skipped (e.g., `src/`, `tests/`, `zzz_utils/`)
+
+**Risk example:**
+```
+Project with 5,000 files:
+  ✅ .github/          (examined - alphabetically early)
+  ✅ agents/           (examined)
+  ✅ docs/             (examined)
+  ✅ research/         (examined - 1,000 file limit reached here)
+  ❌ src/              (SKIPPED - never examined!)
+  ❌ tests/            (SKIPPED)
+```
+
+Result: Analysis reports "top 5 similar features" but only examined 20% of codebase.
+
+**Mitigation strategies:**
+
+1. **Small-medium projects (<1K files):**
+   - No action needed, all files scanned
+
+2. **Large projects (>1K files):**
+   - Be aware results may be incomplete
+   - Cross-reference with manual exploration
+   - Consider skill best for initial orientation, not exhaustive discovery
+
+3. **Very large projects (>5K files):**
+   - Use skill for quick overview only
+   - Prefer manual search (Grep, Glob) for specific patterns
+   - Consider splitting analysis by directory (run skill per subdirectory)
+
+**Future improvements (not yet implemented):**
+- Priority directories (examine `src/`, `lib/`, `app/` first)
+- Recency-based ordering (newer files first)
+- Smart sampling (even distribution across directory tree)
+- Configurable file limit
+
+**Current status:** Design limitation, working as intended for small-medium codebases.
+
+---
+
 ## Troubleshooting
 
 ### Issue: "Found 0 utilities"

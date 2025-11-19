@@ -542,10 +542,13 @@ context = read("bazinga/project_context.json")
 - ALWAYS read from file (current session only)
 - NEVER query bazinga-db (historical analysis is for PM/Tech Lead/Investigator)
 - If "template": true → PM hasn't generated yet, may invoke codebase-analysis for task-specific context
+- If "fallback": true → PM failed to generate, SHOULD invoke codebase-analysis for task-specific context
 
 **What You Get**:
 ```json
 {
+  "session_id": "bazinga_20251119_100000",
+  "generated_at": "2025-11-19T10:00:00Z",
   "project_type": "Web API",
   "primary_language": "Python",
   "architecture_patterns": ["Service layer", "Repository pattern"],
@@ -630,7 +633,7 @@ PM includes file hints in task descriptions:
 3. **Invoke codebase-analysis for complex tasks**:
 ```bash
 # When you need to understand similar implementations
-Skill(skill: "codebase-analysis")
+Skill(command: "codebase-analysis")
 
 # Read the analysis
 cat bazinga/codebase_analysis.json
@@ -734,7 +737,7 @@ The Orchestrator provides you with skills based on `bazinga/skills_config.json`:
 **MANDATORY - Before Committing**:
 ```bash
 # INVOKE lint-check Skill explicitly to catch issues BEFORE committing
-Skill(skill: "lint-check")
+Skill(command: "lint-check")
 
 # Read results and fix all issues before proceeding
 cat bazinga/lint_results.json
@@ -744,17 +747,17 @@ cat bazinga/lint_results.json
 ```bash
 # For COMPLEX tasks - Use codebase-analysis to understand patterns
 # (Check Context Awareness section above for complexity assessment)
-Skill(skill: "codebase-analysis")
+Skill(command: "codebase-analysis")
 cat bazinga/codebase_analysis.json  # Review discovered patterns
 
 # When modifying APIs - Use api-contract-validation
-Skill(skill: "api-contract-validation")
+Skill(command: "api-contract-validation")
 
 # Use db-migration-check when creating migrations
-Skill(skill: "db-migration-check")
+Skill(command: "db-migration-check")
 
 # Use test-pattern-analysis when writing complex tests
-Skill(skill: "test-pattern-analysis")
+Skill(command: "test-pattern-analysis")
 ```
 
 **Best Practice**:

@@ -78,7 +78,7 @@ if missing:
 
 ### Phase 2: Template Seed File (30 min) ✅
 
-**File**: `bazinga/project_context.template.json`
+**File**: `.claude/templates/project_context.template.json`
 
 **Purpose**:
 - Provides fallback when PM doesn't generate context
@@ -102,9 +102,9 @@ if file_exists("bazinga/project_context.json"):
         # PM had issues generating context, using minimal fallback
         pass
 
-elif file_exists("bazinga/project_context.template.json"):
+elif file_exists(".claude/templates/project_context.template.json"):
     # PM hasn't generated context yet, use template as fallback
-    context = read_file("bazinga/project_context.template.json")
+    context = read_file(".claude/templates/project_context.template.json")
 
 else:
     # No context available at all
@@ -372,7 +372,7 @@ grep -n ".claude/skills" .claude/skills/codebase-analysis/scripts/analyze_codeba
 **Codex**: "PM docs say create bazinga/project_context.json, but no template/seed file exists."
 
 **Fixed**:
-- Created `bazinga/project_context.template.json`
+- Created `.claude/templates/project_context.template.json`
 - Pre-populated with BAZINGA defaults
 - Developer agent checks for template as fallback
 - PM validation creates fallback if generation fails
@@ -410,7 +410,7 @@ grep -n ".claude/skills" .claude/skills/codebase-analysis/scripts/analyze_codeba
 | `analyze_codebase.py` | +120 | Performance + filtering |
 | `similarity.py` | +25 | Gitignore support |
 | `pattern_detector.py` | +23 | Fix pytest detection |
-| `bazinga/project_context.template.json` | +56 (new) | Seed file |
+| `.claude/templates/project_context.template.json` | +56 (new) | Seed file |
 | `research/tests/test-analyzer-performance.sh` | +200 (new) | Integration tests |
 | `research/troubleshooting-*.md` | +650 (new) | Troubleshooting |
 
@@ -562,7 +562,7 @@ python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py \
 # Expected: "Found 37 utilities"
 
 # 4. Check template exists
-ls -lh bazinga/project_context.template.json
+ls -lh .claude/templates/project_context.template.json
 # Should exist
 ```
 

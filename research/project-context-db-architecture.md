@@ -16,7 +16,7 @@
 - **Project context → Files only** ❌
 
 **File Location Error:**
-- Template at `bazinga/project_context.template.json` (gitignored, won't commit)
+- Template at `.claude/templates/project_context.template.json` (gitignored, won't commit)
 - No version control for template
 - No history tracking for context evolution
 
@@ -103,7 +103,7 @@ PM overwrites with real context
 **Move:**
 ```bash
 mkdir -p .claude/templates
-git mv -f bazinga/project_context.template.json .claude/templates/
+git mv -f .claude/templates/project_context.template.json .claude/templates/
 ```
 
 **Update references:**

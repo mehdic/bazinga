@@ -34,7 +34,7 @@ ls -lh bazinga/project_context.json
 cat bazinga/pm_errors.log
 
 # Check if template exists as fallback
-ls -lh bazinga/project_context.template.json
+ls -lh .claude/templates/project_context.template.json
 ```
 
 **Root Causes**:
@@ -52,7 +52,7 @@ tail -20 bazinga/pm_errors.log
 
 **Solution 2**: Manually create from template
 ```bash
-cp bazinga/project_context.template.json bazinga/project_context.json
+cp .claude/templates/project_context.template.json bazinga/project_context.json
 # Edit to match your project
 ```
 
@@ -433,7 +433,7 @@ grep -c "VALIDATION (MANDATORY)" agents/project_manager.md
 # Expected: 1
 
 # 3. Check template exists
-ls bazinga/project_context.template.json
+ls .claude/templates/project_context.template.json
 # Should exist
 
 # 4. Test analyzer
@@ -533,7 +533,7 @@ git checkout main agents/developer.md
 
 # 2. Remove new files
 rm -rf .claude/skills/codebase-analysis/
-rm bazinga/project_context.template.json
+rm .claude/templates/project_context.template.json
 
 # 3. Rebuild slash commands
 ./scripts/build-slash-commands.sh
@@ -590,7 +590,7 @@ else
 fi
 
 # Check 3
-if [ -f "bazinga/project_context.template.json" ]; then
+if [ -f ".claude/templates/project_context.template.json" ]; then
     echo "✓ Template file exists"
 else
     echo "❌ Template missing"

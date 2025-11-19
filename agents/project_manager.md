@@ -646,9 +646,32 @@ After analyzing requirements and before creating task groups, generate project c
 ```bash
 If file exists: bazinga/project_context.json
   AND created within last hour
+  AND session_id matches current session
   → Reuse existing context
 Else
   → Generate new context
+```
+
+**Session ID Verification:**
+```python
+import json
+from datetime import datetime, timedelta
+
+# Read existing context
+with open('bazinga/project_context.json') as f:
+    existing_context = json.load(f)
+
+# Check conditions
+file_age = datetime.now() - datetime.fromisoformat(existing_context.get('generated_at', '1970-01-01'))
+session_matches = existing_context.get('session_id') == current_session_id
+is_recent = file_age < timedelta(hours=1)
+
+if session_matches and is_recent:
+    # Reuse existing context
+    context = existing_context
+else:
+    # Generate new context (session mismatch or stale)
+    context = generate_new_context()
 ```
 
 **Generate Project Context:**

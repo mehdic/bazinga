@@ -1,8 +1,15 @@
 # Skills Implementation Summary
 
 **Date:** 2025-11-07
+**Updated:** 2025-11-19
 **Status:** ✅ IMPLEMENTED
 **Session:** claude/explore-spec-kit-011CUtHzsgMKHEcNpoqSuQnD
+
+---
+
+**📚 For general skill creation guidance:** See `research/skill-implementation-guide.md` (comprehensive reference for creating, updating, and invoking skills)
+
+**📝 This document:** Implementation history and BAZINGA-specific architectural decisions
 
 ---
 

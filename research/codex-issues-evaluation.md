@@ -220,7 +220,7 @@ else: generate and save to DB
 ## Issue #4: Troubleshooting Docs Point to Old Template Location 🟡 MINOR
 
 ### Codex's Claim
-> "The template now lives under `.claude/templates/project_context.template.json`, but the repair guides still tell operators to `ls/cp bazinga/project_context.template.json`. Following those steps now fails outright."
+> "The template now lives under `.claude/templates/project_context.template.json`, but the repair guides still tell operators to `ls/cp .claude/templates/project_context.template.json`. Following those steps now fails outright."
 
 ### Investigation Results
 
@@ -261,7 +261,7 @@ research/project-context-db-architecture.md:106
 ```bash
 # Update all research docs
 find research/ -type f -name "*.md" -exec sed -i \
-  's|bazinga/project_context.template.json|.claude/templates/project_context.template.json|g' {} +
+  's|.claude/templates/project_context.template.json|.claude/templates/project_context.template.json|g' {} +
 ```
 
 ---
@@ -417,7 +417,7 @@ max_files: int = 5000  # Cover larger repos
 4. **Fix Issue #4 - Doc locations** (5 min)
    ```bash
    find research/ -type f -name "*.md" -exec sed -i \
-     's|bazinga/project_context.template.json|.claude/templates/project_context.template.json|g' {} +
+     's|.claude/templates/project_context.template.json|.claude/templates/project_context.template.json|g' {} +
    ```
 
 ### Phase 3: Optional (Document Only)
