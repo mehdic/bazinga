@@ -1,0 +1,67 @@
+name: Validate Skills Structure
+
+on:
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - 'agents/**/*.md'
+      - 'scripts/validate-skills.sh'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - '.claude/skills/**'
+      - 'agents/**/*.md'
+      - 'scripts/validate-skills.sh'
+
+jobs:
+  validate-skills:
+    name: Validate Skill Structure and Invocation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Make validation script executable
+        run: chmod +x scripts/validate-skills.sh
+
+      - name: Validate skill structure
+        run: |
+          echo "🔍 Validating skill structure and invocation syntax..."
+          echo ""
+          ./scripts/validate-skills.sh
+
+      - name: Validation summary
+        if: success()
+        run: |
+          echo ""
+          echo "✅ All skills are properly structured!"
+          echo ""
+          echo "Validated:"
+          echo "  - SKILL.md exists for all skills"
+          echo "  - Required frontmatter fields present"
+          echo "  - Skill names match directory names"
+          echo "  - Required sections exist"
+          echo "  - Correct invocation syntax in agent files"
+
+      - name: Validation failed
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ Skill validation failed!"
+          echo ""
+          echo "One or more skills have structural issues or incorrect invocation syntax."
+          echo ""
+          echo "Common issues:"
+          echo "  - Missing SKILL.md file"
+          echo "  - Missing required frontmatter (version, name, description)"
+          echo "  - Skill name doesn't match directory name"
+          echo "  - Missing required sections (When to Invoke, Your Task)"
+          echo "  - Wrong invocation syntax: Skill(skill:) instead of Skill(command:)"
+          echo ""
+          echo "See research/skill-implementation-guide.md for complete requirements"
+          echo "See research/skill-fix-manual.md for step-by-step fixing guide"
+          echo ""
+          exit 1
