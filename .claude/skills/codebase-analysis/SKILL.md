@@ -1,184 +1,165 @@
 ---
-name: codebase-analysis
-description: Analyze codebase to find similar features, reusable utilities, and architectural patterns
 version: 1.0.0
+name: codebase-analysis
+description: Analyzes codebase to find similar features, reusable utilities, and architectural patterns
+author: BAZINGA Team
+tags: [development, analysis, codebase, context]
 allowed-tools: [Bash, Read]
 ---
 
 # Codebase Analysis Skill
 
-You are the codebase-analysis skill. When invoked with a task description, you analyze the existing codebase to find similar features, reusable utilities, and architectural patterns.
+You are the codebase-analysis skill. Your role is to analyze a codebase and provide developers with relevant context for their implementation tasks.
 
 ## When to Invoke This Skill
 
-**Invoke this skill when:**
-- Before starting new feature development
-- Developer needs to find similar existing code
-- Looking for reusable utilities or patterns
-- Understanding codebase architecture
-- Avoiding duplicate implementations
-
-**Do NOT invoke when:**
-- Implementing completely novel features with no precedent
-- Working in greenfield projects with no existing code
-- Fixing typos or documentation
-- Emergency bug fixes (skip analysis to save time)
-
----
+You should be invoked when:
+- A developer needs to understand existing patterns before implementation
+- Complex features require architectural guidance
+- Reusable utilities need to be discovered
+- Similar features exist that could be referenced
+- Developer is working on a new feature area
 
 ## Your Task
 
-When invoked:
-1. Execute the codebase analysis script with task description
-2. Read the generated analysis report
-3. Return a summary to the calling agent
+When invoked with a task description, you must:
 
----
+### Step 1: Execute Analysis Script
 
-## Step 1: Execute Codebase Analysis Script
-
-Use the **Bash** tool to run the pre-built analysis script with the task description:
+Run the analysis script with the provided task:
 
 ```bash
-python3 .claude/skills/codebase-analysis/analyze.py --task "{task_description}"
+python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py \
+  --task "$TASK_DESCRIPTION" \
+  --session "$SESSION_ID" \
+  --cache-enabled \
+  --output bazinga/codebase_analysis.json
 ```
 
-This script will:
-- Extract keywords from task description
-- Find similar existing features
-- Discover reusable utilities
-- Identify architectural patterns
-- Extract project conventions
-- Generate `bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json`
+### Step 2: Read Analysis Results
 
----
-
-## Step 2: Read Generated Report
-
-Use the **Read** tool to read:
+Read the generated analysis results:
 
 ```bash
-bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+cat bazinga/codebase_analysis.json
 ```
 
-Extract key information:
-- `similar_features` - Existing code to reference
-- `reusable_utilities` - Functions/classes to reuse
-- `architectural_patterns` - Project patterns to follow
-- `suggested_approach` - Implementation guidance
-- `conventions` - Code style and standards
+### Step 3: Return Summary to Developer
 
----
-
-## Step 3: Return Summary
-
-Return a concise summary to the calling agent:
-
-```
-Codebase Analysis:
-- Similar features found: {count}
-- Reusable utilities: {count}
-
-Most similar: {file} (similarity: {score})
-
-Reusable utilities:
-- {utility1}: {description}
-- {utility2}: {description}
-
-Architectural patterns:
-- {pattern1}
-- {pattern2}
-
-Suggested approach:
-{approach}
-
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
-```
-
----
+Return a concise, actionable summary including:
+- Similar features found (with file paths)
+- Reusable utilities discovered
+- Architectural patterns to follow
+- Suggested implementation approach
 
 ## Example Invocation
 
-**Scenario: Implementing Password Reset**
+### Input
+Developer invokes: `/codebase-analysis "Implement password reset functionality with email verification"`
 
-Input: Developer needs to implement password reset endpoint
+### Your Actions
 
-Expected output:
-```
-Codebase Analysis:
-- Similar features found: 3
-- Reusable utilities: 5
-
-Most similar: auth/login.py (similarity: 0.82)
-
-Reusable utilities:
-- EmailService (utils/email.py): Send templated emails
-- TokenGenerator (utils/crypto.py): Generate secure tokens
-- UserValidator (utils/validators.py): Validate email addresses
-
-Architectural patterns:
-- Service layer pattern (services/ directory)
-- Repository pattern for database access
-- JWT authentication
-
-Suggested approach:
-1. Create PasswordResetService in services/ (following service layer pattern)
-2. Reuse EmailService from utils/email.py
-3. Reuse TokenGenerator from utils/crypto.py
-4. Follow existing auth patterns in auth/login.py
-5. Add tests with 80% coverage target
-
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+1. **Execute analysis:**
+```bash
+python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py \
+  --task "Implement password reset functionality with email verification" \
+  --session "bazinga_20251118_100000" \
+  --cache-enabled \
+  --output bazinga/codebase_analysis.json
 ```
 
-**Scenario: No Similar Features Found**
-
-Input: Implementing completely new payment integration
-
-Expected output:
-```
-Codebase Analysis:
-- Similar features found: 0
-- Reusable utilities: 2
-
-No similar payment features found in codebase.
-
-Reusable utilities:
-- ApiClient (utils/http.py): HTTP client wrapper
-- ConfigLoader (utils/config.py): Load environment config
-
-Architectural patterns:
-- Service layer pattern
-- Dependency injection
-
-Suggested approach:
-1. Implement from scratch following project patterns
-2. Create PaymentService in services/
-3. Reuse ApiClient for external API calls
-4. Add comprehensive tests (no existing payment tests to reference)
-
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+2. **Read results:**
+```bash
+cat bazinga/codebase_analysis.json
 ```
 
----
+3. **Return summary:**
+```
+CODEBASE ANALYSIS COMPLETE
+
+## Similar Features Found
+- User registration (auth/register.py) - 85% similarity
+  * Email validation pattern
+  * Token generation approach
+  * Database transaction handling
+- Email verification (auth/verify.py) - 72% similarity
+  * Token expiry logic
+  * Email template usage
+
+## Reusable Utilities
+- EmailService (utils/email.py) - send_email(), validate_email()
+- TokenGenerator (utils/tokens.py) - generate_token(), verify_token()
+- PasswordHasher (utils/crypto.py) - hash_password(), verify_password()
+
+## Architectural Patterns
+- Service layer pattern (all business logic in services/)
+- Repository pattern for data access
+- Decorator-based authentication
+
+## Suggested Implementation Approach
+1. Create PasswordResetService in services/
+2. Reuse EmailService for sending reset emails
+3. Use TokenGenerator for reset tokens
+4. Follow transaction pattern from register.py
+5. Add tests similar to test_registration.py
+
+Full analysis details saved to: bazinga/codebase_analysis.json
+```
+
+## Cache Behavior
+
+The skill maintains an intelligent cache to improve performance:
+- **Project-wide patterns**: Cached for 1 hour
+- **Utilities**: Cached for entire session
+- **Similar features**: Always fresh (task-specific)
+- **Cache location**: `bazinga/.analysis_cache/`
+
+Expected cache efficiency: 60%+ after first run
 
 ## Error Handling
 
-**If no similar features found:**
-- Return: "No similar features found. Suggest implementing from scratch following project patterns."
+If analysis fails or times out:
+1. Check if partial results are available
+2. Return what was found with error indication
+3. Suggest manual exploration as fallback
 
-**If no utilities found:**
-- Return: "No reusable utilities found. Developer may need to create new utility functions."
+Example error response:
+```
+ANALYSIS PARTIALLY COMPLETE
 
-**If codebase structure unclear:**
-- Return: "Could not detect clear architectural patterns. Analyze manually."
+⚠️ Warning: Full analysis timed out after 20 seconds
 
----
+## Partial Results
+- Found 2 similar features (may be incomplete)
+- Utilities discovery incomplete
 
-## Notes
+Suggestion: Manually explore /auth and /utils directories for patterns
 
-- The script handles all similarity matching and pattern detection
-- Focuses on high similarity matches (>0.7)
-- Prioritizes reusable code to avoid duplication
-- Respects existing patterns for consistency
-- Includes test patterns in analysis
+Partial results saved to: bazinga/codebase_analysis.json
+```
+
+## Performance Expectations
+
+- First run: 10-20 seconds (building cache)
+- Subsequent runs: 5-10 seconds (using cache)
+- Large codebases (>10K files): May take up to 30 seconds
+
+## Integration with Developer Workflow
+
+Developers will invoke you:
+1. **Before implementation** - to understand patterns
+2. **When stuck** - to find similar code
+3. **For complex tasks** - to get architectural guidance
+
+Your analysis helps developers:
+- Write code consistent with the codebase
+- Reuse existing utilities
+- Follow established patterns
+- Reduce revision cycles
+
+## Important Notes
+
+- You are a read-only skill - never modify code
+- Focus on actionable insights, not exhaustive documentation
+- Prioritize relevance over completeness
+- Always save full results to JSON even if returning summary

@@ -638,6 +638,94 @@ Execution Plan:
 Recommended parallelism: 2 developers for phase 1
 ```
 
+**Phase 4.5: Generate Project Context (NEW)**
+
+After analyzing requirements and before creating task groups, generate project context to help developers understand the codebase. This context will be saved and reused across all developers.
+
+**Check Existing Context:**
+```bash
+If file exists: bazinga/project_context.json
+  AND created within last hour
+  → Reuse existing context
+Else
+  → Generate new context
+```
+
+**Generate Project Context:**
+```json
+{
+  "project_type": "Detected project type (REST API, CLI tool, library, microservice)",
+  "primary_language": "Python/JavaScript/Go/Java (detected)",
+  "framework": "Flask/Express/Django/Spring (if applicable)",
+  "architecture_patterns": [
+    "Service layer pattern (services/)",
+    "Repository pattern (repositories/)",
+    "MVC pattern (models/views/controllers/)"
+  ],
+  "conventions": {
+    "error_handling": "How errors are typically handled",
+    "authentication": "Auth approach if present",
+    "validation": "Input validation approach",
+    "testing": "Test framework and patterns used"
+  },
+  "key_directories": {
+    "services": "Business logic location (e.g., services/)",
+    "models": "Data models location (e.g., models/)",
+    "utilities": "Shared utilities location (e.g., utils/)",
+    "tests": "Test files location (e.g., tests/)"
+  },
+  "common_utilities": [
+    {
+      "name": "EmailService",
+      "location": "utils/email.py",
+      "purpose": "Handles email sending"
+    },
+    {
+      "name": "TokenGenerator",
+      "location": "utils/tokens.py",
+      "purpose": "JWT token generation"
+    }
+  ],
+  "test_framework": "pytest/jest/go test",
+  "coverage_target": "80%",
+  "generated_at": "2025-11-18T10:00:00Z",
+  "session_id": "[current session_id]"
+}
+```
+
+**Save Context:**
+Write to `bazinga/project_context.json` for developers to read.
+
+**Enhance Task Group Descriptions:**
+
+When creating task groups, include relevant file hints:
+
+Original task description:
+```
+Group A: User Authentication
+- Implement login endpoint
+- Add JWT token generation
+```
+
+Enhanced with file hints:
+```
+Group A: User Authentication
+- Implement login endpoint
+- Add JWT token generation
+
+Relevant files to reference:
+- Existing auth patterns: /auth/basic_auth.py
+- User model: /models/user.py
+- JWT utility: /utils/token.py (if exists)
+- Similar endpoint: /api/register.py
+- Error handling: /utils/responses.py
+
+Key patterns to follow:
+- Use service layer pattern (see /services/user_service.py)
+- Follow error_response() pattern from /utils/responses.py
+- Use validators from /utils/validators.py
+```
+
 **Phase 5: Save Your PM State with Spec-Kit Context to Database**
 
 **Request to bazinga-db skill:**
