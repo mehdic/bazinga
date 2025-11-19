@@ -1,0 +1,63 @@
+name: Validate Orchestrator References
+
+on:
+  pull_request:
+    paths:
+      - 'agents/orchestrator.md'
+      - '.claude/commands/bazinga.orchestrate.md'
+      - 'scripts/validate-orchestrator-references.sh'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'agents/orchestrator.md'
+      - '.claude/commands/bazinga.orchestrate.md'
+      - 'scripts/validate-orchestrator-references.sh'
+
+jobs:
+  validate:
+    name: Validate §line and §Step References
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Make validation script executable
+        run: chmod +x scripts/validate-orchestrator-references.sh
+
+      - name: Validate references
+        run: |
+          echo "🔍 Running orchestrator reference validation..."
+          ./scripts/validate-orchestrator-references.sh --verbose
+
+      - name: Check for orphaned sections
+        run: |
+          echo ""
+          echo "🔍 Checking for orphaned sections..."
+          ./scripts/validate-orchestrator-references.sh --check-orphans
+        continue-on-error: true  # Orphans are warnings, not errors
+
+      - name: Validation summary
+        if: success()
+        run: |
+          echo "✅ All orchestrator references are valid!"
+          echo ""
+          echo "Validated:"
+          echo "  - §line XXXX references (with content keywords)"
+          echo "  - §Step X.Y.Z references"
+          echo "  - No broken references detected"
+
+      - name: Validation failed
+        if: failure()
+        run: |
+          echo "❌ Orchestrator reference validation failed!"
+          echo ""
+          echo "This PR has broken references in agents/orchestrator.md"
+          echo ""
+          echo "To fix locally:"
+          echo "  ./scripts/validate-orchestrator-references.sh --fix"
+          echo ""
+          echo "Then commit the fixes and push again."
+          exit 1
