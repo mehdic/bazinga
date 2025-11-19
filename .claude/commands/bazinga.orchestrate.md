@@ -2756,11 +2756,11 @@ Skill(command: "bazinga-db")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Parse PM feedback → identify what needs fixing and which agent to respawn
-- Immediately spawn agent with revision prompt (Session ID, PM feedback, files to fix)
-- Track iteration in database → Continue workflow automatically
+- Query task groups (§line 3279) → Parse PM feedback → Identify what needs fixing
+- Build revision prompt per §Step 2A.1 → Spawn agent → Log response (§line 1697)
+- Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
-**❌ DO NOT ask "Would you like me to continue?" - just spawn agents immediately**
+**❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
 
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
@@ -3197,11 +3197,11 @@ Skill(command: "velocity-tracker")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Parse PM feedback → identify which groups need fixes and what agent to respawn
-- Immediately spawn agents in parallel (one message, multiple Task calls with group-specific revision prompts)
-- Track iteration per group in database → Continue workflow automatically
+- Query task groups (§line 3279) → Parse PM feedback → Identify groups needing fixes
+- Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
+- Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
-**❌ DO NOT ask "Would you like me to continue?" - just spawn agents immediately**
+**❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
 
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
