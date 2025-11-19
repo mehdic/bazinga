@@ -1,223 +1,220 @@
 #!/usr/bin/env python3
-"""
-Text Similarity Functions
+"""Find similar code to a given task."""
 
-Provides functions for calculating text similarity between task descriptions
-and code files using TF-IDF and cosine similarity.
-"""
-
+import os
 import re
-from collections import Counter
-from typing import List, Set
-import math
+from typing import List, Dict, Any
+from difflib import SequenceMatcher
 
 
-def extract_keywords(text: str, min_length: int = 3) -> List[str]:
-    """
-    Extract keywords from text.
+class SimilarityFinder:
+    def find_similar(self, task: str, gitignore_patterns: set = None, max_files: int = 1000) -> List[Dict[str, Any]]:
+        """Find files similar to the given task."""
+        if gitignore_patterns is None:
+            gitignore_patterns = set()
 
-    Args:
-        text: Input text
-        min_length: Minimum keyword length
+        # Extract keywords from task
+        keywords = self.extract_keywords(task)
+        similar_files = []
+        file_count = 0
 
-    Returns:
-        List of keywords
-    """
-    # Convert to lowercase
-    text = text.lower()
+        # Search for files containing keywords
+        for root, dirs, files in os.walk("."):
+            # Filter out ignored directories
+            dirs[:] = [d for d in dirs if not self._should_ignore(os.path.join(root, d), gitignore_patterns)]
 
-    # Remove special characters, keep alphanumeric and spaces
-    text = re.sub(r'[^a-z0-9\s]', ' ', text)
+            for file in files:
+                if file_count >= max_files:
+                    break
 
-    # Split into words
-    words = text.split()
+                # Only check source code files
+                if self._is_source_file(file):
+                    file_path = os.path.join(root, file)
 
-    # Common stop words to filter out
-    stop_words = {
-        'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
-        'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from', 'that', 'this',
-        'it', 'be', 'are', 'was', 'were', 'been', 'have', 'has', 'had',
-        'do', 'does', 'did', 'will', 'would', 'should', 'could', 'can',
-        'may', 'might', 'must', 'shall'
-    }
+                    # Skip if path should be ignored
+                    if self._should_ignore(file_path, gitignore_patterns):
+                        continue
 
-    # Filter out stop words and short words
-    keywords = [
-        word for word in words
-        if len(word) >= min_length and word not in stop_words
-    ]
+                    file_count += 1
+                    similarity_score = self.calculate_similarity(file_path, keywords)
+                    
+                    if similarity_score > 0.3:  # 30% similarity threshold
+                        matched_keywords = self.get_matched_keywords(file_path, keywords)
+                        patterns = self.extract_patterns(file_path)
+                        
+                        similar_files.append({
+                            "file": file_path,
+                            "similarity": similarity_score,
+                            "matched_keywords": matched_keywords,
+                            "patterns": patterns
+                        })
 
-    return keywords
+        # Sort by similarity score
+        similar_files.sort(key=lambda x: x["similarity"], reverse=True)
+        return similar_files[:5]  # Return top 5
 
+    def extract_keywords(self, task: str) -> List[str]:
+        """Extract meaningful keywords from task description."""
+        # Remove common words
+        stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 
+            'implement', 'add', 'create', 'make', 'build', 'write', 'update',
+            'fix', 'change', 'modify', 'new', 'should', 'must', 'need', 'want'
+        }
 
-def calculate_term_frequency(keywords: List[str]) -> Counter:
-    """
-    Calculate term frequency (TF).
+        # Extract words
+        words = re.findall(r'\b[a-zA-Z]+\b', task.lower())
+        
+        # Filter keywords
+        keywords = []
+        for word in words:
+            if word not in stop_words and len(word) > 2:
+                keywords.append(word)
+                # Also add variations
+                if word.endswith('ing'):
+                    base = word[:-3]
+                    if len(base) > 2:
+                        keywords.append(base)
+                elif word.endswith('ed'):
+                    base = word[:-2]
+                    if len(base) > 2:
+                        keywords.append(base)
 
-    Args:
-        keywords: List of keywords
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_keywords = []
+        for keyword in keywords:
+            if keyword not in seen:
+                seen.add(keyword)
+                unique_keywords.append(keyword)
 
-    Returns:
-        Counter with term frequencies
-    """
-    return Counter(keywords)
+        return unique_keywords
 
+    def calculate_similarity(self, file_path: str, keywords: List[str]) -> float:
+        """Calculate similarity score between file and keywords."""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read().lower()
+                
+            # Calculate based on multiple factors
+            scores = []
+            
+            # 1. Keyword presence score
+            if keywords:
+                matched = sum(1 for keyword in keywords if keyword in content)
+                keyword_score = matched / len(keywords)
+                scores.append(keyword_score)
+            
+            # 2. Filename similarity
+            filename = os.path.basename(file_path).lower()
+            filename_words = re.findall(r'\b[a-zA-Z]+\b', filename)
+            if keywords and filename_words:
+                filename_matches = sum(1 for keyword in keywords if any(
+                    keyword in word or word in keyword 
+                    for word in filename_words
+                ))
+                filename_score = filename_matches / len(keywords)
+                scores.append(filename_score * 1.5)  # Boost filename matches
+            
+            # 3. Path similarity (e.g., auth/login.py for "authentication" task)
+            path_parts = file_path.lower().split(os.sep)
+            if keywords and path_parts:
+                path_matches = sum(1 for keyword in keywords if any(
+                    keyword in part for part in path_parts
+                ))
+                path_score = path_matches / len(keywords)
+                scores.append(path_score * 1.2)  # Slightly boost path matches
+            
+            # Return weighted average
+            if scores:
+                return min(sum(scores) / len(scores), 1.0)  # Cap at 1.0
+            return 0.0
 
-def calculate_cosine_similarity(vec1: Counter, vec2: Counter) -> float:
-    """
-    Calculate cosine similarity between two term frequency vectors.
+        except Exception:
+            return 0.0
 
-    Args:
-        vec1: First term frequency vector
-        vec2: Second term frequency vector
+    def get_matched_keywords(self, file_path: str, keywords: List[str]) -> List[str]:
+        """Get list of keywords that matched in the file."""
+        matched = []
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read().lower()
 
-    Returns:
-        Cosine similarity score (0.0 to 1.0)
-    """
-    # Get all unique terms
-    all_terms = set(vec1.keys()) | set(vec2.keys())
+            for keyword in keywords:
+                if keyword in content:
+                    matched.append(keyword)
 
-    if not all_terms:
-        return 0.0
+        except Exception:
+            pass
 
-    # Calculate dot product
-    dot_product = sum(vec1[term] * vec2[term] for term in all_terms)
+        return matched
 
-    # Calculate magnitudes
-    magnitude1 = math.sqrt(sum(vec1[term] ** 2 for term in vec1))
-    magnitude2 = math.sqrt(sum(vec2[term] ** 2 for term in vec2))
+    def extract_patterns(self, file_path: str) -> List[str]:
+        """Extract notable patterns from a file."""
+        patterns = []
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                lines = content.split('\n')
 
-    # Avoid division by zero
-    if magnitude1 == 0 or magnitude2 == 0:
-        return 0.0
+            # Look for common patterns
+            patterns_found = set()
+            
+            # Service/class definitions
+            for line in lines:
+                if re.match(r'^class\s+\w+Service', line):
+                    patterns_found.add("service layer pattern")
+                elif re.match(r'^class\s+\w+Repository', line):
+                    patterns_found.add("repository pattern")
+                elif re.match(r'^class\s+\w+Factory', line):
+                    patterns_found.add("factory pattern")
+                elif re.match(r'^class\s+\w+Controller', line):
+                    patterns_found.add("controller pattern")
+                elif '@' in line and ('route' in line.lower() or 'app.' in line):
+                    patterns_found.add("decorator-based routing")
+                elif 'async def' in line or 'async function' in line:
+                    patterns_found.add("async/await pattern")
+                elif 'try:' in line or 'try {' in line:
+                    patterns_found.add("error handling")
+                elif 'jwt' in line.lower() or 'token' in line.lower():
+                    patterns_found.add("token-based auth")
+                elif 'validate' in line.lower() or 'validator' in line.lower():
+                    patterns_found.add("validation logic")
+                elif 'transaction' in line.lower() or 'commit' in line.lower():
+                    patterns_found.add("database transactions")
 
-    # Calculate cosine similarity
-    similarity = dot_product / (magnitude1 * magnitude2)
+            patterns = list(patterns_found)
 
-    return similarity
+        except Exception:
+            pass
 
+        return patterns[:5]  # Limit to top 5 patterns
 
-def calculate_similarity(query: str, document: str) -> float:
-    """
-    Calculate similarity between query text and document.
+    def _should_ignore(self, path: str, gitignore_patterns: set) -> bool:
+        """Check if path should be ignored."""
+        parts = path.split(os.sep)
+        for part in parts:
+            if part in gitignore_patterns:
+                return True
+            # Check for pattern matches
+            for pattern in gitignore_patterns:
+                if pattern.endswith('*') and part.startswith(pattern[:-1]):
+                    return True
+                if pattern.startswith('*') and part.endswith(pattern[1:]):
+                    return True
+        return False
 
-    Uses keyword extraction and cosine similarity.
+    def _is_source_file(self, filename: str) -> bool:
+        """Check if file is a source code file."""
+        source_extensions = {
+            '.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.rs',
+            '.rb', '.php', '.cs', '.cpp', '.cc', '.c', '.h', '.hpp',
+            '.swift', '.kt', '.scala', '.ex', '.exs'
+        }
 
-    Args:
-        query: Query text (task description)
-        document: Document text (code file content)
-
-    Returns:
-        Similarity score (0.0 to 1.0)
-    """
-    # Extract keywords
-    query_keywords = extract_keywords(query)
-    doc_keywords = extract_keywords(document)
-
-    # Calculate term frequencies
-    query_tf = calculate_term_frequency(query_keywords)
-    doc_tf = calculate_term_frequency(doc_keywords)
-
-    # Calculate cosine similarity
-    similarity = calculate_cosine_similarity(query_tf, doc_tf)
-
-    return similarity
-
-
-def calculate_jaccard_similarity(set1: Set[str], set2: Set[str]) -> float:
-    """
-    Calculate Jaccard similarity between two sets.
-
-    Args:
-        set1: First set
-        set2: Second set
-
-    Returns:
-        Jaccard similarity (0.0 to 1.0)
-    """
-    if not set1 or not set2:
-        return 0.0
-
-    intersection = len(set1 & set2)
-    union = len(set1 | set2)
-
-    if union == 0:
-        return 0.0
-
-    return intersection / union
-
-
-def find_matching_keywords(query: str, document: str) -> List[str]:
-    """
-    Find keywords that appear in both query and document.
-
-    Args:
-        query: Query text
-        document: Document text
-
-    Returns:
-        List of matching keywords
-    """
-    query_keywords = set(extract_keywords(query))
-    doc_keywords = set(extract_keywords(document))
-
-    matching = list(query_keywords & doc_keywords)
-    return matching
-
-
-def calculate_keyword_density(keywords: List[str], text: str) -> float:
-    """
-    Calculate density of specific keywords in text.
-
-    Args:
-        keywords: Keywords to search for
-        text: Text to search in
-
-    Returns:
-        Density score (0.0 to 1.0)
-    """
-    text_lower = text.lower()
-    total_words = len(text.split())
-
-    if total_words == 0:
-        return 0.0
-
-    # Count keyword occurrences
-    keyword_count = sum(text_lower.count(keyword.lower()) for keyword in keywords)
-
-    # Calculate density
-    density = min(keyword_count / total_words, 1.0)
-
-    return density
-
-
-# Example usage
-if __name__ == "__main__":
-    # Test similarity calculation
-    query = "Implement password reset endpoint with email token"
-    document = """
-    def reset_password(email, token):
-        if not validate_email(email):
-            return error_response('Invalid email')
-
-        if not verify_token(token):
-            return error_response('Invalid token')
-
-        # Reset password logic
-        user = User.query.filter_by(email=email).first()
-        user.reset_password()
-
-        # Send confirmation email
-        send_email(email, 'Password reset successful')
-
-        return success_response()
-    """
-
-    similarity = calculate_similarity(query, document)
-    print(f"Similarity: {similarity:.2f}")
-
-    keywords = extract_keywords(query)
-    print(f"Keywords: {keywords}")
-
-    matching = find_matching_keywords(query, document)
-    print(f"Matching keywords: {matching}")
+        for ext in source_extensions:
+            if filename.endswith(ext):
+                return True
+        return False

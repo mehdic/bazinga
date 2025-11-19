@@ -1524,14 +1524,6 @@ ELSE IF PM chose "parallel":
 ---
 ## Phase 2A: Simple Mode Execution
 
-**Note:** Prepare code context silently. No user output needed for internal analysis.
-
-### Step 2A.0: Prepare Code Context
-
-Extract keywords from PM's task description and find similar files (limit to top 3). Read common utility directories (utils/, helpers/, lib/, services/).
-
-Build code context section with similar files and available utilities for developer prompt.
-
 ### Step 2A.1: Spawn Single Developer
 
 **User output (capsule format):**
@@ -1566,7 +1558,7 @@ Include these sections in order:
 - ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
 - ✓ Group assignment (main)
 - ✓ Mode (Simple)
-- ✓ Code context from Step 2A.0
+- ✓ Task description from PM
 - ✓ Testing framework section (from testing_config.json)
 - ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
 - ✓ Mandatory workflow steps (with Skill() invocations)
@@ -1609,34 +1601,33 @@ These are OPTIONAL - invoke only when your workflow or task requires them.
 **MANDATORY WORKFLOW:**
 
 BEFORE Implementing:
-1. Review codebase context above
 [IF codebase-analysis is mandatory]:
-2. INVOKE Codebase Analysis Skill (MANDATORY)
+1. INVOKE Codebase Analysis Skill (MANDATORY)
    Skill(command: "codebase-analysis")
 
 During Implementation:
-3. Implement the COMPLETE solution
-4. Write unit tests
+2. Implement the COMPLETE solution
+3. Write unit tests
 [IF test-pattern-analysis is mandatory]:
-5. INVOKE Test Pattern Analysis Skill (MANDATORY)
+4. INVOKE Test Pattern Analysis Skill (MANDATORY)
    Skill(command: "test-pattern-analysis")
 
 BEFORE Reporting READY_FOR_QA:
-6. Run ALL unit tests - MUST pass 100%
+5. Run ALL unit tests - MUST pass 100%
 [IF lint-check is mandatory]:
-7. INVOKE lint-check Skill (MANDATORY)
+6. INVOKE lint-check Skill (MANDATORY)
    Skill(command: "lint-check")
-8. Run build check - MUST succeed
+7. Run build check - MUST succeed
 [IF api-contract-validation is mandatory AND api_changes]:
-9. INVOKE API Contract Validation (MANDATORY)
+8. INVOKE API Contract Validation (MANDATORY)
    Skill(command: "api-contract-validation")
 [IF db-migration-check is mandatory AND migration_changes]:
-10. INVOKE DB Migration Check (MANDATORY)
+9. INVOKE DB Migration Check (MANDATORY)
     Skill(command: "db-migration-check")
 
 ONLY THEN:
-11. Commit to branch: [branch_name]
-12. Report: READY_FOR_QA
+10. Commit to branch: [branch_name]
+11. Report: READY_FOR_QA
 ```
 
 **5. VALIDATION - Before spawning, verify your prompt contains:**
@@ -2771,16 +2762,6 @@ Skill(command: "bazinga-db")
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
 
-### Step 2B.0: Prepare Code Context for Each Group
-
-For each group in PM's execution plan, prepare code context (same pattern as Step 2A.0 but per-group):
-- Extract keywords from task description
-- Find similar files (limit to top 3)
-- Read common utility directories
-- Build code context block for this group
-
-Store each group's code context separately for use in developer prompts.
-
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
 Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
@@ -2812,7 +2793,7 @@ Task(subagent_type: "general-purpose", description: "Developer Group C", prompt:
 - ✓ Group assignment (specific group ID: A, B, C, etc.)
 - ✓ Mode (Parallel)
 - ✓ Branch name for this group
-- ✓ Code context for THIS group (from Step 2B.0)
+- ✓ Task description for THIS group from PM
 - ✓ Testing framework section (from testing_config.json)
 - ✓ Advanced skills section (ONLY for skills with "mandatory" status)
 - ✓ Mandatory workflow steps (with Skill() invocations)
