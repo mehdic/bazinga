@@ -53,7 +53,7 @@ echo "TEST 3: Complex Task (Full analysis)"
 echo "--------------------------------------------"
 START_TIME=$(date +%s)
 python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py \
-  --task "implement OAuth2 authentication with Google and GitHub providers" \
+  --task "add new agent for code review and quality assurance checks" \
   --session "${TEST_SESSION}-complex" \
   --cache-enabled \
   --timeout 30 \
