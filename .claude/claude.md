@@ -236,6 +236,7 @@ This ensures:
 3. **Database = memory** - All state stored in SQLite database (bazinga/bazinga.db) via bazinga-db skill
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
+6. **Surgical edits only** - Agent files near size limits. Changes must be: surgical (precise), compact (minimal lines), clear (no vague paths). No "when needed" logic. Explicit decision rules only.
 
 ---
 

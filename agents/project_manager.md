@@ -693,8 +693,18 @@ Else
 }
 ```
 
-**Save Context:**
-Write to `bazinga/project_context.json` for developers to read.
+**Save Context (DB + File):**
+
+1. **Primary: Save to Database**
+```
+bazinga-db, save state
+  session_id: {current_session_id}
+  state_type: project_context
+  state_data: {context_json}
+```
+
+2. **Cache: Write to File**
+Write to `bazinga/project_context.json` (overwrites template). Developers read this for fast access. DB stores history for analysis.
 
 **VALIDATION (MANDATORY):**
 

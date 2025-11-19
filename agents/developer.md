@@ -532,29 +532,16 @@ The PM generates a `bazinga/project_context.json` file at session start containi
 - Common utilities and their purposes
 - Test frameworks and build systems
 
-**Step 1: Check for PM's Project Context**
+**Step 1: Read Project Context**
+
 ```bash
-# At task start, check if PM created context
-if file_exists("bazinga/project_context.json"):
-    context = read_file("bazinga/project_context.json")
-    # Use this to understand project conventions
-
-    # Check if this is a fallback context
-    if "fallback" in context and context["fallback"]:
-        # PM had issues generating context, using minimal fallback
-        # Consider using codebase-analysis skill for better context
-        pass
-
-elif file_exists("bazinga/project_context.template.json"):
-    # PM hasn't generated context yet, use template as fallback
-    context = read_file("bazinga/project_context.template.json")
-    # This is generic - consider codebase-analysis for task-specific context
-
-else:
-    # No context available at all
-    # For complex tasks, invoke codebase-analysis skill
-    context = None
+context = read("bazinga/project_context.json")
 ```
+
+**Rules:**
+- ALWAYS read from file (current session only)
+- NEVER query bazinga-db (historical analysis is for PM/Tech Lead/Investigator)
+- If "template": true → PM hasn't generated yet, may invoke codebase-analysis for task-specific context
 
 **What You Get**:
 ```json
