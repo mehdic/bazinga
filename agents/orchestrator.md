@@ -689,7 +689,7 @@ bazinga/
 - ✅ **Agent blocked** → **Immediately spawn Investigator** to resolve blocker
 - ✅ **Group completed** → **Immediately check other groups** and continue
 - ✅ **PM sends CONTINUE** → **Immediately spawn agents** (no user confirmation)
-- ❌ **NEVER pause for user input** unless PM explicitly needs clarification (NEEDS_CLARIFICATION)
+- ❌ **NEVER pause for user input** unless PM explicitly needs clarification (NEEDS_CLARIFICATION) (NEEDS_CLARIFICATION)
 - ❌ **NEVER stop just to give status updates** - status messages are just progress indicators, not stop points
 - ❌ **NEVER wait for user to tell you what to do next** - follow the workflow automatically
 - ❌ **NEVER ask "Would you like me to continue?"** - just continue automatically
