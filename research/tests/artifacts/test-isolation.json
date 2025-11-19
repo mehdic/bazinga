@@ -1,7 +1,7 @@
 {
-  "task": "add unit tests for auth module",
-  "session_id": "integration-test-1763562536-patterns",
-  "timestamp": "2025-11-19T14:28:57.223173",
+  "task": "test session isolation",
+  "session_id": "test-isolation-",
+  "timestamp": "2025-11-19T14:28:44.989019",
   "cache_hits": 0,
   "cache_misses": 3,
   "timed_out": false,
@@ -433,37 +433,64 @@
   ],
   "similar_features": [
     {
-      "file": "./.claude/skills/test-pattern-analysis/scripts/analyze_tests.py",
-      "similarity": 0.43333333333333335,
+      "file": "./dashboard/js/session-nav.js",
+      "similarity": 0.5222222222222221,
       "matched_keywords": [
-        "unit",
-        "tests",
-        "auth",
-        "module"
+        "test",
+        "session"
       ],
       "patterns": [
-        "token-based auth",
+        "error handling",
+        "async/await pattern"
+      ]
+    },
+    {
+      "file": "./dashboard/js/session-mgmt.js",
+      "similarity": 0.41111111111111104,
+      "matched_keywords": [
+        "session"
+      ],
+      "patterns": [
         "error handling"
       ]
     },
     {
-      "file": "./src/bazinga_cli/__init__.py",
-      "similarity": 0.3333333333333333,
+      "file": "./test_performance_comparison.py",
+      "similarity": 0.35555555555555557,
       "matched_keywords": [
-        "unit",
-        "tests",
-        "auth",
-        "module"
+        "test",
+        "session"
       ],
       "patterns": [
-        "validation logic",
-        "decorator-based routing",
-        "database transactions",
-        "token-based auth",
-        "error handling"
+        "error handling",
+        "database transactions"
+      ]
+    },
+    {
+      "file": "./test_concurrent_access.py",
+      "similarity": 0.35555555555555557,
+      "matched_keywords": [
+        "test",
+        "session"
+      ],
+      "patterns": [
+        "error handling",
+        "token-based auth"
+      ]
+    },
+    {
+      "file": "./.claude/skills/test-pattern-analysis/scripts/analyze_tests.py",
+      "similarity": 0.35555555555555557,
+      "matched_keywords": [
+        "test",
+        "session"
+      ],
+      "patterns": [
+        "error handling",
+        "token-based auth"
       ]
     }
   ],
-  "suggested_approach": "Follow patterns from ./.claude/skills/test-pattern-analysis/scripts/analyze_tests.py (43% similar) | Reuse Skill: test-coverage from .claude/skills/test-coverage/SKILL.md | Write tests using pytest",
+  "suggested_approach": "Follow patterns from ./dashboard/js/session-nav.js (52% similar) | Reuse Skill: test-coverage from .claude/skills/test-coverage/SKILL.md | Write tests using pytest",
   "cache_efficiency": "0.0%"
 }

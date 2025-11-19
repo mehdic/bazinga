@@ -34,7 +34,9 @@ class CodebaseAnalyzer:
         self.session_id = session_id
         self.cache_enabled = cache_enabled
         self.timeout = timeout
-        self.cache = CacheManager("bazinga/.analysis_cache") if cache_enabled else None
+        # Session-isolated cache to prevent concurrent session collisions
+        cache_dir = f"bazinga/.analysis_cache/{session_id}" if cache_enabled else None
+        self.cache = CacheManager(cache_dir) if cache_enabled else None
         self.pattern_detector = PatternDetector()
         self.similarity_finder = SimilarityFinder()
         self.gitignore_patterns = self._load_gitignore()
@@ -363,10 +365,14 @@ def main():
     parser.add_argument('--task', required=True, help='Task description')
     parser.add_argument('--session', required=True, help='Session ID')
     parser.add_argument('--cache-enabled', action='store_true', help='Enable caching')
-    parser.add_argument('--output', default='bazinga/codebase_analysis.json', help='Output file path')
+    parser.add_argument('--output', help='Output file path (default: session-isolated artifacts directory)')
     parser.add_argument('--timeout', type=int, default=30, help='Timeout in seconds (default: 30, 0=no timeout)')
 
     args = parser.parse_args()
+
+    # Session-isolated output path (follows BAZINGA artifact conventions)
+    if not args.output:
+        args.output = f'bazinga/artifacts/{args.session}/skills/codebase-analysis/report.json'
 
     analyzer = CodebaseAnalyzer(
         task=args.task,

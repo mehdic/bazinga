@@ -1,16 +1,16 @@
 {
-  "test_session": "integration-test-1763560005",
-  "timestamp": "2025-11-19T13:46:46+00:00",
+  "test_session": "integration-test-1763562536",
+  "timestamp": "2025-11-19T14:28:57+00:00",
   "tests_run": 5,
   "tests": {
     "simple_task": {
       "file": "test1-simple-task.json",
-      "duration": "2025-11-19T13:46:45.399539",
+      "duration": "2025-11-19T14:28:56.456097",
       "passed": true
     },
     "medium_task": {
       "file": "test2-medium-task.json",
-      "utilities_found": 37,
+      "utilities_found": 38,
       "passed": true
     },
     "complex_task": {
@@ -20,7 +20,7 @@
     },
     "cache_efficiency": {
       "file": "test4-cached-task.json",
-      "efficiency": "33.3%",
+      "efficiency": "0.0%",
       "passed": true
     },
     "pattern_detection": {
