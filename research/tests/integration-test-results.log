@@ -1,0 +1,72 @@
+==========================================
+BAZINGA Codebase Analyzer Integration Test
+==========================================
+
+Test Session: integration-test-1763560005
+Output Directory: research/tests/artifacts
+
+TEST 1: Simple Task Analysis
+--------------------------------------------
+✓ Analysis complete. Results saved to research/tests/artifacts/test1-simple-task.json
+Cache efficiency: 33.3%
+Found 0 similar features
+Found 37 utilities
+Duration: 0s
+
+TEST 2: Medium Complexity Task (Should find utilities)
+--------------------------------------------
+✓ Analysis complete. Results saved to research/tests/artifacts/test2-medium-task.json
+Cache efficiency: 33.3%
+Found 0 similar features
+Found 37 utilities
+Duration: 0s
+
+TEST 3: Complex Task (Full analysis)
+--------------------------------------------
+✓ Analysis complete. Results saved to research/tests/artifacts/test3-complex-task.json
+Cache efficiency: 33.3%
+Found 0 similar features
+Found 37 utilities
+Duration: 0s
+
+TEST 4: Cache Efficiency (Re-run complex task)
+--------------------------------------------
+✓ Analysis complete. Results saved to research/tests/artifacts/test4-cached-task.json
+Cache efficiency: 33.3%
+Found 0 similar features
+Found 37 utilities
+Duration: 1s
+
+TEST 5: Pattern Detection (Pytest should be found)
+--------------------------------------------
+✓ Analysis complete. Results saved to research/tests/artifacts/test5-pattern-detection.json
+Cache efficiency: 33.3%
+Found 2 similar features
+Found 37 utilities
+Duration: 0s
+
+==========================================
+VALIDATION
+==========================================
+✓ Test 1 - File created: PASS
+✓ Test 2 - Found utilities: PASS (37 utilities)
+✓ Test 3 - Found similar features: FAIL (0 features)
+✓ Test 4 - Cache efficiency: 33.3%
+✓ Test 5 - Pytest detected: PASS
+
+==========================================
+TEST SUMMARY
+==========================================
+All test artifacts saved to: research/tests/artifacts/
+
+Files created:
+  test-summary.json (775)
+  test1-simple-task.json (14K)
+  test2-medium-task.json (14K)
+  test3-complex-task.json (14K)
+  test4-cached-task.json (14K)
+  test5-pattern-detection.json (15K)
+
+Test summary: research/tests/artifacts/test-summary.json
+
+✓ Integration tests complete!

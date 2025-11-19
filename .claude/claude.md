@@ -236,52 +236,75 @@ This ensures:
 3. **Database = memory** - All state stored in SQLite database (bazinga/bazinga.db) via bazinga-db skill
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
+6. **Surgical edits only** - Agent files near size limits. Changes must be: surgical (precise), compact (minimal lines), clear (no vague paths). No "when needed" logic. Explicit decision rules only.
 
 ---
 
-## 🔴 CRITICAL: Skill File Editing Guidelines
+## 🔴 CRITICAL: Skills - Creation, Editing, and Invocation
 
-**When creating or editing ANY skill SKILL.md file, you MUST follow this guide:**
+**When working with ANY skill (creating, editing SKILL.md, or invoking), you MUST follow these guides:**
 
-📋 **MANDATORY REFERENCE:** `/home/user/bazinga/research/skill-fix-manual.md`
+### 📚 Comprehensive Skill Reference (Primary)
 
-### Key Requirements
+**MANDATORY REFERENCE:** `/home/user/bazinga/research/skill-implementation-guide.md`
 
-1. **Skills are Claude instances** - SKILL.md contains instructions FOR the skill instance, not documentation ABOUT it
-2. **Proper framing** - Start with "You are the [skill-name] skill..."
-3. **Call scripts** - Skills should call existing scripts, not implement logic inline
-4. **Required sections:**
-   - YAML frontmatter with `version: 1.0.0`
-   - "When to Invoke This Skill" section
-   - "Your Task" section (3 steps: execute script → read report → return summary)
-   - "Example Invocation" scenarios with concrete input/output
+**Use this guide for:**
+- ✅ Creating new skills (complete guide with examples)
+- ✅ Understanding skill tool definition and invocation syntax
+- ✅ SKILL.md format and frontmatter requirements
+- ✅ Directory structure and organization
+- ✅ Best practices and common patterns
+- ✅ Troubleshooting skill issues
+- ✅ **CRITICAL:** Correct invocation syntax (`Skill(command: "skill-name")`)
 
-### Before Editing Any SKILL.md
+**Key takeaway:** Parameter name is `command`, NOT `skill`. Using wrong parameter causes silent failures.
 
-```bash
-# ALWAYS read the manual first
-Read: /home/user/bazinga/research/skill-fix-manual.md
-```
+### 🔧 Fixing Broken Skills (Secondary)
 
-This manual provides:
-- ✅ Correct skill pattern (150-250 lines focused on instructions)
-- ❌ Wrong pattern to avoid (300-500+ lines of documentation)
-- ✅ Step-by-step fix process
+**REFERENCE:** `/home/user/bazinga/research/skill-fix-manual.md`
+
+**Use this guide for:**
+- ✅ Step-by-step process to fix existing broken skills
 - ✅ Before/After examples
 - ✅ Validation checklist
 
-**❌ DO NOT:**
-- Write documentation-style content
-- Show raw bash commands for humans to copy
-- Include detailed implementation logic
-- Create skills without version numbers
-- Skip "When to Invoke" section
+### 📖 Implementation History (Context)
 
-**✅ DO:**
-- Write actionable instructions for the skill instance
-- Call existing scripts in `.claude/skills/skill-name/`
-- Include example invocation scenarios
-- Keep it under 250 lines
-- Use minimal allowed-tools (usually `[Bash, Read]`)
+**REFERENCE:** `/home/user/bazinga/research/skills-implementation-summary.md`
+
+**Use this for:**
+- Understanding BAZINGA-specific skill patterns
+- Dual-mode implementation (basic/advanced)
+- Hybrid invocation approach
+- Historical context and decisions
+
+### Quick Reference
+
+**Creating skills:**
+```bash
+# 1. Read comprehensive guide
+Read: /home/user/bazinga/research/skill-implementation-guide.md
+
+# 2. Follow SKILL.md format with required frontmatter
+# 3. Keep instructions focused (<250 lines)
+# 4. Move verbose content to references/usage.md
+```
+
+**Invoking skills:**
+```python
+# ✅ CORRECT
+Skill(command: "skill-name")
+
+# ❌ WRONG (silent failure)
+Skill(skill: "skill-name")  # Wrong parameter name!
+```
+
+**Editing skills:**
+```bash
+# 1. Read skill-fix-manual.md for step-by-step process
+# 2. Verify frontmatter has version, name, description
+# 3. Ensure "When to Invoke" and "Your Task" sections exist
+# 4. Test invocation after editing
+```
 
 ---

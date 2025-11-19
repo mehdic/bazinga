@@ -1,0 +1,437 @@
+{
+  "task": "fix typo in README",
+  "session_id": "integration-test-1763562536-simple",
+  "timestamp": "2025-11-19T14:28:56.456097",
+  "cache_hits": 0,
+  "cache_misses": 3,
+  "timed_out": false,
+  "partial_results": false,
+  "project_patterns": {
+    "test_framework": "pytest",
+    "build_system": "setuptools/pip",
+    "package_manager": "none detected",
+    "primary_language": "javascript"
+  },
+  "utilities": [
+    {
+      "name": "Skill: skill-creator",
+      "path": ".claude/skills/skill-creator/SKILL.md",
+      "functions": [],
+      "purpose": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations."
+    },
+    {
+      "name": "init_skill",
+      "path": ".claude/skills/skill-creator/scripts/init_skill.py",
+      "functions": [
+        "main",
+        "title_case_skill_name",
+        "init_skill",
+        "main"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "package_skill",
+      "path": ".claude/skills/skill-creator/scripts/package_skill.py",
+      "functions": [
+        "package_skill",
+        "main"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "quick_validate",
+      "path": ".claude/skills/skill-creator/scripts/quick_validate.py",
+      "functions": [
+        "validate_skill"
+      ],
+      "purpose": "Input validation"
+    },
+    {
+      "name": "Skill: security-scan",
+      "path": ".claude/skills/security-scan/SKILL.md",
+      "functions": [],
+      "purpose": "\"Run comprehensive security vulnerability scans when reviewing code. Automatically uses basic mode (fast, high/medium severity only) for first reviews, advanced mode (comprehensive, all severities) for iterations. Detects SQL injection, XSS, hardcoded secrets, insecure dependencies. Use before approving any code changes or pull requests.\""
+    },
+    {
+      "name": "Skill: quality-dashboard",
+      "path": ".claude/skills/quality-dashboard/SKILL.md",
+      "functions": [],
+      "purpose": "Unified project health dashboard aggregating all quality metrics"
+    },
+    {
+      "name": "Skill: codebase-analysis",
+      "path": ".claude/skills/codebase-analysis/SKILL.md",
+      "functions": [],
+      "purpose": "Analyzes codebase to find similar features, reusable utilities, and architectural patterns"
+    },
+    {
+      "name": "similarity",
+      "path": ".claude/skills/codebase-analysis/scripts/similarity.py",
+      "functions": [
+        "find_similar",
+        "extract_keywords",
+        "calculate_similarity",
+        "get_matched_keywords",
+        "extract_patterns",
+        "_should_ignore",
+        "_is_source_file"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "analyze",
+      "path": ".claude/skills/codebase-analysis/scripts/analyze.py",
+      "functions": [
+        "get_current_session_id",
+        "load_profile",
+        "find_code_files",
+        "find_similar_features",
+        "extract_key_functions",
+        "functionName",
+        "functionName",
+        "detect_file_patterns",
+        "analyze_codebase",
+        "generate_suggestion",
+        "main"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "patterns",
+      "path": ".claude/skills/codebase-analysis/scripts/patterns.py",
+      "functions": [
+        "detect_patterns",
+        "find_utilities",
+        "extract_utility_functions",
+        "determine_utility_name",
+        "extract_conventions"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "pattern_detector",
+      "path": ".claude/skills/codebase-analysis/scripts/pattern_detector.py",
+      "functions": [
+        "detect_patterns",
+        "_directory_exists",
+        "_file_pattern_exists",
+        "_detect_test_framework",
+        "_detect_build_system",
+        "_detect_package_manager",
+        "_detect_primary_language"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "cache_manager",
+      "path": ".claude/skills/codebase-analysis/scripts/cache_manager.py",
+      "functions": [
+        "__init__",
+        "_load_index",
+        "_save_index",
+        "get",
+        "set",
+        "clear_old_cache",
+        "_remove_cache_file",
+        "_hash_key",
+        "get_cache_stats"
+      ],
+      "purpose": "Cryptography and hashing"
+    },
+    {
+      "name": "analyze_codebase",
+      "path": ".claude/skills/codebase-analysis/scripts/analyze_codebase.py",
+      "functions": [
+        "timeout_handler",
+        "__init__",
+        "analyze",
+        "_load_gitignore",
+        "_should_ignore",
+        "find_utilities",
+        "scan_utility_directory",
+        "_extract_skill_description",
+        "extract_functions",
+        "' in line and '",
+        "')",
+        "infer_purpose",
+        "generate_suggestions",
+        "save_results",
+        "main"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "Skill: references",
+      "path": ".claude/skills/codebase-analysis/references/usage.md",
+      "functions": [],
+      "purpose": "**Version:** 1.0.0"
+    },
+    {
+      "name": "Skill: api-contract-validation",
+      "path": ".claude/skills/api-contract-validation/SKILL.md",
+      "functions": [],
+      "purpose": "Detect breaking changes in API contracts (OpenAPI/Swagger specs)"
+    },
+    {
+      "name": "parser",
+      "path": ".claude/skills/api-contract-validation/scripts/parser.py",
+      "functions": [
+        "find_openapi_specs",
+        "parse_spec",
+        "auto_generate_spec",
+        "try_fastapi_spec",
+        "try_flask_spec",
+        "try_django_spec",
+        "try_express_spec"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "validate",
+      "path": ".claude/skills/api-contract-validation/scripts/validate.py",
+      "functions": [
+        "get_current_session_id",
+        "load_profile",
+        "find_baseline",
+        "save_baseline",
+        "validate_api_contract",
+        "generate_recommendations",
+        "main"
+      ],
+      "purpose": "Input validation"
+    },
+    {
+      "name": "diff",
+      "path": ".claude/skills/api-contract-validation/scripts/diff.py",
+      "functions": [
+        "compare_specs",
+        "compare_paths",
+        "compare_operation",
+        "compare_responses",
+        "compare_response_schema",
+        "compare_request_body",
+        "compare_schemas",
+        "compare_security",
+        "get_schema_from_response",
+        "get_schemas",
+        "classify_change_severity"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "Skill: test-coverage",
+      "path": ".claude/skills/test-coverage/SKILL.md",
+      "functions": [],
+      "purpose": "\"Generate comprehensive test coverage reports when reviewing code. Identifies untested code paths and low-coverage areas. Supports Python (pytest-cov), JavaScript (jest), Go (go test -cover), Java (JaCoCo). Use when reviewing tests or before approving code changes.\""
+    },
+    {
+      "name": "Skill: pattern-miner",
+      "path": ".claude/skills/pattern-miner/SKILL.md",
+      "functions": [],
+      "purpose": "Mine historical data for patterns and predictive insights"
+    },
+    {
+      "name": "Skill: test-pattern-analysis",
+      "path": ".claude/skills/test-pattern-analysis/SKILL.md",
+      "functions": [],
+      "purpose": "Analyze existing tests to identify patterns, fixtures, and conventions before writing new tests"
+    },
+    {
+      "name": "frameworks",
+      "path": ".claude/skills/test-pattern-analysis/scripts/frameworks.py",
+      "functions": [
+        "detect_framework",
+        "has_pytest_in_file",
+        "has_jest_in_package_json",
+        "has_jest_in_file",
+        "has_go_test_files",
+        "has_junit_in_file",
+        "has_rspec_in_file",
+        "get_framework_version",
+        "get_pytest_version",
+        "get_jest_version",
+        "get_go_version",
+        "get_junit_version"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "patterns",
+      "path": ".claude/skills/test-pattern-analysis/scripts/patterns.py",
+      "functions": [
+        "extract_fixtures",
+        "extract_pytest_fixtures",
+        "extract_jest_fixtures",
+        "extract_go_fixtures",
+        "extract_junit_fixtures",
+        "detect_test_structure",
+        "extract_naming_pattern",
+        "extract_example_test_name",
+        "find_test_utilities",
+        "analyze_test_file"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "analyze_tests",
+      "path": ".claude/skills/test-pattern-analysis/scripts/analyze_tests.py",
+      "functions": [
+        "get_current_session_id",
+        "load_profile",
+        "find_test_files",
+        "find_similar_tests",
+        "suggest_test_cases",
+        "extract_coverage_target",
+        "analyze_test_suite",
+        "main"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "Skill: db-migration-check",
+      "path": ".claude/skills/db-migration-check/SKILL.md",
+      "functions": [],
+      "purpose": "Detect dangerous operations in database migrations before deployment"
+    },
+    {
+      "name": "check",
+      "path": ".claude/skills/db-migration-check/scripts/check.py",
+      "functions": [
+        "get_current_session_id",
+        "load_profile",
+        "check_migrations",
+        "generate_recommendations",
+        "main"
+      ],
+      "purpose": "Input validation"
+    },
+    {
+      "name": "frameworks",
+      "path": ".claude/skills/db-migration-check/scripts/frameworks.py",
+      "functions": [
+        "detect_database_and_framework",
+        "detect_from_alembic",
+        "parse_sqlalchemy_url",
+        "detect_from_django",
+        "detect_from_flyway",
+        "parse_jdbc_url",
+        "detect_from_liquibase",
+        "detect_mongoose",
+        "detect_from_rails",
+        "find_files"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "detectors",
+      "path": ".claude/skills/db-migration-check/scripts/detectors.py",
+      "functions": [
+        "detect_dangerous_operations",
+        "check_postgresql",
+        "check_mysql",
+        "check_sqlserver",
+        "check_mongodb",
+        "check_sqlite",
+        "check_oracle"
+      ],
+      "purpose": "Input validation"
+    },
+    {
+      "name": "parsers",
+      "path": ".claude/skills/db-migration-check/scripts/parsers.py",
+      "functions": [
+        "find_migrations",
+        "parse_migration_file",
+        "parse_alembic_migration",
+        "parse_django_migration",
+        "parse_sql_migration",
+        "parse_mongoose_migration",
+        "parse_rails_migration"
+      ],
+      "purpose": "Utility functions"
+    },
+    {
+      "name": "Skill: lint-check",
+      "path": ".claude/skills/lint-check/SKILL.md",
+      "functions": [],
+      "purpose": "\"Run code quality linters when reviewing code. Checks style, complexity, and best practices. Supports Python (ruff), JavaScript (eslint), Go (golangci-lint), Ruby (rubocop), Java (Checkstyle/PMD). Use when reviewing any code changes for quality issues.\""
+    },
+    {
+      "name": "Skill: velocity-tracker",
+      "path": ".claude/skills/velocity-tracker/SKILL.md",
+      "functions": [],
+      "purpose": "Track development velocity, cycle times, and identify trends for PM decision-making"
+    },
+    {
+      "name": "Skill: bazinga-db",
+      "path": ".claude/skills/bazinga-db/INTEGRATION_GUIDE.md",
+      "functions": [],
+      "purpose": "The bazinga-db system now includes **automatic validation and verification** for all agent response "
+    },
+    {
+      "name": "Skill: bazinga-db",
+      "path": ".claude/skills/bazinga-db/SKILL.md",
+      "functions": [],
+      "purpose": "Database operations for BAZINGA orchestration system. This skill should be used when agents need to save or retrieve orchestration state, logs, task groups, token usage, or skill outputs. Replaces file-based storage with concurrent-safe SQLite database. Use instead of writing to bazinga/*.json files or docs/orchestration-log.md."
+    },
+    {
+      "name": "bazinga_db",
+      "path": ".claude/skills/bazinga-db/scripts/bazinga_db.py",
+      "functions": [
+        "__init__",
+        "_ensure_db_exists",
+        "_get_connection",
+        "create_session",
+        "update_session_status",
+        "get_session",
+        "list_sessions",
+        "log_interaction",
+        "get_logs",
+        "stream_logs",
+        "save_state",
+        "get_latest_state",
+        "create_task_group",
+        "update_task_group",
+        "get_task_groups"
+      ],
+      "purpose": "Database operations"
+    },
+    {
+      "name": "init_db",
+      "path": ".claude/skills/bazinga-db/scripts/init_db.py",
+      "functions": [
+        "init_database",
+        "main"
+      ],
+      "purpose": "Database operations"
+    },
+    {
+      "name": "auto_logger",
+      "path": ".claude/skills/bazinga-db/scripts/auto_logger.py",
+      "functions": [
+        "__init__",
+        "log_agent_response",
+        "get_stats",
+        "verify_session_logs",
+        "main"
+      ],
+      "purpose": "Logging utilities"
+    },
+    {
+      "name": "Skill: references",
+      "path": ".claude/skills/bazinga-db/references/schema.md",
+      "functions": [],
+      "purpose": "This document provides complete reference documentation for the BAZINGA database schema."
+    },
+    {
+      "name": "Skill: references",
+      "path": ".claude/skills/bazinga-db/references/command_examples.md",
+      "functions": [],
+      "purpose": "This document provides practical examples of using the bazinga-db skill commands."
+    }
+  ],
+  "similar_features": [],
+  "suggested_approach": "Write tests using pytest",
+  "cache_efficiency": "0.0%"
+}

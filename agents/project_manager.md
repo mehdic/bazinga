@@ -638,6 +638,192 @@ Execution Plan:
 Recommended parallelism: 2 developers for phase 1
 ```
 
+**Phase 4.5: Generate Project Context (NEW)**
+
+After analyzing requirements and before creating task groups, generate project context to help developers understand the codebase. This context will be saved and reused across all developers.
+
+**Check Existing Context:**
+```bash
+If file exists: bazinga/project_context.json
+  AND created within last hour
+  AND session_id matches current session
+  → Reuse existing context
+Else
+  → Generate new context
+```
+
+**Session ID Verification:**
+```python
+import json
+from datetime import datetime, timedelta
+
+# Read existing context
+with open('bazinga/project_context.json') as f:
+    existing_context = json.load(f)
+
+# Check conditions
+file_age = datetime.now() - datetime.fromisoformat(existing_context.get('generated_at', '1970-01-01'))
+session_matches = existing_context.get('session_id') == current_session_id
+is_recent = file_age < timedelta(hours=1)
+
+if session_matches and is_recent:
+    # Reuse existing context
+    context = existing_context
+else:
+    # Generate new context (session mismatch or stale)
+    context = generate_new_context()
+```
+
+**Generate Project Context:**
+```json
+{
+  "project_type": "Detected project type (REST API, CLI tool, library, microservice)",
+  "primary_language": "Python/JavaScript/Go/Java (detected)",
+  "framework": "Flask/Express/Django/Spring (if applicable)",
+  "architecture_patterns": [
+    "Service layer pattern (services/)",
+    "Repository pattern (repositories/)",
+    "MVC pattern (models/views/controllers/)"
+  ],
+  "conventions": {
+    "error_handling": "How errors are typically handled",
+    "authentication": "Auth approach if present",
+    "validation": "Input validation approach",
+    "testing": "Test framework and patterns used"
+  },
+  "key_directories": {
+    "services": "Business logic location (e.g., services/)",
+    "models": "Data models location (e.g., models/)",
+    "utilities": "Shared utilities location (e.g., utils/)",
+    "tests": "Test files location (e.g., tests/)"
+  },
+  "common_utilities": [
+    {
+      "name": "EmailService",
+      "location": "utils/email.py",
+      "purpose": "Handles email sending"
+    },
+    {
+      "name": "TokenGenerator",
+      "location": "utils/tokens.py",
+      "purpose": "JWT token generation"
+    }
+  ],
+  "test_framework": "pytest/jest/go test",
+  "coverage_target": "80%",
+  "generated_at": "2025-11-18T10:00:00Z",
+  "session_id": "[current session_id]"
+}
+```
+
+**Save Context (DB + File):**
+
+1. **Primary: Save to Database**
+```
+bazinga-db, save state
+  session_id: {current_session_id}
+  state_type: project_context
+  state_data: {context_json}
+```
+
+2. **Cache: Write to File**
+Write to `bazinga/project_context.json` (overwrites template). Developers read this for fast access. DB stores history for analysis.
+
+**VALIDATION (MANDATORY):**
+
+After generating and saving project_context.json, verify it was created successfully:
+
+```bash
+# Step 1: Verify file exists
+if [ ! -f "bazinga/project_context.json" ]; then
+    echo "ERROR: Failed to create project_context.json"
+    # Create minimal fallback context
+fi
+
+# Step 2: Verify JSON is valid
+python3 -c "import json; json.load(open('bazinga/project_context.json'))" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "ERROR: Invalid JSON in project_context.json"
+    # Create minimal fallback context
+fi
+
+# Step 3: Verify required fields
+python3 -c "
+import json
+ctx = json.load(open('bazinga/project_context.json'))
+required = ['project_type', 'primary_language', 'session_id', 'generated_at']
+missing = [f for f in required if f not in ctx]
+if missing:
+    print(f'ERROR: Missing required fields: {missing}')
+    exit(1)
+" 2>/dev/null
+```
+
+**Fallback Context (if validation fails):**
+
+If context generation or validation fails, create this minimal fallback:
+
+```json
+{
+  "project_type": "unknown",
+  "primary_language": "detected from file extensions",
+  "framework": "none detected",
+  "architecture_patterns": [],
+  "conventions": {},
+  "key_directories": {},
+  "common_utilities": [],
+  "test_framework": "none detected",
+  "coverage_target": "unknown",
+  "generated_at": "[current timestamp]",
+  "session_id": "[current session_id]",
+  "fallback": true,
+  "fallback_reason": "Context generation failed - using minimal fallback"
+}
+```
+
+**Error Logging:**
+
+If context generation fails, log to `bazinga/pm_errors.log`:
+```
+[timestamp] ERROR: Project context generation failed
+[timestamp] REASON: [error description]
+[timestamp] ACTION: Created fallback context
+[timestamp] IMPACT: Developers may have reduced code awareness
+```
+
+**Continue on Fallback:**
+Even if context generation fails, CONTINUE with task planning. The fallback context ensures developers can still work, just with less guidance.
+
+**Enhance Task Group Descriptions:**
+
+When creating task groups, include relevant file hints:
+
+Original task description:
+```
+Group A: User Authentication
+- Implement login endpoint
+- Add JWT token generation
+```
+
+Enhanced with file hints:
+```
+Group A: User Authentication
+- Implement login endpoint
+- Add JWT token generation
+
+Relevant files to reference:
+- Existing auth patterns: /auth/basic_auth.py
+- User model: /models/user.py
+- JWT utility: /utils/token.py (if exists)
+- Similar endpoint: /api/register.py
+- Error handling: /utils/responses.py
+
+Key patterns to follow:
+- Use service layer pattern (see /services/user_service.py)
+- Follow error_response() pattern from /utils/responses.py
+- Use validators from /utils/validators.py
+```
+
 **Phase 5: Save Your PM State with Spec-Kit Context to Database**
 
 **Request to bazinga-db skill:**
