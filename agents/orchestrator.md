@@ -2292,7 +2292,7 @@ Skill(command: "bazinga-db")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§line 3279) → Parse PM feedback → Identify what needs fixing
+- Query task groups (§line 146 (Query task groups)) → Parse PM feedback → Identify what needs fixing
 - Build revision prompt per §Step 2A.1 → Spawn agent → Log response (§line 1697)
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
@@ -2481,7 +2481,7 @@ Skill(command: "velocity-tracker")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§line 3279) → Parse PM feedback → Identify groups needing fixes
+- Query task groups (§line 146 (Query task groups)) → Parse PM feedback → Identify groups needing fixes
 - Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
 - Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
