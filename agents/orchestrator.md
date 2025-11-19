@@ -786,7 +786,7 @@ PM returns decision with:
 
 **Step 1: Parse PM response and output capsule to user**
 
-Use §PM Response Parsing (lines 362-449) to extract:
+Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
@@ -1202,7 +1202,7 @@ Task(subagent_type: "general-purpose", description: "Developer implementation", 
 
 **Step 1: Parse response and output capsule to user**
 
-Use §Developer Response Parsing (lines 96-175) to extract:
+Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL)
 - **Files** created/modified
 - **Tests** added (count)
@@ -1229,7 +1229,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §Developer Response Parsing line 152-157)
+**Apply fallbacks:** If data missing, use generic descriptions (see Developer fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -1385,7 +1385,7 @@ Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA
 
 **Step 1: Parse response and output capsule to user**
 
-Use §QA Expert Response Parsing (lines 178-257) to extract:
+Use the QA Expert Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
@@ -1412,7 +1412,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §QA Expert Response Parsing line 236-251)
+**Apply fallbacks:** If data missing, use generic descriptions (see QA fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -1572,7 +1572,7 @@ Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: 
 
 **Step 1: Parse response and output capsule to user**
 
-Use §Tech Lead Response Parsing (lines 261-330) to extract:
+Use the Tech Lead Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Decision** (APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS)
 - **Security issues** count
 - **Lint issues** count
@@ -1605,7 +1605,7 @@ IF decision = ESCALATE_TO_OPUS:
   ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §Tech Lead Response Parsing line 309-327)
+**Apply fallbacks:** If data missing, use generic descriptions (see Tech Lead fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -2223,7 +2223,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 
 **Step 1: Parse response and output capsule to user**
 
-Use §PM Response Parsing (lines 340-431) to extract:
+Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
@@ -2250,7 +2250,7 @@ IF decision = NEEDS_CLARIFICATION:
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §PM Response Parsing line 404-428)
+**Apply fallbacks:** If data missing, use generic descriptions (see PM fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -2292,8 +2292,8 @@ Skill(command: "bazinga-db")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§line 146 (Query task groups)) → Parse PM feedback → Identify what needs fixing
-- Build revision prompt per §Step 2A.1 → Spawn agent → Log response (§line 1697)
+- Query task groups (§Step 1.4) → Parse PM feedback → Identify what needs fixing
+- Build revision prompt per §Step 2A.1 → Spawn agent → Log to database (see `bazinga/templates/logging_pattern.md`)
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
@@ -2357,7 +2357,7 @@ See `bazinga/templates/prompt_building.md` for detailed instructions.
 
 **Step 1: Parse response and output capsule to user**
 
-Use §Developer Response Parsing (lines 96-175) to extract status, files, tests, coverage, summary.
+Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
 - READY_FOR_QA/REVIEW: `🔨 Group {id} complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
@@ -2481,7 +2481,7 @@ Skill(command: "velocity-tracker")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§line 146 (Query task groups)) → Parse PM feedback → Identify groups needing fixes
+- Query task groups (§Step 1.4) → Parse PM feedback → Identify groups needing fixes
 - Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
 - Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
