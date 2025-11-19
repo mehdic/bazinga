@@ -689,9 +689,11 @@ bazinga/
 - ✅ **Receive agent response** → **Immediately log to database** → **Immediately route to next agent or action**
 - ✅ **Agent blocked** → **Immediately spawn Investigator** to resolve blocker
 - ✅ **Group completed** → **Immediately check other groups** and continue
-- ❌ **NEVER pause for user input** unless PM explicitly needs clarification
+- ✅ **PM sends CONTINUE** → **Immediately spawn agents** (no user confirmation)
+- ❌ **NEVER pause for user input** unless PM explicitly needs clarification (NEEDS_CLARIFICATION)
 - ❌ **NEVER stop just to give status updates** - status messages are just progress indicators, not stop points
 - ❌ **NEVER wait for user to tell you what to do next** - follow the workflow automatically
+- ❌ **NEVER ask "Would you like me to continue?"** - just continue automatically
 
 **Your job is to keep the workflow moving forward autonomously. Only PM can stop the workflow by sending BAZINGA.**
 
@@ -2686,7 +2688,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 **Step 1: Parse response and output capsule to user**
 
 Use §PM Response Parsing (lines 340-431) to extract:
-- **Decision** (BAZINGA, CONTINUE, CLARIFICATION_NEEDED, REQUIRES_CHANGES)
+- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
 - **Next actions** (if continuing)
@@ -2700,13 +2702,13 @@ IF decision = BAZINGA:
   [Show final report in next step]
   ```
 
-IF decision = CONTINUE or REQUIRES_CHANGES:
+IF decision = CONTINUE:
   → Use "PM Assessment" template:
   ```
   📋 PM check | {assessment_summary} | {feedback_summary} → {next_action}
   ```
 
-IF decision = CLARIFICATION_NEEDED:
+IF decision = NEEDS_CLARIFICATION:
   → Use "Clarification" template:
   ```
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
@@ -2748,18 +2750,20 @@ Skill(command: "bazinga-db")
 
 
 
-### Step 2A.9: Check for BAZINGA
+### Step 2A.9: Route PM Response (Simple Mode)
 
 **IF PM sends BAZINGA:**
 - **Immediately proceed to Completion phase** (no user input needed)
 
-**IF PM requests changes:**
-- **Immediately identify** what needs rework from PM's feedback
-- **Immediately respawn** from appropriate stage (Developer, QA, or Tech Lead)
-- Track iteration count in database
-- Continue workflow automatically (no user input needed)
+**IF PM sends CONTINUE:**
+- Query task groups (§line 3279) → Parse PM feedback → Identify what needs fixing
+- Build revision prompt per §Step 2A.1 → Spawn agent → Log response (§line 1697)
+- Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
-**CRITICAL:** Do NOT stop after PM response. Either proceed to Completion or respawn agents to address PM's feedback. The workflow must continue autonomously.
+**❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
+
+**IF PM sends NEEDS_CLARIFICATION:**
+- Follow clarification workflow from Step 1.3a (only case where you stop for user input)
 
 **IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md`. All database logging follows `bazinga/templates/logging_pattern.md`.
 
@@ -3151,8 +3155,8 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 
 **Construct and output capsule:**
 - BAZINGA: `✅ BAZINGA - Orchestration Complete!` [show final report in next step]
-- CONTINUE/REQUIRES_CHANGES: `📋 PM check | {assessment} | {feedback} → {next_action}`
-- CLARIFICATION_NEEDED: `⚠️ PM needs clarification | {question} | Awaiting response`
+- CONTINUE: `📋 PM check | {assessment} | {feedback} → {next_action}`
+- NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
 
 **Step 2: Log PM response:**
 ```
@@ -3192,13 +3196,15 @@ Skill(command: "velocity-tracker")
 **IF PM sends BAZINGA:**
 - **Immediately proceed to Completion phase** (no user input needed)
 
-**IF PM requests changes:**
-- **Immediately identify** which groups need rework from PM's feedback
-- **Immediately respawn** those groups from appropriate stage (Developer, QA, or Tech Lead)
-- Track iteration count in database
-- Continue workflow automatically (no user input needed)
+**IF PM sends CONTINUE:**
+- Query task groups (§line 3279) → Parse PM feedback → Identify groups needing fixes
+- Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
+- Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
-**CRITICAL:** Do NOT stop after PM response. Either proceed to Completion or respawn agents to address PM's feedback. The workflow must continue autonomously.
+**❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
+
+**IF PM sends NEEDS_CLARIFICATION:**
+- Follow clarification workflow from Step 1.3a (only case where you stop for user input)
 
 ---
 
@@ -3814,11 +3820,14 @@ When in doubt, spawn an agent. NEVER do the work yourself.
 2. PM completion signal (BAZINGA)
 
 **Everything else continues automatically:**
+- PM sends CONTINUE? Immediately spawn agents for revision
 - Agent blocked? Spawn Investigator
 - Agent done? Route to next agent
 - Group complete? Check other groups and continue
 - Tests fail? Respawn developer with feedback
+- Tech Lead requests changes? Respawn developer
 - No user input needed!
+- NEVER ask "Would you like me to continue?" - just do it!
 
 **Logging Rule:**
 **EVERY agent response → IMMEDIATELY invoke bazinga-db skill → THEN proceed to next step**

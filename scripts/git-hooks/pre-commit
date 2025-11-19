@@ -9,6 +9,17 @@ STAGED_FILES=$(git diff --cached --name-only)
 # Check if orchestrator agent was modified
 if echo "$STAGED_FILES" | grep -q "^agents/orchestrator\.md$"; then
     echo "🔨 Detected changes to agents/orchestrator.md"
+
+    # Validate references before building
+    echo "   Validating §line and §Step references..."
+    if ! ./scripts/validate-orchestrator-references.sh; then
+        echo ""
+        echo "❌ COMMIT BLOCKED: Broken references in agents/orchestrator.md"
+        echo ""
+        echo "Fix the broken references and try again."
+        exit 1
+    fi
+
     echo "   Rebuilding slash commands..."
 
     # Run build script
