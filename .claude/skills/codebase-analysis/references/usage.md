@@ -9,12 +9,14 @@
 
 The skill maintains an intelligent cache to improve performance:
 
-- **Project-wide patterns**: Cached for 1 hour (shared across sessions)
-- **Utilities**: Cached per session
-- **Similar features**: Always fresh (task-specific)
-- **Cache location**: `bazinga/.analysis_cache/{session_id}/`
+- **Project-wide patterns**: Cached for 1 hour (shared across all sessions)
+- **Utilities**: Cached per session (via session-keyed cache names)
+- **Similar features**: Always fresh (task-specific, never cached)
+- **Cache location**: `bazinga/.analysis_cache/` (global, shared)
 
-**Expected cache efficiency:** 33%+ after first run (measured on BAZINGA project)
+**Expected cache efficiency:** 33%+ after first session (measured on BAZINGA project)
+
+**Cross-session benefits:** When multiple sessions run within 1 hour, they share the project patterns cache, improving performance for all sessions.
 
 **Cache invalidation:**
 - Project patterns expire after 1 hour

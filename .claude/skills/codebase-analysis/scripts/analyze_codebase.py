@@ -34,9 +34,8 @@ class CodebaseAnalyzer:
         self.session_id = session_id
         self.cache_enabled = cache_enabled
         self.timeout = timeout
-        # Session-isolated cache to prevent concurrent session collisions
-        cache_dir = f"bazinga/.analysis_cache/{session_id}" if cache_enabled else None
-        self.cache = CacheManager(cache_dir) if cache_enabled else None
+        # Global cache for cross-session sharing (project_patterns cached 1h, utilities per-session via key)
+        self.cache = CacheManager("bazinga/.analysis_cache") if cache_enabled else None
         self.pattern_detector = PatternDetector()
         self.similarity_finder = SimilarityFinder()
         self.gitignore_patterns = self._load_gitignore()
