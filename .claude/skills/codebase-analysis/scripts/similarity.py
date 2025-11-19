@@ -8,24 +8,34 @@ from difflib import SequenceMatcher
 
 
 class SimilarityFinder:
-    def find_similar(self, task: str) -> List[Dict[str, Any]]:
+    def find_similar(self, task: str, gitignore_patterns: set = None, max_files: int = 1000) -> List[Dict[str, Any]]:
         """Find files similar to the given task."""
+        if gitignore_patterns is None:
+            gitignore_patterns = set()
+
         # Extract keywords from task
         keywords = self.extract_keywords(task)
         similar_files = []
+        file_count = 0
 
         # Search for files containing keywords
         for root, dirs, files in os.walk("."):
-            # Skip hidden and build directories
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in [
-                'node_modules', 'dist', 'build', '__pycache__', 'vendor', 
-                'coverage', 'target', 'out', '.git'
-            ]]
+            # Filter out ignored directories
+            dirs[:] = [d for d in dirs if not self._should_ignore(os.path.join(root, d), gitignore_patterns)]
 
             for file in files:
+                if file_count >= max_files:
+                    break
+
                 # Only check source code files
                 if self._is_source_file(file):
                     file_path = os.path.join(root, file)
+
+                    # Skip if path should be ignored
+                    if self._should_ignore(file_path, gitignore_patterns):
+                        continue
+
+                    file_count += 1
                     similarity_score = self.calculate_similarity(file_path, keywords)
                     
                     if similarity_score > 0.3:  # 30% similarity threshold
@@ -182,6 +192,20 @@ class SimilarityFinder:
 
         return patterns[:5]  # Limit to top 5 patterns
 
+    def _should_ignore(self, path: str, gitignore_patterns: set) -> bool:
+        """Check if path should be ignored."""
+        parts = path.split(os.sep)
+        for part in parts:
+            if part in gitignore_patterns:
+                return True
+            # Check for pattern matches
+            for pattern in gitignore_patterns:
+                if pattern.endswith('*') and part.startswith(pattern[:-1]):
+                    return True
+                if pattern.startswith('*') and part.endswith(pattern[1:]):
+                    return True
+        return False
+
     def _is_source_file(self, filename: str) -> bool:
         """Check if file is a source code file."""
         source_extensions = {
@@ -189,7 +213,7 @@ class SimilarityFinder:
             '.rb', '.php', '.cs', '.cpp', '.cc', '.c', '.h', '.hpp',
             '.swift', '.kt', '.scala', '.ex', '.exs'
         }
-        
+
         for ext in source_extensions:
             if filename.endswith(ext):
                 return True

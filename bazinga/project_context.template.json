@@ -1,0 +1,60 @@
+{
+  "_comment": "This is a template for project_context.json. The PM agent should generate this automatically during Phase 4.5. If PM doesn't create it, developers can use this as fallback.",
+
+  "project_type": "CLI tool / Development orchestration system",
+  "primary_language": "Python",
+  "framework": "Click (CLI framework)",
+
+  "architecture_patterns": [
+    "Agent-based architecture (.claude/agents/)",
+    "Skill-based extensions (.claude/skills/)",
+    "Command pattern (.claude/commands/)",
+    "Database persistence (bazinga/bazinga.db)"
+  ],
+
+  "conventions": {
+    "file_structure": "Modular agent definitions in agents/, skills in .claude/skills/",
+    "naming": "snake_case for Python, kebab-case for agent files",
+    "error_handling": "Structured error responses with status codes",
+    "testing": "pytest with fixtures in tests/",
+    "documentation": "Research docs in research/, implementation docs in docs/"
+  },
+
+  "key_directories": {
+    "agents": "Agent definition files (orchestrator, PM, developer, QA, tech lead)",
+    "skills": ".claude/skills/ - Reusable skill implementations",
+    "commands": ".claude/commands/ - Slash command definitions",
+    "scripts": "scripts/ - Build and utility scripts",
+    "database": "bazinga/ - Session state and orchestration data",
+    "tests": "tests/ - Test suites",
+    "research": "research/ - Analysis and design documents"
+  },
+
+  "common_utilities": [
+    {
+      "name": "bazinga-db",
+      "location": ".claude/skills/bazinga-db/",
+      "purpose": "Database operations for orchestration state"
+    },
+    {
+      "name": "build-slash-commands",
+      "location": "scripts/build-slash-commands.sh",
+      "purpose": "Rebuilds slash commands from agent sources"
+    },
+    {
+      "name": "codebase-analysis",
+      "location": ".claude/skills/codebase-analysis/",
+      "purpose": "Analyzes codebase for patterns and context"
+    }
+  ],
+
+  "test_framework": "pytest",
+  "build_system": "setuptools",
+  "package_manager": "pip",
+  "coverage_target": "80%",
+
+  "generated_at": "2025-11-19T00:00:00Z",
+  "session_id": "template",
+  "template": true,
+  "template_note": "PM should replace this with actual generated context during Phase 4.5"
+}

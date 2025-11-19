@@ -538,6 +538,22 @@ The PM generates a `bazinga/project_context.json` file at session start containi
 if file_exists("bazinga/project_context.json"):
     context = read_file("bazinga/project_context.json")
     # Use this to understand project conventions
+
+    # Check if this is a fallback context
+    if "fallback" in context and context["fallback"]:
+        # PM had issues generating context, using minimal fallback
+        # Consider using codebase-analysis skill for better context
+        pass
+
+elif file_exists("bazinga/project_context.template.json"):
+    # PM hasn't generated context yet, use template as fallback
+    context = read_file("bazinga/project_context.template.json")
+    # This is generic - consider codebase-analysis for task-specific context
+
+else:
+    # No context available at all
+    # For complex tasks, invoke codebase-analysis skill
+    context = None
 ```
 
 **What You Get**:

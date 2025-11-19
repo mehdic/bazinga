@@ -65,16 +65,29 @@ class PatternDetector:
 
     def _detect_test_framework(self) -> str:
         """Detect the testing framework being used."""
-        if os.path.exists("pytest.ini") or os.path.exists("setup.cfg") or os.path.exists("pyproject.toml"):
-            # Check for pytest markers
-            if os.path.exists("pyproject.toml"):
-                try:
-                    with open("pyproject.toml", "r") as f:
-                        if "pytest" in f.read():
-                            return "pytest"
-                except:
-                    pass
+        # Check pytest.ini first (most specific)
+        if os.path.exists("pytest.ini"):
             return "pytest"
+
+        # Check setup.cfg for pytest config
+        if os.path.exists("setup.cfg"):
+            try:
+                with open("setup.cfg", "r") as f:
+                    content = f.read()
+                    if "[tool:pytest]" in content or "pytest" in content:
+                        return "pytest"
+            except:
+                pass
+
+        # Check pyproject.toml for pytest config
+        if os.path.exists("pyproject.toml"):
+            try:
+                with open("pyproject.toml", "r") as f:
+                    content = f.read()
+                    if "pytest" in content or "[tool.pytest" in content:
+                        return "pytest"
+            except:
+                pass
         elif os.path.exists("jest.config.js") or os.path.exists("jest.config.ts"):
             return "jest"
         elif os.path.exists("karma.conf.js"):

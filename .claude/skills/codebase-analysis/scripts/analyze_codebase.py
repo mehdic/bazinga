@@ -7,9 +7,10 @@ import json
 import os
 import sys
 import argparse
+import signal
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 
 # Import supporting modules
 from pattern_detector import PatternDetector
@@ -17,53 +18,86 @@ from similarity import SimilarityFinder
 from cache_manager import CacheManager
 
 
+class TimeoutError(Exception):
+    """Raised when analysis times out."""
+    pass
+
+
+def timeout_handler(signum, frame):
+    """Handle timeout signal."""
+    raise TimeoutError("Analysis timed out")
+
+
 class CodebaseAnalyzer:
-    def __init__(self, task: str, session_id: str, cache_enabled: bool = True):
+    def __init__(self, task: str, session_id: str, cache_enabled: bool = True, timeout: int = 30):
         self.task = task
         self.session_id = session_id
         self.cache_enabled = cache_enabled
+        self.timeout = timeout
         self.cache = CacheManager("bazinga/.analysis_cache") if cache_enabled else None
         self.pattern_detector = PatternDetector()
         self.similarity_finder = SimilarityFinder()
+        self.gitignore_patterns = self._load_gitignore()
 
     def analyze(self) -> Dict[str, Any]:
-        """Main analysis entry point."""
+        """Main analysis entry point with timeout protection."""
         results = {
             "task": self.task,
             "session_id": self.session_id,
             "timestamp": datetime.now().isoformat(),
             "cache_hits": 0,
-            "cache_misses": 0
+            "cache_misses": 0,
+            "timed_out": False,
+            "partial_results": False
         }
 
-        # Get or compute project patterns (cacheable)
-        patterns_cache_key = "project_patterns"
-        if self.cache and self.cache.get(patterns_cache_key, max_age_hours=1):
-            results["project_patterns"] = self.cache.get(patterns_cache_key)
-            results["cache_hits"] += 1
-        else:
-            results["project_patterns"] = self.pattern_detector.detect_patterns()
-            if self.cache:
-                self.cache.set(patterns_cache_key, results["project_patterns"])
+        # Set timeout alarm if supported (Unix only)
+        if hasattr(signal, 'SIGALRM') and self.timeout > 0:
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(self.timeout)
+
+        try:
+            # Get or compute project patterns (cacheable)
+            patterns_cache_key = "project_patterns"
+            if self.cache and self.cache.get(patterns_cache_key, max_age_hours=1):
+                results["project_patterns"] = self.cache.get(patterns_cache_key)
+                results["cache_hits"] += 1
+            else:
+                results["project_patterns"] = self.pattern_detector.detect_patterns()
+                if self.cache:
+                    self.cache.set(patterns_cache_key, results["project_patterns"])
+                results["cache_misses"] += 1
+
+            # Get or compute utilities (cacheable)
+            utilities_cache_key = f"utilities_{self.session_id}"
+            if self.cache and self.cache.get(utilities_cache_key):
+                results["utilities"] = self.cache.get(utilities_cache_key)
+                results["cache_hits"] += 1
+            else:
+                results["utilities"] = self.find_utilities()
+                if self.cache:
+                    self.cache.set(utilities_cache_key, results["utilities"])
+                results["cache_misses"] += 1
+
+            # Find similar features (NOT cacheable - task specific)
+            results["similar_features"] = self.similarity_finder.find_similar(
+                self.task,
+                gitignore_patterns=self.gitignore_patterns
+            )
             results["cache_misses"] += 1
 
-        # Get or compute utilities (cacheable)
-        utilities_cache_key = f"utilities_{self.session_id}"
-        if self.cache and self.cache.get(utilities_cache_key):
-            results["utilities"] = self.cache.get(utilities_cache_key)
-            results["cache_hits"] += 1
-        else:
-            results["utilities"] = self.find_utilities()
-            if self.cache:
-                self.cache.set(utilities_cache_key, results["utilities"])
-            results["cache_misses"] += 1
+            # Generate suggestions based on analysis
+            results["suggested_approach"] = self.generate_suggestions(results)
 
-        # Find similar features (NOT cacheable - task specific)
-        results["similar_features"] = self.similarity_finder.find_similar(self.task)
-        results["cache_misses"] += 1
+        except TimeoutError:
+            results["timed_out"] = True
+            results["partial_results"] = True
+            results["timeout_message"] = f"Analysis timed out after {self.timeout}s - returning partial results"
 
-        # Generate suggestions based on analysis
-        results["suggested_approach"] = self.generate_suggestions(results)
+        finally:
+            # Cancel timeout alarm
+            if hasattr(signal, 'SIGALRM') and self.timeout > 0:
+                signal.alarm(0)
 
         # Calculate cache efficiency
         total_operations = results["cache_hits"] + results["cache_misses"]
@@ -71,45 +105,125 @@ class CodebaseAnalyzer:
 
         return results
 
+    def _load_gitignore(self) -> Set[str]:
+        """Load .gitignore patterns for filtering."""
+        patterns = set()
+        # Default patterns to always ignore
+        patterns.update([
+            '.git', '__pycache__', 'node_modules', 'dist', 'build',
+            'coverage', 'target', 'out', '.pytest_cache', '.mypy_cache',
+            'venv', 'env', '.venv', '.env', 'vendor', '.next', '.nuxt'
+        ])
+
+        # Load from .gitignore if exists
+        if os.path.exists('.gitignore'):
+            try:
+                with open('.gitignore', 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            # Simple pattern matching (not full gitignore spec)
+                            pattern = line.rstrip('/').lstrip('/')
+                            patterns.add(pattern)
+            except:
+                pass
+
+        return patterns
+
+    def _should_ignore(self, path: str) -> bool:
+        """Check if path should be ignored based on gitignore patterns."""
+        parts = path.split(os.sep)
+        for part in parts:
+            if part in self.gitignore_patterns:
+                return True
+            # Check for pattern matches
+            for pattern in self.gitignore_patterns:
+                if pattern.endswith('*') and part.startswith(pattern[:-1]):
+                    return True
+                if pattern.startswith('*') and part.endswith(pattern[1:]):
+                    return True
+        return False
+
     def find_utilities(self) -> List[Dict[str, Any]]:
         """Find reusable utilities in common directories."""
         utilities = []
-        utility_dirs = ["utils", "helpers", "lib", "common", "shared", "utilities"]
+        utility_dirs = [
+            "utils", "helpers", "lib", "common", "shared", "utilities",
+            ".claude/skills"  # Added: BAZINGA-specific skills directory
+        ]
 
         for dir_name in utility_dirs:
             # Check if directory exists at root level
-            if os.path.exists(dir_name):
+            if os.path.exists(dir_name) and not self._should_ignore(dir_name):
                 utilities.extend(self.scan_utility_directory(dir_name))
-            
+
             # Check in src/ or lib/ subdirectories
             for parent in ["src", "lib", "app"]:
                 path = os.path.join(parent, dir_name)
-                if os.path.exists(path):
+                if os.path.exists(path) and not self._should_ignore(path):
                     utilities.extend(self.scan_utility_directory(path))
 
         return utilities
 
-    def scan_utility_directory(self, dir_path: str) -> List[Dict[str, Any]]:
+    def scan_utility_directory(self, dir_path: str, max_files: int = 100) -> List[Dict[str, Any]]:
         """Scan a utility directory for reusable functions."""
         utilities = []
-        
+        file_count = 0
+
         for root, dirs, files in os.walk(dir_path):
-            # Skip hidden directories and node_modules
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'node_modules']
-            
+            # Filter out ignored directories
+            dirs[:] = [d for d in dirs if not self._should_ignore(os.path.join(root, d))]
+
             for file in files:
-                if file.endswith(('.py', '.js', '.ts', '.go', '.java')):
+                if file_count >= max_files:
+                    break
+
+                if file.endswith(('.py', '.js', '.ts', '.go', '.java', '.md')):
                     file_path = os.path.join(root, file)
-                    functions = self.extract_functions(file_path)
-                    if functions:
+
+                    # Skip if path should be ignored
+                    if self._should_ignore(file_path):
+                        continue
+
+                    file_count += 1
+
+                    # For .md files (like SKILL.md), extract skill info
+                    if file.endswith('.md') and 'skills' in dir_path:
                         utilities.append({
-                            "name": os.path.splitext(file)[0],
+                            "name": f"Skill: {os.path.basename(os.path.dirname(file_path))}",
                             "path": file_path,
-                            "functions": functions,
-                            "purpose": self.infer_purpose(file, functions)
+                            "functions": [],
+                            "purpose": self._extract_skill_description(file_path)
                         })
-        
+                    else:
+                        functions = self.extract_functions(file_path)
+                        if functions:
+                            utilities.append({
+                                "name": os.path.splitext(file)[0],
+                                "path": file_path,
+                                "functions": functions,
+                                "purpose": self.infer_purpose(file, functions)
+                            })
+
         return utilities
+
+    def _extract_skill_description(self, skill_md_path: str) -> str:
+        """Extract description from SKILL.md file."""
+        try:
+            with open(skill_md_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+                # Look for description in frontmatter or first paragraph
+                in_frontmatter = False
+                for i, line in enumerate(lines[:20]):  # Check first 20 lines
+                    if line.strip() == '---':
+                        in_frontmatter = not in_frontmatter
+                    elif in_frontmatter and 'description:' in line:
+                        return line.split('description:')[1].strip()
+                    elif not in_frontmatter and line.strip() and not line.startswith('#'):
+                        return line.strip()[:100]  # First non-heading line
+        except:
+            pass
+        return "Skill utility"
 
     def extract_functions(self, file_path: str) -> List[str]:
         """Extract function signatures from a file."""
@@ -250,26 +364,38 @@ def main():
     parser.add_argument('--session', required=True, help='Session ID')
     parser.add_argument('--cache-enabled', action='store_true', help='Enable caching')
     parser.add_argument('--output', default='bazinga/codebase_analysis.json', help='Output file path')
+    parser.add_argument('--timeout', type=int, default=30, help='Timeout in seconds (default: 30, 0=no timeout)')
 
     args = parser.parse_args()
 
     analyzer = CodebaseAnalyzer(
         task=args.task,
         session_id=args.session,
-        cache_enabled=args.cache_enabled
+        cache_enabled=args.cache_enabled,
+        timeout=args.timeout
     )
 
     try:
         results = analyzer.analyze()
         analyzer.save_results(results, args.output)
-        
-        print(f"Analysis complete. Results saved to {args.output}")
+
+        if results.get('timed_out'):
+            print(f"⚠️  {results.get('timeout_message', 'Analysis timed out')}")
+            print(f"Partial results saved to {args.output}")
+        else:
+            print(f"✓ Analysis complete. Results saved to {args.output}")
+
         print(f"Cache efficiency: {results['cache_efficiency']}")
         print(f"Found {len(results.get('similar_features', []))} similar features")
         print(f"Found {len(results.get('utilities', []))} utilities")
-        
+
+        if results.get('timed_out'):
+            sys.exit(2)  # Exit code 2 for timeout
+
     except Exception as e:
         print(f"Error during analysis: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 

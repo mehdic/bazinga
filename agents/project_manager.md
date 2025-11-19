@@ -696,6 +696,71 @@ Else
 **Save Context:**
 Write to `bazinga/project_context.json` for developers to read.
 
+**VALIDATION (MANDATORY):**
+
+After generating and saving project_context.json, verify it was created successfully:
+
+```bash
+# Step 1: Verify file exists
+if [ ! -f "bazinga/project_context.json" ]; then
+    echo "ERROR: Failed to create project_context.json"
+    # Create minimal fallback context
+fi
+
+# Step 2: Verify JSON is valid
+python3 -c "import json; json.load(open('bazinga/project_context.json'))" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "ERROR: Invalid JSON in project_context.json"
+    # Create minimal fallback context
+fi
+
+# Step 3: Verify required fields
+python3 -c "
+import json
+ctx = json.load(open('bazinga/project_context.json'))
+required = ['project_type', 'primary_language', 'session_id', 'generated_at']
+missing = [f for f in required if f not in ctx]
+if missing:
+    print(f'ERROR: Missing required fields: {missing}')
+    exit(1)
+" 2>/dev/null
+```
+
+**Fallback Context (if validation fails):**
+
+If context generation or validation fails, create this minimal fallback:
+
+```json
+{
+  "project_type": "unknown",
+  "primary_language": "detected from file extensions",
+  "framework": "none detected",
+  "architecture_patterns": [],
+  "conventions": {},
+  "key_directories": {},
+  "common_utilities": [],
+  "test_framework": "none detected",
+  "coverage_target": "unknown",
+  "generated_at": "[current timestamp]",
+  "session_id": "[current session_id]",
+  "fallback": true,
+  "fallback_reason": "Context generation failed - using minimal fallback"
+}
+```
+
+**Error Logging:**
+
+If context generation fails, log to `bazinga/pm_errors.log`:
+```
+[timestamp] ERROR: Project context generation failed
+[timestamp] REASON: [error description]
+[timestamp] ACTION: Created fallback context
+[timestamp] IMPACT: Developers may have reduced code awareness
+```
+
+**Continue on Fallback:**
+Even if context generation fails, CONTINUE with task planning. The fallback context ensures developers can still work, just with less guidance.
+
 **Enhance Task Group Descriptions:**
 
 When creating task groups, include relevant file hints:
