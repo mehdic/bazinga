@@ -1006,9 +1006,10 @@ bazinga-db, please get all task groups for session [current session_id]
 Skill(command: "bazinga-db")
 ```
 
-**Check the response:**
-- If task groups are returned (array with N groups), proceed to Step 1.5
-- If task groups are empty or no records found, proceed to Step 1.4b (fallback)
+**Check the response and validate:**
+- If task groups returned with N > 0: ✅ Proceed to Step 1.5
+- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback - PM didn't save groups)
+- If parallel mode AND N > 4: ⚠️ Too many groups (max 4) - use first 4 only, log warning
 
 #### Step 1.4b: Fallback - Create Task Groups from PM Response
 
@@ -1087,8 +1088,10 @@ If fails: Fix prompt before spawning (see agents/developer.md for workflow requi
 
 **Build Task description:**
 ```python
+# Simple mode: 40 char truncation (prefix "Dev: " = 5 chars, total ~45)
 task_name = task_groups[0].name if task_groups[0].name else "main group"
 description = f"Dev: {task_name[:40]}{'...' if len(task_name) > 40 else ''}"
+# Note: Parallel mode uses 30 chars because group ID takes visual space ("Dev A: " = 7 chars)
 ```
 
 **Spawn:**
@@ -1369,11 +1372,14 @@ Then invoke: `Skill(command: "bazinga-db")`
 **Required Context (must be available):**
 - `session_id` - Current session (from Step 0)
 - `group_id` - Current group ("main", "A", "B", etc.)
-- `branch` - Developer's feature branch
+- `branch` - Developer's feature branch (from developer spawn context - verify available)
 - `investigation_state` - Initialized with: problem_summary, hypothesis_matrix, suggested_skills (from Tech Lead)
 - `skills_config` - For investigator skills (from Step 0)
 
-**Loop Execution:** Follow complete procedure in `bazinga/templates/investigation_loop.md`
+**Loop Execution:**
+1. **Read the full procedure:** Use Read tool → `bazinga/templates/investigation_loop.md`
+2. **Execute all steps** in the template (up to 5 iterations)
+3. **Return to orchestrator** at the exit code destination below
 
 **Exit Codes (explicit routing):**
 
@@ -1613,7 +1619,8 @@ for group in groups_to_spawn:  # e.g., groups A, B, C
     task = next(t for t in task_groups if t.group_id == group.id)
     task_name = task.name if task.name else group.id
 
-    # Truncate to 30 chars, add "..." if longer
+    # Truncate to 30 chars (shorter than simple mode's 40 because group ID takes space)
+    # Format: "Dev A: " = 7 char prefix vs simple mode "Dev: " = 5 chars
     truncated = task_name[:30] + ("..." if len(task_name) > 30 else "")
 
     # Build description
@@ -1804,6 +1811,13 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 **Pattern for ALL agent logging:** Use this macro notation throughout workflow.
 
 **Macro Notation:** `§DB.log(agent_type, session, content, iteration, agent_id)`
+
+**🔴 CRITICAL WARNING:** This is a DOCUMENTATION REFERENCE, not executable code!
+After EVERY §DB.log() usage, you MUST add:
+```
+Then invoke: `Skill(command: "bazinga-db")`
+```
+Forgetting this will cause silent database logging failure!
 
 **Fully Expanded Example (use this pattern when needed):**
 ```
