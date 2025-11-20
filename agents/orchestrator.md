@@ -1192,7 +1192,10 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt built using above process])
+# Extract brief task summary from PM's task description (first 40 chars max)
+# Build contextual description: "Dev: {task_summary}"
+# Example: "Dev: JWT auth middleware" instead of "Developer implementation"
+Task(subagent_type: "general-purpose", description: "Dev: {task_summary}", prompt: [Developer prompt built using above process])
 ```
 
 
@@ -1377,7 +1380,9 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA Expert prompt built using above process])
+# Use group_id from context: "QA {group}: tests"
+# Example: "QA main: tests" or "QA A: tests"
+Task(subagent_type: "general-purpose", description: "QA {group}: tests", prompt: [QA Expert prompt built using above process])
 ```
 
 
@@ -1564,7 +1569,9 @@ See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [Tech Lead prompt built using above process])
+# Use group_id from context: "TechLead {group}: review"
+# Example: "TechLead main: review" or "TechLead A: review"
+Task(subagent_type: "general-purpose", description: "TechLead {group}: review", prompt: [Tech Lead prompt built using above process])
 ```
 
 
@@ -2317,9 +2324,11 @@ Process internally (parallel spawning is already announced in planning complete 
 When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
 ```
-Task(subagent_type: "general-purpose", description: "Developer Group A", prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", description: "Developer Group B", prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", description: "Developer Group C", prompt: [Group C prompt])
+# Extract task name from each group (first 30 chars): "Dev {id}: {task_name}"
+# Example: "Dev A: JWT auth" instead of "Developer Group A"
+Task(subagent_type: "general-purpose", description: "Dev A: {task_name_A}", prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", description: "Dev B: {task_name_B}", prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", description: "Dev C: {task_name_C}", prompt: [Group C prompt])
 ... up to 4 developers max
 ```
 
