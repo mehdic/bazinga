@@ -11,7 +11,7 @@ import tempfile
 import shutil
 
 # Current schema version
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -110,11 +110,18 @@ def init_database(db_path: str) -> None:
                 # Has old CHECK constraint, migrate
                 migrate_v1_to_v2(conn, cursor)
 
+        # Handle v2→v3 migration (add development_plans table)
+        if current_version == 2:
+            print("🔄 Migrating schema from v2 to v3...")
+            # No data migration needed - just add new table
+            # Table will be created below with CREATE TABLE IF NOT EXISTS
+            print("✓ Migration to v3 complete (development_plans table added)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Remove agent_type CHECK constraint"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Add development_plans table for multi-phase orchestrations"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -259,6 +266,28 @@ def init_database(db_path: str) -> None:
         ON decisions(session_id, timestamp DESC)
     """)
     print("✓ Created decisions table with indexes")
+
+    # Development plans table (for multi-phase orchestrations)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS development_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT UNIQUE NOT NULL,
+            original_prompt TEXT NOT NULL,
+            plan_text TEXT NOT NULL,
+            phases TEXT NOT NULL,
+            current_phase INTEGER,
+            total_phases INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            metadata TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_devplans_session
+        ON development_plans(session_id)
+    """)
+    print("✓ Created development_plans table with indexes")
 
     # Record schema version for new databases
     current_version = get_schema_version(cursor)

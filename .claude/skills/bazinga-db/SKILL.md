@@ -13,11 +13,12 @@ You are the bazinga-db skill. When invoked, you handle database operations for t
 
 **Invoke this skill when:**
 - Orchestrator needs to log agent interactions or save orchestrator state
-- Project Manager needs to save PM state or create/update task groups
+- Project Manager needs to save PM state, create/update task groups, or manage development plans
 - Developer/QA/Tech Lead needs to log completion or update task status
 - Any agent needs to save skill outputs (security scan, coverage, lint results)
 - Dashboard needs to query orchestration data
 - Any agent mentions "save to database", "query database", or "bazinga-db"
+- PM needs to save/retrieve multi-phase development plans
 - Replacing file writes to `bazinga/*.json` or `docs/orchestration-log.md`
 
 **Do NOT invoke when:**
@@ -69,6 +70,9 @@ Extract from the calling agent's request:
 - "save skill output" → save-skill-output
 - "dashboard snapshot" / "get dashboard data" → dashboard-snapshot
 - "stream logs" / "recent logs" → stream-logs
+- "save development plan" / "save plan" → save-development-plan
+- "get development plan" / "get plan" → get-development-plan
+- "update plan progress" / "update phase" → update-plan-progress
 
 **Required parameters:**
 - session_id (almost always required)
@@ -174,6 +178,32 @@ Updates session status (active, completed, failed). Auto-sets end_time for compl
 ```bash
 SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
   "<session_id>")
+```
+
+**Save development plan:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" save-development-plan \
+  "<session_id>" \
+  "<original_prompt>" \
+  "<plan_text>" \
+  '<phases_json>' \
+  <current_phase> \
+  <total_phases> \
+  '<metadata_json>'
+```
+
+**Get development plan:**
+```bash
+PLAN=$(python3 "$DB_SCRIPT" --db "$DB_PATH" get-development-plan \
+  "<session_id>")
+```
+
+**Update plan progress:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" update-plan-progress \
+  "<session_id>" \
+  <phase_number> \
+  "<status>"
 ```
 
 **Full command reference:** See `scripts/bazinga_db.py --help` for all available operations.

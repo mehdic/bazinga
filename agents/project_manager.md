@@ -513,6 +513,27 @@ API response times increased 5x after recent deployment.
 
 ### When All Work Complete (After Tech Debt Check)
 
+**BEFORE BAZINGA: Check Development Plan Status**
+
+IF development plan exists for this session:
+
+Query plan: `Skill(command: "bazinga-db")` → `bazinga-db, please get the development plan: Session ID: {session_id}`
+
+Check phases:
+- Count completed phases vs total phases
+- IF incomplete phases remain → **DO NOT send BAZINGA**
+- Output: `📋 Plan: Phase {N} complete | Phase {M} pending | Use "resume" or "/orchestrate Phase {M}" to continue`
+- **Status:** PARTIAL_PLAN_COMPLETE (not BAZINGA)
+
+IF all plan phases completed:
+- Mark current phase as completed: `Skill(command: "bazinga-db")` → `bazinga-db, please update plan progress: Session ID: {session_id}, Phase Number: {N}, Status: completed`
+- Proceed to BAZINGA validation below
+
+IF no plan exists OR all phases done:
+- Proceed to BAZINGA validation below
+
+**Rationale:** Multi-phase plans should not send BAZINGA until ALL phases complete. Session should stay "active" for user to continue later.
+
 ## 🚨 BAZINGA VALIDATION PROTOCOL
 
 **Path A: Full Achievement** ✅
@@ -1114,6 +1135,108 @@ When spawning developers through orchestrator, include this context:
 
 ## Phase 1: Initial Planning (First Spawn)
 
+### Step 0: Development Plan Management (FIRST ACTION)
+
+**Query current session's plan:**
+
+Invoke skill: `Skill(command: "bazinga-db")`
+
+Provide request:
+```
+bazinga-db, please get the development plan:
+
+Session ID: {session_id}
+```
+
+**Handle response:**
+
+**IF plan found → CONTINUATION MODE:**
+- Parse: original_prompt, phases[], current_phase, metadata
+- Map user request to phases (e.g., "Phase 2" → phases[1])
+- Output: `📋 Plan: {total}-phase | Phase 1✓ Phase 2→ Phase 3⏸`
+- Jump to Step 1 with plan context
+
+**IF no plan found → CHECK FOR ORPHANED PLANS:**
+
+User request contains phase references ("Phase", "phase", "Step")? If yes:
+
+*New sessions may lose plan context. Search recent sessions:*
+
+Invoke: `Skill(command: "bazinga-db")`
+```
+bazinga-db, please list the most recent sessions (limit 5).
+```
+
+For each recent session (last 24h), query its plan. If plan found with matching phase names:
+- Show user: `📋 Found plan from {prev_session} | Continue it? (assuming yes)`
+- Load plan, update session_id to current
+- Continue in CONTINUATION MODE
+
+**IF still no plan → PLAN CREATION MODE:**
+
+Detect plan type:
+1. **User-provided plan:** Explicit "Phase 1:", "Step 1:", numbered items + scope keywords ("only", "for now", "start with")
+2. **PM-generated plan:** Complex work (will need >2 task groups) → break into phases
+
+**Example - User-provided plan:**
+```
+User: "Phase 1: JWT auth, Phase 2: User reg, Phase 3: Email. Do Phase 1 only."
+
+Parse:
+- Phase 1: "JWT auth" (requested_now: true, status: "pending")
+- Phase 2: "User reg" (requested_now: false, status: "not_started")
+- Phase 3: "Email" (requested_now: false, status: "not_started")
+```
+
+**Example - PM-generated plan:**
+```
+User: "Add complete authentication system with social logins"
+
+Analyze: Will need auth, OAuth, UI, tests → 3 task groups → Generate phases:
+- Phase 1: "Core auth infrastructure"
+- Phase 2: "Social OAuth integration"
+- Phase 3: "UI and E2E tests"
+```
+
+**Save plan** (see exact format below):
+
+Invoke: `Skill(command: "bazinga-db")`
+```
+bazinga-db, please save this development plan:
+
+Session ID: {session_id}
+Original Prompt: {user's exact message, escape quotes}
+Plan Text: Phase 1: JWT auth
+Phase 2: User registration
+Phase 3: Email verification
+Phases: [{"phase":1,"name":"JWT auth","status":"pending","description":"Implement JWT tokens","requested_now":true},{"phase":2,"name":"User registration","status":"not_started","description":"Signup flow","requested_now":false},{"phase":3,"name":"Email verification","status":"not_started","description":"Email confirmation","requested_now":false}]
+Current Phase: 1
+Total Phases: 3
+Metadata: {"plan_type":"user_provided_partial","scope_requested":"Phase 1 only"}
+```
+
+**CRITICAL - JSON Construction:**
+- Use compact JSON (no newlines inside array)
+- Escape quotes in descriptions: `"JWT \"bearer\" tokens"` → `"JWT \\"bearer\\" tokens"`
+- Required fields: phase (int), name, status, description, requested_now (bool)
+- Keep descriptions short (<50 chars) to avoid command-line limits
+
+**Error Handling:**
+
+IF bazinga-db fails (timeout, locked, error):
+- Log: `⚠️ Plan save failed | {error} | Continuing without persistence`
+- Continue to Step 1 normally (graceful degradation)
+- Plan won't persist, but current orchestration continues
+
+IF JSON construction fails:
+- Skip plan save
+- Continue to Step 1 normally
+- Log: `⚠️ Plan parsing failed | Proceeding as simple orchestration`
+
+Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
+
+**Full schema:** research/development-plan-management-strategy.md
+
 ### Step 1: Analyze Requirements
 Read user requirements, identify features, detect dependencies, estimate complexity.
 
@@ -1602,6 +1725,8 @@ Read provided context:
 - Updated PM state from database
 - Completion updates (which groups approved/failed)
 - Current group statuses
+
+**If development plan exists:** Query plan status and update completed phases via bazinga-db `update-plan-progress` when phases complete. Keep plan synchronized with actual progress.
 
 ### Step 2: Decide Next Action
 
