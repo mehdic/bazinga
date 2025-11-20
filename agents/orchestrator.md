@@ -1190,12 +1190,23 @@ ONLY THEN:
 See `agents/developer.md` for full developer agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
+**Build contextual Task description:**
+```python
+# Step 1: Get task name from task_groups (queried at Step 1.4)
+# For simple mode, use task_groups[0] (group_id="main")
+task_name = task_groups[0].name if task_groups[0].name else "main group"
+
+# Step 2: Truncate to 40 chars, add "..." if longer
+task_summary = task_name[:40] + ("..." if len(task_name) > 40 else "")
+
+# Step 3: Build description
+description = f"Dev: {task_summary}"
+# Example: "Dev: JWT auth middleware" or "Dev: main group" (fallback)
+```
+
 **Spawn:**
 ```
-# Extract brief task summary from PM's task description (first 40 chars max)
-# Build contextual description: "Dev: {task_summary}"
-# Example: "Dev: JWT auth middleware" instead of "Developer implementation"
-Task(subagent_type: "general-purpose", description: "Dev: {task_summary}", prompt: [Developer prompt built using above process])
+Task(subagent_type: "general-purpose", description: [description from above], prompt: [Developer prompt built using above process])
 ```
 
 
@@ -1378,11 +1389,21 @@ THEN:
 See `agents/qa_expert.md` for full QA Expert agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
+**Build contextual Task description:**
+```python
+# Step 1: Get current group_id from context (passed in prompt building at Step 2A.4)
+# For simple mode: group_id = "main"
+# For parallel mode: group_id = "A", "B", "C", etc.
+group_id = [current group being processed]
+
+# Step 2: Build description
+description = f"QA {group_id}: tests"
+# Example: "QA main: tests" or "QA A: tests"
+```
+
 **Spawn:**
 ```
-# Use group_id from context: "QA {group}: tests"
-# Example: "QA main: tests" or "QA A: tests"
-Task(subagent_type: "general-purpose", description: "QA {group}: tests", prompt: [QA Expert prompt built using above process])
+Task(subagent_type: "general-purpose", description: [description from above], prompt: [QA Expert prompt built using above process])
 ```
 
 
@@ -1567,11 +1588,21 @@ ONLY THEN:
 See `agents/techlead.md` for full Tech Lead agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
+**Build contextual Task description:**
+```python
+# Step 1: Get current group_id from context (passed in prompt building at Step 2A.6)
+# For simple mode: group_id = "main"
+# For parallel mode: group_id = "A", "B", "C", etc.
+group_id = [current group being processed]
+
+# Step 2: Build description
+description = f"TechLead {group_id}: review"
+# Example: "TechLead main: review" or "TechLead A: review"
+```
+
 **Spawn:**
 ```
-# Use group_id from context: "TechLead {group}: review"
-# Example: "TechLead main: review" or "TechLead A: review"
-Task(subagent_type: "general-purpose", description: "TechLead {group}: review", prompt: [Tech Lead prompt built using above process])
+Task(subagent_type: "general-purpose", description: [description from above], prompt: [Tech Lead prompt built using above process])
 ```
 
 
@@ -1806,11 +1837,25 @@ These are OPTIONAL - invoke only when investigation requires them.
 [REST OF agents/investigator.md content starting from "## Your Role" section]
 ```
 
-**4. Spawn Investigator:**
+**4. Build contextual Task description:**
+```python
+# Step 1: Get problem summary from investigation_state (initialized at Step 2A.6b)
+problem = investigation_state.problem_summary
+
+# Step 2: Truncate to 35 chars, add "..." if longer
+summary = problem[:35] + ("..." if len(problem) > 35 else "")
+
+# Step 3: Build description with iteration number
+iteration = investigation_state.current_iteration
+description = f"Investigator {iteration}/5: {summary}"
+# Example: "Investigator 1/5: Timeout in auth flow" or "Investigator 2/5: Database connection pool..."
+```
+
+**5. Spawn Investigator:**
 ```
 Task(
   subagent_type: "general-purpose",
-  description: "Investigator iteration [N]",
+  description: [description from above],
   prompt: [Investigator prompt built above with sections A + B + C]
 )
 ```
@@ -2323,12 +2368,30 @@ Process internally (parallel spawning is already announced in planning complete 
 
 When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
+**Build contextual Task descriptions for each group:**
+```python
+# Step 1: Get task_groups from database (queried at Step 1.4)
+# Step 2: For EACH group being spawned:
+for group in groups_to_spawn:  # e.g., groups A, B, C
+    # Get task name from task_groups
+    task = next(t for t in task_groups if t.group_id == group.id)
+    task_name = task.name if task.name else group.id
+
+    # Truncate to 30 chars, add "..." if longer
+    truncated = task_name[:30] + ("..." if len(task_name) > 30 else "")
+
+    # Build description
+    descriptions[group.id] = f"Dev {group.id}: {truncated}"
+    # Example: "Dev A: JWT auth" or "Dev B: User registration..."
+
+# Step 3: Spawn all in parallel
 ```
-# Extract task name from each group (first 30 chars): "Dev {id}: {task_name}"
-# Example: "Dev A: JWT auth" instead of "Developer Group A"
-Task(subagent_type: "general-purpose", description: "Dev A: {task_name_A}", prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", description: "Dev B: {task_name_B}", prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", description: "Dev C: {task_name_C}", prompt: [Group C prompt])
+
+**Spawn:**
+```
+Task(subagent_type: "general-purpose", description: descriptions["A"], prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", description: descriptions["B"], prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [Group C prompt])
 ... up to 4 developers max
 ```
 
