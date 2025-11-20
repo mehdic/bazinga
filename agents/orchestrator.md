@@ -1654,6 +1654,22 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
 
+**🔴 CRITICAL WORKFLOW RULE - NEVER STOP BETWEEN PHASES:**
+
+**Multi-phase execution is common in parallel mode:**
+- PM may create Phase 1 (setup groups A, B, C) and Phase 2 (feature groups D, E, F)
+- When Phase 1 completes, orchestrator MUST automatically start Phase 2
+- **NEVER STOP TO WAIT FOR USER INPUT between phases**
+- Only stop when PM sends BAZINGA or NEEDS_CLARIFICATION
+
+**How to detect and continue to next phase:**
+- After EACH group's Tech Lead approval: Check if pending groups exist (Step 2B.7a)
+- IF pending groups found: Immediately spawn developers for next phase
+- IF no pending groups: Then spawn PM for final assessment
+- Process continuously until all phases complete
+
+**Without this rule:** Orchestrator hangs after Phase 1, waiting indefinitely for user to say "continue"
+
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
 Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
@@ -1768,6 +1784,64 @@ Then invoke: `Skill(command: "bazinga-db")`
 **Workflow execution:** Process groups concurrently but track each independently.
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
+
+### Step 2B.7a: Phase Continuation Check (CRITICAL - PREVENTS HANG)
+
+**🔴 MANDATORY: After each Tech Lead approval, check for next phase BEFORE spawning PM**
+
+**When a group is approved by Tech Lead:**
+
+1. **Update group status in database:**
+   ```
+   bazinga-db, please update task group:
+
+   Group ID: [group_id]
+   Status: completed
+   ```
+
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Query ALL task groups to check overall progress:**
+   ```
+   bazinga-db, please get all task groups for session [session_id]
+   ```
+
+   Then invoke: `Skill(command: "bazinga-db")`
+
+3. **Analyze the task groups returned:**
+
+   Count groups by status:
+   - `completed_count`: Groups with status='completed'
+   - `in_progress_count`: Groups with status='in_progress'
+   - `pending_count`: Groups with status='pending'
+   - `total_count`: Total groups
+
+4. **Decision logic:**
+
+   **IF `pending_count` > 0:**
+   - **There are MORE PHASES to execute!**
+   - **DO NOT spawn PM yet**
+   - Extract the pending groups (these are the next phase)
+   - **User output (capsule format):**
+     ```
+     ✅ Phase N complete | {completed_count}/{total_count} groups done | Starting Phase N+1 → Groups {pending_group_ids}
+     ```
+   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
+   - Process internally (no additional routing messages - phase transition is already announced in capsule)
+
+   **ELSE IF `pending_count` == 0 AND `in_progress_count` == 0:**
+   - **All groups complete - time for PM final assessment**
+   - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
+
+   **ELSE IF `in_progress_count` > 0:**
+   - **Some groups still in progress - wait for them**
+   - Continue processing other groups
+   - Do NOT spawn PM yet
+   - Do NOT spawn next phase yet
+
+**🔴 CRITICAL: This check PREVENTS the orchestrator from hanging between phases!**
+
+Without this check, when Phase 1 completes, the orchestrator doesn't know there's a Phase 2 and just stops waiting for instructions.
 
 **When ALL groups reach "complete" status → Proceed to Step 2B.8**
 
