@@ -282,10 +282,45 @@ Investigation:
 
 ## PM Response Parsing
 
+**PRIORITY: Check for Investigation Answers FIRST**
+
+**If PM response contains "## Investigation Answers" section:**
+
+Extract investigation findings to show user BEFORE planning capsule:
+
+**Extraction pattern:**
+```
+Look for section: ## Investigation Answers
+Extract all question-answer pairs
+Format: Question → Answer → Evidence
+```
+
+**Capsule construction (investigation results):**
+```
+📊 Investigation results | {findings_summary} | Details: {details}
+```
+
+**Example extraction:**
+```
+PM response contains:
+## Investigation Answers
+**Question:** How many E2E tests exist?
+**Answer:** Found 83 E2E tests in 5 files (30 passing, 53 skipped)
+**Evidence:** npm test output
+
+Orchestrator outputs:
+📊 Investigation results | Found 83 E2E tests in 5 files | 30 passing, 53 skipped
+```
+
+**Fallback:** If investigation section exists but formatting unclear, extract key findings from the section and summarize.
+
+---
+
 **Expected status values:**
 - `BAZINGA` - Work complete, all requirements met
 - `CONTINUE` - More work needed
 - `NEEDS_CLARIFICATION` - User input required
+- `INVESTIGATION_ONLY` - Only questions answered, no implementation requested
 
 **Information to extract:**
 
@@ -294,6 +329,7 @@ Investigation:
    Status: BAZINGA
    **PM Status:** CONTINUE
    PM Status: NEEDS_CLARIFICATION
+   **Status:** INVESTIGATION_ONLY
    ```
 
 2. **Mode decision** (initial PM spawn) - Look for:

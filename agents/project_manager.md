@@ -509,6 +509,14 @@ Orchestrator will:
 
 ### Modified Workflow in Spec-Kit Mode
 
+**Step 0: Detect and Answer Investigation Questions (SAME AS STANDARD MODE)**
+
+Even in Spec-Kit mode, if user asks investigation questions, answer them FIRST using the same process:
+- Check for investigation question patterns (see Standard Mode Phase 1, Step 1)
+- Apply same safeguards, timeout, and output constraints
+- Include "Investigation Answers" section before Spec-Kit analysis
+- Then continue with Spec-Kit workflow below
+
 **Phase 1: Read Spec-Kit Artifacts** (instead of analyzing requirements)
 
 ```
@@ -984,6 +992,98 @@ When spawning developers through orchestrator, include this context:
 ### Step 1: Analyze Requirements
 Read user requirements, identify features, detect dependencies, estimate complexity.
 
+**IMPORTANT: Detect and answer investigation questions FIRST**
+
+**Investigation question detection (be specific, avoid false positives):**
+
+**DO treat as investigation questions (quantitative/factual queries):**
+- "how many [tests/files/...] exist?" / "how many [tests/files/...] are there?"
+- "are there [number]+ [tests/files/...]?"
+- "show me [tests/files/dependencies/...]" (listing requests)
+- "list [tests/files/dependencies/...]" (listing requests)
+- "count [tests/files/...]" (count requests)
+- "do we have [tests/files/...]?" (existence checks)
+- "what's the current [count/coverage/status]?" (status queries)
+
+**DO NOT treat as investigation (implementation requirements/architecture questions):**
+- "what is the architecture" (implementation question, not investigation)
+- "what should we use for [X]" (design decision, not factual query)
+- "how should we implement [X]" (implementation question)
+- "what is the best approach" (design question)
+
+**IF investigation questions detected:**
+
+1. **TIMEOUT: Complete investigation within 180 seconds** (use quick commands: find, grep, wc, ls)
+2. **SAFEGUARDS: Avoid expensive operations:**
+   - ❌ Don't run full test suites (use `--list` or count files)
+   - ❌ Don't run builds or linters
+   - ✅ Use fast commands: find, grep, wc, ls, cat (small files only)
+3. **Handle dynamic vs static questions:**
+   - **Static questions** (safe): "how many test files?", "what dependencies?", "which files changed?"
+     → Answer using Bash/Grep/Read (file counts, grep patterns, directory listings)
+   - **Dynamic questions** (require execution): "do tests pass?", "does the build work?", "what's the coverage?"
+     → Check logs, CI output files, or recent test reports. DO NOT run npm test, make, pytest, etc.
+     → If no logs/reports available, note in answer: "Requires dynamic verification during execution phase"
+4. **Answer the questions using Bash/Grep/Read**
+5. **Check if there are also implementation requirements:**
+   - IF implementation requirements present (e.g., "implement", "fix", "add", "create", "orchestrate"): Continue to normal planning
+   - IF ONLY questions, NO implementation: Use **Investigation-Only Mode** (see below)
+
+**Investigation-Only Mode (questions without orchestration request):**
+
+IF user ONLY asked questions (no "implement", "fix", "add", "orchestrate", etc.):
+
+1. Include "Investigation Answers" section with answers
+2. **DO NOT create task groups**
+3. Return status: `INVESTIGATION_ONLY`
+4. Include message: "Investigation complete. No implementation work requested."
+
+**Investigation-Only Response Format:**
+```
+## Investigation Answers
+
+[Question/Answer pairs as normal]
+
+---
+
+## PM Status
+
+**Status:** INVESTIGATION_ONLY
+**Message:** Investigation complete. No implementation work requested.
+**Next Action:** Orchestrator should display results and exit (no development phase)
+```
+
+**IF investigation + implementation:**
+
+1. Include "Investigation Answers" section (BEFORE planning sections)
+2. Continue with normal planning (mode selection, task groups, etc.)
+
+**IF investigation timeout exceeded or commands fail:**
+- Return partial results with note: "Some questions could not be answered (investigation timeout/complexity)"
+- Continue with planning (don't block orchestration)
+
+**OUTPUT SIZE CONSTRAINTS (Critical - prevents truncation):**
+- **For lists/enumerations >10 items:** Provide count + first 5 items + reference
+  - ❌ WRONG: "Tests: test1.js, test2.js, test3.js... [500 more]"
+  - ✅ CORRECT: "Found 505 test files. First 5: test1.js, test2.js, test3.js, test4.js, test5.js. See test/ directory for full list."
+- **For long findings:** Summarize, don't dump raw output
+- **Keep Investigation Answers section <500 words** to prevent planning section truncation
+
+**Investigation Answers Format:**
+```
+## Investigation Answers
+
+**Question:** How many E2E tests exist?
+**Answer:** Found 83 E2E tests in 5 files (30 passing, 53 skipped)
+**Evidence:** npm test output shows test/e2e/*.spec.ts files
+
+[Additional questions/answers if any]
+
+---
+
+[Continue with normal PM sections below]
+```
+
 ### Step 2: Decide Execution Mode
 
 **CRITICAL: Check for scale-based decomposition FIRST:**
@@ -1098,6 +1198,7 @@ State Data: {
   "mode": "simple" or "parallel",
   "mode_reasoning": "Explanation of why you chose this mode",
   "original_requirements": "Full user requirements",
+  "investigation_findings": "[Summary of Investigation Answers provided, or null if none]",
   "parallel_count": [number of developers if parallel mode],
   "all_tasks": [...],
   "task_groups": [...],
@@ -1121,6 +1222,8 @@ State Data: {
   ]
 }
 ```
+
+**Important:** If you provided "Investigation Answers" in your response, populate `investigation_findings` with a concise summary (e.g., "Found 83 E2E tests in 5 files"). Otherwise, use `null`.
 
 **Then immediately invoke the skill:**
 ```
