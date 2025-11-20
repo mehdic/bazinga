@@ -362,7 +362,7 @@ Skill(command: "bazinga-db")
 **IF list is empty (no previous sessions):**
 - This is the FIRST session ever
 - Decision: Follow **Path B** (create new session)
-- **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
+- **IMMEDIATELY jump to Path B (line 499). Do NOT stop.**
 
 **IF list has sessions:**
 - Check the most recent session's status field
@@ -370,7 +370,7 @@ Skill(command: "bazinga-db")
   - Previous session is finished
   - Decision: Follow **Path B** (create new session)
   - **DO NOT try to resume a completed session**
-  - **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
+  - **IMMEDIATELY jump to Path B (line 499). Do NOT stop.**
 - **IF status = "active" or "running":**
   - Previous session is still in progress
   - **IMMEDIATELY proceed to user intent analysis below. Do NOT stop.**
@@ -393,8 +393,8 @@ User said: "[user's message]"
 - If this → They want a NEW SESSION
 
 **Decision:**
-- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 856). Do NOT stop.**
-- User wants NEW task → **IMMEDIATELY jump to Path B below (line 951). Do NOT stop.**
+- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 404). Do NOT stop.**
+- User wants NEW task → **IMMEDIATELY jump to Path B below (line 499). Do NOT stop.**
 
 **Simple rule:** Check previous session status FIRST. If completed, always create new. Otherwise, check user's intent.
 
@@ -806,30 +806,16 @@ IF status = initial mode decision (PM's first response):
   ```
 
 IF status = NEEDS_CLARIFICATION:
-  → Use clarification template (line 427)
+  → Use clarification template (§Step 1.3a)
 
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template (lines 411-421)
 
 **Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
 
-**Step 3: Log PM interaction to database:**
-```
-bazinga-db, please log this PM interaction:
+**Step 3: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
 
-Session ID: [current session_id]
-Agent Type: pm
-Content: [Full PM response]
-Iteration: 1
-Agent ID: pm_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+Then invoke: `Skill(command: "bazinga-db")`
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
@@ -1020,9 +1006,10 @@ bazinga-db, please get all task groups for session [current session_id]
 Skill(command: "bazinga-db")
 ```
 
-**Check the response:**
-- If task groups are returned (array with N groups), proceed to Step 1.5
-- If task groups are empty or no records found, proceed to Step 1.4b (fallback)
+**Check the response and validate:**
+- If task groups returned with N > 0: ✅ Proceed to Step 1.5
+- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback - PM didn't save groups)
+- If parallel mode AND N > 4: ⚠️ Too many groups (max 4) - use first 4 only, log warning
 
 #### Step 1.4b: Fallback - Create Task Groups from PM Response
 
@@ -1080,120 +1067,40 @@ ELSE IF PM chose "parallel":
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-**YOU MUST follow `bazinga/templates/prompt_building.md` EXACTLY.**
-**DO NOT write custom prompts. DO NOT improvise. DO NOT skip this process.**
+**Prompt Structure:**
+1. **Agent role & workflow:** Read `agents/developer.md` (full agent definition with developer-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json developer section)
 
-**Step-by-Step Prompt Building Process:**
+**Agent Parameters:**
+- **Agent:** Developer | **Group:** main | **Mode:** Simple
+- **Session:** [session_id] | **Branch:** [current_branch]
+- **Skills Source:** skills_config.json (developer section)
+- **Testing Source:** testing_config.json
+- **Task Source:** [from PM response]
 
-**1. Check skills_config.json for developer skills:**
-
-From the skills_config.json you loaded during initialization, identify which developer skills have status = "mandatory" or "optional":
-
+**Pre-Spawn Validation (MUST pass):**
 ```
-Developer Skills Status:
-- lint-check: [mandatory/optional/disabled]
-- codebase-analysis: [mandatory/optional/disabled]
-- test-pattern-analysis: [mandatory/optional/disabled]
-- api-contract-validation: [mandatory/optional/disabled]
-- db-migration-check: [mandatory/optional/disabled]
+✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Testing mode  ✓ Report format
 ```
+If fails: Fix prompt before spawning (see agents/developer.md for workflow requirements)
 
-**2. Build prompt sections (following agents/developer.md):**
-
-Include these sections in order:
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
-- ✓ Group assignment (main)
-- ✓ Mode (Simple)
-- ✓ Task description from PM
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
-- ✓ Mandatory workflow steps (with Skill() invocations)
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to prompt:**
-
+**Build Task description:**
+```python
+# Simple mode: 40 char truncation (prefix "Dev: " = 5 chars, total ~45)
+# Defensive: Check task_groups exists and has entries (should always be true after Step 1.4)
+if not task_groups or len(task_groups) == 0:
+    description = "Dev: main group"  # Fallback if task_groups somehow empty
+else:
+    task_name = task_groups[0].name if task_groups[0].name else "main group"
+    description = f"Dev: {task_name[:40]}{'...' if len(task_name) > 40 else ''}"
+# Note: Parallel mode uses 30 chars because group ID takes visual space ("Dev A: " = 7 chars)
 ```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: Run [WHEN]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-USE THESE SKILLS - They are MANDATORY!
-```
-
-**3b. For EACH optional skill, add to prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use when needed:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [CONDITION]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-   When to use: [Context-specific guidance]
-
-These are OPTIONAL - invoke only when your workflow or task requires them.
-```
-
-**4. Add MANDATORY WORKFLOW section:**
-
-```
-**MANDATORY WORKFLOW:**
-
-BEFORE Implementing:
-[IF codebase-analysis is mandatory]:
-1. INVOKE Codebase Analysis Skill (MANDATORY)
-   Skill(command: "codebase-analysis")
-
-During Implementation:
-2. Implement the COMPLETE solution
-3. Write unit tests
-[IF test-pattern-analysis is mandatory]:
-4. INVOKE Test Pattern Analysis Skill (MANDATORY)
-   Skill(command: "test-pattern-analysis")
-
-BEFORE Reporting READY_FOR_QA:
-5. Run ALL unit tests - MUST pass 100%
-[IF lint-check is mandatory]:
-6. INVOKE lint-check Skill (MANDATORY)
-   Skill(command: "lint-check")
-7. Run build check - MUST succeed
-[IF api-contract-validation is mandatory AND api_changes]:
-8. INVOKE API Contract Validation (MANDATORY)
-   Skill(command: "api-contract-validation")
-[IF db-migration-check is mandatory AND migration_changes]:
-9. INVOKE DB Migration Check (MANDATORY)
-    Skill(command: "db-migration-check")
-
-ONLY THEN:
-10. Commit to branch: [branch_name]
-11. Report: READY_FOR_QA
-```
-
-**5. VALIDATION - Before spawning, verify your prompt contains:**
-
-```
-✓ [ ] The word "Skill(command:" appears at least once (for each mandatory skill)
-✓ [ ] Testing mode from testing_config.json is mentioned
-✓ [ ] MANDATORY WORKFLOW section exists
-✓ [ ] Report format specified
-```
-
-**IF ANY CHECKBOX IS UNCHECKED: Your prompt is INCOMPLETE. Fix it before spawning.**
-
-See `agents/developer.md` for full developer agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "Developer implementation", prompt: [Developer prompt built using above process])
+Task(subagent_type: "general-purpose", description: description, prompt: [Developer prompt])
 ```
 
 
@@ -1234,23 +1141,9 @@ IF status = BLOCKED:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log developer interaction:**
-```
-bazinga-db, please log this developer interaction:
+**Step 4: Log developer interaction:** §DB.log(developer, session_id, dev_response, iteration, developer_main)
 
-Session ID: [session_id]
-Agent Type: developer
-Content: [Developer response]
-Iteration: [iteration]
-Agent ID: dev_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+Then invoke: `Skill(command: "bazinga-db")`
 
 **AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
 
@@ -1285,100 +1178,33 @@ Skill(command: "bazinga-db")
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING - SKILLS REQUIRED
 
-**YOU MUST include mandatory skills in QA Expert prompt.**
+**Prompt Structure:**
+1. **Agent role & workflow:** Read `agents/qa_expert.md` (full agent definition with QA-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json qa_expert section)
 
-**1. Check skills_config.json for qa_expert skills:**
+**Agent Parameters:**
+- **Agent:** QA Expert | **Group:** [group_id] | **Mode:** [Simple/Parallel]
+- **Session:** [session_id]
+- **Skills Source:** skills_config.json (qa_expert section)
+- **Testing Source:** testing_config.json
+- **Context:** [Developer changes summary]
 
-From the skills_config.json you loaded during initialization, identify which qa_expert skills have status = "mandatory" or "optional":
-
+**Pre-Spawn Validation (MUST pass):**
 ```
-QA Expert Skills Status:
-- pattern-miner: [mandatory/optional/disabled]
-- quality-dashboard: [mandatory/optional/disabled]
+✓ "Skill(command:" per mandatory skill  ✓ Testing workflow  ✓ Test framework  ✓ Report format
 ```
+If fails: Fix prompt before spawning (see agents/qa_expert.md for workflow requirements)
 
-**2. Build QA Expert prompt following agents/qa_expert.md:**
-
-Include these sections:
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (QA Expert in Claude Code Multi-Agent Dev Team)
-- ✓ Developer changes summary and test requirements
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
-- ✓ Mandatory testing workflow with skill invocations
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to QA Expert prompt:**
-
+**Build Task description:**
+```python
+description = f"QA {group_id}: tests"
 ```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: Run [WHEN]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-USE THESE SKILLS - They are MANDATORY!
-```
-
-**3b. For EACH optional skill, add to QA Expert prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use when needed:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [CONDITION]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-   When to use: [Context-specific guidance]
-
-These are OPTIONAL - invoke only when your analysis requires them.
-```
-
-**4. Add MANDATORY TESTING WORKFLOW to QA Expert prompt:**
-
-```
-**MANDATORY TESTING WORKFLOW:**
-
-Run Tests:
-1. Execute integration tests
-2. Execute contract tests
-3. Execute E2E tests (if applicable)
-4. Verify test results
-
-AFTER Testing:
-[IF pattern-miner is mandatory]:
-5. INVOKE Pattern Miner Skill (MANDATORY)
-   Skill(command: "pattern-miner")
-
-[IF quality-dashboard is mandatory]:
-6. INVOKE Quality Dashboard Skill (MANDATORY)
-   Skill(command: "quality-dashboard")
-
-THEN:
-7. Make recommendation: APPROVE_FOR_REVIEW or REQUEST_CHANGES
-```
-
-**5. VALIDATION - Before spawning QA Expert, verify prompt contains:**
-
-```
-✓ [ ] Testing workflow defined
-✓ [ ] Skill invocation instructions (if any mandatory skills)
-✓ [ ] Recommendation format (APPROVE_FOR_REVIEW/REQUEST_CHANGES)
-```
-
-**IF ANY CHECKBOX IS UNCHECKED: QA Expert prompt is INCOMPLETE. Fix it before spawning.**
-
-See `agents/qa_expert.md` for full QA Expert agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA Expert prompt built using above process])
+Task(subagent_type: "general-purpose", description: description, prompt: [QA Expert prompt])
 ```
 
 
@@ -1460,112 +1286,33 @@ Skill(command: "bazinga-db")
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING - SKILLS REQUIRED
 
-**YOU MUST include mandatory skills in Tech Lead prompt.**
+**Prompt Structure:**
+1. **Agent role & workflow:** Read `agents/techlead.md` (full agent definition with Tech Lead-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json tech_lead section)
 
-**1. Check skills_config.json for tech_lead skills:**
+**Agent Parameters:**
+- **Agent:** Tech Lead | **Group:** [group_id] | **Mode:** [Simple/Parallel]
+- **Session:** [session_id]
+- **Skills Source:** skills_config.json (tech_lead section)
+- **Testing Source:** testing_config.json
+- **Context:** [Implementation + QA summary]
 
-From the skills_config.json you loaded during initialization, identify which tech_lead skills have status = "mandatory" or "optional":
-
+**Pre-Spawn Validation (MUST pass):**
 ```
-Tech Lead Skills Status:
-- security-scan: [mandatory/optional/disabled]
-- lint-check: [mandatory/optional/disabled]
-- test-coverage: [mandatory/optional/disabled]
-- codebase-analysis: [mandatory/optional/disabled]
-- pattern-miner: [mandatory/optional/disabled]
-- test-pattern-analysis: [mandatory/optional/disabled]
+✓ "Skill(command:" per mandatory skill  ✓ Review workflow  ✓ Decision format  ✓ Frameworks
 ```
+If fails: Fix prompt before spawning (see agents/techlead.md for workflow requirements)
 
-**2. Build Tech Lead prompt following agents/techlead.md:**
-
-Include these sections:
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (Tech Lead in Claude Code Multi-Agent Dev Team)
-- ✓ Group assignment and implementation summary
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
-- ✓ Mandatory review workflow with skill invocations
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to Tech Lead prompt:**
-
+**Build Task description:**
+```python
+description = f"TechLead {group_id}: review"
 ```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: Run [WHEN]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-USE THESE SKILLS - They are MANDATORY before approving!
-```
-
-**3b. For EACH optional skill, add to Tech Lead prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use in specific frameworks:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [FRAMEWORK]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-**When to use optional skills:**
-- codebase-analysis: Framework 1 (Root Cause Analysis), Framework 2 (Architectural Decisions), Framework 3 (Performance Investigation)
-- pattern-miner: Framework 1 (Root Cause Analysis), Framework 3 (Performance Investigation - historical patterns)
-- test-pattern-analysis: Framework 4 (Flaky Test Analysis)
-
-These are OPTIONAL - invoke only when frameworks indicate they're needed.
-```
-
-**4. Add MANDATORY REVIEW WORKFLOW to Tech Lead prompt:**
-
-```
-**MANDATORY REVIEW WORKFLOW:**
-
-BEFORE Manual Review:
-[IF security-scan is mandatory]:
-1. INVOKE Security Scan Skill (MANDATORY)
-   Skill(command: "security-scan")
-
-[IF lint-check is mandatory]:
-2. INVOKE Lint Check Skill (MANDATORY)
-   Skill(command: "lint-check")
-
-[IF test-coverage is mandatory]:
-3. INVOKE Test Coverage Skill (MANDATORY)
-   Skill(command: "test-coverage")
-
-THEN Perform Manual Review:
-4. Review architecture and code quality
-5. Assess performance implications
-6. Check security best practices
-7. Evaluate test adequacy
-
-ONLY THEN:
-8. Make decision: APPROVED or REQUEST_CHANGES
-```
-
-**5. VALIDATION - Before spawning Tech Lead, verify prompt contains:**
-
-```
-✓ [ ] At least one "Skill(command:" instruction (for each mandatory skill)
-✓ [ ] MANDATORY REVIEW WORKFLOW section
-✓ [ ] Decision format (APPROVED/REQUEST_CHANGES)
-```
-
-**IF ANY CHECKBOX IS UNCHECKED: Tech Lead prompt is INCOMPLETE. Fix it before spawning.**
-
-See `agents/techlead.md` for full Tech Lead agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: [Tech Lead prompt built using above process])
+Task(subagent_type: "general-purpose", description: description, prompt: [Tech Lead prompt])
 ```
 
 
@@ -1610,23 +1357,9 @@ IF decision = ESCALATE_TO_OPUS:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log Tech Lead interaction:**
-```
-bazinga-db, please log this techlead interaction:
+**Step 4: Log Tech Lead interaction:** §DB.log(techlead, session_id, tl_response, iteration, techlead_main)
 
-Session ID: [session_id]
-Agent Type: techlead
-Content: [Tech Lead response]
-Iteration: [iteration]
-Agent ID: techlead_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+Then invoke: `Skill(command: "bazinga-db")`
 
 **AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
@@ -1636,457 +1369,36 @@ Skill(command: "bazinga-db")
 
 **IF Tech Lead reports: INVESTIGATION_IN_PROGRESS**
 
-**⚠️ IMPORTANT:** Orchestrator manages investigation iterations. Investigator agents cannot "wait" or loop internally. Each iteration is a separate agent spawn.
-
-**User output (capsule format):**
-```
-🔬 Investigation needed | Tech Lead identified complex issue requiring deep analysis | Starting investigation (max 5 iterations)
-```
-
-**Log Tech Lead request:**
-```
-bazinga-db, please log this techlead interaction:
-
-Session ID: [session_id]
-Agent Type: techlead
-Content: [Tech Lead response with investigation request]
-Iteration: [iteration]
-Agent ID: techlead_main
-Status: investigation_requested
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
----
-
-#### Investigation Loop State Initialization
-
-**Initialize investigation state:**
-```yaml
-investigation_state:
-  group_id: [current_group_id]
-  session_id: [current_session_id]
-  branch: [developer's_feature_branch]
-  current_iteration: 0
-  max_iterations: 5
-  status: "in_progress"
-  problem_summary: [from Tech Lead]
-  hypothesis_matrix: [from Tech Lead]
-  suggested_skills: [from Tech Lead]
-  iterations_log: []
-  developer_results: null
-```
-
-**Save investigation state to database:**
-```
-bazinga-db, please save investigation state:
-
-Session ID: [session_id]
-Group ID: [group_id]
-State Type: investigation
-State Data: [investigation_state YAML above]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
----
-
-#### Investigation Iteration Loop
-
-**WHILE investigation_state.status == "in_progress" AND investigation_state.current_iteration < investigation_state.max_iterations:**
-
-**Increment iteration counter:**
-```
-investigation_state.current_iteration += 1
-```
-
-**User output (capsule format):**
-```
-🔬 Investigation iteration {N}/5 | {hypothesis_being_tested} | Testing hypothesis
-```
-
----
-
-##### Iteration Step 1: Spawn Investigator
-
-**1. Check skills_config.json for investigator skills:**
-
-From the skills_config.json you loaded during initialization, identify which investigator skills have status = "mandatory" or "optional":
-
-```
-Investigator Skills Status:
-- codebase-analysis: [mandatory/optional/disabled]
-- pattern-miner: [mandatory/optional/disabled]
-- test-pattern-analysis: [mandatory/optional/disabled]
-- security-scan: [mandatory/optional/disabled]
-```
-
-**2. Build Investigator Prompt:**
-
-Read `agents/investigator.md` and build prompt with these sections in order:
-
-A) **Investigation Context** (session state)
-B) **Skills Section** (mandatory + optional from config)
-C) **Rest of agents/investigator.md content**
-
-**Section A - Investigation Context:**
-
-```
----
-🔬 INVESTIGATION CONTEXT
----
-Session ID: [investigation_state.session_id]
-Group ID: [investigation_state.group_id]
-Branch: [investigation_state.branch]
-Current Iteration: [investigation_state.current_iteration]
-Iterations Remaining: [5 - current_iteration]
-
-Problem Summary: [investigation_state.problem_summary]
-
-Initial Hypothesis Matrix: [investigation_state.hypothesis_matrix]
-
-Previous Iteration Results (if iteration > 1):
-[investigation_state.iterations_log[previous iterations]]
-
-Developer Results from Previous Iteration (if available):
-[investigation_state.developer_results]
----
-```
-
-**Section B - Skills Injection:**
-
-**3. For EACH mandatory skill, add to prompt:**
-
-```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: [Description]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-Examples:
-- **Codebase Analysis**: Analyze codebase for similar patterns
-- **Pattern Miner**: Historical pattern analysis
-
-USE THESE SKILLS - They are MANDATORY for every investigation!
-```
-
-**3b. For EACH optional skill, add to prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use when needed:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [CONDITION]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-   When to use: [Context-specific guidance]
-
-Examples:
-- **Test Pattern Analysis**: Use when investigating test-related issues or flaky tests
-- **Security Scan**: Use when hypothesis involves security vulnerabilities
-
-These are OPTIONAL - invoke only when investigation requires them.
-```
-
-**Section C - Rest of investigator.md:**
-
-```
-[REST OF agents/investigator.md content starting from "## Your Role" section]
-```
-
-**4. Spawn Investigator:**
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "Investigator iteration [N]",
-  prompt: [Investigator prompt built above with sections A + B + C]
-)
-```
-
----
-
-##### Iteration Step 2: Receive Investigator Response
-
-**🔴 CRITICAL - READ THE AGENT RESPONSE:**
-
-The Task tool returns the FULL Investigator response. This IS the Investigator's analysis.
-
-**DO NOT:**
-- ❌ Ignore the response
-- ❌ Think it's "just a log ID"
-- ❌ "Take direct action" yourself
-- ❌ Skip parsing the Investigator's findings
-
-**YOU MUST:**
-- ✅ Read the FULL response from the Task tool result
-- ✅ Parse the Investigator's status (ROOT_CAUSE_FOUND, NEED_DEVELOPER_DIAGNOSTIC, etc.)
-- ✅ Extract the relevant details (diagnosis, hypothesis, next steps)
-- ✅ Use this information to route to the next action
-
-**If the response is unclear:**
-- Re-spawn the Investigator with clarification request
-- DO NOT improvise a solution yourself
-
-**After reading the full response, log it:**
-```
-bazinga-db, please log this investigator interaction:
-
-Session ID: [session_id]
-Agent Type: investigator
-Content: [Full Investigator response from Task tool]
-Iteration: [current_iteration]
-Agent ID: investigator_[group_id]_iter[N]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
-
-**AFTER logging Investigator response: IMMEDIATELY continue to Step 3 (Route Based on Investigator Action). Do NOT stop.**
-
-**Parse Investigator action from response (that you just read above). Look for status markers:**
-
----
-
-##### Iteration Step 3: Route Based on Investigator Action
-
-**ACTION 1: Investigator reports "ROOT_CAUSE_FOUND"**
-
-```
-Status: ROOT_CAUSE_FOUND
-Root Cause: [description]
-Confidence: [High/Medium]
-Recommended Solution: [solution]
-```
-
-**If found:**
-- Update investigation_state.status = "completed"
-- Update investigation_state.root_cause = [description]
-- Update investigation_state.solution = [solution]
-- Save investigation state to database
-- **EXIT LOOP** → Go to Step 2A.6c (Tech Lead validation)
-
-**User output (capsule format):**
-```
-✅ Root cause found | {root_cause_summary} identified in iteration {N} | Proceeding to Tech Lead validation
-```
-
----
-
-**ACTION 2: Investigator reports "NEED_DEVELOPER_DIAGNOSTIC"**
-
-```
-Status: NEED_DEVELOPER_DIAGNOSTIC
-Hypothesis Being Tested: [hypothesis]
-Diagnostic Request:
-  - Add logging to: [file:line]
-  - Specific code changes: [code]
-  - Expected timeline: [X minutes]
-  - What to collect: [metrics/logs]
-```
-
-**If needs Developer:**
-
-**User output (capsule format):**
-```
-🔬 Diagnostic instrumentation needed | Adding logging to test {hypothesis} | Developer instrumenting code
-```
-
-**Build Developer Prompt:**
-
-Read `agents/developer.md` and prepend:
-
-```
----
-🔬 DIAGNOSTIC REQUEST FROM INVESTIGATOR
----
-Session ID: [session_id]
-Group ID: [group_id]
-Branch: [investigation_state.branch]
-Investigation Iteration: [current_iteration]
-
-The Investigator is systematically testing hypotheses to find the root cause.
-
-Current Hypothesis: [hypothesis]
-
-Your Task: Add diagnostic instrumentation (NOT a fix)
-
-Specific Changes Needed:
-[Investigator's diagnostic request details]
-
-IMPORTANT:
-- Make ONLY the diagnostic changes requested
-- Do NOT attempt to fix the root cause yet
-- Run the scenario to collect the requested data
-- Report the exact output/metrics
-
-Branch: [investigation_state.branch]
-Commit Message: "Add diagnostic logging for investigation iteration [N]"
-
-After changes:
-- Run the scenario that triggers the problem
-- Collect the requested metrics/logs
-- Report in format:
-
-**Diagnostic Results:**
-```
-[actual output/metrics]
-```
-
-Status: DIAGNOSTIC_COMPLETE
----
-
-[REST OF agents/developer.md content]
-```
-
-**Spawn Developer:**
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "Developer diagnostic for iteration [N]",
-  prompt: [Developer prompt built above]
-)
-```
-
-**After Developer responds:**
-
-**Log Developer response:**
-```
-bazinga-db, please log this developer interaction:
-
-Session ID: [session_id]
-Agent Type: developer
-Content: [Developer response with diagnostic results]
-Iteration: [current_iteration]
-Agent ID: developer_[group_id]_diagnostic[N]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Extract diagnostic results from Developer response:**
-- Store in investigation_state.developer_results = [results]
-- Add to iteration log
-
-**Save updated investigation state:**
-```
-bazinga-db, please update investigation state:
-[updated state with developer results]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Continue loop** (next iteration with Developer results)
-
-**User output (capsule format):**
-```
-🔬 Diagnostic data collected | {brief_summary_of_results} | Continuing investigation
-```
-
----
-
-**ACTION 3: Investigator reports "HYPOTHESIS_ELIMINATED"**
-
-```
-Status: HYPOTHESIS_ELIMINATED
-Hypothesis: [which one]
-Reason: [evidence]
-Next Hypothesis to Test: [next one]
-```
-
-**If hypothesis eliminated:**
-- Add to iterations_log
-- Clear developer_results (not needed for next hypothesis)
-- Save investigation state
-- **Continue loop** (test next hypothesis)
-
-**User output (capsule format):**
-```
-🔬 Hypothesis eliminated | {eliminated_hypothesis} ruled out by evidence | Testing next theory
-```
-
----
-
-**ACTION 4: Investigator reports "NEED_MORE_ANALYSIS"**
-
-```
-Status: NEED_MORE_ANALYSIS
-Reason: [why more analysis needed]
-Next Steps: [what Investigator will do]
-```
-
-**If needs more analysis:**
-- Add to iterations_log
-- Save investigation state
-- **Continue loop** (Investigator will analyze further)
-
-**User output (capsule format):**
-```
-🔬 Deeper analysis needed | Refining investigation scope | Continuing investigation
-```
-
----
-
-**ACTION 5: Investigator reports "BLOCKED"**
-
-```
-Status: BLOCKED
-Blocker: [description]
-Recommendation: [what's needed to unblock]
-```
-
-**If blocked:**
-- Update investigation_state.status = "blocked"
-- Save investigation state
-- **EXIT LOOP**
-- Spawn PM to resolve blocker
-
-**User output (capsule format):**
-```
-🛑 Investigation blocked | {blocker_description} | Escalating to PM for resolution
-```
-
-**Spawn PM:**
-```
-PM, investigation is blocked:
-Blocker: [description]
-Progress so far: [iterations_log]
-Recommendation: [what's needed]
-
-Please decide: Reprioritize OR Provide resources to unblock
-```
-
----
-
-**END WHILE LOOP**
-
-**If loop exits due to max iterations reached:**
-
-**User output (capsule format):**
-```
-⏱️ Investigation timeout | Max 5 iterations reached | Gathering partial findings for Tech Lead review
-```
-
-**Update investigation state:**
-```
-investigation_state.status = "incomplete"
-investigation_state.partial_findings = [last Investigator analysis]
-```
-
-**Save investigation state:**
-```
-bazinga-db, please update investigation state:
-[state with status=incomplete]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Proceed to Step 2A.6c with partial findings**
+**📋 Full investigation loop procedure:** `bazinga/templates/investigation_loop.md` (v1.0)
+
+**Entry Condition:** Tech Lead status = `INVESTIGATION_IN_PROGRESS`
+
+**Required Context (must be available):**
+- `session_id` - Current session (from Step 0)
+- `group_id` - Current group ("main", "A", "B", etc.)
+- `branch` - Developer's feature branch (from developer spawn context - verify available)
+- `investigation_state` - Initialized with: problem_summary, hypothesis_matrix, suggested_skills (from Tech Lead)
+- `skills_config` - For investigator skills (from Step 0)
+
+**Loop Execution:**
+1. **Read the full procedure:** Use Read tool → `bazinga/templates/investigation_loop.md`
+2. **Execute all steps** in the template (up to 5 iterations)
+3. **Return to orchestrator** at the exit code destination below
+
+**Exit Codes (explicit routing):**
+
+| Status | Condition | Next Action |
+|--------|-----------|-------------|
+| `ROOT_CAUSE_FOUND` | Investigator identified root cause | → Step 2A.6c (Tech Lead validates solution) |
+| `BLOCKED` | Missing resources/access | → Escalate to PM for unblock decision |
+| `incomplete` | Max 5 iterations reached | → Step 2A.6c (Tech Lead reviews partial findings) |
+
+**Routing Actions Within Loop:**
+- `NEED_DEVELOPER_DIAGNOSTIC` → Spawn Developer for instrumentation, continue loop
+- `HYPOTHESIS_ELIMINATED` → Continue loop with next hypothesis
+- `NEED_MORE_ANALYSIS` → Continue loop for deeper analysis
+
+**Note:** Investigator cannot loop internally. Orchestrator manages iterations (max 5) as separate agent spawns.
 
 ---
 
@@ -2266,24 +1578,9 @@ Skill(command: "velocity-tracker")
 
 
 
-**Log PM interaction:**
-```
-bazinga-db, please log this PM interaction:
+**Log PM interaction:** §DB.log(pm, session_id, pm_response, iteration, pm_final)
 
-Session ID: [session_id]
-Agent Type: pm
-Content: [PM response]
-Iteration: [iteration]
-Agent ID: pm_final
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
+Then invoke: `Skill(command: "bazinga-db")`
 
 
 
@@ -2317,10 +1614,34 @@ Process internally (parallel spawning is already announced in planning complete 
 
 When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
+**Build contextual Task descriptions for each group:**
+```python
+# Step 1: Get task_groups from database (queried at Step 1.4)
+# Step 2: For EACH group being spawned:
+for group in groups_to_spawn:  # e.g., groups A, B, C
+    # Get task name from task_groups (defensive: use fallback if not found)
+    task = next((t for t in task_groups if t.group_id == group.id), None)
+    if task and task.name:
+        task_name = task.name
+    else:
+        task_name = group.id  # Fallback to group ID if task not found or has no name
+
+    # Truncate to 30 chars (shorter than simple mode's 40 because group ID takes space)
+    # Format: "Dev A: " = 7 char prefix vs simple mode "Dev: " = 5 chars
+    truncated = task_name[:30] + ("..." if len(task_name) > 30 else "")
+
+    # Build description
+    descriptions[group.id] = f"Dev {group.id}: {truncated}"
+    # Example: "Dev A: JWT auth" or "Dev B: User registration..."
+
+# Step 3: Spawn all in parallel
 ```
-Task(subagent_type: "general-purpose", description: "Developer Group A", prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", description: "Developer Group B", prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", description: "Developer Group C", prompt: [Group C prompt])
+
+**Spawn:**
+```
+Task(subagent_type: "general-purpose", description: descriptions["A"], prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", description: descriptions["B"], prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [Group C prompt])
 ... up to 4 developers max
 ```
 
@@ -2328,27 +1649,29 @@ Task(subagent_type: "general-purpose", description: "Developer Group C", prompt:
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
-**Follow the SAME process as Simple Mode (Step 2A.1)** with these group-specific adaptations:
+**Prompt Structure (PER GROUP):**
+1. **Agent role & workflow:** Read `agents/developer.md` (full agent definition with developer-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json developer section)
 
-**For EACH group (A, B, C, D), build prompt with:**
-1. ✓ Session ID (from Step 0)
-2. ✓ Group assignment (specific group ID: A, B, C, D) + Mode ("Parallel")
-3. ✓ **Group-specific branch name**
-4. ✓ **Group-specific task description** from PM
-5. ✓ Testing framework + Mandatory/Optional skills (same as Simple Mode)
-6. ✓ MANDATORY WORKFLOW (same as Simple Mode, but with group branch)
-7. ✓ Report format
+**Agent Parameters (PER GROUP):**
+- **Agent:** Developer | **Group:** [A/B/C/D] | **Mode:** Parallel
+- **Session:** [session_id]
+- **Branch:** [group_branch] (group-specific)
+- **Skills Source:** skills_config.json (developer section)
+- **Testing Source:** testing_config.json
+- **Task Source:** [from PM for this group]
 
-**Validation checklist (for EACH group):**
-- [ ] "Skill(command:" appears once per mandatory skill
-- [ ] Testing mode from testing_config.json included
-- [ ] MANDATORY WORKFLOW section present
-- [ ] Group-specific branch name included
-- [ ] Report format specified
+**Pre-Spawn Validation (MUST pass for EACH group):**
+```
+✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Group branch  ✓ Testing mode  ✓ Report format
+```
+If fails: Fix ALL prompts before spawning (see agents/developer.md for workflow requirements)
 
-**IMPORTANT:** Build prompts for ALL groups BEFORE spawning any.
+**Build Task descriptions:** Use extraction code from Step 2B.1 (task_groups iteration with truncation)
 
-See `bazinga/templates/prompt_building.md` for detailed instructions.
+**Critical:** Build ALL group prompts BEFORE spawning. Then spawn in ONE message for parallelism.
 
 **AFTER receiving ALL developer responses:**
 
@@ -2367,24 +1690,9 @@ Use the Developer Response Parsing section in `bazinga/templates/response_parsin
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log to database** (see `bazinga/templates/logging_pattern.md`):
-```
-bazinga-db, please log this developer interaction:
+**Step 4: Log to database:** §DB.log(developer, session_id, dev_response, iteration, dev_group_[X])
 
-Session ID: [current session_id]
-Agent Type: developer
-Content: [Full developer response]
-Iteration: [iteration]
-Agent ID: dev_group_[X]
-```
-
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
+Then invoke: `Skill(command: "bazinga-db")`
 
 ### Step 2B.3-2B.7: Route Each Group Independently
 
@@ -2443,24 +1751,9 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 - CONTINUE: `📋 PM check | {assessment} | {feedback} → {next_action}`
 - NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
 
-**Step 2: Log PM response:**
-```
-bazinga-db, please log this PM interaction:
+**Step 2: Log PM response:** §DB.log(pm, session_id, pm_response, iteration, pm_parallel_final)
 
-Session ID: [session_id]
-Agent Type: pm
-Content: [PM response]
-Iteration: [iteration]
-Agent ID: pm_parallel_final
-```
-
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
+Then invoke: `Skill(command: "bazinga-db")`
 
 **Step 3: Track velocity metrics:**
 ```
@@ -2483,7 +1776,7 @@ Skill(command: "velocity-tracker")
 
 **IF PM sends CONTINUE:**
 - Query task groups (§Step 1.4) → Parse PM feedback → Identify groups needing fixes
-- Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
+- Build revision prompts per §Step 2B.1 → Spawn in parallel (all groups in ONE message) → Log responses
 - Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
@@ -2517,6 +1810,52 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 **⚠️ THIS IS NOT OPTIONAL - Every agent interaction MUST be logged to database!**
 
 **If database doesn't exist:** The bazinga-db skill will automatically initialize it on first use.
+
+---
+
+## §DB: Database Logging Reference
+
+**Pattern for ALL agent logging:** Use this macro notation throughout workflow.
+
+**Macro Notation:** `§DB.log(agent_type, session, content, iteration, agent_id)`
+
+**🔴 CRITICAL WARNING:** This is a DOCUMENTATION REFERENCE, not executable code!
+After EVERY §DB.log() usage, you MUST add:
+```
+Then invoke: `Skill(command: "bazinga-db")`
+```
+Forgetting this will cause silent database logging failure!
+
+**Fully Expanded Example (use this pattern when needed):**
+```
+bazinga-db, please log this developer interaction:
+
+Session ID: [session_id]
+Agent Type: developer
+Content: [Full Developer response from Task tool]
+Iteration: [iteration]
+Agent ID: developer_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill. Verify succeeded (silent), then continue workflow.
+
+**Error Handling:** If bazinga-db fails:
+- **For initialization operations** (session creation, task groups in Steps 1-3): STOP workflow - cannot proceed without state
+  - Error capsule: `❌ Database initialization failed | {error} | Cannot proceed - check bazinga-db skill`
+- **For agent interaction logging** (Steps 4+ in workflow): Log warning, continue workflow (data integrity degraded but orchestration continues)
+  - Warning capsule: `⚠️ Database logging failed | {error} | Continuing (session resume may be affected)`
+- Note: Workflow logging failures may prevent session resume but shouldn't halt current orchestration
+
+**Common Usage Examples:**
+- PM: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
+- Developer: `§DB.log(developer, session_id, dev_response, iteration, developer_main)`
+- QA Expert: `§DB.log(qa_expert, session_id, qa_response, iteration, qa_main)`
+- Tech Lead: `§DB.log(techlead, session_id, tl_response, iteration, techlead_main)`
 
 ---
 
