@@ -361,7 +361,7 @@ Skill(command: "bazinga-db")
 **IF list is empty (no previous sessions):**
 - This is the FIRST session ever
 - Decision: Follow **Path B** (create new session)
-- **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
+- **IMMEDIATELY jump to Path B (line 499). Do NOT stop.**
 
 **IF list has sessions:**
 - Check the most recent session's status field
@@ -369,7 +369,7 @@ Skill(command: "bazinga-db")
   - Previous session is finished
   - Decision: Follow **Path B** (create new session)
   - **DO NOT try to resume a completed session**
-  - **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
+  - **IMMEDIATELY jump to Path B (line 499). Do NOT stop.**
 - **IF status = "active" or "running":**
   - Previous session is still in progress
   - **IMMEDIATELY proceed to user intent analysis below. Do NOT stop.**
@@ -392,8 +392,8 @@ User said: "[user's message]"
 - If this → They want a NEW SESSION
 
 **Decision:**
-- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 856). Do NOT stop.**
-- User wants NEW task → **IMMEDIATELY jump to Path B below (line 951). Do NOT stop.**
+- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 404). Do NOT stop.**
+- User wants NEW task → **IMMEDIATELY jump to Path B below (line 499). Do NOT stop.**
 
 **Simple rule:** Check previous session status FIRST. If completed, always create new. Otherwise, check user's intent.
 
@@ -805,7 +805,7 @@ IF status = initial mode decision (PM's first response):
   ```
 
 IF status = NEEDS_CLARIFICATION:
-  → Use clarification template (line 427)
+  → Use clarification template (§Step 1.3a)
 
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template (lines 411-421)
