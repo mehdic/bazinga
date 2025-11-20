@@ -1063,113 +1063,20 @@ ELSE IF PM chose "parallel":
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-**YOU MUST follow `bazinga/templates/prompt_building.md` EXACTLY.**
-**DO NOT write custom prompts. DO NOT improvise. DO NOT skip this process.**
+**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
 
-**Step-by-Step Prompt Building Process:**
+**Agent Parameters:**
+- **Agent:** Developer | **Group:** main | **Mode:** Simple
+- **Session:** [session_id] | **Branch:** [current_branch]
+- **Skills Source:** skills_config.json (developer section)
+- **Testing Source:** testing_config.json
+- **Task Source:** [from PM response]
 
-**1. Check skills_config.json for developer skills:**
-
-From the skills_config.json you loaded during initialization, identify which developer skills have status = "mandatory" or "optional":
-
+**Pre-Spawn Validation (MUST pass):**
 ```
-Developer Skills Status:
-- lint-check: [mandatory/optional/disabled]
-- codebase-analysis: [mandatory/optional/disabled]
-- test-pattern-analysis: [mandatory/optional/disabled]
-- api-contract-validation: [mandatory/optional/disabled]
-- db-migration-check: [mandatory/optional/disabled]
+✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Testing mode  ✓ Report format
 ```
-
-**2. Build prompt sections (following agents/developer.md):**
-
-Include these sections in order:
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
-- ✓ Group assignment (main)
-- ✓ Mode (Simple)
-- ✓ Task description from PM
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
-- ✓ Mandatory workflow steps (with Skill() invocations)
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to prompt:**
-
-```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: Run [WHEN]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-USE THESE SKILLS - They are MANDATORY!
-```
-
-**3b. For EACH optional skill, add to prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use when needed:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [CONDITION]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-   When to use: [Context-specific guidance]
-
-These are OPTIONAL - invoke only when your workflow or task requires them.
-```
-
-**4. Add MANDATORY WORKFLOW section:**
-
-```
-**MANDATORY WORKFLOW:**
-
-BEFORE Implementing:
-[IF codebase-analysis is mandatory]:
-1. INVOKE Codebase Analysis Skill (MANDATORY)
-   Skill(command: "codebase-analysis")
-
-During Implementation:
-2. Implement the COMPLETE solution
-3. Write unit tests
-[IF test-pattern-analysis is mandatory]:
-4. INVOKE Test Pattern Analysis Skill (MANDATORY)
-   Skill(command: "test-pattern-analysis")
-
-BEFORE Reporting READY_FOR_QA:
-5. Run ALL unit tests - MUST pass 100%
-[IF lint-check is mandatory]:
-6. INVOKE lint-check Skill (MANDATORY)
-   Skill(command: "lint-check")
-7. Run build check - MUST succeed
-[IF api-contract-validation is mandatory AND api_changes]:
-8. INVOKE API Contract Validation (MANDATORY)
-   Skill(command: "api-contract-validation")
-[IF db-migration-check is mandatory AND migration_changes]:
-9. INVOKE DB Migration Check (MANDATORY)
-    Skill(command: "db-migration-check")
-
-ONLY THEN:
-10. Commit to branch: [branch_name]
-11. Report: READY_FOR_QA
-```
-
-**5. VALIDATION - Before spawning, verify your prompt contains:**
-
-```
-✓ [ ] The word "Skill(command:" appears at least once (for each mandatory skill)
-✓ [ ] Testing mode from testing_config.json is mentioned
-✓ [ ] MANDATORY WORKFLOW section exists
-✓ [ ] Report format specified
-```
-
-**IF ANY CHECKBOX IS UNCHECKED: Your prompt is INCOMPLETE. Fix it before spawning.**
+If fails: Fix prompt before spawning (see prompt_building.md § Troubleshooting)
 
 See `agents/developer.md` for full developer agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
@@ -1254,93 +1161,20 @@ IF status = BLOCKED:
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING - SKILLS REQUIRED
 
-**YOU MUST include mandatory skills in QA Expert prompt.**
+**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
 
-**1. Check skills_config.json for qa_expert skills:**
+**Agent Parameters:**
+- **Agent:** QA Expert | **Group:** [group_id] | **Mode:** [Simple/Parallel]
+- **Session:** [session_id]
+- **Skills Source:** skills_config.json (qa_expert section)
+- **Testing Source:** testing_config.json
+- **Context:** [Developer changes summary]
 
-From the skills_config.json you loaded during initialization, identify which qa_expert skills have status = "mandatory" or "optional":
-
+**Pre-Spawn Validation (MUST pass):**
 ```
-QA Expert Skills Status:
-- pattern-miner: [mandatory/optional/disabled]
-- quality-dashboard: [mandatory/optional/disabled]
+✓ "Skill(command:" per mandatory skill  ✓ Testing workflow  ✓ Test framework  ✓ Report format
 ```
-
-**2. Build QA Expert prompt following agents/qa_expert.md:**
-
-Include these sections:
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (QA Expert in Claude Code Multi-Agent Dev Team)
-- ✓ Developer changes summary and test requirements
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
-- ✓ Mandatory testing workflow with skill invocations
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to QA Expert prompt:**
-
-```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: Run [WHEN]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-USE THESE SKILLS - They are MANDATORY!
-```
-
-**3b. For EACH optional skill, add to QA Expert prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use when needed:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [CONDITION]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-   When to use: [Context-specific guidance]
-
-These are OPTIONAL - invoke only when your analysis requires them.
-```
-
-**4. Add MANDATORY TESTING WORKFLOW to QA Expert prompt:**
-
-```
-**MANDATORY TESTING WORKFLOW:**
-
-Run Tests:
-1. Execute integration tests
-2. Execute contract tests
-3. Execute E2E tests (if applicable)
-4. Verify test results
-
-AFTER Testing:
-[IF pattern-miner is mandatory]:
-5. INVOKE Pattern Miner Skill (MANDATORY)
-   Skill(command: "pattern-miner")
-
-[IF quality-dashboard is mandatory]:
-6. INVOKE Quality Dashboard Skill (MANDATORY)
-   Skill(command: "quality-dashboard")
-
-THEN:
-7. Make recommendation: APPROVE_FOR_REVIEW or REQUEST_CHANGES
-```
-
-**5. VALIDATION - Before spawning QA Expert, verify prompt contains:**
-
-```
-✓ [ ] Testing workflow defined
-✓ [ ] Skill invocation instructions (if any mandatory skills)
-✓ [ ] Recommendation format (APPROVE_FOR_REVIEW/REQUEST_CHANGES)
-```
-
-**IF ANY CHECKBOX IS UNCHECKED: QA Expert prompt is INCOMPLETE. Fix it before spawning.**
+If fails: Fix prompt before spawning (see prompt_building.md § Troubleshooting)
 
 See `agents/qa_expert.md` for full QA Expert agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
@@ -1431,110 +1265,26 @@ Skill(command: "bazinga-db")
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING - SKILLS REQUIRED
 
-**YOU MUST include mandatory skills in Tech Lead prompt.**
+**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
 
-**1. Check skills_config.json for tech_lead skills:**
+**Agent Parameters:**
+- **Agent:** Tech Lead | **Group:** [group_id] | **Mode:** [Simple/Parallel]
+- **Session:** [session_id]
+- **Skills Source:** skills_config.json (tech_lead section)
+- **Testing Source:** testing_config.json
+- **Context:** [Implementation + QA summary]
 
-From the skills_config.json you loaded during initialization, identify which tech_lead skills have status = "mandatory" or "optional":
-
+**Pre-Spawn Validation (MUST pass):**
 ```
-Tech Lead Skills Status:
-- security-scan: [mandatory/optional/disabled]
-- lint-check: [mandatory/optional/disabled]
-- test-coverage: [mandatory/optional/disabled]
-- codebase-analysis: [mandatory/optional/disabled]
-- pattern-miner: [mandatory/optional/disabled]
-- test-pattern-analysis: [mandatory/optional/disabled]
+✓ "Skill(command:" per mandatory skill  ✓ Review workflow  ✓ Decision format  ✓ Frameworks
 ```
-
-**2. Build Tech Lead prompt following agents/techlead.md:**
-
-Include these sections:
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (Tech Lead in Claude Code Multi-Agent Dev Team)
-- ✓ Group assignment and implementation summary
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (for skills with "mandatory" and "optional" status)
-- ✓ Mandatory review workflow with skill invocations
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to Tech Lead prompt:**
-
-```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: Run [WHEN]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-USE THESE SKILLS - They are MANDATORY before approving!
-```
-
-**3b. For EACH optional skill, add to Tech Lead prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use in specific frameworks:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [FRAMEWORK]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-**When to use optional skills:**
-- codebase-analysis: Framework 1 (Root Cause Analysis), Framework 2 (Architectural Decisions), Framework 3 (Performance Investigation)
-- pattern-miner: Framework 1 (Root Cause Analysis), Framework 3 (Performance Investigation - historical patterns)
-- test-pattern-analysis: Framework 4 (Flaky Test Analysis)
-
-These are OPTIONAL - invoke only when frameworks indicate they're needed.
-```
-
-**4. Add MANDATORY REVIEW WORKFLOW to Tech Lead prompt:**
-
-```
-**MANDATORY REVIEW WORKFLOW:**
-
-BEFORE Manual Review:
-[IF security-scan is mandatory]:
-1. INVOKE Security Scan Skill (MANDATORY)
-   Skill(command: "security-scan")
-
-[IF lint-check is mandatory]:
-2. INVOKE Lint Check Skill (MANDATORY)
-   Skill(command: "lint-check")
-
-[IF test-coverage is mandatory]:
-3. INVOKE Test Coverage Skill (MANDATORY)
-   Skill(command: "test-coverage")
-
-THEN Perform Manual Review:
-4. Review architecture and code quality
-5. Assess performance implications
-6. Check security best practices
-7. Evaluate test adequacy
-
-ONLY THEN:
-8. Make decision: APPROVED or REQUEST_CHANGES
-```
-
-**5. VALIDATION - Before spawning Tech Lead, verify prompt contains:**
-
-```
-✓ [ ] At least one "Skill(command:" instruction (for each mandatory skill)
-✓ [ ] MANDATORY REVIEW WORKFLOW section
-✓ [ ] Decision format (APPROVED/REQUEST_CHANGES)
-```
-
-**IF ANY CHECKBOX IS UNCHECKED: Tech Lead prompt is INCOMPLETE. Fix it before spawning.**
+If fails: Fix prompt before spawning (see prompt_building.md § Troubleshooting)
 
 See `agents/techlead.md` for full Tech Lead agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
 **Build Task description:** See §TaskDesc table (Tech Lead mode)
+
 
 **Spawn:**
 ```
@@ -1865,61 +1615,28 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
-**Follow the SAME process as Simple Mode (Step 2A.1)** with these group-specific adaptations:
+**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
 
-**For EACH group (A, B, C, D), build prompt with:**
-1. ✓ Session ID (from Step 0)
-2. ✓ Group assignment (specific group ID: A, B, C, D) + Mode ("Parallel")
-3. ✓ **Group-specific branch name**
-4. ✓ **Group-specific task description** from PM
-5. ✓ Testing framework + Mandatory/Optional skills (same as Simple Mode)
-6. ✓ MANDATORY WORKFLOW (same as Simple Mode, but with group branch)
-7. ✓ Report format
+**Agent Parameters (PER GROUP):**
+- **Agent:** Developer | **Group:** [A/B/C/D] | **Mode:** Parallel
+- **Session:** [session_id]
+- **Branch:** [group_branch] (group-specific)
+- **Skills Source:** skills_config.json (developer section)
+- **Testing Source:** testing_config.json
+- **Task Source:** [from PM for this group]
 
-**Validation checklist (for EACH group):**
-- [ ] "Skill(command:" appears once per mandatory skill
-- [ ] Testing mode from testing_config.json included
-- [ ] MANDATORY WORKFLOW section present
-- [ ] Group-specific branch name included
-- [ ] Report format specified
-
-**IMPORTANT:** Build prompts for ALL groups BEFORE spawning any.
-
-**2. Build prompt sections for THIS group:**
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
-- ✓ Group assignment (specific group ID: A, B, C, etc.)
-- ✓ Mode (Parallel)
-- ✓ Branch name for this group
-- ✓ Task description for THIS group from PM
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
-- ✓ Mandatory workflow steps (with Skill() invocations)
-- ✓ Report format
-
-**3. For EACH mandatory skill, add to THIS group's prompt:**
-Same skill section as Simple Mode (see Step 2A.1)
-
-**4. Add MANDATORY WORKFLOW section to THIS group's prompt:**
-Same workflow as Simple Mode, but include group-specific branch name
-
-**5. VALIDATION - Before spawning, verify EACH group's prompt contains:**
+**Pre-Spawn Validation (MUST pass for EACH group):**
 ```
-✓ [ ] "Skill(command:" appears at least once per mandatory skill
-✓ [ ] Testing mode from testing_config.json
-✓ [ ] MANDATORY WORKFLOW section
-✓ [ ] Group-specific branch name
-✓ [ ] Report format
+✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Group branch  ✓ Testing mode  ✓ Report format
 ```
+If fails: Fix ALL prompts before spawning (see prompt_building.md § Troubleshooting)
 
-**REPEAT THIS PROCESS FOR EACH GROUP (A, B, C, D).**
+**Build Task description:** See §TaskDesc table (Developer Parallel mode)
 
-**IF ANY GROUP'S PROMPT IS INCOMPLETE: Fix ALL prompts before spawning.**
+**Critical:** Build ALL group prompts BEFORE spawning. Then spawn in ONE message for parallelism.
 
-See `bazinga/templates/message_templates.md` for standard prompt format.
-See `agents/developer.md` for full developer agent definition.
-
-See `bazinga/templates/prompt_building.md` for detailed instructions.
+See `agents/developer.md` for full Developer agent definition.
+See `bazinga/templates/prompt_building.md` for the template reference.
 
 **AFTER receiving ALL developer responses:**
 
