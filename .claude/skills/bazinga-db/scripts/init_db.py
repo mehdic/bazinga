@@ -7,7 +7,68 @@ Creates all necessary tables for managing orchestration state.
 import sqlite3
 import sys
 from pathlib import Path
+import tempfile
+import shutil
 
+# Current schema version
+SCHEMA_VERSION = 2
+
+def get_schema_version(cursor) -> int:
+    """Get current schema version from database."""
+    try:
+        cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+        result = cursor.fetchone()
+        return result[0] if result else 0
+    except sqlite3.OperationalError:
+        # Table doesn't exist, this is version 0 (pre-versioning)
+        return 0
+
+def migrate_v1_to_v2(conn, cursor) -> None:
+    """Migrate from v1 (CHECK constraint) to v2 (no constraint)."""
+    print("🔄 Migrating schema from v1 to v2...")
+
+    # Export existing data
+    cursor.execute("SELECT * FROM orchestration_logs")
+    logs_data = cursor.fetchall()
+    print(f"   - Backing up {len(logs_data)} orchestration log entries")
+
+    # Drop old table
+    cursor.execute("DROP TABLE IF EXISTS orchestration_logs")
+
+    # Recreate with new schema (no CHECK constraint)
+    cursor.execute("""
+        CREATE TABLE orchestration_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            iteration INTEGER,
+            agent_type TEXT NOT NULL,
+            agent_id TEXT,
+            content TEXT NOT NULL,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        )
+    """)
+
+    # Recreate indexes
+    cursor.execute("""
+        CREATE INDEX idx_logs_session
+        ON orchestration_logs(session_id, timestamp DESC)
+    """)
+    cursor.execute("""
+        CREATE INDEX idx_logs_agent_type
+        ON orchestration_logs(session_id, agent_type)
+    """)
+
+    # Restore data
+    if logs_data:
+        cursor.executemany("""
+            INSERT INTO orchestration_logs
+            (id, session_id, timestamp, iteration, agent_type, agent_id, content)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, logs_data)
+        print(f"   - Restored {len(logs_data)} orchestration log entries")
+
+    print("✓ Migration to v2 complete")
 
 def init_database(db_path: str) -> None:
     """Initialize the BAZINGA database with complete schema."""
@@ -21,7 +82,45 @@ def init_database(db_path: str) -> None:
     # Enable WAL mode for better concurrency
     cursor.execute("PRAGMA journal_mode = WAL")
 
-    print("Creating BAZINGA database schema...")
+    # Create schema_version table first (if doesn't exist)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            description TEXT
+        )
+    """)
+
+    # Get current schema version
+    current_version = get_schema_version(cursor)
+    print(f"Current schema version: {current_version}")
+
+    # Run migrations if needed
+    if current_version < SCHEMA_VERSION:
+        print(f"Schema upgrade required: v{current_version} -> v{SCHEMA_VERSION}")
+
+        if current_version == 0 or current_version == 1:
+            # Check if orchestration_logs exists with old schema
+            cursor.execute("""
+                SELECT sql FROM sqlite_master
+                WHERE type='table' AND name='orchestration_logs'
+            """)
+            result = cursor.fetchone()
+            if result and 'CHECK' in result[0]:
+                # Has old CHECK constraint, migrate
+                migrate_v1_to_v2(conn, cursor)
+
+        # Record version upgrade
+        cursor.execute("""
+            INSERT OR REPLACE INTO schema_version (version, description)
+            VALUES (?, ?)
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Remove agent_type CHECK constraint"))
+        conn.commit()
+        print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
+    elif current_version == SCHEMA_VERSION:
+        print(f"✓ Schema is up-to-date (v{SCHEMA_VERSION})")
+
+    print("\nCreating/verifying BAZINGA database schema...")
 
     # Sessions table
     cursor.execute("""
@@ -161,10 +260,20 @@ def init_database(db_path: str) -> None:
     """)
     print("✓ Created decisions table with indexes")
 
+    # Record schema version for new databases
+    current_version = get_schema_version(cursor)
+    if current_version == 0:
+        cursor.execute("""
+            INSERT INTO schema_version (version, description)
+            VALUES (?, ?)
+        """, (SCHEMA_VERSION, f"Initial schema v{SCHEMA_VERSION}"))
+        print(f"✓ Recorded schema version: v{SCHEMA_VERSION}")
+
     conn.commit()
     conn.close()
 
     print(f"\n✅ Database initialized successfully at: {db_path}")
+    print(f"   - Schema version: v{SCHEMA_VERSION}")
     print(f"   - WAL mode enabled for better concurrency")
     print(f"   - Foreign keys enabled for referential integrity")
     print(f"   - All indexes created for optimal query performance")

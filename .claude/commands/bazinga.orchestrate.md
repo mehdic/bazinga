@@ -788,7 +788,12 @@ if [ ! -f "bazinga/project_context.json" ]; then
   "conventions": {},
   "key_directories": {},
   "common_utilities": [],
+  "test_framework": "unknown",
+  "build_system": "unknown",
+  "package_manager": "unknown",
+  "coverage_target": "0%",
   "session_id": "fallback",
+  "generated_at": "1970-01-01T00:00:00Z",
   "template": true,
   "fallback": true,
   "fallback_note": "Template not found. PM must generate full context during Phase 4.5."
@@ -1854,7 +1859,16 @@ Then invoke: `Skill(command: "bazinga-db")`
 
    Then invoke: `Skill(command: "bazinga-db")`
 
-3. **Analyze the task groups returned:**
+3. **Load PM state to get execution_phases:**
+   ```
+   bazinga-db, please get PM state for session [session_id]
+   ```
+
+   Then invoke: `Skill(command: "bazinga-db")`
+
+   Extract `execution_phases` array from PM state.
+
+4. **Analyze the task groups returned:**
 
    Count groups by status:
    - `completed_count`: Groups with status='completed'
@@ -1862,18 +1876,70 @@ Then invoke: `Skill(command: "bazinga-db")`
    - `pending_count`: Groups with status='pending'
    - `total_count`: Total groups
 
-4. **Decision logic:**
+5. **Decision logic (Phase-Aware):**
+
+   **IF `execution_phases` is empty or null:**
+   - No phase dependencies, use simple logic:
 
    **IF `pending_count` > 0:**
-   - **There are MORE PHASES to execute!**
+   - **There are more groups to execute**
    - **DO NOT spawn PM yet**
-   - Extract the pending groups (these are the next phase)
+   - Extract all pending groups
    - **User output (capsule format):**
      ```
-     ✅ Phase N complete | {completed_count}/{total_count} groups done | Starting Phase N+1 → Groups {pending_group_ids}
+     ✅ Group {completed_group_id} approved | {completed_count}/{total_count} groups done | Starting remaining groups → {pending_group_ids}
      ```
    - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
-   - Process internally (no additional routing messages - phase transition is already announced in capsule)
+   - Process internally (no additional routing messages)
+
+   **IF `execution_phases` has phases:**
+   - Use phase-aware logic:
+
+   **Step 5a: Determine current phase**
+   - Find lowest phase number where NOT all groups are completed
+   - Example: Phase 1 all complete, Phase 2 has pending/in_progress → current_phase = 2
+
+   **Step 5b: Check current phase status**
+
+   **IF current_phase groups all completed:**
+   - Move to next phase
+   - Get next_phase = current_phase + 1
+
+   **IF next_phase exists:**
+   - Extract group_ids for next_phase
+   - **User output (capsule format):**
+     ```
+     ✅ Phase {current_phase} complete | {completed_count}/{total_count} groups done | Starting Phase {next_phase} → {next_phase_description}
+     ```
+   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for next_phase groups
+   - Process internally (no additional routing messages)
+
+   **ELSE (no next_phase):**
+   - All phases complete
+   - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
+
+   **ELSE IF current_phase has in_progress groups:**
+   - **Wait for current phase groups to complete**
+   - **User output (capsule format):**
+     ```
+     ✅ Group {completed_group_id} approved | Phase {current_phase}: {completed_in_phase}/{total_in_phase} done | Waiting for {in_progress_count} groups
+     ```
+   - **Exit this check** - will run again when next group completes
+   - Do NOT spawn PM yet
+   - Do NOT start next phase yet
+
+   **Simple mode fallback (no phases):**
+
+   **IF `pending_count` > 0:**
+   - **There are MORE groups to execute**
+   - **DO NOT spawn PM yet**
+   - Extract the pending groups
+   - **User output (capsule format):**
+     ```
+     ✅ Group approved | {completed_count}/{total_count} groups done | Starting remaining groups → {pending_group_ids}
+     ```
+   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
+   - Process internally (no additional routing messages)
 
    **ELSE IF `pending_count` == 0 AND `in_progress_count` == 0:**
    - **All groups complete - time for PM final assessment**

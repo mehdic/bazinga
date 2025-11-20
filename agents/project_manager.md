@@ -1146,6 +1146,56 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 - ❌ "Establish baseline for 695 tests" → Too large, use batching
 - ❌ Multiple "then" statements → Too many sequential steps
 
+### Step 3.5: Organize into Execution Phases (If Dependencies Exist)
+
+**When to use execution_phases:**
+- Tasks have natural sequential dependencies
+- Phase 2 CANNOT start until Phase 1 completes
+- Example: Database schema migration → Data migration
+
+**When NOT to use:**
+- All groups can run in parallel
+- No dependencies between groups
+- Use empty array: `"execution_phases": []`
+
+**Format:**
+```json
+"execution_phases": [
+  {
+    "phase": 1,
+    "group_ids": ["group_1", "group_2"],
+    "description": "Setup database schema"
+  },
+  {
+    "phase": 2,
+    "group_ids": ["group_3"],
+    "description": "Migrate data (requires Phase 1 schema)"
+  }
+]
+```
+
+**Critical Rules:**
+1. Every group_id MUST appear in exactly one phase
+2. Phases MUST be numbered sequentially starting from 1
+3. Orchestrator will execute phases in order, waiting for each to complete
+4. Groups within same phase run in parallel (up to parallel_count limit)
+
+**Example Scenarios:**
+
+**Good - Use Phases:**
+```
+Phase 1: Create auth middleware, Add JWT library
+Phase 2: Implement login endpoint (needs middleware from Phase 1)
+Phase 3: Add tests (needs endpoints from Phase 2)
+```
+
+**Bad - Don't Use Phases:**
+```
+Group 1: Add feature A
+Group 2: Add feature B
+(Both independent, can run in parallel, no phases needed)
+```
+
 ### Step 4: Adaptive Parallelism
 
 **You decide how many developers to spawn** (max 4, consider actual benefit):
@@ -1202,7 +1252,18 @@ State Data: {
   "parallel_count": [number of developers if parallel mode],
   "all_tasks": [...],
   "task_groups": [...],
-  "execution_phases": [...],
+  "execution_phases": [
+    {
+      "phase": 1,
+      "group_ids": ["group_1", "group_2"],
+      "description": "Setup and infrastructure"
+    },
+    {
+      "phase": 2,
+      "group_ids": ["group_3"],
+      "description": "Data migration (depends on Phase 1)"
+    }
+  ],
   "completed_groups": [],
   "in_progress_groups": [],
   "pending_groups": [...],
