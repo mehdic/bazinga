@@ -209,21 +209,26 @@ bazinga/
 ```
 
 **Path Variables:**
-- `SESSION_ID`: Current session ID (e.g., bazinga_20250113_143530)
-- `ARTIFACTS_DIR`: `bazinga/artifacts/{SESSION_ID}/`
-- `SKILLS_DIR`: `bazinga/artifacts/{SESSION_ID}/skills/`
+- `SESSION_ID`: Current session ID bash variable (e.g., `SESSION_ID="bazinga_20250113_143530"`)
+- `ARTIFACTS_DIR`: `bazinga/artifacts/{SESSION_ID}/` (documentation placeholder)
+- `SKILLS_DIR`: `bazinga/artifacts/{SESSION_ID}/skills/` (documentation placeholder)
+
+**⚠️ Important - Variable Syntax:**
+- **In orchestrator bash code:** Use `${SESSION_ID}` (bash variable expansion)
+- **In documentation/paths:** Use `{SESSION_ID}` (placeholder showing structure)
+- **When spawning agents:** Provide actual session ID value (e.g., "Session ID: bazinga_20251120_153352")
 
 **Rules:**
-1. **All session artifacts** → `bazinga/artifacts/{SESSION_ID}/`
+1. **All session artifacts** → `bazinga/artifacts/{SESSION_ID}/` (replace {SESSION_ID} with actual value)
 2. **All skill outputs** → `bazinga/artifacts/{SESSION_ID}/skills/`
 3. **Configuration files** → `bazinga/` (root level)
 4. **Templates** → `bazinga/templates/`
 5. **Never write to bazinga root** - only artifacts/, templates/, or config files
 
-**Example paths for current session:**
-- Build baseline: `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
-- Completion report: `bazinga/artifacts/{SESSION_ID}/completion_report.md`
-- Security scan: `bazinga/artifacts/{SESSION_ID}/skills/security_scan.json`
+**Example paths for current session (if SESSION_ID=bazinga_20251120_153352):**
+- Build baseline: `bazinga/artifacts/bazinga_20251120_153352/build_baseline.log`
+- Completion report: `bazinga/artifacts/bazinga_20251120_153352/completion_report.md`
+- Security scan: `bazinga/artifacts/bazinga_20251120_153352/skills/security_scan.json`
 
 ---
 
@@ -777,6 +782,8 @@ if [ ! -f "bazinga/project_context.json" ]; then
     else
         # Create minimal fallback to prevent downstream agent crashes
         # Use atomic write to prevent TOCTOU race with PM context generation
+        # ⚠️ IMPORTANT: Fallback structure must match .claude/templates/project_context.template.json
+        # If template structure changes, update fallback here to match
         TEMP_FALLBACK=$(mktemp)
         cat > "$TEMP_FALLBACK" <<'FALLBACK_EOF'
 {
@@ -800,7 +807,8 @@ if [ ! -f "bazinga/project_context.json" ]; then
 }
 FALLBACK_EOF
         mv "$TEMP_FALLBACK" bazinga/project_context.json
-        echo "Warning: Template not found, created minimal fallback. PM must regenerate context."
+        echo "⚠️  Warning: Template not found, created minimal fallback. PM must regenerate context."
+        echo "    If you see frequent template warnings, check BAZINGA CLI installation."
     fi
 fi
 ```
@@ -1172,12 +1180,15 @@ ELSE IF PM chose "parallel":
    - Testing framework configuration (from testing_config.json)
    - Mandatory skills (from skills_config.json developer section)
 
-**Agent Parameters:**
+**Agent Parameters (include these in spawned agent prompt):**
 - **Agent:** Developer | **Group:** main | **Mode:** Simple
-- **Session:** [session_id] | **Branch:** [current_branch]
+- **Session ID:** [INSERT ACTUAL SESSION_ID VALUE HERE - e.g., bazinga_20251120_153352]
+- **Branch:** [INSERT ACTUAL BRANCH NAME - from git branch --show-current]
 - **Skills Source:** skills_config.json (developer section)
 - **Testing Source:** testing_config.json
 - **Task Source:** [from PM response]
+
+**Critical:** Replace `[INSERT ACTUAL SESSION_ID VALUE HERE]` with the actual `$SESSION_ID` variable value. Agents need the literal string, not a placeholder.
 
 **Pre-Spawn Validation (MUST pass):**
 ```
@@ -1770,13 +1781,15 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
    - Testing framework configuration (from testing_config.json)
    - Mandatory skills (from skills_config.json developer section)
 
-**Agent Parameters (PER GROUP):**
+**Agent Parameters (PER GROUP - include these in each spawned agent prompt):**
 - **Agent:** Developer | **Group:** [A/B/C/D] | **Mode:** Parallel
-- **Session:** [session_id]
-- **Branch:** [group_branch] (group-specific)
+- **Session ID:** [INSERT ACTUAL SESSION_ID VALUE HERE - e.g., bazinga_20251120_153352]
+- **Branch:** [INSERT ACTUAL GROUP BRANCH NAME - e.g., feature/group-a]
 - **Skills Source:** skills_config.json (developer section)
 - **Testing Source:** testing_config.json
 - **Task Source:** [from PM for this group]
+
+**Critical:** Replace `[INSERT ACTUAL SESSION_ID VALUE HERE]` with the actual `$SESSION_ID` variable value. Each agent needs the literal session ID string.
 
 **Pre-Spawn Validation (MUST pass for EACH group):**
 ```

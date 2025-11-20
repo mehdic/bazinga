@@ -100,6 +100,105 @@ rm /tmp/orchestration_logs_backup.csv
 
 If you're initializing a new database, the updated schema will be used automatically.
 
+**⚠️ Note:** As of schema v2, automatic migration is built into `init_db.py`. Simply run:
+```bash
+python .claude/skills/bazinga-db/scripts/init_db.py bazinga/bazinga.db
+```
+
+The script will detect old schema and migrate automatically while preserving data.
+
+---
+
+## PowerShell Migration (Windows Users)
+
+If you're on Windows without WSL/bash, use these PowerShell alternatives:
+
+### PowerShell Option 1: Fresh Start
+
+```powershell
+# Backup existing database (optional)
+Copy-Item bazinga/bazinga.db bazinga/bazinga.db.backup -ErrorAction SilentlyContinue
+
+# Remove old database
+Remove-Item bazinga/bazinga.db -ErrorAction SilentlyContinue
+
+# Reinitialize with new schema
+python .claude/skills/bazinga-db/scripts/init_db.py bazinga/bazinga.db
+```
+
+### PowerShell Option 2: Automatic Migration (Recommended)
+
+**Since schema v2, migration is automatic:**
+
+```powershell
+# Just run init_db.py - it detects and migrates automatically
+python .claude/skills/bazinga-db/scripts/init_db.py bazinga/bazinga.db
+```
+
+Output will show:
+```
+Current schema version: 1
+Schema upgrade required: v1 -> v2
+🔄 Migrating schema from v1 to v2...
+   - Backing up N orchestration log entries
+   - Restored N orchestration log entries
+✓ Migration to v2 complete
+```
+
+### PowerShell Option 3: Manual Migration (Advanced)
+
+If you need manual control:
+
+```powershell
+# 1. Backup database
+Copy-Item bazinga/bazinga.db bazinga/bazinga.db.backup
+
+# 2. Use Python to run SQL commands
+$dbPath = "bazinga/bazinga.db"
+
+python -c @"
+import sqlite3
+conn = sqlite3.connect('$dbPath')
+cursor = conn.cursor()
+
+# Export data
+cursor.execute('SELECT * FROM orchestration_logs')
+logs = cursor.fetchall()
+print(f'Backing up {len(logs)} logs')
+
+# Drop old table
+cursor.execute('DROP TABLE IF EXISTS orchestration_logs')
+
+# Create new table
+cursor.execute('''
+CREATE TABLE orchestration_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    iteration INTEGER,
+    agent_type TEXT NOT NULL,
+    agent_id TEXT,
+    content TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+)
+''')
+
+# Recreate indexes
+cursor.execute('CREATE INDEX idx_logs_session ON orchestration_logs(session_id, timestamp DESC)')
+cursor.execute('CREATE INDEX idx_logs_agent_type ON orchestration_logs(session_id, agent_type)')
+
+# Restore data
+cursor.executemany('INSERT INTO orchestration_logs VALUES (?,?,?,?,?,?,?)', logs)
+print(f'Restored {len(logs)} logs')
+
+conn.commit()
+conn.close()
+"@
+
+# 3. Verify
+python -c "import sqlite3; conn = sqlite3.connect('$dbPath'); print(f'Total logs: {conn.execute(\"SELECT COUNT(*) FROM orchestration_logs\").fetchone()[0]}'); conn.close()"
+```
+
 ---
 
 ## Verification
