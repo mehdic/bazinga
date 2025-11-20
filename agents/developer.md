@@ -535,10 +535,7 @@ The PM generates a `bazinga/project_context.json` file at session start containi
 **Step 1: Initialize Session Environment**
 
 ```bash
-# Ensure artifacts directory exists for this session (CRITICAL: Do this first)
-mkdir -p bazinga/artifacts/{SESSION_ID}
-
-# Read project context
+# Read project context (orchestrator creates artifacts directory)
 context = read("bazinga/project_context.json")
 ```
 

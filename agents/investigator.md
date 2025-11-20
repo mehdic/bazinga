@@ -498,12 +498,6 @@ Then invoke: Skill(command: "bazinga-db")
 
 ## Investigation Workflow
 
-**CRITICAL: Initialize session environment immediately:**
-```bash
-# Ensure artifacts directory exists for this session (do this first)
-mkdir -p bazinga/artifacts/{SESSION_ID}
-```
-
 ### Phase 1: Deep Dive Analysis
 
 **Before first iteration:**

@@ -775,7 +775,9 @@ if [ ! -f "bazinga/project_context.json" ]; then
         cp .claude/templates/project_context.template.json bazinga/project_context.json
     else
         # Create minimal fallback to prevent downstream agent crashes
-        cat > bazinga/project_context.json <<'FALLBACK_EOF'
+        # Use atomic write to prevent TOCTOU race with PM context generation
+        TEMP_FALLBACK=$(mktemp)
+        cat > "$TEMP_FALLBACK" <<'FALLBACK_EOF'
 {
   "_comment": "Minimal fallback context - PM should regenerate during Phase 4.5",
   "project_type": "unknown",
@@ -791,6 +793,7 @@ if [ ! -f "bazinga/project_context.json" ]; then
   "fallback_note": "Template not found. PM must generate full context during Phase 4.5."
 }
 FALLBACK_EOF
+        mv "$TEMP_FALLBACK" bazinga/project_context.json
         echo "Warning: Template not found, created minimal fallback. PM must regenerate context."
     fi
 fi
@@ -1876,8 +1879,13 @@ Then invoke: `Skill(command: "bazinga-db")`
    - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
 
    **ELSE IF `in_progress_count` > 0:**
-   - **Some groups still in progress - wait for them**
-   - Continue processing other groups
+   - **Some groups still in progress - wait for them to complete**
+   - **User output (capsule format):**
+     ```
+     ✅ Group {completed_group_id} approved | {completed_count}/{total_count} groups done | Waiting for {in_progress_count} groups in progress
+     ```
+   - **Exit this check** - no action needed now
+   - **This check will run again** when the next Tech Lead approves another group
    - Do NOT spawn PM yet
    - Do NOT spawn next phase yet
 
