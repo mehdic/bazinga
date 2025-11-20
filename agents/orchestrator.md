@@ -2136,6 +2136,14 @@ When PM sends BAZINGA:
 SHUTDOWN CHECKLIST:
 [ ] 1. Get dashboard snapshot from database
 [ ] 2. Detect anomalies (gaps between goal and actual)
+[ ] 2.5. Git cleanup - Check for uncommitted/unpushed work:
+    [ ] 2.5.1. Check git status for uncommitted changes
+    [ ] 2.5.2. Commit uncommitted changes (if any)
+    [ ] 2.5.3. Get current branch name
+    [ ] 2.5.4. Check for unpushed commits
+    [ ] 2.5.5. Push to remote (if needed)
+    [ ] 2.5.6. Record git state in database
+    [ ] 2.5.7. Display git cleanup success
 [ ] 3. Read completion report template
 [ ] 4. Generate detailed report file: bazinga/artifacts/{SESSION_ID}/completion_report.md
 [ ] 5. Invoke velocity-tracker skill
@@ -2202,6 +2210,156 @@ Check for issues requiring attention:
 
 Flag any anomalies for inclusion in reports.
 
+### Step 2.5: Git Cleanup - Commit and Push Uncommitted Work
+
+**⚠️ MANDATORY: Ensure all code is committed and pushed before completion**
+
+Before generating the final report, verify all work is saved to the remote repository.
+
+#### Sub-step 2.5.1: Check Git Status
+
+**Check for uncommitted changes:**
+```bash
+git status --porcelain
+```
+
+**Parse the output:**
+- If empty: No uncommitted changes, proceed to Step 2.5.4 (push check)
+- If not empty: Uncommitted changes detected, proceed to Step 2.5.2
+
+#### Sub-step 2.5.2: Commit Uncommitted Changes
+
+**If uncommitted changes found:**
+
+Display to user (capsule format):
+```
+💾 Git cleanup | Uncommitted changes detected | Committing work to feature branch
+```
+
+**Analyze changes and create commit message:**
+```bash
+# Get list of modified/new files
+git status --short
+
+# Create descriptive commit message based on PM's final assessment
+# Format: "feat: [brief description from PM summary]"
+# Example: "feat: Implement JWT authentication with test coverage"
+```
+
+**Commit the changes:**
+```bash
+git add .
+git commit -m "$(cat <<'EOF'
+[Commit message from PM summary]
+
+Orchestration session: [SESSION_ID]
+Completed by: Claude Code Multi-Agent Dev Team
+Mode: [SIMPLE/PARALLEL]
+Groups: [N] completed
+EOF
+)"
+```
+
+**Error handling:**
+- If commit fails: Output error capsule and STOP (cannot complete without saving work)
+- Error message: `❌ Git commit failed | [error_details] | Cannot proceed - work not saved`
+
+#### Sub-step 2.5.3: Get Current Branch Name
+
+**Extract the branch name:**
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+echo "Current branch: $CURRENT_BRANCH"
+```
+
+**Verify it matches the session branch pattern:**
+- Branch should start with `claude/`
+- Branch should end with session ID or follow required pattern
+- If mismatch: Log warning but continue (may be intentional)
+
+#### Sub-step 2.5.4: Check for Unpushed Commits
+
+**Check if local branch is ahead of remote:**
+```bash
+# Fetch remote to get latest state
+git fetch origin $CURRENT_BRANCH 2>/dev/null || true
+
+# Check if there are unpushed commits
+git rev-list @{u}..HEAD --count 2>/dev/null || echo "0"
+```
+
+**Parse the result:**
+- If count > 0: Unpushed commits exist, proceed to Step 2.5.5
+- If count = 0 AND no uncommitted changes from Step 2.5.1: All work already pushed, proceed to Step 3
+- If error (no remote tracking): Branch needs initial push, proceed to Step 2.5.5
+
+#### Sub-step 2.5.5: Push to Remote
+
+**Display to user (capsule format):**
+```
+📤 Pushing to remote | Branch: [branch_name] | Saving work to remote repository
+```
+
+**Push the branch:**
+```bash
+git push -u origin $CURRENT_BRANCH
+```
+
+**Retry logic (network resilience):**
+- If push fails due to network errors: Retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s)
+- Example: `sleep 2 && git push -u origin $CURRENT_BRANCH`
+- If push fails due to 403/permission: Output specific error and STOP
+
+**Error handling:**
+- If push fails after retries: Output error capsule and STOP
+- Error message: `❌ Git push failed | [error_details] | Cannot proceed - work not saved to remote`
+- Common 403 error: `❌ Git push failed | HTTP 403 - branch name doesn't match session pattern | Check branch name starts with 'claude/' and ends with session ID`
+
+#### Sub-step 2.5.6: Record Git State in Database
+
+**After successful commit/push, record final state:**
+
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save git state:
+
+Session ID: [current session_id]
+State Type: git_final
+State Data: {
+  "branch": "[CURRENT_BRANCH]",
+  "commit_sha": "[git rev-parse HEAD]",
+  "commit_message": "[last commit message]",
+  "pushed_to_remote": true,
+  "push_timestamp": "[ISO timestamp]",
+  "uncommitted_changes": false
+}
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Verification:**
+- ✅ Git state saved to database
+- ✅ Branch name recorded for user reference
+- ✅ Commit SHA available for traceability
+
+#### Sub-step 2.5.7: Display Git Cleanup Success
+
+**Display to user (capsule format):**
+```
+✅ Git cleanup complete | All changes committed and pushed to [branch_name] | Work saved to remote
+```
+
+**This message confirms:**
+- All uncommitted work has been committed
+- All commits have been pushed to remote
+- Branch name is available for merging to main
+- Work is safely stored and won't be lost
+
+**AFTER successful git cleanup: IMMEDIATELY continue to Step 3 (Generate Detailed Report). Do NOT stop.**
+
 ### Step 3: Generate Detailed Report
 
 Create comprehensive report file:
@@ -2214,6 +2372,7 @@ See `bazinga/templates/completion_report.md` for full report structure.
 
 Report includes:
 - Session summary (mode, duration, groups)
+- Git state (branch, commit SHA, push status)
 - Quality metrics (security, coverage, lint, build)
 - Efficiency metrics (approval rate, escalations)
 - Task groups breakdown
@@ -2301,10 +2460,15 @@ Example output:
 **Duration**: 12 minutes
 **Groups**: 1/1 completed ✅
 
+**Git Status**: All changes committed and pushed ✅
+**Branch**: claude/auto-commit-merge-trigger-01SmpxrBC61DeJU7PAEthhTh
+**Latest Commit**: a3f9b21 - feat: Implement JWT authentication with test coverage
+
 **Quality**: All checks passed ✅
 **Skills Used**: 6 of 11 available
 **Detailed Report**: bazinga/artifacts/bazinga_20250113_143530/completion_report.md
 
+**Next Steps**: Merge branch to main when ready
 ═══════════════════════════════════════════════════════════
 ```
 
