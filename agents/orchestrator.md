@@ -1673,471 +1673,33 @@ Skill(command: "bazinga-db")
 
 **IF Tech Lead reports: INVESTIGATION_IN_PROGRESS**
 
-**⚠️ IMPORTANT:** Orchestrator manages investigation iterations. Investigator agents cannot "wait" or loop internally. Each iteration is a separate agent spawn.
+**📋 Full investigation loop procedure:** `bazinga/templates/investigation_loop.md` (v1.0)
 
-**User output (capsule format):**
-```
-🔬 Investigation needed | Tech Lead identified complex issue requiring deep analysis | Starting investigation (max 5 iterations)
-```
+**Entry Condition:** Tech Lead status = `INVESTIGATION_IN_PROGRESS`
 
-**Log Tech Lead request:**
-```
-bazinga-db, please log this techlead interaction:
+**Required Context (must be available):**
+- `session_id` - Current session (from Step 0)
+- `group_id` - Current group ("main", "A", "B", etc.)
+- `branch` - Developer's feature branch
+- `investigation_state` - Initialized with: problem_summary, hypothesis_matrix, suggested_skills (from Tech Lead)
+- `skills_config` - For investigator skills (from Step 0)
 
-Session ID: [session_id]
-Agent Type: techlead
-Content: [Tech Lead response with investigation request]
-Iteration: [iteration]
-Agent ID: techlead_main
-Status: investigation_requested
-```
+**Loop Execution:** Follow complete procedure in `bazinga/templates/investigation_loop.md`
 
-Then invoke: `Skill(command: "bazinga-db")`
+**Exit Codes (explicit routing):**
 
----
+| Status | Condition | Next Action |
+|--------|-----------|-------------|
+| `ROOT_CAUSE_FOUND` | Investigator identified root cause | → Step 2A.6c (Tech Lead validates solution) |
+| `BLOCKED` | Missing resources/access | → Escalate to PM for unblock decision |
+| `incomplete` | Max 5 iterations reached | → Step 2A.6c (Tech Lead reviews partial findings) |
 
-#### Investigation Loop State Initialization
+**Routing Actions Within Loop:**
+- `NEED_DEVELOPER_DIAGNOSTIC` → Spawn Developer for instrumentation, continue loop
+- `HYPOTHESIS_ELIMINATED` → Continue loop with next hypothesis
+- `NEED_MORE_ANALYSIS` → Continue loop for deeper analysis
 
-**Initialize investigation state:**
-```yaml
-investigation_state:
-  group_id: [current_group_id]
-  session_id: [current_session_id]
-  branch: [developer's_feature_branch]
-  current_iteration: 0
-  max_iterations: 5
-  status: "in_progress"
-  problem_summary: [from Tech Lead]
-  hypothesis_matrix: [from Tech Lead]
-  suggested_skills: [from Tech Lead]
-  iterations_log: []
-  developer_results: null
-```
-
-**Save investigation state to database:**
-```
-bazinga-db, please save investigation state:
-
-Session ID: [session_id]
-Group ID: [group_id]
-State Type: investigation
-State Data: [investigation_state YAML above]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
----
-
-#### Investigation Iteration Loop
-
-**WHILE investigation_state.status == "in_progress" AND investigation_state.current_iteration < investigation_state.max_iterations:**
-
-**Increment iteration counter:**
-```
-investigation_state.current_iteration += 1
-```
-
-**User output (capsule format):**
-```
-🔬 Investigation iteration {N}/5 | {hypothesis_being_tested} | Testing hypothesis
-```
-
----
-
-##### Iteration Step 1: Spawn Investigator
-
-**1. Check skills_config.json for investigator skills:**
-
-From the skills_config.json you loaded during initialization, identify which investigator skills have status = "mandatory" or "optional":
-
-```
-Investigator Skills Status:
-- codebase-analysis: [mandatory/optional/disabled]
-- pattern-miner: [mandatory/optional/disabled]
-- test-pattern-analysis: [mandatory/optional/disabled]
-- security-scan: [mandatory/optional/disabled]
-```
-
-**2. Build Investigator Prompt:**
-
-Read `agents/investigator.md` and build prompt with these sections in order:
-
-A) **Investigation Context** (session state)
-B) **Skills Section** (mandatory + optional from config)
-C) **Rest of agents/investigator.md content**
-
-**Section A - Investigation Context:**
-
-```
----
-🔬 INVESTIGATION CONTEXT
----
-Session ID: [investigation_state.session_id]
-Group ID: [investigation_state.group_id]
-Branch: [investigation_state.branch]
-Current Iteration: [investigation_state.current_iteration]
-Iterations Remaining: [5 - current_iteration]
-
-Problem Summary: [investigation_state.problem_summary]
-
-Initial Hypothesis Matrix: [investigation_state.hypothesis_matrix]
-
-Previous Iteration Results (if iteration > 1):
-[investigation_state.iterations_log[previous iterations]]
-
-Developer Results from Previous Iteration (if available):
-[investigation_state.developer_results]
----
-```
-
-**Section B - Skills Injection:**
-
-**3. For EACH mandatory skill, add to prompt:**
-
-```
-⚡ ADVANCED SKILLS ACTIVE
-
-You have access to the following mandatory Skills:
-
-[FOR EACH skill where status = "mandatory"]:
-X. **[Skill Name]**: [Description]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-
-Examples:
-- **Codebase Analysis**: Analyze codebase for similar patterns
-- **Pattern Miner**: Historical pattern analysis
-
-USE THESE SKILLS - They are MANDATORY for every investigation!
-```
-
-**3b. For EACH optional skill, add to prompt:**
-
-```
-⚡ OPTIONAL SKILLS AVAILABLE
-
-The following Skills are available for use when needed:
-
-[FOR EACH skill where status = "optional"]:
-X. **[Skill Name]**: Use when [CONDITION]
-   Skill(command: "[skill-name]")
-   See: .claude/skills/[skill-name]/SKILL.md for details
-   When to use: [Context-specific guidance]
-
-Examples:
-- **Test Pattern Analysis**: Use when investigating test-related issues or flaky tests
-- **Security Scan**: Use when hypothesis involves security vulnerabilities
-
-These are OPTIONAL - invoke only when investigation requires them.
-```
-
-**Section C - Rest of investigator.md:**
-
-```
-[REST OF agents/investigator.md content starting from "## Your Role" section]
-```
-
-**4. Build contextual Task description:**
-```python
-# Step 1: Get problem summary from investigation_state (initialized at Step 2A.6b)
-problem = investigation_state.problem_summary
-
-# Step 2: Truncate to 35 chars, add "..." if longer
-summary = problem[:35] + ("..." if len(problem) > 35 else "")
-
-# Step 3: Build description with iteration number
-iteration = investigation_state.current_iteration
-description = f"Investigator {iteration}/5: {summary}"
-# Example: "Investigator 1/5: Timeout in auth flow" or "Investigator 2/5: Database connection pool..."
-```
-
-**5. Spawn Investigator:**
-```
-Task(
-  subagent_type: "general-purpose",
-  description: [description from above],
-  prompt: [Investigator prompt built above with sections A + B + C]
-)
-```
-
----
-
-##### Iteration Step 2: Receive Investigator Response
-
-**🔴 CRITICAL - READ THE AGENT RESPONSE:**
-
-The Task tool returns the FULL Investigator response. This IS the Investigator's analysis.
-
-**DO NOT:**
-- ❌ Ignore the response
-- ❌ Think it's "just a log ID"
-- ❌ "Take direct action" yourself
-- ❌ Skip parsing the Investigator's findings
-
-**YOU MUST:**
-- ✅ Read the FULL response from the Task tool result
-- ✅ Parse the Investigator's status (ROOT_CAUSE_FOUND, NEED_DEVELOPER_DIAGNOSTIC, etc.)
-- ✅ Extract the relevant details (diagnosis, hypothesis, next steps)
-- ✅ Use this information to route to the next action
-
-**If the response is unclear:**
-- Re-spawn the Investigator with clarification request
-- DO NOT improvise a solution yourself
-
-**After reading the full response, log it:**
-```
-bazinga-db, please log this investigator interaction:
-
-Session ID: [session_id]
-Agent Type: investigator
-Content: [Full Investigator response from Task tool]
-Iteration: [current_iteration]
-Agent ID: investigator_[group_id]_iter[N]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
-
-**AFTER logging Investigator response: IMMEDIATELY continue to Step 3 (Route Based on Investigator Action). Do NOT stop.**
-
-**Parse Investigator action from response (that you just read above). Look for status markers:**
-
----
-
-##### Iteration Step 3: Route Based on Investigator Action
-
-**ACTION 1: Investigator reports "ROOT_CAUSE_FOUND"**
-
-```
-Status: ROOT_CAUSE_FOUND
-Root Cause: [description]
-Confidence: [High/Medium]
-Recommended Solution: [solution]
-```
-
-**If found:**
-- Update investigation_state.status = "completed"
-- Update investigation_state.root_cause = [description]
-- Update investigation_state.solution = [solution]
-- Save investigation state to database
-- **EXIT LOOP** → Go to Step 2A.6c (Tech Lead validation)
-
-**User output (capsule format):**
-```
-✅ Root cause found | {root_cause_summary} identified in iteration {N} | Proceeding to Tech Lead validation
-```
-
----
-
-**ACTION 2: Investigator reports "NEED_DEVELOPER_DIAGNOSTIC"**
-
-```
-Status: NEED_DEVELOPER_DIAGNOSTIC
-Hypothesis Being Tested: [hypothesis]
-Diagnostic Request:
-  - Add logging to: [file:line]
-  - Specific code changes: [code]
-  - Expected timeline: [X minutes]
-  - What to collect: [metrics/logs]
-```
-
-**If needs Developer:**
-
-**User output (capsule format):**
-```
-🔬 Diagnostic instrumentation needed | Adding logging to test {hypothesis} | Developer instrumenting code
-```
-
-**Build Developer Prompt:**
-
-Read `agents/developer.md` and prepend:
-
-```
----
-🔬 DIAGNOSTIC REQUEST FROM INVESTIGATOR
----
-Session ID: [session_id]
-Group ID: [group_id]
-Branch: [investigation_state.branch]
-Investigation Iteration: [current_iteration]
-
-The Investigator is systematically testing hypotheses to find the root cause.
-
-Current Hypothesis: [hypothesis]
-
-Your Task: Add diagnostic instrumentation (NOT a fix)
-
-Specific Changes Needed:
-[Investigator's diagnostic request details]
-
-IMPORTANT:
-- Make ONLY the diagnostic changes requested
-- Do NOT attempt to fix the root cause yet
-- Run the scenario to collect the requested data
-- Report the exact output/metrics
-
-Branch: [investigation_state.branch]
-Commit Message: "Add diagnostic logging for investigation iteration [N]"
-
-After changes:
-- Run the scenario that triggers the problem
-- Collect the requested metrics/logs
-- Report in format:
-
-**Diagnostic Results:**
-```
-[actual output/metrics]
-```
-
-Status: DIAGNOSTIC_COMPLETE
----
-
-[REST OF agents/developer.md content]
-```
-
-**Spawn Developer:**
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "Developer diagnostic for iteration [N]",
-  prompt: [Developer prompt built above]
-)
-```
-
-**After Developer responds:**
-
-**Log Developer response:**
-```
-bazinga-db, please log this developer interaction:
-
-Session ID: [session_id]
-Agent Type: developer
-Content: [Developer response with diagnostic results]
-Iteration: [current_iteration]
-Agent ID: developer_[group_id]_diagnostic[N]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Extract diagnostic results from Developer response:**
-- Store in investigation_state.developer_results = [results]
-- Add to iteration log
-
-**Save updated investigation state:**
-```
-bazinga-db, please update investigation state:
-[updated state with developer results]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Continue loop** (next iteration with Developer results)
-
-**User output (capsule format):**
-```
-🔬 Diagnostic data collected | {brief_summary_of_results} | Continuing investigation
-```
-
----
-
-**ACTION 3: Investigator reports "HYPOTHESIS_ELIMINATED"**
-
-```
-Status: HYPOTHESIS_ELIMINATED
-Hypothesis: [which one]
-Reason: [evidence]
-Next Hypothesis to Test: [next one]
-```
-
-**If hypothesis eliminated:**
-- Add to iterations_log
-- Clear developer_results (not needed for next hypothesis)
-- Save investigation state
-- **Continue loop** (test next hypothesis)
-
-**User output (capsule format):**
-```
-🔬 Hypothesis eliminated | {eliminated_hypothesis} ruled out by evidence | Testing next theory
-```
-
----
-
-**ACTION 4: Investigator reports "NEED_MORE_ANALYSIS"**
-
-```
-Status: NEED_MORE_ANALYSIS
-Reason: [why more analysis needed]
-Next Steps: [what Investigator will do]
-```
-
-**If needs more analysis:**
-- Add to iterations_log
-- Save investigation state
-- **Continue loop** (Investigator will analyze further)
-
-**User output (capsule format):**
-```
-🔬 Deeper analysis needed | Refining investigation scope | Continuing investigation
-```
-
----
-
-**ACTION 5: Investigator reports "BLOCKED"**
-
-```
-Status: BLOCKED
-Blocker: [description]
-Recommendation: [what's needed to unblock]
-```
-
-**If blocked:**
-- Update investigation_state.status = "blocked"
-- Save investigation state
-- **EXIT LOOP**
-- Spawn PM to resolve blocker
-
-**User output (capsule format):**
-```
-🛑 Investigation blocked | {blocker_description} | Escalating to PM for resolution
-```
-
-**Spawn PM:**
-```
-PM, investigation is blocked:
-Blocker: [description]
-Progress so far: [iterations_log]
-Recommendation: [what's needed]
-
-Please decide: Reprioritize OR Provide resources to unblock
-```
-
----
-
-**END WHILE LOOP**
-
-**If loop exits due to max iterations reached:**
-
-**User output (capsule format):**
-```
-⏱️ Investigation timeout | Max 5 iterations reached | Gathering partial findings for Tech Lead review
-```
-
-**Update investigation state:**
-```
-investigation_state.status = "incomplete"
-investigation_state.partial_findings = [last Investigator analysis]
-```
-
-**Save investigation state:**
-```
-bazinga-db, please update investigation state:
-[state with status=incomplete]
-```
-
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Proceed to Step 2A.6c with partial findings**
+**Note:** Investigator cannot loop internally. Orchestrator manages iterations (max 5) as separate agent spawns.
 
 ---
 
@@ -2622,6 +2184,42 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 **⚠️ THIS IS NOT OPTIONAL - Every agent interaction MUST be logged to database!**
 
 **If database doesn't exist:** The bazinga-db skill will automatically initialize it on first use.
+
+---
+
+## §DB: Database Logging Reference
+
+**Pattern for ALL agent logging:** Use this macro notation throughout workflow.
+
+**Macro Notation:** `§DB.log(agent_type, session, content, iteration, agent_id)`
+
+**Fully Expanded Example (use this pattern when needed):**
+```
+bazinga-db, please log this developer interaction:
+
+Session ID: [session_id]
+Agent Type: developer
+Content: [Full Developer response from Task tool]
+Iteration: [iteration]
+Agent ID: developer_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill. Verify succeeded (silent), then continue workflow.
+
+**Error Handling:** If bazinga-db fails:
+- Output error capsule: `❌ Database logging failed | {error} | Cannot proceed - check bazinga-db skill`
+- STOP workflow (data integrity requirement)
+
+**Common Usage Examples:**
+- PM: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
+- Developer: `§DB.log(developer, session_id, dev_response, iteration, developer_main)`
+- QA: `§DB.log(qa, session_id, qa_response, iteration, qa_main)`
+- Tech Lead: `§DB.log(techlead, session_id, tl_response, iteration, techlead_main)`
 
 ---
 
