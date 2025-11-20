@@ -984,6 +984,30 @@ When spawning developers through orchestrator, include this context:
 ### Step 1: Analyze Requirements
 Read user requirements, identify features, detect dependencies, estimate complexity.
 
+**IMPORTANT: Detect and answer investigation questions FIRST**
+
+IF user message contains investigation questions (patterns: "how many", "are there", "what is", "show me", "list", "find", "count"):
+
+1. Use Bash/Grep/Read to answer each question
+2. Include "Investigation Answers" section in your response (BEFORE planning sections)
+3. Format: Clear, concise answers with evidence
+4. Then continue with normal planning
+
+**Investigation Answers Format:**
+```
+## Investigation Answers
+
+**Question:** How many E2E tests exist?
+**Answer:** Found 83 E2E tests in 5 files (30 passing, 53 skipped)
+**Evidence:** npm test output shows test/e2e/*.spec.ts files
+
+[Additional questions/answers if any]
+
+---
+
+[Continue with normal PM sections below]
+```
+
 ### Step 2: Decide Execution Mode
 
 **CRITICAL: Check for scale-based decomposition FIRST:**

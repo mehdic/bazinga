@@ -784,7 +784,23 @@ PM returns decision with:
 
 ### Step 1.3: Receive PM Decision
 
-**Step 1: Parse PM response and output capsule to user**
+**Step 1: Check for Investigation Answers (PRIORITY)**
+
+Check if PM response contains "## Investigation Answers" section:
+
+**IF investigation answers present:**
+- Extract question(s) and answer(s) from the section
+- Output investigation capsule BEFORE planning capsule:
+  ```
+  📊 Investigation results | {findings_summary} | Details: {details}
+  ```
+- Example: `📊 Investigation results | Found 83 E2E tests in 5 files | 30 passing, 53 skipped`
+- Then continue to parse planning sections
+
+**IF no investigation answers:**
+- Skip to Step 2 (parse planning sections)
+
+**Step 2: Parse PM response and output capsule to user**
 
 Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
@@ -792,7 +808,7 @@ Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` t
 - **Task groups** (if mode decision)
 - **Assessment** (if continue/bazinga)
 
-**Step 2: Construct and output capsule based on status**
+**Step 3: Construct and output capsule based on status**
 
 IF status = initial mode decision (PM's first response):
   → Use "Planning complete" template (lines 401-408):
@@ -812,7 +828,7 @@ IF status = BAZINGA or CONTINUE:
 
 **Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
 
-**Step 3: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
+**Step 4: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
 
 Then invoke: `Skill(command: "bazinga-db")`
 
