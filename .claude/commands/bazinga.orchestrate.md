@@ -754,7 +754,21 @@ Returns latest PM state or null if first iteration.
 
 Process internally (PM spawn is already announced in earlier capsule - no additional routing message needed).
 
-Ensure project context template exists: `[ ! -f "bazinga/project_context.json" ] && cp .claude/templates/project_context.template.json bazinga/project_context.json` (PM will overwrite with real context)
+**Ensure project context template exists:**
+```bash
+# Create bazinga directory if missing
+mkdir -p bazinga
+
+# Copy template if project_context doesn't exist
+if [ ! -f "bazinga/project_context.json" ]; then
+    if [ -f ".claude/templates/project_context.template.json" ]; then
+        cp .claude/templates/project_context.template.json bazinga/project_context.json
+    else
+        echo "Warning: Template not found, PM will create project_context from scratch"
+    fi
+fi
+```
+PM will overwrite with real context during Phase 4.5.
 
 Build PM prompt by reading `agents/project_manager.md` and including:
 - **Session ID from Step 0** - [current session_id created in Step 0]

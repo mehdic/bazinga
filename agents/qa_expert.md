@@ -226,6 +226,12 @@ Unit Tests: 12/12 passing
 Developer Notes: "JWT authentication with generation, validation, and refresh"
 ```
 
+**CRITICAL: Initialize session environment immediately:**
+```bash
+# Ensure artifacts directory exists for this session (do this before any testing)
+mkdir -p bazinga/artifacts/{SESSION_ID}
+```
+
 ### Step 2: Checkout Feature Branch
 
 ```bash
@@ -661,10 +667,8 @@ After fixes, QA will retest.
 **If any tests fail**, write a detailed artifact file for orchestrator reference:
 
 ```bash
-# Step 1: Create artifacts directory (if it doesn't exist)
-Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
-
-# Step 2: Write artifact file (unique per group to avoid collisions)
+# Write artifact file (unique per group to avoid collisions)
+# Note: artifacts directory already created in Step 1
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md",
   content: """
