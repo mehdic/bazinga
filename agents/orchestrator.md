@@ -2069,6 +2069,7 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 ## Database Operations Reference
 
 **For detailed database operation examples**, see: `.claude/templates/orchestrator_db_reference.md`
+*(Note: Reference file is for human developers only - not accessible during orchestration execution)*
 
 **Quick patterns you'll use throughout:**
 
@@ -2078,13 +2079,45 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
+**⚠️ CRITICAL - §DB.log() is DOCUMENTATION SHORTHAND, not executable code!**
+
+When you see: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
+
+You MUST expand it to:
+```
+bazinga-db, please log this pm interaction:
+
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: 1
+Agent ID: pm_main
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Forgetting the Skill invocation causes silent logging failure!**
+
+**Database Error Handling:**
+
+If bazinga-db skill fails, handle based on operation type:
+
+**During initialization (Steps 1-3: session creation, task groups, initial state):**
+- ❌ **STOP WORKFLOW** - Cannot proceed without foundational state
+- Error output: `❌ Database initialization failed | {error} | Cannot proceed - check bazinga-db skill`
+- Do NOT continue orchestration
+
+**During workflow (Steps 4+: agent interaction logging):**
+- ⚠️ **LOG WARNING, CONTINUE** - Degraded but functional
+- Warning output: `⚠️ Database logging failed | {error} | Continuing (session resume may be affected)`
+- Continue orchestration (logging failures shouldn't halt current work)
+
 **Common state operations:**
 - Read PM state: `bazinga-db, please get the latest PM state for session [id]`
 - Save orchestrator state: `bazinga-db, please save the orchestrator state: Session ID... State Data: {...}`
 - Get task groups: `bazinga-db, please get all task groups for session [id]`
 - Update group status: `bazinga-db, please update task group: Group ID... Status...`
 
-**Full examples and all operations:** See `.claude/templates/orchestrator_db_reference.md`
+**Full examples and all operations:** See `.claude/templates/orchestrator_db_reference.md` *(human reference only)*
 
 ---
 ## Role Reminders
