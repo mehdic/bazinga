@@ -417,7 +417,7 @@ Would you like me to:
 ## PM Status Update
 
 ### Critical Issue Detected
-Final verification discovered 361 test failures at workspace root level.
+Final verification discovered {N} test failures at workspace root level.
 
 ### Analysis
 - Developers tested in isolation → Tests passed ✅
@@ -426,7 +426,7 @@ Final verification discovered 361 test failures at workspace root level.
 
 **Status:** INVESTIGATION_NEEDED
 **Next Action:** Orchestrator should spawn Investigator with:
-- Problem: 361 integration test failures
+- Problem: Multiple integration test failures
 - Context: Works in isolation, fails when integrated
 - Hypothesis: Cross-service dependency issues or build artifacts
 ```
