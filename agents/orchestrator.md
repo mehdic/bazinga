@@ -1768,7 +1768,7 @@ Skill(command: "velocity-tracker")
 
 **IF PM sends CONTINUE:**
 - Query task groups (§Step 1.4) → Parse PM feedback → Identify groups needing fixes
-- Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
+- Build revision prompts per §Step 2B.1 → Spawn in parallel (all groups in ONE message) → Log responses
 - Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
