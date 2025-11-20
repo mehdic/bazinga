@@ -770,10 +770,8 @@ Skill(command: "bazinga-db")
 **After completing investigation**, write a detailed artifact file for orchestrator reference:
 
 ```bash
-# Step 1: Create artifacts directory (if it doesn't exist)
-Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
-
-# Step 2: Write artifact file
+# Write artifact file
+# Note: artifacts directory already created at workflow start
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md",
   content: """

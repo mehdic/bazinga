@@ -208,21 +208,26 @@ bazinga/
 ```
 
 **Path Variables:**
-- `SESSION_ID`: Current session ID (e.g., bazinga_20250113_143530)
-- `ARTIFACTS_DIR`: `bazinga/artifacts/{SESSION_ID}/`
-- `SKILLS_DIR`: `bazinga/artifacts/{SESSION_ID}/skills/`
+- `SESSION_ID`: Current session ID bash variable (e.g., `SESSION_ID="bazinga_20250113_143530"`)
+- `ARTIFACTS_DIR`: `bazinga/artifacts/{SESSION_ID}/` (documentation placeholder)
+- `SKILLS_DIR`: `bazinga/artifacts/{SESSION_ID}/skills/` (documentation placeholder)
+
+**⚠️ Important - Variable Syntax:**
+- **In orchestrator bash code:** Use `${SESSION_ID}` (bash variable expansion)
+- **In documentation/paths:** Use `{SESSION_ID}` (placeholder showing structure)
+- **When spawning agents:** Provide actual session ID value (e.g., "Session ID: bazinga_20251120_153352")
 
 **Rules:**
-1. **All session artifacts** → `bazinga/artifacts/{SESSION_ID}/`
+1. **All session artifacts** → `bazinga/artifacts/{SESSION_ID}/` (replace {SESSION_ID} with actual value)
 2. **All skill outputs** → `bazinga/artifacts/{SESSION_ID}/skills/`
 3. **Configuration files** → `bazinga/` (root level)
 4. **Templates** → `bazinga/templates/`
 5. **Never write to bazinga root** - only artifacts/, templates/, or config files
 
-**Example paths for current session:**
-- Build baseline: `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
-- Completion report: `bazinga/artifacts/{SESSION_ID}/completion_report.md`
-- Security scan: `bazinga/artifacts/{SESSION_ID}/skills/security_scan.json`
+**Example paths for current session (if SESSION_ID=bazinga_20251120_153352):**
+- Build baseline: `bazinga/artifacts/bazinga_20251120_153352/build_baseline.log`
+- Completion report: `bazinga/artifacts/bazinga_20251120_153352/completion_report.md`
+- Security scan: `bazinga/artifacts/bazinga_20251120_153352/skills/security_scan.json`
 
 ---
 
@@ -418,6 +423,10 @@ From the bazinga-db response you just received, extract the first (most recent) 
 ```bash
 # Example: If response showed "bazinga_20251113_160528" as most recent
 SESSION_ID="bazinga_20251113_160528"  # ← Use the ACTUAL session_id from response
+
+# Ensure artifacts directories exist (in case they were manually deleted)
+mkdir -p "bazinga/artifacts/${SESSION_ID}"
+mkdir -p "bazinga/artifacts/${SESSION_ID}/skills"
 ```
 
 **CRITICAL:** Set this variable NOW before proceeding. Do not skip this.
@@ -505,7 +514,14 @@ Display:
    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
    ```
 
-2. **Create session in database:**
+2. **Create artifacts directory structure:**
+   ```bash
+   # Create artifacts directories for this session (required for build baseline logs and skill outputs)
+   mkdir -p "bazinga/artifacts/${SESSION_ID}"
+   mkdir -p "bazinga/artifacts/${SESSION_ID}/skills"
+   ```
+
+3. **Create session in database:**
 
    ### 🔴 MANDATORY SESSION CREATION - CANNOT BE SKIPPED
 
@@ -543,9 +559,9 @@ Display:
 
    **IF bazinga-db skill fails or returns error:** Output `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill` and STOP.
 
-   **AFTER successful session creation: IMMEDIATELY continue to step 3 (Load configurations). Do NOT stop.**
+   **AFTER successful session creation: IMMEDIATELY continue to step 4 (Load configurations). Do NOT stop.**
 
-3. **Load configurations:**
+4. **Load configurations:**
 
    ```bash
    # Read active skills configuration
@@ -557,11 +573,11 @@ Display:
 
    **Note:** Read configurations using Read tool, but don't show Read tool output to user - it's internal setup.
 
-   **AFTER reading configs: IMMEDIATELY continue to step 4 (Store config in database). Do NOT stop.**
+   **AFTER reading configs: IMMEDIATELY continue to step 5 (Store config in database). Do NOT stop.**
 
    See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
-4. **Store config references in database:**
+5. **Store config references in database:**
 
    ### 🔴 MANDATORY: Store configuration in database
 
@@ -600,9 +616,9 @@ Display:
 
    **IF skill fails:** Output `❌ Config save failed | Cannot proceed` and STOP.
 
-   **AFTER successful config save: IMMEDIATELY continue to step 5 (Build baseline check). Do NOT stop.**
+   **AFTER successful config save: IMMEDIATELY continue to step 6 (Build baseline check). Do NOT stop.**
 
-5. **Run build baseline check:**
+6. **Run build baseline check:**
 
    **Note:** Run build check silently. No user output needed unless build fails. If build fails, output: `❌ Build failed | {error_type} | Cannot proceed - fix required`
 
@@ -623,9 +639,9 @@ Display:
    - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
    - (If successful or unknown: silent, no output)
 
-   **AFTER build baseline check: IMMEDIATELY continue to step 6 (Start dashboard). Do NOT stop.**
+   **AFTER build baseline check: IMMEDIATELY continue to step 7 (Start dashboard). Do NOT stop.**
 
-6. **Start dashboard if not running:**
+7. **Start dashboard if not running:**
 
    ```bash
    # Check if dashboard is running
@@ -753,7 +769,49 @@ Returns latest PM state or null if first iteration.
 
 Process internally (PM spawn is already announced in earlier capsule - no additional routing message needed).
 
-Ensure project context template exists: `[ ! -f "bazinga/project_context.json" ] && cp .claude/templates/project_context.template.json bazinga/project_context.json` (PM will overwrite with real context)
+**Ensure project context template exists:**
+```bash
+# Create bazinga directory if missing
+mkdir -p bazinga
+
+# Copy template if project_context doesn't exist
+if [ ! -f "bazinga/project_context.json" ]; then
+    if [ -f ".claude/templates/project_context.template.json" ]; then
+        cp .claude/templates/project_context.template.json bazinga/project_context.json
+    else
+        # Create minimal fallback to prevent downstream agent crashes
+        # Use atomic write to prevent TOCTOU race with PM context generation
+        # ⚠️ IMPORTANT: Fallback structure must match .claude/templates/project_context.template.json
+        # If template structure changes, update fallback here to match
+        TEMP_FALLBACK=$(mktemp)
+        cat > "$TEMP_FALLBACK" <<'FALLBACK_EOF'
+{
+  "_comment": "Minimal fallback context - PM should regenerate during Phase 4.5",
+  "project_type": "unknown",
+  "primary_language": "unknown",
+  "framework": "unknown",
+  "architecture_patterns": [],
+  "conventions": {},
+  "key_directories": {},
+  "common_utilities": [],
+  "test_framework": "unknown",
+  "build_system": "unknown",
+  "package_manager": "unknown",
+  "coverage_target": "0%",
+  "session_id": "fallback",
+  "generated_at": "1970-01-01T00:00:00Z",
+  "template": true,
+  "fallback": true,
+  "fallback_note": "Template not found. PM must generate full context during Phase 4.5."
+}
+FALLBACK_EOF
+        mv "$TEMP_FALLBACK" bazinga/project_context.json
+        echo "⚠️  Warning: Template not found, created minimal fallback. PM must regenerate context."
+        echo "    If you see frequent template warnings, check BAZINGA CLI installation."
+    fi
+fi
+```
+PM will overwrite with real context during Phase 4.5. Fallback ensures downstream agents don't crash.
 
 Build PM prompt by reading `agents/project_manager.md` and including:
 - **Session ID from Step 0** - [current session_id created in Step 0]
@@ -1121,12 +1179,15 @@ ELSE IF PM chose "parallel":
    - Testing framework configuration (from testing_config.json)
    - Mandatory skills (from skills_config.json developer section)
 
-**Agent Parameters:**
+**Agent Parameters (include these in spawned agent prompt):**
 - **Agent:** Developer | **Group:** main | **Mode:** Simple
-- **Session:** [session_id] | **Branch:** [current_branch]
+- **Session ID:** [INSERT ACTUAL SESSION_ID VALUE HERE - e.g., bazinga_20251120_153352]
+- **Branch:** [INSERT ACTUAL BRANCH NAME - from git branch --show-current]
 - **Skills Source:** skills_config.json (developer section)
 - **Testing Source:** testing_config.json
 - **Task Source:** [from PM response]
+
+**Critical:** Replace `[INSERT ACTUAL SESSION_ID VALUE HERE]` with the actual `$SESSION_ID` variable value. Agents need the literal string, not a placeholder.
 
 **Pre-Spawn Validation (MUST pass):**
 ```
@@ -1654,6 +1715,22 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
 
+**🔴 CRITICAL WORKFLOW RULE - NEVER STOP BETWEEN PHASES:**
+
+**Multi-phase execution is common in parallel mode:**
+- PM may create Phase 1 (setup groups A, B, C) and Phase 2 (feature groups D, E, F)
+- When Phase 1 completes, orchestrator MUST automatically start Phase 2
+- **NEVER STOP TO WAIT FOR USER INPUT between phases**
+- Only stop when PM sends BAZINGA or NEEDS_CLARIFICATION
+
+**How to detect and continue to next phase:**
+- After EACH group's Tech Lead approval: Check if pending groups exist (Step 2B.7a)
+- IF pending groups found: Immediately spawn developers for next phase
+- IF no pending groups: Then spawn PM for final assessment
+- Process continuously until all phases complete
+
+**Without this rule:** Orchestrator hangs after Phase 1, waiting indefinitely for user to say "continue"
+
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
 Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
@@ -1703,13 +1780,15 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
    - Testing framework configuration (from testing_config.json)
    - Mandatory skills (from skills_config.json developer section)
 
-**Agent Parameters (PER GROUP):**
+**Agent Parameters (PER GROUP - include these in each spawned agent prompt):**
 - **Agent:** Developer | **Group:** [A/B/C/D] | **Mode:** Parallel
-- **Session:** [session_id]
-- **Branch:** [group_branch] (group-specific)
+- **Session ID:** [INSERT ACTUAL SESSION_ID VALUE HERE - e.g., bazinga_20251120_153352]
+- **Branch:** [INSERT ACTUAL GROUP BRANCH NAME - e.g., feature/group-a]
 - **Skills Source:** skills_config.json (developer section)
 - **Testing Source:** testing_config.json
 - **Task Source:** [from PM for this group]
+
+**Critical:** Replace `[INSERT ACTUAL SESSION_ID VALUE HERE]` with the actual `$SESSION_ID` variable value. Each agent needs the literal session ID string.
 
 **Pre-Spawn Validation (MUST pass for EACH group):**
 ```
@@ -1768,6 +1847,130 @@ Then invoke: `Skill(command: "bazinga-db")`
 **Workflow execution:** Process groups concurrently but track each independently.
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
+
+### Step 2B.7a: Phase Continuation Check (CRITICAL - PREVENTS HANG)
+
+**🔴 MANDATORY: After each Tech Lead approval, check for next phase BEFORE spawning PM**
+
+**When a group is approved by Tech Lead:**
+
+1. **Update group status in database:**
+   ```
+   bazinga-db, please update task group:
+
+   Group ID: [group_id]
+   Status: completed
+   ```
+
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Query ALL task groups to check overall progress:**
+   ```
+   bazinga-db, please get all task groups for session [session_id]
+   ```
+
+   Then invoke: `Skill(command: "bazinga-db")`
+
+3. **Load PM state to get execution_phases:**
+   ```
+   bazinga-db, please get PM state for session [session_id]
+   ```
+
+   Then invoke: `Skill(command: "bazinga-db")`
+
+   Extract `execution_phases` array from PM state.
+
+4. **Analyze the task groups returned:**
+
+   Count groups by status:
+   - `completed_count`: Groups with status='completed'
+   - `in_progress_count`: Groups with status='in_progress'
+   - `pending_count`: Groups with status='pending'
+   - `total_count`: Total groups
+
+5. **Decision logic (Phase-Aware):**
+
+   **IF `execution_phases` is empty or null:**
+   - No phase dependencies, use simple logic:
+
+   **IF `pending_count` > 0:**
+   - **There are more groups to execute**
+   - **DO NOT spawn PM yet**
+   - Extract all pending groups
+   - **User output (capsule format):**
+     ```
+     ✅ Group {completed_group_id} approved | {completed_count}/{total_count} groups done | Starting remaining groups → {pending_group_ids}
+     ```
+   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
+   - Process internally (no additional routing messages)
+
+   **IF `execution_phases` has phases:**
+   - Use phase-aware logic:
+
+   **Step 5a: Determine current phase**
+   - Find lowest phase number where NOT all groups are completed
+   - Example: Phase 1 all complete, Phase 2 has pending/in_progress → current_phase = 2
+
+   **Step 5b: Check current phase status**
+
+   **IF current_phase groups all completed:**
+   - Move to next phase
+   - Get next_phase = current_phase + 1
+
+   **IF next_phase exists:**
+   - Extract group_ids for next_phase
+   - **User output (capsule format):**
+     ```
+     ✅ Phase {current_phase} complete | {completed_count}/{total_count} groups done | Starting Phase {next_phase} → {next_phase_description}
+     ```
+   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for next_phase groups
+   - Process internally (no additional routing messages)
+
+   **ELSE (no next_phase):**
+   - All phases complete
+   - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
+
+   **ELSE IF current_phase has in_progress groups:**
+   - **Wait for current phase groups to complete**
+   - **User output (capsule format):**
+     ```
+     ✅ Group {completed_group_id} approved | Phase {current_phase}: {completed_in_phase}/{total_in_phase} done | Waiting for {in_progress_count} groups
+     ```
+   - **Exit this check** - will run again when next group completes
+   - Do NOT spawn PM yet
+   - Do NOT start next phase yet
+
+   **Simple mode fallback (no phases):**
+
+   **IF `pending_count` > 0:**
+   - **There are MORE groups to execute**
+   - **DO NOT spawn PM yet**
+   - Extract the pending groups
+   - **User output (capsule format):**
+     ```
+     ✅ Group approved | {completed_count}/{total_count} groups done | Starting remaining groups → {pending_group_ids}
+     ```
+   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
+   - Process internally (no additional routing messages)
+
+   **ELSE IF `pending_count` == 0 AND `in_progress_count` == 0:**
+   - **All groups complete - time for PM final assessment**
+   - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
+
+   **ELSE IF `in_progress_count` > 0:**
+   - **Some groups still in progress - wait for them to complete**
+   - **User output (capsule format):**
+     ```
+     ✅ Group {completed_group_id} approved | {completed_count}/{total_count} groups done | Waiting for {in_progress_count} groups in progress
+     ```
+   - **Exit this check** - no action needed now
+   - **This check will run again** when the next Tech Lead approves another group
+   - Do NOT spawn PM yet
+   - Do NOT spawn next phase yet
+
+**🔴 CRITICAL: This check PREVENTS the orchestrator from hanging between phases!**
+
+Without this check, when Phase 1 completes, the orchestrator doesn't know there's a Phase 2 and just stops waiting for instructions.
 
 **When ALL groups reach "complete" status → Proceed to Step 2B.8**
 

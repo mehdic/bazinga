@@ -532,9 +532,10 @@ The PM generates a `bazinga/project_context.json` file at session start containi
 - Common utilities and their purposes
 - Test frameworks and build systems
 
-**Step 1: Read Project Context**
+**Step 1: Initialize Session Environment**
 
 ```bash
+# Read project context (orchestrator creates artifacts directory)
 context = read("bazinga/project_context.json")
 ```
 
@@ -1136,10 +1137,8 @@ Provide a structured report with these MANDATORY fields:
 **If tests are failing (Failing: Z > 0)**, write a detailed artifact file for orchestrator reference:
 
 ```bash
-# Step 1: Create artifacts directory (if it doesn't exist)
-Bash(command: "mkdir -p bazinga/artifacts/{SESSION_ID}")
-
-# Step 2: Write artifact file (unique per group to avoid collisions)
+# Write artifact file (unique per group to avoid collisions)
+# Note: artifacts directory already created in Step 1
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md",
   content: """

@@ -1,5 +1,5 @@
 {
-  "_comment": "This is a template for project_context.json. The PM agent should generate this automatically during Phase 4.5. If PM doesn't create it, developers can use this as fallback.",
+  "_comment": "This is a template for project_context.json. The PM agent should generate this automatically during Phase 4.5. If PM doesn't create it, developers can use this as fallback. ⚠️ IMPORTANT: If you add/remove fields here, update the fallback JSON in agents/orchestrator.md (lines 787-807) to match!",
 
   "project_type": "CLI tool / Development orchestration system",
   "primary_language": "Python",
