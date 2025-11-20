@@ -418,6 +418,10 @@ From the bazinga-db response you just received, extract the first (most recent) 
 ```bash
 # Example: If response showed "bazinga_20251113_160528" as most recent
 SESSION_ID="bazinga_20251113_160528"  # ← Use the ACTUAL session_id from response
+
+# Ensure artifacts directories exist (in case they were manually deleted)
+mkdir -p "bazinga/artifacts/${SESSION_ID}"
+mkdir -p "bazinga/artifacts/${SESSION_ID}/skills"
 ```
 
 **CRITICAL:** Set this variable NOW before proceeding. Do not skip this.
@@ -505,7 +509,14 @@ Display:
    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
    ```
 
-2. **Create session in database:**
+2. **Create artifacts directory structure:**
+   ```bash
+   # Create artifacts directories for this session (required for build baseline logs and skill outputs)
+   mkdir -p "bazinga/artifacts/${SESSION_ID}"
+   mkdir -p "bazinga/artifacts/${SESSION_ID}/skills"
+   ```
+
+3. **Create session in database:**
 
    ### 🔴 MANDATORY SESSION CREATION - CANNOT BE SKIPPED
 
@@ -543,9 +554,9 @@ Display:
 
    **IF bazinga-db skill fails or returns error:** Output `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill` and STOP.
 
-   **AFTER successful session creation: IMMEDIATELY continue to step 3 (Load configurations). Do NOT stop.**
+   **AFTER successful session creation: IMMEDIATELY continue to step 4 (Load configurations). Do NOT stop.**
 
-3. **Load configurations:**
+4. **Load configurations:**
 
    ```bash
    # Read active skills configuration
@@ -557,11 +568,11 @@ Display:
 
    **Note:** Read configurations using Read tool, but don't show Read tool output to user - it's internal setup.
 
-   **AFTER reading configs: IMMEDIATELY continue to step 4 (Store config in database). Do NOT stop.**
+   **AFTER reading configs: IMMEDIATELY continue to step 5 (Store config in database). Do NOT stop.**
 
    See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
 
-4. **Store config references in database:**
+5. **Store config references in database:**
 
    ### 🔴 MANDATORY: Store configuration in database
 
@@ -600,9 +611,9 @@ Display:
 
    **IF skill fails:** Output `❌ Config save failed | Cannot proceed` and STOP.
 
-   **AFTER successful config save: IMMEDIATELY continue to step 5 (Build baseline check). Do NOT stop.**
+   **AFTER successful config save: IMMEDIATELY continue to step 6 (Build baseline check). Do NOT stop.**
 
-5. **Run build baseline check:**
+6. **Run build baseline check:**
 
    **Note:** Run build check silently. No user output needed unless build fails. If build fails, output: `❌ Build failed | {error_type} | Cannot proceed - fix required`
 
@@ -623,9 +634,9 @@ Display:
    - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
    - (If successful or unknown: silent, no output)
 
-   **AFTER build baseline check: IMMEDIATELY continue to step 6 (Start dashboard). Do NOT stop.**
+   **AFTER build baseline check: IMMEDIATELY continue to step 7 (Start dashboard). Do NOT stop.**
 
-6. **Start dashboard if not running:**
+7. **Start dashboard if not running:**
 
    ```bash
    # Check if dashboard is running
@@ -763,11 +774,28 @@ if [ ! -f "bazinga/project_context.json" ]; then
     if [ -f ".claude/templates/project_context.template.json" ]; then
         cp .claude/templates/project_context.template.json bazinga/project_context.json
     else
-        echo "Warning: Template not found, PM will create project_context from scratch"
+        # Create minimal fallback to prevent downstream agent crashes
+        cat > bazinga/project_context.json <<'FALLBACK_EOF'
+{
+  "_comment": "Minimal fallback context - PM should regenerate during Phase 4.5",
+  "project_type": "unknown",
+  "primary_language": "unknown",
+  "framework": "unknown",
+  "architecture_patterns": [],
+  "conventions": {},
+  "key_directories": {},
+  "common_utilities": [],
+  "session_id": "fallback",
+  "template": true,
+  "fallback": true,
+  "fallback_note": "Template not found. PM must generate full context during Phase 4.5."
+}
+FALLBACK_EOF
+        echo "Warning: Template not found, created minimal fallback. PM must regenerate context."
     fi
 fi
 ```
-PM will overwrite with real context during Phase 4.5.
+PM will overwrite with real context during Phase 4.5. Fallback ensures downstream agents don't crash.
 
 Build PM prompt by reading `agents/project_manager.md` and including:
 - **Session ID from Step 0** - [current session_id created in Step 0]
