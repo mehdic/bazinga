@@ -72,7 +72,7 @@ CREATE TABLE orchestration_logs (
     session_id TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     iteration INTEGER,
-    agent_type TEXT CHECK(agent_type IN ('pm', 'developer', 'qa_expert', 'techlead', 'orchestrator')),
+    agent_type TEXT NOT NULL,
     agent_id TEXT,
     content TEXT NOT NULL,
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
@@ -88,7 +88,7 @@ CREATE INDEX idx_logs_agent_type ON orchestration_logs(session_id, agent_type);
 - `session_id`: Foreign key to sessions table
 - `timestamp`: When the interaction occurred
 - `iteration`: Orchestration iteration number
-- `agent_type`: Type of agent (`pm`, `developer`, `qa`, `tech_lead`, `orchestrator`)
+- `agent_type`: Type of agent (accepts any agent type for extensibility: `pm`, `developer`, `qa_expert`, `techlead`, `orchestrator`, `investigator`, `requirements_engineer`, `orchestrator_speckit`, or any future agent types)
 - `agent_id`: Specific agent instance (e.g., `developer_1`)
 - `content`: Full agent response text
 
