@@ -80,484 +80,28 @@ All user-visible updates MUST use the capsule format defined in `bazinga/templat
 
 ## 📊 Agent Response Parsing for Capsule Construction
 
-**Purpose:** Extract structured information from agent responses to construct compact capsules.
+**Complete parsing guide:** `bazinga/templates/response_parsing.md`
 
-**Principle:** Best-effort parsing. If specific information is missing, use general descriptions. Never fail because data isn't in expected format.
+**Quick Reference:**
 
-### General Parsing Strategy
+For each agent type, extract:
+- **Developer**: Status (READY_FOR_QA/REVIEW/BLOCKED/PARTIAL), files, tests, coverage
+- **QA Expert**: Status (PASS/FAIL/PARTIAL), test results, failures, quality signals
+- **Tech Lead**: Decision (APPROVED/CHANGES_REQUESTED/ESCALATE/INVESTIGATION), security/lint issues
+- **PM**: Status (BAZINGA/CONTINUE/CLARIFY), mode decision, task groups
+- **Investigator**: Status (ROOT_CAUSE_FOUND/NEED_DIAGNOSTIC/etc.), hypotheses
 
-1. **Read the full agent response** - Don't assume structure
-2. **Extract key fields** - Look for status, summary, file mentions, metrics
-3. **Scan for patterns** - File extensions (.py, .js), numbers (test counts, percentages)
-4. **Construct capsule** - Use template with extracted data
-5. **Fallback gracefully** - If data missing, use generic phrasing
+**Parsing principle:** Best-effort extraction with fallbacks. Never fail on missing data.
 
----
-
-### Developer Response Parsing
-
-**Expected status values:**
-- `READY_FOR_QA` - Implementation complete, has integration/E2E tests
-- `READY_FOR_REVIEW` - Implementation complete, only unit tests or no tests
-- `BLOCKED` - Cannot proceed without external help
-- `PARTIAL` - Some work done, more needed
-
-**Information to extract:**
-
-1. **Status** - Scan for lines like:
-   ```
-   Status: READY_FOR_QA
-   **Status:** READY_FOR_REVIEW
-   ```
-
-2. **Files modified/created** - Look for:
-   ```
-   - Created: file1.py, file2.js
-   - Modified: config.py
-   - Files created: [list]
-   - Implemented in: file.py
-   ```
-   Also scan response text for file extensions: `.py`, `.js`, `.ts`, `.go`, etc.
-
-3. **Tests added** - Look for:
-   ```
-   - Added 12 tests
-   - Tests created: 15
-   - Test count: N
-   - Created test_*.py files
-   ```
-   Count mentions of `test` if specific number not found.
-
-4. **Coverage** - Look for:
-   ```
-   - Coverage: 92%
-   - Test coverage: 85.7%
-   - 87% coverage
-   ```
-   Extract percentage if mentioned.
-
-5. **Summary** - Look for:
-   ```
-   Summary: One sentence description
-   **Summary:** Description
-   ```
-   Or use first substantial paragraph if no explicit summary.
-
-**Capsule construction:**
-
-```
-🔨 Group {id} complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
-```
-
-**Fallback logic:**
-
-If missing:
-- **Files**: Say "implementation complete" instead of listing files
-- **Tests**: Say "with tests" or "no new tests" based on status
-- **Coverage**: Omit coverage mention
-- **Summary**: Use "Implementation complete" or extract from first paragraph
-
-**Examples:**
-
-Full data available:
-```
-🔨 Group A complete | JWT auth implemented, 3 files created, 12 tests added (92% coverage) | No blockers → QA review
-```
-
-Minimal data (only status available):
-```
-🔨 Group B complete | Implementation complete | Ready → Tech Lead review
-```
-
-Files but no test count:
-```
-🔨 Group C complete | Password reset in password_reset.py, with tests | Ready → QA testing
-```
-
----
-
-### QA Expert Response Parsing
-
-**Expected status values:**
-- `PASS` - All tests passed
-- `FAIL` - Some tests failed
-- `PARTIAL` - Some tests couldn't run
-
-**Information to extract:**
-
-1. **Status/Recommendation** - Look for:
-   ```
-   Status: PASS
-   Recommendation: APPROVE_FOR_REVIEW
-   Status: FAIL
-   ```
-
-2. **Test results** - Look for:
-   ```
-   - 12/12 tests passed
-   - Tests passed: 15
-   - 3 failed, 12 passed
-   - Unit Tests: 10/10 passed
-   ```
-
-3. **Coverage** - Same pattern as Developer
-
-4. **Failures** - If failed, look for:
-   ```
-   Failed tests: [list]
-   Failing: test_auth_edge_case, test_timeout
-   ```
-
-5. **Security/Quality mentions** - Look for:
-   ```
-   - security clear
-   - no vulnerabilities
-   - 0 security issues
-   ```
-
-**Capsule construction (PASS):**
-
-```
-✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
-```
-
-**Capsule construction (FAIL):**
-
-```
-⚠️ Group {id} QA failed | {failed}/{total} tests failing ({failure_summary}) | Developer fixing → See artifacts/{session}/qa_failures.md
-```
-
-**Fallback logic:**
-
-If missing:
-- **Test counts**: Say "all tests passed" or "tests failed"
-- **Coverage**: Omit
-- **Failure details**: Say "N tests failing" without specifics
-- **Quality signals**: Omit
-
-**Examples:**
-
-Full pass:
-```
-✅ Group A tests passing | 12/12 tests passed, 92% coverage, security clear | Approved → Tech Lead review
-```
-
-Minimal pass:
-```
-✅ Group B tests passing | All tests passed | Approved → Code review
-```
-
-Fail with details:
-```
-⚠️ Group C QA failed | 3/15 tests failing (auth edge cases) | Developer fixing → See artifacts/bazinga_123/qa_failures.md
-```
-
-Fail minimal:
-```
-⚠️ Group A QA failed | Tests failing | Developer fixing
-```
-
----
-
-### Tech Lead Response Parsing
-
-**Expected status values:**
-- `APPROVED` - Code quality approved
-- `CHANGES_REQUESTED` - Issues need fixing
-- `ESCALATE_TO_OPUS` - Complex issues, need better model
-- `SPAWN_INVESTIGATOR` - Complex problem needs investigation
-
-**Information to extract:**
-
-1. **Decision** - Look for:
-   ```
-   Decision: APPROVED
-   **Decision:** CHANGES_REQUESTED
-   Status: APPROVED
-   ```
-
-2. **Security issues** - Look for:
-   ```
-   - Security: 0 issues
-   - 1 high severity issue
-   - security clear
-   - Security scan: 2 medium issues found
-   ```
-
-3. **Lint issues** - Look for:
-   ```
-   - Lint: 0 issues
-   - 3 lint errors
-   - Code quality: 5 warnings
-   ```
-
-4. **Coverage** - Same pattern
-
-5. **Reason** - Look for:
-   ```
-   Reason: Quality is excellent
-   **Reason:** SQL injection vulnerability
-   ```
-
-**Capsule construction (APPROVED):**
-
-```
-✅ Group {id} approved | {quality_summary} | Complete ({completed}/{total} groups)
-```
-
-**Capsule construction (CHANGES_REQUESTED):**
-
-```
-⚠️ Group {id} needs revision | {issue_summary} | Fixes required → Developer
-```
-
-**Capsule construction (ESCALATE):**
-
-```
-🔬 Group {id} complexity detected | {escalation_reason} | Escalating to Opus → Tech Lead (Rev {N})
-```
-
-**Capsule construction (INVESTIGATION):**
-
-```
-🔬 Group {id} investigation needed | {complex_issue} | Spawning Investigator for deep analysis
-```
-
-**Quality summary construction:**
-
-Combine available info:
-- Security: "Security clear" OR "N security issues found"
-- Lint: "0 lint issues" OR "N lint issues"
-- Coverage: "coverage {N}%"
-- Architecture: "architecture solid" if mentioned
-
-**Examples:**
-
-Full approval:
-```
-✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
-```
-
-Minimal approval:
-```
-✅ Group B approved | Code quality approved | Complete (2/3 groups)
-```
-
-Changes needed:
-```
-⚠️ Group C needs revision | 1 high security issue (SQL injection) + 3 lint errors | Fixes required → Developer
-```
-
-Minimal changes:
-```
-⚠️ Group A needs revision | Code quality issues found | Developer fixing
-```
-
-Investigation:
-```
-🔬 Group C investigation needed | Intermittent test failures with unclear root cause | Spawning Investigator
-```
-
----
-
-### PM Response Parsing
-
-**Expected status values:**
-- `BAZINGA` - Work complete, all requirements met
-- `CONTINUE` - More work needed
-- `NEEDS_CLARIFICATION` - User input required
-
-**Information to extract:**
-
-1. **Status** - Look for:
-   ```
-   Status: BAZINGA
-   **PM Status:** CONTINUE
-   PM Status: NEEDS_CLARIFICATION
-   ```
-
-2. **Mode decision** (initial PM spawn) - Look for:
-   ```
-   Mode: SIMPLE
-   Execution Mode: PARALLEL
-   Decision: Parallel mode with 3 developers
-   ```
-
-3. **Task groups** (initial PM spawn) - Look for:
-   ```
-   Group A: JWT Authentication
-   Task Groups:
-     - Group A: ...
-     - Group B: ...
-   ```
-
-4. **Clarification question** - Look for:
-   ```
-   Question: Should we use Stripe test mode?
-   Blocker Type: Missing External Data
-   ```
-
-**Capsule construction (mode decision):**
-
-```
-📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
-```
-
-OR
-
-```
-📋 Planning complete | Single-group execution: {task_summary} | Starting development
-```
-
-**Capsule construction (BAZINGA):**
-
-```
-✅ BAZINGA - Orchestration Complete!
-[Show final report]
-```
-
-**Capsule construction (CONTINUE):**
-
-```
-📋 PM check | {assessment} | {feedback} → {next_action}
-```
-
-**Capsule construction (CLARIFICATION):**
-
-```
-⚠️ PM needs clarification | {blocker_type}: {question_summary} | Awaiting response (auto-proceed with fallback in 5 min)
-```
-
-**Fallback logic:**
-
-If mode/groups not clear, scan for keywords:
-- "parallel" → parallel mode
-- "simple" → simple mode
-- Count group mentions (Group A, Group B, etc.)
-
-**Examples:**
-
-Mode decision:
+**Capsule templates (examples):**
 ```
-📋 Planning complete | 3 parallel groups: JWT auth (5 files), User reg (3 files), Password reset (4 files) | Starting development → Groups A, B, C
+🔨 Developer: Group {id} complete | {summary}, {files}, {tests} ({coverage}%) | {status} → {next}
+✅ QA: Group {id} passing | {passed}/{total} tests, {coverage}%, {quality} | → Tech Lead
+✅ Tech Lead: Group {id} approved | {quality_summary} | Complete ({N}/{total} groups)
+📋 PM: Planning complete | {mode}: {groups} | Starting development
 ```
 
-Simple mode:
-```
-📋 Planning complete | Single-group execution: Implement user authentication | Starting development
-```
-
-Clarification:
-```
-⚠️ PM needs clarification | Missing external data: Should we use Stripe test mode or production? | Awaiting response
-```
-
----
-
-### Investigator Response Parsing
-
-**Expected status values:**
-- `ROOT_CAUSE_FOUND` - Problem identified
-- `NEED_DEVELOPER_DIAGNOSTIC` - Need code instrumentation
-- `HYPOTHESIS_ELIMINATED` - Ruled out a theory
-- `NEED_MORE_ANALYSIS` - Continuing investigation
-- `BLOCKED` - Cannot proceed
-
-**Information to extract:**
-
-1. **Status** - Same pattern as other agents
-
-2. **Root cause** - Look for:
-   ```
-   Root Cause: Race condition in async flow
-   **Root Cause:** Memory leak in cache
-   ```
-
-3. **Hypothesis** - Look for:
-   ```
-   Hypothesis Being Tested: Database connection timeout
-   Testing: Race condition theory
-   ```
-
-4. **Diagnostic request** - Look for what Developer needs to add
-
-**Capsule construction varies by status - use templates from investigation messages already defined.**
-
----
-
-## Best Practices for Parsing
-
-### 1. Scan Multiple Patterns
-
-Don't rely on exact format. Look for variations:
-```python
-# Instead of expecting exactly "Status: READY_FOR_QA"
-# Scan for any of:
-- "Status: READY_FOR_QA"
-- "**Status:** READY_FOR_QA"
-- "Status READY_FOR_QA"
-- "ready for QA" (case insensitive)
-```
-
-### 2. Extract from Natural Text
-
-If structured fields missing, scan the prose:
-```
-Response: "I've implemented JWT authentication in auth_middleware.py
-and token_validator.py, added 12 comprehensive tests achieving 92% coverage."
-
-Extract:
-- Files: auth_middleware.py, token_validator.py (2 files)
-- Tests: 12
-- Coverage: 92%
-- Topic: JWT authentication
-```
-
-### 3. Use Defaults
-
-Always have fallback values:
-```
-files = extract_files(response) OR "implementation complete"
-tests = extract_test_count(response) OR "with tests" if has_tests else ""
-coverage = extract_coverage(response) OR None
-```
-
-### 4. Prioritize Clarity
-
-If unsure, use clear generic phrasing:
-```
-Good: "Group A complete | Implementation finished | Ready → QA"
-Bad:  "Group A complete | ??? | ??? → ???"
-```
-
-### 5. Link to Artifacts for Details
-
-When information is too detailed or missing:
-```
-⚠️ Multiple issues found → See artifacts/bazinga_123/techlead_review.md
-```
-
----
-
-## Parsing Workflow Summary
-
-For each agent response:
-
-1. **Identify agent type** (Developer, QA, Tech Lead, PM, Investigator)
-2. **Extract status** (required - determines next routing)
-3. **Scan for key metrics** (files, tests, coverage, issues)
-4. **Look for summary/description** (topic, what was done)
-5. **Select capsule template** based on agent type + status
-6. **Fill template** with extracted data
-7. **Apply fallbacks** for missing data
-8. **Output capsule** to user
-
-**If extraction fails completely:** Output a minimal but clear capsule:
-```
-[Agent type] {id} {status_word} | {generic_description} | {next_action}
-
-Example: "Developer Group A complete | Implementation finished | Ready for review"
-```
+**Detailed extraction patterns, fallback strategies, and complete examples:** See `bazinga/templates/response_parsing.md`
 
 ---
 
@@ -1243,7 +787,7 @@ PM returns decision with:
 
 **Step 1: Parse PM response and output capsule to user**
 
-Use §PM Response Parsing (lines 362-449) to extract:
+Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
@@ -1659,7 +1203,7 @@ Task(subagent_type: "general-purpose", description: "Developer implementation", 
 
 **Step 1: Parse response and output capsule to user**
 
-Use §Developer Response Parsing (lines 96-175) to extract:
+Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL)
 - **Files** created/modified
 - **Tests** added (count)
@@ -1686,7 +1230,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §Developer Response Parsing line 152-157)
+**Apply fallbacks:** If data missing, use generic descriptions (see Developer fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -1842,7 +1386,7 @@ Task(subagent_type: "general-purpose", description: "QA validation", prompt: [QA
 
 **Step 1: Parse response and output capsule to user**
 
-Use §QA Expert Response Parsing (lines 178-257) to extract:
+Use the QA Expert Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
@@ -1869,7 +1413,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §QA Expert Response Parsing line 236-251)
+**Apply fallbacks:** If data missing, use generic descriptions (see QA fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -2029,7 +1573,7 @@ Task(subagent_type: "general-purpose", description: "Tech Lead review", prompt: 
 
 **Step 1: Parse response and output capsule to user**
 
-Use §Tech Lead Response Parsing (lines 261-330) to extract:
+Use the Tech Lead Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Decision** (APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS)
 - **Security issues** count
 - **Lint issues** count
@@ -2062,7 +1606,7 @@ IF decision = ESCALATE_TO_OPUS:
   ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §Tech Lead Response Parsing line 309-327)
+**Apply fallbacks:** If data missing, use generic descriptions (see Tech Lead fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -2680,7 +2224,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 
 **Step 1: Parse response and output capsule to user**
 
-Use §PM Response Parsing (lines 340-431) to extract:
+Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
 - **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
@@ -2707,7 +2251,7 @@ IF decision = NEEDS_CLARIFICATION:
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see §PM Response Parsing line 404-428)
+**Apply fallbacks:** If data missing, use generic descriptions (see PM fallback strategies in `bazinga/templates/response_parsing.md`)
 
 **Step 3: Output capsule to user**
 
@@ -2749,8 +2293,8 @@ Skill(command: "bazinga-db")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§line 3279) → Parse PM feedback → Identify what needs fixing
-- Build revision prompt per §Step 2A.1 → Spawn agent → Log response (§line 1697)
+- Query task groups (§Step 1.4) → Parse PM feedback → Identify what needs fixing
+- Build revision prompt per §Step 2A.1 → Spawn agent → Log to database (see `bazinga/templates/logging_pattern.md`)
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
@@ -2784,46 +2328,27 @@ Task(subagent_type: "general-purpose", description: "Developer Group C", prompt:
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
-**YOU MUST build EACH developer prompt using the same process as Simple Mode (Step 2A.1).**
+**Follow the SAME process as Simple Mode (Step 2A.1)** with these group-specific adaptations:
 
-**For EACH group, follow this process:**
+**For EACH group (A, B, C, D), build prompt with:**
+1. ✓ Session ID (from Step 0)
+2. ✓ Group assignment (specific group ID: A, B, C, D) + Mode ("Parallel")
+3. ✓ **Group-specific branch name**
+4. ✓ **Group-specific task description** from PM
+5. ✓ Testing framework + Mandatory/Optional skills (same as Simple Mode)
+6. ✓ MANDATORY WORKFLOW (same as Simple Mode, but with group branch)
+7. ✓ Report format
 
-**1. Check skills_config.json for developer mandatory skills** (same as Simple Mode)
+**Validation checklist (for EACH group):**
+- [ ] "Skill(command:" appears once per mandatory skill
+- [ ] Testing mode from testing_config.json included
+- [ ] MANDATORY WORKFLOW section present
+- [ ] Group-specific branch name included
+- [ ] Report format specified
 
-**2. Build prompt sections for THIS group:**
-- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
-- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
-- ✓ Group assignment (specific group ID: A, B, C, etc.)
-- ✓ Mode (Parallel)
-- ✓ Branch name for this group
-- ✓ Task description for THIS group from PM
-- ✓ Testing framework section (from testing_config.json)
-- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
-- ✓ Mandatory workflow steps (with Skill() invocations)
-- ✓ Report format
+**IMPORTANT:** Build prompts for ALL groups BEFORE spawning any.
 
-**3. For EACH mandatory skill, add to THIS group's prompt:**
-Same skill section as Simple Mode (see Step 2A.1)
-
-**4. Add MANDATORY WORKFLOW section to THIS group's prompt:**
-Same workflow as Simple Mode, but include group-specific branch name
-
-**5. VALIDATION - Before spawning, verify EACH group's prompt contains:**
-```
-✓ [ ] "Skill(command:" appears at least once per mandatory skill
-✓ [ ] Testing mode from testing_config.json
-✓ [ ] MANDATORY WORKFLOW section
-✓ [ ] Group-specific branch name
-✓ [ ] Report format
-```
-
-**REPEAT THIS PROCESS FOR EACH GROUP (A, B, C, D).**
-
-**IF ANY GROUP'S PROMPT IS INCOMPLETE: Fix ALL prompts before spawning.**
-
-See `bazinga/templates/message_templates.md` for standard prompt format.
-See `agents/developer.md` for full developer agent definition.
-
+See `bazinga/templates/prompt_building.md` for detailed instructions.
 
 **AFTER receiving ALL developer responses:**
 
@@ -2833,7 +2358,7 @@ See `agents/developer.md` for full developer agent definition.
 
 **Step 1: Parse response and output capsule to user**
 
-Use §Developer Response Parsing (lines 96-175) to extract status, files, tests, coverage, summary.
+Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
 - READY_FOR_QA/REVIEW: `🔨 Group {id} complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
@@ -2863,255 +2388,32 @@ Skill(command: "bazinga-db")
 
 ### Step 2B.3-2B.7: Route Each Group Independently
 
-**For EACH group independently, follow the same routing workflow as Phase 2A:**
-
-The routing chain for each group is:
-**Developer** → **QA Expert** (if applicable) → **Tech Lead** → **PM final check**
-
-**Specifically, for each group:**
-
-1. **Route Developer Response** (Step 2B.3):
-   - IF status is READY_FOR_QA → Proceed to QA (Step 2B.4) or Tech Lead (skip QA based on testing config)
-   - IF status is BLOCKED/INCOMPLETE → Provide feedback, respawn developer (track revisions)
-
-2. **Spawn QA Expert** (Step 2B.4) - IF qa_expert_enabled:
-
-   ### 🔴 USE SAME QA PROMPT BUILDING PROCESS AS STEP 2A.4
-
-   **Follow the EXACT same mandatory prompt building process from Step 2A.4**, but for this group's files:
-   - Check skills_config.json for qa_expert mandatory skills
-   - Build prompt following prompt_building.md template
-   - Include mandatory skills section (if any)
-   - Add mandatory testing workflow with skill invocations
-   - Validate prompt before spawning
-
-   Spawn: `Task(subagent_type="general-purpose", description="QA Group [X]", prompt=[QA prompt built using Step 2A.4 process])`
-
-
-   **AFTER receiving the QA Expert's response:**
-
-   **Step 1: Parse response and output capsule** (same as Step 2A.4)
-
-   Use §QA Expert Response Parsing to extract status, tests, coverage, quality signals.
-
-   **Construct and output capsule:**
-   - PASS: `✅ Group {id} tests passing | {tests}, {coverage}%, {quality} | Approved → Tech Lead`
-   - FAIL: `⚠️ Group {id} QA failed | {failures} | Developer fixing → See artifacts/{SESSION_ID}/qa_failures_group_{id}.md`
-
-   **Step 2: Log QA response:**
-   ```
-   bazinga-db, please log this QA interaction:
-
-   Session ID: [session_id]
-   Agent Type: qa_expert
-   Content: [QA response]
-   Iteration: [iteration]
-   Agent ID: qa_group_[X]
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db")
-   ```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
-
-3. **Route QA Response** (Step 2B.5):
-   - IF QA approves → Proceed to Tech Lead (Step 2B.6)
-   - IF QA requests changes → Respawn developer with QA feedback (track revisions)
-
-4. **Spawn Tech Lead** (Step 2B.6):
-
-   ### 🔴 USE SAME TECH LEAD PROMPT BUILDING PROCESS AS STEP 2A.6
-
-   **Follow the EXACT same mandatory prompt building process from Step 2A.6**, but for this group's files:
-   - Check skills_config.json for tech_lead mandatory skills
-   - Build prompt following prompt_building.md template
-   - Include mandatory skills section (for each mandatory skill)
-   - Add mandatory review workflow with skill invocations
-   - Validate prompt before spawning
-
-   Spawn: `Task(subagent_type="general-purpose", description="Tech Lead Group [X]", prompt=[Tech Lead prompt built using Step 2A.6 process])`
-
-
-   **AFTER receiving the Tech Lead's response:**
-
-   **Step 1: Parse response and output capsule** (same as Step 2A.6)
-
-   Use §Tech Lead Response Parsing to extract decision, security/lint issues, architecture assessment.
-
-   **Construct and output capsule:**
-   - APPROVED: `✅ Group {id} approved | Security: {count}, Lint: {count}, {architecture} | Complete`
-   - CHANGES_REQUESTED: `⚠️ Group {id} needs changes | {issues} | Developer fixing`
-   - SPAWN_INVESTIGATOR: `🔬 Group {id} needs investigation | {problem} | Spawning investigator`
-
-   **Step 2: Log Tech Lead response:**
-   ```
-   bazinga-db, please log this techlead interaction:
-
-   Session ID: [session_id]
-   Agent Type: techlead
-   Content: [Tech Lead response]
-   Iteration: [iteration]
-   Agent ID: techlead_group_[X]
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db")
-   ```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
-
-5. **Route Tech Lead Response** (Step 2B.7):
-   - IF Tech Lead approves → Mark group as COMPLETE, THEN **continue workflow automatically**:
-     * Update task group status to 'completed' in database
-     * Invoke bazinga-db to update orchestrator state
-     * **Check all other groups** (query task groups from database)
-     * **Route based on group status:**
-       - If ALL groups completed → **Immediately proceed to Step 2B.8** (Spawn PM)
-       - If some groups still in_progress → **Continue waiting** (do NOT stop, do NOT ask user)
-       - If ANY groups BLOCKED → **Immediately spawn Investigator** to resolve blockers (see Step 2B.7b below)
-   - IF Tech Lead requests changes → Respawn appropriate agent (developer or QA) with feedback (track revisions)
-   - IF Tech Lead requests investigation (INVESTIGATION_IN_PROGRESS) → Follow same pattern as Step 2A.6b:
-     * Spawn Investigator for this group
-     * Investigator performs systematic root cause analysis
-     * After investigation, Tech Lead validates findings
-     * Route based on validation result (APPROVED/CHANGES_REQUESTED)
-
-**CRITICAL:** After marking a group COMPLETE, you MUST continue the workflow automatically. Do NOT stop for user input. Do NOT just provide a status update. Check other groups and take action.
-
-**IMPORTANT:** Track revision counts per group in database. Escalate if >2 revisions.
-
-All agent prompts follow same pattern as Phase 2A (see `bazinga/templates/prompt_building.md`).
-
----
-
-### Step 2B.7b: Resolve Blocked Groups Automatically (NEW)
-
-**When to use this step:** If Step 2B.7 detects ANY groups with status='blocked', immediately execute this step.
-
-**User output (capsule format):**
-```
-🛑 Blocked groups detected | {N} group(s) blocked: {group_ids} | Spawning Investigator to resolve blockers
-```
-
-**For EACH blocked group:**
-
-1. **Query the group details from database:**
-   ```
-   bazinga-db, please get task group details:
-   Group ID: [blocked_group_id]
-   ```
-   Then invoke: `Skill(command: "bazinga-db")`
-
-2. **Extract blocker information:**
-   - Blocker description (from developer/agent response)
-   - Dependencies (what is the group waiting for?)
-   - Evidence (error messages, logs, etc.)
-
-3. **Spawn Investigator to resolve blocker:**
-
-   **Build Investigator Prompt:**
-
-   Read `agents/investigator.md` and prepend:
-
-   ```
-   ---
-   🔬 BLOCKER RESOLUTION REQUEST
-   ---
-   Session ID: [session_id]
-   Blocked Group ID: [group_id]
-   Blocker Type: Dependency/Environment Issue
-
-   Problem Summary:
-   [Description from blocked group - e.g., "Backend services not running"]
-
-   Evidence:
-   [Error messages, logs, or status from blocked developer]
-
-   Your Task:
-   1. Diagnose the blocker (why are backend services not running?)
-   2. Identify the solution (how to start/fix the dependency)
-   3. Provide step-by-step resolution
-   4. If resolution requires code changes, specify exactly what needs to be done
-
-   Report Format:
-   **Blocker Diagnosis:**
-   [Root cause of the blocker]
-
-   **Solution:**
-   [Step-by-step resolution]
-
-   **Next Action for Orchestrator:**
-   - spawn_developer: [with these instructions]
-   - OR update_environment: [with these commands]
-   - OR escalate_to_pm: [if blocker cannot be resolved]
-   ---
-
-   [REST OF agents/investigator.md content]
-   ```
-
-   **Spawn Investigator:**
-   ```
-   Task(
-     subagent_type: "general-purpose",
-     description: "Investigator resolving blocker for group [X]",
-     prompt: [Investigator prompt built above]
-   )
-   ```
-
-4. **After Investigator responds:**
-
-   **🔴 CRITICAL - READ THE AGENT RESPONSE:**
-
-   The Task tool returns the FULL agent response. This IS the Investigator's report.
-
-   **DO NOT:**
-   - ❌ Ignore the response
-   - ❌ Think it's "just a log ID"
-   - ❌ "Take direct action" yourself
-   - ❌ Skip using the agent's recommendations
-
-   **YOU MUST:**
-   - ✅ Read the FULL response from the Task tool result
-   - ✅ Parse the Investigator's diagnosis and solution
-   - ✅ Extract the "Next Action for Orchestrator" section
-   - ✅ Follow the Investigator's recommendations exactly
-
-   **If the response is unclear or missing:**
-   - Re-spawn the Investigator with a clarification request
-   - DO NOT improvise a solution yourself
-
-   **After reading the Investigator's full response, log it:**
-   ```
-   bazinga-db, please log this investigator interaction:
-
-   Session ID: [session_id]
-   Agent Type: investigator
-   Content: [Full Investigator response from Task tool]
-   Iteration: [iteration]
-   Agent ID: investigator_blocker_[group_id]
-   ```
-
-   Then invoke: `Skill(command: "bazinga-db")`
-
-5. **Route based on Investigator's recommendation (from the response you just read):**
-
-   - **If "spawn_developer":** Spawn Developer with Investigator's instructions to fix the blocker
-   - **If "update_environment":** Execute the commands/changes needed (may spawn Developer or use Bash if simple setup)
-   - **If "escalate_to_pm":** Spawn PM to decide on reprioritization or resource allocation
-
-   **After blocker resolved:**
-   - Update task group status from 'blocked' to 'in_progress'
-   - Re-spawn the originally blocked agent with blocker resolution context
-   - Continue workflow (check other groups again)
-
-**CRITICAL:** Do NOT stop after resolving one blocker. Check if OTHER groups are blocked and resolve those too. Only proceed to Step 2B.8 when ALL groups are either completed or in_progress (no blockers remain).
-
----
+**Critical difference from Simple Mode:** Each group flows through the workflow INDEPENDENTLY and CONCURRENTLY.
+
+**For EACH group, execute the SAME workflow as Phase 2A (Steps 2A.3 through 2A.7):**
+
+| Phase 2A Step | Phase 2B Equivalent | Notes |
+|---------------|---------------------|-------|
+| 2A.3: Route Developer Response | 2B.3 | Check this group's developer status |
+| 2A.4: Spawn QA Expert | 2B.4 | Use this group's files only |
+| 2A.5: Route QA Response | 2B.5 | Check this group's QA status |
+| 2A.6: Spawn Tech Lead | 2B.6 | Use this group's context only |
+| 2A.6b: Investigation Loop | 2B.6b | Same investigation process |
+| 2A.6c: Tech Lead Validation | 2B.6c | Validate this group's investigation |
+| 2A.7: Route Tech Lead Response | 2B.7 | Check this group's approval |
+
+**Group-specific adaptations:**
+- Replace "main" with group ID (A, B, C, D)
+- Use group-specific branch name
+- Use group-specific files list
+- Track group status independently in database
+- Log with agent_id: `{role}_group_{X}`
+
+**Workflow execution:** Process groups concurrently but track each independently.
+
+**Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
+
+**When ALL groups reach "complete" status → Proceed to Step 2B.8**
 
 ### Step 2B.8: Spawn PM When All Groups Complete
 
@@ -3180,7 +2482,7 @@ Skill(command: "velocity-tracker")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§line 3279) → Parse PM feedback → Identify groups needing fixes
+- Query task groups (§Step 1.4) → Parse PM feedback → Identify groups needing fixes
 - Build revision prompts per §Step 2B.1 → Spawn in parallel per §line 2788 → Log responses
 - Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 

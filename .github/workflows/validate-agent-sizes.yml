@@ -1,0 +1,67 @@
+name: Validate Agent and Command Sizes
+
+on:
+  pull_request:
+    paths:
+      - 'agents/**/*.md'
+      - '.claude/commands/**/*.md'
+      - 'scripts/validate-agent-sizes.sh'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'agents/**/*.md'
+      - '.claude/commands/**/*.md'
+      - 'scripts/validate-agent-sizes.sh'
+
+jobs:
+  validate-sizes:
+    name: Check Agent and Command File Sizes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Make validation script executable
+        run: chmod +x scripts/validate-agent-sizes.sh
+
+      - name: Validate file sizes
+        run: |
+          echo "🔍 Checking agent and command file sizes..."
+          echo ""
+          ./scripts/validate-agent-sizes.sh
+
+      - name: Validation summary
+        if: success()
+        run: |
+          echo ""
+          echo "✅ All agent and command files are within size limits!"
+          echo ""
+          echo "Validated:"
+          echo "  - All files in agents/"
+          echo "  - All files in .claude/commands/"
+          echo "  - No files exceed 25,000 token limit (~100,000 characters)"
+
+      - name: Validation failed
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ Agent or command file size validation failed!"
+          echo ""
+          echo "One or more files exceed the maximum size limit."
+          echo ""
+          echo "Claude Code has a practical limit of ~25,000 tokens per agent/command file."
+          echo "Files exceeding this limit may cause performance issues or failures."
+          echo ""
+          echo "To fix:"
+          echo "  1. Review the files flagged above"
+          echo "  2. Refactor to reduce size by:"
+          echo "     - Moving templates to separate files"
+          echo "     - Removing verbose examples"
+          echo "     - Consolidating duplicate sections"
+          echo "     - Extracting common patterns to shared docs"
+          echo "  3. See research/orchestrator-bloat-analysis.md for guidance"
+          echo ""
+          exit 1
