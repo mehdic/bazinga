@@ -423,6 +423,68 @@ class BazingaDB:
             'recent_logs': self.get_logs(session_id, limit=10)
         }
 
+    # ==================== DEVELOPMENT PLAN OPERATIONS ====================
+
+    def save_development_plan(self, session_id: str, original_prompt: str,
+                             plan_text: str, phases: List[Dict],
+                             current_phase: int, total_phases: int,
+                             metadata: Optional[Dict] = None) -> None:
+        """Save or update development plan for a session."""
+        conn = self._get_connection()
+        metadata_json = json.dumps(metadata) if metadata else None
+        phases_json = json.dumps(phases)
+
+        conn.execute("""
+            INSERT OR REPLACE INTO development_plans
+            (session_id, original_prompt, plan_text, phases, current_phase, total_phases, metadata, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (session_id, original_prompt, plan_text, phases_json, current_phase, total_phases, metadata_json))
+        conn.commit()
+        conn.close()
+        print(f"✓ Saved development plan for session {session_id}")
+
+    def get_development_plan(self, session_id: str) -> Optional[Dict]:
+        """Get development plan for a session."""
+        conn = self._get_connection()
+        row = conn.execute("""
+            SELECT * FROM development_plans WHERE session_id = ?
+        """, (session_id,)).fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        plan = dict(row)
+        plan['phases'] = json.loads(plan['phases'])
+        if plan['metadata']:
+            plan['metadata'] = json.loads(plan['metadata'])
+        return plan
+
+    def update_plan_progress(self, session_id: str, phase_number: int, status: str) -> None:
+        """Update a specific phase status in the development plan."""
+        plan = self.get_development_plan(session_id)
+        if not plan:
+            print(f"Error: No plan found for session {session_id}", file=sys.stderr)
+            sys.exit(1)
+
+        phases = plan['phases']
+        for phase in phases:
+            if phase['phase'] == phase_number:
+                phase['status'] = status
+                if status == 'completed':
+                    phase['completed_at'] = datetime.now().isoformat()
+                break
+
+        conn = self._get_connection()
+        conn.execute("""
+            UPDATE development_plans
+            SET phases = ?, current_phase = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE session_id = ?
+        """, (json.dumps(phases), phase_number, session_id))
+        conn.commit()
+        conn.close()
+        print(f"✓ Updated phase {phase_number} status to: {status}")
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -521,6 +583,24 @@ def main():
                     value = int(value)
                 kwargs[key] = value
             db.update_task_group(group_id, **kwargs)
+        elif cmd == 'save-development-plan':
+            session_id = cmd_args[0]
+            original_prompt = cmd_args[1]
+            plan_text = cmd_args[2]
+            phases = json.loads(cmd_args[3])
+            current_phase = int(cmd_args[4])
+            total_phases = int(cmd_args[5])
+            metadata = json.loads(cmd_args[6]) if len(cmd_args) > 6 else None
+            db.save_development_plan(session_id, original_prompt, plan_text, phases, current_phase, total_phases, metadata)
+        elif cmd == 'get-development-plan':
+            session_id = cmd_args[0]
+            result = db.get_development_plan(session_id)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'update-plan-progress':
+            session_id = cmd_args[0]
+            phase_number = int(cmd_args[1])
+            status = cmd_args[2]
+            db.update_plan_progress(session_id, phase_number, status)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             sys.exit(1)

@@ -1114,6 +1114,41 @@ When spawning developers through orchestrator, include this context:
 
 ## Phase 1: Initial Planning (First Spawn)
 
+### Step 0: Development Plan Management (FIRST ACTION)
+
+**ALWAYS check for existing plan BEFORE analyzing requirements:**
+
+Query bazinga-db for plan: `Skill(command: "bazinga-db")` with request:
+```
+bazinga-db, please get the development plan:
+
+Session ID: {session_id}
+```
+
+**IF plan exists (continuation):**
+- Load plan: original_prompt, phases array, current_phase
+- Map user's new request to plan phases (which phases to execute?)
+- Update phase statuses to "in_progress" for requested phases
+- Output: `📋 Plan: {total}-phase | Phase {N}✓ Phase {M}→ Phase {P}⏸` (1 line)
+- Continue to Step 1 with plan context
+
+**IF plan does NOT exist (first time):**
+- Detect explicit plan: Look for "Phase", "Step", numbered lists + partial scope keywords ("only", "for now")
+- If explicit plan found: Parse phases, determine scope (now vs later)
+- If no explicit plan: Analyze if complex (will create >2 task groups) - if yes, generate phases
+- Create plan JSON (see research/development-plan-management-strategy.md for schema)
+- Save via bazinga-db: `save development plan` with session_id, original_prompt, plan_text, phases JSON, current_phase, total_phases, metadata
+- Output: `📋 Plan: {total}-phase detected | Phase {N}→ Others⏸` (1 line)
+- Continue to Step 1
+
+**Phase JSON schema:** `[{"phase": 1, "name": "...", "status": "pending|in_progress|completed", "description": "...", "requested_now": true|false}, ...]`
+
+**Status values:** pending, in_progress, completed, blocked
+
+**Metadata:** `{"plan_type": "user_provided_partial|user_provided_full|pm_generated", "scope_requested": "...", "complexity": "simple|medium|complex"}`
+
+**For full workflow and examples, see:** research/development-plan-management-strategy.md
+
 ### Step 1: Analyze Requirements
 Read user requirements, identify features, detect dependencies, estimate complexity.
 
@@ -1602,6 +1637,8 @@ Read provided context:
 - Updated PM state from database
 - Completion updates (which groups approved/failed)
 - Current group statuses
+
+**If development plan exists:** Query plan status and update completed phases via bazinga-db `update-plan-progress` when phases complete. Keep plan synchronized with actual progress.
 
 ### Step 2: Decide Next Action
 
