@@ -787,32 +787,63 @@ PM returns decision with:
 
 **Step 1: Check for Investigation Answers (PRIORITY)**
 
-Check if PM response contains "## Investigation Answers" section:
+Check if PM response contains investigation section. Look for these headers (fuzzy match):
+- "## Investigation Answers"
+- "## Investigation Results"
+- "## Answers"
+- "## Findings"
+- "## Investigation"
+- Case-insensitive matching
 
-**IF investigation answers present:**
+**IF investigation section found:**
 - Extract question(s) and answer(s) from the section
+- Handle multiple questions (see multi-question logic below)
 - Output investigation capsule BEFORE planning capsule:
   ```
   📊 Investigation results | {findings_summary} | Details: {details}
   ```
 - Example: `📊 Investigation results | Found 83 E2E tests in 5 files | 30 passing, 53 skipped`
+- **Log investigation to database:**
+  ```
+  bazinga-db, please log this investigation:
+
+  Session ID: [session_id]
+  Investigation Type: pre_orchestration_qa
+  Questions: [extracted questions]
+  Answers: [extracted answers]
+  ```
+  Then invoke: `Skill(command: "bazinga-db")`
 - Then continue to parse planning sections
 
-**IF no investigation answers:**
+**Multi-question capsule construction:**
+- IF 1 question: `📊 Investigation results | {answer_summary} | {details}`
+- IF 2 questions: `📊 Investigation results | {answer1_summary} + {answer2_summary} | See full details`
+- IF 3+ questions: `📊 Investigation results | Answered {N} questions | {first_answer_summary}, ...`
+
+**IF no investigation section:**
 - Skip to Step 2 (parse planning sections)
+
+**Error handling:**
+- IF section found but parsing fails: Log warning, continue to Step 2 (don't block orchestration)
 
 **Step 2: Parse PM response and output capsule to user**
 
 Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
-- **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
+- **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
 - **Assessment** (if continue/bazinga)
 
 **Step 3: Construct and output capsule based on status**
 
+IF status = INVESTIGATION_ONLY:
+  → Investigation answered, no orchestration needed
+  → Display final investigation capsule (already shown in Step 1)
+  → Update session status to 'completed'
+  → EXIT orchestration (no development phase)
+
 IF status = initial mode decision (PM's first response):
-  → Use "Planning complete" template (lines 401-408):
+  → Use "Planning complete" template:
   ```
   📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
   ```
@@ -825,7 +856,7 @@ IF status = NEEDS_CLARIFICATION:
   → Use clarification template (§Step 1.3a)
 
 IF status = BAZINGA or CONTINUE:
-  → Use appropriate template (lines 411-421)
+  → Use appropriate template
 
 **Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
 

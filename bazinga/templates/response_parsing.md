@@ -320,6 +320,7 @@ Orchestrator outputs:
 - `BAZINGA` - Work complete, all requirements met
 - `CONTINUE` - More work needed
 - `NEEDS_CLARIFICATION` - User input required
+- `INVESTIGATION_ONLY` - Only questions answered, no implementation requested
 
 **Information to extract:**
 
@@ -328,6 +329,7 @@ Orchestrator outputs:
    Status: BAZINGA
    **PM Status:** CONTINUE
    PM Status: NEEDS_CLARIFICATION
+   **Status:** INVESTIGATION_ONLY
    ```
 
 2. **Mode decision** (initial PM spawn) - Look for:

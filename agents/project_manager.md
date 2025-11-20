@@ -986,12 +986,67 @@ Read user requirements, identify features, detect dependencies, estimate complex
 
 **IMPORTANT: Detect and answer investigation questions FIRST**
 
-IF user message contains investigation questions (patterns: "how many", "are there", "what is", "show me", "list", "find", "count"):
+**Investigation question detection (be specific, avoid false positives):**
 
-1. Use Bash/Grep/Read to answer each question
-2. Include "Investigation Answers" section in your response (BEFORE planning sections)
-3. Format: Clear, concise answers with evidence
-4. Then continue with normal planning
+**DO treat as investigation questions (quantitative/factual queries):**
+- "how many [tests/files/...] exist?" / "how many [tests/files/...] are there?"
+- "are there [number]+ [tests/files/...]?"
+- "show me [tests/files/dependencies/...]" (listing requests)
+- "list [tests/files/dependencies/...]" (listing requests)
+- "count [tests/files/...]" (count requests)
+- "do we have [tests/files/...]?" (existence checks)
+- "what's the current [count/coverage/status]?" (status queries)
+
+**DO NOT treat as investigation (implementation requirements/architecture questions):**
+- "what is the architecture" (implementation question, not investigation)
+- "what should we use for [X]" (design decision, not factual query)
+- "how should we implement [X]" (implementation question)
+- "what is the best approach" (design question)
+
+**IF investigation questions detected:**
+
+1. **TIMEOUT: Complete investigation within 180 seconds** (use quick commands: find, grep, wc, ls)
+2. **SAFEGUARDS: Avoid expensive operations:**
+   - ❌ Don't run full test suites (use `--list` or count files)
+   - ❌ Don't run builds or linters
+   - ✅ Use fast commands: find, grep, wc, ls, cat (small files only)
+3. **Answer the questions using Bash/Grep/Read**
+4. **Check if there are also implementation requirements:**
+   - IF implementation requirements present (e.g., "implement", "fix", "add", "create", "orchestrate"): Continue to normal planning
+   - IF ONLY questions, NO implementation: Use **Investigation-Only Mode** (see below)
+
+**Investigation-Only Mode (questions without orchestration request):**
+
+IF user ONLY asked questions (no "implement", "fix", "add", "orchestrate", etc.):
+
+1. Include "Investigation Answers" section with answers
+2. **DO NOT create task groups**
+3. Return status: `INVESTIGATION_ONLY`
+4. Include message: "Investigation complete. No implementation work requested."
+
+**Investigation-Only Response Format:**
+```
+## Investigation Answers
+
+[Question/Answer pairs as normal]
+
+---
+
+## PM Status
+
+**Status:** INVESTIGATION_ONLY
+**Message:** Investigation complete. No implementation work requested.
+**Next Action:** Orchestrator should display results and exit (no development phase)
+```
+
+**IF investigation + implementation:**
+
+1. Include "Investigation Answers" section (BEFORE planning sections)
+2. Continue with normal planning (mode selection, task groups, etc.)
+
+**IF investigation timeout exceeded or commands fail:**
+- Return partial results with note: "Some questions could not be answered (investigation timeout/complexity)"
+- Continue with planning (don't block orchestration)
 
 **Investigation Answers Format:**
 ```
