@@ -1,0 +1,11 @@
+# CODEOWNERS file for bazinga repository
+# This file defines who must approve PRs for specific files or directories
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owner - requires approval from @mehdic for ALL changes
+* @mehdic
+
+# You can add specific patterns later, for example:
+# /docs/ @mehdic @other-user
+# *.js @mehdic
+# /.github/ @mehdic
