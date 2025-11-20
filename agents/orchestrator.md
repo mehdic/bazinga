@@ -852,7 +852,9 @@ IF status = initial mode decision (PM's first response):
   ```
 
 IF status = NEEDS_CLARIFICATION:
+  → Investigation capsule already shown in Step 1 (if present)
   → Use clarification template (§Step 1.3a)
+  → SKIP planning capsule (PM needs clarification before planning)
 
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template
