@@ -440,6 +440,65 @@ Would you like me to:
 
 **Workflow:** PM (investigation request) → Orchestrator spawns Investigator → Investigator→Tech Lead→Developer
 
+**Example 1 - Build Failure:**
+```
+## PM Status Update
+
+### Critical Issue Detected
+Build failing on production target with linker errors.
+
+### Analysis
+- Local dev builds succeed
+- CI/CD pipeline fails at link stage
+- Root cause: Unknown
+
+**Status:** INVESTIGATION_NEEDED
+**Next Action:** Orchestrator should spawn Investigator with:
+- Problem: Production build linker errors (undefined references)
+- Context: Works locally, fails in CI
+- Hypothesis: Missing library dependencies or compiler flag differences
+```
+
+**Example 2 - Deployment Blocker:**
+```
+## PM Status Update
+
+### Critical Issue Detected
+Deployment to staging environment blocked - pods failing health checks.
+
+### Analysis
+- Docker images build successfully
+- Kubernetes pods start but fail readiness probe
+- Logs show connection timeouts
+- Root cause: Unknown
+
+**Status:** INVESTIGATION_NEEDED
+**Next Action:** Orchestrator should spawn Investigator with:
+- Problem: Staging deployment health check failures
+- Context: Images build, pods start, but fail readiness
+- Hypothesis: Network config, missing env vars, or service dependencies
+```
+
+**Example 3 - Performance Regression:**
+```
+## PM Status Update
+
+### Critical Issue Detected
+API response times increased 5x after recent deployment.
+
+### Analysis
+- No code changes to query logic
+- Database queries show normal execution time
+- Load hasn't increased
+- Root cause: Unknown
+
+**Status:** INVESTIGATION_NEEDED
+**Next Action:** Orchestrator should spawn Investigator with:
+- Problem: 5x performance degradation on API endpoints
+- Context: No query changes, normal DB performance, consistent load
+- Hypothesis: Connection pooling, cache invalidation, or middleware overhead
+```
+
 ### Tech Debt Gate (Before BAZINGA)
 
 **MANDATORY:** Check bazinga/tech_debt.json before BAZINGA using TechDebtManager from scripts/tech_debt.py

@@ -1675,6 +1675,16 @@ IF decision = NEEDS_CLARIFICATION:
 
 **Apply fallbacks:** If data missing, use generic descriptions (see PM fallback strategies in `bazinga/templates/response_parsing.md`)
 
+**IF PM response lacks explicit status code OR presents options/questions:**
+
+Analyze response content to infer intent:
+- Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
+- Requests changes, fixes, or updates → CONTINUE
+- Indicates completion or approval → BAZINGA
+- Asks about requirements or scope → NEEDS_CLARIFICATION
+
+Use inferred decision for routing (as if PM explicitly stated it).
+
 **Step 3: Output capsule to user**
 
 **Step 4: Track velocity:**
@@ -1691,59 +1701,6 @@ Skill(command: "velocity-tracker")
 **Log PM interaction:** §DB.log(pm, session_id, pm_response, iteration, pm_final)
 
 Then invoke: `Skill(command: "bazinga-db")`
-
-
-### Step 2A.8b: Fallback Parser for Ambiguous PM Responses
-
-**IF PM response does NOT contain clear status codes** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED), apply fallback parser:
-
-**🔴 CRITICAL: This prevents workflow stops when PM gives ambiguous responses.**
-
-**Detection patterns (PM violated decision protocol):**
-- Contains "Would you like" or "Should I"
-- Contains "Options:" or numbered lists (1., 2., 3.)
-- Contains multiple "or" statements
-- Asks questions instead of giving directives
-
-**When detected, extract implicit decision from content:**
-
-**Pattern #1: Test failures, errors, or blockers mentioned:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["test fail", "error", "block", "bug", "break"]):
-    extracted_decision = "INVESTIGATION_NEEDED"
-    extracted_action = "spawn_investigator"
-```
-
-**Pattern #2: Changes or fixes requested:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["fix", "change", "update", "modify", "improve"]):
-    extracted_decision = "CONTINUE"
-    extracted_action = "reassign_to_developer"
-```
-
-**Pattern #3: Approval or completion implied:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["complete", "done", "ready", "approve", "success"]):
-    extracted_decision = "BAZINGA"
-    extracted_action = "proceed_to_completion"
-```
-
-**Pattern #4: Questions about requirements:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["clarify", "unclear", "which", "what do you want", "need to know"]):
-    extracted_decision = "NEEDS_CLARIFICATION"
-    extracted_action = "stop_for_user_input"
-```
-
-**After extraction, output warning capsule:**
-```
-⚠️ PM response ambiguous | Extracted decision: {extracted_decision} | Proceeding autonomously
-```
-
-**Then proceed to Step 2A.9 with extracted decision** (not original PM response)
-
-**This ensures workflow NEVER STOPS inappropriately even if PM violates decision protocol.**
-
 
 ### Step 2A.9: Route PM Response (Simple Mode)
 
@@ -2067,6 +2024,16 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 - CONTINUE: `📋 PM check | {assessment} | {feedback} → {next_action}`
 - NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
 
+**IF PM response lacks explicit status code OR presents options/questions:**
+
+Analyze response content to infer intent:
+- Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
+- Requests changes, fixes, or updates → CONTINUE
+- Indicates completion or approval → BAZINGA
+- Asks about requirements or scope → NEEDS_CLARIFICATION
+
+Use inferred decision for routing (as if PM explicitly stated it).
+
 **Step 2: Log PM response:** §DB.log(pm, session_id, pm_response, iteration, pm_parallel_final)
 
 Then invoke: `Skill(command: "bazinga-db")`
@@ -2084,58 +2051,6 @@ Then invoke:
 ```
 Skill(command: "velocity-tracker")
 ```
-
-### Step 2B.8b: Fallback Parser for Ambiguous PM Responses
-
-**IF PM response does NOT contain clear status codes** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED), apply fallback parser:
-
-**🔴 CRITICAL: This prevents workflow stops when PM gives ambiguous responses.**
-
-**Detection patterns (PM violated decision protocol):**
-- Contains "Would you like" or "Should I"
-- Contains "Options:" or numbered lists (1., 2., 3.)
-- Contains multiple "or" statements
-- Asks questions instead of giving directives
-
-**When detected, extract implicit decision from content:**
-
-**Pattern #1: Test failures, errors, or blockers mentioned:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["test fail", "error", "block", "bug", "break"]):
-    extracted_decision = "INVESTIGATION_NEEDED"
-    extracted_action = "spawn_investigator"
-```
-
-**Pattern #2: Changes or fixes requested:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["fix", "change", "update", "modify", "improve"]):
-    extracted_decision = "CONTINUE"
-    extracted_action = "reassign_to_developer"
-```
-
-**Pattern #3: Approval or completion implied:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["complete", "done", "ready", "approve", "success"]):
-    extracted_decision = "BAZINGA"
-    extracted_action = "proceed_to_completion"
-```
-
-**Pattern #4: Questions about requirements:**
-```python
-if any(keyword in pm_response.lower() for keyword in ["clarify", "unclear", "which", "what do you want", "need to know"]):
-    extracted_decision = "NEEDS_CLARIFICATION"
-    extracted_action = "stop_for_user_input"
-```
-
-**After extraction, output warning capsule:**
-```
-⚠️ PM response ambiguous | Extracted decision: {extracted_decision} | Proceeding autonomously
-```
-
-**Then proceed to Step 2B.9 with extracted decision** (not original PM response)
-
-**This ensures workflow NEVER STOPS inappropriately even if PM violates decision protocol.**
-
 
 ### Step 2B.9: Route PM Response
 
