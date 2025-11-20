@@ -1693,6 +1693,57 @@ Skill(command: "velocity-tracker")
 Then invoke: `Skill(command: "bazinga-db")`
 
 
+### Step 2A.8b: Fallback Parser for Ambiguous PM Responses
+
+**IF PM response does NOT contain clear status codes** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED), apply fallback parser:
+
+**🔴 CRITICAL: This prevents workflow stops when PM gives ambiguous responses.**
+
+**Detection patterns (PM violated decision protocol):**
+- Contains "Would you like" or "Should I"
+- Contains "Options:" or numbered lists (1., 2., 3.)
+- Contains multiple "or" statements
+- Asks questions instead of giving directives
+
+**When detected, extract implicit decision from content:**
+
+**Pattern #1: Test failures, errors, or blockers mentioned:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["test fail", "error", "block", "bug", "break"]):
+    extracted_decision = "INVESTIGATION_NEEDED"
+    extracted_action = "spawn_investigator"
+```
+
+**Pattern #2: Changes or fixes requested:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["fix", "change", "update", "modify", "improve"]):
+    extracted_decision = "CONTINUE"
+    extracted_action = "reassign_to_developer"
+```
+
+**Pattern #3: Approval or completion implied:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["complete", "done", "ready", "approve", "success"]):
+    extracted_decision = "BAZINGA"
+    extracted_action = "proceed_to_completion"
+```
+
+**Pattern #4: Questions about requirements:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["clarify", "unclear", "which", "what do you want", "need to know"]):
+    extracted_decision = "NEEDS_CLARIFICATION"
+    extracted_action = "stop_for_user_input"
+```
+
+**After extraction, output warning capsule:**
+```
+⚠️ PM response ambiguous | Extracted decision: {extracted_decision} | Proceeding autonomously
+```
+
+**Then proceed to Step 2A.9 with extracted decision** (not original PM response)
+
+**This ensures workflow NEVER STOPS inappropriately even if PM violates decision protocol.**
+
 
 ### Step 2A.9: Route PM Response (Simple Mode)
 
@@ -1705,6 +1756,19 @@ Then invoke: `Skill(command: "bazinga-db")`
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
+
+**IF PM sends INVESTIGATION_NEEDED:**
+- **Immediately spawn Investigator** (no user permission required)
+- Extract problem description from PM response
+- Build Investigator prompt with context:
+  * Session ID, Group ID, Branch
+  * Problem description (test failures, bugs, errors)
+  * Available evidence (logs, test results, error messages)
+- Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
+- After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
+- Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
+
+**❌ DO NOT ask "Should I spawn Investigator?" - spawn immediately**
 
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
@@ -2021,6 +2085,58 @@ Then invoke:
 Skill(command: "velocity-tracker")
 ```
 
+### Step 2B.8b: Fallback Parser for Ambiguous PM Responses
+
+**IF PM response does NOT contain clear status codes** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED), apply fallback parser:
+
+**🔴 CRITICAL: This prevents workflow stops when PM gives ambiguous responses.**
+
+**Detection patterns (PM violated decision protocol):**
+- Contains "Would you like" or "Should I"
+- Contains "Options:" or numbered lists (1., 2., 3.)
+- Contains multiple "or" statements
+- Asks questions instead of giving directives
+
+**When detected, extract implicit decision from content:**
+
+**Pattern #1: Test failures, errors, or blockers mentioned:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["test fail", "error", "block", "bug", "break"]):
+    extracted_decision = "INVESTIGATION_NEEDED"
+    extracted_action = "spawn_investigator"
+```
+
+**Pattern #2: Changes or fixes requested:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["fix", "change", "update", "modify", "improve"]):
+    extracted_decision = "CONTINUE"
+    extracted_action = "reassign_to_developer"
+```
+
+**Pattern #3: Approval or completion implied:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["complete", "done", "ready", "approve", "success"]):
+    extracted_decision = "BAZINGA"
+    extracted_action = "proceed_to_completion"
+```
+
+**Pattern #4: Questions about requirements:**
+```python
+if any(keyword in pm_response.lower() for keyword in ["clarify", "unclear", "which", "what do you want", "need to know"]):
+    extracted_decision = "NEEDS_CLARIFICATION"
+    extracted_action = "stop_for_user_input"
+```
+
+**After extraction, output warning capsule:**
+```
+⚠️ PM response ambiguous | Extracted decision: {extracted_decision} | Proceeding autonomously
+```
+
+**Then proceed to Step 2B.9 with extracted decision** (not original PM response)
+
+**This ensures workflow NEVER STOPS inappropriately even if PM violates decision protocol.**
+
+
 ### Step 2B.9: Route PM Response
 
 **IF PM sends BAZINGA:**
@@ -2032,6 +2148,19 @@ Skill(command: "velocity-tracker")
 - Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
+
+**IF PM sends INVESTIGATION_NEEDED:**
+- **Immediately spawn Investigator** (no user permission required)
+- Extract problem description from PM response
+- Build Investigator prompt with context:
+  * Session ID, Group ID(s) affected, Branch(es)
+  * Problem description (test failures, integration issues, complex bugs)
+  * Available evidence (logs, test results, error messages)
+- Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
+- After Investigator response: Route to Tech Lead for validation (Step 2B.7c if applicable)
+- Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
+
+**❌ DO NOT ask "Should I spawn Investigator?" - spawn immediately**
 
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
