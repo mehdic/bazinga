@@ -362,7 +362,7 @@ Skill(command: "bazinga-db")
 **IF list is empty (no previous sessions):**
 - This is the FIRST session ever
 - Decision: Follow **Path B** (create new session)
-- **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
+- **IMMEDIATELY jump to Path B (line 499). Do NOT stop.**
 
 **IF list has sessions:**
 - Check the most recent session's status field
@@ -370,7 +370,7 @@ Skill(command: "bazinga-db")
   - Previous session is finished
   - Decision: Follow **Path B** (create new session)
   - **DO NOT try to resume a completed session**
-  - **IMMEDIATELY jump to Path B (line 951). Do NOT stop.**
+  - **IMMEDIATELY jump to Path B (line 499). Do NOT stop.**
 - **IF status = "active" or "running":**
   - Previous session is still in progress
   - **IMMEDIATELY proceed to user intent analysis below. Do NOT stop.**
@@ -393,8 +393,8 @@ User said: "[user's message]"
 - If this → They want a NEW SESSION
 
 **Decision:**
-- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 856). Do NOT stop.**
-- User wants NEW task → **IMMEDIATELY jump to Path B below (line 951). Do NOT stop.**
+- User wants to RESUME → **IMMEDIATELY jump to Path A below (line 404). Do NOT stop.**
+- User wants NEW task → **IMMEDIATELY jump to Path B below (line 499). Do NOT stop.**
 
 **Simple rule:** Check previous session status FIRST. If completed, always create new. Otherwise, check user's intent.
 
@@ -806,7 +806,7 @@ IF status = initial mode decision (PM's first response):
   ```
 
 IF status = NEEDS_CLARIFICATION:
-  → Use clarification template (line 427)
+  → Use clarification template (§Step 1.3a)
 
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template (lines 411-421)
@@ -1089,8 +1089,12 @@ If fails: Fix prompt before spawning (see agents/developer.md for workflow requi
 **Build Task description:**
 ```python
 # Simple mode: 40 char truncation (prefix "Dev: " = 5 chars, total ~45)
-task_name = task_groups[0].name if task_groups[0].name else "main group"
-description = f"Dev: {task_name[:40]}{'...' if len(task_name) > 40 else ''}"
+# Defensive: Check task_groups exists and has entries (should always be true after Step 1.4)
+if not task_groups or len(task_groups) == 0:
+    description = "Dev: main group"  # Fallback if task_groups somehow empty
+else:
+    task_name = task_groups[0].name if task_groups[0].name else "main group"
+    description = f"Dev: {task_name[:40]}{'...' if len(task_name) > 40 else ''}"
 # Note: Parallel mode uses 30 chars because group ID takes visual space ("Dev A: " = 7 chars)
 ```
 
@@ -1615,9 +1619,12 @@ When you make multiple Task() calls in a single message, they execute in PARALLE
 # Step 1: Get task_groups from database (queried at Step 1.4)
 # Step 2: For EACH group being spawned:
 for group in groups_to_spawn:  # e.g., groups A, B, C
-    # Get task name from task_groups
-    task = next(t for t in task_groups if t.group_id == group.id)
-    task_name = task.name if task.name else group.id
+    # Get task name from task_groups (defensive: use fallback if not found)
+    task = next((t for t in task_groups if t.group_id == group.id), None)
+    if task and task.name:
+        task_name = task.name
+    else:
+        task_name = group.id  # Fallback to group ID if task not found or has no name
 
     # Truncate to 30 chars (shorter than simple mode's 40 because group ID takes space)
     # Format: "Dev A: " = 7 char prefix vs simple mode "Dev: " = 5 chars
@@ -1847,7 +1854,7 @@ Skill(command: "bazinga-db")
 **Common Usage Examples:**
 - PM: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
 - Developer: `§DB.log(developer, session_id, dev_response, iteration, developer_main)`
-- QA: `§DB.log(qa, session_id, qa_response, iteration, qa_main)`
+- QA Expert: `§DB.log(qa_expert, session_id, qa_response, iteration, qa_main)`
 - Tech Lead: `§DB.log(techlead, session_id, tl_response, iteration, techlead_main)`
 
 ---
