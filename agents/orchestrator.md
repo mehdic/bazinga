@@ -2419,6 +2419,40 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 
 **IMPORTANT:** Build prompts for ALL groups BEFORE spawning any.
 
+**2. Build prompt sections for THIS group:**
+- ✓ **Session ID from Step 0** - [current session_id] ← CRITICAL for database operations
+- ✓ Role definition (Developer in Claude Code Multi-Agent Dev Team)
+- ✓ Group assignment (specific group ID: A, B, C, etc.)
+- ✓ Mode (Parallel)
+- ✓ Branch name for this group
+- ✓ Task description for THIS group from PM
+- ✓ Testing framework section (from testing_config.json)
+- ✓ Advanced skills section (ONLY for skills with "mandatory" status)
+- ✓ Mandatory workflow steps (with Skill() invocations)
+- ✓ Report format
+
+**3. For EACH mandatory skill, add to THIS group's prompt:**
+Same skill section as Simple Mode (see Step 2A.1)
+
+**4. Add MANDATORY WORKFLOW section to THIS group's prompt:**
+Same workflow as Simple Mode, but include group-specific branch name
+
+**5. VALIDATION - Before spawning, verify EACH group's prompt contains:**
+```
+✓ [ ] "Skill(command:" appears at least once per mandatory skill
+✓ [ ] Testing mode from testing_config.json
+✓ [ ] MANDATORY WORKFLOW section
+✓ [ ] Group-specific branch name
+✓ [ ] Report format
+```
+
+**REPEAT THIS PROCESS FOR EACH GROUP (A, B, C, D).**
+
+**IF ANY GROUP'S PROMPT IS INCOMPLETE: Fix ALL prompts before spawning.**
+
+See `bazinga/templates/message_templates.md` for standard prompt format.
+See `agents/developer.md` for full developer agent definition.
+
 See `bazinga/templates/prompt_building.md` for detailed instructions.
 
 **AFTER receiving ALL developer responses:**
