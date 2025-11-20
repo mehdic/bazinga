@@ -812,23 +812,7 @@ IF status = BAZINGA or CONTINUE:
 
 **Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
 
-**Step 3: Log PM interaction to database:**
-```
-bazinga-db, please log this PM interaction:
-
-Session ID: [current session_id]
-Agent Type: pm
-Content: [Full PM response]
-Iteration: 1
-Agent ID: pm_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Step 3: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
@@ -1190,23 +1174,11 @@ ONLY THEN:
 See `agents/developer.md` for full developer agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
-**Build contextual Task description:**
-```python
-# Step 1: Get task name from task_groups (queried at Step 1.4)
-# For simple mode, use task_groups[0] (group_id="main")
-task_name = task_groups[0].name if task_groups[0].name else "main group"
-
-# Step 2: Truncate to 40 chars, add "..." if longer
-task_summary = task_name[:40] + ("..." if len(task_name) > 40 else "")
-
-# Step 3: Build description
-description = f"Dev: {task_summary}"
-# Example: "Dev: JWT auth middleware" or "Dev: main group" (fallback)
-```
+**Build Task description:** See §TaskDesc table (Developer Simple mode)
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: [description from above], prompt: [Developer prompt built using above process])
+Task(subagent_type: "general-purpose", description: [per §TaskDesc], prompt: [Developer prompt])
 ```
 
 
@@ -1247,23 +1219,7 @@ IF status = BLOCKED:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log developer interaction:**
-```
-bazinga-db, please log this developer interaction:
-
-Session ID: [session_id]
-Agent Type: developer
-Content: [Developer response]
-Iteration: [iteration]
-Agent ID: dev_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Step 4: Log developer interaction:** §DB.log(developer, session_id, dev_response, iteration, developer_main)
 
 **AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
 
@@ -1389,21 +1345,11 @@ THEN:
 See `agents/qa_expert.md` for full QA Expert agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
-**Build contextual Task description:**
-```python
-# Step 1: Get current group_id from context (passed in prompt building at Step 2A.4)
-# For simple mode: group_id = "main"
-# For parallel mode: group_id = "A", "B", "C", etc.
-group_id = [current group being processed]
-
-# Step 2: Build description
-description = f"QA {group_id}: tests"
-# Example: "QA main: tests" or "QA A: tests"
-```
+**Build Task description:** See §TaskDesc table (QA Expert mode)
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: [description from above], prompt: [QA Expert prompt built using above process])
+Task(subagent_type: "general-purpose", description: [per §TaskDesc], prompt: [QA Expert prompt])
 ```
 
 
@@ -1588,21 +1534,11 @@ ONLY THEN:
 See `agents/techlead.md` for full Tech Lead agent definition.
 See `bazinga/templates/prompt_building.md` for the template reference.
 
-**Build contextual Task description:**
-```python
-# Step 1: Get current group_id from context (passed in prompt building at Step 2A.6)
-# For simple mode: group_id = "main"
-# For parallel mode: group_id = "A", "B", "C", etc.
-group_id = [current group being processed]
-
-# Step 2: Build description
-description = f"TechLead {group_id}: review"
-# Example: "TechLead main: review" or "TechLead A: review"
-```
+**Build Task description:** See §TaskDesc table (Tech Lead mode)
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: [description from above], prompt: [Tech Lead prompt built using above process])
+Task(subagent_type: "general-purpose", description: [per §TaskDesc], prompt: [Tech Lead prompt])
 ```
 
 
@@ -1647,23 +1583,7 @@ IF decision = ESCALATE_TO_OPUS:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log Tech Lead interaction:**
-```
-bazinga-db, please log this techlead interaction:
-
-Session ID: [session_id]
-Agent Type: techlead
-Content: [Tech Lead response]
-Iteration: [iteration]
-Agent ID: techlead_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Step 4: Log Tech Lead interaction:** §DB.log(techlead, session_id, tl_response, iteration, techlead_main)
 
 **AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
@@ -1879,23 +1799,7 @@ Skill(command: "velocity-tracker")
 
 
 
-**Log PM interaction:**
-```
-bazinga-db, please log this PM interaction:
-
-Session ID: [session_id]
-Agent Type: pm
-Content: [PM response]
-Iteration: [iteration]
-Agent ID: pm_final
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Log PM interaction:** §DB.log(pm, session_id, pm_response, iteration, pm_final)
 
 
 
@@ -2034,23 +1938,7 @@ Use the Developer Response Parsing section in `bazinga/templates/response_parsin
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log to database** (see `bazinga/templates/logging_pattern.md`):
-```
-bazinga-db, please log this developer interaction:
-
-Session ID: [current session_id]
-Agent Type: developer
-Content: [Full developer response]
-Iteration: [iteration]
-Agent ID: dev_group_[X]
-```
-
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Step 4: Log to database:** §DB.log(developer, session_id, dev_response, iteration, dev_group_[X])
 
 
 ### Step 2B.3-2B.7: Route Each Group Independently
@@ -2110,23 +1998,7 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 - CONTINUE: `📋 PM check | {assessment} | {feedback} → {next_action}`
 - NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
 
-**Step 2: Log PM response:**
-```
-bazinga-db, please log this PM interaction:
-
-Session ID: [session_id]
-Agent Type: pm
-Content: [PM response]
-Iteration: [iteration]
-Agent ID: pm_parallel_final
-```
-
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**Step 2: Log PM response:** §DB.log(pm, session_id, pm_response, iteration, pm_parallel_final)
 
 
 **Step 3: Track velocity metrics:**
@@ -2184,6 +2056,37 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 **⚠️ THIS IS NOT OPTIONAL - Every agent interaction MUST be logged to database!**
 
 **If database doesn't exist:** The bazinga-db skill will automatically initialize it on first use.
+
+---
+
+## §TaskDesc: Task Description Building Reference
+
+**Extract contextual task descriptions for all agent spawns:**
+
+| Agent Type | Data Source | Format | Truncate | Fallback | Example Output |
+|------------|-------------|--------|----------|----------|----------------|
+| Developer (Simple) | `task_groups[0].name` | `"Dev: {name}"` | 40→"..." (MUST) | `"main group"` | `"Dev: JWT auth middleware"` |
+| Developer (Parallel) | `task_groups[id].name` | `"Dev {id}: {name}"` | 30→"..." (MUST) | `group.id` | `"Dev A: JWT auth"` |
+| QA Expert | `group_id` (context) | `"QA {id}: tests"` | - | - | `"QA main: tests"` |
+| Tech Lead | `group_id` (context) | `"TechLead {id}: review"` | - | - | `"TechLead A: review"` |
+| Investigator | `investigation_state.problem_summary` | `"Investigator {N}/5: {prob}"` | 35→"..." (MUST) | - | `"Investigator 2/5: Timeout..."` |
+
+**Data Sources:**
+- `task_groups`: From database query at Step 1.4
+- `group_id`: From prompt building context
+- `investigation_state`: Initialized at Step 2A.6b
+
+**Truncation Rules (MUST enforce):**
+- Developer (Simple): MUST truncate at 40 chars, append "..."
+- Developer (Parallel): MUST truncate at 30 chars, append "..."
+- Investigator: MUST truncate at 35 chars, append "..."
+- No truncation for QA/TechLead (short format)
+
+**Fallback Behavior:**
+- If `task_groups[].name` empty: Use fallback value
+- If `investigation_state.problem_summary` missing: Re-initialize from Tech Lead
+
+**At spawn points:** Reference this table, apply extraction logic per agent type.
 
 ---
 
