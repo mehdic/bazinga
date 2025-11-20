@@ -407,28 +407,35 @@ Would you like me to:
 **Next Action:** Orchestrator should spawn Investigator to diagnose [problem description]
 ```
 
-**Use when:**
-- Test failures with unclear root cause (integration issues, environmental problems)
-- Complex bugs requiring systematic diagnosis
-- Multiple symptoms pointing to unknown systemic issue
+**Use when ANY blocking issue has unclear root cause:**
+- Test failures (integration, e2e, unit)
+- Build failures (compilation, linking, packaging)
+- Dependency conflicts (version mismatches, missing packages)
+- Performance problems (memory leaks, slow queries, bottlenecks)
+- Security vulnerabilities (exploits, misconfigurations)
+- Infrastructure issues (deployment, networking, cloud resources)
+- Complex bugs (race conditions, edge cases, systemic issues)
+- Integration failures (API contracts, third-party services)
+- Configuration problems (env vars, settings, permissions)
+- **Any technical blocker requiring systematic diagnosis**
 
-**Example (Test Failures):**
+**Example Pattern:**
 ```
 ## PM Status Update
 
 ### Critical Issue Detected
-Final verification discovered {N} test failures at workspace root level.
+[Describe the blocker: build failing, tests failing, deployment blocked, etc.]
 
 ### Analysis
-- Developers tested in isolation → Tests passed ✅
-- Integration testing at root → Tests failing ❌
+- What was tried: [actions taken]
+- Current state: [observable symptoms]
 - Root cause: Unknown (requires investigation)
 
 **Status:** INVESTIGATION_NEEDED
 **Next Action:** Orchestrator should spawn Investigator with:
-- Problem: Multiple integration test failures
-- Context: Works in isolation, fails when integrated
-- Hypothesis: Cross-service dependency issues or build artifacts
+- Problem: [specific blocker description]
+- Context: [relevant information]
+- Hypothesis: [initial theories if any]
 ```
 
 **Workflow:** PM (investigation request) → Orchestrator spawns Investigator → Investigator→Tech Lead→Developer

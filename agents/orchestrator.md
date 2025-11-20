@@ -1761,8 +1761,8 @@ if any(keyword in pm_response.lower() for keyword in ["clarify", "unclear", "whi
 - Extract problem description from PM response
 - Build Investigator prompt with context:
   * Session ID, Group ID, Branch
-  * Problem description (test failures, bugs, errors)
-  * Available evidence (logs, test results, error messages)
+  * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
+  * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
 - Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
@@ -2153,8 +2153,8 @@ if any(keyword in pm_response.lower() for keyword in ["clarify", "unclear", "whi
 - Extract problem description from PM response
 - Build Investigator prompt with context:
   * Session ID, Group ID(s) affected, Branch(es)
-  * Problem description (test failures, integration issues, complex bugs)
-  * Available evidence (logs, test results, error messages)
+  * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
+  * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
 - Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2B.7c if applicable)
 - Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
