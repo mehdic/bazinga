@@ -815,6 +815,8 @@ IF status = BAZINGA or CONTINUE:
 
 **Step 3: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
 
+Then invoke: `Skill(command: "bazinga-db")`
+
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
 ### Step 1.3a: Handle PM Clarification Requests (if applicable)
@@ -1064,7 +1066,11 @@ ELSE IF PM chose "parallel":
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
+**Prompt Structure:**
+1. **Agent role & workflow:** Read `agents/developer.md` (full agent definition with developer-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json developer section)
 
 **Agent Parameters:**
 - **Agent:** Developer | **Group:** main | **Mode:** Simple
@@ -1077,16 +1083,17 @@ ELSE IF PM chose "parallel":
 ```
 ✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Testing mode  ✓ Report format
 ```
-If fails: Fix prompt before spawning (see prompt_building.md § Troubleshooting)
+If fails: Fix prompt before spawning (see agents/developer.md for workflow requirements)
 
-See `agents/developer.md` for full developer agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
-
-**Build Task description:** See §TaskDesc table (Developer Simple mode)
+**Build Task description:**
+```python
+task_name = task_groups[0].name if task_groups[0].name else "main group"
+description = f"Dev: {task_name[:40]}{'...' if len(task_name) > 40 else ''}"
+```
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: [per §TaskDesc], prompt: [Developer prompt])
+Task(subagent_type: "general-purpose", description: description, prompt: [Developer prompt])
 ```
 
 
@@ -1129,6 +1136,8 @@ IF status = BLOCKED:
 
 **Step 4: Log developer interaction:** §DB.log(developer, session_id, dev_response, iteration, developer_main)
 
+Then invoke: `Skill(command: "bazinga-db")`
+
 **AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
 
 ### Step 2A.3: Route Developer Response
@@ -1162,7 +1171,11 @@ IF status = BLOCKED:
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING - SKILLS REQUIRED
 
-**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
+**Prompt Structure:**
+1. **Agent role & workflow:** Read `agents/qa_expert.md` (full agent definition with QA-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json qa_expert section)
 
 **Agent Parameters:**
 - **Agent:** QA Expert | **Group:** [group_id] | **Mode:** [Simple/Parallel]
@@ -1175,16 +1188,16 @@ IF status = BLOCKED:
 ```
 ✓ "Skill(command:" per mandatory skill  ✓ Testing workflow  ✓ Test framework  ✓ Report format
 ```
-If fails: Fix prompt before spawning (see prompt_building.md § Troubleshooting)
+If fails: Fix prompt before spawning (see agents/qa_expert.md for workflow requirements)
 
-See `agents/qa_expert.md` for full QA Expert agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
-
-**Build Task description:** See §TaskDesc table (QA Expert mode)
+**Build Task description:**
+```python
+description = f"QA {group_id}: tests"
+```
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: [per §TaskDesc], prompt: [QA Expert prompt])
+Task(subagent_type: "general-purpose", description: description, prompt: [QA Expert prompt])
 ```
 
 
@@ -1266,7 +1279,11 @@ Skill(command: "bazinga-db")
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING - SKILLS REQUIRED
 
-**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
+**Prompt Structure:**
+1. **Agent role & workflow:** Read `agents/techlead.md` (full agent definition with Tech Lead-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json tech_lead section)
 
 **Agent Parameters:**
 - **Agent:** Tech Lead | **Group:** [group_id] | **Mode:** [Simple/Parallel]
@@ -1279,17 +1296,16 @@ Skill(command: "bazinga-db")
 ```
 ✓ "Skill(command:" per mandatory skill  ✓ Review workflow  ✓ Decision format  ✓ Frameworks
 ```
-If fails: Fix prompt before spawning (see prompt_building.md § Troubleshooting)
+If fails: Fix prompt before spawning (see agents/techlead.md for workflow requirements)
 
-See `agents/techlead.md` for full Tech Lead agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
-
-**Build Task description:** See §TaskDesc table (Tech Lead mode)
-
+**Build Task description:**
+```python
+description = f"TechLead {group_id}: review"
+```
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: [per §TaskDesc], prompt: [Tech Lead prompt])
+Task(subagent_type: "general-purpose", description: description, prompt: [Tech Lead prompt])
 ```
 
 
@@ -1335,6 +1351,8 @@ IF decision = ESCALATE_TO_OPUS:
 **Step 3: Output capsule to user**
 
 **Step 4: Log Tech Lead interaction:** §DB.log(techlead, session_id, tl_response, iteration, techlead_main)
+
+Then invoke: `Skill(command: "bazinga-db")`
 
 **AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
@@ -1552,6 +1570,7 @@ Skill(command: "velocity-tracker")
 
 **Log PM interaction:** §DB.log(pm, session_id, pm_response, iteration, pm_final)
 
+Then invoke: `Skill(command: "bazinga-db")`
 
 
 
@@ -1616,7 +1635,11 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
 
-**Procedure:** Follow `bazinga/templates/prompt_building.md` EXACTLY (full steps + examples)
+**Prompt Structure (PER GROUP):**
+1. **Agent role & workflow:** Read `agents/developer.md` (full agent definition with developer-specific workflow)
+2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
+   - Testing framework configuration (from testing_config.json)
+   - Mandatory skills (from skills_config.json developer section)
 
 **Agent Parameters (PER GROUP):**
 - **Agent:** Developer | **Group:** [A/B/C/D] | **Mode:** Parallel
@@ -1630,14 +1653,11 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 ```
 ✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Group branch  ✓ Testing mode  ✓ Report format
 ```
-If fails: Fix ALL prompts before spawning (see prompt_building.md § Troubleshooting)
+If fails: Fix ALL prompts before spawning (see agents/developer.md for workflow requirements)
 
-**Build Task description:** See §TaskDesc table (Developer Parallel mode)
+**Build Task descriptions:** Use extraction code from Step 2B.1 (task_groups iteration with truncation)
 
 **Critical:** Build ALL group prompts BEFORE spawning. Then spawn in ONE message for parallelism.
-
-See `agents/developer.md` for full Developer agent definition.
-See `bazinga/templates/prompt_building.md` for the template reference.
 
 **AFTER receiving ALL developer responses:**
 
@@ -1658,6 +1678,7 @@ Use the Developer Response Parsing section in `bazinga/templates/response_parsin
 
 **Step 4: Log to database:** §DB.log(developer, session_id, dev_response, iteration, dev_group_[X])
 
+Then invoke: `Skill(command: "bazinga-db")`
 
 ### Step 2B.3-2B.7: Route Each Group Independently
 
@@ -1718,6 +1739,7 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 
 **Step 2: Log PM response:** §DB.log(pm, session_id, pm_response, iteration, pm_parallel_final)
 
+Then invoke: `Skill(command: "bazinga-db")`
 
 **Step 3: Track velocity metrics:**
 ```
@@ -1777,37 +1799,6 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, etc.]
 
 ---
 
-## §TaskDesc: Task Description Building Reference
-
-**Extract contextual task descriptions for all agent spawns:**
-
-| Agent Type | Data Source | Format | Truncate | Fallback | Example Output |
-|------------|-------------|--------|----------|----------|----------------|
-| Developer (Simple) | `task_groups[0].name` | `"Dev: {name}"` | 40→"..." (MUST) | `"main group"` | `"Dev: JWT auth middleware"` |
-| Developer (Parallel) | `task_groups[id].name` | `"Dev {id}: {name}"` | 30→"..." (MUST) | `group.id` | `"Dev A: JWT auth"` |
-| QA Expert | `group_id` (context) | `"QA {id}: tests"` | - | - | `"QA main: tests"` |
-| Tech Lead | `group_id` (context) | `"TechLead {id}: review"` | - | - | `"TechLead A: review"` |
-| Investigator | `investigation_state.problem_summary` | `"Investigator {N}/5: {prob}"` | 35→"..." (MUST) | - | `"Investigator 2/5: Timeout..."` |
-
-**Data Sources:**
-- `task_groups`: From database query at Step 1.4
-- `group_id`: From prompt building context
-- `investigation_state`: Initialized at Step 2A.6b
-
-**Truncation Rules (MUST enforce):**
-- Developer (Simple): MUST truncate at 40 chars, append "..."
-- Developer (Parallel): MUST truncate at 30 chars, append "..."
-- Investigator: MUST truncate at 35 chars, append "..."
-- No truncation for QA/TechLead (short format)
-
-**Fallback Behavior:**
-- If `task_groups[].name` empty: Use fallback value
-- If `investigation_state.problem_summary` missing: Re-initialize from Tech Lead
-
-**At spawn points:** Reference this table, apply extraction logic per agent type.
-
----
-
 ## §DB: Database Logging Reference
 
 **Pattern for ALL agent logging:** Use this macro notation throughout workflow.
@@ -1833,8 +1824,11 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** You MUST invoke bazinga-db skill. Verify succeeded (silent), then continue workflow.
 
 **Error Handling:** If bazinga-db fails:
-- Output error capsule: `❌ Database logging failed | {error} | Cannot proceed - check bazinga-db skill`
-- STOP workflow (data integrity requirement)
+- **For initialization operations** (session creation, task groups in Steps 1-3): STOP workflow - cannot proceed without state
+  - Error capsule: `❌ Database initialization failed | {error} | Cannot proceed - check bazinga-db skill`
+- **For agent interaction logging** (Steps 4+ in workflow): Log warning, continue workflow (data integrity degraded but orchestration continues)
+  - Warning capsule: `⚠️ Database logging failed | {error} | Continuing (session resume may be affected)`
+- Note: Workflow logging failures may prevent session resume but shouldn't halt current orchestration
 
 **Common Usage Examples:**
 - PM: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
