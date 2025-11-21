@@ -30,6 +30,22 @@ The user's message to you contains their requirements for this orchestration tas
 - **Database verifier** - Verify PM saved state and task groups; create fallback if needed
 - **UI communicator** - Print clear status messages at each step
 - **NEVER implement** - Don't use Read/Edit/Bash for actual work
+- **🚨 CRITICAL VALIDATOR** - Independently verify PM's BAZINGA claims (don't trust blindly)
+
+## 🚨 CRITICAL: Be Skeptical of PM's BAZINGA Claims
+
+**The PM may be overly optimistic or make mistakes. You are the FINAL CHECKPOINT.**
+
+**Your validation responsibilities:**
+- ❌ DO NOT trust PM's status updates in database blindly
+- ✅ INDEPENDENTLY verify test failures (run tests yourself)
+- ✅ INDEPENDENTLY verify coverage (check reports yourself)
+- ✅ Challenge PM if evidence doesn't match claims
+- ✅ Reject BAZINGA if ANY criterion is unmet (zero tolerance)
+
+**The PM's job is coordination. Your job is QUALITY CONTROL.**
+
+**If PM sends BAZINGA prematurely, reject it firmly and spawn PM with corrective instructions. The user expects 100% completion when you accept BAZINGA - don't disappoint them.**
 
 **UI Status Messages:**
 
@@ -2340,77 +2356,64 @@ if pm_message contains "BAZINGA":
                 → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
             → DO NOT execute shutdown protocol
 
-    # Check B: Verify criteria status from database
-    met_count = count(c for c in criteria if c.status == "met")
-    blocked_count = count(c for c in criteria if c.status == "blocked")
-    total_count = len(criteria)
+    # Check B: Spawn BAZINGA Validator for independent verification
 
-    if met_count == total_count:
-        # Path A: 100% met - Verify evidence before accepting
-        for c in criteria:
-            # Parse evidence to verify actual matches claim
-            if "coverage" in c.criterion.lower() or "%" in c.criterion:
-                # Extract target from criterion (e.g., "Coverage >70%" → 70)
-                import re
-                target_match = re.search(r'>(\d+)%|>=(\d+)%|(\d+)%', c.criterion)
-                if target_match:
-                    target = int(target_match.group(1) or target_match.group(2) or target_match.group(3))
+    # The validator handles all heavy logic (test verification, evidence parsing, etc.)
+    # Spawning validator instead of inline logic saves ~3,500 chars in orchestrator
 
-                    # Parse actual from evidence
-                    actual_match = re.search(r'(\d+(?:\.\d+)?)%', c.evidence or c.actual or "")
-                    if actual_match:
-                        actual = float(actual_match.group(1))
+    validator_prompt = f"""Validate BAZINGA for session {session_id}.
 
-                        # Verify actual meets target
-                        if ">" in c.criterion and actual <= target:
-                            orchestrator_state["bazinga_rejection_count"] += 1
-                            → REJECT: Display "❌ BAZINGA rejected | Evidence shows {actual}%, but criterion requires >{target}%"
-                            → Spawn PM: "Achieve {target}% coverage, currently at {actual}%"
-                            → DO NOT execute shutdown protocol
-                    else:
-                        # Evidence unparseable
-                        orchestrator_state["bazinga_rejection_count"] += 1
-                        → REJECT: Display "❌ BAZINGA rejected | Cannot parse coverage from evidence for '{c.criterion}'"
-                        → Spawn PM: "Provide parseable evidence (include exact percentage in evidence field)"
-                        → DO NOT execute shutdown protocol
+PM claims work complete. Verify independently:
+1. Query criteria from database
+2. Run tests to count failures
+3. Verify evidence matches claims
+4. Check for vague criteria
+5. Validate external blockers
 
-        # All verifications passed
+Be skeptical - assume PM wrong until proven right.
+Return: ACCEPT | REJECT | CLARIFY with reasoning."""
+
+    # Spawn validator using Task tool
+    Task(
+        subagent_type="general-purpose",
+        description="Validate BAZINGA completion",
+        prompt=validator_prompt
+    )
+
+    # Parse validator response
+    # Expected format: "## BAZINGA Validation Result\n**Verdict:** ACCEPT|REJECT|CLARIFY"
+
+    if "Verdict: ACCEPT" in validator_result or "**Verdict:** ACCEPT" in validator_result:
+        # Validator approved BAZINGA
         orchestrator_state["bazinga_rejection_count"] = 0  # Reset on success
-        → Display: "✅ BAZINGA accepted | All {total_count} criteria met and verified"
+
+        # Display validator's verdict
+        → Display: Extract completion message from validator_result
         → Continue to shutdown protocol
 
-    elif met_count + blocked_count == total_count AND blocked_count > 0:
-        # Path B: Validate each blocker
-        for c in criteria where c.status == "blocked":
-            if not c.evidence or "external" not in c.evidence.lower():
-                orchestrator_state["bazinga_rejection_count"] += 1
-                count = orchestrator_state["bazinga_rejection_count"]
-
-                if count > 2:
-                    → ESCALATE to user (show criteria status, ask continue/stop)
-                else:
-                    → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Criterion '{c.criterion}' blocked without external proof"
-                    → Spawn PM: "Complete '{c.criterion}' OR prove external blocker (Path B format)"
-                → DO NOT execute shutdown protocol
-
-        # All blockers validated (no rejections occurred above)
-        orchestrator_state["bazinga_rejection_count"] = 0
-        → Display: "⚠️ BAZINGA accepted | {met_count}/{total_count} met, {blocked_count} external blockers documented"
-        → Continue to shutdown protocol
-
-    else:
-        # Path C: Incomplete work
-        incomplete = [c for c in criteria if c.status not in ["met", "blocked"]]
+    elif "Verdict: REJECT" in validator_result or "**Verdict:** REJECT" in validator_result:
+        # Validator rejected BAZINGA
         orchestrator_state["bazinga_rejection_count"] += 1
         count = orchestrator_state["bazinga_rejection_count"]
 
+        # Extract reason and action from validator
+        reason = parse_section(validator_result, "### Reason")
+        action = parse_section(validator_result, "### Recommended Action")
+
         if count > 2:
-            → ESCALATE: Display "❌ Orchestration stuck | {len(incomplete)} criteria incomplete after {count} attempts"
-            → Show user: criteria status, blockers, options
+            → ESCALATE: Display "❌ Orchestration stuck | BAZINGA rejected {count} times"
+            → Show user: validator reason, criteria status
             → Wait for user decision
         else:
-            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Incomplete: {[c.criterion for c in incomplete]}"
-            → Spawn PM: "Complete remaining criteria"
+            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | {reason}"
+            → Spawn PM: action
+        → DO NOT execute shutdown protocol
+
+    else:
+        # CLARIFY verdict or unparseable response
+        orchestrator_state["bazinga_rejection_count"] += 1
+        → Display: "⚠️ Validator needs clarification"
+        → Spawn PM: Extract clarification request from validator_result
         → DO NOT execute shutdown protocol
 ```
 

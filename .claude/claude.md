@@ -308,3 +308,87 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 ```
 
 ---
+
+## 🧠 ULTRATHINK: Deep Analysis Documentation
+
+**When the user includes the keyword "ultrathink" in their request, you MUST:**
+
+1. **Perform deep critical analysis** of the problem/solution
+2. **Create a research document** immediately after completing the analysis  
+3. **Save to research folder** with descriptive filename
+
+### Process
+
+**Step 1: Analyze (as requested)**
+- Perform the deep analysis the user requested
+- Be critical, pragmatic, and thorough
+- Consider pros/cons, alternatives, trade-offs
+
+**Step 2: Document (automatic)**
+- Create markdown file in `research/` folder
+- Filename format: `{topic}-{analysis-type}.md`
+  - Example: `bazinga-validator-agent-design.md`
+  - Example: `authentication-strategy-analysis.md`
+  - Example: `performance-optimization-approach.md`
+
+**Step 3: Structure**
+```markdown
+# {Title}: {Analysis Type}
+
+**Date:** YYYY-MM-DD
+**Context:** {Brief context}
+**Decision:** {What was decided}
+**Status:** {Proposed/Implemented/Abandoned}
+
+---
+
+## Problem Statement
+{What problem are we solving}
+
+## Solution
+{Proposed solution with details}
+
+## Critical Analysis
+### Pros ✅
+### Cons ⚠️
+### Verdict
+
+## Implementation Details
+{Technical specifics}
+
+## Comparison to Alternatives
+{Why this vs other approaches}
+
+## Decision Rationale
+{Why this is the right approach}
+
+## Lessons Learned
+{What this teaches us}
+
+## References
+{Links, related docs, context}
+```
+
+### Examples of "Ultrathink" Requests
+
+✅ "ultrathink about whether we should use microservices"
+✅ "I need you to ultrathink this architecture decision"
+✅ "ultrathink: should we refactor or rewrite?"
+✅ "ultrathink about the best approach here"
+
+### Why This Matters
+
+**Benefits:**
+- **Preserves reasoning** - Future reference for decisions
+- **Avoids repeating analysis** - Don't re-solve same problems
+- **Knowledge sharing** - Team can understand decisions
+- **Audit trail** - Track why choices were made
+
+**The research folder becomes a living knowledge base of critical decisions.**
+
+---
+
+✅ Project context loaded successfully!
+
+📚 Research documents available in 'research/' folder
+   Use these for historical context and past decisions
