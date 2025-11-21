@@ -1285,8 +1285,8 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **IF Developer reports READY_FOR_QA:**
 - Check testing_config.json for qa_expert_enabled
-- IF QA enabled → Proceed to Step 2A.4 (Spawn QA)
-- IF QA disabled → Skip to Step 2A.6 (Spawn Tech Lead)
+- IF QA enabled → **IMMEDIATELY continue to Step 2A.4 (Spawn QA). Do NOT stop.**
+- IF QA disabled → **IMMEDIATELY skip to Step 2A.6 (Spawn Tech Lead). Do NOT stop.**
 
 **IF Developer reports BLOCKED:**
 - **Do NOT stop for user input**
@@ -1302,6 +1302,8 @@ Then invoke: `Skill(command: "bazinga-db")`
 - Respawn developer with guidance
 - Track revision count in database
 - Escalate to Tech Lead if >2 revisions (spawn Tech Lead for guidance, not user input)
+
+**🔴 CRITICAL: Do NOT wait for user input. Automatically proceed to the next step based on developer status.**
 
 ### Step 2A.4: Spawn QA Expert
 
