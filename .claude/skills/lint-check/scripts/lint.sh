@@ -309,6 +309,17 @@ rm -f bazinga/lint_results_raw.json 2>/dev/null || true
 echo "✅ Linting complete"
 echo "📁 Results saved to: $OUTPUT_FILE"
 
+# Save to database
+echo "💾 Saving to database..."
+DB_PATH="bazinga/bazinga.db"
+DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+SKILL_OUTPUT=$(cat "$OUTPUT_FILE")
+
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
+    "$SESSION_ID" \
+    "lint-check" \
+    "$SKILL_OUTPUT" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
+
 # Display summary if jq available
 if command_exists "jq" && [ "$TOOL" != "none" ]; then
     if [ "$LANG" = "python" ] && [ "$TOOL" = "ruff" ]; then

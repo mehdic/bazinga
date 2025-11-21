@@ -244,24 +244,12 @@ python3 $DB_SCRIPT --db $DB_PATH get-skill-output \
 
 ## Configuration
 
-### Set Configuration
-```bash
-# Skills config
-python3 $DB_SCRIPT --db $DB_PATH set-config \
-  "skills_config" \
-  '{"security_scan":{"status":"mandatory"},"test_coverage":{"status":"optional"}}'
+**REMOVED:** Configuration table no longer exists (2025-11-21).
+See `research/empty-tables-analysis.md` for details.
 
-# Testing mode
-python3 $DB_SCRIPT --db $DB_PATH set-config \
-  "testing_mode" \
-  '{"framework":"full","coverage_threshold":80}'
-```
-
-### Get Configuration
-```bash
-python3 $DB_SCRIPT --db $DB_PATH get-config \
-  "skills_config"
-```
+Use file-based configuration instead:
+- Skills config: `bazinga/skills_config.json`
+- Testing config: `bazinga/testing_config.json`
 
 ---
 

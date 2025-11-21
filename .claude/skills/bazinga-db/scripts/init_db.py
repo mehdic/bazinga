@@ -239,33 +239,13 @@ def init_database(db_path: str) -> None:
     """)
     print("✓ Created skill_outputs table with indexes")
 
-    # Configuration table (replaces config JSON files)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS configuration (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    print("✓ Created configuration table")
+    # REMOVED: Configuration table - No use case defined
+    # See research/empty-tables-analysis.md for details
+    # Table creation commented out as of 2025-11-21
 
-    # Decisions log table (for orchestrator decisions)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS decisions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            iteration INTEGER,
-            decision_type TEXT NOT NULL,
-            decision_data TEXT NOT NULL,
-            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-        )
-    """)
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_decisions_session
-        ON decisions(session_id, timestamp DESC)
-    """)
-    print("✓ Created decisions table with indexes")
+    # REMOVED: Decisions table - Redundant with orchestration_logs
+    # See research/empty-tables-analysis.md for details
+    # Table creation commented out as of 2025-11-21
 
     # Development plans table (for multi-phase orchestrations)
     cursor.execute("""
