@@ -568,9 +568,9 @@ IF 100% criteria met:
 ELSE IF <100% criteria met:
   → Check if gaps are fixable:
     - Fixable (tests, config, code) → Spawn Developer (Path C)
-    - Truly out-of-scope → Request user approval (Path B)
+    - Truly out-of-scope → Send BAZINGA with blocker documentation (Path B)
 
-  → FORBIDDEN: Send BAZINGA without user approval when <100%
+  → FORBIDDEN: Send BAZINGA when gaps are fixable (use Path C instead)
 ```
 
 **Path A: Full Achievement** ✅

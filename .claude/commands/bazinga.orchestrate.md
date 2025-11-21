@@ -2400,7 +2400,7 @@ if pm_message contains "BAZINGA":
                     → Spawn PM: "Complete '{c.criterion}' OR prove external blocker (Path B format)"
                 → DO NOT execute shutdown protocol
 
-        # All blockers validated - ACCEPT Path B
+        # All blockers validated (no rejections occurred above)
         orchestrator_state["bazinga_rejection_count"] = 0
         → Display: "⚠️ BAZINGA accepted | {met_count}/{total_count} met, {blocked_count} external blockers documented"
         → Continue to shutdown protocol
