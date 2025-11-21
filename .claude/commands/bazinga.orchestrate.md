@@ -2318,6 +2318,29 @@ SHUTDOWN CHECKLIST:
 
 **Validation Before Accepting BAZINGA:**
 
+**MANDATORY: Templated Rejection Messages (Prevent Role Drift)**
+
+When rejecting BAZINGA, orchestrator MUST use structured templates. NEVER analyze code or suggest implementation details.
+
+**Rejection Template Structure:**
+```
+❌ BAZINGA rejected (attempt {count}/3) | {reason} | {directive}
+```
+
+**Examples:**
+- "❌ BAZINGA rejected (attempt 1/3) | No criteria in database | PM must extract criteria"
+- "❌ BAZINGA rejected (attempt 2/3) | Evidence shows 44%, criterion requires >70% | PM must achieve target coverage"
+
+**FORBIDDEN in rejection messages:**
+- ❌ Code analysis ("The issue is in line 42...")
+- ❌ Implementation suggestions ("Try using pytest-cov...")
+- ❌ Debugging guidance ("Check if the config is...")
+
+**ALLOWED in rejection messages:**
+- ✅ What failed (criterion name, expected vs actual)
+- ✅ What to fix (directive to PM, not implementation details)
+- ✅ Rejection count (for escalation tracking)
+
 **MANDATORY: Database-Verified Success Criteria Check**
 
 When PM sends BAZINGA, orchestrator MUST independently verify via database (not trust PM's message):
@@ -2327,6 +2350,15 @@ if pm_message contains "BAZINGA":
     # Step 1: Initialize rejection tracking (if not exists)
     if "bazinga_rejection_count" not in orchestrator_state:
         orchestrator_state["bazinga_rejection_count"] = 0
+
+    # Step 1.5: Token-aware safety valve (prevent session truncation)
+    # Check if conversation is approaching token limit
+    if estimated_token_usage() > 0.95:  # >95% token usage
+        # Accept BAZINGA with warning, bypass strict verification
+        → Display: "⚠️ BAZINGA accepted (token limit reached) | Strict validation bypassed to prevent session truncation | ⚠️ WARNING: Success criteria were not fully verified due to token exhaustion"
+        → Log warning to database: "BAZINGA accepted under degraded mode (token exhaustion)"
+        → Continue to shutdown protocol
+        # Note: This prevents catastrophic failure where session ends before saving work
 
     # Step 2: Query database for success criteria (ground truth) with retry
     criteria = None
