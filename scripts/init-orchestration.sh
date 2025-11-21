@@ -368,9 +368,33 @@ echo "🗄️  Initializing BAZINGA database..."
 DB_PATH="bazinga/bazinga.db"
 DB_INIT_SCRIPT=".claude/skills/bazinga-db/scripts/init_db.py"
 DB_CLI_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_MIGRATION_SCRIPT=".claude/skills/bazinga-db/scripts/migrate_task_groups_schema.py"
 
 if [ -f "$DB_PATH" ]; then
     echo "✓ Database already exists"
+
+    # Run migration if needed
+    if [ -f "$DB_MIGRATION_SCRIPT" ]; then
+        echo "🔄 Checking for required database migrations..."
+
+        # Check if task_groups table has old schema (id as single PRIMARY KEY)
+        SCHEMA_CHECK=$(sqlite3 "$DB_PATH" "SELECT sql FROM sqlite_master WHERE type='table' AND name='task_groups'" 2>/dev/null)
+
+        if echo "$SCHEMA_CHECK" | grep -q "id TEXT PRIMARY KEY"; then
+            echo "⚠️  Detected old task_groups schema - migration required"
+            echo "📝 Running database migration..."
+            python3 "$DB_MIGRATION_SCRIPT" --db "$DB_PATH"
+
+            if [ $? -eq 0 ]; then
+                echo "✅ Database migration completed successfully"
+            else
+                echo "❌ Warning: Database migration failed"
+                echo "   Please run manually: python3 $DB_MIGRATION_SCRIPT --db $DB_PATH"
+            fi
+        else
+            echo "✓ Database schema is up to date"
+        fi
+    fi
 else
     if [ -f "$DB_INIT_SCRIPT" ]; then
         echo "📝 Creating database schema..."

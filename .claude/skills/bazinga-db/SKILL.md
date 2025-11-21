@@ -155,6 +155,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet create-task-group \
 ```bash
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-task-group \
   "<group_id>" \
+  "<session_id>" \
   [--status "<status>"] \
   [--assigned_to "<agent_id>"] \
   [--revision_count <N>]
@@ -510,7 +511,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet log-interaction "$SID" "pm" "$CONTE
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-state "$SID" "pm" '{"iteration":1}'
 
 # Update task group
-python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-task-group "group_a" --status "completed"
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-task-group "group_a" "$SID" --status "completed"
 
 # Dashboard snapshot
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet dashboard-snapshot "$SID"

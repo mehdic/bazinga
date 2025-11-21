@@ -287,10 +287,10 @@ class BazingaDB:
         finally:
             conn.close()
 
-    def update_task_group(self, group_id: str, status: Optional[str] = None,
+    def update_task_group(self, group_id: str, session_id: str, status: Optional[str] = None,
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
                          last_review_status: Optional[str] = None) -> None:
-        """Update task group fields."""
+        """Update task group fields (requires session_id for composite key)."""
         conn = self._get_connection()
         updates = []
         params = []
@@ -310,8 +310,8 @@ class BazingaDB:
 
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
-            query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ?"
-            params.append(group_id)
+            query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
+            params.extend([group_id, session_id])
             conn.execute(query, params)
             conn.commit()
             self._print_success(f"✓ Task group updated: {group_id}")
@@ -576,15 +576,16 @@ def main():
             db.create_task_group(group_id, session_id, name, status, assigned_to)
         elif cmd == 'update-task-group':
             group_id = cmd_args[0]
+            session_id = cmd_args[1]
             kwargs = {}
-            for i in range(1, len(cmd_args), 2):
+            for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 value = cmd_args[i + 1]
                 # Convert revision_count to int if present
                 if key == 'revision_count':
                     value = int(value)
                 kwargs[key] = value
-            db.update_task_group(group_id, **kwargs)
+            db.update_task_group(group_id, session_id, **kwargs)
         elif cmd == 'save-development-plan':
             session_id = cmd_args[0]
             original_prompt = cmd_args[1]

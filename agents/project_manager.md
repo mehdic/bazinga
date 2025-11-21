@@ -1777,6 +1777,7 @@ Extract current `revision_count` from the response.
 bazinga-db, please update task group:
 
 Group ID: [group_id]
+Session ID: [current session_id]
 Revision Count: [current_revision_count + 1]
 Last Review Status: CHANGES_REQUESTED
 Status: in_progress
