@@ -239,7 +239,3 @@ grep -n ".claude/skills" .claude/skills/codebase-analysis/scripts/analyze_codeba
 # Always use --cache-enabled
 --cache-enabled
 ```
-
----
-
-**For complete troubleshooting guide, see:** `/home/user/bazinga/research/troubleshooting-orchestrator-context-fix.md`

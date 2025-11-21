@@ -485,6 +485,31 @@ From PM state received:
 
 ---
 
+**Step 4.5: Check Success Criteria (CRITICAL for Resume)**
+
+**Old sessions may not have success criteria in database. Check now:**
+
+Request to bazinga-db skill:
+```
+bazinga-db, please get success criteria for session: [session_id]
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**If criteria NOT found (empty result):**
+- This is an old session from before success criteria enforcement
+- PM must extract criteria retroactively from original requirements
+- **Add to PM spawn context:** "CRITICAL: This resumed session has no success criteria in database. You MUST: 1) Extract success criteria from original requirements '[original_requirements from pm_state]', 2) Save to database using bazinga-db, 3) Continue work"
+
+**If criteria found:**
+- Good, session already has criteria tracked
+- Continue normally
+
+---
+
 **Step 5: Spawn PM to Continue (DO THIS NOW)**
 
 Display:
@@ -2164,77 +2189,6 @@ If bazinga-db skill fails, handle based on operation type:
 **Full examples and all operations:** See `.claude/templates/orchestrator_db_reference.md` *(human reference only)*
 
 ---
-## Role Reminders
-
-Throughout the workflow, remind yourself:
-
-**After each agent spawn:**
-```
-[ORCHESTRATOR ROLE ACTIVE]
-I am coordinating agents, not implementing.
-My tools: Task (spawn), Write (log/state only)
-```
-
-**At iteration milestones:**
-```
-Iteration 5: 🔔 Role Check: Still orchestrating (spawning agents only)
-Iteration 10: 🔔 Role Check: Have NOT used Read/Edit/Bash for implementation
-Iteration 15: 🔔 Role Check: Still maintaining coordinator role
-```
-
-**Before any temptation to use forbidden tools:**
-```
-🛑 STOP! Am I about to:
-- Read code files? → Spawn agent to read
-- Edit files? → Spawn agent to edit
-- Run commands? → Spawn agent to run
-- Search code? → Spawn agent to search
-
-If YES to any: Use Task tool instead!
-```
-
----
-
-## Display Messages to User
-
-Keep user informed with clear progress messages:
-
-```markdown
-═══════════════════════════════════════════
-Claude Code Multi-Agent Dev Team Orchestration: [Phase Name]
-═══════════════════════════════════════════
-
-[Current status]
-
-[What just happened]
-
-[What's next]
-
-[Progress indicator if applicable]
-```
-
-**Example:**
-
-```
-═══════════════════════════════════════════
-Claude Code Multi-Agent Dev Team Orchestration: PM Mode Selection
-═══════════════════════════════════════════
-
-PM analyzed requirements and chose: PARALLEL MODE
-
-3 independent features detected:
-- JWT Authentication
-- User Registration
-- Password Reset
-
-Execution plan:
-- Phase 1: Auth + Registration (2 developers in parallel)
-- Phase 2: Password Reset (1 developer, depends on Auth)
-
-Next: Spawning 2 developers for Groups A and B...
-```
-
----
 
 ## Stuck Detection
 
@@ -2292,19 +2246,181 @@ SHUTDOWN CHECKLIST:
 
 **Validation Before Accepting BAZINGA:**
 
-Check PM's message for evidence:
+**MANDATORY: Templated Rejection Messages (Prevent Role Drift)**
+
+When rejecting BAZINGA, orchestrator MUST use structured templates. NEVER analyze code or suggest implementation details.
+
+**Rejection Template Structure:**
 ```
-if pm_message contains "BAZINGA":
-    if "Actual:" not in pm_message:
-        → REJECT: Display error "PM must provide actual validated results"
-        → DO NOT execute shutdown protocol
-    if "Evidence:" not in pm_message:
-        → REJECT: Display error "PM must provide test output evidence"
-        → DO NOT execute shutdown protocol
-    # Only proceed if validation present
+❌ BAZINGA rejected (attempt {count}/3) | {reason} | {directive}
 ```
 
-**The Rule**: Complete shutdown protocol in order. No celebrations until all steps done.
+**Examples:**
+- "❌ BAZINGA rejected (attempt 1/3) | No criteria in database | PM must extract criteria"
+- "❌ BAZINGA rejected (attempt 2/3) | Evidence shows 44%, criterion requires >70% | PM must achieve target coverage"
+
+**FORBIDDEN in rejection messages:**
+- ❌ Code analysis ("The issue is in line 42...")
+- ❌ Implementation suggestions ("Try using pytest-cov...")
+- ❌ Debugging guidance ("Check if the config is...")
+
+**ALLOWED in rejection messages:**
+- ✅ What failed (criterion name, expected vs actual)
+- ✅ What to fix (directive to PM, not implementation details)
+- ✅ Rejection count (for escalation tracking)
+
+**MANDATORY: Database-Verified Success Criteria Check**
+
+When PM sends BAZINGA, orchestrator MUST independently verify via database (not trust PM's message):
+
+```
+if pm_message contains "BAZINGA":
+    # Step 1: Initialize rejection tracking (if not exists)
+    if "bazinga_rejection_count" not in orchestrator_state:
+        orchestrator_state["bazinga_rejection_count"] = 0
+
+    # Step 1.5: Token-aware safety valve (prevent session truncation)
+    # Check if conversation is approaching token limit
+    if estimated_token_usage() > 0.95:  # >95% token usage
+        # Accept BAZINGA with warning, bypass strict verification
+        → Display: "⚠️ BAZINGA accepted (token limit reached) | Strict validation bypassed to prevent session truncation | ⚠️ WARNING: Success criteria were not fully verified due to token exhaustion"
+        → Log warning to database: "BAZINGA accepted under degraded mode (token exhaustion)"
+        → Continue to shutdown protocol
+        # Note: This prevents catastrophic failure where session ends before saving work
+
+    # Step 2: Query database for success criteria (ground truth) with retry
+    criteria = None
+    for attempt in range(3):
+        try:
+            Request: "bazinga-db, please get success criteria for session: [session_id]"
+            Invoke: Skill(command: "bazinga-db")
+            criteria = parse_database_response()
+            break  # Success, exit retry loop
+        except Exception as e:
+            if attempt < 2:
+                # Retry with exponential backoff
+                wait_seconds = 2 ** attempt  # 1s, 2s
+                → Log: "Database query failed (attempt {attempt+1}/3), retrying in {wait_seconds}s..."
+                wait(wait_seconds)
+                continue
+            else:
+                # All retries exhausted
+                → ESCALATE: Display "❌ Database unavailable after 3 attempts | Cannot verify criteria | Options: 1) Wait and retry, 2) Manual verification"
+                → Wait for user decision
+                → DO NOT execute shutdown protocol
+
+    # Check A: Criteria exist in database?
+    if not criteria or len(criteria) == 0:
+        # PM never saved criteria (skipped extraction)
+        orchestrator_state["bazinga_rejection_count"] += 1
+        count = orchestrator_state["bazinga_rejection_count"]
+
+        if count > 2:
+            → ESCALATE: Display "❌ Orchestration stuck | PM repeatedly failed to extract criteria | User intervention required"
+            → Show user current state and options
+            → Wait for user decision (exception to autonomy)
+        else:
+            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | No criteria in database | PM must extract criteria"
+            → Spawn PM: "Extract success criteria from requirements, save to database, restart Phase 1"
+        → DO NOT execute shutdown protocol
+
+    # Check A.5: Validate criteria are specific and measurable
+    for c in criteria:
+        is_vague = (
+            # Vague patterns that lack specific targets
+            "improve" in c.criterion.lower() and ">" not in c.criterion and "<" not in c.criterion and "%" not in c.criterion
+            or "make" in c.criterion.lower() and "progress" in c.criterion.lower()
+            or "fix" in c.criterion.lower() and "all" not in c.criterion.lower() and "%" not in c.criterion.lower()
+            or c.criterion.lower() in ["done", "complete", "working", "better"]
+            or len(c.criterion.split()) < 3  # Too short to be specific
+        )
+
+        if is_vague:
+            orchestrator_state["bazinga_rejection_count"] += 1
+            count = orchestrator_state["bazinga_rejection_count"]
+
+            if count > 2:
+                → ESCALATE: Display "❌ Orchestration stuck | Vague criteria '{c.criterion}' | User intervention required"
+            else:
+                → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Criterion '{c.criterion}' is not measurable | Must include specific targets (e.g., 'Coverage >70%', 'All tests passing', 'Response time <200ms')"
+                → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
+            → DO NOT execute shutdown protocol
+
+    # Check B: Verify criteria status from database
+    met_count = count(c for c in criteria if c.status == "met")
+    blocked_count = count(c for c in criteria if c.status == "blocked")
+    total_count = len(criteria)
+
+    if met_count == total_count:
+        # Path A: 100% met - Verify evidence before accepting
+        for c in criteria:
+            # Parse evidence to verify actual matches claim
+            if "coverage" in c.criterion.lower() or "%" in c.criterion:
+                # Extract target from criterion (e.g., "Coverage >70%" → 70)
+                import re
+                target_match = re.search(r'>(\d+)%|>=(\d+)%|(\d+)%', c.criterion)
+                if target_match:
+                    target = int(target_match.group(1) or target_match.group(2) or target_match.group(3))
+
+                    # Parse actual from evidence
+                    actual_match = re.search(r'(\d+(?:\.\d+)?)%', c.evidence or c.actual or "")
+                    if actual_match:
+                        actual = float(actual_match.group(1))
+
+                        # Verify actual meets target
+                        if ">" in c.criterion and actual <= target:
+                            orchestrator_state["bazinga_rejection_count"] += 1
+                            → REJECT: Display "❌ BAZINGA rejected | Evidence shows {actual}%, but criterion requires >{target}%"
+                            → Spawn PM: "Achieve {target}% coverage, currently at {actual}%"
+                            → DO NOT execute shutdown protocol
+                    else:
+                        # Evidence unparseable
+                        orchestrator_state["bazinga_rejection_count"] += 1
+                        → REJECT: Display "❌ BAZINGA rejected | Cannot parse coverage from evidence for '{c.criterion}'"
+                        → Spawn PM: "Provide parseable evidence (include exact percentage in evidence field)"
+                        → DO NOT execute shutdown protocol
+
+        # All verifications passed
+        orchestrator_state["bazinga_rejection_count"] = 0  # Reset on success
+        → Display: "✅ BAZINGA accepted | All {total_count} criteria met and verified"
+        → Continue to shutdown protocol
+
+    elif met_count + blocked_count == total_count AND blocked_count > 0:
+        # Path B: Validate each blocker
+        for c in criteria where c.status == "blocked":
+            if not c.evidence or "external" not in c.evidence.lower():
+                orchestrator_state["bazinga_rejection_count"] += 1
+                count = orchestrator_state["bazinga_rejection_count"]
+
+                if count > 2:
+                    → ESCALATE to user (show criteria status, ask continue/stop)
+                else:
+                    → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Criterion '{c.criterion}' blocked without external proof"
+                    → Spawn PM: "Complete '{c.criterion}' OR prove external blocker (Path B format)"
+                → DO NOT execute shutdown protocol
+
+        # All blockers validated (no rejections occurred above)
+        orchestrator_state["bazinga_rejection_count"] = 0
+        → Display: "⚠️ BAZINGA accepted | {met_count}/{total_count} met, {blocked_count} external blockers documented"
+        → Continue to shutdown protocol
+
+    else:
+        # Path C: Incomplete work
+        incomplete = [c for c in criteria if c.status not in ["met", "blocked"]]
+        orchestrator_state["bazinga_rejection_count"] += 1
+        count = orchestrator_state["bazinga_rejection_count"]
+
+        if count > 2:
+            → ESCALATE: Display "❌ Orchestration stuck | {len(incomplete)} criteria incomplete after {count} attempts"
+            → Show user: criteria status, blockers, options
+            → Wait for user decision
+        else:
+            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Incomplete: {[c.criterion for c in incomplete]}"
+            → Spawn PM: "Complete remaining criteria"
+        → DO NOT execute shutdown protocol
+```
+
+**The Rule**: Orchestrator verifies DATABASE (ground truth), not PM's message. Tracks rejection count to prevent infinite loops. Escalates to user after 3 rejections.
 
 ### Step 1: Get Dashboard Snapshot
 
@@ -2659,42 +2775,15 @@ Example output:
 ═══════════════════════════════════════════════════════════
 ```
 
-**Status emoji logic**:
-- ✅ Green checkmark: All good (0 issues remaining)
-- ⚠️ Yellow warning: Some concerns (issues found but addressed, or minor gaps)
-- ❌ Red X: Problems remain (should be rare - unresolved issues)
-
-**Examples**:
-
-```
-Security: ✅ All issues addressed (3 found → 3 fixed)
-Security: ⚠️ Scan completed with warnings (2 medium issues addressed)
-Security: ❌ Critical issues remain (1 critical unresolved)
-
-Coverage: ✅ 87.5% average (target: 80%)
-Coverage: ⚠️ 78.2% average (below 80% target)
-
-Lint: ✅ All issues fixed (42 found → 42 fixed)
-Lint: ⚠️ 3 warnings remain (5 errors fixed)
-```
-
 ---
 
-## Key Principles to Remember
+## Key Principles
 
-1. **You coordinate, never implement** - Only use Task, Skill (bazinga-db), Read (configs only), Bash (init only)
-2. **🔴 SESSION MUST BE CREATED** - MANDATORY: Invoke bazinga-db skill to create session. Process results silently. Cannot proceed without session.
-3. **🔴 CONFIGS MUST BE LOADED** - MANDATORY: Read skills_config.json and testing_config.json during initialization. Process silently. Cannot proceed without configs.
-4. **🔴 PROMPTS MUST FOLLOW TEMPLATE** - MANDATORY: Build ALL agent prompts using prompt_building.md. Include skill invocations. Validate before spawning.
-5. **PM decides mode** - Always spawn PM first, respect their decision
-6. **Parallel = one message** - Spawn multiple developers in ONE message
-7. **Independent routing** - Each group flows through dev→QA→tech lead independently
-8. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-9. **Database = memory** - All state in database via bazinga-db skill
-10. **🔴 LOG EVERYTHING TO DATABASE** - MANDATORY: Invoke bazinga-db skill after EVERY agent interaction (process results silently)
-11. **Capsule format only** - Use compact progress capsules from message_templates.md (NO verbose routing, NO role checks to user, NO database confirmations)
-12. **Summary + artifacts** - Main transcript shows capsules, link to artifacts for details
-13. **Check for BAZINGA** - Only end workflow when PM says BAZINGA
+- Coordinate, never implement (Task/Skill only for work)
+- PM decides mode; respect decision
+- Database = memory (bazinga-db for all state)
+- Capsule format only (no verbose routing)
+- Check for BAZINGA before ending
 
 ---
 

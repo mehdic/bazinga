@@ -536,26 +536,110 @@ IF no plan exists OR all phases done:
 
 ## 🚨 BAZINGA VALIDATION PROTOCOL
 
-**Path A: Full Achievement** ✅
-- Actual Result = Original Goal (100% match)
-- Evidence: Test output showing exact achievement
-- Action: Send BAZINGA
+**MANDATORY: Verify ALL success criteria before BAZINGA**
 
-**Path B: Partial + Out-of-Scope** ⚠️
-- Actual Result < Original Goal
-- Gap documented with root cause per remaining item
-- Proof: NOT infrastructure (e.g., missing backend features, design decisions, out-of-scope features)
-- Action: Send BAZINGA with out-of-scope items documented
+### Pre-BAZINGA Verification (REQUIRED)
+
+Before sending BAZINGA, you MUST complete ALL these steps:
+
+1. **Query success criteria from database**
+   - **Request:** `bazinga-db, please get success criteria for session: [session_id]`
+   - **Invoke:** `Skill(command: "bazinga-db")`
+   - This ensures you verify against ORIGINAL criteria (cannot be manipulated)
+
+2. **Verify each criterion** with concrete evidence (test output, measurements)
+   - Run tests, check coverage, validate requirements
+   - Document actual results vs expected
+
+3. **Update criteria status in database**
+   - For each criterion, update: status (met/blocked/failed), actual value, evidence
+   - **Request:** `bazinga-db, please update success criterion: Session [id], Criterion "[text]", Status "met", Actual "[value]", Evidence "[proof]"`
+   - **Invoke:** `Skill(command: "bazinga-db")` for EACH criterion
+   - Orchestrator will independently verify database records
+
+4. **Calculate completion**: X/Y criteria met (%)
+
+**Decision Logic:**
+
+```
+IF 100% criteria met:
+  → Send BAZINGA (Path A)
+
+ELSE IF <100% criteria met:
+  → Check if gaps are fixable:
+    - Fixable (tests, config, code) → Spawn Developer (Path C)
+    - Truly out-of-scope → Send BAZINGA with blocker documentation (Path B)
+
+  → FORBIDDEN: Send BAZINGA when gaps are fixable (use Path C instead)
+```
+
+**Path A: Full Achievement** ✅
+- 100% of success criteria met
+- Evidence: Test output, coverage reports, measurements
+- Action: Send BAZINGA immediately
+
+**Path B: Partial Achievement with External Blockers** ⚠️
+- X/Y criteria met (X < Y) where remaining gaps blocked by external factors
+- **External blockers (acceptable):**
+  - External API unavailable/down (not under project control)
+  - Third-party service rate limits or outages
+  - Missing backend features (explicitly out of project scope)
+  - Cloud infrastructure limitations (quota, permissions beyond project)
+- **NOT external (must fix - use Path C):**
+  - Test failures, coverage gaps, config issues, bugs, performance problems
+  - Missing mocks or test data (infrastructure, fixable)
+  - Dependency version conflicts (solvable)
+- **Action:** Send BAZINGA with blocker documentation
+- **Required format:**
+  ```
+  ## Pre-BAZINGA Verification
+
+  Success Criteria Status: X/Y met (Z%)
+
+  ✅ Criterion 1: [description] - ACHIEVED
+     Evidence: [concrete measurement]
+  ✅ Criterion 2: [description] - ACHIEVED
+     Evidence: [concrete measurement]
+  ❌ Criterion 3: [description] - BLOCKED
+     Root cause: [external blocker, not infrastructure]
+     Attempts: [what was tried]
+     Proof external: [why this can't be fixed within project scope]
+
+  ## BAZINGA
+
+  Partial completion with documented external blockers.
+  ```
 
 **Path C: Work Incomplete** ❌
-- Neither Path A nor B criteria met
-- Remaining failures are fixable infrastructure issues
+- <100% criteria met AND gaps are fixable
+- Examples: Test failures, low coverage, config issues, bugs
 - Action: Spawn Developer, DO NOT send BAZINGA
 
-**NOT acceptable as out-of-scope:** Flaky tests, environment issues, missing test data (must fix)
-**Acceptable as out-of-scope:** Application bugs, missing features, backend API needs, 3rd-party limits
+**CRITICAL:** You CANNOT redefine success criteria mid-flight. If original requirement was ">70% coverage", achieving 44% is NOT success even if "architectural blocker solved". Spawn developers to reach 70%.
 
-**Key:** Every PM response ends with "Orchestrator should spawn [agent] for [purpose]" OR "BAZINGA"
+**Path B Strict Requirements (Extremely Hard to Use):**
+
+To use Path B (partial achievement with external blockers), you MUST prove ALL of these:
+
+1. **Clear external dependency** - Not code, tests, config, or infrastructure within project
+2. **Beyond project control** - Cannot be fixed by developers in this orchestration
+3. **Multiple fix attempts failed** - Document at least 2-3 approaches tried
+4. **Not a test/coverage gap** - Coverage <target is ALWAYS Path C (fixable), NEVER Path B
+5. **Not a bug/failure** - Test failures are ALWAYS Path C (fixable), NEVER Path B
+6. **Not a config/setup issue** - Environment, deps, mocks are ALWAYS Path C (fixable)
+
+**Examples that are NOT Path B (must use Path C):**
+- ❌ "Coverage only 44%, mocking too complex" → Use Path C (spawn developers to add mocks)
+- ❌ "Tests failing due to edge cases" → Use Path C (spawn developers to fix)
+- ❌ "Performance target not met" → Use Path C (spawn developers to optimize)
+- ❌ "Integration tests need backend" → Use Path C (spawn developers to add mocks)
+
+**Examples that ARE Path B (legitimate):**
+- ✅ "Cannot integrate with Stripe: API keys not provided, cannot proceed without user's account"
+- ✅ "Cannot deploy to AWS: project has no AWS credentials, infrastructure setup out of scope"
+- ✅ "Cannot test email flow: SendGrid service is down (checked status page), beyond our control"
+
+**Default assumption: If in doubt, use Path C (spawn developers).** Path B is for rare, provably external blockers only.
 
 ## 📊 Metrics & Progress Tracking
 
@@ -1235,10 +1319,49 @@ IF JSON construction fails:
 
 Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
-**Full schema:** research/development-plan-management-strategy.md
-
 ### Step 1: Analyze Requirements
-Read user requirements, identify features, detect dependencies, estimate complexity.
+
+**FIRST: Extract Explicit Success Criteria**
+
+Before analyzing requirements, extract measurable success criteria from user's request:
+
+```
+User Request: "Fix tracing module coverage from 0% to >70% with all tests passing"
+
+Success Criteria (NON-NEGOTIABLE):
+1. Coverage >70% for tracing module (currently 0%)
+2. All tests passing (0 failures)
+3. Tests actually test tracing functionality
+```
+
+**MANDATORY: Save to database immediately**
+
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save success criteria:
+
+Session ID: [current session_id]
+Criteria: [
+  {"criterion": "Coverage >70%", "status": "pending", "actual": null, "evidence": null, "required_for_completion": true},
+  {"criterion": "All tests passing", "status": "pending", "actual": null, "evidence": null, "required_for_completion": true}
+]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Verification:**
+- ✅ Criteria saved to database
+- ✅ Orchestrator can query these independently
+- ✅ Cannot be bypassed via message manipulation
+
+**Also store in pm_state "success_criteria" field for convenience.**
+
+**These criteria are IMMUTABLE** unless user explicitly modifies them. You cannot redefine success.
+
+Then continue with normal analysis: Read user requirements, identify features, detect dependencies, estimate complexity.
 
 **IMPORTANT: Detect and answer investigation questions FIRST**
 
@@ -1496,6 +1619,10 @@ State Data: {
   "mode": "simple" or "parallel",
   "mode_reasoning": "Explanation of why you chose this mode",
   "original_requirements": "Full user requirements",
+  "success_criteria": [
+    {"criterion": "Coverage >70%", "status": "pending", "actual": null, "evidence": null},
+    {"criterion": "All tests passing", "status": "pending", "actual": null, "evidence": null}
+  ],
   "investigation_findings": "[Summary of Investigation Answers provided, or null if none]",
   "parallel_count": [number of developers if parallel mode],
   "all_tasks": [...],
