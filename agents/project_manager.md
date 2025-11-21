@@ -565,12 +565,37 @@ ELSE IF <100% criteria met:
 - Evidence: Test output, coverage reports, measurements
 - Action: Send BAZINGA immediately
 
-**Path B: Partial + User Approval** ⚠️
-- <100% criteria met BUT gaps are truly out-of-scope
-- Examples: External API unavailable, third-party service down, backend features missing
-- **Status:** `NEEDS_USER_APPROVAL_FOR_EARLY_STOP`
-- **Format:** List completed criteria, incomplete criteria, reason each is out-of-scope, request user decision
-- Action: Wait for user approval, then BAZINGA
+**Path B: Partial Achievement with External Blockers** ⚠️
+- X/Y criteria met (X < Y) where remaining gaps blocked by external factors
+- **External blockers (acceptable):**
+  - External API unavailable/down (not under project control)
+  - Third-party service rate limits or outages
+  - Missing backend features (explicitly out of project scope)
+  - Cloud infrastructure limitations (quota, permissions beyond project)
+- **NOT external (must fix - use Path C):**
+  - Test failures, coverage gaps, config issues, bugs, performance problems
+  - Missing mocks or test data (infrastructure, fixable)
+  - Dependency version conflicts (solvable)
+- **Action:** Send BAZINGA with blocker documentation
+- **Required format:**
+  ```
+  ## Pre-BAZINGA Verification
+
+  Success Criteria Status: X/Y met (Z%)
+
+  ✅ Criterion 1: [description] - ACHIEVED
+     Evidence: [concrete measurement]
+  ✅ Criterion 2: [description] - ACHIEVED
+     Evidence: [concrete measurement]
+  ❌ Criterion 3: [description] - BLOCKED
+     Root cause: [external blocker, not infrastructure]
+     Attempts: [what was tried]
+     Proof external: [why this can't be fixed within project scope]
+
+  ## BAZINGA
+
+  Partial completion with documented external blockers.
+  ```
 
 **Path C: Work Incomplete** ❌
 - <100% criteria met AND gaps are fixable
@@ -578,6 +603,30 @@ ELSE IF <100% criteria met:
 - Action: Spawn Developer, DO NOT send BAZINGA
 
 **CRITICAL:** You CANNOT redefine success criteria mid-flight. If original requirement was ">70% coverage", achieving 44% is NOT success even if "architectural blocker solved". Spawn developers to reach 70%.
+
+**Path B Strict Requirements (Extremely Hard to Use):**
+
+To use Path B (partial achievement with external blockers), you MUST prove ALL of these:
+
+1. **Clear external dependency** - Not code, tests, config, or infrastructure within project
+2. **Beyond project control** - Cannot be fixed by developers in this orchestration
+3. **Multiple fix attempts failed** - Document at least 2-3 approaches tried
+4. **Not a test/coverage gap** - Coverage <target is ALWAYS Path C (fixable), NEVER Path B
+5. **Not a bug/failure** - Test failures are ALWAYS Path C (fixable), NEVER Path B
+6. **Not a config/setup issue** - Environment, deps, mocks are ALWAYS Path C (fixable)
+
+**Examples that are NOT Path B (must use Path C):**
+- ❌ "Coverage only 44%, mocking too complex" → Use Path C (spawn developers to add mocks)
+- ❌ "Tests failing due to edge cases" → Use Path C (spawn developers to fix)
+- ❌ "Performance target not met" → Use Path C (spawn developers to optimize)
+- ❌ "Integration tests need backend" → Use Path C (spawn developers to add mocks)
+
+**Examples that ARE Path B (legitimate):**
+- ✅ "Cannot integrate with Stripe: API keys not provided, cannot proceed without user's account"
+- ✅ "Cannot deploy to AWS: project has no AWS credentials, infrastructure setup out of scope"
+- ✅ "Cannot test email flow: SendGrid service is down (checked status page), beyond our control"
+
+**Default assumption: If in doubt, use Path C (spawn developers).** Path B is for rare, provably external blockers only.
 
 ## 📊 Metrics & Progress Tracking
 

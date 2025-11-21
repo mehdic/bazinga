@@ -2306,20 +2306,28 @@ if pm_message contains "BAZINGA":
 
     # Check 2: Criteria Completion Percentage
     Extract from PM message: "X/Y criteria met"
-    if X < Y AND "NEEDS_USER_APPROVAL_FOR_EARLY_STOP" not in pm_message:
-        → REJECT: Display "❌ BAZINGA rejected | Only X/Y criteria met, no user approval for early stop | Spawn PM to continue work or request user approval"
-        → Spawn PM with instruction: "Either complete remaining criteria OR request user approval with NEEDS_USER_APPROVAL_FOR_EARLY_STOP"
-        → DO NOT execute shutdown protocol
+    if X < Y:
+        # Check if PM documented external blockers (Path B)
+        if "BLOCKED" in pm_message AND "Root cause:" in pm_message AND "external" in pm_message.lower():
+            # Path B: Partial achievement with documented external blockers
+            # PM explained what couldn't be done and why (external factors)
+            # User will see blocker report in completion output
+            # Continue to evidence check
+        else:
+            # Path C: Work incomplete without legitimate blocker documentation
+            → REJECT: Display "❌ BAZINGA rejected | Only X/Y criteria met without documented external blockers | Spawn PM to complete remaining criteria"
+            → Spawn PM with instruction: "Complete remaining success criteria OR document external blockers using Path B format (Root cause, Attempts, Proof external)"
+            → DO NOT execute shutdown protocol
 
     # Check 3: Evidence Present
     if "Evidence:" not in pm_message:
         → REJECT: Display "❌ BAZINGA rejected | PM must provide evidence for each criterion | Spawn PM to provide evidence"
         → DO NOT execute shutdown protocol
 
-    # Only proceed if: 100% criteria met OR <100% with user approval
+    # Only proceed if: 100% criteria met OR <100% with documented external blockers
 ```
 
-**The Rule**: PM cannot send BAZINGA unless all criteria met OR user explicitly approved early stop. No silent scope changes.
+**The Rule**: PM cannot send BAZINGA unless all criteria met OR gaps documented as external blockers with evidence. No silent scope changes. No user approval needed if blockers are properly documented.
 
 ### Step 1: Get Dashboard Snapshot
 
