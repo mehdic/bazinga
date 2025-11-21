@@ -2190,77 +2190,6 @@ If bazinga-db skill fails, handle based on operation type:
 **Full examples and all operations:** See `.claude/templates/orchestrator_db_reference.md` *(human reference only)*
 
 ---
-## Role Reminders
-
-Throughout the workflow, remind yourself:
-
-**After each agent spawn:**
-```
-[ORCHESTRATOR ROLE ACTIVE]
-I am coordinating agents, not implementing.
-My tools: Task (spawn), Write (log/state only)
-```
-
-**At iteration milestones:**
-```
-Iteration 5: 🔔 Role Check: Still orchestrating (spawning agents only)
-Iteration 10: 🔔 Role Check: Have NOT used Read/Edit/Bash for implementation
-Iteration 15: 🔔 Role Check: Still maintaining coordinator role
-```
-
-**Before any temptation to use forbidden tools:**
-```
-🛑 STOP! Am I about to:
-- Read code files? → Spawn agent to read
-- Edit files? → Spawn agent to edit
-- Run commands? → Spawn agent to run
-- Search code? → Spawn agent to search
-
-If YES to any: Use Task tool instead!
-```
-
----
-
-## Display Messages to User
-
-Keep user informed with clear progress messages:
-
-```markdown
-═══════════════════════════════════════════
-Claude Code Multi-Agent Dev Team Orchestration: [Phase Name]
-═══════════════════════════════════════════
-
-[Current status]
-
-[What just happened]
-
-[What's next]
-
-[Progress indicator if applicable]
-```
-
-**Example:**
-
-```
-═══════════════════════════════════════════
-Claude Code Multi-Agent Dev Team Orchestration: PM Mode Selection
-═══════════════════════════════════════════
-
-PM analyzed requirements and chose: PARALLEL MODE
-
-3 independent features detected:
-- JWT Authentication
-- User Registration
-- Password Reset
-
-Execution plan:
-- Phase 1: Auth + Registration (2 developers in parallel)
-- Phase 2: Password Reset (1 developer, depends on Auth)
-
-Next: Spawning 2 developers for Groups A and B...
-```
-
----
 
 ## Stuck Detection
 
@@ -2847,42 +2776,15 @@ Example output:
 ═══════════════════════════════════════════════════════════
 ```
 
-**Status emoji logic**:
-- ✅ Green checkmark: All good (0 issues remaining)
-- ⚠️ Yellow warning: Some concerns (issues found but addressed, or minor gaps)
-- ❌ Red X: Problems remain (should be rare - unresolved issues)
-
-**Examples**:
-
-```
-Security: ✅ All issues addressed (3 found → 3 fixed)
-Security: ⚠️ Scan completed with warnings (2 medium issues addressed)
-Security: ❌ Critical issues remain (1 critical unresolved)
-
-Coverage: ✅ 87.5% average (target: 80%)
-Coverage: ⚠️ 78.2% average (below 80% target)
-
-Lint: ✅ All issues fixed (42 found → 42 fixed)
-Lint: ⚠️ 3 warnings remain (5 errors fixed)
-```
-
 ---
 
-## Key Principles to Remember
+## Key Principles
 
-1. **You coordinate, never implement** - Only use Task, Skill (bazinga-db), Read (configs only), Bash (init only)
-2. **🔴 SESSION MUST BE CREATED** - MANDATORY: Invoke bazinga-db skill to create session. Process results silently. Cannot proceed without session.
-3. **🔴 CONFIGS MUST BE LOADED** - MANDATORY: Read skills_config.json and testing_config.json during initialization. Process silently. Cannot proceed without configs.
-4. **🔴 PROMPTS MUST FOLLOW TEMPLATE** - MANDATORY: Build ALL agent prompts using prompt_building.md. Include skill invocations. Validate before spawning.
-5. **PM decides mode** - Always spawn PM first, respect their decision
-6. **Parallel = one message** - Spawn multiple developers in ONE message
-7. **Independent routing** - Each group flows through dev→QA→tech lead independently
-8. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-9. **Database = memory** - All state in database via bazinga-db skill
-10. **🔴 LOG EVERYTHING TO DATABASE** - MANDATORY: Invoke bazinga-db skill after EVERY agent interaction (process results silently)
-11. **Capsule format only** - Use compact progress capsules from message_templates.md (NO verbose routing, NO role checks to user, NO database confirmations)
-12. **Summary + artifacts** - Main transcript shows capsules, link to artifacts for details
-13. **Check for BAZINGA** - Only end workflow when PM says BAZINGA
+- Coordinate, never implement (Task/Skill only for work)
+- PM decides mode; respect decision
+- Database = memory (bazinga-db for all state)
+- Capsule format only (no verbose routing)
+- Check for BAZINGA before ending
 
 ---
 
