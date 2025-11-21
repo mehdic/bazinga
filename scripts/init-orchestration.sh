@@ -378,7 +378,21 @@ if [ -f "$DB_PATH" ]; then
         echo "🔄 Checking for required database migrations..."
 
         # Check if task_groups table has old schema (id as single PRIMARY KEY)
-        SCHEMA_CHECK=$(sqlite3 "$DB_PATH" "SELECT sql FROM sqlite_master WHERE type='table' AND name='task_groups'" 2>/dev/null)
+        # Use Python sqlite3 module instead of sqlite3 command (not always available)
+        SCHEMA_CHECK=$(python3 -c "
+import sqlite3
+import sys
+try:
+    conn = sqlite3.connect('$DB_PATH')
+    cursor = conn.execute(\"SELECT sql FROM sqlite_master WHERE type='table' AND name='task_groups'\")
+    row = cursor.fetchone()
+    if row:
+        print(row[0])
+    conn.close()
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null)
 
         if echo "$SCHEMA_CHECK" | grep -q "id TEXT PRIMARY KEY"; then
             echo "⚠️  Detected old task_groups schema - migration required"

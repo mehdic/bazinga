@@ -281,9 +281,9 @@ class BazingaDB:
                 VALUES (?, ?, ?, ?, ?)
             """, (group_id, session_id, name, status, assigned_to))
             conn.commit()
-            self._print_success(f"✓ Task group created: {group_id}")
+            self._print_success(f"✓ Task group created: {group_id} (session: {session_id[:20]}...)")
         except sqlite3.IntegrityError:
-            print(f"! Task group already exists: {group_id}", file=sys.stderr)
+            print(f"! Task group already exists: {group_id} in session {session_id}", file=sys.stderr)
         finally:
             conn.close()
 
@@ -312,9 +312,14 @@ class BazingaDB:
             updates.append("updated_at = CURRENT_TIMESTAMP")
             query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
             params.extend([group_id, session_id])
-            conn.execute(query, params)
+            cursor = conn.execute(query, params)
             conn.commit()
-            self._print_success(f"✓ Task group updated: {group_id}")
+
+            # Validate that UPDATE actually modified rows
+            if cursor.rowcount == 0:
+                print(f"! Task group not found: {group_id} in session {session_id}", file=sys.stderr)
+            else:
+                self._print_success(f"✓ Task group updated: {group_id} (session: {session_id[:20]}...)")
 
         conn.close()
 
