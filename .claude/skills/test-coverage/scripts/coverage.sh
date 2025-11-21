@@ -278,6 +278,17 @@ rm -f bazinga/coverage_report_raw.json bazinga/jest-results.json 2>/dev/null || 
 echo "✅ Coverage analysis complete"
 echo "📁 Results saved to: $OUTPUT_FILE"
 
+# Save to database
+echo "💾 Saving to database..."
+DB_PATH="bazinga/bazinga.db"
+DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+SKILL_OUTPUT=$(cat "$OUTPUT_FILE")
+
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
+    "$SESSION_ID" \
+    "test-coverage" \
+    "$SKILL_OUTPUT" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
+
 # Display summary if jq available
 if command_exists "jq"; then
     if [ "$LANG" = "python" ]; then

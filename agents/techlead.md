@@ -137,29 +137,29 @@ The Orchestrator provides you with skills based on `bazinga/skills_config.json`:
 
 1. **security-scan** - Security vulnerability detection
    - Automatically runs in basic (fast) or advanced (comprehensive) mode
-   - Results: `bazinga/security_scan.json`
+   - Results: Database (skill_outputs table)
 
 2. **test-coverage** - Test coverage analysis
    - Reports line/branch coverage and untested paths
-   - Results: `bazinga/coverage_report.json`
+   - Results: Database (skill_outputs table)
 
 3. **lint-check** - Code quality linting
    - Style, complexity, best practices
-   - Results: `bazinga/lint_results.json`
+   - Results: Database (skill_outputs table)
 
 **Optional Skills (USE in specific frameworks):**
 
 4. **codebase-analysis** - Find similar code patterns and architectural context
    - **When to use:** Framework 1 (Root Cause), Framework 2 (Architecture), Framework 3 (Performance)
-   - Results: `bazinga/codebase_analysis.json`
+   - Results: Database (skill_outputs table)
 
 5. **pattern-miner** - Historical pattern analysis
    - **When to use:** Framework 1 (Root Cause), Framework 3 (Performance patterns)
-   - Results: `bazinga/pattern_insights.json`
+   - Results: Database (skill_outputs table)
 
 6. **test-pattern-analysis** - Test pattern learning
    - **When to use:** Framework 4 (Flaky Test Analysis)
-   - Results: `bazinga/test_patterns.json`
+   - Results: Database (skill_outputs table)
 
 ### Reading Skill Results
 
@@ -172,34 +172,21 @@ The Developer's report includes a "Testing Mode" field. Read it to determine whi
 cat bazinga/testing_config.json | jq '._testing_framework.mode'
 ```
 
-**Based on testing mode, read the appropriate Skill results:**
+**Retrieve Skill results from database:**
 
-{IF testing_mode == "full" OR testing_mode NOT specified}
 ```bash
-# FULL MODE - Read all automated analysis results
-cat bazinga/security_scan.json
-cat bazinga/coverage_report.json      # Test coverage analysis
-cat bazinga/lint_results.json
-```
-{ENDIF}
+# Set up shortcuts
+DB="bazinga/bazinga.db"
+SID="{SESSION_ID}"
+GET="python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --db $DB --quiet get-skill-output"
 
-{IF testing_mode == "minimal"}
-```bash
-# MINIMAL MODE - Test coverage may be limited
-cat bazinga/security_scan.json
-cat bazinga/lint_results.json
-# Note: Test coverage analysis may be skipped in minimal mode
+# Get results based on testing mode
+$GET $SID "security-scan"          # Always run
+$GET $SID "lint-check"             # Always run
+$GET $SID "test-coverage"          # Skip if testing_mode=="disabled"
 ```
-{ENDIF}
 
-{IF testing_mode == "disabled"}
-```bash
-# DISABLED MODE - Limited automated analysis
-cat bazinga/security_scan.json
-cat bazinga/lint_results.json
-# Note: Test coverage analysis is not applicable (testing disabled)
-```
-{ENDIF}
+**Note:** Retrieve security+lint always; coverage only if testing enabled.
 
 **Use automated findings to guide your manual review:**
 - Security scan flags vulnerabilities to investigate (always run)
@@ -556,9 +543,9 @@ Check systematically:
 
 **Step 1: Review Security Scan Results**
 
-security-scan already ran automatically. Read results:
+security-scan already ran automatically. Read results from database:
 ```bash
-cat bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --db bazinga/bazinga.db --quiet get-skill-output {SESSION_ID} "security-scan"
 ```
 
 **Step 2: Triage by Severity**

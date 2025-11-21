@@ -395,26 +395,16 @@ class BazingaDB:
         return json.loads(row['output_data']) if row else None
 
     # ==================== CONFIGURATION OPERATIONS ====================
-
-    def set_config(self, key: str, value: Any) -> None:
-        """Set configuration value."""
-        conn = self._get_connection()
-        conn.execute("""
-            INSERT OR REPLACE INTO configuration (key, value, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-        """, (key, json.dumps(value)))
-        conn.commit()
-        conn.close()
-        self._print_success(f"✓ Config set: {key}")
-
-    def get_config(self, key: str) -> Optional[Any]:
-        """Get configuration value."""
-        conn = self._get_connection()
-        row = conn.execute("""
-            SELECT value FROM configuration WHERE key = ?
-        """, (key,)).fetchone()
-        conn.close()
-        return json.loads(row['value']) if row else None
+    # REMOVED: Configuration table no longer exists (2025-11-21)
+    # See research/empty-tables-analysis.md for details
+    #
+    # def set_config(self, key: str, value: Any) -> None:
+    #     """Set configuration value."""
+    #     ...
+    #
+    # def get_config(self, key: str) -> Optional[Any]:
+    #     """Get configuration value."""
+    #     ...
 
     # ==================== DASHBOARD DATA ====================
 
@@ -563,6 +553,11 @@ def main():
             skill_name = cmd_args[1]
             output_data = json.loads(cmd_args[2])
             db.save_skill_output(session_id, skill_name, output_data)
+        elif cmd == 'get-skill-output':
+            session_id = cmd_args[0]
+            skill_name = cmd_args[1]
+            result = db.get_skill_output(session_id, skill_name)
+            print(json.dumps(result, indent=2))
         elif cmd == 'get-task-groups':
             session_id = cmd_args[0]
             status = cmd_args[1] if len(cmd_args) > 1 else None
