@@ -547,7 +547,7 @@ Expected output:
 ### Step 7: Validate the Fixed Skill
 
 ```bash
-python3 validate_skills.py
+python3 scripts/validate_skills.py
 ```
 
 **Check for:**
@@ -766,7 +766,7 @@ Calls `scan.sh` script (446 lines), focuses on when to invoke, example scenarios
 Use the validation script:
 
 ```bash
-python3 validate_skills.py
+python3 scripts/validate_skills.py
 ```
 
 This checks:
@@ -920,7 +920,7 @@ Use this checklist when fixing a skill:
 - [ ] "When to Invoke" has 2+ exclusion conditions
 
 ### Validation
-- [ ] Run `python3 validate_skills.py` - all pass
+- [ ] Run `python3 scripts/validate_skills.py` - all pass
 - [ ] Manual review of SKILL.md structure
 - [ ] Length reduction achieved (ideally 30-50% shorter)
 - [ ] Script is called in Step 1 (not raw commands)
