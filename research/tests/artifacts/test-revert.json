@@ -433,7 +433,7 @@
   ],
   "similar_features": [
     {
-      "file": "./test_performance_comparison.py",
+      "file": "./tests/test_performance_comparison.py",
       "similarity": 0.3666666666666667,
       "matched_keywords": [
         "test"
@@ -444,7 +444,7 @@
       ]
     },
     {
-      "file": "./test_telemetry.py",
+      "file": "./tests/test_telemetry.py",
       "similarity": 0.3666666666666667,
       "matched_keywords": [
         "test"
@@ -452,7 +452,7 @@
       "patterns": []
     },
     {
-      "file": "./test_concurrent_access.py",
+      "file": "./tests/test_concurrent_access.py",
       "similarity": 0.3666666666666667,
       "matched_keywords": [
         "test"
@@ -482,6 +482,6 @@
       ]
     }
   ],
-  "suggested_approach": "Follow patterns from ./test_performance_comparison.py (37% similar) | Reuse Skill: test-coverage from .claude/skills/test-coverage/SKILL.md | Write tests using pytest",
+  "suggested_approach": "Follow patterns from ./tests/test_performance_comparison.py (37% similar) | Reuse Skill: test-coverage from .claude/skills/test-coverage/SKILL.md | Write tests using pytest",
   "cache_efficiency": "0.0%"
 }
