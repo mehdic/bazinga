@@ -184,9 +184,10 @@ def init_database(db_path: str) -> None:
     print("✓ Created state_snapshots table with indexes")
 
     # Task groups table (normalized from pm_state.json)
+    # PRIMARY KEY: Composite (id, session_id) allows same group ID across sessions
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
-            id TEXT PRIMARY KEY,
+            id TEXT NOT NULL,
             session_id TEXT NOT NULL,
             name TEXT NOT NULL,
             status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'failed')) DEFAULT 'pending',
@@ -195,6 +196,7 @@ def init_database(db_path: str) -> None:
             last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id, session_id),
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)

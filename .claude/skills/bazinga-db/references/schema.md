@@ -192,8 +192,8 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 # Create task group
 db.create_task_group('group_a', 'bazinga_123', 'Authentication', status='pending')
 
-# Update task group
-db.update_task_group('group_a', status='completed', last_review_status='APPROVED')
+# Update task group (requires session_id for composite key)
+db.update_task_group('group_a', 'bazinga_123', status='completed', last_review_status='APPROVED')
 
 # Get incomplete task groups
 incomplete = db.get_task_groups('bazinga_123', status='in_progress')

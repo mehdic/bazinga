@@ -129,6 +129,7 @@ python3 $DB_SCRIPT --db $DB_PATH create-task-group \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
+  "bazinga_123" \
   --status "completed" \
   --last_review_status "APPROVED"
 ```
@@ -137,6 +138,7 @@ python3 $DB_SCRIPT --db $DB_PATH update-task-group \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
+  "bazinga_123" \
   --revision_count 2
 ```
 
@@ -144,6 +146,7 @@ python3 $DB_SCRIPT --db $DB_PATH update-task-group \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
+  "bazinga_123" \
   --assigned_to "developer_1"
 ```
 
@@ -305,7 +308,7 @@ python3 $DB_SCRIPT --db $DB_PATH save-state \
 
 # 3. Update task group
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
-  "group_a" --status "in_progress" --assigned_to "developer_1"
+  "group_a" "$SESSION_ID" --status "in_progress" --assigned_to "developer_1"
 ```
 
 ### Developer Completion Workflow
@@ -320,7 +323,7 @@ python3 $DB_SCRIPT --db $DB_PATH log-tokens \
 
 # 3. Update task group
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
-  "group_a" --status "completed"
+  "group_a" "$SESSION_ID" --status "completed"
 ```
 
 ### Tech Lead Review Workflow
@@ -332,6 +335,7 @@ python3 $DB_SCRIPT --db $DB_PATH log-interaction \
 # 2. Update task group with review result
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
+  "$SESSION_ID" \
   --last_review_status "CHANGES_REQUESTED" \
   --revision_count 1
 
