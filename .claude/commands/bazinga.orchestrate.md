@@ -2328,11 +2328,26 @@ if pm_message contains "BAZINGA":
     if "bazinga_rejection_count" not in orchestrator_state:
         orchestrator_state["bazinga_rejection_count"] = 0
 
-    # Step 2: Query database for success criteria (ground truth)
-    Request: "bazinga-db, please get success criteria for session: [session_id]"
-    Invoke: Skill(command: "bazinga-db")
-
-    criteria = parse_database_response()
+    # Step 2: Query database for success criteria (ground truth) with retry
+    criteria = None
+    for attempt in range(3):
+        try:
+            Request: "bazinga-db, please get success criteria for session: [session_id]"
+            Invoke: Skill(command: "bazinga-db")
+            criteria = parse_database_response()
+            break  # Success, exit retry loop
+        except Exception as e:
+            if attempt < 2:
+                # Retry with exponential backoff
+                wait_seconds = 2 ** attempt  # 1s, 2s
+                → Log: "Database query failed (attempt {attempt+1}/3), retrying in {wait_seconds}s..."
+                wait(wait_seconds)
+                continue
+            else:
+                # All retries exhausted
+                → ESCALATE: Display "❌ Database unavailable after 3 attempts | Cannot verify criteria | Options: 1) Wait and retry, 2) Manual verification"
+                → Wait for user decision
+                → DO NOT execute shutdown protocol
 
     # Check A: Criteria exist in database?
     if not criteria or len(criteria) == 0:
@@ -2349,15 +2364,65 @@ if pm_message contains "BAZINGA":
             → Spawn PM: "Extract success criteria from requirements, save to database, restart Phase 1"
         → DO NOT execute shutdown protocol
 
+    # Check A.5: Validate criteria are specific and measurable
+    for c in criteria:
+        is_vague = (
+            # Vague patterns that lack specific targets
+            "improve" in c.criterion.lower() and ">" not in c.criterion and "<" not in c.criterion and "%" not in c.criterion
+            or "make" in c.criterion.lower() and "progress" in c.criterion.lower()
+            or "fix" in c.criterion.lower() and "all" not in c.criterion.lower() and "%" not in c.criterion.lower()
+            or c.criterion.lower() in ["done", "complete", "working", "better"]
+            or len(c.criterion.split()) < 3  # Too short to be specific
+        )
+
+        if is_vague:
+            orchestrator_state["bazinga_rejection_count"] += 1
+            count = orchestrator_state["bazinga_rejection_count"]
+
+            if count > 2:
+                → ESCALATE: Display "❌ Orchestration stuck | Vague criteria '{c.criterion}' | User intervention required"
+            else:
+                → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Criterion '{c.criterion}' is not measurable | Must include specific targets (e.g., 'Coverage >70%', 'All tests passing', 'Response time <200ms')"
+                → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
+            → DO NOT execute shutdown protocol
+
     # Check B: Verify criteria status from database
     met_count = count(c for c in criteria if c.status == "met")
     blocked_count = count(c for c in criteria if c.status == "blocked")
     total_count = len(criteria)
 
     if met_count == total_count:
-        # Path A: 100% - ACCEPT
+        # Path A: 100% met - Verify evidence before accepting
+        for c in criteria:
+            # Parse evidence to verify actual matches claim
+            if "coverage" in c.criterion.lower() or "%" in c.criterion:
+                # Extract target from criterion (e.g., "Coverage >70%" → 70)
+                import re
+                target_match = re.search(r'>(\d+)%|>=(\d+)%|(\d+)%', c.criterion)
+                if target_match:
+                    target = int(target_match.group(1) or target_match.group(2) or target_match.group(3))
+
+                    # Parse actual from evidence
+                    actual_match = re.search(r'(\d+(?:\.\d+)?)%', c.evidence or c.actual or "")
+                    if actual_match:
+                        actual = float(actual_match.group(1))
+
+                        # Verify actual meets target
+                        if ">" in c.criterion and actual <= target:
+                            orchestrator_state["bazinga_rejection_count"] += 1
+                            → REJECT: Display "❌ BAZINGA rejected | Evidence shows {actual}%, but criterion requires >{target}%"
+                            → Spawn PM: "Achieve {target}% coverage, currently at {actual}%"
+                            → DO NOT execute shutdown protocol
+                    else:
+                        # Evidence unparseable
+                        orchestrator_state["bazinga_rejection_count"] += 1
+                        → REJECT: Display "❌ BAZINGA rejected | Cannot parse coverage from evidence for '{c.criterion}'"
+                        → Spawn PM: "Provide parseable evidence (include exact percentage in evidence field)"
+                        → DO NOT execute shutdown protocol
+
+        # All verifications passed
         orchestrator_state["bazinga_rejection_count"] = 0  # Reset on success
-        → Display: "✅ BAZINGA accepted | All {total_count} criteria met"
+        → Display: "✅ BAZINGA accepted | All {total_count} criteria met and verified"
         → Continue to shutdown protocol
 
     elif met_count + blocked_count == total_count AND blocked_count > 0:
