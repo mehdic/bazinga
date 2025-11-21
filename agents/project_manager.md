@@ -540,11 +540,24 @@ IF no plan exists OR all phases done:
 
 ### Pre-BAZINGA Verification (REQUIRED)
 
-Before sending BAZINGA, you MUST:
+Before sending BAZINGA, you MUST complete ALL these steps:
 
-1. **List original success criteria** (from initial requirements analysis)
+1. **Query success criteria from database**
+   - **Request:** `bazinga-db, please get success criteria for session: [session_id]`
+   - **Invoke:** `Skill(command: "bazinga-db")`
+   - This ensures you verify against ORIGINAL criteria (cannot be manipulated)
+
 2. **Verify each criterion** with concrete evidence (test output, measurements)
-3. **Calculate completion**: X/Y criteria met (%)
+   - Run tests, check coverage, validate requirements
+   - Document actual results vs expected
+
+3. **Update criteria status in database**
+   - For each criterion, update: status (met/blocked/failed), actual value, evidence
+   - **Request:** `bazinga-db, please update success criterion: Session [id], Criterion "[text]", Status "met", Actual "[value]", Evidence "[proof]"`
+   - **Invoke:** `Skill(command: "bazinga-db")` for EACH criterion
+   - Orchestrator will independently verify database records
+
+4. **Calculate completion**: X/Y criteria met (%)
 
 **Decision Logic:**
 
@@ -1321,9 +1334,32 @@ Success Criteria (NON-NEGOTIABLE):
 1. Coverage >70% for tracing module (currently 0%)
 2. All tests passing (0 failures)
 3. Tests actually test tracing functionality
-
-Store in pm_state.json "success_criteria" field.
 ```
+
+**MANDATORY: Save to database immediately**
+
+**Request to bazinga-db skill:**
+```
+bazinga-db, please save success criteria:
+
+Session ID: [current session_id]
+Criteria: [
+  {"criterion": "Coverage >70%", "status": "pending", "actual": null, "evidence": null, "required_for_completion": true},
+  {"criterion": "All tests passing", "status": "pending", "actual": null, "evidence": null, "required_for_completion": true}
+]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**Verification:**
+- ✅ Criteria saved to database
+- ✅ Orchestrator can query these independently
+- ✅ Cannot be bypassed via message manipulation
+
+**Also store in pm_state "success_criteria" field for convenience.**
 
 **These criteria are IMMUTABLE** unless user explicitly modifies them. You cannot redefine success.
 

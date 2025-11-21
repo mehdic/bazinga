@@ -485,6 +485,31 @@ From PM state received:
 
 ---
 
+**Step 4.5: Check Success Criteria (CRITICAL for Resume)**
+
+**Old sessions may not have success criteria in database. Check now:**
+
+Request to bazinga-db skill:
+```
+bazinga-db, please get success criteria for session: [session_id]
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+**If criteria NOT found (empty result):**
+- This is an old session from before success criteria enforcement
+- PM must extract criteria retroactively from original requirements
+- **Add to PM spawn context:** "CRITICAL: This resumed session has no success criteria in database. You MUST: 1) Extract success criteria from original requirements '[original_requirements from pm_state]', 2) Save to database using bazinga-db, 3) Continue work"
+
+**If criteria found:**
+- Good, session already has criteria tracked
+- Continue normally
+
+---
+
 **Step 5: Spawn PM to Continue (DO THIS NOW)**
 
 Display:
@@ -2292,41 +2317,84 @@ SHUTDOWN CHECKLIST:
 
 **Validation Before Accepting BAZINGA:**
 
-**MANDATORY: Verify PM completed Pre-BAZINGA Verification**
+**MANDATORY: Database-Verified Success Criteria Check**
 
-Check PM's message for required validation:
+When PM sends BAZINGA, orchestrator MUST independently verify via database (not trust PM's message):
+
 ```
 if pm_message contains "BAZINGA":
-    # Check 1: Success Criteria Verification
-    if "Success Criteria" not in pm_message OR "Pre-BAZINGA Verification" not in pm_message:
-        → REJECT: Display "❌ BAZINGA rejected | PM must verify all success criteria before completion | Spawn PM to complete verification"
-        → Spawn PM with instruction: "Complete Pre-BAZINGA Verification checklist"
-        → DO NOT execute shutdown protocol
+    # Step 1: Initialize rejection tracking (if not exists)
+    if "bazinga_rejection_count" not in orchestrator_state:
+        orchestrator_state["bazinga_rejection_count"] = 0
 
-    # Check 2: Criteria Completion Percentage
-    Extract from PM message: "X/Y criteria met"
-    if X < Y:
-        # Check if PM documented external blockers (Path B)
-        if "BLOCKED" in pm_message AND "Root cause:" in pm_message AND "external" in pm_message.lower():
-            # Path B: Partial achievement with documented external blockers
-            # PM explained what couldn't be done and why (external factors)
-            # User will see blocker report in completion output
-            # Continue to evidence check
+    # Step 2: Query database for success criteria (ground truth)
+    Request: "bazinga-db, please get success criteria for session: [session_id]"
+    Invoke: Skill(command: "bazinga-db")
+
+    criteria = parse_database_response()
+
+    # Check A: Criteria exist in database?
+    if not criteria or len(criteria) == 0:
+        # PM never saved criteria (skipped extraction)
+        orchestrator_state["bazinga_rejection_count"] += 1
+        count = orchestrator_state["bazinga_rejection_count"]
+
+        if count > 2:
+            → ESCALATE: Display "❌ Orchestration stuck | PM repeatedly failed to extract criteria | User intervention required"
+            → Show user current state and options
+            → Wait for user decision (exception to autonomy)
         else:
-            # Path C: Work incomplete without legitimate blocker documentation
-            → REJECT: Display "❌ BAZINGA rejected | Only X/Y criteria met without documented external blockers | Spawn PM to complete remaining criteria"
-            → Spawn PM with instruction: "Complete remaining success criteria OR document external blockers using Path B format (Root cause, Attempts, Proof external)"
-            → DO NOT execute shutdown protocol
-
-    # Check 3: Evidence Present
-    if "Evidence:" not in pm_message:
-        → REJECT: Display "❌ BAZINGA rejected | PM must provide evidence for each criterion | Spawn PM to provide evidence"
+            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | No criteria in database | PM must extract criteria"
+            → Spawn PM: "Extract success criteria from requirements, save to database, restart Phase 1"
         → DO NOT execute shutdown protocol
 
-    # Only proceed if: 100% criteria met OR <100% with documented external blockers
+    # Check B: Verify criteria status from database
+    met_count = count(c for c in criteria if c.status == "met")
+    blocked_count = count(c for c in criteria if c.status == "blocked")
+    total_count = len(criteria)
+
+    if met_count == total_count:
+        # Path A: 100% - ACCEPT
+        orchestrator_state["bazinga_rejection_count"] = 0  # Reset on success
+        → Display: "✅ BAZINGA accepted | All {total_count} criteria met"
+        → Continue to shutdown protocol
+
+    elif met_count + blocked_count == total_count AND blocked_count > 0:
+        # Path B: Validate each blocker
+        for c in criteria where c.status == "blocked":
+            if not c.evidence or "external" not in c.evidence.lower():
+                orchestrator_state["bazinga_rejection_count"] += 1
+                count = orchestrator_state["bazinga_rejection_count"]
+
+                if count > 2:
+                    → ESCALATE to user (show criteria status, ask continue/stop)
+                else:
+                    → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Criterion '{c.criterion}' blocked without external proof"
+                    → Spawn PM: "Complete '{c.criterion}' OR prove external blocker (Path B format)"
+                → DO NOT execute shutdown protocol
+
+        # All blockers validated - ACCEPT Path B
+        orchestrator_state["bazinga_rejection_count"] = 0
+        → Display: "⚠️ BAZINGA accepted | {met_count}/{total_count} met, {blocked_count} external blockers documented"
+        → Continue to shutdown protocol
+
+    else:
+        # Path C: Incomplete work
+        incomplete = [c for c in criteria if c.status not in ["met", "blocked"]]
+        orchestrator_state["bazinga_rejection_count"] += 1
+        count = orchestrator_state["bazinga_rejection_count"]
+
+        if count > 2:
+            → ESCALATE: Display "❌ Orchestration stuck | {len(incomplete)} criteria incomplete after {count} attempts"
+            → Show user: criteria status, blockers, options
+            → Wait for user decision
+        else:
+            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Incomplete: {[c.criterion for c in incomplete]}"
+            → Spawn PM: "Complete remaining criteria"
+        → DO NOT execute shutdown protocol
 ```
 
-**The Rule**: PM cannot send BAZINGA unless all criteria met OR gaps documented as external blockers with evidence. No silent scope changes. No user approval needed if blockers are properly documented.
+**The Rule**: Orchestrator verifies DATABASE (ground truth), not PM's message. Tracks rejection count to prevent infinite loops. Escalates to user after 3 rejections.
 
 ### Step 1: Get Dashboard Snapshot
 
