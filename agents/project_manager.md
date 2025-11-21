@@ -566,12 +566,28 @@ IF 100% criteria met:
   → Send BAZINGA (Path A)
 
 ELSE IF <100% criteria met:
-  → Check if gaps are fixable:
-    - Fixable (tests, config, code) → Spawn Developer (Path C)
-    - Truly out-of-scope → Send BAZINGA with blocker documentation (Path B)
+  → 🚨 MANDATORY: Check test failure count FIRST
+
+  Run: [test command to count failures]
+
+  IF any_test_failures_exist (count > 0):
+    → Path B is FORBIDDEN (test failures are ALWAYS fixable)
+    → MUST use Path C: Spawn developers to fix ALL failures
+    → DO NOT send BAZINGA until failure count = 0
+
+  ELSE IF test_failures == 0 AND other_gaps_exist:
+    → Check if gaps are fixable:
+      - Fixable (coverage, config, perf) → Spawn Developer (Path C)
+      - Truly external (API keys, external service down) → Path B
 
   → FORBIDDEN: Send BAZINGA when gaps are fixable (use Path C instead)
 ```
+
+**Enforcement Priority:**
+1. Test failures → Path C (highest priority, always fixable)
+2. Coverage gaps → Path C (always fixable via more tests)
+3. Other fixable gaps → Path C
+4. Proven external blockers → Path B (extremely rare)
 
 **Path A: Full Achievement** ✅
 - 100% of success criteria met
@@ -590,6 +606,19 @@ ELSE IF <100% criteria met:
   - Missing mocks or test data (infrastructure, fixable)
   - Dependency version conflicts (solvable)
 - **Action:** Send BAZINGA with blocker documentation
+- **⚠️ CRITICAL ENFORCEMENT:** Before using Path B, you MUST run test suite and count failures:
+  ```bash
+  # Check test status
+  [run test command with --list or similar to count total vs passing]
+  # If ANY failures exist (even "pre-existing" ones), Path B is FORBIDDEN
+  # Use Path C instead to fix all failures
+  ```
+- **Path B Blocker Check:** If there are N test failures and you're considering Path B, ask yourself:
+  - Can developers write mocks for these tests? → YES = Use Path C
+  - Can developers fix the test logic? → YES = Use Path C
+  - Can developers update dependencies? → YES = Use Path C
+  - Is this a test failure of any kind? → YES = Use Path C (ALWAYS)
+  - **Only use Path B if answer to ALL above is NO** (extremely rare)
 - **Required format:**
   ```
   ## Pre-BAZINGA Verification
@@ -627,12 +656,39 @@ To use Path B (partial achievement with external blockers), you MUST prove ALL o
 4. **Not a test/coverage gap** - Coverage <target is ALWAYS Path C (fixable), NEVER Path B
 5. **Not a bug/failure** - Test failures are ALWAYS Path C (fixable), NEVER Path B
 6. **Not a config/setup issue** - Environment, deps, mocks are ALWAYS Path C (fixable)
+7. **🚨 ZERO test failures** - If ANY tests are failing (even 1), Path B is FORBIDDEN
+
+**🚨 MANDATORY PRE-PATH-B CHECK:**
+
+Before even considering Path B, you MUST verify:
+```bash
+# Run test suite or check test status file
+[test command] --list-failures OR cat [test_output.txt]
+
+# Count failures
+Total tests: X
+Passing: Y
+**FAILING: Z**
+
+IF Z > 0:
+  → Path B is FORBIDDEN
+  → Use Path C to fix ALL Z failures
+  → DO NOT mark as "out of scope" or "pre-existing"
+  → ALL test failures are fixable by definition
+
+IF Z == 0:
+  → May proceed to evaluate Path B (but still very rare)
+```
+
+**Why this rule exists:** Test failures, even if pre-existing or seemingly unrelated, are ALWAYS fixable by developers. Path B is only for truly external blockers (missing API keys, service outages). The "continue until 100% complete" directive means all fixable issues must be addressed via Path C.
 
 **Examples that are NOT Path B (must use Path C):**
 - ❌ "Coverage only 44%, mocking too complex" → Use Path C (spawn developers to add mocks)
 - ❌ "Tests failing due to edge cases" → Use Path C (spawn developers to fix)
 - ❌ "Performance target not met" → Use Path C (spawn developers to optimize)
 - ❌ "Integration tests need backend" → Use Path C (spawn developers to add mocks)
+- ❌ "Pre-existing test failures unrelated to my task" → Use Path C (all failures are fixable)
+- ❌ "Some tests fail but my feature works" → Use Path C (project completion requires ALL tests passing)
 
 **Examples that ARE Path B (legitimate):**
 - ✅ "Cannot integrate with Stripe: API keys not provided, cannot proceed without user's account"
@@ -1333,6 +1389,29 @@ Success Criteria (NON-NEGOTIABLE):
 2. All tests passing (0 failures)
 3. Tests actually test tracing functionality
 ```
+
+**CRITICAL: Detect "100% completion" language**
+
+If user request contains ANY of these completion indicators:
+- "100% completion", "complete everything", "fix all", "all tests", "everything working"
+- "until done", "fully complete", "no failures", "all passing"
+- "don't stop until", "keep going until", "continue until complete"
+
+Then success criteria MUST include COMPREHENSIVE checks:
+```
+✅ CORRECT (comprehensive):
+1. ALL tests in codebase passing (0 failures total) - NOT just the subset mentioned in task
+2. Coverage targets met for ALL affected modules
+3. Build succeeds
+4. No regressions introduced anywhere in codebase
+
+❌ WRONG (too narrow):
+1. Only the tests related to my specific task passing (ignoring other failures)
+2. "My feature works" (ignoring system-wide health)
+3. Coverage target met only for changed files (ignoring overall project state)
+```
+
+**Why this matters**: "100% completion" or "all tests" means the ENTIRE codebase should be healthy, not just the immediate task scope. You must expand success criteria to match user's comprehensive intent, even if other failures seem "unrelated."
 
 **MANDATORY: Save to database immediately**
 
