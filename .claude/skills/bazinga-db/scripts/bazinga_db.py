@@ -16,9 +16,15 @@ import argparse
 class BazingaDB:
     """Database client for BAZINGA orchestration."""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, quiet: bool = False):
         self.db_path = db_path
+        self.quiet = quiet
         self._ensure_db_exists()
+
+    def _print_success(self, message: str):
+        """Print success message unless in quiet mode."""
+        if not self.quiet:
+            print(message)
 
     def _ensure_db_exists(self):
         """Ensure database exists, create if not."""
@@ -86,7 +92,7 @@ class BazingaDB:
                 'created_at': verify['created_at']
             }
 
-            print(f"✓ Session created: {session_id}")
+            self._print_success(f"✓ Session created: {session_id}")
             return result
 
         except sqlite3.IntegrityError as e:
@@ -99,7 +105,7 @@ class BazingaDB:
                 """, (session_id,)).fetchone()
 
                 if existing:
-                    print(f"✓ Session already exists: {session_id}")
+                    self._print_success(f"✓ Session already exists: {session_id}")
                     return dict(existing)
                 else:
                     raise RuntimeError(f"Session reported as existing but not found: {session_id}")
@@ -120,7 +126,7 @@ class BazingaDB:
         """, (status, end_time, session_id))
         conn.commit()
         conn.close()
-        print(f"✓ Session {session_id} status updated to: {status}")
+        self._print_success(f"✓ Session {session_id} status updated to: {status}")
 
     def get_session(self, session_id: str) -> Optional[Dict]:
         """Get session details."""
@@ -184,7 +190,7 @@ class BazingaDB:
                 'agent_id': agent_id
             }
 
-            print(f"✓ Logged {agent_type} interaction (log_id={log_id}, {result['content_length']} chars)")
+            self._print_success(f"✓ Logged {agent_type} interaction (log_id={log_id}, {result['content_length']} chars)")
             return result
 
         except Exception as e:
@@ -250,7 +256,7 @@ class BazingaDB:
         """, (session_id, state_type, json.dumps(state_data)))
         conn.commit()
         conn.close()
-        print(f"✓ Saved {state_type} state")
+        self._print_success(f"✓ Saved {state_type} state")
 
     def get_latest_state(self, session_id: str, state_type: str) -> Optional[Dict]:
         """Get latest state snapshot."""
@@ -275,7 +281,7 @@ class BazingaDB:
                 VALUES (?, ?, ?, ?, ?)
             """, (group_id, session_id, name, status, assigned_to))
             conn.commit()
-            print(f"✓ Task group created: {group_id}")
+            self._print_success(f"✓ Task group created: {group_id}")
         except sqlite3.IntegrityError:
             print(f"! Task group already exists: {group_id}", file=sys.stderr)
         finally:
@@ -308,7 +314,7 @@ class BazingaDB:
             params.append(group_id)
             conn.execute(query, params)
             conn.commit()
-            print(f"✓ Task group updated: {group_id}")
+            self._print_success(f"✓ Task group updated: {group_id}")
 
         conn.close()
 
@@ -375,7 +381,7 @@ class BazingaDB:
         """, (session_id, skill_name, json.dumps(output_data)))
         conn.commit()
         conn.close()
-        print(f"✓ Saved {skill_name} output")
+        self._print_success(f"✓ Saved {skill_name} output")
 
     def get_skill_output(self, session_id: str, skill_name: str) -> Optional[Dict]:
         """Get latest skill output."""
@@ -399,7 +405,7 @@ class BazingaDB:
         """, (key, json.dumps(value)))
         conn.commit()
         conn.close()
-        print(f"✓ Config set: {key}")
+        self._print_success(f"✓ Config set: {key}")
 
     def get_config(self, key: str) -> Optional[Any]:
         """Get configuration value."""
@@ -441,7 +447,7 @@ class BazingaDB:
         """, (session_id, original_prompt, plan_text, phases_json, current_phase, total_phases, metadata_json))
         conn.commit()
         conn.close()
-        print(f"✓ Saved development plan for session {session_id}")
+        self._print_success(f"✓ Saved development plan for session {session_id}")
 
     def get_development_plan(self, session_id: str) -> Optional[Dict]:
         """Get development plan for a session."""
@@ -483,7 +489,7 @@ class BazingaDB:
         """, (json.dumps(phases), phase_number, session_id))
         conn.commit()
         conn.close()
-        print(f"✓ Updated phase {phase_number} status to: {status}")
+        self._print_success(f"✓ Updated phase {phase_number} status to: {status}")
 
     # ==================== QUERY OPERATIONS ====================
 
@@ -502,11 +508,12 @@ class BazingaDB:
 def main():
     parser = argparse.ArgumentParser(description='BAZINGA Database Client')
     parser.add_argument('--db', required=True, help='Database path')
+    parser.add_argument('--quiet', action='store_true', help='Suppress success messages, only show errors')
     parser.add_argument('command', help='Command to execute')
     parser.add_argument('args', nargs=argparse.REMAINDER, help='Command arguments')
 
     args = parser.parse_args()
-    db = BazingaDB(args.db)
+    db = BazingaDB(args.db, quiet=args.quiet)
 
     # Parse command and execute
     cmd = args.command
@@ -546,7 +553,7 @@ def main():
             tokens = int(cmd_args[2])
             agent_id = cmd_args[3] if len(cmd_args) > 3 else None
             db.log_tokens(session_id, agent_type, tokens, agent_id)
-            print(f"✓ Logged {tokens} tokens for {agent_type}")
+            db._print_success(f"✓ Logged {tokens} tokens for {agent_type}")
         elif cmd == 'token-summary':
             by = cmd_args[1] if len(cmd_args) > 1 else 'agent_type'
             result = db.get_token_summary(cmd_args[0], by)

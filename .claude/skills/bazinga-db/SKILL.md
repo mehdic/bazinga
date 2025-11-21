@@ -94,17 +94,19 @@ Extract from the calling agent's request:
 
 Use the **Bash** tool to run the appropriate command:
 
+**IMPORTANT:** Always use the `--quiet` flag to suppress success messages. Only errors will be shown:
+
 ### Session Management
 
 **List recent sessions:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" list-sessions [limit]
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet list-sessions [limit]
 ```
 Returns JSON array of recent sessions (default 10, ordered by created_at DESC).
 
 **Create new session:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet create-session \
   "<session_id>" \
   "<mode>" \
   "<requirements>"
@@ -116,7 +118,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" create-session \
 
 **Log agent interaction:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" log-interaction \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet log-interaction \
   "<session_id>" \
   "<agent_type>" \
   "<content>" \
@@ -126,7 +128,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" log-interaction \
 
 **Save state (PM or orchestrator):**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" save-state \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-state \
   "<session_id>" \
   "<state_type>" \
   '<json_data>'
@@ -134,14 +136,14 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" save-state \
 
 **Get latest state:**
 ```bash
-STATE=$(python3 "$DB_SCRIPT" --db "$DB_PATH" get-state \
+STATE=$(python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-state \
   "<session_id>" \
   "<state_type>")
 ```
 
 **Create task group:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" create-task-group \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet create-task-group \
   "<group_id>" \
   "<session_id>" \
   "<name>" \
@@ -151,7 +153,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" create-task-group \
 
 **Update task group:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" update-task-group \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-task-group \
   "<group_id>" \
   [--status "<status>"] \
   [--assigned_to "<agent_id>"] \
@@ -160,7 +162,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" update-task-group \
 
 **Get task groups:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" get-task-groups \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-task-groups \
   "<session_id>" \
   [status]
 ```
@@ -168,7 +170,7 @@ Returns JSON array of task groups for the session. Optional status filter (pendi
 
 **Update session status:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" update-session-status \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-session-status \
   "<session_id>" \
   "<status>"
 ```
@@ -176,13 +178,13 @@ Updates session status (active, completed, failed). Auto-sets end_time for compl
 
 **Dashboard snapshot:**
 ```bash
-SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot \
+SNAPSHOT=$(python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet dashboard-snapshot \
   "<session_id>")
 ```
 
 **Save development plan:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" save-development-plan \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-development-plan \
   "<session_id>" \
   "<original_prompt>" \
   "<plan_text>" \
@@ -194,13 +196,13 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" save-development-plan \
 
 **Get development plan:**
 ```bash
-PLAN=$(python3 "$DB_SCRIPT" --db "$DB_PATH" get-development-plan \
+PLAN=$(python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-development-plan \
   "<session_id>")
 ```
 
 **Update plan progress:**
 ```bash
-python3 "$DB_SCRIPT" --db "$DB_PATH" update-plan-progress \
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-plan-progress \
   "<session_id>" \
   <phase_number> \
   "<status>"
@@ -502,16 +504,16 @@ Proceeding with original request...
 
 ```bash
 # Log interaction
-python3 "$DB_SCRIPT" --db "$DB_PATH" log-interaction "$SID" "pm" "$CONTENT" 1
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet log-interaction "$SID" "pm" "$CONTENT" 1
 
 # Save PM state
-python3 "$DB_SCRIPT" --db "$DB_PATH" save-state "$SID" "pm" '{"iteration":1}'
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-state "$SID" "pm" '{"iteration":1}'
 
 # Update task group
-python3 "$DB_SCRIPT" --db "$DB_PATH" update-task-group "group_a" --status "completed"
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-task-group "group_a" --status "completed"
 
 # Dashboard snapshot
-python3 "$DB_SCRIPT" --db "$DB_PATH" dashboard-snapshot "$SID"
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet dashboard-snapshot "$SID"
 ```
 
 **Success criteria:**
