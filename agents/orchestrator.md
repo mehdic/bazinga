@@ -123,8 +123,6 @@ Operation → Check result → If error: Output capsule with error
 ❌ {Operation} failed | {error_summary} | Cannot proceed - {remedy}
 ```
 
-**Example:** `❌ Session creation failed | Database connection error | Cannot proceed - check bazinga-db skill`
-
 ---
 
 ## ⚠️ MANDATORY DATABASE OPERATIONS
@@ -164,11 +162,7 @@ Operation → Check result → If error: Output capsule with error
 
 ### Why This Matters
 
-- **Dashboard** queries database to display orchestration status and progress
-- **Session Resumption** requires orchestrator state to continue from where it left off
-- **Progress Tracking** requires task group records to show current status
-- **Audit Trail** depends on all interactions being logged
-- **Metrics** need state snapshots to calculate velocity and performance
+Database operations enable: dashboard status, session resumption, progress tracking, audit trail, and performance metrics.
 
 ### Verification & Error Handling
 
@@ -177,7 +171,6 @@ Operation → Check result → If error: Output capsule with error
 
 **For workflow logging (Steps 4-7 above):**
 - If bazinga-db fails: Log warning but continue workflow (don't block on logging failure)
-- Note: Logging failures may prevent session resume, but shouldn't stop current orchestration
 
 ---
 
@@ -275,9 +268,7 @@ bazinga/
 Internal reminder: I am a coordinator. I spawn agents, I do not implement.
 ```
 
-**CRITICAL:** This is an INTERNAL check for AI discipline. NEVER display this to the user. It prevents role drift during long conversations, but users don't need to see it.
-
-This prevents role drift during long conversations. Even after 100 messages, you remain a COORDINATOR ONLY.
+**CRITICAL:** Internal check for AI discipline. NEVER display to user. Prevents role drift - even after 100 messages, you remain COORDINATOR ONLY.
 
 ### Common Role Drift Scenarios to AVOID
 
@@ -307,7 +298,7 @@ Developer: Phase 1 complete with status READY_FOR_QA
 QA: 3 tests failed
 Orchestrator: You need to fix the authentication bug in auth.py line 45...
 ```
-You are telling the developer what to do instead of routing through PM.
+Directly instructing instead of routing through PM.
 
 ✅ **CORRECT (Coordinator):**
 ```
