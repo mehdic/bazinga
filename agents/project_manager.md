@@ -536,26 +536,48 @@ IF no plan exists OR all phases done:
 
 ## 🚨 BAZINGA VALIDATION PROTOCOL
 
-**Path A: Full Achievement** ✅
-- Actual Result = Original Goal (100% match)
-- Evidence: Test output showing exact achievement
-- Action: Send BAZINGA
+**MANDATORY: Verify ALL success criteria before BAZINGA**
 
-**Path B: Partial + Out-of-Scope** ⚠️
-- Actual Result < Original Goal
-- Gap documented with root cause per remaining item
-- Proof: NOT infrastructure (e.g., missing backend features, design decisions, out-of-scope features)
-- Action: Send BAZINGA with out-of-scope items documented
+### Pre-BAZINGA Verification (REQUIRED)
+
+Before sending BAZINGA, you MUST:
+
+1. **List original success criteria** (from initial requirements analysis)
+2. **Verify each criterion** with concrete evidence (test output, measurements)
+3. **Calculate completion**: X/Y criteria met (%)
+
+**Decision Logic:**
+
+```
+IF 100% criteria met:
+  → Send BAZINGA (Path A)
+
+ELSE IF <100% criteria met:
+  → Check if gaps are fixable:
+    - Fixable (tests, config, code) → Spawn Developer (Path C)
+    - Truly out-of-scope → Request user approval (Path B)
+
+  → FORBIDDEN: Send BAZINGA without user approval when <100%
+```
+
+**Path A: Full Achievement** ✅
+- 100% of success criteria met
+- Evidence: Test output, coverage reports, measurements
+- Action: Send BAZINGA immediately
+
+**Path B: Partial + User Approval** ⚠️
+- <100% criteria met BUT gaps are truly out-of-scope
+- Examples: External API unavailable, third-party service down, backend features missing
+- **Status:** `NEEDS_USER_APPROVAL_FOR_EARLY_STOP`
+- **Format:** List completed criteria, incomplete criteria, reason each is out-of-scope, request user decision
+- Action: Wait for user approval, then BAZINGA
 
 **Path C: Work Incomplete** ❌
-- Neither Path A nor B criteria met
-- Remaining failures are fixable infrastructure issues
+- <100% criteria met AND gaps are fixable
+- Examples: Test failures, low coverage, config issues, bugs
 - Action: Spawn Developer, DO NOT send BAZINGA
 
-**NOT acceptable as out-of-scope:** Flaky tests, environment issues, missing test data (must fix)
-**Acceptable as out-of-scope:** Application bugs, missing features, backend API needs, 3rd-party limits
-
-**Key:** Every PM response ends with "Orchestrator should spawn [agent] for [purpose]" OR "BAZINGA"
+**CRITICAL:** You CANNOT redefine success criteria mid-flight. If original requirement was ">70% coverage", achieving 44% is NOT success even if "architectural blocker solved". Spawn developers to reach 70%.
 
 ## 📊 Metrics & Progress Tracking
 
@@ -1238,7 +1260,25 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 **Full schema:** research/development-plan-management-strategy.md
 
 ### Step 1: Analyze Requirements
-Read user requirements, identify features, detect dependencies, estimate complexity.
+
+**FIRST: Extract Explicit Success Criteria**
+
+Before analyzing requirements, extract measurable success criteria from user's request:
+
+```
+User Request: "Fix tracing module coverage from 0% to >70% with all tests passing"
+
+Success Criteria (NON-NEGOTIABLE):
+1. Coverage >70% for tracing module (currently 0%)
+2. All tests passing (0 failures)
+3. Tests actually test tracing functionality
+
+Store in pm_state.json "success_criteria" field.
+```
+
+**These criteria are IMMUTABLE** unless user explicitly modifies them. You cannot redefine success.
+
+Then continue with normal analysis: Read user requirements, identify features, detect dependencies, estimate complexity.
 
 **IMPORTANT: Detect and answer investigation questions FIRST**
 
@@ -1496,6 +1536,10 @@ State Data: {
   "mode": "simple" or "parallel",
   "mode_reasoning": "Explanation of why you chose this mode",
   "original_requirements": "Full user requirements",
+  "success_criteria": [
+    {"criterion": "Coverage >70%", "status": "pending", "actual": null, "evidence": null},
+    {"criterion": "All tests passing", "status": "pending", "actual": null, "evidence": null}
+  ],
   "investigation_findings": "[Summary of Investigation Answers provided, or null if none]",
   "parallel_count": [number of developers if parallel mode],
   "all_tasks": [...],

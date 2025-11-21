@@ -2293,19 +2293,33 @@ SHUTDOWN CHECKLIST:
 
 **Validation Before Accepting BAZINGA:**
 
-Check PM's message for evidence:
+**MANDATORY: Verify PM completed Pre-BAZINGA Verification**
+
+Check PM's message for required validation:
 ```
 if pm_message contains "BAZINGA":
-    if "Actual:" not in pm_message:
-        → REJECT: Display error "PM must provide actual validated results"
+    # Check 1: Success Criteria Verification
+    if "Success Criteria" not in pm_message OR "Pre-BAZINGA Verification" not in pm_message:
+        → REJECT: Display "❌ BAZINGA rejected | PM must verify all success criteria before completion | Spawn PM to complete verification"
+        → Spawn PM with instruction: "Complete Pre-BAZINGA Verification checklist"
         → DO NOT execute shutdown protocol
+
+    # Check 2: Criteria Completion Percentage
+    Extract from PM message: "X/Y criteria met"
+    if X < Y AND "NEEDS_USER_APPROVAL_FOR_EARLY_STOP" not in pm_message:
+        → REJECT: Display "❌ BAZINGA rejected | Only X/Y criteria met, no user approval for early stop | Spawn PM to continue work or request user approval"
+        → Spawn PM with instruction: "Either complete remaining criteria OR request user approval with NEEDS_USER_APPROVAL_FOR_EARLY_STOP"
+        → DO NOT execute shutdown protocol
+
+    # Check 3: Evidence Present
     if "Evidence:" not in pm_message:
-        → REJECT: Display error "PM must provide test output evidence"
+        → REJECT: Display "❌ BAZINGA rejected | PM must provide evidence for each criterion | Spawn PM to provide evidence"
         → DO NOT execute shutdown protocol
-    # Only proceed if validation present
+
+    # Only proceed if: 100% criteria met OR <100% with user approval
 ```
 
-**The Rule**: Complete shutdown protocol in order. No celebrations until all steps done.
+**The Rule**: PM cannot send BAZINGA unless all criteria met OR user explicitly approved early stop. No silent scope changes.
 
 ### Step 1: Get Dashboard Snapshot
 
