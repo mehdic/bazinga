@@ -455,7 +455,7 @@
       ]
     },
     {
-      "file": "./test_performance_comparison.py",
+      "file": "./tests/test_performance_comparison.py",
       "similarity": 0.35555555555555557,
       "matched_keywords": [
         "test",
@@ -467,7 +467,7 @@
       ]
     },
     {
-      "file": "./test_concurrent_access.py",
+      "file": "./tests/test_concurrent_access.py",
       "similarity": 0.35555555555555557,
       "matched_keywords": [
         "test",
