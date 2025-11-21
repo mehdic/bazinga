@@ -292,134 +292,18 @@ class BazingaSetup:
         """
         Setup global configuration, merging with existing config if present.
 
-        Strategy:
-        1. Check if config exists in target (supports multiple locations for backwards compatibility)
-        2. If exists and is_update=True, replace old BAZINGA section with new one
-        3. If exists and is_update=False, append if not present
-        4. If doesn't exist, create new .claude/CLAUDE.md with our content
+        DISABLED (2025-11-21): User requested to stop copying claude.md config files
+        to client projects. Users should manage their own .claude/claude.md files.
+
+        The session-start hook still loads .claude/claude.md if it exists, but the
+        CLI no longer copies/creates this file automatically.
 
         Args:
             target_dir: Target directory for installation
             is_update: If True, replaces existing BAZINGA config with new version
         """
-        source_config = self.source_dir / "config" / "claude.md"
-        if not source_config.exists():
-            return False
-
-        # Read BAZINGA configuration
-        with open(source_config, 'r') as f:
-            bazinga_config = f.read()
-
-        # Extract BAZINGA-specific content
-        bazinga_lines = bazinga_config.split('\n')
-        bazinga_config_section = None
-        for i, line in enumerate(bazinga_lines):
-            if "⚠️ CRITICAL" in line or "Orchestrator Role Enforcement" in line:
-                # Include separator line before this section
-                start_idx = max(0, i - 2)  # Include the --- separator
-                bazinga_config_section = '\n'.join(bazinga_lines[start_idx:])
-                break
-
-        if not bazinga_config_section:
-            # Fallback: use everything after line 7
-            bazinga_config_section = '\n'.join(bazinga_lines[7:])
-
-        # Check for existing .claude.md in project root or .claude/ directory
-        # Check multiple variations (case-insensitive)
-        possible_filenames = [
-            ".claude.md",    # Recommended format
-            "claude.md",     # Without dot
-            "CLAUDE.md",     # Uppercase without dot
-            ".CLAUDE.md",    # Uppercase with dot
-        ]
-
-        possible_locations = []
-        # Check in project root
-        for filename in possible_filenames:
-            possible_locations.append(target_dir / filename)
-        # Check in .claude/ directory
-        for filename in possible_filenames:
-            possible_locations.append(target_dir / ".claude" / filename)
-
-        existing_config_path = None
-        for path in possible_locations:
-            if path.exists():
-                existing_config_path = path
-                console.print(f"  [dim]Found existing config: {path.name}[/dim]")
-                break
-
-        if existing_config_path:
-            # Read existing configuration
-            with open(existing_config_path, 'r') as f:
-                existing_content = f.read()
-
-            # Check if BAZINGA configuration is already present
-            has_bazinga = "BAZINGA" in existing_content or "Orchestrator Role Enforcement" in existing_content
-
-            if has_bazinga and is_update:
-                # Update mode: Replace old BAZINGA section with new one
-                try:
-                    # Try to intelligently replace the BAZINGA section
-                    updated_content = self._replace_bazinga_section(
-                        existing_content,
-                        bazinga_config_section
-                    )
-
-                    if updated_content is None:
-                        # Couldn't automatically update - save to separate file
-                        update_file = existing_config_path.parent / f"{existing_config_path.name}.bazinga-update"
-                        with open(update_file, 'w') as f:
-                            f.write(bazinga_config_section)
-
-                        console.print(
-                            f"  ⚠️  Could not automatically update {existing_config_path.name}\n"
-                            f"      New BAZINGA config saved to: {update_file.name}\n"
-                            f"      Please manually merge the changes."
-                        )
-                        return True
-
-                    # Successfully created updated content
-                    with open(existing_config_path, 'w') as f:
-                        f.write(updated_content)
-
-                    console.print(f"  ✓ Updated BAZINGA config in {existing_config_path.name}")
-                    return True
-
-                except Exception as e:
-                    # Error during update - save to separate file
-                    update_file = existing_config_path.parent / f"{existing_config_path.name}.bazinga-update"
-                    with open(update_file, 'w') as f:
-                        f.write(bazinga_config_section)
-
-                    console.print(
-                        f"  ⚠️  Error updating {existing_config_path.name}: {e}\n"
-                        f"      New BAZINGA config saved to: {update_file.name}\n"
-                        f"      Please manually merge the changes."
-                    )
-                    return True
-
-            elif has_bazinga and not is_update:
-                # Init mode: Already has BAZINGA, skip
-                console.print(f"  ℹ️  BAZINGA config already present in {existing_config_path.name}")
-                return True
-
-            else:
-                # No BAZINGA section - append it
-                merged_content = existing_content.rstrip() + '\n\n' + bazinga_config_section
-
-                with open(existing_config_path, 'w') as f:
-                    f.write(merged_content)
-
-                console.print(f"  ✓ Merged BAZINGA config into existing {existing_config_path.name}")
-                return True
-        else:
-            # No existing config, create new one in .claude directory
-            claude_dir = target_dir / ".claude"
-            claude_dir.mkdir(parents=True, exist_ok=True)
-            dest_config = claude_dir / "CLAUDE.md"
-            shutil.copy2(source_config, dest_config)
-            console.print(f"  ✓ Created .claude/CLAUDE.md with BAZINGA config")
-            return True
+        console.print(f"  [dim]Skipping config setup (users manage their own .claude/claude.md)[/dim]")
+        return True
 
     def _replace_bazinga_section(self, content: str, new_bazinga_section: str) -> Optional[str]:
         """
