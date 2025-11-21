@@ -1319,8 +1319,6 @@ IF JSON construction fails:
 
 Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
-**Full schema:** research/development-plan-management-strategy.md
-
 ### Step 1: Analyze Requirements
 
 **FIRST: Extract Explicit Success Criteria**
