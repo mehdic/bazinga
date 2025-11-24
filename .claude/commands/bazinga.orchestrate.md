@@ -2356,49 +2356,44 @@ if pm_message contains "BAZINGA":
                 → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
             → DO NOT execute shutdown protocol
 
-    # Check B: Spawn BAZINGA Validator for independent verification
+    # Check B: Invoke BAZINGA Validator skill for independent verification
 
-    # The validator handles all heavy logic (test verification, evidence parsing, etc.)
-    # Spawning validator instead of inline logic saves ~3,500 chars in orchestrator
+    # The validator skill handles all heavy logic (test verification, evidence parsing, etc.)
+    # Using skill instead of inline logic saves ~3,500 chars in orchestrator
 
-    validator_prompt = f"""Validate BAZINGA for session {session_id}.
+    # Invoke validator skill
+    Skill(command: "bazinga-validator")
 
-PM claims work complete. Verify independently:
-1. Query criteria from database
-2. Run tests to count failures
-3. Verify evidence matches claims
-4. Check for vague criteria
-5. Validate external blockers
+    # In the same message, provide context to validator:
+    # "bazinga-validator, validate BAZINGA for session: {session_id}"
 
-Be skeptical - assume PM wrong until proven right.
-Return: ACCEPT | REJECT | CLARIFY with reasoning."""
-
-    # Spawn validator using Task tool
-    Task(
-        subagent_type="general-purpose",
-        description="Validate BAZINGA completion",
-        prompt=validator_prompt
-    )
+    # The validator will:
+    # 1. Query success criteria from database (via bazinga-db skill)
+    # 2. Run tests independently to count failures
+    # 3. Verify evidence matches claims
+    # 4. Check for vague criteria
+    # 5. Validate external blockers (if Path B)
+    # 6. Return structured verdict
 
     # Parse validator response
     # Expected format: "## BAZINGA Validation Result\n**Verdict:** ACCEPT|REJECT|CLARIFY"
 
-    if "Verdict: ACCEPT" in validator_result or "**Verdict:** ACCEPT" in validator_result:
+    if "Verdict: ACCEPT" in validator_response or "**Verdict:** ACCEPT" in validator_response:
         # Validator approved BAZINGA
         orchestrator_state["bazinga_rejection_count"] = 0  # Reset on success
 
         # Display validator's verdict
-        → Display: Extract completion message from validator_result
+        → Display: Extract completion message from validator_response
         → Continue to shutdown protocol
 
-    elif "Verdict: REJECT" in validator_result or "**Verdict:** REJECT" in validator_result:
+    elif "Verdict: REJECT" in validator_response or "**Verdict:** REJECT" in validator_response:
         # Validator rejected BAZINGA
         orchestrator_state["bazinga_rejection_count"] += 1
         count = orchestrator_state["bazinga_rejection_count"]
 
         # Extract reason and action from validator
-        reason = parse_section(validator_result, "### Reason")
-        action = parse_section(validator_result, "### Recommended Action")
+        reason = parse_section(validator_response, "### Reason")
+        action = parse_section(validator_response, "### Recommended Action")
 
         if count > 2:
             → ESCALATE: Display "❌ Orchestration stuck | BAZINGA rejected {count} times"
@@ -2413,7 +2408,7 @@ Return: ACCEPT | REJECT | CLARIFY with reasoning."""
         # CLARIFY verdict or unparseable response
         orchestrator_state["bazinga_rejection_count"] += 1
         → Display: "⚠️ Validator needs clarification"
-        → Spawn PM: Extract clarification request from validator_result
+        → Spawn PM: Extract clarification request from validator_response
         → DO NOT execute shutdown protocol
 ```
 
