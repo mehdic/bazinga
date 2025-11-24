@@ -122,32 +122,28 @@ jobs:
           # Handle timeout errors (exit code 28)
           if [ "$CURL_EXIT" -eq 28 ]; then
             echo "Error: API request timed out after 210 seconds"
-            {
-              echo "## ⚠️ Gemini API Timeout"
-              echo ""
-              echo "The Gemini 3 Pro model took too long to respond (>3.5 minutes). This can happen with large diffs or complex analysis."
-              echo ""
-              echo "**Suggestions:**"
-              echo "- Try reducing the diff size"
-              echo "- Use a faster model (e.g., gemini-2.5-flash)"
-              echo "- Retry the workflow"
-            } > review.txt
+            echo "## ⚠️ Gemini API Timeout" > review.txt
+            echo "" >> review.txt
+            echo "The Gemini 3 Pro model took too long to respond (greater than 3.5 minutes). This can happen with large diffs or complex analysis." >> review.txt
+            echo "" >> review.txt
+            echo "**Suggestions:**" >> review.txt
+            echo "- Try reducing the diff size" >> review.txt
+            echo "- Use a faster model (e.g., gemini-2.5-flash)" >> review.txt
+            echo "- Retry the workflow" >> review.txt
             exit 0
           fi
 
           # Handle other curl errors
           if [ "$CURL_EXIT" -ne 0 ]; then
             echo "Error: Curl failed with exit code $CURL_EXIT"
-            {
-              echo "## ⚠️ Network Error"
-              echo ""
-              echo "Failed to connect to Gemini API (curl exit code: $CURL_EXIT)."
-              echo ""
-              echo "**Please check:**"
-              echo "- Network connectivity"
-              echo "- API endpoint availability"
-              echo "- Retry the workflow"
-            } > review.txt
+            echo "## ⚠️ Network Error" > review.txt
+            echo "" >> review.txt
+            echo "Failed to connect to Gemini API (curl exit code: $CURL_EXIT)." >> review.txt
+            echo "" >> review.txt
+            echo "**Please check:**" >> review.txt
+            echo "- Network connectivity" >> review.txt
+            echo "- API endpoint availability" >> review.txt
+            echo "- Retry the workflow" >> review.txt
             exit 0
           fi
 
@@ -157,23 +153,17 @@ jobs:
 
             # Build error message based on HTTP status
             if [ "$HTTP_CODE" == "429" ]; then
-              {
-                echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)"
-                echo ""
-                echo "Rate limit exceeded. Please check your API quota at https://aistudio.google.com/app/apikey"
-              } > review.txt
+              echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
+              echo "" >> review.txt
+              echo "Rate limit exceeded. Please check your API quota at https://aistudio.google.com/app/apikey" >> review.txt
             elif [ "$HTTP_CODE" == "401" ] || [ "$HTTP_CODE" == "403" ]; then
-              {
-                echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)"
-                echo ""
-                echo "Authentication failed. Please verify GEMINI_API_KEY secret is configured correctly."
-              } > review.txt
+              echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
+              echo "" >> review.txt
+              echo "Authentication failed. Please verify GEMINI_API_KEY secret is configured correctly." >> review.txt
             else
-              {
-                echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)"
-                echo ""
-                echo "API call failed. Check workflow logs for details."
-              } > review.txt
+              echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
+              echo "" >> review.txt
+              echo "API call failed. Check workflow logs for details." >> review.txt
             fi
 
             exit 0
