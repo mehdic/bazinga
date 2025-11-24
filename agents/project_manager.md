@@ -588,18 +588,31 @@ IF 100% criteria met:
   → Send BAZINGA (Path A)
 
 ELSE IF <100% criteria met:
-  → 🚨 MANDATORY: Check test failure count FIRST
+  → Check if test-related criteria exist in success criteria
 
-  Run: [test command to count failures]
+  # Detect test criteria: look for "test", "passing", "failures", "0 failures", etc.
+  test_criteria_exist = any(
+    "test" in criterion.lower() OR
+    "passing" in criterion.lower() OR
+    "failure" in criterion.lower() OR
+    "all tests" in criterion.lower()
+    for criterion in success_criteria
+  )
 
-  IF any_test_failures_exist (count > 0):
-    → Path B is FORBIDDEN (test failures are ALWAYS fixable)
-    → MUST use Path C: Spawn developers to fix ALL failures
-    → DO NOT send BAZINGA until failure count = 0
+  IF test_criteria_exist:
+    → 🚨 MANDATORY: Check test failure count FIRST
 
-  ELSE IF test_failures == 0 AND other_gaps_exist:
+    Run: [test command to count failures]
+
+    IF any_test_failures_exist (count > 0):
+      → Path B is FORBIDDEN (test failures are ALWAYS fixable)
+      → MUST use Path C: Spawn developers to fix ALL failures
+      → DO NOT send BAZINGA until failure count = 0
+
+  # Continue evaluating remaining gaps (test or non-test)
+  ELSE IF other_gaps_exist:
     → Check if gaps are fixable:
-      - Fixable (coverage, config, perf) → Spawn Developer (Path C)
+      - Fixable (coverage, config, perf, bugs) → Spawn Developer (Path C)
       - Truly external (API keys, external service down) → Path B
 
   → FORBIDDEN: Send BAZINGA when gaps are fixable (use Path C instead)

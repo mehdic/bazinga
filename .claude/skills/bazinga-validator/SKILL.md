@@ -54,9 +54,9 @@ bazinga-db, please get success criteria for session: [session_id]
 
 ---
 
-## Step 2: Independent Test Verification (HIGHEST PRIORITY)
+## Step 2: Independent Test Verification (CONDITIONAL)
 
-**Critical:** Do NOT trust PM's test status. Run tests yourself.
+**Critical:** Only run tests if test-related criteria exist.
 
 ### 2.1: Detect Test-Related Criteria
 
@@ -66,7 +66,25 @@ Look for criteria containing:
 - "0 failures"
 - "100% tests"
 
+**If NO test-related criteria found:**
+```
+→ Skip entire Step 2 (test verification)
+→ Continue to Step 3 (verify other evidence)
+→ Tests are not part of requirements
+→ Log: "No test criteria detected, skipping test verification"
+```
+
+**If test-related criteria found:**
+```
+→ Proceed with test verification below
+→ Run tests independently
+→ Count failures
+→ Zero tolerance for any failures
+```
+
 ### 2.2: Find Test Command
+
+**Only execute if test criteria exist (from Step 2.1).**
 
 Check for test configuration:
 - `package.json` → scripts.test (Node.js)
@@ -229,6 +247,7 @@ ELSE IF all verifications passed AND met_count + blocked_count == total_count:
 ELSE IF test_failures_found:
   → Return: REJECT
   → Reason: "Independent verification: {failure_count} test failures found"
+  → Note: This only applies if test criteria exist (Step 2.1)
 
 ELSE IF evidence_mismatch:
   → Return: REJECT
@@ -242,6 +261,8 @@ ELSE:
   → Return: REJECT
   → Reason: "Incomplete: {list incomplete criteria}"
 ```
+
+**Important:** If no test-related criteria exist, the validator skips Step 2 entirely. The decision tree proceeds based on other evidence (Step 3) only.
 
 ---
 
@@ -348,6 +369,36 @@ These are fixable via Path C (spawn developers).
 ### Recommended Action
 
 REJECT BAZINGA. Spawn PM with instruction: "375 tests still failing. Continue fixing until failure count = 0."
+```
+
+---
+
+## Example: ACCEPT Verdict (No Test Criteria)
+
+```markdown
+## BAZINGA Validation Result
+
+**Verdict:** ACCEPT
+**Path:** A (Full achievement)
+**Completion:** 2/2 criteria met (100%)
+
+### Verification Details
+
+⏭️ Test Verification: SKIPPED
+   - No test-related criteria detected
+   - Tests not part of requirements
+
+✅ Evidence Verification: 2/2
+   - Dark mode toggle working: ✅ PASS (verified in UI)
+   - Settings page updated: ✅ PASS (component added)
+
+### Reason
+
+No test requirements specified. Independent verification confirms all specified criteria met with concrete evidence.
+
+### Recommended Action
+
+Accept BAZINGA and proceed to shutdown protocol.
 ```
 
 ---
