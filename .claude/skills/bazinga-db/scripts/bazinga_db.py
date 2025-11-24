@@ -495,7 +495,7 @@ class BazingaDB:
             raise ValueError(f"Invalid status: {status}. Must be one of: {', '.join(valid_statuses)}")
 
     def save_success_criteria(self, session_id: str, criteria: List[Dict]) -> None:
-        """Save success criteria for a session (UPSERT - replaces existing)."""
+        """Save success criteria for a session (full replacement - removes stale criteria)."""
         # Validate inputs before database operations
         if not criteria:
             raise ValueError("criteria cannot be empty")
@@ -510,7 +510,13 @@ class BazingaDB:
 
         conn = self._get_connection()
         try:
-            # Use transaction for all-or-nothing save
+            # Use transaction for all-or-nothing save (delete + insert)
+            # Step 1: Delete all existing criteria for this session
+            conn.execute("""
+                DELETE FROM success_criteria WHERE session_id = ?
+            """, (session_id,))
+
+            # Step 2: Insert new criteria
             for criterion_obj in criteria:
                 criterion_text = criterion_obj.get('criterion', '').strip()
                 status = criterion_obj.get('status', 'pending')
@@ -518,18 +524,10 @@ class BazingaDB:
                 evidence = criterion_obj.get('evidence')
                 required = criterion_obj.get('required_for_completion', True)
 
-                # UPSERT using INSERT OR REPLACE
                 conn.execute("""
                     INSERT INTO success_criteria
-                    (session_id, criterion, status, actual, evidence, required_for_completion, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(session_id, criterion)
-                    DO UPDATE SET
-                        status = excluded.status,
-                        actual = excluded.actual,
-                        evidence = excluded.evidence,
-                        required_for_completion = excluded.required_for_completion,
-                        updated_at = CURRENT_TIMESTAMP
+                    (session_id, criterion, status, actual, evidence, required_for_completion, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, (session_id, criterion_text, status, actual, evidence, required))
 
             conn.commit()
