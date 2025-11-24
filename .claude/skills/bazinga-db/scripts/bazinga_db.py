@@ -488,13 +488,31 @@ class BazingaDB:
 
     # ==================== SUCCESS CRITERIA OPERATIONS ====================
 
+    def _validate_criterion_status(self, status: str) -> None:
+        """Validate criterion status value."""
+        valid_statuses = ['pending', 'met', 'blocked', 'failed']
+        if status not in valid_statuses:
+            raise ValueError(f"Invalid status: {status}. Must be one of: {', '.join(valid_statuses)}")
+
     def save_success_criteria(self, session_id: str, criteria: List[Dict]) -> None:
         """Save success criteria for a session (UPSERT - replaces existing)."""
+        # Validate inputs before database operations
+        if not criteria:
+            raise ValueError("criteria cannot be empty")
+
+        for i, criterion_obj in enumerate(criteria):
+            criterion_text = criterion_obj.get('criterion', '').strip()
+            if not criterion_text:
+                raise ValueError(f"Criterion {i}: 'criterion' text cannot be empty")
+
+            status = criterion_obj.get('status', 'pending')
+            self._validate_criterion_status(status)
+
         conn = self._get_connection()
         try:
             # Use transaction for all-or-nothing save
             for criterion_obj in criteria:
-                criterion_text = criterion_obj.get('criterion', '')
+                criterion_text = criterion_obj.get('criterion', '').strip()
                 status = criterion_obj.get('status', 'pending')
                 actual = criterion_obj.get('actual')
                 evidence = criterion_obj.get('evidence')
@@ -540,6 +558,12 @@ class BazingaDB:
                                  actual: Optional[str] = None,
                                  evidence: Optional[str] = None) -> None:
         """Update a specific success criterion (status, actual, evidence)."""
+        # Validate inputs
+        if not criterion or not criterion.strip():
+            raise ValueError("criterion text cannot be empty")
+        if status is not None:
+            self._validate_criterion_status(status)
+
         conn = self._get_connection()
         updates = []
         params = []

@@ -128,7 +128,7 @@ def init_database(db_path: str) -> None:
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Add development_plans table for multi-phase orchestrations"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Add success_criteria table for BAZINGA validation"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
