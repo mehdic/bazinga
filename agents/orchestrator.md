@@ -50,7 +50,9 @@ The user's message to you contains their requirements for this orchestration tas
 
 **MANDATORY: Use Compact Progress Capsule Format**
 
-All user-visible updates MUST use the capsule format defined in `bazinga/templates/message_templates.md`:
+**⚠️ NOTE:** You loaded message templates (`bazinga/templates/message_templates.md`) during initialization. Use those exact formats for all user-facing output.
+
+All user-visible updates MUST use the capsule format:
 
 ```
 [Emoji] [Action/Phase] | [Key Observation] | [Decision/Outcome] → [Next Step]
@@ -75,7 +77,7 @@ All user-visible updates MUST use the capsule format defined in `bazinga/templat
 ✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
 ```
 
-**Reference:** See `bazinga/templates/message_templates.md` for complete template catalog.
+**Reference:** Use the complete template catalog from `bazinga/templates/message_templates.md` (loaded at initialization).
 
 **Summary vs Artifact Separation:**
 
@@ -95,7 +97,7 @@ All user-visible updates MUST use the capsule format defined in `bazinga/templat
 
 ## 📊 Agent Response Parsing for Capsule Construction
 
-**Complete parsing guide:** `bazinga/templates/response_parsing.md`
+**⚠️ NOTE:** You loaded the complete parsing guide (`bazinga/templates/response_parsing.md`) during initialization. Use the patterns and fallback strategies from that guide throughout this session.
 
 **Quick Reference:**
 
@@ -116,7 +118,7 @@ For each agent type, extract:
 📋 PM: Planning complete | {mode}: {groups} | Starting development
 ```
 
-**Detailed extraction patterns, fallback strategies, and complete examples:** See `bazinga/templates/response_parsing.md`
+**Detailed extraction patterns, fallback strategies, and complete examples:** Use the patterns from `bazinga/templates/response_parsing.md` (loaded at initialization)
 
 ---
 
@@ -500,7 +502,7 @@ Display:
 
    **AFTER reading configs: IMMEDIATELY continue to step 5 (Store config in database). Do NOT stop.**
 
-   See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
+   See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
 
 5. **Store config references in database:**
 
@@ -582,7 +584,23 @@ Display:
 
    **Note:** Process dashboard startup silently - dashboard is background infrastructure, no user output needed.
 
-   **AFTER dashboard check/start: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
+   **AFTER dashboard check/start: IMMEDIATELY continue to step 8 (Load template guides). Do NOT stop.**
+
+8. **Load critical template guides:**
+
+   **⚠️ MANDATORY: Read templates that contain runtime instructions**
+
+   These templates are NOT documentation - they contain critical operational logic that must be loaded before orchestration begins.
+
+   ```
+   Read(file_path: "bazinga/templates/message_templates.md")
+   Read(file_path: "bazinga/templates/response_parsing.md")
+   Read(file_path: "bazinga/templates/prompt_building.md")
+   ```
+
+   **Verify all 3 templates loaded.** If ANY Read fails → Output `❌ Template load failed | [filename]` and STOP.
+
+   **AFTER loading and verifying templates: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
 
 **Database Storage:**
 
@@ -593,7 +611,7 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 
 ### ⚠️ INITIALIZATION VERIFICATION CHECKPOINT
 
-**CRITICAL:** Verify initialization complete (session ID, database, configs loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
+**CRITICAL:** Verify initialization complete (session ID, database, configs loaded, templates loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
 
 **Then IMMEDIATELY proceed to Phase 1 - spawn PM without stopping or waiting.
 
@@ -763,7 +781,11 @@ Check if PM response contains investigation section. Look for these headers (fuz
   Questions: [extracted questions]
   Answers: [extracted answers]
   ```
-  Then invoke: `Skill(command: "bazinga-db")`
+
+  **Then invoke:**
+  ```
+  Skill(command: "bazinga-db")
+  ```
 - Then continue to parse planning sections
 
 **Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
@@ -772,7 +794,7 @@ Check if PM response contains investigation section. Look for these headers (fuz
 
 **Step 2: Parse PM response and output capsule to user**
 
-Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
@@ -806,23 +828,52 @@ IF status = BAZINGA or CONTINUE:
 
 **Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
 
-**Step 4: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
+**Step 4: Log PM interaction:**
+```
+bazinga-db, please log this pm interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: 1
+Agent ID: pm_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
-### Step 1.3a: Handle PM Clarification Requests (if applicable)
+### Step 1.3a: Handle PM Status and Route Accordingly
 
-**Detection:** Check if PM response contains `PM Status: NEEDS_CLARIFICATION`
+**Detection:** Check PM Status code from response
 
-**If NEEDS_CLARIFICATION is NOT present:**
-- PM has made a decision (SIMPLE or PARALLEL mode)
+**Expected status codes from initial PM spawn:**
+- `PLANNING_COMPLETE` - PM completed planning, proceed to execution
+- `NEEDS_CLARIFICATION` - PM needs user input before planning
+- `INVESTIGATION_ONLY` - User only asked questions, no implementation needed
+
+**IF status = PLANNING_COMPLETE:**
+- PM has completed planning (created mode decision and task groups)
 - **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
 
-**If NEEDS_CLARIFICATION IS present:** Execute clarification workflow below
+**IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
-#### Clarification Workflow
+**IF status = INVESTIGATION_ONLY:**
+- PM only answered questions (no implementation requested)
+- Display PM's investigation findings to user
+- **END orchestration** (no development work needed)
+
+**IF status is missing or unclear:**
+- Apply fallback: If response contains task groups or mode decision, treat as PLANNING_COMPLETE
+- If response contains questions/clarifications, treat as NEEDS_CLARIFICATION
+- **IMMEDIATELY jump to Step 1.4. Do NOT stop.**
+
+#### Clarification Workflow (NEEDS_CLARIFICATION)
 
 **Step 1: Log Clarification Request**
 
@@ -1033,7 +1084,7 @@ Repeat for each task group found in the PM's response.
 
 Process internally (creating task groups from PM response - no user output needed for database sync).
 
-See `bazinga/templates/message_templates.md` for PM response format examples.
+Use the PM response format examples from `bazinga/templates/message_templates.md` (loaded at initialization).
 
 ### Step 1.5: Route Based on Mode
 
@@ -1060,7 +1111,7 @@ ELSE IF PM chose "parallel":
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING
 
-**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1069,7 +1120,7 @@ ELSE IF PM chose "parallel":
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL)
 - **Files** created/modified
 - **Tests** added (count)
@@ -1096,13 +1147,27 @@ IF status = BLOCKED:
   ⚠️ Group {id} blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see Developer fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log developer interaction:** §DB.log(developer, session_id, dev_response, iteration, developer_main)
+**Step 4: Log developer interaction:**
+```
+bazinga-db, please log this developer interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: developer
+Content: [dev_response]
+Iteration: [iteration]
+Agent ID: developer_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
 
@@ -1137,7 +1202,7 @@ Before moving to the next group or ending your message, verify:
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
-2. Add configuration from `bazinga/templates/prompt_building.md`
+2. Add configuration from `bazinga/templates/prompt_building.md` (loaded at initialization)
 3. Include in prompt:
    - Summary of work completed so far
    - Specific gaps/issues that remain (extract from developer response)
@@ -1205,14 +1270,14 @@ Task(subagent_type="general-purpose",
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
 
 **Step 1: Parse response and output capsule to user**
 
-Use the QA Expert Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the QA Expert Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
@@ -1239,7 +1304,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see QA fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
 
@@ -1298,14 +1363,14 @@ Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", pro
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Tech Lead Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the Tech Lead Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Decision** (APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS)
 - **Security issues** count
 - **Lint issues** count
@@ -1338,13 +1403,27 @@ IF decision = ESCALATE_TO_OPUS:
   ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see Tech Lead fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log Tech Lead interaction:** §DB.log(techlead, session_id, tl_response, iteration, techlead_main)
+**Step 4: Log Tech Lead interaction:**
+```
+bazinga-db, please log this techlead interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: techlead
+Content: [tl_response]
+Iteration: [iteration]
+Agent ID: techlead_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
@@ -1366,7 +1445,14 @@ Then invoke: `Skill(command: "bazinga-db")`
 - `skills_config` - For investigator skills (from Step 0)
 
 **Loop Execution:**
-1. **Read the full procedure:** Use Read tool → `bazinga/templates/investigation_loop.md`
+
+1. **Read the full investigation procedure**
+
+Use the Read tool to read the complete investigation loop:
+```
+Read(file_path: "bazinga/templates/investigation_loop.md")
+```
+
 2. **Execute all steps** in the template (up to 5 iterations)
 3. **Return to orchestrator** at the exit code destination below
 
@@ -1477,7 +1563,10 @@ Iteration: [iteration]
 Agent ID: techlead_validation
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
 **Tech Lead Decision:**
 - Reviews Investigator's logic
@@ -1534,7 +1623,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 
 **Step 1: Parse response and output capsule to user**
 
-Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
@@ -1561,7 +1650,7 @@ IF decision = NEEDS_CLARIFICATION:
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see PM fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
@@ -1586,9 +1675,23 @@ Skill(command: "velocity-tracker")
 
 
 
-**Log PM interaction:** §DB.log(pm, session_id, pm_response, iteration, pm_final)
+**Log PM interaction:**
+```
+bazinga-db, please log this pm interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: [iteration]
+Agent ID: pm_final
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 ### Step 2A.9: Route PM Response (Simple Mode)
 
@@ -1597,7 +1700,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **IF PM sends CONTINUE:**
 - Query task groups (§Step 1.4) → Parse PM feedback → Identify what needs fixing
-- Build revision prompt per §Step 2A.1 → Spawn agent → Log to database (see `bazinga/templates/logging_pattern.md`)
+- Build revision prompt per §Step 2A.1 → Spawn agent → Log to database
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
@@ -1618,7 +1721,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
 
-**IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md`. All database logging follows `bazinga/templates/logging_pattern.md`.
+**IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md` (loaded at initialization).
 
 ---
 ## Phase 2B: Parallel Mode Execution
@@ -1750,7 +1853,7 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract status, files, tests, coverage, summary.
+Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
 - READY_FOR_QA/REVIEW: `🔨 Group {id} complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
@@ -1759,9 +1862,23 @@ Use the Developer Response Parsing section in `bazinga/templates/response_parsin
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log to database:** §DB.log(developer, session_id, dev_response, iteration, dev_group_[X])
+**Step 4: Log to database:**
+```
+bazinga-db, please log this developer interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: developer
+Content: [dev_response]
+Iteration: [iteration]
+Agent ID: dev_group_[X]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 ### Step 2B.2a: Mandatory Batch Processing (LAYER 1 - ROOT CAUSE FIX)
 
@@ -1920,7 +2037,11 @@ Before ending your orchestrator message in parallel mode (Step 2B), you MUST ans
 Query database NOW to get fresh state (if not already queried in this message):
 ```
 Request: "bazinga-db, please get all task groups for session [session_id]"
-Then invoke: Skill(command: "bazinga-db")
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 Parse returned groups and check status:
@@ -2009,9 +2130,23 @@ Analyze response content to infer intent:
 
 Use inferred decision for routing (as if PM explicitly stated it).
 
-**Step 2: Log PM response:** §DB.log(pm, session_id, pm_response, iteration, pm_parallel_final)
+**Step 2: Log PM response:**
+```
+bazinga-db, please log this pm interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: [iteration]
+Agent ID: pm_parallel_final
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **Step 3: Track velocity metrics:**
 ```
@@ -2095,27 +2230,39 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, invest
 
 **Quick patterns you'll use throughout:**
 
-**After EVERY agent interaction:**
+**After EVERY agent interaction, you MUST log it using this format:**
 ```
-§DB.log(agent_type, session_id, agent_response, iteration, agent_id)
+bazinga-db, please log this [agent_type] interaction:
+
+Session ID: [session_id]
+Agent Type: [agent_type]
+Content: [agent_response]
+Iteration: [iteration]
+Agent ID: [agent_id]
 ```
-Then invoke: `Skill(command: "bazinga-db")`
 
-**⚠️ CRITICAL - §DB.log() is DOCUMENTATION SHORTHAND, not executable code!**
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
-When you see: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
+**⚠️ CRITICAL - You MUST invoke the Skill after providing the log request!**
 
-You MUST expand it to:
+**Example for PM:**
 ```
 bazinga-db, please log this pm interaction:
 
-Session ID: [session_id]
+Session ID: bazinga_20251124_100000
 Agent Type: pm
-Content: [pm_response]
+Content: [full PM response text]
 Iteration: 1
 Agent ID: pm_main
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
 **Forgetting the Skill invocation causes silent logging failure!**
 
@@ -2166,566 +2313,18 @@ When PM sends BAZINGA:
 
 ## 🚨 MANDATORY SHUTDOWN PROTOCOL - NO SKIPPING ALLOWED
 
-**⚠️ CRITICAL**: When PM sends BAZINGA, you MUST complete ALL steps IN ORDER. This is NOT optional.
+**⚠️ CRITICAL**: When PM sends BAZINGA, you MUST follow the complete shutdown protocol.
 
-**🛑 MANDATORY CHECKLIST - Execute each step sequentially:**
+**Step 1: Read the full shutdown protocol**
 
+Use the Read tool to read the complete shutdown protocol:
 ```
-SHUTDOWN CHECKLIST:
-[ ] 1. Get dashboard snapshot from database
-[ ] 2. Detect anomalies (gaps between goal and actual)
-[ ] 2.5. Git cleanup - Check for uncommitted/unpushed work:
-    [ ] 2.5.1. Check git status for uncommitted changes
-    [ ] 2.5.2. Commit uncommitted changes (if any)
-    [ ] 2.5.3. Get current branch name
-    [ ] 2.5.4. Check for unpushed commits
-    [ ] 2.5.5. Push to remote (if needed)
-    [ ] 2.5.6. Record git state in database
-    [ ] 2.5.7. Display git cleanup success
-[ ] 3. Read completion report template
-[ ] 4. Generate detailed report file: bazinga/artifacts/{SESSION_ID}/completion_report.md
-[ ] 5. Invoke velocity-tracker skill
-[ ] 6. Save final orchestrator state to database
-[ ] 7. Update session status to 'completed' with end_time
-[ ] 8. Verify database writes succeeded
-[ ] 9. ONLY THEN display success message to user
+Read(file_path: "bazinga/templates/shutdown_protocol.md")
 ```
 
-**❌ IF ANY STEP FAILS:**
-- Log the failure
-- Display error message, NOT success
-- Session remains 'active', NOT 'completed'
-- Do NOT proceed to next step
+**Step 2: Execute all steps in the template sequentially**
 
-**Validation Before Accepting BAZINGA:**
-
-**MANDATORY: Templated Rejection Messages (Prevent Role Drift)**
-
-When rejecting BAZINGA, orchestrator MUST use structured templates. NEVER analyze code or suggest implementation details.
-
-**Rejection Template Structure:**
-```
-❌ BAZINGA rejected (attempt {count}/3) | {reason} | {directive}
-```
-
-**Examples:**
-- "❌ BAZINGA rejected (attempt 1/3) | No criteria in database | PM must extract criteria"
-- "❌ BAZINGA rejected (attempt 2/3) | Evidence shows 44%, criterion requires >70% | PM must achieve target coverage"
-
-**FORBIDDEN in rejection messages:**
-- ❌ Code analysis ("The issue is in line 42...")
-- ❌ Implementation suggestions ("Try using pytest-cov...")
-- ❌ Debugging guidance ("Check if the config is...")
-
-**ALLOWED in rejection messages:**
-- ✅ What failed (criterion name, expected vs actual)
-- ✅ What to fix (directive to PM, not implementation details)
-- ✅ Rejection count (for escalation tracking)
-
-**MANDATORY: Database-Verified Success Criteria Check**
-
-When PM sends BAZINGA, orchestrator MUST independently verify via database (not trust PM's message):
-
-```
-if pm_message contains "BAZINGA":
-    # Step 1: Initialize rejection tracking (if not exists)
-    if "bazinga_rejection_count" not in orchestrator_state:
-        orchestrator_state["bazinga_rejection_count"] = 0
-
-    # Step 1.5: Token-aware safety valve (prevent session truncation)
-    # Check if conversation is approaching token limit
-    if estimated_token_usage() > 0.95:  # >95% token usage
-        # Accept BAZINGA with warning, bypass strict verification
-        → Display: "⚠️ BAZINGA accepted (token limit reached) | Strict validation bypassed to prevent session truncation | ⚠️ WARNING: Success criteria were not fully verified due to token exhaustion"
-        → Log warning to database: "BAZINGA accepted under degraded mode (token exhaustion)"
-        → Continue to shutdown protocol
-        # Note: This prevents catastrophic failure where session ends before saving work
-
-    # Step 2: Query database for success criteria (ground truth) with retry
-    criteria = None
-    for attempt in range(3):
-        try:
-            Request: "bazinga-db, get success criteria for session [session_id]"
-            Command: get-success-criteria [session_id]
-            Invoke: Skill(command: "bazinga-db")
-            criteria = parse_database_response()
-            break  # Success, exit retry loop
-        except Exception as e:
-            if attempt < 2:
-                # Retry with exponential backoff
-                wait_seconds = 2 ** attempt  # 1s, 2s
-                → Log: "Database query failed (attempt {attempt+1}/3), retrying in {wait_seconds}s..."
-                wait(wait_seconds)
-                continue
-            else:
-                # All retries exhausted
-                → ESCALATE: Display "❌ Database unavailable after 3 attempts | Cannot verify criteria | Options: 1) Wait and retry, 2) Manual verification"
-                → Wait for user decision
-                → DO NOT execute shutdown protocol
-
-    # Check A: Criteria exist in database?
-    if not criteria or len(criteria) == 0:
-        # PM never saved criteria (skipped extraction)
-        orchestrator_state["bazinga_rejection_count"] += 1
-        count = orchestrator_state["bazinga_rejection_count"]
-
-        if count > 2:
-            → ESCALATE: Display "❌ Orchestration stuck | PM repeatedly failed to extract criteria | User intervention required"
-            → Show user current state and options
-            → Wait for user decision (exception to autonomy)
-        else:
-            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | No criteria in database | PM must extract criteria"
-            → Spawn PM: "Extract success criteria from requirements, save to database, restart Phase 1"
-        → DO NOT execute shutdown protocol
-
-    # Check A.5: Validate criteria are specific and measurable
-    for c in criteria:
-        is_vague = (
-            # Vague patterns that lack specific targets
-            "improve" in c.criterion.lower() and ">" not in c.criterion and "<" not in c.criterion and "%" not in c.criterion
-            or "make" in c.criterion.lower() and "progress" in c.criterion.lower()
-            or "fix" in c.criterion.lower() and "all" not in c.criterion.lower() and "%" not in c.criterion.lower()
-            or c.criterion.lower() in ["done", "complete", "working", "better"]
-            or len(c.criterion.split()) < 3  # Too short to be specific
-        )
-
-        if is_vague:
-            orchestrator_state["bazinga_rejection_count"] += 1
-            count = orchestrator_state["bazinga_rejection_count"]
-
-            if count > 2:
-                → ESCALATE: Display "❌ Orchestration stuck | Vague criteria '{c.criterion}' | User intervention required"
-            else:
-                → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Criterion '{c.criterion}' is not measurable | Must include specific targets (e.g., 'Coverage >70%', 'All tests passing', 'Response time <200ms')"
-                → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
-            → DO NOT execute shutdown protocol
-
-    # Check B: Query database (ground truth), then validate
-
-    Request: "bazinga-db, get success criteria for session [session_id]"
-    Command: get-success-criteria [session_id]
-    Invoke: Skill(command: "bazinga-db")
-
-    criteria = parse_criteria_from_database_response()
-    met_count = count(criteria where status="met")
-    total_count = count(criteria where required_for_completion=true)
-
-    IF met_count < total_count:
-        orchestrator_state["bazinga_rejection_count"] += 1
-        count = orchestrator_state["bazinga_rejection_count"]
-        incomplete_criteria = [c for c in criteria if c.status != "met"]
-
-        if count > 2:
-            → ESCALATE: Display "❌ Orchestration stuck | Only {met_count}/{total_count} criteria met"
-        else:
-            → REJECT: Display "❌ BAZINGA rejected ({count}/3) | Incomplete: {met_count}/{total_count}"
-            → Spawn PM: "Continue work. Incomplete: {list incomplete_criteria}"
-        → DO NOT execute shutdown protocol, skip validator spawn
-
-    try:
-        # Invoke validator skill for independent verification
-        # The validator returns a structured response with verdict
-        Skill(command: "bazinga-validator")
-        # In same message: "bazinga-validator, validate BAZINGA for session: {session_id}"
-
-        # After skill completes, you receive validator_response containing:
-        # "## BAZINGA Validation Result\n**Verdict:** ACCEPT|REJECT|CLARIFY"
-        # Parse this response to determine next action:
-
-        if "Verdict: ACCEPT" in validator_response or "**Verdict:** ACCEPT" in validator_response:
-            orchestrator_state["bazinga_rejection_count"] = 0
-            → Display: Extract completion message from validator_response
-            → Continue to shutdown protocol
-
-        elif "Verdict: REJECT" in validator_response or "**Verdict:** REJECT" in validator_response:
-            orchestrator_state["bazinga_rejection_count"] += 1
-            count = orchestrator_state["bazinga_rejection_count"]
-            reason = parse_section(validator_response, "### Reason")
-            action = parse_section(validator_response, "### Recommended Action")
-
-            if count > 2:
-                → ESCALATE: Display "❌ Orchestration stuck | BAZINGA rejected {count} times"
-                → Show user: validator reason, criteria status
-            else:
-                → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | {reason}"
-                → Spawn PM: action
-            → DO NOT execute shutdown protocol
-
-        else:
-            orchestrator_state["bazinga_rejection_count"] += 1
-            → Display: "⚠️ Validator needs clarification"
-            → Spawn PM: Extract clarification request from validator_response
-            → DO NOT execute shutdown protocol
-
-    except (ValidatorTimeout, ValidatorError, SkillInvocationError):
-        # FALLBACK: Validator failed - trust PM's database state (lenient)
-        → Display: "⚠️ Validator unavailable - trusting PM's database state"
-
-        IF met_count == total_count:
-            orchestrator_state["bazinga_rejection_count"] = 0
-            → Display: "✅ BAZINGA ACCEPTED (database state, validator unavailable)"
-            → Continue to shutdown protocol
-        ELSE:
-            orchestrator_state["bazinga_rejection_count"] += 1
-            → REJECT: Display "❌ BAZINGA rejected | Incomplete: {met_count}/{total_count}"
-            → Spawn PM: "Continue work. Validator unavailable, database shows incomplete."
-            → DO NOT execute shutdown protocol
-```
-
-**The Rule**: Orchestrator verifies DATABASE (ground truth), not PM's message. Tracks rejection count to prevent infinite loops. Escalates to user after 3 rejections.
-
-### Step 1: Get Dashboard Snapshot
-
-Query complete metrics from database:
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please provide dashboard snapshot:
-
-Session ID: [current session_id]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
-
-
-The dashboard snapshot returns:
-- pm_state, orch_state, task_groups
-- token_usage, recent_logs
-- All skill outputs (security_scan, test_coverage, lint_check, velocity_tracker, etc.)
-
-### Step 2: Detect Anomalies
-
-Check for issues requiring attention:
-- High revision counts (> 2)
-- Coverage gaps (< 80%)
-- Unresolved security issues
-- Build health regressions
-- Excessive token usage
-
-Flag any anomalies for inclusion in reports.
-
-### Step 2.5: Git Cleanup - Commit and Push Uncommitted Work
-
-**⚠️ MANDATORY: Ensure all code is committed and pushed before completion**
-
-Before generating the final report, verify all work is saved to the remote repository.
-
-#### Sub-step 2.5.1: Check Git Status
-
-**Check for uncommitted changes:**
-```bash
-git status --porcelain
-```
-
-**Parse the output:**
-- If empty: No uncommitted changes, proceed to Step 2.5.4 (push check)
-- If not empty: Uncommitted changes detected, proceed to Step 2.5.2
-
-#### Sub-step 2.5.2: Commit Uncommitted Changes
-
-**If uncommitted changes found:**
-
-Display to user (capsule format):
-```
-💾 Git cleanup | Uncommitted changes detected | Committing work to feature branch
-```
-
-**Analyze changes and create commit message:**
-```bash
-# Get list of modified/new files
-git status --short
-
-# Create descriptive commit message based on PM's final assessment
-# Format: "feat: [brief description from PM summary]"
-# Example: "feat: Implement JWT authentication with test coverage"
-```
-
-**Commit the changes:**
-```bash
-git add .
-git commit -m "$(cat <<'EOF'
-[Commit message from PM summary]
-
-Orchestration session: [SESSION_ID]
-Completed by: Claude Code Multi-Agent Dev Team
-Mode: [SIMPLE/PARALLEL]
-Groups: [N] completed
-EOF
-)"
-```
-
-**Error handling:**
-- If commit fails: Output error capsule and STOP (cannot complete without saving work)
-- Error message: `❌ Git commit failed | [error_details] | Cannot proceed - work not saved`
-
-#### Sub-step 2.5.3: Get Current Branch Name
-
-**Extract the branch name:**
-```bash
-CURRENT_BRANCH=$(git branch --show-current)
-echo "Current branch: $CURRENT_BRANCH"
-```
-
-**Verify it matches the session branch pattern:**
-- Branch should start with `claude/`
-- Branch should end with session ID or follow required pattern
-- If mismatch: Log warning but continue (may be intentional)
-
-#### Sub-step 2.5.4: Check for Unpushed Commits
-
-**Check if local branch is ahead of remote:**
-```bash
-# Fetch remote to get latest state
-git fetch origin $CURRENT_BRANCH 2>/dev/null || true
-
-# Check if there are unpushed commits
-git rev-list @{u}..HEAD --count 2>/dev/null || echo "0"
-```
-
-**Parse the result:**
-- If count > 0: Unpushed commits exist, proceed to Step 2.5.5
-- If count = 0 AND no uncommitted changes from Step 2.5.1: All work already pushed, proceed to Step 3
-- If error (no remote tracking): Branch needs initial push, proceed to Step 2.5.5
-
-#### Sub-step 2.5.5: Push to Remote
-
-**Display to user (capsule format):**
-```
-📤 Pushing to remote | Branch: [branch_name] | Saving work to remote repository
-```
-
-**Push the branch:**
-```bash
-git push -u origin $CURRENT_BRANCH
-```
-
-**Retry logic (network resilience):**
-- If push fails due to network errors: Retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s)
-- Example: `sleep 2 && git push -u origin $CURRENT_BRANCH`
-- If push fails due to 403/permission: Output specific error and STOP
-
-**Error handling:**
-- If push fails after retries: Output error capsule and STOP
-- Error message: `❌ Git push failed | [error_details] | Cannot proceed - work not saved to remote`
-- Common 403 error: `❌ Git push failed | HTTP 403 - branch name doesn't match session pattern | Check branch name starts with 'claude/' and ends with session ID`
-
-#### Sub-step 2.5.6: Record Git State in Database
-
-**After successful commit/push, record final state:**
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please save git state:
-
-Session ID: [current session_id]
-State Type: git_final
-State Data: {
-  "branch": "[CURRENT_BRANCH]",
-  "commit_sha": "[git rev-parse HEAD]",
-  "commit_message": "[last commit message]",
-  "pushed_to_remote": true,
-  "push_timestamp": "[ISO timestamp]",
-  "uncommitted_changes": false
-}
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**Verification:**
-- ✅ Git state saved to database
-- ✅ Branch name recorded for user reference
-- ✅ Commit SHA available for traceability
-
-#### Sub-step 2.5.7: Display Git Cleanup Success
-
-**Display to user (capsule format):**
-```
-✅ Git cleanup complete | All changes committed and pushed to [branch_name] | Work saved to remote
-```
-
-**This message confirms:**
-- All uncommitted work has been committed
-- All commits have been pushed to remote
-- Branch name is available for merging to main
-- Work is safely stored and won't be lost
-
-**AFTER successful git cleanup: IMMEDIATELY continue to Step 3 (Generate Detailed Report). Do NOT stop.**
-
-### Step 3: Generate Detailed Report
-
-Create comprehensive report file:
-
-```
-bazinga/artifacts/{SESSION_ID}/completion_report.md
-```
-
-See `bazinga/templates/completion_report.md` for full report structure.
-
-Report includes:
-- Session summary (mode, duration, groups)
-- Git state (branch, commit SHA, push status)
-- Quality metrics (security, coverage, lint, build)
-- Efficiency metrics (approval rate, escalations)
-- Task groups breakdown
-- Skills usage summary
-- Anomalies detected
-- Token usage & cost estimate
-
-### Step 4: Update Database
-
-**⚠️ MANDATORY: Save final orchestrator state and update session**
-
-This step has TWO required sub-steps that MUST both be completed:
-
-#### Sub-step 4.1: Save Final Orchestrator State
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please save the orchestrator state:
-
-Session ID: [current session_id]
-State Type: orchestrator
-State Data: {
-  "status": "completed",
-  "end_time": [timestamp],
-  "duration_minutes": [duration],
-  "completion_report": [report_filename],
-  "current_phase": "completion",
-  "iteration": [final iteration count],
-  "total_spawns": [total agent spawns]
-}
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-
-#### Sub-step 4.2: Update Session Status to Completed
-
-**Request to bazinga-db skill:**
-```
-bazinga-db, please update session status:
-
-Session ID: [current session_id]
-Status: completed
-End Time: [timestamp]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-
-**Verification Checkpoint:**
-- ✅ Orchestrator final state saved (1 invocation)
-- ✅ Session status updated to 'completed' (1 invocation)
-- ✅ Both invocations returned success responses
-
-**CRITICAL:** You MUST complete both database operations before proceeding to Step 5. The dashboard and metrics depend on this final state being persisted.
-
-
-### Step 5: Display Concise Report
-
-Output to user (keep under 30 lines):
-
-See `bazinga/templates/completion_report.md` for Tier 1 report format.
-
-Display includes:
-- Mode, duration, groups completed
-- Quality overview (security, coverage, lint, build)
-- Skills used summary
-- Efficiency metrics (approval rate, escalations)
-- Anomalies (if any)
-- Link to detailed report file
-
-Example output:
-```
-═══════════════════════════════════════════════════════════
-✅ BAZINGA - Orchestration Complete!
-═══════════════════════════════════════════════════════════
-
-**Mode**: SIMPLE (1 developer)
-**Duration**: 12 minutes
-**Groups**: 1/1 completed ✅
-
-**Git Status**: All changes committed and pushed ✅
-**Branch**: claude/auto-commit-merge-trigger-01SmpxrBC61DeJU7PAEthhTh
-**Latest Commit**: a3f9b21 - feat: Implement JWT authentication with test coverage
-
-**Quality**: All checks passed ✅
-**Skills Used**: 6 of 11 available
-**Detailed Report**: bazinga/artifacts/bazinga_20250113_143530/completion_report.md
-
-**Next Steps**: Merge branch to main when ready
-═══════════════════════════════════════════════════════════
-```
-
----
-## Summary
-
-**Mode**: {mode} ({num_developers} developer(s))
-**Duration**: {duration_minutes} minutes
-**Groups**: {total_groups}/{total_groups} completed ✅
-**Token Usage**: ~{total_tokens/1000}K tokens (~${estimated_cost})
-
-## Quality Overview
-
-**Security**: {security_status} ({security_summary})
-**Coverage**: {coverage_status} {coverage_avg}% average (target: 80%)
-**Lint**: {lint_status} ({lint_summary})
-**Build**: {build_health["final"]}
-
-## Skills Used
-
-{Query bazinga-db skill for skill outputs from this session}
-{Get skill results from skill_outputs table in database}
-
-**Skills Invoked**: {count} of 11 available
-{FOR each Skill that ran}:
-- **{skill_name}**: {status_emoji} {status} - {brief_summary}
-{END FOR}
-
-{Examples of status display}:
-- **security-scan**: ✅ Success - 0 vulnerabilities found
-- **lint-check**: ✅ Success - 12 issues fixed
-- **test-coverage**: ✅ Success - 87.5% average coverage
-- **velocity-tracker**: ✅ Success - 12 points completed
-- **codebase-analysis**: ✅ Success - Found 3 similar patterns
-- **pattern-miner**: ⚠️ Partial - Limited historical data
-
-📁 **Detailed results**: See `bazinga/` folder for full JSON outputs
-
-## Efficiency
-
-**First-time approval**: {approval_rate}% ({first_time_approvals}/{total_groups} groups)
-**Model escalations**: {groups_escalated_opus} group(s) → Opus at revision 3+
-**Scan escalations**: {groups_escalated_scan} group(s) → advanced at revision 2+
-
-{IF anomalies exist}:
-## Attention Required
-
-{FOR each anomaly}:
-⚠️ **{anomaly.title}**: {anomaly.message}
-   - {anomaly.details}
-   - Recommendation: {anomaly.recommendation}
-
-## Detailed Report
-
-📊 **Full metrics and analysis**: `{report_filename}`
-
-═══════════════════════════════════════════════════════════
-```
+Follow ALL steps defined in the template file you just read. The template contains the complete, authoritative shutdown procedure.
 
 ---
 
