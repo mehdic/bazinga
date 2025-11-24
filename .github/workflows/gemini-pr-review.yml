@@ -100,7 +100,7 @@ jobs:
           # Save response to file with extended timeout for Gemini 3 Pro
           HTTP_CODE=$(curl -s \
             --connect-timeout 30 \
-            --max-time 180 \
+            --max-time 210 \
             -w "%{http_code}" \
             -o gemini_response.json \
             -X POST \
@@ -116,8 +116,8 @@ jobs:
 
           # Handle timeout errors (exit code 28)
           if [ "$CURL_EXIT" -eq 28 ]; then
-            echo "Error: API request timed out after 180 seconds"
-            echo "⚠️ **Gemini API Timeout**\n\nThe Gemini 3 Pro model took too long to respond (>180s). This can happen with large diffs or complex analysis.\n\n**Suggestions:**\n- Try reducing the diff size\n- Use a faster model (e.g., gemini-2.5-flash)\n- Retry the workflow" > review.txt
+            echo "Error: API request timed out after 210 seconds"
+            echo "⚠️ **Gemini API Timeout**\n\nThe Gemini 3 Pro model took too long to respond (>3.5 minutes). This can happen with large diffs or complex analysis.\n\n**Suggestions:**\n- Try reducing the diff size\n- Use a faster model (e.g., gemini-2.5-flash)\n- Retry the workflow" > review.txt
             exit 0
           fi
 
