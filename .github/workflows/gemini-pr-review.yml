@@ -47,31 +47,25 @@ jobs:
           # Build prompt
           truncation_note = "Note: The diff has been truncated due to size limits." if truncated else ""
 
-          prompt = f"""You are reviewing a pull request.
-
-          Pull Request Title: {pr_title}
-
-          Branch URL: {branch_url}
-
-          Please use the branch URL above to access and understand the full project context, including:
-          - The overall project structure and architecture
-          - Existing code patterns and conventions
-          - Related files and dependencies
-          - The broader context of these changes
-
-          Below is the Git diff of the changes in this PR:
-
-          {truncation_note}
-
-          {diff_content}
-
-          Using the project context from the branch, please analyze this diff and provide:
-          1. Potential bugs or regressions - Consider how these changes interact with the existing codebase
-          2. Style or readability issues - Compare against the project's existing code patterns
-          3. Concrete suggestions for improvement - Based on the project's architecture and conventions
-
-          Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
-          """
+          prompt_parts = [
+              "You are reviewing a pull request.\n\n",
+              f"Pull Request Title: {pr_title}\n\n",
+              f"Branch URL: {branch_url}\n\n",
+              "Please use the branch URL above to access and understand the full project context, including:\n",
+              "- The overall project structure and architecture\n",
+              "- Existing code patterns and conventions\n",
+              "- Related files and dependencies\n",
+              "- The broader context of these changes\n\n",
+              "Below is the Git diff of the changes in this PR:\n\n",
+              f"{truncation_note}\n\n" if truncation_note else "",
+              f"{diff_content}\n\n",
+              "Using the project context from the branch, please analyze this diff and provide:\n",
+              "1. Potential bugs or regressions - Consider how these changes interact with the existing codebase\n",
+              "2. Style or readability issues - Compare against the project's existing code patterns\n",
+              "3. Concrete suggestions for improvement - Based on the project's architecture and conventions\n\n",
+              "Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment."
+          ]
+          prompt = "".join(prompt_parts)
 
           # Prepare Gemini API request
           url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent"
