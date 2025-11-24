@@ -148,73 +148,35 @@ Operation → Check result → If error: Output capsule with error
 
 ### Required Database Operations
 
-1. **At Initialization (Step 0, Path B):**
-   - MUST invoke bazinga-db to save initial orchestrator state
-   - MUST include skills_config, testing_config, and phase info
-   - MUST wait for confirmation before proceeding
+MUST invoke bazinga-db at:
+1. Initialization: Save orchestrator state (skills_config, testing_config, phase)
+2. PM decision: Log PM interaction
+3. PM state verify: Query task groups (create if empty)
+4. Agent spawn: Update orchestrator state (agent type, iteration, phase)
+5. Agent response: Log interaction, update phase/status
+6. Task group update: Record status changes, assignments, reviews
+7. Completion: Save final state, update session status to 'completed'
 
-2. **After Receiving PM Decision (Step 1.3):**
-   - MUST invoke bazinga-db to log PM interaction
-   - MUST wait for confirmation
+Database enables: dashboard status, session resumption, progress tracking, audit trail, metrics.
 
-3. **After Verifying PM State (Step 1.4):**
-   - MUST invoke bazinga-db to query task groups
-   - If empty, MUST create task groups from PM response (Step 1.4b)
-
-4. **After Each Agent Spawn:**
-   - MUST invoke bazinga-db to update orchestrator state
-   - MUST record agent type, iteration, and phase
-
-5. **After Each Agent Response:**
-   - MUST invoke bazinga-db to log agent interaction
-   - MUST update orchestrator state with new phase/status
-
-6. **After Updating Task Group Status:**
-   - MUST invoke bazinga-db to update task group records
-   - MUST record status changes, assignments, and review results
-
-7. **At Completion (Phase 3, Step 4):**
-   - MUST invoke bazinga-db to save final orchestrator state
-   - MUST invoke bazinga-db to update session status to 'completed'
-
-### Why This Matters
-
-Database operations enable: dashboard status, session resumption, progress tracking, audit trail, and performance metrics.
-
-### Verification & Error Handling
-
-**For initialization operations (Steps 1-3 above):**
-- If bazinga-db fails: Output error capsule per §Error Handling and cannot proceed
-
-**For workflow logging (Steps 4-7 above):**
-- If bazinga-db fails: Log warning but continue workflow (don't block on logging failure)
+**Error handling:** Init ops (1-3) fail → cannot proceed. Logging ops (4-7) fail → log warning, continue.
 
 ---
 
 ## 📁 File Path Rules - MANDATORY STRUCTURE
 
-**All session artifacts MUST follow this structure:**
-
+**Session artifacts structure:**
 ```
 bazinga/
-├── bazinga.db                    # Database (all state/logs)
-├── skills_config.json            # Skills configuration (git-tracked)
-├── testing_config.json           # Testing configuration (git-tracked)
-├── artifacts/                    # All session outputs (gitignored)
-│   └── {session_id}/             # One folder per session
-│       ├── skills/               # All skill outputs
-│       │   ├── security_scan.json
-│       │   ├── coverage_report.json
-│       │   ├── lint_results.json
-│       │   └── ... (all skill outputs)
-│       ├── completion_report.md  # Session completion report
-│       ├── build_baseline.log    # Build baseline output
-│       └── build_baseline_status.txt  # Build baseline status
-└── templates/                    # Prompt templates (git-tracked)
-    ├── prompt_building.md
-    ├── completion_report.md
-    ├── message_templates.md
-    └── logging_pattern.md
+├── bazinga.db                  # Database (state/logs)
+├── skills_config.json          # Skills config
+├── testing_config.json         # Testing config
+├── artifacts/{session_id}/     # Session outputs (gitignored)
+│   ├── skills/                 # Skill outputs (security_scan.json, coverage_report.json, etc.)
+│   ├── completion_report.md
+│   ├── build_baseline.log
+│   └── build_baseline_status.txt
+└── templates/                  # Prompt templates
 ```
 
 **Path Variables:**
@@ -457,39 +419,17 @@ Display this message to confirm which session you're resuming.
 
 Request to bazinga-db skill:
 ```
-bazinga-db, please get the latest PM state for session: bazinga_20251113_160528
-
-I need to understand what was in progress:
-- What mode was selected (simple/parallel)
-- What task groups exist
-- What was the last status
-- Where we left off
-
-This will help me resume properly and spawn the PM with correct context.
+bazinga-db, get PM state for session: [session_id] - mode, task groups, last status, where we left off
 ```
+Invoke: `Skill(command: "bazinga-db")`
 
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Extract PM state from response, but don't show raw skill output to user.
-
-**AFTER receiving PM state: IMMEDIATELY continue to Step 4 (Analyze Resume Context). Do NOT stop.**
+Extract PM state, then IMMEDIATELY continue to Step 4.
 
 ---
 
-**Step 4: Analyze Resume Context (AFTER receiving PM state)**
+**Step 4: Analyze Resume Context**
 
-After bazinga-db returns the PM state, analyze:
-
-User requested: "[user's original message]"
-
-From PM state received:
-- Mode: [simple/parallel]
-- Task groups: [list with statuses]
-- Last activity: [what was last done]
-- Next steps: [what should continue]
+From PM state: mode (simple/parallel), task groups (statuses), last activity, next steps.
 
 ---
 
@@ -699,42 +639,11 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 - **Benefits:** Concurrent-safe, ACID transactions, fast indexed queries
 - **Details:** See `.claude/skills/bazinga-db/SKILL.md` for complete schema
 
-### ═══════════════════════════════════════════
 ### ⚠️ INITIALIZATION VERIFICATION CHECKPOINT
-### ═══════════════════════════════════════════
 
-**🔴 CRITICAL: Before spawning PM, you MUST verify ALL initialization steps completed.**
+**CRITICAL:** Verify initialization complete (session ID, database, configs loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
 
-**MANDATORY VERIFICATION CHECKLIST:**
-
-**Internal Verification (no user output):**
-
-Confirm internally that:
-- ✓ Session ID generated
-- ✓ Session created in database (bazinga-db invoked)
-- ✓ Skills configuration loaded
-- ✓ Testing configuration loaded
-- ✓ Config stored in database (bazinga-db invoked)
-
-**User sees only:**
-```
-🚀 Starting orchestration | Session: [session_id]
-```
-
-**🔴 CRITICAL: AFTER internal validation passes, you MUST IMMEDIATELY proceed to Phase 1.**
-
-**DO NOT:**
-- ❌ Stop and wait for user input
-- ❌ Pause for any reason
-- ❌ Ask what to do next
-
-**YOU MUST:**
-- ✅ IMMEDIATELY jump to Phase 1 (Spawn Project Manager)
-- ✅ Display the Phase 1 capsule message
-- ✅ Spawn the PM agent
-- ✅ Keep the workflow moving
-
-**Stopping here is WRONG. Continue to Phase 1 NOW.**
+**Then IMMEDIATELY proceed to Phase 1 - spawn PM without stopping or waiting.
 
 ---
 
@@ -905,16 +814,9 @@ Check if PM response contains investigation section. Look for these headers (fuz
   Then invoke: `Skill(command: "bazinga-db")`
 - Then continue to parse planning sections
 
-**Multi-question capsule construction:**
-- IF 1 question: `📊 Investigation results | {answer_summary} | {details}`
-- IF 2 questions: `📊 Investigation results | {answer1_summary} + {answer2_summary} | See full details`
-- IF 3+ questions: `📊 Investigation results | Answered {N} questions | {first_answer_summary}, ...`
+**Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
 
-**IF no investigation section:**
-- Skip to Step 2 (parse planning sections)
-
-**Error handling:**
-- IF section found but parsing fails: Log warning, continue to Step 2 (don't block orchestration)
+**No investigation:** Skip to Step 2. **Parse fails:** Log warning, continue.
 
 **Step 2: Parse PM response and output capsule to user**
 
@@ -2356,42 +2258,30 @@ if pm_message contains "BAZINGA":
                 → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
             → DO NOT execute shutdown protocol
 
-    # Check B: Query database first (ground truth), then invoke validator for independent verification
-
-    # Step B.1: Query database for success criteria (ground truth, fallback)
-    # This provides safety net if validator fails/times out/errors
+    # Check B: Query database (ground truth), then validate
 
     Request: "bazinga-db, get success criteria for session: {session_id}"
     Invoke: Skill(command: "bazinga-db")
 
-    # Parse database response
     criteria = parse_criteria_from_database_response()
     met_count = count(criteria where status="met")
     total_count = count(criteria where required_for_completion=true)
 
-    # Basic sanity check from database
     IF met_count < total_count:
-        # Clearly incomplete - reject immediately without spawning validator
         orchestrator_state["bazinga_rejection_count"] += 1
         count = orchestrator_state["bazinga_rejection_count"]
-
         incomplete_criteria = [c for c in criteria if c.status != "met"]
 
         if count > 2:
             → ESCALATE: Display "❌ Orchestration stuck | Only {met_count}/{total_count} criteria met"
         else:
-            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Incomplete: {met_count}/{total_count} criteria met"
-            → Spawn PM: "Continue work. Incomplete criteria: {list incomplete_criteria}"
-        → DO NOT execute shutdown protocol
-        → Skip validator spawn (validation already failed)
-
-    # Step B.2: Database shows complete - spawn validator for independent verification
-    # Validator will run tests independently to verify PM's claims
+            → REJECT: Display "❌ BAZINGA rejected ({count}/3) | Incomplete: {met_count}/{total_count}"
+            → Spawn PM: "Continue work. Incomplete: {list incomplete_criteria}"
+        → DO NOT execute shutdown protocol, skip validator spawn
 
     try:
-        # Invoke validator skill for independent verification
         Skill(command: "bazinga-validator")
-        # In same message: "bazinga-validator, validate BAZINGA for session: {session_id}"
+        # Message: "bazinga-validator, validate BAZINGA for session: {session_id}"
 
         if "Verdict: ACCEPT" in validator_response or "**Verdict:** ACCEPT" in validator_response:
             orchestrator_state["bazinga_rejection_count"] = 0
