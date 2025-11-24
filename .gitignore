@@ -77,3 +77,6 @@ bazinga/bazinga.db*
 # Coordination folder (legacy - templates now in bazinga/templates/)
 coordination/
 !coordination/templates/
+
+# Claude Code session-specific files
+.claude/session-stop-checks/
