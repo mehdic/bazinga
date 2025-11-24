@@ -128,7 +128,7 @@ The Gemini 3 Pro model took too long to respond (>3.5 minutes). This can happen 
 
 **Suggestions:**
 - Try reducing the diff size
-- Use a faster model (e.g., gemini-2.0-flash)
+- Use a faster model (e.g., gemini-2.5-flash)
 - Retry the workflow
 EOF
             exit 0
