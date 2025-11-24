@@ -2329,8 +2329,14 @@ if pm_message contains "BAZINGA":
         → DO NOT execute shutdown protocol, skip validator spawn
 
     try:
+        # Invoke validator skill for independent verification
+        # The validator returns a structured response with verdict
         Skill(command: "bazinga-validator")
-        # Message: "bazinga-validator, validate BAZINGA for session: {session_id}"
+        # In same message: "bazinga-validator, validate BAZINGA for session: {session_id}"
+
+        # After skill completes, you receive validator_response containing:
+        # "## BAZINGA Validation Result\n**Verdict:** ACCEPT|REJECT|CLARIFY"
+        # Parse this response to determine next action:
 
         if "Verdict: ACCEPT" in validator_response or "**Verdict:** ACCEPT" in validator_response:
             orchestrator_state["bazinga_rejection_count"] = 0
