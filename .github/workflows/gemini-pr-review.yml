@@ -97,10 +97,10 @@ jobs:
 
           echo "Calling Gemini API..."
 
-          # Save response to file with timeout
+          # Save response to file with extended timeout for Gemini 3 Pro
           HTTP_CODE=$(curl -s \
-            --connect-timeout 10 \
-            --max-time 60 \
+            --connect-timeout 30 \
+            --max-time 180 \
             -w "%{http_code}" \
             -o gemini_response.json \
             -X POST \
@@ -109,7 +109,24 @@ jobs:
             -d "$PAYLOAD" \
             https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent)
 
+          CURL_EXIT=$?
+
           echo "HTTP Status: $HTTP_CODE"
+          echo "Curl exit code: $CURL_EXIT"
+
+          # Handle timeout errors (exit code 28)
+          if [ "$CURL_EXIT" -eq 28 ]; then
+            echo "Error: API request timed out after 180 seconds"
+            echo "⚠️ **Gemini API Timeout**\n\nThe Gemini 3 Pro model took too long to respond (>180s). This can happen with large diffs or complex analysis.\n\n**Suggestions:**\n- Try reducing the diff size\n- Use a faster model (e.g., gemini-2.5-flash)\n- Retry the workflow" > review.txt
+            exit 0
+          fi
+
+          # Handle other curl errors
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "Error: Curl failed with exit code $CURL_EXIT"
+            echo "⚠️ **Network Error**\n\nFailed to connect to Gemini API (curl exit code: $CURL_EXIT).\n\nPlease check:\n- Network connectivity\n- API endpoint availability\n- Retry the workflow" > review.txt
+            exit 0
+          fi
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "Error: Gemini API returned status $HTTP_CODE"
