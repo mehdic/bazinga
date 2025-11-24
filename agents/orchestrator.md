@@ -763,7 +763,11 @@ Check if PM response contains investigation section. Look for these headers (fuz
   Questions: [extracted questions]
   Answers: [extracted answers]
   ```
-  Then invoke: `Skill(command: "bazinga-db")`
+
+  **Then invoke:**
+  ```
+  Skill(command: "bazinga-db")
+  ```
 - Then continue to parse planning sections
 
 **Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
@@ -826,17 +830,32 @@ Skill(command: "bazinga-db")
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
-### Step 1.3a: Handle PM Clarification Requests (if applicable)
+### Step 1.3a: Handle PM Status and Route Accordingly
 
-**Detection:** Check if PM response contains `PM Status: NEEDS_CLARIFICATION`
+**Detection:** Check PM Status code from response
 
-**If NEEDS_CLARIFICATION is NOT present:**
-- PM has made a decision (SIMPLE or PARALLEL mode)
+**Expected status codes from initial PM spawn:**
+- `PLANNING_COMPLETE` - PM completed planning, proceed to execution
+- `NEEDS_CLARIFICATION` - PM needs user input before planning
+- `INVESTIGATION_ONLY` - User only asked questions, no implementation needed
+
+**IF status = PLANNING_COMPLETE:**
+- PM has completed planning (created mode decision and task groups)
 - **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
 
-**If NEEDS_CLARIFICATION IS present:** Execute clarification workflow below
+**IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
-#### Clarification Workflow
+**IF status = INVESTIGATION_ONLY:**
+- PM only answered questions (no implementation requested)
+- Display PM's investigation findings to user
+- **END orchestration** (no development work needed)
+
+**IF status is missing or unclear:**
+- Apply fallback: If response contains task groups or mode decision, treat as PLANNING_COMPLETE
+- If response contains questions/clarifications, treat as NEEDS_CLARIFICATION
+- **IMMEDIATELY jump to Step 1.4. Do NOT stop.**
+
+#### Clarification Workflow (NEEDS_CLARIFICATION)
 
 **Step 1: Log Clarification Request**
 
@@ -1519,7 +1538,10 @@ Iteration: [iteration]
 Agent ID: techlead_validation
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
 **Tech Lead Decision:**
 - Reviews Investigator's logic
@@ -1990,7 +2012,11 @@ Before ending your orchestrator message in parallel mode (Step 2B), you MUST ans
 Query database NOW to get fresh state (if not already queried in this message):
 ```
 Request: "bazinga-db, please get all task groups for session [session_id]"
-Then invoke: Skill(command: "bazinga-db")
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 Parse returned groups and check status:
@@ -2207,7 +2233,11 @@ Content: [full PM response text]
 Iteration: 1
 Agent ID: pm_main
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
 **Forgetting the Skill invocation causes silent logging failure!**
 

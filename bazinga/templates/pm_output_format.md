@@ -110,7 +110,7 @@ Prescription Upload). Save complex failures for later investigation.
 ## PM Status: INVESTIGATION_NEEDED
 
 **Critical Issue Detected:** Auth Service has 17 test failures with AggregateError.
-All failures show identical error pattern but root cause unclear.
+All failures show an identical error pattern but the root cause unclear.
 
 **Analysis:**
 - Developer attempted fixes in iterations 1-3
@@ -118,7 +118,7 @@ All failures show identical error pattern but root cause unclear.
 - Mock configurations reviewed
 - Failures persist across all attempts
 
-**Root Cause:** Unknown - appears to be architectural/infrastructure issue
+**Root Cause:** Unknown - appears to be an architectural/infrastructure issue
 rather than simple code bug.
 
 **Next Action:** Orchestrator should spawn Investigator to diagnose Auth Service
