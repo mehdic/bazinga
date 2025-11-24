@@ -23,7 +23,7 @@ jobs:
           BRANCH_URL: https://github.com/${{ github.repository }}/tree/${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          python3 << 'PY'
+          cat > review_script.py << 'PYTHON_SCRIPT'
           import json
           import os
           import sys
@@ -45,33 +45,33 @@ jobs:
               truncated = True
 
           # Build prompt
+          truncation_note = "Note: The diff has been truncated due to size limits." if truncated else ""
+
           prompt = f"""You are reviewing a pull request.
 
-**Pull Request Title:** {pr_title}
+          Pull Request Title: {pr_title}
 
-**Branch URL:** {branch_url}
+          Branch URL: {branch_url}
 
-Please use the branch URL above to access and understand the full project context, including:
-- The overall project structure and architecture
-- Existing code patterns and conventions
-- Related files and dependencies
-- The broader context of these changes
+          Please use the branch URL above to access and understand the full project context, including:
+          - The overall project structure and architecture
+          - Existing code patterns and conventions
+          - Related files and dependencies
+          - The broader context of these changes
 
-Below is the Git diff of the changes in this PR:
+          Below is the Git diff of the changes in this PR:
 
-{'⚠️ Note: The diff has been truncated due to size limits.' if truncated else ''}
+          {truncation_note}
 
-```diff
-{diff_content}
-```
+          {diff_content}
 
-Using the project context from the branch, please analyze this diff and provide:
-1. **Potential bugs or regressions** - Consider how these changes interact with the existing codebase
-2. **Style or readability issues** - Compare against the project's existing code patterns
-3. **Concrete suggestions for improvement** - Based on the project's architecture and conventions
+          Using the project context from the branch, please analyze this diff and provide:
+          1. Potential bugs or regressions - Consider how these changes interact with the existing codebase
+          2. Style or readability issues - Compare against the project's existing code patterns
+          3. Concrete suggestions for improvement - Based on the project's architecture and conventions
 
-Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
-"""
+          Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
+          """
 
           # Prepare Gemini API request
           url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent"
@@ -113,7 +113,9 @@ Format your response as a concise, markdown-formatted code review suitable for p
           except Exception as e:
               print(f"Error calling Gemini API: {e}", file=sys.stderr)
               sys.exit(1)
-          PY
+          PYTHON_SCRIPT
+
+          python3 review_script.py
 
       - name: Post review comment
         env:
