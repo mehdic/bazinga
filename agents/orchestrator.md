@@ -1686,6 +1686,15 @@ Orchestrator output:
 ```
 → CORRECT: All groups handled, no serialization, verified complete
 
+**FAILED FLOW - How Defense-in-Depth Works:**
+
+❌ **Violation:** Orchestrator bypasses Layer 1, spawns only Tech Lead C, forgets Developer B (PARTIAL)
+
+🔴 **Layer 2 catch:** Self-check at Group B: "Did I spawn Task? NO" → Force spawn Developer B
+🔴 **Layer 3 catch:** Pre-stop verification: "Q2: PARTIAL groups? YES (B)" + "Q3: Spawned for B? YES (Layer 2 fixed)" = PASS
+
+**Result:** Layers 2+3 auto-fixed Layer 1 bypass. All groups handled, no stop.
+
 **This three-layer approach prevents the bug at multiple levels.**
 
 ### Step 2B.1: Spawn Multiple Developers in Parallel
@@ -1841,10 +1850,18 @@ Spawning all agents in parallel:
 
 **ENFORCEMENT:**
 
-- Count responses received: N
-- Count Task calls spawned: M
-- IF N > M → VIOLATION (some groups not spawned)
-- Use Step 2B.7b (Pre-Stop Verification) to catch violations
+For each response received, verify the required action was taken:
+- INCOMPLETE → Developer Task spawned
+- PARTIAL → Developer Task spawned
+- READY_FOR_QA → QA Expert Task spawned
+- READY_FOR_REVIEW → Tech Lead Task spawned
+- APPROVED → Phase Continuation Check executed (Step 2B.7a) OR PM spawned
+- BLOCKED → Investigator Task spawned
+- FAILED → Investigator Task spawned
+
+IF any response lacks its required action → VIOLATION (group not properly routed)
+
+Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violations.
 
 **This batch processing workflow is MANDATORY and prevents the root cause of orchestrator stopping bug.**
 
@@ -1899,8 +1916,17 @@ Before ending your orchestrator message in parallel mode (Step 2B), you MUST ans
 - IF any response was not routed → FAIL (auto-fix below)
 
 **Question 2: Are there ANY groups with status INCOMPLETE, PARTIAL, or FAILED that need developer continuation?**
-- Check the latest task group states from database
-- IF any group has status INCOMPLETE/PARTIAL/FAILED → FAIL (auto-fix below)
+
+Query database NOW to get fresh state (if not already queried in this message):
+```
+Request: "bazinga-db, please get all task groups for session [session_id]"
+Then invoke: Skill(command: "bazinga-db")
+```
+
+Parse returned groups and check status:
+- IF any group has status='INCOMPLETE' → FAIL (auto-fix below)
+- IF any group has status='PARTIAL' → FAIL (auto-fix below)
+- IF any group has status='FAILED' → FAIL (auto-fix below)
 
 **Question 3: Did I spawn Task calls for ALL incomplete groups?**
 - List groups that need continuation
