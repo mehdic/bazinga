@@ -486,6 +486,88 @@ class BazingaDB:
         conn.close()
         self._print_success(f"✓ Updated phase {phase_number} status to: {status}")
 
+    # ==================== SUCCESS CRITERIA OPERATIONS ====================
+
+    def save_success_criteria(self, session_id: str, criteria: List[Dict]) -> None:
+        """Save success criteria for a session (UPSERT - replaces existing)."""
+        conn = self._get_connection()
+        try:
+            # Use transaction for all-or-nothing save
+            for criterion_obj in criteria:
+                criterion_text = criterion_obj.get('criterion', '')
+                status = criterion_obj.get('status', 'pending')
+                actual = criterion_obj.get('actual')
+                evidence = criterion_obj.get('evidence')
+                required = criterion_obj.get('required_for_completion', True)
+
+                # UPSERT using INSERT OR REPLACE
+                conn.execute("""
+                    INSERT INTO success_criteria
+                    (session_id, criterion, status, actual, evidence, required_for_completion, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(session_id, criterion)
+                    DO UPDATE SET
+                        status = excluded.status,
+                        actual = excluded.actual,
+                        evidence = excluded.evidence,
+                        required_for_completion = excluded.required_for_completion,
+                        updated_at = CURRENT_TIMESTAMP
+                """, (session_id, criterion_text, status, actual, evidence, required))
+
+            conn.commit()
+            self._print_success(f"✓ Saved {len(criteria)} success criteria for session {session_id}")
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to save success criteria: {str(e)}")
+        finally:
+            conn.close()
+
+    def get_success_criteria(self, session_id: str) -> List[Dict]:
+        """Get all success criteria for a session."""
+        conn = self._get_connection()
+        rows = conn.execute("""
+            SELECT id, session_id, criterion, status, actual, evidence,
+                   required_for_completion, created_at, updated_at
+            FROM success_criteria
+            WHERE session_id = ?
+            ORDER BY id
+        """, (session_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def update_success_criterion(self, session_id: str, criterion: str,
+                                 status: Optional[str] = None,
+                                 actual: Optional[str] = None,
+                                 evidence: Optional[str] = None) -> None:
+        """Update a specific success criterion (status, actual, evidence)."""
+        conn = self._get_connection()
+        updates = []
+        params = []
+
+        if status:
+            updates.append("status = ?")
+            params.append(status)
+        if actual is not None:
+            updates.append("actual = ?")
+            params.append(actual)
+        if evidence is not None:
+            updates.append("evidence = ?")
+            params.append(evidence)
+
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            query = f"UPDATE success_criteria SET {', '.join(updates)} WHERE session_id = ? AND criterion = ?"
+            params.extend([session_id, criterion])
+            cursor = conn.execute(query, params)
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                print(f"! Criterion not found: '{criterion}' in session {session_id}", file=sys.stderr)
+            else:
+                self._print_success(f"✓ Updated criterion: {criterion[:50]}...")
+
+        conn.close()
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -609,6 +691,23 @@ def main():
             phase_number = int(cmd_args[1])
             status = cmd_args[2]
             db.update_plan_progress(session_id, phase_number, status)
+        elif cmd == 'save-success-criteria':
+            session_id = cmd_args[0]
+            criteria = json.loads(cmd_args[1])
+            db.save_success_criteria(session_id, criteria)
+        elif cmd == 'get-success-criteria':
+            session_id = cmd_args[0]
+            result = db.get_success_criteria(session_id)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'update-success-criterion':
+            session_id = cmd_args[0]
+            criterion = cmd_args[1]
+            kwargs = {}
+            for i in range(2, len(cmd_args), 2):
+                key = cmd_args[i].lstrip('--')
+                value = cmd_args[i + 1]
+                kwargs[key] = value
+            db.update_success_criterion(session_id, criterion, **kwargs)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             sys.exit(1)

@@ -439,7 +439,9 @@ From PM state: mode (simple/parallel), task groups (statuses), last activity, ne
 
 Request to bazinga-db skill:
 ```
-bazinga-db, please get success criteria for session: [session_id]
+bazinga-db, get success criteria for session [session_id]
+
+Command: get-success-criteria [session_id]
 ```
 
 Then invoke:
@@ -447,10 +449,10 @@ Then invoke:
 Skill(command: "bazinga-db")
 ```
 
-**If criteria NOT found (empty result):**
+**If criteria NOT found (empty result `[]`):**
 - This is an old session from before success criteria enforcement
-- PM must extract criteria retroactively from original requirements
-- **Add to PM spawn context:** "CRITICAL: This resumed session has no success criteria in database. You MUST: 1) Extract success criteria from original requirements '[original_requirements from pm_state]', 2) Save to database using bazinga-db, 3) Continue work"
+- Check if pm_state has criteria field (old format) that needs migration
+- **Add to PM spawn context:** "CRITICAL: This resumed session has no success criteria in database. You MUST: 1) Extract success criteria from original requirements '[original_requirements from pm_state]' OR migrate from pm_state.success_criteria if exists, 2) Save to database using 'save-success-criteria [session_id] [JSON]', 3) Continue work"
 
 **If criteria found:**
 - Good, session already has criteria tracked
@@ -2254,7 +2256,8 @@ if pm_message contains "BAZINGA":
     criteria = None
     for attempt in range(3):
         try:
-            Request: "bazinga-db, please get success criteria for session: [session_id]"
+            Request: "bazinga-db, get success criteria for session [session_id]"
+            Command: get-success-criteria [session_id]
             Invoke: Skill(command: "bazinga-db")
             criteria = parse_database_response()
             break  # Success, exit retry loop
@@ -2310,7 +2313,8 @@ if pm_message contains "BAZINGA":
 
     # Check B: Query database (ground truth), then validate
 
-    Request: "bazinga-db, get success criteria for session: {session_id}"
+    Request: "bazinga-db, get success criteria for session [session_id]"
+    Command: get-success-criteria [session_id]
     Invoke: Skill(command: "bazinga-db")
 
     criteria = parse_criteria_from_database_response()
