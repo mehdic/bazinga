@@ -144,62 +144,13 @@ Operation → Check result → If error: Output capsule with error
 
 ## ⚠️ MANDATORY DATABASE OPERATIONS
 
-**CRITICAL: You MUST invoke the bazinga-db skill at these required points:**
-
-### Required Database Operations
-
-MUST invoke bazinga-db at:
-1. Initialization: Save orchestrator state (skills_config, testing_config, phase)
-2. PM decision: Log PM interaction
-3. PM state verify: Query task groups (create if empty)
-4. Agent spawn: Update orchestrator state (agent type, iteration, phase)
-5. Agent response: Log interaction, update phase/status
-6. Task group update: Record status changes, assignments, reviews
-7. Completion: Save final state, update session status to 'completed'
-
-Database enables: dashboard status, session resumption, progress tracking, audit trail, metrics.
-
-**Error handling:** Init ops (1-3) fail → cannot proceed. Logging ops (4-7) fail → log warning, continue.
+**Invoke bazinga-db at:** 1) Init (save state), 2) PM response (log), 3) Task groups (query/create), 4) Agent spawn (update), 5) Agent response (log), 6) Status change (update), 7) Completion (finalize). **Error handling:** Init fails → stop. Logging fails → warn, continue.
 
 ---
 
-## 📁 File Path Rules - MANDATORY STRUCTURE
+## 📁 File Paths
 
-**Session artifacts structure:**
-```
-bazinga/
-├── bazinga.db                  # Database (state/logs)
-├── skills_config.json          # Skills config
-├── testing_config.json         # Testing config
-├── artifacts/{session_id}/     # Session outputs (gitignored)
-│   ├── skills/                 # Skill outputs (security_scan.json, coverage_report.json, etc.)
-│   ├── completion_report.md
-│   ├── build_baseline.log
-│   └── build_baseline_status.txt
-└── templates/                  # Prompt templates
-```
-
-**Path Variables:**
-- `SESSION_ID`: Current session ID bash variable (e.g., `SESSION_ID="bazinga_20250113_143530"`)
-- `ARTIFACTS_DIR`: `bazinga/artifacts/{SESSION_ID}/` (documentation placeholder)
-- `SKILLS_DIR`: `bazinga/artifacts/{SESSION_ID}/skills/` (documentation placeholder)
-
-**⚠️ Important - Variable Syntax:**
-- **In orchestrator bash code:** Use `${SESSION_ID}` (bash variable expansion)
-- **In documentation/paths:** Use `{SESSION_ID}` (placeholder showing structure)
-- **When spawning agents:** Provide actual session ID value (e.g., "Session ID: bazinga_20251120_153352")
-
-**Rules:**
-1. **All session artifacts** → `bazinga/artifacts/{SESSION_ID}/` (replace {SESSION_ID} with actual value)
-2. **All skill outputs** → `bazinga/artifacts/{SESSION_ID}/skills/`
-3. **Configuration files** → `bazinga/` (root level)
-4. **Templates** → `bazinga/templates/`
-5. **Never write to bazinga root** - only artifacts/, templates/, or config files
-
-**Example paths for current session (if SESSION_ID=bazinga_20251120_153352):**
-- Build baseline: `bazinga/artifacts/bazinga_20251120_153352/build_baseline.log`
-- Completion report: `bazinga/artifacts/bazinga_20251120_153352/completion_report.md`
-- Security scan: `bazinga/artifacts/bazinga_20251120_153352/skills/security_scan.json`
+**Structure:** `bazinga/bazinga.db`, `bazinga/skills_config.json`, `bazinga/testing_config.json`, `bazinga/artifacts/{session_id}/` (outputs), `bazinga/templates/` (prompts). **Rules:** Artifacts → `bazinga/artifacts/${SESSION_ID}/`, Skills → `bazinga/artifacts/${SESSION_ID}/skills/`, Never write to bazinga root.
 
 ---
 
@@ -1108,46 +1059,9 @@ ELSE IF PM chose "parallel":
 🔨 Implementing | Spawning developer for {brief_task_description}
 ```
 
-### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
+### 🔴 MANDATORY DEVELOPER PROMPT BUILDING
 
-**Prompt Structure:**
-1. **Agent role & workflow:** Read `agents/developer.md` (full agent definition with developer-specific workflow)
-2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
-   - Testing framework configuration (from testing_config.json)
-   - Mandatory skills (from skills_config.json developer section)
-
-**Agent Parameters (include these in spawned agent prompt):**
-- **Agent:** Developer | **Group:** main | **Mode:** Simple
-- **Session ID:** [INSERT ACTUAL SESSION_ID VALUE HERE - e.g., bazinga_20251120_153352]
-- **Branch:** [INSERT ACTUAL BRANCH NAME - from git branch --show-current]
-- **Skills Source:** skills_config.json (developer section)
-- **Testing Source:** testing_config.json
-- **Task Source:** [from PM response]
-
-**Critical:** Replace `[INSERT ACTUAL SESSION_ID VALUE HERE]` with the actual `$SESSION_ID` variable value. Agents need the literal string, not a placeholder.
-
-**Pre-Spawn Validation (MUST pass):**
-```
-✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Testing mode  ✓ Report format
-```
-If fails: Fix prompt before spawning (see agents/developer.md for workflow requirements)
-
-**Build Task description:**
-```python
-# Simple mode: 40 char truncation (prefix "Dev: " = 5 chars, total ~45)
-# Defensive: Check task_groups exists and has entries (should always be true after Step 1.4)
-if not task_groups or len(task_groups) == 0:
-    description = "Dev: main group"  # Fallback if task_groups somehow empty
-else:
-    task_name = task_groups[0].name if task_groups[0].name else "main group"
-    description = f"Dev: {task_name[:40]}{'...' if len(task_name) > 40 else ''}"
-# Note: Parallel mode uses 30 chars because group ID takes visual space ("Dev A: " = 7 chars)
-```
-
-**Spawn:**
-```
-Task(subagent_type: "general-purpose", description: description, prompt: [Developer prompt])
-```
+**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1209,6 +1123,16 @@ Then invoke: `Skill(command: "bazinga-db")`
   * After Investigator provides solution, spawn Developer again with resolution
   * Continue workflow automatically
 
+**🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
+
+Before moving to the next group or ending your message, verify:
+1. ✅ Did I spawn an Investigator Task for this BLOCKED group in THIS message?
+2. ✅ Is the Task spawn visible in my current response?
+
+**IF NO:** You violated the workflow. Add the Task spawn NOW before proceeding.
+
+**This check prevents skipping BLOCKED groups during individual group processing.**
+
 **IF Developer reports INCOMPLETE (partial work done):**
 - **IMMEDIATELY spawn new developer Task** (do NOT just write a message and stop)
 
@@ -1240,6 +1164,37 @@ Task(subagent_type="general-purpose", description="Dev {id}: continue work", pro
 
 **🔴 CRITICAL:** Previous developer Task is DONE. You MUST spawn a NEW Task. Writing a message like "Continue fixing NOW" does NOTHING - the developer Task has completed and won't see your message. SPAWN the Task.
 
+**🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
+
+Before moving to the next group or ending your message, verify:
+1. ✅ Did I spawn a Task call for this INCOMPLETE group in THIS message?
+2. ✅ Is the Task spawn visible in my current response?
+
+**IF NO:** You violated the workflow. Add the Task spawn NOW before proceeding.
+
+**This check prevents skipping INCOMPLETE groups during individual group processing.**
+
+**EXAMPLE - FORBIDDEN vs REQUIRED:**
+
+❌ **FORBIDDEN:**
+```
+Developer B reports PARTIAL (69 test failures remain).
+I need to respawn Developer B to continue fixing the tests.
+Let me move on to other groups first.
+```
+→ WRONG: No Task spawn, group left incomplete
+
+✅ **REQUIRED:**
+```
+Developer B reports PARTIAL (69 test failures remain).
+Spawning Developer B continuation to fix remaining tests:
+
+Task(subagent_type="general-purpose",
+     description="Dev B: fix remaining test failures",
+     prompt=[continuation prompt with test failure context])
+```
+→ CORRECT: Task spawned immediately, group handled
+
 **🔴 CRITICAL: Do NOT wait for user input. Automatically proceed to the next step based on developer status.**
 
 ### Step 2A.4: Spawn QA Expert
@@ -1249,36 +1204,9 @@ Task(subagent_type="general-purpose", description="Dev {id}: continue work", pro
 ✅ Testing | Running tests + coverage analysis
 ```
 
-### 🔴 MANDATORY QA EXPERT PROMPT BUILDING - SKILLS REQUIRED
+### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Prompt Structure:**
-1. **Agent role & workflow:** Read `agents/qa_expert.md` (full agent definition with QA-specific workflow)
-2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
-   - Testing framework configuration (from testing_config.json)
-   - Mandatory skills (from skills_config.json qa_expert section)
-
-**Agent Parameters:**
-- **Agent:** QA Expert | **Group:** [group_id] | **Mode:** [Simple/Parallel]
-- **Session:** [session_id]
-- **Skills Source:** skills_config.json (qa_expert section)
-- **Testing Source:** testing_config.json
-- **Context:** [Developer changes summary]
-
-**Pre-Spawn Validation (MUST pass):**
-```
-✓ "Skill(command:" per mandatory skill  ✓ Testing workflow  ✓ Test framework  ✓ Report format
-```
-If fails: Fix prompt before spawning (see agents/qa_expert.md for workflow requirements)
-
-**Build Task description:**
-```python
-description = f"QA {group_id}: tests"
-```
-
-**Spawn:**
-```
-Task(subagent_type: "general-purpose", description: description, prompt: [QA Expert prompt])
-```
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -1369,36 +1297,9 @@ Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", pro
 👔 Reviewing | Security scan + lint check + architecture analysis
 ```
 
-### 🔴 MANDATORY TECH LEAD PROMPT BUILDING - SKILLS REQUIRED
+### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Prompt Structure:**
-1. **Agent role & workflow:** Read `agents/techlead.md` (full agent definition with Tech Lead-specific workflow)
-2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
-   - Testing framework configuration (from testing_config.json)
-   - Mandatory skills (from skills_config.json tech_lead section)
-
-**Agent Parameters:**
-- **Agent:** Tech Lead | **Group:** [group_id] | **Mode:** [Simple/Parallel]
-- **Session:** [session_id]
-- **Skills Source:** skills_config.json (tech_lead section)
-- **Testing Source:** testing_config.json
-- **Context:** [Implementation + QA summary]
-
-**Pre-Spawn Validation (MUST pass):**
-```
-✓ "Skill(command:" per mandatory skill  ✓ Review workflow  ✓ Decision format  ✓ Frameworks
-```
-If fails: Fix prompt before spawning (see agents/techlead.md for workflow requirements)
-
-**Build Task description:**
-```python
-description = f"TechLead {group_id}: review"
-```
-
-**Spawn:**
-```
-Task(subagent_type: "general-purpose", description: description, prompt: [Tech Lead prompt])
-```
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1741,6 +1642,53 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Without this rule:** Orchestrator hangs after Phase 1, waiting indefinitely for user to say "continue"
 
+**REAL-WORLD BUG EXAMPLE (THE BUG WE'RE FIXING):**
+
+❌ **FORBIDDEN - What caused the bug:**
+```
+Received responses:
+- Developer B: PARTIAL (69 test failures remain)
+- Tech Lead C: APPROVED
+
+Orchestrator output:
+"Group C is approved. Group B still has failures. Let me route C first, then respawn B."
+
+[Spawns Tech Lead C only]
+[STOPS - Never spawns Developer B]
+```
+→ WRONG: Serialization ("first... then..."), partial spawning, premature stop
+
+✅ **REQUIRED - Correct handling with three-layer enforcement:**
+```
+Received responses:
+- Developer B: PARTIAL (69 test failures remain)
+- Tech Lead C: APPROVED
+
+LAYER 1 (Batch Processing):
+Parse all: B=PARTIAL, C=APPROVED
+Build queue: Developer B continuation + Phase check for C
+Spawn all in ONE message
+
+LAYER 2 (Step-Level Check):
+Group B PARTIAL → Verify Developer B Task spawned ✓
+Group C APPROVED → Run Phase Continuation Check ✓
+
+LAYER 3 (Pre-Stop Verification):
+Q1: All responses processed? B ✓, C ✓ = YES
+Q2: Any INCOMPLETE groups? B needs continuation = YES → Developer B spawned ✓
+Q3: All Tasks spawned? Developer B ✓ = YES
+PASS - Safe to end message
+
+Orchestrator output:
+"Groups B (PARTIAL) and C (APPROVED) received. Spawning Developer B continuation + running phase check:"
+
+[Task: Developer B continuation with test failure context]
+[Executes: Phase Continuation Check for Group C]
+```
+→ CORRECT: All groups handled, no serialization, verified complete
+
+**This three-layer approach prevents the bug at multiple levels.**
+
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
 Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
@@ -1782,33 +1730,9 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 
 **DO NOT spawn them in separate messages** - that would make them run sequentially, defeating the purpose of parallel mode.
 
-### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE) - NO SHORTCUTS
+### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE)
 
-**Prompt Structure (PER GROUP):**
-1. **Agent role & workflow:** Read `agents/developer.md` (full agent definition with developer-specific workflow)
-2. **Configuration sections:** Add using guidance from `bazinga/templates/prompt_building.md`:
-   - Testing framework configuration (from testing_config.json)
-   - Mandatory skills (from skills_config.json developer section)
-
-**Agent Parameters (PER GROUP - include these in each spawned agent prompt):**
-- **Agent:** Developer | **Group:** [A/B/C/D] | **Mode:** Parallel
-- **Session ID:** [INSERT ACTUAL SESSION_ID VALUE HERE - e.g., bazinga_20251120_153352]
-- **Branch:** [INSERT ACTUAL GROUP BRANCH NAME - e.g., feature/group-a]
-- **Skills Source:** skills_config.json (developer section)
-- **Testing Source:** testing_config.json
-- **Task Source:** [from PM for this group]
-
-**Critical:** Replace `[INSERT ACTUAL SESSION_ID VALUE HERE]` with the actual `$SESSION_ID` variable value. Each agent needs the literal session ID string.
-
-**Pre-Spawn Validation (MUST pass for EACH group):**
-```
-✓ "Skill(command:" per mandatory skill  ✓ MANDATORY WORKFLOW  ✓ Group branch  ✓ Testing mode  ✓ Report format
-```
-If fails: Fix ALL prompts before spawning (see agents/developer.md for workflow requirements)
-
-**Build Task descriptions:** Use extraction code from Step 2B.1 (task_groups iteration with truncation)
-
-**Critical:** Build ALL group prompts BEFORE spawning. Then spawn in ONE message for parallelism.
+**Build PER GROUP:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=[A/B/C/D], Mode=Parallel, Session ID (actual value), Branch (group branch), Skills/Testing source, Task (from PM for group). **Validate EACH:** ✓ Skill(command:, ✓ MANDATORY WORKFLOW, ✓ Group branch, ✓ Testing mode, ✓ Report format. **Descriptions:** Use Step 2B.1 code (task_groups iteration, 30 char truncation). **CRITICAL:** Build ALL prompts BEFORE spawning. Spawn in ONE message for parallelism.
 
 **AFTER receiving ALL developer responses:**
 
@@ -1830,6 +1754,100 @@ Use the Developer Response Parsing section in `bazinga/templates/response_parsin
 **Step 4: Log to database:** §DB.log(developer, session_id, dev_response, iteration, dev_group_[X])
 
 Then invoke: `Skill(command: "bazinga-db")`
+
+### Step 2B.2a: Mandatory Batch Processing (LAYER 1 - ROOT CAUSE FIX)
+
+**🔴 CRITICAL: ENFORCE BATCH PROCESSING TO PREVENT SERIALIZATION**
+
+**This is the PRIMARY FIX for the orchestrator stopping bug.**
+
+**MANDATORY WORKFLOW:**
+
+When you receive multiple developer/QA/Tech Lead responses in parallel mode, you MUST follow this three-step batch process:
+
+**STEP 1: PARSE ALL RESPONSES FIRST**
+
+Before spawning ANY Task, parse ALL responses received in this orchestrator iteration:
+
+```
+Parse iteration:
+- Developer A response → status = READY_FOR_QA
+- Developer B response → status = PARTIAL (69 test failures)
+- QA C response → status = READY_FOR_REVIEW
+- Tech Lead D response → status = APPROVED
+```
+
+**DO NOT spawn Tasks yet.** Complete parsing first.
+
+**STEP 2: BUILD SPAWN QUEUE FOR ALL GROUPS**
+
+After parsing ALL responses, build a complete spawn queue:
+
+```
+Spawn queue:
+1. Group A: status=READY_FOR_QA → Spawn QA Expert A
+2. Group B: status=PARTIAL → Spawn Developer B (continuation)
+3. Group C: status=READY_FOR_REVIEW → Spawn Tech Lead C
+4. Group D: status=APPROVED → Run Phase Continuation Check (Step 2B.7a)
+```
+
+**Identify routing for each group:**
+- READY_FOR_QA → QA Expert
+- READY_FOR_REVIEW → Tech Lead
+- APPROVED → Phase Continuation Check
+- INCOMPLETE → Developer continuation
+- PARTIAL → Developer continuation
+- FAILED → Investigator
+- BLOCKED → Investigator
+
+**STEP 3: SPAWN ALL TASKS IN ONE MESSAGE BLOCK**
+
+**🔴 CRITICAL REQUIREMENT:** Spawn ALL Task calls in a SINGLE message response.
+
+**DO NOT serialize** with "first... then..." language.
+
+**CORRECT PATTERN:**
+
+```
+Received responses from Groups A, B, C.
+Building spawn queue: QA A + Developer B + Tech Lead C
+Spawning all agents in parallel:
+
+[Task call for QA Expert A]
+[Task call for Developer B continuation]
+[Task call for Tech Lead C]
+```
+
+**All three Task calls MUST appear in ONE orchestrator message.**
+
+**FORBIDDEN PATTERNS:**
+
+❌ **Serialization:** "Let me route Group C first, then I'll respawn Developer B"
+- This creates stopping points and causes the bug
+- You MUST route ALL groups in ONE message
+
+❌ **Partial spawning:** Spawning only the first group and stopping
+- Parse ALL → Build queue for ALL → Spawn ALL
+- No exceptions
+
+❌ **Deferred spawning:** "I'll handle the other groups next"
+- There is no "next" - handle ALL groups NOW
+- Build and spawn complete queue in this message
+
+**REQUIRED PATTERN:**
+
+✅ **Batch processing:** Parse all → Build queue → Spawn all in ONE message
+✅ **Parallel Task calls:** All Task invocations in same orchestrator response
+✅ **Complete handling:** Every group gets routed, no groups left pending
+
+**ENFORCEMENT:**
+
+- Count responses received: N
+- Count Task calls spawned: M
+- IF N > M → VIOLATION (some groups not spawned)
+- Use Step 2B.7b (Pre-Stop Verification) to catch violations
+
+**This batch processing workflow is MANDATORY and prevents the root cause of orchestrator stopping bug.**
 
 ### Step 2B.3-2B.7: Route Each Group Independently
 
@@ -1860,129 +1878,73 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 ### Step 2B.7a: Phase Continuation Check (CRITICAL - PREVENTS HANG)
 
-**🔴 MANDATORY: After each Tech Lead approval, check for next phase BEFORE spawning PM**
+**🔴 MANDATORY: After Tech Lead approval, check for next phase BEFORE spawning PM**
 
-**When a group is approved by Tech Lead:**
+**Actions:** 1) Update group status=completed (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count, total_count.
 
-1. **Update group status in database:**
-   ```
-   bazinga-db, please update task group:
+**Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} approved | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.8. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.8, ELSE IF current_phase in_progress → output `✅ Group {id} | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.8**
 
-   Group ID: [group_id]
-   Status: completed
-   ```
+### Step 2B.7b: Pre-Stop Verification Gate (LAYER 3 - FINAL SAFETY NET)
 
-   Then invoke: `Skill(command: "bazinga-db")`
+**🔴 CRITICAL: RUN THIS CHECK BEFORE ENDING ANY ORCHESTRATOR MESSAGE IN STEP 2B**
 
-2. **Query ALL task groups to check overall progress:**
-   ```
-   bazinga-db, please get all task groups for session [session_id]
-   ```
+**This is the LAST CHANCE to catch incomplete work before stopping.**
 
-   Then invoke: `Skill(command: "bazinga-db")`
+**MANDATORY THREE-QUESTION CHECKLIST:**
 
-3. **Load PM state to get execution_phases:**
-   ```
-   bazinga-db, please get PM state for session [session_id]
-   ```
+Before ending your orchestrator message in parallel mode (Step 2B), you MUST answer these three questions:
 
-   Then invoke: `Skill(command: "bazinga-db")`
+**Question 1: Did I process ALL developer responses received?**
+- Count responses received in this message
+- Verify each one was parsed and routed (Dev → QA, QA → Tech Lead, etc.)
+- IF any response was not routed → FAIL (auto-fix below)
 
-   Extract `execution_phases` array from PM state.
+**Question 2: Are there ANY groups with status INCOMPLETE, PARTIAL, or FAILED that need developer continuation?**
+- Check the latest task group states from database
+- IF any group has status INCOMPLETE/PARTIAL/FAILED → FAIL (auto-fix below)
 
-4. **Analyze the task groups returned:**
+**Question 3: Did I spawn Task calls for ALL incomplete groups?**
+- List groups that need continuation
+- Verify each has a corresponding Task spawn in THIS message
+- IF any group missing Task spawn → FAIL (auto-fix below)
 
-   Count groups by status:
-   - `completed_count`: Groups with status='completed'
-   - `in_progress_count`: Groups with status='in_progress'
-   - `pending_count`: Groups with status='pending'
-   - `total_count`: Total groups
+**AUTO-FIX ENFORCEMENT:**
 
-5. **Decision logic (Phase-Aware):**
+**IF ANY question fails:**
+1. **DO NOT end message without spawning Tasks**
+2. **Identify missing Task spawns:**
+   - Groups with INCOMPLETE/PARTIAL/FAILED status
+   - Groups not yet routed to next stage
+3. **Build spawn queue immediately:**
+   - INCOMPLETE → Developer continuation
+   - PARTIAL → Developer continuation
+   - FAILED → Investigator analysis
+   - READY_FOR_QA → QA Expert
+   - READY_FOR_REVIEW → Tech Lead
+4. **Spawn ALL missing Tasks in ONE message block** (do NOT serialize)
+5. **Output:** `🔄 Auto-fix: Found {N} incomplete groups → Spawning {agents} in parallel`
+6. **Re-run this checklist after spawning** to verify all work complete
 
-   **IF `execution_phases` is empty or null:**
-   - No phase dependencies, use simple logic:
+**PASS CRITERIA:**
 
-   **IF `pending_count` > 0:**
-   - **There are more groups to execute**
-   - **DO NOT spawn PM yet**
-   - Extract all pending groups
-   - **User output (capsule format):**
-     ```
-     ✅ Group {completed_group_id} approved | {completed_count}/{total_count} groups done | Starting remaining groups → {pending_group_ids}
-     ```
-   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
-   - Process internally (no additional routing messages)
+You may ONLY end your message if ALL THREE questions pass:
+- ✅ All responses processed
+- ✅ No incomplete groups remain unhandled
+- ✅ All required Tasks spawned in this message
 
-   **IF `execution_phases` has phases:**
-   - Use phase-aware logic:
+**FORBIDDEN PATTERNS:**
 
-   **Step 5a: Determine current phase**
-   - Find lowest phase number where NOT all groups are completed
-   - Example: Phase 1 all complete, Phase 2 has pending/in_progress → current_phase = 2
+❌ "Let me route Group C first, then respawn Developer B" → WRONG (serialization)
+❌ Spawning only first group, leaving others unspawned → WRONG (partial completion)
+❌ Ending message with INCOMPLETE groups → WRONG (premature stop)
 
-   **Step 5b: Check current phase status**
+**REQUIRED PATTERN:**
 
-   **IF current_phase groups all completed:**
-   - Move to next phase
-   - Get next_phase = current_phase + 1
+✅ "Groups B (PARTIAL) and C (READY_FOR_REVIEW) received → Spawning Developer B + Tech Lead C in parallel"
+✅ Both Task calls in ONE message block
+✅ No groups left unhandled
 
-   **IF next_phase exists:**
-   - Extract group_ids for next_phase
-   - **User output (capsule format):**
-     ```
-     ✅ Phase {current_phase} complete | {completed_count}/{total_count} groups done | Starting Phase {next_phase} → {next_phase_description}
-     ```
-   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for next_phase groups
-   - Process internally (no additional routing messages)
-
-   **ELSE (no next_phase):**
-   - All phases complete
-   - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
-
-   **ELSE IF current_phase has in_progress groups:**
-   - **Wait for current phase groups to complete**
-   - **User output (capsule format):**
-     ```
-     ✅ Group {completed_group_id} approved | Phase {current_phase}: {completed_in_phase}/{total_in_phase} done | Waiting for {in_progress_count} groups
-     ```
-   - **Exit this check** - will run again when next group completes
-   - Do NOT spawn PM yet
-   - Do NOT start next phase yet
-
-   **Simple mode fallback (no phases):**
-
-   **IF `pending_count` > 0:**
-   - **There are MORE groups to execute**
-   - **DO NOT spawn PM yet**
-   - Extract the pending groups
-   - **User output (capsule format):**
-     ```
-     ✅ Group approved | {completed_count}/{total_count} groups done | Starting remaining groups → {pending_group_ids}
-     ```
-   - **IMMEDIATELY jump to Step 2B.1** to spawn developers for pending groups
-   - Process internally (no additional routing messages)
-
-   **ELSE IF `pending_count` == 0 AND `in_progress_count` == 0:**
-   - **All groups complete - time for PM final assessment**
-   - **IMMEDIATELY proceed to Step 2B.8** (Spawn PM)
-
-   **ELSE IF `in_progress_count` > 0:**
-   - **Some groups still in progress - wait for them to complete**
-   - **User output (capsule format):**
-     ```
-     ✅ Group {completed_group_id} approved | {completed_count}/{total_count} groups done | Waiting for {in_progress_count} groups in progress
-     ```
-   - **Exit this check** - no action needed now
-   - **This check will run again** when the next Tech Lead approves another group
-   - Do NOT spawn PM yet
-   - Do NOT spawn next phase yet
-
-**🔴 CRITICAL: This check PREVENTS the orchestrator from hanging between phases!**
-
-Without this check, when Phase 1 completes, the orchestrator doesn't know there's a Phase 2 and just stops waiting for instructions.
-
-**When ALL groups reach "complete" status → Proceed to Step 2B.8**
+**This verification gate is your final responsibility check. DO NOT bypass it.**
 
 ### Step 2B.8: Spawn PM When All Groups Complete
 
