@@ -1,0 +1,110 @@
+name: Gemini PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute diff
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          git diff origin/${{ github.base_ref }}...HEAD > diff.patch
+
+      - name: Generate review with Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python3 << 'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          # Read diff
+          with open('diff.patch', 'r') as f:
+              diff_content = f.read()
+
+          # Truncate if too large
+          max_chars = 40000
+          truncated = False
+          if len(diff_content) > max_chars:
+              diff_content = diff_content[:max_chars]
+              truncated = True
+
+          # Build prompt
+          prompt = f"""You are reviewing a pull request. Below is the Git diff of the changes.
+
+Please analyze this diff and provide:
+1. Potential bugs or regressions
+2. Style or readability issues
+3. Concrete suggestions for improvement
+
+Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
+
+{'⚠️ Note: The diff has been truncated due to size limits.' if truncated else ''}
+
+Diff:
+```
+{diff_content}
+```
+"""
+
+          # Prepare Gemini API request
+          url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent"
+          headers = {
+              "Content-Type": "application/json",
+              "x-goog-api-key": os.environ["GEMINI_API_KEY"]
+          }
+
+          payload = {
+              "contents": [
+                  {
+                      "parts": [
+                          {"text": prompt}
+                      ]
+                  }
+              ]
+          }
+
+          # Call Gemini API
+          req = urllib.request.Request(
+              url,
+              data=json.dumps(payload).encode('utf-8'),
+              headers=headers
+          )
+
+          try:
+              with urllib.request.urlopen(req) as response:
+                  result = json.loads(response.read().decode('utf-8'))
+
+              # Extract review text
+              review_text = result['candidates'][0]['content']['parts'][0]['text']
+
+              # Write review to file for next step
+              with open('review.txt', 'w') as f:
+                  f.write(review_text)
+
+              print("Review generated successfully")
+
+          except Exception as e:
+              print(f"Error calling Gemini API: {e}", file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Post review comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REVIEW_BODY=$(jq -Rs . < review.txt)
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d "{\"body\": $REVIEW_BODY}"
