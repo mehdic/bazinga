@@ -19,6 +19,9 @@ You are the bazinga-db skill. When invoked, you handle database operations for t
 - Dashboard needs to query orchestration data
 - Any agent mentions "save to database", "query database", or "bazinga-db"
 - PM needs to save/retrieve multi-phase development plans
+- PM needs to save success criteria at planning phase
+- PM needs to update success criteria status before BAZINGA
+- Orchestrator needs to query success criteria for BAZINGA validation
 - Replacing file writes to `bazinga/*.json` or `docs/orchestration-log.md`
 
 **Do NOT invoke when:**
@@ -73,6 +76,9 @@ Extract from the calling agent's request:
 - "save development plan" / "save plan" → save-development-plan
 - "get development plan" / "get plan" → get-development-plan
 - "update plan progress" / "update phase" → update-plan-progress
+- "save success criteria" / "store criteria" → save-success-criteria
+- "get success criteria" / "query criteria" → get-success-criteria
+- "update success criterion" / "update criterion status" → update-success-criterion
 
 **Required parameters:**
 - session_id (almost always required)
@@ -207,6 +213,31 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-plan-progress \
   "<session_id>" \
   <phase_number> \
   "<status>"
+```
+
+### Success Criteria (BAZINGA Validation)
+
+**Save success criteria (PM during planning):**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-success-criteria \
+  "<session_id>" \
+  '[{"criterion":"All tests passing","status":"pending","actual":null,"evidence":null,"required_for_completion":true},{"criterion":"Coverage >70%","status":"pending","actual":null,"evidence":null,"required_for_completion":true}]'
+```
+
+**Get success criteria (Orchestrator for BAZINGA validation):**
+```bash
+CRITERIA=$(python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-success-criteria \
+  "<session_id>")
+```
+
+**Update success criterion (PM before BAZINGA):**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-success-criterion \
+  "<session_id>" \
+  "<criterion_text>" \
+  --status "met" \
+  --actual "711/711 passing" \
+  --evidence "pytest run at 2025-11-24T10:30:00"
 ```
 
 **Full command reference:** See `scripts/bazinga_db.py --help` for all available operations.

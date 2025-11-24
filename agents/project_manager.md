@@ -565,7 +565,8 @@ IF no plan exists OR all phases done:
 Before sending BAZINGA, you MUST complete ALL these steps:
 
 1. **Query success criteria from database**
-   - **Request:** `bazinga-db, please get success criteria for session: [session_id]`
+   - **Request:** `bazinga-db, get success criteria for session [session_id]`
+   - **Command:** `get-success-criteria [session_id]`
    - **Invoke:** `Skill(command: "bazinga-db")`
    - This ensures you verify against ORIGINAL criteria (cannot be manipulated)
 
@@ -575,8 +576,10 @@ Before sending BAZINGA, you MUST complete ALL these steps:
 
 3. **Update criteria status in database**
    - For each criterion, update: status (met/blocked/failed), actual value, evidence
-   - **Request:** `bazinga-db, please update success criterion: Session [id], Criterion "[text]", Status "met", Actual "[value]", Evidence "[proof]"`
-   - **Invoke:** `Skill(command: "bazinga-db")` for EACH criterion
+   - **Request:** `bazinga-db, update success criterion for session [id]`
+   - **Command:** `update-success-criterion [session_id] "[criterion_text]" --status "met" --actual "[value]" --evidence "[proof]"`
+   - **Example:** `update-success-criterion abc123 "All tests passing" --status "met" --actual "711/711 passing" --evidence "pytest output at 2025-11-24T10:30:00"`
+   - **Invoke:** `Skill(command: "bazinga-db")` for EACH criterion update
    - Orchestrator will independently verify database records
 
 4. **Calculate completion**: X/Y criteria met (%)
@@ -690,6 +693,18 @@ ELSE IF <100% criteria met:
 
   Partial completion with documented external blockers.
   ```
+
+**⚠️ CRITICAL: Update blocked criteria in database**
+
+Before sending BAZINGA with Path B, you MUST update blocked criteria status:
+
+For each blocked criterion:
+- **Request:** `bazinga-db, update success criterion for session [id]`
+- **Command:** `update-success-criterion [session_id] "[criterion_text]" --status "blocked" --actual "[partial_result]" --evidence "[blocker_description]"`
+- **Example:** `update-success-criterion abc123 "Stripe integration working" --status "blocked" --actual "Mock implementation complete" --evidence "Cannot test: No Stripe API keys provided. User must configure keys."`
+- **Invoke:** `Skill(command: "bazinga-db")` for EACH blocked criterion
+
+This ensures orchestrator can independently verify the blocker status.
 
 **Path C: Work Incomplete** ❌
 - <100% criteria met AND gaps are fixable
@@ -1469,13 +1484,12 @@ Then success criteria MUST include COMPREHENSIVE checks:
 
 **Request to bazinga-db skill:**
 ```
-bazinga-db, please save success criteria:
+bazinga-db, save success criteria for session [session_id]
 
-Session ID: [current session_id]
-Criteria: [
-  {"criterion": "Coverage >70%", "status": "pending", "actual": null, "evidence": null, "required_for_completion": true},
-  {"criterion": "All tests passing", "status": "pending", "actual": null, "evidence": null, "required_for_completion": true}
-]
+Command: save-success-criteria [session_id] '[JSON array of criteria objects]'
+
+Example:
+save-success-criteria abc123 '[{"criterion":"Coverage >70%","status":"pending","actual":null,"evidence":null,"required_for_completion":true},{"criterion":"All tests passing","status":"pending","actual":null,"evidence":null,"required_for_completion":true}]'
 ```
 
 **Then invoke:**
