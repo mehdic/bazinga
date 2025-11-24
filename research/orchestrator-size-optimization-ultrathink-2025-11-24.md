@@ -198,10 +198,10 @@ Replace with: "Follow bazinga/templates/shutdown_protocol.md"
 - ✅ Low risk (executed once, end of workflow)
 
 **Cons:**
-- ⚠️ Orchestrator can't read templates at runtime (slash command limitation)
-  - **Resolution:** Reference section (32 lines) includes complete key steps
-  - **Rationale:** Shutdown is procedural, not decision-heavy - reference summary is sufficient
-  - **Templates serve:** Human maintenance and complete documentation (not runtime reference)
+- ⚠️ Orchestrator must explicitly read template at runtime
+  - **Resolution:** Added explicit Read instruction in shutdown protocol
+  - **Rationale:** Template extraction saves tokens, Read instruction provides runtime access
+  - **Templates serve:** Complete documentation (564 lines) accessible via Read tool when needed
 
 **Verdict:** **HIGH IMPACT, LOW RISK**
 

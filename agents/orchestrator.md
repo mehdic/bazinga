@@ -2290,34 +2290,16 @@ When PM sends BAZINGA:
 
 **⚠️ CRITICAL**: When PM sends BAZINGA, you MUST follow the complete shutdown protocol.
 
-**Follow the complete shutdown protocol defined in `bazinga/templates/shutdown_protocol.md`.**
+**Step 1: Read the full shutdown protocol**
 
-**Key steps summary (see template for full details):**
+Use the Read tool to read the complete shutdown protocol:
+```
+Read(file_path: "bazinga/templates/shutdown_protocol.md")
+```
 
-1. **Verify ALL success criteria met** - Database-verified (not just PM's claim), spawn bazinga-validator for independent verification
-2. **Check tech debt blockers** - No high/critical security issues
-3. **Validate development plan completion** - All required work finished
-4. **Git cleanup** - Commit and push all uncommitted work to remote
-5. **Generate completion report** - Create detailed report in bazinga/artifacts/{SESSION_ID}/
-6. **Update database** - Save final orchestrator state and set session status to 'completed'
-7. **Display success message** - Show concise completion report to user
+**Step 2: Execute all steps in the template sequentially**
 
-**CRITICAL RULES (see template for complete logic):**
-
-- **BAZINGA rejection protocol**: Orchestrator independently verifies database (ground truth), tracks rejection count, escalates after 3 rejections
-- **No shortcuts allowed**: Must complete ALL steps sequentially
-- **Git safety**: Cannot complete without committing and pushing all work
-- **Database verification**: Must save final state before displaying success
-
-**Template contains:**
-- Complete BAZINGA validation logic with rejection criteria
-- Bazinga-validator skill integration
-- Tech debt gate checks
-- Development plan verification
-- Git branch operations (commit, push, record)
-- Database state updates
-- Final reporting procedures
-- Error handling and escalation logic
+Follow ALL steps defined in the template file you just read. The template contains the complete, authoritative shutdown procedure.
 
 ---
 
