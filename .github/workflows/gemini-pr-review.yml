@@ -90,7 +90,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             -d "$PAYLOAD" \
-            https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent)
+            https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent)
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
