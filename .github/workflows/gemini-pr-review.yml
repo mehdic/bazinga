@@ -85,20 +85,57 @@ jobs:
           EOF
           )
 
-          curl -s -X POST \
+          echo "Calling Gemini API..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             -H "Content-Type: application/json" \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             -d "$PAYLOAD" \
-            https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent \
-            | jq -r '.candidates[0].content.parts[0].text' > review.txt
+            https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Error: Gemini API returned status $HTTP_CODE"
+            echo "Response: $BODY"
+            echo "⚠️ Gemini API call failed with HTTP $HTTP_CODE. Please check the workflow logs for details." > review.txt
+            exit 0
+          fi
+
+          echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "⚠️ No review generated. Gemini API response was empty or malformed."' > review.txt
+
+          if [ ! -s review.txt ]; then
+            echo "⚠️ Review file is empty after API call. Check Gemini API response." > review.txt
+          fi
+
+          echo "Review generated successfully"
+          echo "Preview:"
+          head -n 10 review.txt
 
       - name: Post review comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "Preparing to post review comment..."
+
+          if [ ! -f review.txt ]; then
+            echo "Error: review.txt not found"
+            exit 1
+          fi
+
+          echo "Review content length: $(wc -c < review.txt) bytes"
+
           REVIEW_BODY=$(jq -Rs . < review.txt)
+
+          echo "Posting comment to PR #${{ github.event.pull_request.number }}..."
+
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -d "{\"body\": $REVIEW_BODY}"
+            -d "{\"body\": $REVIEW_BODY}" \
+            | jq .
+
+          echo "Comment posted successfully"
