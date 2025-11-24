@@ -600,9 +600,26 @@ ELSE IF <100% criteria met:
   )
 
   IF test_criteria_exist:
-    → 🚨 MANDATORY: Check test failure count FIRST
+    → 🚨 MANDATORY: Get test failure count FIRST (before considering BAZINGA)
 
-    Run: [test command to count failures]
+    Methods to get test failure count (in order of preference):
+    1. Query bazinga-db for latest test results:
+       Request: "bazinga-db, get latest test results for session {session_id}"
+       Invoke: Skill(command: "bazinga-db")
+       Parse: Extract failure count from QA Expert or Tech Lead logs
+
+    2. If no database results available:
+       → Spawn QA Expert with request: "Run full test suite NOW and report exact failure count"
+       → Wait for QA Expert response
+       → Parse: Extract "X tests passing, Y tests failing"
+
+    3. If test results file exists and recent (< 5 min):
+       → Read test output file (e.g., test-results.txt)
+       → Parse failure count
+
+    ❌ DO NOT run tests yourself via Bash (you coordinate, QA executes)
+    ✅ DO get exact numeric count: "X passing, Y failing"
+    ❌ DO NOT accept vague answers: "tests look good" or "mostly passing"
 
     IF any_test_failures_exist (count > 0):
       → Path B is FORBIDDEN (test failures are ALWAYS fixable)

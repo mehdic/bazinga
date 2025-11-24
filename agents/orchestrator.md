@@ -2355,60 +2355,81 @@ if pm_message contains "BAZINGA":
                 → Spawn PM: "Redefine criterion '{c.criterion}' with specific measurable target, update in database"
             → DO NOT execute shutdown protocol
 
-    # Check B: Invoke BAZINGA Validator skill for independent verification
+    # Check B: Query database first (ground truth), then invoke validator for independent verification
 
-    # The validator skill handles all heavy logic (test verification, evidence parsing, etc.)
-    # Using skill instead of inline logic saves ~3,500 chars in orchestrator
+    # Step B.1: Query database for success criteria (ground truth, fallback)
+    # This provides safety net if validator fails/times out/errors
 
-    # Invoke validator skill
-    Skill(command: "bazinga-validator")
+    Request: "bazinga-db, get success criteria for session: {session_id}"
+    Invoke: Skill(command: "bazinga-db")
 
-    # In the same message, provide context to validator:
-    # "bazinga-validator, validate BAZINGA for session: {session_id}"
+    # Parse database response
+    criteria = parse_criteria_from_database_response()
+    met_count = count(criteria where status="met")
+    total_count = count(criteria where required_for_completion=true)
 
-    # The validator will:
-    # 1. Query success criteria from database (via bazinga-db skill)
-    # 2. Run tests independently to count failures
-    # 3. Verify evidence matches claims
-    # 4. Check for vague criteria
-    # 5. Validate external blockers (if Path B)
-    # 6. Return structured verdict
-
-    # Parse validator response
-    # Expected format: "## BAZINGA Validation Result\n**Verdict:** ACCEPT|REJECT|CLARIFY"
-
-    if "Verdict: ACCEPT" in validator_response or "**Verdict:** ACCEPT" in validator_response:
-        # Validator approved BAZINGA
-        orchestrator_state["bazinga_rejection_count"] = 0  # Reset on success
-
-        # Display validator's verdict
-        → Display: Extract completion message from validator_response
-        → Continue to shutdown protocol
-
-    elif "Verdict: REJECT" in validator_response or "**Verdict:** REJECT" in validator_response:
-        # Validator rejected BAZINGA
+    # Basic sanity check from database
+    IF met_count < total_count:
+        # Clearly incomplete - reject immediately without spawning validator
         orchestrator_state["bazinga_rejection_count"] += 1
         count = orchestrator_state["bazinga_rejection_count"]
 
-        # Extract reason and action from validator
-        reason = parse_section(validator_response, "### Reason")
-        action = parse_section(validator_response, "### Recommended Action")
+        incomplete_criteria = [c for c in criteria if c.status != "met"]
 
         if count > 2:
-            → ESCALATE: Display "❌ Orchestration stuck | BAZINGA rejected {count} times"
-            → Show user: validator reason, criteria status
-            → Wait for user decision
+            → ESCALATE: Display "❌ Orchestration stuck | Only {met_count}/{total_count} criteria met"
         else:
-            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | {reason}"
-            → Spawn PM: action
+            → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | Incomplete: {met_count}/{total_count} criteria met"
+            → Spawn PM: "Continue work. Incomplete criteria: {list incomplete_criteria}"
         → DO NOT execute shutdown protocol
+        → Skip validator spawn (validation already failed)
 
-    else:
-        # CLARIFY verdict or unparseable response
-        orchestrator_state["bazinga_rejection_count"] += 1
-        → Display: "⚠️ Validator needs clarification"
-        → Spawn PM: Extract clarification request from validator_response
-        → DO NOT execute shutdown protocol
+    # Step B.2: Database shows complete - spawn validator for independent verification
+    # Validator will run tests independently to verify PM's claims
+
+    try:
+        # Invoke validator skill for independent verification
+        Skill(command: "bazinga-validator")
+        # In same message: "bazinga-validator, validate BAZINGA for session: {session_id}"
+
+        if "Verdict: ACCEPT" in validator_response or "**Verdict:** ACCEPT" in validator_response:
+            orchestrator_state["bazinga_rejection_count"] = 0
+            → Display: Extract completion message from validator_response
+            → Continue to shutdown protocol
+
+        elif "Verdict: REJECT" in validator_response or "**Verdict:** REJECT" in validator_response:
+            orchestrator_state["bazinga_rejection_count"] += 1
+            count = orchestrator_state["bazinga_rejection_count"]
+            reason = parse_section(validator_response, "### Reason")
+            action = parse_section(validator_response, "### Recommended Action")
+
+            if count > 2:
+                → ESCALATE: Display "❌ Orchestration stuck | BAZINGA rejected {count} times"
+                → Show user: validator reason, criteria status
+            else:
+                → REJECT: Display "❌ BAZINGA rejected (attempt {count}/3) | {reason}"
+                → Spawn PM: action
+            → DO NOT execute shutdown protocol
+
+        else:
+            orchestrator_state["bazinga_rejection_count"] += 1
+            → Display: "⚠️ Validator needs clarification"
+            → Spawn PM: Extract clarification request from validator_response
+            → DO NOT execute shutdown protocol
+
+    except (ValidatorTimeout, ValidatorError, SkillInvocationError):
+        # FALLBACK: Validator failed - trust PM's database state (lenient)
+        → Display: "⚠️ Validator unavailable - trusting PM's database state"
+
+        IF met_count == total_count:
+            orchestrator_state["bazinga_rejection_count"] = 0
+            → Display: "✅ BAZINGA ACCEPTED (database state, validator unavailable)"
+            → Continue to shutdown protocol
+        ELSE:
+            orchestrator_state["bazinga_rejection_count"] += 1
+            → REJECT: Display "❌ BAZINGA rejected | Incomplete: {met_count}/{total_count}"
+            → Spawn PM: "Continue work. Validator unavailable, database shows incomplete."
+            → DO NOT execute shutdown protocol
 ```
 
 **The Rule**: Orchestrator verifies DATABASE (ground truth), not PM's message. Tracks rejection count to prevent infinite loops. Escalates to user after 3 rejections.
