@@ -20,6 +20,8 @@ jobs:
       - name: Generate review with Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BRANCH_URL: https://github.com/${{ github.repository }}/tree/${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           python3 << 'PY'
           import json
@@ -31,6 +33,10 @@ jobs:
           with open('diff.patch', 'r') as f:
               diff_content = f.read()
 
+          # Get branch URL and PR title
+          branch_url = os.environ.get("BRANCH_URL", "")
+          pr_title = os.environ.get("PR_TITLE", "")
+
           # Truncate if too large
           max_chars = 40000
           truncated = False
@@ -39,21 +45,32 @@ jobs:
               truncated = True
 
           # Build prompt
-          prompt = f"""You are reviewing a pull request. Below is the Git diff of the changes.
+          prompt = f"""You are reviewing a pull request.
 
-Please analyze this diff and provide:
-1. Potential bugs or regressions
-2. Style or readability issues
-3. Concrete suggestions for improvement
+**Pull Request Title:** {pr_title}
 
-Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
+**Branch URL:** {branch_url}
+
+Please use the branch URL above to access and understand the full project context, including:
+- The overall project structure and architecture
+- Existing code patterns and conventions
+- Related files and dependencies
+- The broader context of these changes
+
+Below is the Git diff of the changes in this PR:
 
 {'⚠️ Note: The diff has been truncated due to size limits.' if truncated else ''}
 
-Diff:
-```
+```diff
 {diff_content}
 ```
+
+Using the project context from the branch, please analyze this diff and provide:
+1. **Potential bugs or regressions** - Consider how these changes interact with the existing codebase
+2. **Style or readability issues** - Compare against the project's existing code patterns
+3. **Concrete suggestions for improvement** - Based on the project's architecture and conventions
+
+Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
 """
 
           # Prepare Gemini API request
