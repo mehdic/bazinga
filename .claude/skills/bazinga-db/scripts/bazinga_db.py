@@ -158,7 +158,7 @@ class BazingaDB:
             raise ValueError("agent_type cannot be empty")
         if not content or not content.strip():
             raise ValueError("content cannot be empty")
-        if agent_type not in ['pm', 'developer', 'qa_expert', 'techlead', 'orchestrator']:
+        if agent_type not in ['pm', 'developer', 'qa_expert', 'techlead', 'orchestrator', 'investigator']:
             raise ValueError(f"Invalid agent_type: {agent_type}")
 
         conn = self._get_connection()
