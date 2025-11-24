@@ -17,99 +17,73 @@ jobs:
           git fetch origin ${{ github.base_ref }} --depth=1
           git diff origin/${{ github.base_ref }}...HEAD > diff.patch
 
-      - name: Generate review with Gemini
+      - name: Build prompt
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BRANCH_URL: https://github.com/${{ github.repository }}/tree/${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          cat > review_script.py << 'PYTHON_SCRIPT'
-          import json
-          import os
-          import sys
-          import urllib.request
+          cat > prompt_header.txt << 'EOF'
+          You are reviewing a pull request.
 
-          # Read diff
-          with open('diff.patch', 'r') as f:
-              diff_content = f.read()
+          EOF
 
-          # Get branch URL and PR title
-          branch_url = os.environ.get("BRANCH_URL", "")
-          pr_title = os.environ.get("PR_TITLE", "")
+          echo "Pull Request Title: $PR_TITLE" >> prompt_header.txt
+          echo "" >> prompt_header.txt
+          echo "Branch URL: $BRANCH_URL" >> prompt_header.txt
+          echo "" >> prompt_header.txt
 
-          # Truncate if too large
-          max_chars = 40000
-          truncated = False
-          if len(diff_content) > max_chars:
-              diff_content = diff_content[:max_chars]
-              truncated = True
+          cat >> prompt_header.txt << 'EOF'
+          Please use the branch URL above to access and understand the full project context, including:
+          - The overall project structure and architecture
+          - Existing code patterns and conventions
+          - Related files and dependencies
+          - The broader context of these changes
 
-          # Build prompt
-          truncation_note = "Note: The diff has been truncated due to size limits." if truncated else ""
+          Below is the Git diff of the changes in this PR:
 
-          prompt_parts = [
-              "You are reviewing a pull request.\n\n",
-              f"Pull Request Title: {pr_title}\n\n",
-              f"Branch URL: {branch_url}\n\n",
-              "Please use the branch URL above to access and understand the full project context, including:\n",
-              "- The overall project structure and architecture\n",
-              "- Existing code patterns and conventions\n",
-              "- Related files and dependencies\n",
-              "- The broader context of these changes\n\n",
-              "Below is the Git diff of the changes in this PR:\n\n",
-              f"{truncation_note}\n\n" if truncation_note else "",
-              f"{diff_content}\n\n",
-              "Using the project context from the branch, please analyze this diff and provide:\n",
-              "1. Potential bugs or regressions - Consider how these changes interact with the existing codebase\n",
-              "2. Style or readability issues - Compare against the project's existing code patterns\n",
-              "3. Concrete suggestions for improvement - Based on the project's architecture and conventions\n\n",
-              "Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment."
-          ]
-          prompt = "".join(prompt_parts)
+          EOF
 
-          # Prepare Gemini API request
-          url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent"
-          headers = {
-              "Content-Type": "application/json",
-              "x-goog-api-key": os.environ["GEMINI_API_KEY"]
+          # Truncate diff if too large
+          if [ $(wc -c < diff.patch) -gt 40000 ]; then
+            echo "Note: The diff has been truncated due to size limits." >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            head -c 40000 diff.patch > diff_truncated.patch
+            cat diff_truncated.patch >> prompt_header.txt
+          else
+            cat diff.patch >> prompt_header.txt
+          fi
+
+          cat >> prompt_header.txt << 'EOF'
+
+          Using the project context from the branch, please analyze this diff and provide:
+          1. Potential bugs or regressions - Consider how these changes interact with the existing codebase
+          2. Style or readability issues - Compare against the project's existing code patterns
+          3. Concrete suggestions for improvement - Based on the project's architecture and conventions
+
+          Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
+          EOF
+
+      - name: Call Gemini API
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          PROMPT=$(cat prompt_header.txt | jq -Rs .)
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "contents": [{
+              "parts": [{"text": $PROMPT}]
+            }]
           }
-
-          payload = {
-              "contents": [
-                  {
-                      "parts": [
-                          {"text": prompt}
-                      ]
-                  }
-              ]
-          }
-
-          # Call Gemini API
-          req = urllib.request.Request(
-              url,
-              data=json.dumps(payload).encode('utf-8'),
-              headers=headers
+          EOF
           )
 
-          try:
-              with urllib.request.urlopen(req) as response:
-                  result = json.loads(response.read().decode('utf-8'))
-
-              # Extract review text
-              review_text = result['candidates'][0]['content']['parts'][0]['text']
-
-              # Write review to file for next step
-              with open('review.txt', 'w') as f:
-                  f.write(review_text)
-
-              print("Review generated successfully")
-
-          except Exception as e:
-              print(f"Error calling Gemini API: {e}", file=sys.stderr)
-              sys.exit(1)
-          PYTHON_SCRIPT
-
-          python3 review_script.py
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-goog-api-key: $GEMINI_API_KEY" \
+            -d "$PAYLOAD" \
+            https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent \
+            | jq -r '.candidates[0].content.parts[0].text' > review.txt
 
       - name: Post review comment
         env:
