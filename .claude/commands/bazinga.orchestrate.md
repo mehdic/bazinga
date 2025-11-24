@@ -1208,10 +1208,35 @@ Then invoke: `Skill(command: "bazinga-db")`
   * Continue workflow automatically
 
 **IF Developer reports INCOMPLETE (partial work done):**
-- Provide specific feedback based on what's missing
-- Respawn developer with guidance
-- Track revision count in database
-- Escalate to Tech Lead if >2 revisions (spawn Tech Lead for guidance, not user input)
+- **IMMEDIATELY spawn new developer Task** (do NOT just write a message and stop)
+
+**Build new developer prompt:**
+1. Read `agents/developer.md` for full agent definition
+2. Add configuration from `bazinga/templates/prompt_building.md`
+3. Include in prompt:
+   - Summary of work completed so far
+   - Specific gaps/issues that remain (extract from developer response)
+   - User's completion requirements (e.g., "ALL tests passing", "0 failures")
+   - Concrete next steps to complete work
+4. Track revision count in database (increment by 1):
+   ```
+   bazinga-db, update task group:
+   Group ID: {group_id}
+   Revision Count: {revision_count + 1}
+   ```
+   Invoke: `Skill(command: "bazinga-db")`
+
+**Spawn developer Task:**
+```
+Task(subagent_type="general-purpose", description="Dev {id}: continue work", prompt=[new prompt])
+```
+
+**IF revision count > 2:**
+- Developer is stuck after 3 attempts
+- Spawn Tech Lead for architectural guidance (not user input)
+- Tech Lead provides guidance, then respawn developer with Tech Lead's recommendations
+
+**🔴 CRITICAL:** Previous developer Task is DONE. You MUST spawn a NEW Task. Writing a message like "Continue fixing NOW" does NOTHING - the developer Task has completed and won't see your message. SPAWN the Task.
 
 **🔴 CRITICAL: Do NOT wait for user input. Automatically proceed to the next step based on developer status.**
 
@@ -1318,10 +1343,22 @@ Skill(command: "bazinga-db")
 - Do NOT stop for user input
 
 **IF QA requests changes:**
-- **Immediately respawn developer** with QA feedback
-- Track revision count in database
-- If >2 revisions: Spawn Tech Lead for guidance (not user input)
-- Continue workflow automatically
+- **IMMEDIATELY spawn new developer Task** with QA feedback (do NOT just write a message)
+
+**Build new developer prompt:**
+1. Read `agents/developer.md` for full agent definition
+2. Include QA feedback and failed tests
+3. Track revision count in database (increment by 1)
+
+**Spawn developer Task:**
+```
+Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
+```
+
+**IF revision count > 2:**
+- Spawn Tech Lead for guidance (developer may be stuck)
+
+**🔴 CRITICAL:** SPAWN the Task - don't write "Fix the QA issues" and stop
 
 ### Step 2A.6: Spawn Tech Lead for Review
 
@@ -1557,10 +1594,23 @@ Then invoke: `Skill(command: "bazinga-db")`
 - Do NOT stop for user input
 
 **IF Tech Lead requests changes:**
-- **Immediately respawn** appropriate agent (developer or QA) with feedback
-- Track revision count in database
-- If >2 revisions: Spawn PM to evaluate if task should be simplified (not user input)
-- Continue workflow automatically
+- **IMMEDIATELY spawn appropriate agent Task** with Tech Lead feedback (do NOT just write a message)
+
+**Determine which agent to spawn:**
+- If code issues → Spawn developer with Tech Lead's code feedback
+- If test issues → Spawn QA Expert with Tech Lead's test feedback
+
+**Build prompt and spawn Task:**
+```
+Task(subagent_type="general-purpose", description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
+```
+
+**Track revision count in database (increment by 1)**
+
+**IF revision count > 2:**
+- Spawn PM to evaluate if task should be simplified
+
+**🔴 CRITICAL:** SPAWN the Task - don't write "Fix the Tech Lead's feedback" and stop
 
 **IF Tech Lead requests investigation:**
 - Already handled in Step 2A.6b
