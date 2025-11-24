@@ -593,30 +593,20 @@ Display:
 
    These templates are NOT documentation - they contain critical operational logic that must be loaded before orchestration begins.
 
-   **Read message templates:**
-   ```bash
-   # Read capsule format templates (used for ALL user-facing output)
-   cat bazinga/templates/message_templates.md
-   ```
+   Use the Read tool to load each template into working memory:
 
-   **Read response parsing guide:**
-   ```bash
-   # Read agent response parsing patterns (CRITICAL for routing decisions)
-   cat bazinga/templates/response_parsing.md
    ```
-
-   **Read prompt building guide:**
-   ```bash
-   # Read agent prompt construction patterns (CRITICAL for agent context)
-   cat bazinga/templates/prompt_building.md
+   Read(file_path: "bazinga/templates/message_templates.md")
+   Read(file_path: "bazinga/templates/response_parsing.md")
+   Read(file_path: "bazinga/templates/prompt_building.md")
    ```
-
-   **Note:** Use Read tool for these files. Store the patterns in working memory for the session.
 
    **Why these must be read:**
    - **message_templates.md**: Contains exact capsule format syntax and templates for every agent state
    - **response_parsing.md**: Contains extraction patterns, fallback strategies, and status code mappings
    - **prompt_building.md**: Contains mandatory sections, skill integration, and context requirements for spawning agents
+
+   Store the patterns from these templates in working memory for the entire session.
 
    **AFTER loading templates: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
 
