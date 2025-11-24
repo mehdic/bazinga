@@ -254,10 +254,11 @@ All new orchestrations using the updated bazinga-db will automatically:
 - Ensure SESSION_ID is set before calling log-interaction
 - Check that the session was created first
 
-### "Invalid agent_type"
-- Use only: pm, developer, qa_expert, techlead, orchestrator, investigator
-- Check for typos in agent type
-- Note: Use 'techlead' (not 'tech_lead') and 'investigator' (not 'investigation') to match agent filenames
+### "agent_type cannot be empty"
+- Ensure agent_type is provided and not an empty string
+- Common agent types: pm, developer, qa_expert, techlead, orchestrator, investigator
+- Note: System is extensible - any agent type is accepted (no hardcoded validation)
+- Tip: Use agent filenames as agent_type for consistency (e.g., 'techlead' not 'tech_lead')
 
 ### "Failed to verify log insertion"
 - Database may be corrupted
