@@ -806,9 +806,23 @@ IF status = BAZINGA or CONTINUE:
 
 **Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
 
-**Step 4: Log PM interaction:** §DB.log(pm, session_id, pm_response, 1, pm_main)
+**Step 4: Log PM interaction:**
+```
+bazinga-db, please log this pm interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: 1
+Agent ID: pm_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
@@ -1100,9 +1114,23 @@ IF status = BLOCKED:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log developer interaction:** §DB.log(developer, session_id, dev_response, iteration, developer_main)
+**Step 4: Log developer interaction:**
+```
+bazinga-db, please log this developer interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: developer
+Content: [dev_response]
+Iteration: [iteration]
+Agent ID: developer_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
 
@@ -1342,9 +1370,23 @@ IF decision = ESCALATE_TO_OPUS:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log Tech Lead interaction:** §DB.log(techlead, session_id, tl_response, iteration, techlead_main)
+**Step 4: Log Tech Lead interaction:**
+```
+bazinga-db, please log this techlead interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: techlead
+Content: [tl_response]
+Iteration: [iteration]
+Agent ID: techlead_main
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
 
@@ -1586,9 +1628,23 @@ Skill(command: "velocity-tracker")
 
 
 
-**Log PM interaction:** §DB.log(pm, session_id, pm_response, iteration, pm_final)
+**Log PM interaction:**
+```
+bazinga-db, please log this pm interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: [iteration]
+Agent ID: pm_final
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 ### Step 2A.9: Route PM Response (Simple Mode)
 
@@ -1759,9 +1815,23 @@ Use the Developer Response Parsing section in `bazinga/templates/response_parsin
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log to database:** §DB.log(developer, session_id, dev_response, iteration, dev_group_[X])
+**Step 4: Log to database:**
+```
+bazinga-db, please log this developer interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: developer
+Content: [dev_response]
+Iteration: [iteration]
+Agent ID: dev_group_[X]
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 ### Step 2B.2a: Mandatory Batch Processing (LAYER 1 - ROOT CAUSE FIX)
 
@@ -2009,9 +2079,23 @@ Analyze response content to infer intent:
 
 Use inferred decision for routing (as if PM explicitly stated it).
 
-**Step 2: Log PM response:** §DB.log(pm, session_id, pm_response, iteration, pm_parallel_final)
+**Step 2: Log PM response:**
+```
+bazinga-db, please log this pm interaction:
 
-Then invoke: `Skill(command: "bazinga-db")`
+Session ID: [session_id]
+Agent Type: pm
+Content: [pm_response]
+Iteration: [iteration]
+Agent ID: pm_parallel_final
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
+
+**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
 
 **Step 3: Track velocity metrics:**
 ```
@@ -2095,23 +2179,31 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, invest
 
 **Quick patterns you'll use throughout:**
 
-**After EVERY agent interaction:**
+**After EVERY agent interaction, you MUST log it using this format:**
 ```
-§DB.log(agent_type, session_id, agent_response, iteration, agent_id)
+bazinga-db, please log this [agent_type] interaction:
+
+Session ID: [session_id]
+Agent Type: [agent_type]
+Content: [agent_response]
+Iteration: [iteration]
+Agent ID: [agent_id]
 ```
-Then invoke: `Skill(command: "bazinga-db")`
 
-**⚠️ CRITICAL - §DB.log() is DOCUMENTATION SHORTHAND, not executable code!**
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
+```
 
-When you see: `§DB.log(pm, session_id, pm_response, 1, pm_main)`
+**⚠️ CRITICAL - You MUST invoke the Skill after providing the log request!**
 
-You MUST expand it to:
+**Example for PM:**
 ```
 bazinga-db, please log this pm interaction:
 
-Session ID: [session_id]
+Session ID: bazinga_20251124_100000
 Agent Type: pm
-Content: [pm_response]
+Content: [full PM response text]
 Iteration: 1
 Agent ID: pm_main
 ```
