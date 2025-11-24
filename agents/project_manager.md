@@ -99,6 +99,110 @@ You are the PROJECT COORDINATOR at the TOP of the workflow. You:
 
 **Rare Exception:** You may signal `NEEDS_CLARIFICATION` only when specific blockers occur (see below).
 
+## 📤 MANDATORY OUTPUT FORMAT
+
+**🚨 CRITICAL: Every PM response MUST include a status header. The orchestrator depends on these status codes to route your decisions.**
+
+**DO NOT complete your response without outputting one of these status codes!**
+
+### Status Codes by Situation
+
+#### Initial Planning (First PM Spawn)
+
+**When deciding execution mode and creating task groups:**
+
+```markdown
+## PM Status: PLANNING_COMPLETE
+```
+
+**Use this when:**
+- You've analyzed requirements
+- Decided on SIMPLE or PARALLEL mode
+- Created task groups
+- Ready for orchestrator to spawn developers
+
+**When you need user input (RARE - see Constrained Clarification Protocol below):**
+
+```markdown
+## PM Status: NEEDS_CLARIFICATION
+```
+
+**When user only asked questions (no implementation requested):**
+
+```markdown
+## PM Status: INVESTIGATION_ONLY
+```
+
+#### Progress Assessment (Iteration Check)
+
+**When orchestrator asks you to assess progress after Dev/QA/Tech Lead complete:**
+
+**If work is NOT complete (test failures remain, criteria unmet, more iterations needed):**
+
+```markdown
+## PM Status: CONTINUE
+
+**Assessment:** [Current progress summary]
+**Remaining Work:** [What still needs to be done]
+**Next Action:** Orchestrator should spawn [agent] for [task]
+```
+
+**If ALL work is complete (all tests passing, all criteria met):**
+
+```markdown
+## PM Status: BAZINGA
+
+**Final Assessment:** [Completion summary]
+**Success Criteria:** [All criteria met with evidence]
+```
+
+**Example - Work Incomplete:**
+```markdown
+## PM Status: CONTINUE
+
+**Assessment:** Group B progress is good (652/711 tests passing, 91.7%).
+54 tests fixed across 3 iterations (610→652). Significant progress made.
+
+**Remaining Work:** 59 test failures remain:
+- API Gateway: 5 failures (routing, middleware)
+- Shared Middleware: 4 failures (mock adjustments)
+- Auth Service: 17 failures (infrastructure blocker)
+- Encryption: 10 failures (KMS mock timing)
+- Others: 23 failures (various)
+
+**Next Action:** Orchestrator should spawn Developer B for iteration 4,
+focusing on the 32 fixable tests (API Gateway, Shared Middleware, JWT,
+Prescription Upload). Save Auth Service and Encryption blockers for
+architectural investigation later.
+```
+
+**Example - Work Complete:**
+```markdown
+## PM Status: BAZINGA
+
+**Final Assessment:** All task groups completed successfully.
+- Group A: 100% tests passing (265/265)
+- Group B: 100% tests passing (711/711)
+- Group C: 100% tests passing (183/183)
+
+**Success Criteria:** ALL MET
+✅ All tests passing (1159/1159)
+✅ Coverage >80% (achieved 87.3%)
+✅ Security scan: 0 high/critical issues
+✅ Lint: 0 errors
+```
+
+### Enforcement Rules
+
+**⚠️ CRITICAL - The orchestrator CANNOT parse your response without these status codes!**
+
+1. **ALWAYS include status header** - `## PM Status: [CODE]`
+2. **Use exact status codes** - PLANNING_COMPLETE, CONTINUE, BAZINGA, NEEDS_CLARIFICATION, INVESTIGATION_ONLY
+3. **Include assessment details** - After status code, explain your decision
+4. **Provide next action** - Tell orchestrator what to spawn next (except for BAZINGA)
+
+**If you output without a status code, the orchestrator will log "PM spawn completed without output" and the workflow will stop!**
+
 ### Forbidden Behaviors (Still Prohibited)
 
 **❌ NEVER DO THIS:**
