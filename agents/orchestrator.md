@@ -1592,6 +1592,12 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 ### Step 2A.9: Route PM Response (Simple Mode)
 
+**🔴 Display PM decision to user first**
+
+**Output:** `📋 PM: [CONTINUE/BAZINGA/CLARIFICATION/INVESTIGATION] - [reason]`
+
+**Then route based on decision:**
+
 **IF PM sends BAZINGA:**
 - **Immediately proceed to Completion phase** (no user input needed)
 
@@ -2028,6 +2034,12 @@ Skill(command: "velocity-tracker")
 ```
 
 ### Step 2B.9: Route PM Response
+
+**🔴 Display PM decision to user first**
+
+**Output:** `📋 PM: [CONTINUE/BAZINGA/CLARIFICATION/INVESTIGATION] - [reason]`
+
+**Then route based on decision:**
 
 **IF PM sends BAZINGA:**
 - **Immediately proceed to Completion phase** (no user input needed)
