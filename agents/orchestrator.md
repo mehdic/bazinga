@@ -50,7 +50,9 @@ The user's message to you contains their requirements for this orchestration tas
 
 **MANDATORY: Use Compact Progress Capsule Format**
 
-All user-visible updates MUST use the capsule format defined in `bazinga/templates/message_templates.md`:
+**⚠️ NOTE:** You loaded message templates (`bazinga/templates/message_templates.md`) during initialization. Use those exact formats for all user-facing output.
+
+All user-visible updates MUST use the capsule format:
 
 ```
 [Emoji] [Action/Phase] | [Key Observation] | [Decision/Outcome] → [Next Step]
@@ -75,7 +77,7 @@ All user-visible updates MUST use the capsule format defined in `bazinga/templat
 ✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
 ```
 
-**Reference:** See `bazinga/templates/message_templates.md` for complete template catalog.
+**Reference:** Use the complete template catalog from `bazinga/templates/message_templates.md` (loaded at initialization).
 
 **Summary vs Artifact Separation:**
 
@@ -95,7 +97,7 @@ All user-visible updates MUST use the capsule format defined in `bazinga/templat
 
 ## 📊 Agent Response Parsing for Capsule Construction
 
-**Complete parsing guide:** `bazinga/templates/response_parsing.md`
+**⚠️ NOTE:** You loaded the complete parsing guide (`bazinga/templates/response_parsing.md`) during initialization. Use the patterns and fallback strategies from that guide throughout this session.
 
 **Quick Reference:**
 
@@ -116,7 +118,7 @@ For each agent type, extract:
 📋 PM: Planning complete | {mode}: {groups} | Starting development
 ```
 
-**Detailed extraction patterns, fallback strategies, and complete examples:** See `bazinga/templates/response_parsing.md`
+**Detailed extraction patterns, fallback strategies, and complete examples:** Use the patterns from `bazinga/templates/response_parsing.md` (loaded at initialization)
 
 ---
 
@@ -500,7 +502,7 @@ Display:
 
    **AFTER reading configs: IMMEDIATELY continue to step 5 (Store config in database). Do NOT stop.**
 
-   See `bazinga/templates/prompt_building.md` for how these configs are used to build agent prompts.
+   See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
 
 5. **Store config references in database:**
 
@@ -582,7 +584,40 @@ Display:
 
    **Note:** Process dashboard startup silently - dashboard is background infrastructure, no user output needed.
 
-   **AFTER dashboard check/start: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
+   **AFTER dashboard check/start: IMMEDIATELY continue to step 8 (Load template guides). Do NOT stop.**
+
+8. **Load critical template guides:**
+
+   **⚠️ MANDATORY: Read templates that contain runtime instructions**
+
+   These templates are NOT documentation - they contain critical operational logic that must be loaded before orchestration begins.
+
+   **Read message templates:**
+   ```bash
+   # Read capsule format templates (used for ALL user-facing output)
+   cat bazinga/templates/message_templates.md
+   ```
+
+   **Read response parsing guide:**
+   ```bash
+   # Read agent response parsing patterns (CRITICAL for routing decisions)
+   cat bazinga/templates/response_parsing.md
+   ```
+
+   **Read prompt building guide:**
+   ```bash
+   # Read agent prompt construction patterns (CRITICAL for agent context)
+   cat bazinga/templates/prompt_building.md
+   ```
+
+   **Note:** Use Read tool for these files. Store the patterns in working memory for the session.
+
+   **Why these must be read:**
+   - **message_templates.md**: Contains exact capsule format syntax and templates for every agent state
+   - **response_parsing.md**: Contains extraction patterns, fallback strategies, and status code mappings
+   - **prompt_building.md**: Contains mandatory sections, skill integration, and context requirements for spawning agents
+
+   **AFTER loading templates: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
 
 **Database Storage:**
 
@@ -593,7 +628,7 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 
 ### ⚠️ INITIALIZATION VERIFICATION CHECKPOINT
 
-**CRITICAL:** Verify initialization complete (session ID, database, configs loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
+**CRITICAL:** Verify initialization complete (session ID, database, configs loaded, templates loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
 
 **Then IMMEDIATELY proceed to Phase 1 - spawn PM without stopping or waiting.
 
@@ -776,7 +811,7 @@ Check if PM response contains investigation section. Look for these headers (fuz
 
 **Step 2: Parse PM response and output capsule to user**
 
-Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
@@ -1066,7 +1101,7 @@ Repeat for each task group found in the PM's response.
 
 Process internally (creating task groups from PM response - no user output needed for database sync).
 
-See `bazinga/templates/message_templates.md` for PM response format examples.
+Use the PM response format examples from `bazinga/templates/message_templates.md` (loaded at initialization).
 
 ### Step 1.5: Route Based on Mode
 
@@ -1093,7 +1128,7 @@ ELSE IF PM chose "parallel":
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING
 
-**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1102,7 +1137,7 @@ ELSE IF PM chose "parallel":
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL)
 - **Files** created/modified
 - **Tests** added (count)
@@ -1129,7 +1164,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see Developer fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
 
@@ -1184,7 +1219,7 @@ Before moving to the next group or ending your message, verify:
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
-2. Add configuration from `bazinga/templates/prompt_building.md`
+2. Add configuration from `bazinga/templates/prompt_building.md` (loaded at initialization)
 3. Include in prompt:
    - Summary of work completed so far
    - Specific gaps/issues that remain (extract from developer response)
@@ -1252,14 +1287,14 @@ Task(subagent_type="general-purpose",
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
 
 **Step 1: Parse response and output capsule to user**
 
-Use the QA Expert Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the QA Expert Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
@@ -1286,7 +1321,7 @@ IF status = BLOCKED:
   ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see QA fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
 
@@ -1345,14 +1380,14 @@ Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", pro
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Tech Lead Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the Tech Lead Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Decision** (APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS)
 - **Security issues** count
 - **Lint issues** count
@@ -1385,7 +1420,7 @@ IF decision = ESCALATE_TO_OPUS:
   ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see Tech Lead fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
 
@@ -1427,7 +1462,14 @@ Skill(command: "bazinga-db")
 - `skills_config` - For investigator skills (from Step 0)
 
 **Loop Execution:**
-1. **Read the full procedure:** Use Read tool → `bazinga/templates/investigation_loop.md`
+
+1. **Read the full investigation procedure**
+
+Use the Read tool to read the complete investigation loop:
+```
+Read(file_path: "bazinga/templates/investigation_loop.md")
+```
+
 2. **Execute all steps** in the template (up to 5 iterations)
 3. **Return to orchestrator** at the exit code destination below
 
@@ -1598,7 +1640,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 
 **Step 1: Parse response and output capsule to user**
 
-Use the PM Response Parsing section in `bazinga/templates/response_parsing.md` to extract:
+Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
 - **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
@@ -1625,7 +1667,7 @@ IF decision = NEEDS_CLARIFICATION:
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
   ```
 
-**Apply fallbacks:** If data missing, use generic descriptions (see PM fallback strategies in `bazinga/templates/response_parsing.md`)
+**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
@@ -1675,7 +1717,7 @@ Skill(command: "bazinga-db")
 
 **IF PM sends CONTINUE:**
 - Query task groups (§Step 1.4) → Parse PM feedback → Identify what needs fixing
-- Build revision prompt per §Step 2A.1 → Spawn agent → Log to database (see `bazinga/templates/logging_pattern.md`)
+- Build revision prompt per §Step 2A.1 → Spawn agent → Log to database
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Would you like me to continue?" - just spawn immediately**
@@ -1696,7 +1738,7 @@ Skill(command: "bazinga-db")
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
 
-**IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md`. All database logging follows `bazinga/templates/logging_pattern.md`.
+**IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md` (loaded at initialization).
 
 ---
 ## Phase 2B: Parallel Mode Execution
@@ -1828,7 +1870,7 @@ Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md` to extract status, files, tests, coverage, summary.
+Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
 - READY_FOR_QA/REVIEW: `🔨 Group {id} complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
