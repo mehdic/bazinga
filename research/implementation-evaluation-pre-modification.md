@@ -39,7 +39,15 @@
 
 ## File-by-File Surgical Plan
 
-### 1. orchestrator.md (~500 tokens budget)
+### 1. orchestrator.md (~500 tokens budget) - REFACTOR EXISTING
+
+**⚠️ EXISTING ESCALATION LOGIC TO REFACTOR (not create new):**
+
+| Line | Current | Refactor To |
+|------|---------|-------------|
+| ~1291 | `IF revision count > 2` → Tech Lead | `IF revision count > 0` → Senior Engineer |
+| ~1419 | `IF revision count > 2` → Tech Lead | `IF revision count > 0` → Senior Engineer |
+| ~1685 | `IF revision count > 2` → PM | `IF revision count > 0` → Senior Engineer |
 
 **Changes Required:**
 
@@ -63,16 +71,23 @@ Task(
 ```
 **Tokens: ~20 per spawn × 8 = ~160**
 
-**C. Add Senior Engineer routing in Phase 2A (after Developer routing)**
+**C. REFACTOR existing escalation at lines ~1291, ~1419, ~1685**
 
-Insert ~15 lines after developer routing logic:
+Change from:
 ```markdown
-**Developer Escalation to Senior Engineer:**
-IF Developer status contains ESCALATE_TO_SENIOR OR Developer failed 1x:
-  → Spawn Senior Engineer (model: sonnet) with Developer's work
-  → Senior Engineer routes to QA when complete
+**IF revision count > 2:**
+- Developer is stuck after 3 attempts
+- Spawn Tech Lead for architectural guidance
 ```
-**Tokens: ~150**
+
+To (COMPACT - saves tokens by replacing):
+```markdown
+**IF revision count > 0:**
+- Developer failed, escalate immediately to Senior Engineer
+- Spawn Senior Engineer (model: sonnet) to take over
+- Senior Engineer routes to QA when complete
+```
+**Tokens: NET ZERO (replacing existing text)**
 
 **D. Load model_selection.json at init (add to step 4)**
 ```markdown
@@ -80,11 +95,27 @@ cat bazinga/configs/model_selection.json
 ```
 **Tokens: ~30**
 
-**Total Orchestrator Additions: ~390 tokens** ✅ Within budget
+**E. Add Senior Engineer to agent spawn capability**
+
+Add to Phase 2A agent list (minimal):
+```markdown
+6. **Senior Engineer** - Takes over from failed Developer (model: sonnet)
+```
+**Tokens: ~20**
+
+**Total Orchestrator Changes: ~260 tokens NET** ✅ Within budget (refactoring saves tokens)
 
 ---
 
-### 2. project_manager.md (~1,500 tokens budget)
+### 2. project_manager.md (~1,500 tokens budget) - REFACTOR EXISTING
+
+**⚠️ EXISTING LOGIC TO REFACTOR:**
+
+| Line | Current | Refactor To |
+|------|---------|-------------|
+| ~823 | 99% Rule: >3 revisions → Tech Lead | >0 revisions → Senior Engineer |
+| ~1978 | Revisions 1-2 → Sonnet, 3+ → Opus | Remove (model selection in config) |
+| ~425 | Status codes | Add ESCALATE_TO_SENIOR |
 
 **Changes Required:**
 

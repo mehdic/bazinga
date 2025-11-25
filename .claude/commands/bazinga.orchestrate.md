@@ -17,11 +17,14 @@ The user's message to you contains their requirements for this orchestration tas
 ## Claude Code Multi-Agent Dev Team Overview
 
 **Agents in the System:**
-1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA
-2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision)
-3. **QA Expert** - Runs integration/contract/e2e tests
-4. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues
-5. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems (spawned by Tech Lead)
+1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA [Opus]
+2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision) [Haiku]
+3. **Senior Engineer** - Escalation tier for complex failures (after Developer fails 1x) [Sonnet]
+4. **QA Expert** - Runs integration/contract/e2e tests with 5-level challenge progression [Sonnet]
+5. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues [Opus]
+6. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems [Opus]
+
+**Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
 
 **Your Role:**
 - **Message router** - Pass information between agents
@@ -1289,10 +1292,13 @@ Before moving to the next group or ending your message, verify:
 Task(subagent_type="general-purpose", description="Dev {id}: continue work", prompt=[new prompt])
 ```
 
-**IF revision count > 2:**
-- Developer is stuck after 3 attempts
-- Spawn Tech Lead for architectural guidance (not user input)
-- Tech Lead provides guidance, then respawn developer with Tech Lead's recommendations
+**IF revision count >= 1 (Developer failed once):**
+- Escalate to Senior Engineer (runs on Sonnet, handles complex issues)
+- Build prompt with: original task, developer's attempt, failure details
+- Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: escalated task", prompt=[senior engineer prompt])
+
+**IF Senior Engineer also fails (revision count >= 2 after Senior Eng):**
+- Spawn Tech Lead for architectural guidance
 
 **🔴 CRITICAL:** Previous developer Task is DONE. You MUST spawn a NEW Task. Writing a message like "Continue fixing NOW" does NOTHING - the developer Task has completed and won't see your message. SPAWN the Task.
 
@@ -1417,8 +1423,12 @@ Skill(command: "bazinga-db")
 Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
 ```
 
-**IF revision count > 2:**
-- Spawn Tech Lead for guidance (developer may be stuck)
+**IF revision count >= 1 OR QA reports challenge level 3+ failure:**
+- Escalate to Senior Engineer (model="sonnet")
+- Include QA's challenge level findings in prompt
+
+**IF Senior Engineer also fails (revision >= 2 after Senior Eng):**
+- Spawn Tech Lead for guidance
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the QA issues" and stop
 
@@ -1683,8 +1693,10 @@ Task(subagent_type="general-purpose", description="{agent} {id}: fix Tech Lead i
 
 **Track revision count in database (increment by 1)**
 
-**IF revision count > 2:**
-- Spawn PM to evaluate if task should be simplified
+**Escalation path:**
+- IF revision count == 1: Escalate to Senior Engineer (model="sonnet")
+- IF revision count == 2 AND previous was Senior Eng: Spawn Tech Lead for guidance
+- IF revision count > 2: Spawn PM to evaluate if task should be simplified
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the Tech Lead's feedback" and stop
 

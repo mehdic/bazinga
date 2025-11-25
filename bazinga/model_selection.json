@@ -1,0 +1,56 @@
+{
+  "agents": {
+    "developer": {
+      "model": "haiku",
+      "rationale": "Cost-efficient for straightforward implementation tasks"
+    },
+    "senior_engineer": {
+      "model": "sonnet",
+      "rationale": "Escalation from developer - handles complex failures"
+    },
+    "qa_expert": {
+      "model": "sonnet",
+      "rationale": "Balanced capability for test generation and validation"
+    },
+    "tech_lead": {
+      "model": "opus",
+      "rationale": "Always Opus - critical architectural decisions and security review"
+    },
+    "project_manager": {
+      "model": "opus",
+      "rationale": "Always Opus - strategic planning and final quality gate"
+    },
+    "investigator": {
+      "model": "opus",
+      "rationale": "Complex debugging and root cause analysis"
+    }
+  },
+  "escalation_rules": {
+    "developer_to_senior_engineer": {
+      "triggers": [
+        "revision_count >= 1",
+        "challenge_level_3_fail",
+        "challenge_level_4_fail"
+      ],
+      "description": "Escalate after first failure or Level 3-4 challenge fails"
+    },
+    "senior_engineer_to_tech_lead": {
+      "triggers": [
+        "senior_engineer_revision >= 2",
+        "architectural_concern"
+      ],
+      "description": "Escalate after Senior Engineer struggles twice"
+    }
+  },
+  "_metadata": {
+    "version": "1.0.0",
+    "description": "Model selection and escalation rules for BAZINGA agents",
+    "last_updated": "2025-11-25",
+    "notes": [
+      "Tech Lead and PM are ALWAYS on Opus - non-negotiable",
+      "Developer starts on Haiku for cost efficiency",
+      "Senior Engineer on Sonnet handles escalated complexity",
+      "Escalation triggers after 1 failure (not 2)"
+    ]
+  }
+}
