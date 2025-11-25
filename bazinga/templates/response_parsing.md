@@ -22,7 +22,7 @@
 - `BLOCKED` - Cannot proceed without external help
 - `PARTIAL` - Some work done, more needed (same-tier continuation)
 - `INCOMPLETE` - Partial work, can continue (same-tier retry)
-- `ESCALATE_SENIOR` - Issue too complex, **immediate** Senior Engineer escalation
+- `ESCALATE_SENIOR` - Issue too complex, **immediate** Senior Software Engineer escalation
 
 **Information to extract:**
 

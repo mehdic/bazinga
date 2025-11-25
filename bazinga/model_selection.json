@@ -4,7 +4,7 @@
       "model": "haiku",
       "rationale": "Cost-efficient for straightforward implementation tasks"
     },
-    "senior_engineer": {
+    "senior_software_engineer": {
       "model": "sonnet",
       "rationale": "Escalation from developer - handles complex failures"
     },
@@ -34,7 +34,7 @@
     }
   },
   "escalation_rules": {
-    "developer_to_senior_engineer": {
+    "developer_to_senior_software_engineer": {
       "triggers": [
         "revision_count >= 1",
         "challenge_level_3_fail",
@@ -42,12 +42,12 @@
       ],
       "description": "Escalate after first failure or Level 3-4 challenge fails"
     },
-    "senior_engineer_to_tech_lead": {
+    "senior_software_engineer_to_tech_lead": {
       "triggers": [
-        "senior_engineer_revision >= 2",
+        "senior_software_engineer_revision >= 2",
         "architectural_concern"
       ],
-      "description": "Escalate after Senior Engineer struggles twice"
+      "description": "Escalate after Senior Software Engineer struggles twice"
     }
   },
   "_metadata": {
@@ -57,7 +57,7 @@
     "notes": [
       "Tech Lead and PM are ALWAYS on Opus - non-negotiable",
       "Developer starts on Haiku for cost efficiency",
-      "Senior Engineer on Sonnet handles escalated complexity",
+      "Senior Software Engineer on Sonnet handles escalated complexity",
       "Escalation triggers after 1 failure (not 2)"
     ]
   }

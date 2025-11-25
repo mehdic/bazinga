@@ -695,14 +695,14 @@ def test_invariants():
     assert account.balance >= 0  # Invariant
 ```
 
-**⚠️ Level 3+ failures trigger escalation to Senior Engineer**
+**⚠️ Level 3+ failures trigger escalation to Senior Software Engineer**
 
 **Report format:**
 ```
 Level 3 (Behavioral Contracts): FAIL ❌
 - Precondition: order without items accepted (should reject)
 - Postcondition: total doesn't match item sum
-- ESCALATION TRIGGERED: Level 3 failure → Senior Engineer
+- ESCALATION TRIGGERED: Level 3 failure → Senior Software Engineer
 ```
 
 ### Level 4: Security Adversary
@@ -735,14 +735,14 @@ def test_auth_bypass():
     assert response.status == 401
 ```
 
-**⚠️ Level 4 failures ALWAYS escalate to Senior Engineer**
+**⚠️ Level 4 failures ALWAYS escalate to Senior Software Engineer**
 
 **Report format:**
 ```
 Level 4 (Security Adversary): FAIL ❌
 - SQL injection: ❌ Query vulnerable
 - Auth bypass: ❌ Forged token accepted
-- ESCALATION TRIGGERED: Security failure → Senior Engineer
+- ESCALATION TRIGGERED: Security failure → Senior Software Engineer
 ```
 
 ### Level 5: Production Chaos
@@ -772,14 +772,14 @@ def test_memory_pressure():
     assert result.status != "crashed"
 ```
 
-**⚠️ Level 5 failures escalate to Senior Engineer**
+**⚠️ Level 5 failures escalate to Senior Software Engineer**
 
 **Report format:**
 ```
 Level 5 (Production Chaos): FAIL ❌
 - Race condition: ❌ Data corruption detected
 - Timeout: ✅ Handled gracefully
-- ESCALATION TRIGGERED: Production resilience failure → Senior Engineer
+- ESCALATION TRIGGERED: Production resilience failure → Senior Software Engineer
 ```
 
 ### Challenge Level Summary Report
@@ -798,7 +798,7 @@ After running challenges:
 | 5 | Production Chaos | ⏸️ SKIP | Blocked by Level 3 failure |
 
 **Challenge Status:** FAIL at Level 3
-**Escalation:** Required → Senior Engineer
+**Escalation:** Required → Senior Software Engineer
 ```
 
 ---
@@ -831,7 +831,7 @@ IF all_tests_pass AND challenge_level >= 3 AND self_adversarial_pass:
     → Report PASS, route to Tech Lead
 
 IF challenge_level_3_4_5_fail:
-    → Report FAIL with ESCALATION, route to Senior Engineer
+    → Report FAIL with ESCALATION, route to Senior Software Engineer
 
 IF basic_tests_fail OR challenge_level_1_2_fail:
     → Report FAIL, route back to Developer
@@ -1161,12 +1161,12 @@ When tests fail, provide:
 **Status:** FAIL_ESCALATE
 **Challenge Level:** Failed at Level 3/4/5
 **Escalation Required:** YES
-**Next Step:** Orchestrator, please escalate to Senior Engineer (challenge level 3+ failure)
+**Next Step:** Orchestrator, please escalate to Senior Software Engineer (challenge level 3+ failure)
 ```
 
-**Workflow:** QA Expert (you) → **Senior Engineer** → QA Expert (retest)
+**Workflow:** QA Expert (you) → **Senior Software Engineer** → QA Expert (retest)
 
-**Why Senior Engineer?** Level 3+ failures indicate complexity beyond standard developer scope:
+**Why Senior Software Engineer?** Level 3+ failures indicate complexity beyond standard developer scope:
 - Level 3: Behavioral contract violations require deeper understanding
 - Level 4: Security issues require security expertise
 - Level 5: Production chaos requires resilience engineering

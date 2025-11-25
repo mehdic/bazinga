@@ -6,7 +6,7 @@
     "api-contract-validation": "optional",
     "db-migration-check": "optional"
   },
-  "senior_engineer": {
+  "senior_software_engineer": {
     "lint-check": "mandatory",
     "codebase-analysis": "mandatory",
     "test-pattern-analysis": "mandatory",

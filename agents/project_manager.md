@@ -83,7 +83,7 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 |-----------------|------|-------|
 | 1-3 | Low | Developer (Haiku) |
 | 4-6 | Medium | Developer (Haiku) |
-| 7+ | High | Senior Engineer (Sonnet) |
+| 7+ | High | Senior Software Engineer (Sonnet) |
 
 **Scoring Factors:**
 
@@ -106,7 +106,7 @@ Task: "Add password reset endpoint"
 - Touches 3 files (+2)
 - Feature following patterns (+2)
 - Security-sensitive code (+3)
-Total: 7 → HIGH → Assign to Senior Engineer
+Total: 7 → HIGH → Assign to Senior Software Engineer
 
 Task: "Fix typo in error message"
 - Touches 1 file (+1)
@@ -118,7 +118,7 @@ Total: 2 → LOW → Assign to Developer (Haiku)
 ```markdown
 **Group A:** Password Reset
 - **Complexity:** 7 (HIGH)
-- **Initial Agent:** Senior Engineer (Sonnet)
+- **Initial Agent:** Senior Software Engineer (Sonnet)
 - **Tasks:** T001, T002, T003
 ```
 
@@ -1990,6 +1990,8 @@ Group ID: [group_id like "A", "B", "batch_1", etc.]
 Session ID: [session_id]
 Name: [human readable task name]
 Status: pending
+Complexity: [1-10]
+Initial Tier: [Developer | Senior Software Engineer]
 ```
 
 **Then invoke:**
@@ -2036,8 +2038,43 @@ Return structured response:
 - Files: [list]
 - Estimated effort: N minutes
 - Can parallel: [YES/NO]
+- **Complexity:** [1-10]
+- **Initial Tier:** [Developer | Senior Software Engineer]
+- **Tier Rationale:** [Why this tier - see assignment rules below]
 
 [Repeat for each group]
+
+### Initial Tier Assignment Rules
+
+**Assign initial implementation tier based on complexity and task nature:**
+
+| Complexity | Initial Tier | Rationale |
+|------------|--------------|-----------|
+| 1-4 (Low) | Developer (Haiku) | Standard tasks, cost-efficient |
+| 5-6 (Medium) | Developer (Haiku) | Worth trying Haiku first |
+| 7-10 (High) | Senior Software Engineer (Sonnet) | Complex, skip Haiku to save time |
+
+**Override rules (regardless of complexity score):**
+- Security-sensitive code → **Senior Software Engineer**
+- Architectural decisions → **Senior Software Engineer**
+- Bug fix with clear symptoms → **Developer** (even if complexity 7+)
+- Integration with external systems → **Senior Software Engineer**
+- Performance-critical paths → **Senior Software Engineer**
+
+**Example tier assignments:**
+```
+Group AUTH: JWT Implementation
+- Complexity: 8/10 (token validation, security)
+- Initial Tier: Senior Software Engineer
+- Tier Rationale: Security-sensitive authentication code
+
+Group UTIL: String helpers
+- Complexity: 2/10 (simple utility functions)
+- Initial Tier: Developer
+- Tier Rationale: Standard low-complexity task
+```
+
+**NOTE:** You decide the tier, NOT the model. The orchestrator loads model assignments from database.
 
 ### Execution Plan
 

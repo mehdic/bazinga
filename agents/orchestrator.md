@@ -19,7 +19,7 @@ The user's message to you contains their requirements for this orchestration tas
 **Agents in the System:**
 1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA [Opus]
 2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision) [Haiku]
-3. **Senior Engineer** - Escalation tier for complex failures (after Developer fails 1x) [Sonnet]
+3. **Senior Software Engineer** - Escalation tier for complex failures (after Developer fails 1x) [Sonnet]
 4. **QA Expert** - Runs integration/contract/e2e tests with 5-level challenge progression [Sonnet]
 5. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues [Opus]
 6. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems [Opus]
@@ -551,7 +551,50 @@ Display:
 
    See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
 
-5. **Store config references in database:**
+5. **Load model configuration from database:**
+
+   ### 🔴 MANDATORY: Load Model Configuration
+
+   **Query model configuration for all agents:**
+
+   Request to bazinga-db skill:
+   ```
+   bazinga-db, please retrieve model configuration:
+   Query: Get all agent model assignments from model_config table
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+   **Store model mappings in context for this session:**
+   ```
+   MODEL_CONFIG = {
+     "developer": "[model from DB, default: haiku]",
+     "senior_software_engineer": "[model from DB, default: sonnet]",
+     "qa_expert": "[model from DB, default: sonnet]",
+     "tech_lead": "[model from DB, default: opus]",
+     "project_manager": "[model from DB, default: opus]",
+     "investigator": "[model from DB, default: opus]",
+     "validator": "[model from DB, default: sonnet]"
+   }
+   ```
+
+   **IF model_config table doesn't exist or is empty:**
+   - Use defaults from `bazinga/model_selection.json`
+   - Read file: `Read(file_path: "bazinga/model_selection.json")`
+   - Extract model assignments from `agents` section
+
+   **🔄 CONTEXT RECOVERY:** If you lose model config (e.g., after context compaction), re-query:
+   ```
+   bazinga-db, please retrieve model configuration:
+   Query: Get all agent model assignments
+   ```
+
+   **Use MODEL_CONFIG values in ALL Task invocations instead of hardcoded models.**
+
+6. **Store config references in database:**
 
    ### 🔴 MANDATORY: Store configuration in database
 
@@ -1180,9 +1223,38 @@ ELSE IF PM chose "parallel":
 🔨 Implementing | Spawning developer for {brief_task_description}
 ```
 
-### 🔴 MANDATORY DEVELOPER PROMPT BUILDING
+### 🔴 MANDATORY DEVELOPER/SSE PROMPT BUILDING (PM Tier Decision)
 
-**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", model="haiku", description=desc, prompt=[prompt])`
+**Step 1: Check PM's Initial Tier decision for this task group:**
+- Extract `Initial Tier` from PM's task group output (Developer OR Senior Software Engineer)
+- If PM said "Senior Software Engineer" → Use `agents/senior_software_engineer.md` + `MODEL_CONFIG["senior_software_engineer"]`
+- If PM said "Developer" (or not specified) → Use `agents/developer.md` + `MODEL_CONFIG["developer"]`
+
+**Step 2: Build prompt based on tier:**
+
+**IF Initial Tier = Developer:**
+- Read `agents/developer.md`
+- Model: `MODEL_CONFIG["developer"]` (default: haiku)
+- Description: `f"Dev: {task_name[:40]}"`
+
+**IF Initial Tier = Senior Software Engineer:**
+- Read `agents/senior_software_engineer.md`
+- Model: `MODEL_CONFIG["senior_software_engineer"]` (default: sonnet)
+- Description: `f"SSE: {task_name[:40]}"`
+
+**Step 3: Add config from `bazinga/templates/prompt_building.md`** (testing_config.json + skills_config.json for selected tier)
+
+**Step 4: Include:** Agent=[Developer|SSE], Group=main, Mode=Simple, Session ID, Branch, Skills/Testing source, Task (from PM)
+
+**Step 5: Validate:** ✓ Skill invocations, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format
+
+**Step 6: Spawn:**
+```
+# Use model from MODEL_CONFIG, NOT hardcoded
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])
+```
+
+**🔴 CRITICAL: Follow PM's tier decision. DO NOT override with your own escalation logic for initial spawn.**
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1221,7 +1293,7 @@ IF status = BLOCKED:
 IF status = ESCALATE_SENIOR:
   → Use "Escalation" template:
   ```
-  🔺 Group {id} escalating | {reason} | → Senior Engineer (Sonnet)
+  🔺 Group {id} escalating | {reason} | → Senior Software Engineer (Sonnet)
   ```
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
@@ -1265,7 +1337,7 @@ Skill(command: "bazinga-db")
   * Continue workflow automatically
 
 **IF Developer reports ESCALATE_SENIOR:**
-- **Immediately spawn Senior Engineer** (model="sonnet")
+- **Immediately spawn Senior Software Engineer** (model="sonnet")
 - Build prompt with: original task, developer's attempt, reason for escalation
 - Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: explicit escalation", prompt=[senior engineer prompt])
 - This is an explicit request, not revision-based escalation
@@ -1305,11 +1377,11 @@ Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: cont
 ```
 
 **IF revision count >= 1 (Developer failed once):**
-- Escalate to Senior Engineer (runs on Sonnet, handles complex issues)
+- Escalate to Senior Software Engineer (runs on Sonnet, handles complex issues)
 - Build prompt with: original task, developer's attempt, failure details
 - Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: escalated task", prompt=[senior engineer prompt])
 
-**IF Senior Engineer also fails (revision count >= 2 after Senior Eng):**
+**IF Senior Software Engineer also fails (revision count >= 2 after Senior Eng):**
 - Spawn Tech Lead for architectural guidance
 
 **🔴 CRITICAL:** Previous developer Task is DONE. You MUST spawn a NEW Task. Writing a message like "Continue fixing NOW" does NOTHING - the developer Task has completed and won't see your message. SPAWN the Task.
@@ -1393,7 +1465,7 @@ IF status = BLOCKED:
 IF status = ESCALATE_SENIOR:
   → Use "Challenge Escalation" template:
   ```
-  🔺 Group {id} challenge failed | Level {level} failure: {reason} | → Senior Engineer (Sonnet)
+  🔺 Group {id} challenge failed | Level {level} failure: {reason} | → Senior Software Engineer (Sonnet)
   ```
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
@@ -1442,15 +1514,15 @@ Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: fix 
 ```
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
-- Escalate to Senior Engineer (model="sonnet")
+- Escalate to Senior Software Engineer (model="sonnet")
 - Include QA's challenge level findings in prompt
 
 **IF QA reports ESCALATE_SENIOR explicitly:**
-- **Immediately spawn Senior Engineer** (model="sonnet")
+- **Immediately spawn Senior Software Engineer** (model="sonnet")
 - Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
 - This bypasses revision count check - explicit escalation from QA's challenge testing
 
-**IF Senior Engineer also fails (revision >= 2 after Senior Eng):**
+**IF Senior Software Engineer also fails (revision >= 2 after Senior Eng):**
 - Spawn Tech Lead for guidance
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the QA issues" and stop
@@ -1718,7 +1790,7 @@ Task(subagent_type="general-purpose", model="haiku|sonnet", description="{agent}
 **Track revision count in database (increment by 1)**
 
 **Escalation path:**
-- IF revision count == 1: Escalate to Senior Engineer (model="sonnet")
+- IF revision count == 1: Escalate to Senior Software Engineer (model="sonnet")
 - IF revision count == 2 AND previous was Senior Eng: Spawn Tech Lead for guidance
 - IF revision count > 2: Spawn PM to evaluate if task should be simplified
 
@@ -1975,36 +2047,46 @@ Process internally (parallel spawning is already announced in planning complete 
 
 When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
-**Build contextual Task descriptions for each group:**
+**Build contextual Task descriptions for each group (respecting PM's tier decision):**
 ```python
 # Step 1: Get task_groups from database (queried at Step 1.4)
 # Step 2: For EACH group being spawned:
 for group in groups_to_spawn:  # e.g., groups A, B, C
-    # Get task name from task_groups (defensive: use fallback if not found)
+    # Get task info from task_groups including initial_tier
     task = next((t for t in task_groups if t.group_id == group.id), None)
-    if task and task.name:
-        task_name = task.name
+    if task:
+        task_name = task.name or group.id
+        initial_tier = task.initial_tier or "Developer"  # Default to Developer
     else:
-        task_name = group.id  # Fallback to group ID if task not found or has no name
+        task_name = group.id
+        initial_tier = "Developer"
 
-    # Truncate to 30 chars (shorter than simple mode's 40 because group ID takes space)
-    # Format: "Dev A: " = 7 char prefix vs simple mode "Dev: " = 5 chars
+    # Truncate to 30 chars
     truncated = task_name[:30] + ("..." if len(task_name) > 30 else "")
 
-    # Build description
-    descriptions[group.id] = f"Dev {group.id}: {truncated}"
-    # Example: "Dev A: JWT auth" or "Dev B: User registration..."
+    # Build description based on tier
+    if initial_tier == "Senior Software Engineer":
+        descriptions[group.id] = f"SSE {group.id}: {truncated}"
+        models[group.id] = MODEL_CONFIG["senior_software_engineer"]
+        agent_file[group.id] = "agents/senior_software_engineer.md"
+    else:
+        descriptions[group.id] = f"Dev {group.id}: {truncated}"
+        models[group.id] = MODEL_CONFIG["developer"]
+        agent_file[group.id] = "agents/developer.md"
 
-# Step 3: Spawn all in parallel
+# Step 3: Spawn all in parallel (EACH with its own tier/model)
 ```
 
-**Spawn:**
+**Spawn (using PM's tier decision per group):**
 ```
-Task(subagent_type: "general-purpose", model: "haiku", description: descriptions["A"], prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", model: "haiku", description: descriptions["B"], prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", model: "haiku", description: descriptions["C"], prompt: [Group C prompt])
-... up to 4 developers max
+# Model comes from MODEL_CONFIG based on PM's initial_tier decision per group
+Task(subagent_type: "general-purpose", model: models["A"], description: descriptions["A"], prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", model: models["B"], description: descriptions["B"], prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", model: models["C"], description: descriptions["C"], prompt: [Group C prompt])
+... up to 4 groups max
 ```
+
+**🔴 CRITICAL: Each group may have different tier. Group A might be Developer (haiku) while Group B is SSE (sonnet).**
 
 **DO NOT spawn them in separate messages** - that would make them run sequentially, defeating the purpose of parallel mode.
 
