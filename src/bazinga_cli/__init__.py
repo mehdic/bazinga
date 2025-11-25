@@ -71,9 +71,12 @@ class BazingaSetup:
     def _get_config_source(self, relative_path: str) -> Optional[Path]:
         """
         Resolve config path with priority:
-        1. Shared data directory (system install via shared-data)
-        2. Package directory (wheel install via force-include)
+        1. Package directory (bundled with code - always version-matched)
+        2. Shared data directory (legacy/system installs)
         3. Project root (editable/dev install)
+
+        Priority order matters: Package dir is checked first to avoid
+        stale configs from previous installs in shared-data location.
 
         Args:
             relative_path: Path relative to source (e.g., "bazinga/templates")
@@ -81,21 +84,25 @@ class BazingaSetup:
         Returns:
             Resolved Path if found, None otherwise
         """
-        # 1. Check shared data directory (handles most installed scenarios)
-        path = self.source_dir / relative_path
-        if path.exists():
-            return path
-
-        # 2. Check package directory (force-included in wheels)
+        # 1. Check package directory first (force-included in wheels)
+        # This ensures version-matched configs, avoiding stale shared-data
         pkg_path = Path(__file__).parent / relative_path
         if pkg_path.exists():
             return pkg_path
 
+        # 2. Check shared data directory (legacy installs, agents, etc.)
+        path = self.source_dir / relative_path
+        if path.exists():
+            return path
+
         # 3. Check project root (development/editable mode fallback)
-        # Structure: project_root/src/bazinga_cli/__init__.py
-        dev_path = Path(__file__).parents[2] / relative_path
-        if dev_path.exists():
-            return dev_path
+        # Expected structure: project_root/src/bazinga_cli/__init__.py
+        project_root = Path(__file__).parents[2]
+        # Verify we found actual project root by checking for marker file
+        if (project_root / "pyproject.toml").exists():
+            dev_path = project_root / relative_path
+            if dev_path.exists():
+                return dev_path
 
         return None
 
