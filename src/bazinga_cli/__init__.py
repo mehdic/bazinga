@@ -355,12 +355,24 @@ class BazingaSetup:
             console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
             return False
 
+        # Explicit allowlist of config files to copy
+        # Must match force-include entries in pyproject.toml
+        # This prevents copying runtime state files (pm_state.json, etc.) in dev mode
+        allowed_config_files = [
+            "model_selection.json",
+            "challenge_levels.json",
+            "skills_config.json",
+        ]
+
         copied_count = 0
-        # Copy JSON config files from bazinga/ root (not templates/)
-        for config_file in source_bazinga.glob("*.json"):
+        for filename in allowed_config_files:
+            config_file = source_bazinga / filename
+            if not config_file.exists():
+                continue
+
             try:
                 # SECURITY: Validate filename doesn't contain path traversal
-                safe_filename = PathValidator.validate_filename(config_file.name)
+                safe_filename = PathValidator.validate_filename(filename)
                 dest = bazinga_dir / safe_filename
 
                 # SECURITY: Ensure destination is within bazinga_dir
@@ -370,7 +382,7 @@ class BazingaSetup:
                 console.print(f"  ✓ Copied {safe_filename}")
                 copied_count += 1
             except SecurityError as e:
-                console.print(f"[red]✗ Skipping unsafe file {config_file.name}: {e}[/red]")
+                console.print(f"[red]✗ Skipping unsafe file {filename}: {e}[/red]")
                 continue
 
         return copied_count > 0
