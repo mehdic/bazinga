@@ -40,6 +40,15 @@ app = typer.Typer(
 class BazingaSetup:
     """Handles BAZINGA installation and setup."""
 
+    # Explicit allowlist of config files to copy/distribute
+    # Must match force-include entries in pyproject.toml
+    # This prevents copying runtime state files (pm_state.json, etc.) in dev mode
+    ALLOWED_CONFIG_FILES = [
+        "model_selection.json",
+        "challenge_levels.json",
+        "skills_config.json",
+    ]
+
     def __init__(self, source_dir: Optional[Path] = None):
         """
         Initialize setup handler.
@@ -96,13 +105,15 @@ class BazingaSetup:
             return path
 
         # 3. Check project root (development/editable mode fallback)
-        # Expected structure: project_root/src/bazinga_cli/__init__.py
-        project_root = Path(__file__).parents[2]
-        # Verify we found actual project root by checking for marker file
-        if (project_root / "pyproject.toml").exists():
-            dev_path = project_root / relative_path
-            if dev_path.exists():
-                return dev_path
+        # Iterate upward to find pyproject.toml marker (robust to refactoring)
+        current = Path(__file__).resolve().parent
+        for _ in range(5):  # Search up to 5 levels
+            if (current / "pyproject.toml").exists():
+                dev_path = current / relative_path
+                if dev_path.exists():
+                    return dev_path
+                break  # Found project root but path doesn't exist
+            current = current.parent
 
         return None
 
@@ -355,17 +366,8 @@ class BazingaSetup:
             console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
             return False
 
-        # Explicit allowlist of config files to copy
-        # Must match force-include entries in pyproject.toml
-        # This prevents copying runtime state files (pm_state.json, etc.) in dev mode
-        allowed_config_files = [
-            "model_selection.json",
-            "challenge_levels.json",
-            "skills_config.json",
-        ]
-
         copied_count = 0
-        for filename in allowed_config_files:
+        for filename in self.ALLOWED_CONFIG_FILES:
             config_file = source_bazinga / filename
             if not config_file.exists():
                 continue
