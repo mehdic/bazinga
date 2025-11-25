@@ -962,6 +962,15 @@ Skill(command: "bazinga-db")
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
+**🔴 LAYER 2 SELF-CHECK (PM RESPONSE):**
+
+Before continuing to Step 1.3a, verify:
+1. ✅ Did I invoke `Skill(command: "bazinga-db")` to log PM interaction?
+2. ✅ Did I output a capsule to the user showing PM's analysis?
+3. ✅ Am I about to continue to Step 1.3a (not ending my message)?
+
+**IF ANY IS NO:** Complete it NOW before proceeding. This is MANDATORY.
+
 ### Step 1.3a: Handle PM Status and Route Accordingly
 
 **Detection:** Check PM Status code from response
