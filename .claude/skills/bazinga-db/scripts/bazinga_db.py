@@ -40,16 +40,15 @@ class BazingaDB:
         else:
             # File exists and has content - check if it has tables
             try:
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
-                if not cursor.fetchone():
-                    needs_init = True
-                    print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
-                conn.close()
-            except Exception:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+                    if not cursor.fetchone():
+                        needs_init = True
+                        print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+            except Exception as e:
                 needs_init = True
-                print(f"Database corrupted at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
 
         if not needs_init:
             return
