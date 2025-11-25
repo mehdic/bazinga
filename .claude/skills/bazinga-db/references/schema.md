@@ -21,6 +21,7 @@ This document provides complete reference documentation for the BAZINGA database
 | `skill_outputs` | Skill results | Replaces skill JSON files |
 | `configuration` | System config | Replaces config JSON files |
 | `decisions` | Orchestrator decisions | Decision audit trail |
+| `model_config` | Agent model assignments | Dynamic model selection |
 
 ---
 
@@ -167,6 +168,8 @@ CREATE TABLE task_groups (
     assigned_to TEXT,
     revision_count INTEGER DEFAULT 0,
     last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+    complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+    initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
@@ -184,6 +187,8 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 - `assigned_to`: Agent ID assigned to this group
 - `revision_count`: Number of revision cycles (for escalation)
 - `last_review_status`: Tech Lead review result
+- `complexity`: Task complexity score (1-10), set by PM
+- `initial_tier`: Initial implementation tier (`Developer` or `Senior Software Engineer`), set by PM
 - `created_at`: When task group was created
 - `updated_at`: Last modification timestamp
 
@@ -331,6 +336,57 @@ CREATE INDEX idx_decisions_session ON decisions(session_id, timestamp DESC);
 - `iteration`: Orchestration iteration number
 - `decision_type`: Type of decision (e.g., `spawn_agent`, `escalate_model`)
 - `decision_data`: Decision details as JSON string
+
+---
+
+### model_config
+
+Stores agent model assignments for dynamic model selection.
+
+```sql
+CREATE TABLE model_config (
+    agent_role TEXT PRIMARY KEY,
+    model TEXT NOT NULL,
+    rationale TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+
+-- Default data
+INSERT INTO model_config (agent_role, model, rationale) VALUES
+    ('developer', 'haiku', 'Cost-efficient for L1-2 tasks'),
+    ('senior_software_engineer', 'sonnet', 'Complex failures and L3+ tasks'),
+    ('qa_expert', 'sonnet', 'Test generation and validation'),
+    ('tech_lead', 'opus', 'Architectural decisions - non-negotiable'),
+    ('project_manager', 'opus', 'Strategic planning - non-negotiable'),
+    ('investigator', 'opus', 'Root cause analysis'),
+    ('validator', 'sonnet', 'BAZINGA verification');
+```
+
+**Columns:**
+- `agent_role`: Agent role identifier (primary key)
+- `model`: Model name (e.g., `haiku`, `sonnet`, `opus`)
+- `rationale`: Explanation for model choice
+- `updated_at`: Last update timestamp
+
+**Usage Example:**
+```python
+# Get all model assignments
+models = db.get_model_config()
+# Returns: {'developer': 'haiku', 'senior_software_engineer': 'sonnet', ...}
+
+# Update model for an agent
+db.set_model_config('developer', 'sonnet', 'Upgrading for complex project')
+
+# Get model for specific agent
+model = db.get_agent_model('developer')
+# Returns: 'haiku'
+```
+
+**Why This Table:**
+- Allows runtime model updates without code changes
+- Future-proof for new model releases (Claude 4, etc.)
+- Single source of truth for model assignments
+- Orchestrator queries this at initialization
 
 ---
 

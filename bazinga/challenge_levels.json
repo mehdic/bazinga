@@ -1,0 +1,64 @@
+{
+  "levels": {
+    "1": {
+      "name": "Boundary Probing",
+      "description": "Edge cases and boundary conditions",
+      "qa_focus": ["null_values", "empty_collections", "max_min_values", "type_boundaries"],
+      "developer_scope": "haiku",
+      "escalation_on_fail": false
+    },
+    "2": {
+      "name": "Mutation Analysis",
+      "description": "Code mutation to verify test completeness",
+      "qa_focus": ["operator_mutations", "condition_inversions", "return_value_changes"],
+      "developer_scope": "haiku",
+      "escalation_on_fail": false
+    },
+    "3": {
+      "name": "Behavioral Contracts",
+      "description": "Pre/post conditions and invariants",
+      "qa_focus": ["precondition_violations", "postcondition_checks", "invariant_preservation"],
+      "developer_scope": "haiku",
+      "escalation_on_fail": true
+    },
+    "4": {
+      "name": "Security Adversary",
+      "description": "Adversarial security testing",
+      "qa_focus": ["injection_attacks", "auth_bypass", "privilege_escalation", "data_exposure"],
+      "developer_scope": "senior_software_engineer",
+      "escalation_on_fail": true
+    },
+    "5": {
+      "name": "Production Chaos",
+      "description": "Production-like failure scenarios",
+      "qa_focus": ["network_failures", "resource_exhaustion", "race_conditions", "cascading_failures"],
+      "developer_scope": "senior_software_engineer",
+      "escalation_on_fail": true
+    }
+  },
+  "progression": {
+    "default_start": 1,
+    "max_level": 5,
+    "pass_to_advance": true,
+    "fail_behavior": {
+      "levels_1_2": "retry_with_feedback",
+      "levels_3_4_5": "escalate_if_fail"
+    }
+  },
+  "routing": {
+    "level_1_2_pass": "advance_level",
+    "level_1_2_fail": "developer_retry",
+    "level_3_4_5_pass": "advance_level",
+    "level_3_4_5_fail": "escalate_to_senior_software_engineer"
+  },
+  "_metadata": {
+    "version": "1.0.0",
+    "description": "5-level test challenge progression for QA Expert",
+    "last_updated": "2025-11-25",
+    "notes": [
+      "Levels 1-2: Basic tests, developer can retry on Haiku",
+      "Levels 3-5: Advanced tests, escalate to Senior Software Engineer on fail",
+      "Level 4-5 always require Senior Software Engineer scope"
+    ]
+  }
+}

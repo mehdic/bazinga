@@ -6,6 +6,14 @@
     "api-contract-validation": "optional",
     "db-migration-check": "optional"
   },
+  "senior_software_engineer": {
+    "lint-check": "mandatory",
+    "codebase-analysis": "mandatory",
+    "test-pattern-analysis": "mandatory",
+    "api-contract-validation": "optional",
+    "db-migration-check": "optional",
+    "security-scan": "optional"
+  },
   "tech_lead": {
     "security-scan": "mandatory",
     "lint-check": "mandatory",
@@ -32,7 +40,7 @@
   },
   "_metadata": {
     "description": "Skills configuration for BAZINGA agents",
-    "last_updated": "2025-01-16T00:00:00Z",
+    "last_updated": "2025-11-25T00:00:00Z",
     "profile": "lite",
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent (always runs)",
