@@ -2048,6 +2048,26 @@ Orchestrator output:
 
 **This three-layer approach prevents the bug at multiple levels.**
 
+### Step 2B.0: Context Optimization Checkpoint (≥3 Developers)
+
+**Trigger:** Execute this step ONLY when `parallel_count >= 3`
+
+**Purpose:** Large parallel spawns consume significant context. This checkpoint gives users the option to compact first.
+
+**Output to user:**
+```
+📊 **Context Optimization Point**
+About to spawn {parallel_count} developers in parallel.
+💡 For optimal performance, consider running `/compact` now.
+⏳ Continuing in 3 seconds... (Ctrl+C to pause and compact)
+```
+
+**Then IMMEDIATELY continue to Step 2B.1** - do NOT wait for user input.
+
+**Rationale:** User can:
+- Let it proceed (context is fine)
+- Press Ctrl+C, run `/compact`, then resume with `/bazinga.orchestrate`
+
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
 Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
