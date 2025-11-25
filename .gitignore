@@ -69,6 +69,8 @@ bazinga/
 !bazinga/templates/
 !bazinga/skills_config.json
 !bazinga/testing_config.json
+!bazinga/model_selection.json
+!bazinga/challenge_levels.json
 
 # BAZINGA artifacts (session outputs - always gitignored)
 bazinga/artifacts/

@@ -17,11 +17,14 @@ The user's message to you contains their requirements for this orchestration tas
 ## Claude Code Multi-Agent Dev Team Overview
 
 **Agents in the System:**
-1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA
-2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision)
-3. **QA Expert** - Runs integration/contract/e2e tests
-4. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues
-5. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems (spawned by Tech Lead)
+1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA [Opus]
+2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision) [Haiku]
+3. **Senior Software Engineer** - Escalation tier for complex failures (after Developer fails 1x) [Sonnet]
+4. **QA Expert** - Runs integration/contract/e2e tests with 5-level challenge progression [Sonnet]
+5. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues [Opus]
+6. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems [Opus]
+
+**Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
 
 **Your Role:**
 - **Message router** - Pass information between agents
@@ -548,7 +551,50 @@ Display:
 
    See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
 
-5. **Store config references in database:**
+5. **Load model configuration from database:**
+
+   ### 🔴 MANDATORY: Load Model Configuration
+
+   **Query model configuration for all agents:**
+
+   Request to bazinga-db skill:
+   ```
+   bazinga-db, please retrieve model configuration:
+   Query: Get all agent model assignments from model_config table
+   ```
+
+   Then invoke:
+   ```
+   Skill(command: "bazinga-db")
+   ```
+
+   **Store model mappings in context for this session:**
+   ```
+   MODEL_CONFIG = {
+     "developer": "[model from DB, default: haiku]",
+     "senior_software_engineer": "[model from DB, default: sonnet]",
+     "qa_expert": "[model from DB, default: sonnet]",
+     "tech_lead": "[model from DB, default: opus]",
+     "project_manager": "[model from DB, default: opus]",
+     "investigator": "[model from DB, default: opus]",
+     "validator": "[model from DB, default: sonnet]"
+   }
+   ```
+
+   **IF model_config table doesn't exist or is empty:**
+   - Use defaults from `bazinga/model_selection.json`
+   - Read file: `Read(file_path: "bazinga/model_selection.json")`
+   - Extract model assignments from `agents` section
+
+   **🔄 CONTEXT RECOVERY:** If you lose model config (e.g., after context compaction), re-query:
+   ```
+   bazinga-db, please retrieve model configuration:
+   Query: Get all agent model assignments
+   ```
+
+   **Use MODEL_CONFIG values in ALL Task invocations instead of hardcoded models.**
+
+6. **Store config references in database:**
 
    ### 🔴 MANDATORY: Store configuration in database
 
@@ -1177,9 +1223,38 @@ ELSE IF PM chose "parallel":
 🔨 Implementing | Spawning developer for {brief_task_description}
 ```
 
-### 🔴 MANDATORY DEVELOPER PROMPT BUILDING
+### 🔴 MANDATORY DEVELOPER/SSE PROMPT BUILDING (PM Tier Decision)
 
-**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Step 1: Check PM's Initial Tier decision for this task group:**
+- Extract `Initial Tier` from PM's task group output (Developer OR Senior Software Engineer)
+- If PM said "Senior Software Engineer" → Use `agents/senior_software_engineer.md` + `MODEL_CONFIG["senior_software_engineer"]`
+- If PM said "Developer" (or not specified) → Use `agents/developer.md` + `MODEL_CONFIG["developer"]`
+
+**Step 2: Build prompt based on tier:**
+
+**IF Initial Tier = Developer:**
+- Read `agents/developer.md`
+- Model: `MODEL_CONFIG["developer"]` (default: haiku)
+- Description: `f"Dev: {task_name[:40]}"`
+
+**IF Initial Tier = Senior Software Engineer:**
+- Read `agents/senior_software_engineer.md`
+- Model: `MODEL_CONFIG["senior_software_engineer"]` (default: sonnet)
+- Description: `f"SSE: {task_name[:40]}"`
+
+**Step 3: Add config from `bazinga/templates/prompt_building.md`** (testing_config.json + skills_config.json for selected tier)
+
+**Step 4: Include:** Agent=[Developer|SSE], Group=main, Mode=Simple, Session ID, Branch, Skills/Testing source, Task (from PM)
+
+**Step 5: Validate:** ✓ Skill invocations, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format
+
+**Step 6: Spawn:**
+```
+# Use model from MODEL_CONFIG, NOT hardcoded
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])
+```
+
+**🔴 CRITICAL: Follow PM's tier decision. DO NOT override with your own escalation logic for initial spawn.**
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1213,6 +1288,12 @@ IF status = BLOCKED:
   → Use "Blocker" template:
   ```
   ⚠️ Group {id} blocked | {blocker_description} | Investigating
+  ```
+
+IF status = ESCALATE_SENIOR:
+  → Use "Escalation" template:
+  ```
+  🔺 Group {id} escalating | {reason} | → Senior Software Engineer (Sonnet)
   ```
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
@@ -1255,6 +1336,12 @@ Skill(command: "bazinga-db")
   * After Investigator provides solution, spawn Developer again with resolution
   * Continue workflow automatically
 
+**IF Developer reports ESCALATE_SENIOR:**
+- **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
+- Build prompt with: original task, developer's attempt, reason for escalation
+- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: explicit escalation", prompt=[senior engineer prompt])
+- This is an explicit request, not revision-based escalation
+
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
 
 Before moving to the next group or ending your message, verify:
@@ -1286,13 +1373,16 @@ Before moving to the next group or ending your message, verify:
 
 **Spawn developer Task:**
 ```
-Task(subagent_type="general-purpose", description="Dev {id}: continue work", prompt=[new prompt])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: continue work", prompt=[new prompt])
 ```
 
-**IF revision count > 2:**
-- Developer is stuck after 3 attempts
-- Spawn Tech Lead for architectural guidance (not user input)
-- Tech Lead provides guidance, then respawn developer with Tech Lead's recommendations
+**IF revision count >= 1 (Developer failed once):**
+- Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"], handles complex issues)
+- Build prompt with: original task, developer's attempt, failure details
+- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: escalated task", prompt=[senior engineer prompt])
+
+**IF Senior Software Engineer also fails (revision count >= 2 after Senior Eng):**
+- Spawn Tech Lead for architectural guidance
 
 **🔴 CRITICAL:** Previous developer Task is DONE. You MUST spawn a NEW Task. Writing a message like "Continue fixing NOW" does NOTHING - the developer Task has completed and won't see your message. SPAWN the Task.
 
@@ -1321,7 +1411,7 @@ Let me move on to other groups first.
 Developer B reports PARTIAL (69 test failures remain).
 Spawning Developer B continuation to fix remaining tests:
 
-Task(subagent_type="general-purpose",
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
      description="Dev B: fix remaining test failures",
      prompt=[continuation prompt with test failure context])
 ```
@@ -1338,7 +1428,7 @@ Task(subagent_type="general-purpose",
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -1370,6 +1460,12 @@ IF status = BLOCKED:
   → Use "Blocker" template:
   ```
   ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
+  ```
+
+IF status = ESCALATE_SENIOR:
+  → Use "Challenge Escalation" template:
+  ```
+  🔺 Group {id} challenge failed | Level {level} failure: {reason} | → Senior Software Engineer (Sonnet)
   ```
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
@@ -1414,11 +1510,20 @@ Skill(command: "bazinga-db")
 
 **Spawn developer Task:**
 ```
-Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
 ```
 
-**IF revision count > 2:**
-- Spawn Tech Lead for guidance (developer may be stuck)
+**IF revision count >= 1 OR QA reports challenge level 3+ failure:**
+- Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
+- Include QA's challenge level findings in prompt
+
+**IF QA reports ESCALATE_SENIOR explicitly:**
+- **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
+- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
+- This bypasses revision count check - explicit escalation from QA's challenge testing
+
+**IF Senior Software Engineer also fails (revision >= 2 after Senior Eng):**
+- Spawn Tech Lead for guidance
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the QA issues" and stop
 
@@ -1431,7 +1536,7 @@ Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", pro
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1678,13 +1783,16 @@ Skill(command: "bazinga-db")
 
 **Build prompt and spawn Task:**
 ```
-Task(subagent_type="general-purpose", description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
+# Model selection: use MODEL_CONFIG for appropriate agent
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
 ```
 
 **Track revision count in database (increment by 1)**
 
-**IF revision count > 2:**
-- Spawn PM to evaluate if task should be simplified
+**Escalation path:**
+- IF revision count == 1: Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
+- IF revision count == 2 AND previous was Senior Eng: Spawn Tech Lead for guidance
+- IF revision count > 2: Spawn PM to evaluate if task should be simplified
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the Tech Lead's feedback" and stop
 
@@ -1722,7 +1830,7 @@ Build PM prompt with complete implementation summary and quality metrics.
 
 **Spawn:**
 ```
-Task(subagent_type="general-purpose", description="PM final assessment", prompt=[PM prompt])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])
 ```
 
 
@@ -1843,7 +1951,7 @@ Skill(command: "bazinga-db")
   * Session ID, Group ID, Branch
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
+- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
 
@@ -1939,36 +2047,46 @@ Process internally (parallel spawning is already announced in planning complete 
 
 When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
 
-**Build contextual Task descriptions for each group:**
+**Build contextual Task descriptions for each group (respecting PM's tier decision):**
 ```python
 # Step 1: Get task_groups from database (queried at Step 1.4)
 # Step 2: For EACH group being spawned:
 for group in groups_to_spawn:  # e.g., groups A, B, C
-    # Get task name from task_groups (defensive: use fallback if not found)
+    # Get task info from task_groups including initial_tier
     task = next((t for t in task_groups if t.group_id == group.id), None)
-    if task and task.name:
-        task_name = task.name
+    if task:
+        task_name = task.name or group.id
+        initial_tier = task.initial_tier or "Developer"  # Default to Developer
     else:
-        task_name = group.id  # Fallback to group ID if task not found or has no name
+        task_name = group.id
+        initial_tier = "Developer"
 
-    # Truncate to 30 chars (shorter than simple mode's 40 because group ID takes space)
-    # Format: "Dev A: " = 7 char prefix vs simple mode "Dev: " = 5 chars
+    # Truncate to 30 chars
     truncated = task_name[:30] + ("..." if len(task_name) > 30 else "")
 
-    # Build description
-    descriptions[group.id] = f"Dev {group.id}: {truncated}"
-    # Example: "Dev A: JWT auth" or "Dev B: User registration..."
+    # Build description based on tier
+    if initial_tier == "Senior Software Engineer":
+        descriptions[group.id] = f"SSE {group.id}: {truncated}"
+        models[group.id] = MODEL_CONFIG["senior_software_engineer"]
+        agent_file[group.id] = "agents/senior_software_engineer.md"
+    else:
+        descriptions[group.id] = f"Dev {group.id}: {truncated}"
+        models[group.id] = MODEL_CONFIG["developer"]
+        agent_file[group.id] = "agents/developer.md"
 
-# Step 3: Spawn all in parallel
+# Step 3: Spawn all in parallel (EACH with its own tier/model)
 ```
 
-**Spawn:**
+**Spawn (using PM's tier decision per group):**
 ```
-Task(subagent_type: "general-purpose", description: descriptions["A"], prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", description: descriptions["B"], prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [Group C prompt])
-... up to 4 developers max
+# Model comes from MODEL_CONFIG based on PM's initial_tier decision per group
+Task(subagent_type: "general-purpose", model: models["A"], description: descriptions["A"], prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", model: models["B"], description: descriptions["B"], prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", model: models["C"], description: descriptions["C"], prompt: [Group C prompt])
+... up to 4 groups max
 ```
+
+**🔴 CRITICAL: Each group may have different tier. Group A might be Developer (haiku) while Group B is SSE (sonnet).**
 
 **DO NOT spawn them in separate messages** - that would make them run sequentially, defeating the purpose of parallel mode.
 
@@ -2237,7 +2355,7 @@ Build PM prompt with:
 - All group results and commit summaries
 - Overall status check request
 
-Spawn: `Task(subagent_type="general-purpose", description="PM overall assessment", prompt=[PM prompt])`
+Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt=[PM prompt])`
 
 
 **AFTER receiving the PM's response:**
@@ -2314,7 +2432,7 @@ Skill(command: "velocity-tracker")
   * Session ID, Group ID(s) affected, Branch(es)
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
+- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2B.7c if applicable)
 - Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
 

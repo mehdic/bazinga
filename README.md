@@ -236,6 +236,19 @@ Revision 3+:  Claude Opus (deep analysis for persistent issues)
 - **Automatic** - No manual model switching
 - **Smart** - Opus only when truly needed
 
+### Two-Tier Developer System
+
+PM assigns tasks to the right tier based on complexity:
+
+| Complexity | Tier | Model |
+|------------|------|-------|
+| 1-6 (standard) | Developer | Haiku |
+| 7-10 (complex) | Senior Software Engineer | Sonnet |
+
+**Override rules:** Security-sensitive or architectural tasks always go to Senior Software Engineer, regardless of score.
+
+**Details:** See [research/tier-and-model-decision-flow.md](research/tier-and-model-decision-flow.md)
+
 ---
 
 ## Multi-Language Support

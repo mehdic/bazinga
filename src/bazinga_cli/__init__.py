@@ -288,6 +288,44 @@ class BazingaSetup:
 
         return copied_count > 0
 
+    def copy_bazinga_configs(self, target_dir: Path) -> bool:
+        """
+        Copy bazinga config files (JSON) to target bazinga/ directory.
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if configs were copied successfully, False otherwise
+        """
+        bazinga_dir = target_dir / "bazinga"
+        bazinga_dir.mkdir(parents=True, exist_ok=True)
+
+        source_bazinga = self.source_dir / "bazinga"
+        if not source_bazinga.exists():
+            console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
+            return False
+
+        copied_count = 0
+        # Copy JSON config files from bazinga/ root (not templates/)
+        for config_file in source_bazinga.glob("*.json"):
+            try:
+                # SECURITY: Validate filename doesn't contain path traversal
+                safe_filename = PathValidator.validate_filename(config_file.name)
+                dest = bazinga_dir / safe_filename
+
+                # SECURITY: Ensure destination is within bazinga_dir
+                PathValidator.ensure_within_directory(dest, bazinga_dir)
+
+                shutil.copy2(config_file, dest)
+                console.print(f"  ✓ Copied {safe_filename}")
+                copied_count += 1
+            except SecurityError as e:
+                console.print(f"[red]✗ Skipping unsafe file {config_file.name}: {e}[/red]")
+                continue
+
+        return copied_count > 0
+
     def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:
         """
         Setup global configuration, merging with existing config if present.
@@ -1017,6 +1055,10 @@ def init(
         if not setup.copy_templates(target_dir):
             console.print("[yellow]⚠️  No templates found[/yellow]")
 
+        console.print("\n[bold cyan]7.1. Copying config files[/bold cyan]")
+        if not setup.copy_bazinga_configs(target_dir):
+            console.print("[yellow]⚠️  No config files found[/yellow]")
+
         console.print("\n[bold cyan]8. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
@@ -1680,6 +1722,13 @@ def update(
         console.print("  [green]✓ Templates updated[/green]")
     else:
         console.print("  [yellow]⚠️  No templates found[/yellow]")
+
+    # Update config files
+    console.print("\n[bold cyan]7.1. Updating config files[/bold cyan]")
+    if setup.copy_bazinga_configs(target_dir):
+        console.print("  [green]✓ Config files updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  No config files found[/yellow]")
 
     # Update dashboard dependencies
     console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
