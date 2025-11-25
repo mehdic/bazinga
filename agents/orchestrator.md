@@ -886,6 +886,13 @@ IF status = NEEDS_CLARIFICATION:
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template
 
+IF status = INVESTIGATION_NEEDED:
+  → Use "Investigation Needed" template:
+  ```
+  🔬 Investigation needed | {problem_summary} | Spawning Investigator
+  ```
+  → Immediately spawn Investigator (see §Step 2A.6b for investigation loop)
+
 **Apply fallbacks:** If data missing, scan for "parallel", "simple", group names.
 
 **Step 4: Log PM interaction:**
@@ -1686,7 +1693,29 @@ Task(subagent_type="general-purpose", description="{agent} {id}: fix Tech Lead i
 
 ### Step 2A.8: Spawn PM for Final Check
 
-Process internally (PM will assess completion - no verbose spawn message needed).
+**FIRST: Output Technical Review Summary to user (consolidates all group reviews):**
+
+```markdown
+👔 **Technical Review Summary**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Group {id} ({description}):** {status_emoji} {status}
+  • Security: {security_summary}
+  • Lint: {lint_summary}
+  • Coverage: {coverage}%
+  • Architecture: {architecture_notes}
+
+**Group {id} ({description}):** {status_emoji} {status}
+  • Security: {security_summary}
+  • Issues: {issues_if_any}
+
+**Overall:** {approved}/{total} groups approved{, N pending fixes if any}
+```
+
+**Data sources:** Aggregate from all Tech Lead responses stored in session.
+**Fallback:** If only one group, skip summary (already shown in individual review).
+
+**THEN: Spawn PM for final assessment (no verbose spawn message needed).**
 
 Build PM prompt with complete implementation summary and quality metrics.
 
@@ -1743,6 +1772,13 @@ IF decision = NEEDS_CLARIFICATION:
   ```
   ⚠️ PM needs clarification | {question_summary} | Awaiting response
   ```
+
+IF decision = INVESTIGATION_NEEDED:
+  → Use "Investigation Needed" template:
+  ```
+  🔬 Investigation needed | {problem_summary} | Spawning Investigator
+  ```
+  → Immediately spawn Investigator (see §Step 2A.6b for investigation loop)
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
