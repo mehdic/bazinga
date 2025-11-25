@@ -40,6 +40,15 @@ app = typer.Typer(
 class BazingaSetup:
     """Handles BAZINGA installation and setup."""
 
+    # Explicit allowlist of config files to copy/distribute
+    # Must match force-include entries in pyproject.toml
+    # This prevents copying runtime state files (pm_state.json, etc.) in dev mode
+    ALLOWED_CONFIG_FILES = [
+        "model_selection.json",
+        "challenge_levels.json",
+        "skills_config.json",
+    ]
+
     def __init__(self, source_dir: Optional[Path] = None):
         """
         Initialize setup handler.
@@ -67,6 +76,46 @@ class BazingaSetup:
                     self.source_dir = dev_dir
         else:
             self.source_dir = source_dir
+
+    def _get_config_source(self, relative_path: str) -> Optional[Path]:
+        """
+        Resolve config path with priority:
+        1. Package directory (bundled with code - always version-matched)
+        2. Shared data directory (legacy/system installs)
+        3. Project root (editable/dev install)
+
+        Priority order matters: Package dir is checked first to avoid
+        stale configs from previous installs in shared-data location.
+
+        Args:
+            relative_path: Path relative to source (e.g., "bazinga/templates")
+
+        Returns:
+            Resolved Path if found, None otherwise
+        """
+        # 1. Check package directory first (force-included in wheels)
+        # This ensures version-matched configs, avoiding stale shared-data
+        pkg_path = Path(__file__).parent / relative_path
+        if pkg_path.exists():
+            return pkg_path
+
+        # 2. Check shared data directory (legacy installs, agents, etc.)
+        path = self.source_dir / relative_path
+        if path.exists():
+            return path
+
+        # 3. Check project root (development/editable mode fallback)
+        # Iterate upward to find pyproject.toml marker (robust to refactoring)
+        current = Path(__file__).resolve().parent
+        for _ in range(5):  # Search up to 5 levels
+            if (current / "pyproject.toml").exists():
+                dev_path = current / relative_path
+                if dev_path.exists():
+                    return dev_path
+                break  # Found project root but path doesn't exist
+            current = current.parent
+
+        return None
 
     def get_agent_files(self) -> list[Path]:
         """Get list of agent markdown files."""
@@ -268,11 +317,14 @@ class BazingaSetup:
         templates_dir = target_dir / "bazinga" / "templates"
         templates_dir.mkdir(parents=True, exist_ok=True)
 
-        source_templates = self.source_dir / "bazinga" / "templates"
-        if not source_templates.exists():
-            # Fallback to coordination/templates if bazinga/templates doesn't exist
-            source_templates = self.source_dir / "coordination" / "templates"
-            if not source_templates.exists():
+        # Use helper for path resolution with legacy fallback
+        source_templates = self._get_config_source("bazinga/templates")
+        if not source_templates:
+            # Legacy fallback: coordination/templates
+            legacy_path = self._get_config_source("coordination/templates")
+            if legacy_path:
+                source_templates = legacy_path
+            else:
                 console.print("[yellow]⚠️  No templates found in source[/yellow]")
                 return False
 
@@ -308,17 +360,22 @@ class BazingaSetup:
         bazinga_dir = target_dir / "bazinga"
         bazinga_dir.mkdir(parents=True, exist_ok=True)
 
-        source_bazinga = self.source_dir / "bazinga"
-        if not source_bazinga.exists():
+        # Use helper for path resolution (handles shared-data, package, and dev installs)
+        source_bazinga = self._get_config_source("bazinga")
+        if not source_bazinga:
             console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
             return False
 
         copied_count = 0
-        # Copy JSON config files from bazinga/ root (not templates/)
-        for config_file in source_bazinga.glob("*.json"):
+        for filename in self.ALLOWED_CONFIG_FILES:
+            config_file = source_bazinga / filename
+            if not config_file.exists():
+                console.print(f"[yellow]⚠️  Warning: Expected config file not found: {filename}[/yellow]")
+                continue
+
             try:
                 # SECURITY: Validate filename doesn't contain path traversal
-                safe_filename = PathValidator.validate_filename(config_file.name)
+                safe_filename = PathValidator.validate_filename(filename)
                 dest = bazinga_dir / safe_filename
 
                 # SECURITY: Ensure destination is within bazinga_dir
@@ -328,7 +385,7 @@ class BazingaSetup:
                 console.print(f"  ✓ Copied {safe_filename}")
                 copied_count += 1
             except SecurityError as e:
-                console.print(f"[red]✗ Skipping unsafe file {config_file.name}: {e}[/red]")
+                console.print(f"[red]✗ Skipping unsafe file {filename}: {e}[/red]")
                 continue
 
         return copied_count > 0
