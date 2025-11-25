@@ -20,8 +20,9 @@
 - `READY_FOR_QA` - Implementation complete, has integration/E2E tests
 - `READY_FOR_REVIEW` - Implementation complete, only unit tests or no tests
 - `BLOCKED` - Cannot proceed without external help
-- `PARTIAL` - Some work done, more needed
-- `ESCALATE_SENIOR` - Issue too complex, explicitly requesting Senior Engineer
+- `PARTIAL` - Some work done, more needed (same-tier continuation)
+- `INCOMPLETE` - Partial work, can continue (same-tier retry)
+- `ESCALATE_SENIOR` - Issue too complex, **immediate** Senior Engineer escalation
 
 **Information to extract:**
 
