@@ -21,6 +21,7 @@
 - `READY_FOR_REVIEW` - Implementation complete, only unit tests or no tests
 - `BLOCKED` - Cannot proceed without external help
 - `PARTIAL` - Some work done, more needed
+- `ESCALATE_SENIOR` - Issue too complex, explicitly requesting Senior Engineer
 
 **Information to extract:**
 
@@ -102,6 +103,7 @@ Files but no test count:
 - `PASS` - All tests passed
 - `FAIL` - Some tests failed
 - `PARTIAL` - Some tests couldn't run
+- `ESCALATE_SENIOR` - Challenge Level 3+ failure requiring Senior Engineer
 
 **Information to extract:**
 
