@@ -1182,7 +1182,7 @@ ELSE IF PM chose "parallel":
 
 ### 🔴 MANDATORY DEVELOPER PROMPT BUILDING
 
-**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=main, Mode=Simple, Session ID (actual value, not placeholder), Branch (from git), Skills/Testing source, Task (from PM). **Validate:** ✓ Skill(command: per mandatory skill, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format. **Description:** `f"Dev: {task_name[:40]}"`. **Spawn:** `Task(subagent_type="general-purpose", model="haiku", description=desc, prompt=[prompt])`
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1289,7 +1289,7 @@ Before moving to the next group or ending your message, verify:
 
 **Spawn developer Task:**
 ```
-Task(subagent_type="general-purpose", description="Dev {id}: continue work", prompt=[new prompt])
+Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: continue work", prompt=[new prompt])
 ```
 
 **IF revision count >= 1 (Developer failed once):**
@@ -1327,7 +1327,7 @@ Let me move on to other groups first.
 Developer B reports PARTIAL (69 test failures remain).
 Spawning Developer B continuation to fix remaining tests:
 
-Task(subagent_type="general-purpose",
+Task(subagent_type="general-purpose", model="haiku",
      description="Dev B: fix remaining test failures",
      prompt=[continuation prompt with test failure context])
 ```
@@ -1344,7 +1344,7 @@ Task(subagent_type="general-purpose",
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model="sonnet", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -1420,7 +1420,7 @@ Skill(command: "bazinga-db")
 
 **Spawn developer Task:**
 ```
-Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
+Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
 ```
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
@@ -1441,7 +1441,7 @@ Task(subagent_type="general-purpose", description="Dev {id}: fix QA issues", pro
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model="opus", description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1688,7 +1688,8 @@ Skill(command: "bazinga-db")
 
 **Build prompt and spawn Task:**
 ```
-Task(subagent_type="general-purpose", description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
+# Model selection: haiku for developer, sonnet for QA
+Task(subagent_type="general-purpose", model="haiku|sonnet", description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
 ```
 
 **Track revision count in database (increment by 1)**
@@ -1734,7 +1735,7 @@ Build PM prompt with complete implementation summary and quality metrics.
 
 **Spawn:**
 ```
-Task(subagent_type="general-purpose", description="PM final assessment", prompt=[PM prompt])
+Task(subagent_type="general-purpose", model="opus", description="PM final assessment", prompt=[PM prompt])
 ```
 
 
@@ -1855,7 +1856,7 @@ Skill(command: "bazinga-db")
   * Session ID, Group ID, Branch
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
+- Spawn: `Task(subagent_type="general-purpose", model="opus", description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
 
@@ -1976,9 +1977,9 @@ for group in groups_to_spawn:  # e.g., groups A, B, C
 
 **Spawn:**
 ```
-Task(subagent_type: "general-purpose", description: descriptions["A"], prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", description: descriptions["B"], prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", description: descriptions["C"], prompt: [Group C prompt])
+Task(subagent_type: "general-purpose", model: "haiku", description: descriptions["A"], prompt: [Group A prompt])
+Task(subagent_type: "general-purpose", model: "haiku", description: descriptions["B"], prompt: [Group B prompt])
+Task(subagent_type: "general-purpose", model: "haiku", description: descriptions["C"], prompt: [Group C prompt])
 ... up to 4 developers max
 ```
 
@@ -2249,7 +2250,7 @@ Build PM prompt with:
 - All group results and commit summaries
 - Overall status check request
 
-Spawn: `Task(subagent_type="general-purpose", description="PM overall assessment", prompt=[PM prompt])`
+Spawn: `Task(subagent_type="general-purpose", model="opus", description="PM overall assessment", prompt=[PM prompt])`
 
 
 **AFTER receiving the PM's response:**
@@ -2326,7 +2327,7 @@ Skill(command: "velocity-tracker")
   * Session ID, Group ID(s) affected, Branch(es)
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", description="Investigate blocker", prompt=[Investigator prompt])`
+- Spawn: `Task(subagent_type="general-purpose", model="opus", description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2B.7c if applicable)
 - Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
 

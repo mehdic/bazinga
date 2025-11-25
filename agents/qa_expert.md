@@ -562,6 +562,42 @@ Failed Scenarios:
 | 4 | Security Adversary | Injection, auth bypass, exploits | **YES** |
 | 5 | Production Chaos | Race conditions, failures, timeouts | **YES** |
 
+### Challenge Level Selection (MANDATORY)
+
+**Before running challenges, analyze the code change and select appropriate max level:**
+
+| Code Characteristic | Detection Method | Max Level |
+|---------------------|------------------|-----------|
+| Bug fix only | Commit message contains "fix", single file change | 1 |
+| Utility/helper | Files in /utils, /helpers, no state changes | 2 |
+| New feature | New files/functions added, internal only | 2 |
+| Business logic | Files in /models, /services, state mutations | 3 |
+| External-facing | Files in /api, /routes, /controllers | 4 |
+| Authentication/Auth | Files in /auth, token handling, permissions | 4 |
+| Critical system | Payment, distributed systems, data pipelines | 5 |
+| Security-sensitive | Crypto, secrets, user data handling | 5 |
+
+**Selection Algorithm:**
+```
+1. Check file paths → determine domain
+2. Check for keywords (auth, payment, security, api) → escalate if found
+3. Check complexity score from PM → higher score = higher max level
+4. Default: Start at Level 1, max at Level 3 unless criteria above apply
+```
+
+**Example Selection:**
+```
+Files: src/services/payment_processor.py
+Keywords: "payment", "transaction"
+Complexity: 7/10
+→ Max Level: 5 (Critical system)
+
+Files: src/utils/string_helpers.py
+Keywords: none
+Complexity: 2/10
+→ Max Level: 2 (Utility)
+```
+
 ### Level Progression
 
 ```

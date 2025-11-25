@@ -23,6 +23,14 @@
     "investigator": {
       "model": "opus",
       "rationale": "Complex debugging and root cause analysis"
+    },
+    "validator": {
+      "model": "sonnet",
+      "rationale": "Independent BAZINGA verification - spawned only by PM"
+    },
+    "orchestrator": {
+      "model": "sonnet",
+      "rationale": "Coordination and routing - inline execution via slash command"
     }
   },
   "escalation_rules": {
