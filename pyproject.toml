@@ -55,8 +55,15 @@ bazinga = "bazinga_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bazinga_cli"]
-# Ignore VCS exclusion patterns so gitignored bazinga/ files are included in wheel
-ignore-vcs = true
+
+# Force-include bazinga config files as package data
+# These are gitignored (for runtime state) but needed for distribution
+# CLI checks package directory first, then falls back to shared-data
+[tool.hatch.build.targets.wheel.force-include]
+"bazinga/model_selection.json" = "bazinga_cli/bazinga/model_selection.json"
+"bazinga/challenge_levels.json" = "bazinga_cli/bazinga/challenge_levels.json"
+"bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
+"bazinga/templates" = "bazinga_cli/bazinga/templates"
 
 [tool.hatch.build.targets.wheel.shared-data]
 "agents" = "share/bazinga_cli/agents"
@@ -66,4 +73,3 @@ ignore-vcs = true
 "config" = "share/bazinga_cli/config"
 ".claude/skills" = "share/bazinga_cli/.claude/skills"
 "dashboard" = "share/bazinga_cli/dashboard"
-"bazinga" = "share/bazinga_cli/bazinga"

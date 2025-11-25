@@ -270,11 +270,16 @@ class BazingaSetup:
 
         source_templates = self.source_dir / "bazinga" / "templates"
         if not source_templates.exists():
-            # Fallback to coordination/templates if bazinga/templates doesn't exist
-            source_templates = self.source_dir / "coordination" / "templates"
-            if not source_templates.exists():
-                console.print("[yellow]⚠️  No templates found in source[/yellow]")
-                return False
+            # Fallback 1: Check package directory (for pip/uvx installs with force-include)
+            package_dir = Path(__file__).parent / "bazinga" / "templates"
+            if package_dir.exists():
+                source_templates = package_dir
+            else:
+                # Fallback 2: coordination/templates (legacy)
+                source_templates = self.source_dir / "coordination" / "templates"
+                if not source_templates.exists():
+                    console.print("[yellow]⚠️  No templates found in source[/yellow]")
+                    return False
 
         copied_count = 0
         for template_file in source_templates.glob("*.md"):
@@ -310,8 +315,13 @@ class BazingaSetup:
 
         source_bazinga = self.source_dir / "bazinga"
         if not source_bazinga.exists():
-            console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
-            return False
+            # Fallback: Check package directory (for pip/uvx installs with force-include)
+            package_dir = Path(__file__).parent / "bazinga"
+            if package_dir.exists():
+                source_bazinga = package_dir
+            else:
+                console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
+                return False
 
         copied_count = 0
         # Copy JSON config files from bazinga/ root (not templates/)
