@@ -68,6 +68,37 @@ class BazingaSetup:
         else:
             self.source_dir = source_dir
 
+    def _get_config_source(self, relative_path: str) -> Optional[Path]:
+        """
+        Resolve config path with priority:
+        1. Shared data directory (system install via shared-data)
+        2. Package directory (wheel install via force-include)
+        3. Project root (editable/dev install)
+
+        Args:
+            relative_path: Path relative to source (e.g., "bazinga/templates")
+
+        Returns:
+            Resolved Path if found, None otherwise
+        """
+        # 1. Check shared data directory (handles most installed scenarios)
+        path = self.source_dir / relative_path
+        if path.exists():
+            return path
+
+        # 2. Check package directory (force-included in wheels)
+        pkg_path = Path(__file__).parent / relative_path
+        if pkg_path.exists():
+            return pkg_path
+
+        # 3. Check project root (development/editable mode fallback)
+        # Structure: project_root/src/bazinga_cli/__init__.py
+        dev_path = Path(__file__).parents[2] / relative_path
+        if dev_path.exists():
+            return dev_path
+
+        return None
+
     def get_agent_files(self) -> list[Path]:
         """Get list of agent markdown files."""
         agents_dir = self.source_dir / "agents"
@@ -268,18 +299,16 @@ class BazingaSetup:
         templates_dir = target_dir / "bazinga" / "templates"
         templates_dir.mkdir(parents=True, exist_ok=True)
 
-        source_templates = self.source_dir / "bazinga" / "templates"
-        if not source_templates.exists():
-            # Fallback 1: Check package directory (for pip/uvx installs with force-include)
-            package_dir = Path(__file__).parent / "bazinga" / "templates"
-            if package_dir.exists():
-                source_templates = package_dir
+        # Use helper for path resolution with legacy fallback
+        source_templates = self._get_config_source("bazinga/templates")
+        if not source_templates:
+            # Legacy fallback: coordination/templates
+            legacy_path = self._get_config_source("coordination/templates")
+            if legacy_path:
+                source_templates = legacy_path
             else:
-                # Fallback 2: coordination/templates (legacy)
-                source_templates = self.source_dir / "coordination" / "templates"
-                if not source_templates.exists():
-                    console.print("[yellow]⚠️  No templates found in source[/yellow]")
-                    return False
+                console.print("[yellow]⚠️  No templates found in source[/yellow]")
+                return False
 
         copied_count = 0
         for template_file in source_templates.glob("*.md"):
@@ -313,15 +342,11 @@ class BazingaSetup:
         bazinga_dir = target_dir / "bazinga"
         bazinga_dir.mkdir(parents=True, exist_ok=True)
 
-        source_bazinga = self.source_dir / "bazinga"
-        if not source_bazinga.exists():
-            # Fallback: Check package directory (for pip/uvx installs with force-include)
-            package_dir = Path(__file__).parent / "bazinga"
-            if package_dir.exists():
-                source_bazinga = package_dir
-            else:
-                console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
-                return False
+        # Use helper for path resolution (handles shared-data, package, and dev installs)
+        source_bazinga = self._get_config_source("bazinga")
+        if not source_bazinga:
+            console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
+            return False
 
         copied_count = 0
         # Copy JSON config files from bazinga/ root (not templates/)
