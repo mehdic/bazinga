@@ -240,6 +240,46 @@ This ensures:
 
 ---
 
+## 🔴 CRITICAL: Config File Sync Requirement
+
+**When adding new bazinga config files (JSON), you MUST update TWO places:**
+
+### Files That Must Stay In Sync
+
+1. **`pyproject.toml`** - `[tool.hatch.build.targets.wheel.force-include]` section
+2. **`src/bazinga_cli/__init__.py`** - `BazingaSetup.ALLOWED_CONFIG_FILES` list
+
+### Why This Matters
+
+- `force-include` controls what gets packaged in the wheel
+- `ALLOWED_CONFIG_FILES` controls what gets copied during `bazinga install`
+- If they're out of sync: files get packaged but never installed, or vice versa
+
+### Checklist When Adding New Config Files
+
+```bash
+# 1. Add file to bazinga/ directory
+# 2. Add to pyproject.toml force-include:
+"bazinga/new_config.json" = "bazinga_cli/bazinga/new_config.json"
+
+# 3. Add to ALLOWED_CONFIG_FILES in __init__.py:
+ALLOWED_CONFIG_FILES = [
+    "model_selection.json",
+    "challenge_levels.json",
+    "skills_config.json",
+    "new_config.json",  # <-- ADD HERE
+]
+
+# 4. Run the sync test to verify:
+python -m pytest tests/test_config_sync.py -v
+```
+
+### Automated Verification
+
+The `tests/test_config_sync.py` test will fail if these lists are out of sync.
+
+---
+
 ## 🔴 CRITICAL: Skills - Creation, Editing, and Invocation
 
 **When working with ANY skill (creating, editing SKILL.md, or invoking), you MUST follow these guides:**
