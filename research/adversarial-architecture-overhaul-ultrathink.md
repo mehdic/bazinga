@@ -320,8 +320,8 @@ For each applicable level, generate 2-5 challenge tests targeting that level's t
 
 - ALL challenge tests pass → Report PASS to Tech Lead
 - Level 1-2 failures → Route back to Developer (standard issues)
-- Level 3 failures → Route to Developer with contract violation details
-- Level 4-5 failures → Route to Developer + flag for Senior Engineer review
+- Level 3-4 failures → Escalate to Senior Engineer immediately (contract/security)
+- Level 5 failures → Senior Engineer + Tech Lead consultation (production chaos)
 ```
 
 ---
@@ -395,6 +395,10 @@ Create a two-tier development system where:
 - **3-4 points:** Developer (Haiku) with Senior review on completion
 - **5+ points:** Senior Software Engineer (Sonnet) directly
 
+**Escalation Triggers (Developer → Senior Engineer):**
+- Developer fails 1x (any failure = immediate escalation)
+- Level 3+ challenge test failures (contract/security issues)
+
 ### Senior Engineer Agent Definition
 
 **New file: `agents/senior_engineer.md`**
@@ -430,8 +434,8 @@ You are a **Senior Software Engineer** - an experienced developer who handles co
 ## When You Are Spawned
 
 1. **Direct assignment:** PM assigned you due to task complexity (5+ points)
-2. **Escalation:** Developer failed 2+ times OR Level 4-5 challenge failures
-3. **Review request:** PM requests senior review before QA
+2. **Escalation:** Developer failed 1x OR Level 3-4 challenge failures
+3. **Review request:** PM requests senior review before QA (3-4 point tasks)
 
 ## Workflow
 
@@ -516,18 +520,19 @@ Same as Developer:
 ### Escalation Flow
 
 ```
-Developer (Haiku) fails 2x
+Developer (Haiku) fails 1x OR Level 3-4 challenge fails
     │
     ▼
 PM receives failure report
     │
-    ├─► Simple issue (typo, missing import)?
-    │     → Developer tries again with feedback
-    │
-    └─► Complex issue (architecture, security)?
-          → Escalate to Senior Engineer
+    └─► Escalate to Senior Engineer immediately
           → Senior Engineer reviews + fixes
           → Route to QA
+
+WHY aggressive escalation:
+- Level 3 failures = contract/architectural issues (need senior perspective)
+- Level 4 failures = security issues (must have senior review)
+- 1 failure = don't waste time, get expert help fast
 ```
 
 ---
@@ -925,7 +930,7 @@ For each challenge:
 **Step 3.2: Update PM for task assignment**
 - [ ] Add complexity scoring matrix
 - [ ] Add Developer vs Senior Engineer assignment logic
-- [ ] Add escalation triggers (2x failure, Level 4-5 challenge)
+- [ ] Add escalation triggers (1x failure, Level 3-4 challenge failures)
 
 **Step 3.3: Update orchestrator routing**
 - [ ] Add Senior Engineer spawn capability
@@ -1045,7 +1050,7 @@ For each challenge:
 |------|------------|
 | Model selection adds latency | Cache config, minimize reads |
 | Challenge levels incorrectly assigned | PM reviews code type determination |
-| Escalation loops | Max escalation count (2) before user intervention |
+| Senior Engineer over-utilized | Track metrics, adjust complexity thresholds if needed |
 
 ### Low Risks
 
@@ -1080,7 +1085,7 @@ For each challenge:
 | Metric | Current | Target | Measurement |
 |--------|---------|--------|-------------|
 | Time to BAZINGA | Baseline | +10% max | End-to-end time |
-| Escalation rate | N/A | <20% | Developer → Senior escalations |
+| Escalation rate | N/A | 20-40% | Developer → Senior escalations (aggressive is OK) |
 
 ---
 
