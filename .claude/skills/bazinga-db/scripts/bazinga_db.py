@@ -27,25 +27,49 @@ class BazingaDB:
             print(message)
 
     def _ensure_db_exists(self):
-        """Ensure database exists, create if not."""
-        if not Path(self.db_path).exists():
+        """Ensure database exists and has schema, create if not."""
+        db_path = Path(self.db_path)
+        needs_init = False
+
+        if not db_path.exists():
+            needs_init = True
             print(f"Database not found at {self.db_path}. Auto-initializing...", file=sys.stderr)
-            # Auto-initialize the database
-            script_dir = Path(__file__).parent
-            init_script = script_dir / "init_db.py"
+        elif db_path.stat().st_size == 0:
+            needs_init = True
+            print(f"Database file is empty at {self.db_path}. Auto-initializing...", file=sys.stderr)
+        else:
+            # File exists and has content - check if it has tables
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+                if not cursor.fetchone():
+                    needs_init = True
+                    print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                conn.close()
+            except Exception:
+                needs_init = True
+                print(f"Database corrupted at {self.db_path}. Auto-initializing...", file=sys.stderr)
 
-            import subprocess
-            result = subprocess.run(
-                [sys.executable, str(init_script), self.db_path],
-                capture_output=True,
-                text=True
-            )
+        if not needs_init:
+            return
 
-            if result.returncode != 0:
-                print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
-                sys.exit(1)
+        # Auto-initialize the database
+        script_dir = Path(__file__).parent
+        init_script = script_dir / "init_db.py"
 
-            print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, str(init_script), self.db_path],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get database connection with proper settings."""
