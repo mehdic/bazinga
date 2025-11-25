@@ -23,19 +23,106 @@ These are the standard message formats for displaying orchestration progress to 
 
 ## Initialization Messages
 
-### Session Start
+### Session Start (Basic - for simple requests)
 ```
 🚀 Starting orchestration | Session: {session_id}
 ```
 
-**Example:**
+### Session Start (Enhanced - for complex requests)
+
+**Use this format when the task involves multiple phases, spec files, or complex requirements:**
+
+```markdown
+🚀 **BAZINGA Orchestration Starting**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Session:** {session_id}
+**Input:** {source_file_or_description}
+
+**Workflow Overview:**
+1. 📋 PM analyzes requirements → execution plan
+2. 🔨 Developers implement in parallel
+3. ✅ QA validates tests + coverage
+4. 👔 Tech Lead reviews security + architecture
+5. 📋 PM validates criteria → BAZINGA
+
+Spawning Project Manager for analysis...
 ```
-🚀 Starting orchestration | Session: bazinga_20251117_143530
+
+**Note:** Task count is determined by PM during analysis, not shown at init.
+
+**Example:**
+```markdown
+🚀 **BAZINGA Orchestration Starting**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Session:** bazinga_20251125_114715
+**Input:** tasks2.md
+
+**Workflow Overview:**
+1. 📋 PM analyzes requirements → execution plan
+2. 🔨 Developers implement in parallel
+3. ✅ QA validates tests + coverage
+4. 👔 Tech Lead reviews security + architecture
+5. 📋 PM validates criteria → BAZINGA
+
+Spawning Project Manager for analysis...
 ```
 
 ---
 
 ## Planning Phase Messages
+
+### Execution Plan Ready (After PM Planning)
+
+**Use this format after PM completes planning to show the full execution plan:**
+
+```markdown
+📋 **Execution Plan Ready**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Mode:** {mode} ({N} concurrent developers)
+**Tasks:** {task_count} across {phase_count} phases
+
+**Phases:**
+> Phase 1: {phase_name} - Groups {group_ids}
+> Phase 2: {phase_name} - Groups {group_ids}
+
+**Success Criteria:**
+• {criterion_1}
+• {criterion_2}
+
+**Starting:** Phase 1 with Groups {ids}
+```
+
+**Note:** Use markdown blockquotes (>) instead of box-drawing characters for terminal compatibility.
+
+**Example:**
+```markdown
+📋 **Execution Plan Ready**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Mode:** Parallel (3 concurrent developers)
+**Tasks:** 12 across 2 phases
+
+**Phases:**
+> Phase 1: Foundation Setup - Groups A, B, C
+>   • Group A: Database schema + models
+>   • Group B: Authentication infrastructure
+>   • Group C: Core API structure
+>
+> Phase 2: Feature Implementation - Groups D, E, F
+>   • Group D: User management endpoints
+>   • Group E: Product catalog service
+>   • Group F: Order processing logic
+
+**Success Criteria:**
+• All tests passing (zero tolerance for failures)
+• Coverage >70% on new code
+• No high/critical security vulnerabilities
+
+**Starting:** Phase 1 with Groups A, B, C
+```
 
 ### Planning in Progress
 ```
@@ -201,6 +288,48 @@ These are the standard message formats for displaying orchestration progress to 
 **Example:**
 ```
 🔬 Group C investigation needed | Intermittent test failures with unclear root cause | Spawning Investigator for deep analysis
+```
+
+### Technical Review Summary (NEW - Multi-group overview)
+
+**Use this format when summarizing Tech Lead reviews for multiple groups:**
+
+```markdown
+👔 **Technical Review Summary**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Group {id} ({name}):** {status_emoji} {status}
+  • Security: {security_summary}
+  • Architecture: {architecture_assessment}
+  • Tests: {test_summary}
+
+**Group {id} ({name}):** {status_emoji} {status}
+  • Security: {security_summary}
+  • Issue: {issue_if_any}
+
+**Overall:** {completed}/{total} groups approved, {pending} pending
+```
+
+**Example:**
+```markdown
+👔 **Technical Review Summary**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Group A (Database Schema):** ✅ Approved
+  • Security: 0 issues
+  • Architecture: Clean migration pattern
+  • Tests: 15/15 passing (89% coverage)
+
+**Group B (Authentication):** ⚠️ Minor changes needed
+  • Security: 1 medium (add rate limiting)
+  • Will be addressed in next iteration
+
+**Group C (Core API):** ✅ Approved
+  • Security: 0 issues
+  • Architecture: RESTful design, proper error handling
+  • Tests: 22/22 passing (91% coverage)
+
+**Overall:** 2/3 groups approved, 1 pending minor fixes
 ```
 
 ---
