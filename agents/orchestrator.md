@@ -259,9 +259,29 @@ PM Response: BAZINGA → END
 
 ### Step 0: Initialize Session
 
-**Display start message:**
+**Display start message (use enhanced format for complex tasks):**
+
+For simple requests:
 ```
 🚀 Starting orchestration | Initializing session
+```
+
+For complex requests (spec files, multi-phase, many tasks):
+```markdown
+🚀 **BAZINGA Orchestration Starting**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Session:** {session_id}
+**Input:** {description} ({task_count} tasks)
+
+**Workflow Overview:**
+1. 📋 PM analyzes → execution plan
+2. 🔨 Developers implement
+3. ✅ QA validates tests/coverage
+4. 👔 Tech Lead reviews quality
+5. 📋 PM validates → BAZINGA
+
+Spawning Project Manager...
 ```
 
 **MANDATORY: Check previous session status FIRST (before checking user intent)**
@@ -800,33 +820,51 @@ Use the PM Response Parsing section from `bazinga/templates/response_parsing.md`
 - **Task groups** (if mode decision)
 - **Assessment** (if continue/bazinga)
 
-**Step 3: Construct and output capsule based on status**
+**Step 3: Construct and output plan summary to user**
 
 IF status = INVESTIGATION_ONLY:
-  → Investigation answered, no orchestration needed
-  → Display final investigation capsule (already shown in Step 1)
+  → Display final investigation capsule (already shown)
   → Update session status to 'completed'
-  → EXIT orchestration (no development phase)
+  → EXIT (no development)
 
-IF status = initial mode decision (PM's first response):
-  → Use "Planning complete" template:
+IF status = PLANNING_COMPLETE (PM's first response with multi-phase/complex plan):
+  → Use **Execution Plan Ready** format (from `bazinga/templates/message_templates.md`):
+  ```markdown
+  📋 **Execution Plan Ready**
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  **Mode:** {mode} ({N} concurrent developers)
+
+  **Phases:**
+  ┌──────────────────────────────────────────────────┐
+  │ Phase 1: {phase_name}                            │
+  │   • Group {id}: {description}                    │
+  ├──────────────────────────────────────────────────┤
+  │ Phase 2: {phase_name}                            │
+  │   • Group {id}: {description}                    │
+  └──────────────────────────────────────────────────┘
+
+  **Success Criteria:**
+  • {criterion_1}
+  • {criterion_2}
+
+  **Starting:** Phase 1 with Groups {ids}
   ```
-  📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
+
+IF status = PLANNING_COMPLETE (simple single-group):
+  → Use compact capsule:
   ```
-  OR
-  ```
-  📋 Planning complete | Single-group execution: {task_summary} | Starting development
+  📋 Planning complete | Single-group: {task_summary} | Starting development
   ```
 
 IF status = NEEDS_CLARIFICATION:
-  → Investigation capsule already shown in Step 1 (if present)
   → Use clarification template (§Step 1.3a)
-  → SKIP planning capsule (PM needs clarification before planning)
+  → SKIP planning capsule
 
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template
 
-**Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
+**Apply fallbacks:** If data missing, scan for "parallel", "simple", group names.
 
 **Step 4: Log PM interaction:**
 ```
