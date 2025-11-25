@@ -1218,6 +1218,12 @@ IF status = BLOCKED:
   ⚠️ Group {id} blocked | {blocker_description} | Investigating
   ```
 
+IF status = ESCALATE_SENIOR:
+  → Use "Escalation" template:
+  ```
+  🔺 Group {id} escalating | {reason} | → Senior Engineer (Sonnet)
+  ```
+
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
@@ -1257,6 +1263,12 @@ Skill(command: "bazinga-db")
   * Spawn Investigator with blocker resolution request
   * After Investigator provides solution, spawn Developer again with resolution
   * Continue workflow automatically
+
+**IF Developer reports ESCALATE_SENIOR:**
+- **Immediately spawn Senior Engineer** (model="sonnet")
+- Build prompt with: original task, developer's attempt, reason for escalation
+- Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: explicit escalation", prompt=[senior engineer prompt])
+- This is an explicit request, not revision-based escalation
 
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
 
@@ -1378,6 +1390,12 @@ IF status = BLOCKED:
   ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
   ```
 
+IF status = ESCALATE_SENIOR:
+  → Use "Challenge Escalation" template:
+  ```
+  🔺 Group {id} challenge failed | Level {level} failure: {reason} | → Senior Engineer (Sonnet)
+  ```
+
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
 **Step 3: Output capsule to user**
@@ -1426,6 +1444,11 @@ Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: fix 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
 - Escalate to Senior Engineer (model="sonnet")
 - Include QA's challenge level findings in prompt
+
+**IF QA reports ESCALATE_SENIOR explicitly:**
+- **Immediately spawn Senior Engineer** (model="sonnet")
+- Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
+- This bypasses revision count check - explicit escalation from QA's challenge testing
 
 **IF Senior Engineer also fails (revision >= 2 after Senior Eng):**
 - Spawn Tech Lead for guidance
