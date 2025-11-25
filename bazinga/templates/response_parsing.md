@@ -322,12 +322,14 @@ Orchestrator outputs:
 - `CONTINUE` - More work needed
 - `NEEDS_CLARIFICATION` - User input required
 - `INVESTIGATION_ONLY` - Only questions answered, no implementation requested
+- `INVESTIGATION_NEEDED` - Blocked by unclear root cause, need investigator
 
 **Information to extract:**
 
 1. **Status** - Look for:
    ```
    ## PM Status: PLANNING_COMPLETE
+   ## PM Status: INVESTIGATION_NEEDED
    Status: BAZINGA
    **PM Status:** CONTINUE
    PM Status: NEEDS_CLARIFICATION
@@ -335,6 +337,7 @@ Orchestrator outputs:
    ```
 
    **Note:** `PLANNING_COMPLETE` is PM's initial response after analyzing requirements. It includes mode decision and task groups.
+   **Note:** `INVESTIGATION_NEEDED` means PM is blocked by unclear root cause - orchestrator should spawn Investigator.
 
 2. **Mode decision** (initial PM spawn) - Look for:
    ```
@@ -403,6 +406,12 @@ Starting Phase 1...
 
 ```
 ⚠️ PM needs clarification | {blocker_type}: {question_summary} | Awaiting response (auto-proceed with fallback in 5 min)
+```
+
+**Capsule construction (INVESTIGATION_NEEDED):**
+
+```
+🔬 Investigation needed | {problem_summary} | Spawning Investigator
 ```
 
 **Fallback logic:**

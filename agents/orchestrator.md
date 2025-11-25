@@ -828,7 +828,7 @@ Check if PM response contains investigation section. Look for these headers (fuz
 **Step 2: Parse PM response and output capsule to user**
 
 Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Status** (PLANNING_COMPLETE, BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY)
+- **Status** (PLANNING_COMPLETE, BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY, INVESTIGATION_NEEDED)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
 - **Assessment** (if continue/bazinga)
@@ -1691,7 +1691,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 **Step 1: Parse response and output capsule to user**
 
 Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
+- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
 - **Next actions** (if continuing)
