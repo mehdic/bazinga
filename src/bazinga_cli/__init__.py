@@ -162,6 +162,9 @@ class BazingaSetup:
 
         return True
 
+    # Skills to exclude from CLI install/update (development-only skills)
+    EXCLUDED_SKILLS = {"skill-creator"}
+
     def copy_skills(self, target_dir: Path, script_type: str = "sh") -> bool:
         """
         Copy Skills to target .claude/skills directory.
@@ -183,6 +186,10 @@ class BazingaSetup:
         # Copy each skill directory
         for skill_dir in source_skills.iterdir():
             if skill_dir.is_dir():
+                # Skip excluded skills (development-only)
+                if skill_dir.name in self.EXCLUDED_SKILLS:
+                    console.print(f"  [dim]⏭️  Skipping {skill_dir.name} (development-only)[/dim]")
+                    continue
                 dest_skill_dir = skills_dir / skill_dir.name
                 dest_skill_dir.mkdir(exist_ok=True)
 
@@ -1569,8 +1576,7 @@ def update(
             "  • Agent definitions (.claude/agents/)\n"
             "  • Scripts (.claude/scripts/)\n"
             "  • Commands (.claude/commands/)\n"
-            "  • Skills (.claude/skills/)\n"
-            "  • Configuration (.claude.md - merged if needed)\n\n"
+            "  • Skills (.claude/skills/)\n\n"
             "[dim]Coordination files will NOT be modified[/dim]\n"
         )
         confirm = typer.confirm("Continue with update?")
