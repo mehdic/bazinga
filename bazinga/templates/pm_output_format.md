@@ -20,7 +20,32 @@ The orchestrator depends on these status codes to route your decisions. Without 
 
 ```markdown
 ## PM Status: PLANNING_COMPLETE
+
+**Mode:** PARALLEL (or SIMPLE)
+**Developers:** {N} concurrent
+**Total Tasks:** {count} across {phase_count} phases
+
+**Phases:**
+- Phase 1: {phase_name}
+  - Group {id}: {description}
+  - Group {id}: {description}
+- Phase 2: {phase_name}
+  - Group {id}: {description}
+
+**Success Criteria:**
+- {criterion_1}
+- {criterion_2}
+
+**Next Action:** Orchestrator should spawn {N} developer(s) for Phase 1 groups: {ids}
 ```
+
+**Required fields for orchestrator parsing:**
+- Mode (SIMPLE or PARALLEL)
+- Developer count
+- Task/phase counts
+- Phase breakdown with group IDs
+- Success criteria list
+- Next action with specific group IDs
 
 **Use when:**
 - You've analyzed requirements

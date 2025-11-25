@@ -314,6 +314,16 @@ Skill(command: "bazinga-db")
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, extract the session list data, but don't show raw skill output to user.
 
+**IF bazinga-db fails (Exit code 1 or error):**
+- Output warning: `⚠️ Database unavailable | Checking fallback state file`
+- Check for fallback file: `bazinga/pm_state_temp.json`
+- IF file exists:
+  - Read file contents with `Read(file_path: "bazinga/pm_state_temp.json")`
+  - Use state from file to determine session status
+  - Attempt to sync to DB when DB becomes available
+- IF file doesn't exist:
+  - No previous session state - proceed as new session
+
 **AFTER receiving the session list: IMMEDIATELY analyze the response and continue workflow. Do NOT stop.**
 
 **After receiving the session list, check the status:**
