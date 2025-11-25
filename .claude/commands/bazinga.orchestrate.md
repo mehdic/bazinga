@@ -63,9 +63,16 @@ All user-visible updates MUST use the capsule format:
 - ✅ One capsule per major state transition
 - ✅ Surface problems and solutions (not just status)
 - ✅ Link to artifacts for detail > 3 lines
-- ❌ NEVER output database operations
+- ❌ NEVER output database operations (except errors - see below)
 - ❌ NEVER output role checks to user
 - ❌ NEVER output routing mechanics ("forwarding to...", "received from...")
+
+**Exceptions - Use Rich Context Blocks for:**
+- 🚀 **Initialization** (Step 0) - Show workflow overview
+- 📋 **Planning Complete** (Step 1.3) - Show execution plan, phases, criteria
+- 👔 **Tech Lead Summary** (Step 2A.6/2B.6) - Show quality metrics
+- ✅ **BAZINGA** - Show completion summary
+- ⚠️ **System Warnings** - Report DB failures, fallbacks, critical errors
 
 **Examples:**
 ```
@@ -260,10 +267,36 @@ PM Response: BAZINGA → END
 
 ### Step 0: Initialize Session
 
-**Display start message:**
+**Display start message (use enhanced format for complex tasks):**
+
+For simple requests:
 ```
 🚀 Starting orchestration | Initializing session
 ```
+
+For complex requests (spec files, multi-phase, many tasks):
+```markdown
+🚀 **BAZINGA Orchestration Starting**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Session:** {session_id}
+**Input:** {source_file_or_description}
+
+**Workflow Overview:**
+1. 📋 PM analyzes requirements → execution plan
+2. 🔨 Developers implement in parallel
+3. ✅ QA validates tests + coverage
+4. 👔 Tech Lead reviews security + architecture
+5. 📋 PM validates criteria → BAZINGA
+
+Spawning Project Manager for analysis...
+```
+
+**Note:** Task count is determined by PM during analysis, not shown at init.
+
+**Heuristics for complex vs simple format:**
+- **Use enhanced format** if ANY of: spec file input (.md, .txt), multi-file request, 3+ distinct requirements, explicit phases mentioned
+- **Use simple format** for: single feature request, bug fix, small refactor
 
 **MANDATORY: Check previous session status FIRST (before checking user intent)**
 
@@ -796,38 +829,55 @@ Check if PM response contains investigation section. Look for these headers (fuz
 **Step 2: Parse PM response and output capsule to user**
 
 Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Status** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY)
+- **Status** (PLANNING_COMPLETE, BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY, INVESTIGATION_NEEDED)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
 - **Assessment** (if continue/bazinga)
 
-**Step 3: Construct and output capsule based on status**
+**Step 3: Construct and output plan summary to user**
 
 IF status = INVESTIGATION_ONLY:
-  → Investigation answered, no orchestration needed
-  → Display final investigation capsule (already shown in Step 1)
+  → Display final investigation capsule (already shown)
   → Update session status to 'completed'
-  → EXIT orchestration (no development phase)
+  → EXIT (no development)
 
-IF status = initial mode decision (PM's first response):
-  → Use "Planning complete" template:
+IF status = PLANNING_COMPLETE (PM's first response with multi-phase/complex plan):
+  → Use **Execution Plan Ready** format:
+  ```markdown
+  📋 **Execution Plan Ready**
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  **Mode:** {mode} ({N} concurrent developers)
+  **Tasks:** {task_count} across {phase_count} phases
+
+  **Phases:**
+  > Phase 1: {phase_name} - Groups {group_ids}
+  > Phase 2: {phase_name} - Groups {group_ids}
+
+  **Success Criteria:**
+  • {criterion_1}
+  • {criterion_2}
+
+  **Starting:** Phase 1 with Groups {ids}
   ```
-  📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
+
+  **Data sources:** Extract from PM response - mode, task_groups array, success_criteria array, execution_phases.
+  **Fallback:** If phases not explicit, list all groups as single phase.
+
+IF status = PLANNING_COMPLETE (simple single-group):
+  → Use compact capsule:
   ```
-  OR
-  ```
-  📋 Planning complete | Single-group execution: {task_summary} | Starting development
+  📋 Planning complete | Single-group: {task_summary} | Starting development
   ```
 
 IF status = NEEDS_CLARIFICATION:
-  → Investigation capsule already shown in Step 1 (if present)
   → Use clarification template (§Step 1.3a)
-  → SKIP planning capsule (PM needs clarification before planning)
+  → SKIP planning capsule
 
 IF status = BAZINGA or CONTINUE:
   → Use appropriate template
 
-**Apply fallbacks:** If data missing, scan response for keywords like "parallel", "simple", group names.
+**Apply fallbacks:** If data missing, scan for "parallel", "simple", group names.
 
 **Step 4: Log PM interaction:**
 ```
@@ -1382,15 +1432,32 @@ Use the Tech Lead Response Parsing section from `bazinga/templates/response_pars
 
 IF decision = APPROVED:
   → Use "Tech Lead Approved" template:
-  ```
-  ✅ Group {id} approved | Security: {security_count} issues, Lint: {lint_count} issues, {architecture_assessment} | Complete
+  ```markdown
+  👔 **Technical Review: Group {id}** ✅ APPROVED
+
+  **Quality Summary:**
+  • Security: {security_summary} (e.g., "0 issues" or "2 medium issues")
+  • Lint: {lint_summary} (e.g., "clean" or "3 warnings")
+  • Coverage: {coverage}%
+  • Architecture: {architecture_verdict}
+
+  **Verdict:** Approved | {N}/{total} groups complete
   ```
 
+  **Data sources:** Extract from Tech Lead response - security issues count, lint issues count, coverage %, architecture assessment.
+  **Fallback:** `✅ Group {id} approved | Quality checks passed | Complete ({N}/{total})`
+
 IF decision = CHANGES_REQUESTED:
-  → Use "Tech Lead Requests Changes" template:
+  → Use "Tech Lead Changes" template:
+  ```markdown
+  👔 **Technical Review: Group {id}** ⚠️ CHANGES REQUESTED
+
+  **Issues:** {issue_summary}
+  **Action:** Developer fixing
   ```
-  ⚠️ Group {id} needs changes | {issue_summary} | Developer fixing → See feedback
-  ```
+
+  **Data sources:** Extract issue summary from Tech Lead's "Reason" or issues list.
+  **Fallback:** `⚠️ Group {id} needs changes | Issues found | Developer fixing`
 
 IF decision = SPAWN_INVESTIGATOR:
   → Use "Investigation Needed" template:
@@ -1625,7 +1692,7 @@ Task(subagent_type="general-purpose", description="PM final assessment", prompt=
 **Step 1: Parse response and output capsule to user**
 
 Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION)
+- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED)
 - **Assessment** of current state
 - **Feedback** (if requesting changes)
 - **Next actions** (if continuing)
@@ -1634,16 +1701,33 @@ Use the PM Response Parsing section from `bazinga/templates/response_parsing.md`
 
 IF decision = BAZINGA:
   → Use "Completion" template:
+  ```markdown
+  ✅ **BAZINGA - Orchestration Complete!**
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  **Summary:**
+  • Groups: {groups_complete}/{total} approved
+  • Tests: {test_status} ({coverage}% coverage)
+  • Quality: All gates passed
+
+  **Success Criteria:** {criteria_met}/{criteria_total} met ✅
   ```
-  ✅ BAZINGA - Orchestration Complete!
-  [Show final report in next step]
-  ```
+
+  **Data sources:** Extract from PM's BAZINGA response - group counts, test status, criteria validation.
+  **Fallback:** `✅ BAZINGA! All work complete | Success criteria met`
 
 IF decision = CONTINUE:
   → Use "PM Assessment" template:
+  ```markdown
+  📋 **PM Assessment**
+
+  **Status:** {groups_complete}/{total_groups} groups approved
+  **Issues:** {issue_summary}
+  **Next:** {next_action}
   ```
-  📋 PM check | {assessment_summary} | {feedback_summary} → {next_action}
-  ```
+
+  **Data sources:** Extract from PM response - group status, issues mentioned, next steps.
+  **Fallback:** `📋 PM check | Work continues | {next_action}`
 
 IF decision = NEEDS_CLARIFICATION:
   → Use "Clarification" template:
@@ -2116,10 +2200,12 @@ Spawn: `Task(subagent_type="general-purpose", description="PM overall assessment
 
 Use §PM Response Parsing to extract decision, assessment, feedback.
 
-**Construct and output capsule:**
-- BAZINGA: `✅ BAZINGA - Orchestration Complete!` [show final report in next step]
-- CONTINUE: `📋 PM check | {assessment} | {feedback} → {next_action}`
+**Construct and output capsule (use enhanced templates from Step 2A.8):**
+- BAZINGA: Use "Completion" template with technical summary (tests, security, lint, deliverables)
+- CONTINUE: Use "PM Assessment" template with skill results (quality metrics, issues, next action)
 - NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
+
+**See Step 2A.8 for full template formats with technical details.**
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
