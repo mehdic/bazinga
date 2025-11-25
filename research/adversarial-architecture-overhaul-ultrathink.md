@@ -768,11 +768,11 @@ For each challenge:
 | Agent | Model | Rationale |
 |-------|-------|-----------|
 | **Orchestrator** | Sonnet | Coordination logic, doesn't need deep reasoning |
-| **PM** | Opus | Strategic thinking, completion decisions, adversarial |
+| **PM** | **Opus** | Strategic thinking, completion decisions, adversarial (ALWAYS) |
 | **Developer** | Haiku | Fast, cost-effective for straightforward code |
 | **Senior Engineer** | Sonnet | Better reasoning for complex architecture |
 | **QA Expert** | Sonnet | Pattern recognition, adversarial test generation |
-| **Tech Lead** | Opus | Deep analysis, security review, adversarial |
+| **Tech Lead** | **Opus** | Deep analysis, security review, adversarial (ALWAYS) |
 | **Investigator** | Opus | Complex problem analysis |
 | **Validator** | Sonnet | Verification is pattern-matching |
 
@@ -783,7 +783,7 @@ For each challenge:
 - Average tokens per spawn: ~50K
 - Cost: 8 × 50K × $3/M = $1.20
 
-**After (Optimized):**
+**After (Quality-Optimized with Opus for Leadership):**
 - Developer (Haiku): 4 spawns × 50K × $0.25/M = $0.05
 - Senior Eng (Sonnet): 1 spawn × 50K × $3/M = $0.15
 - QA (Sonnet): 1 spawn × 50K × $3/M = $0.15
@@ -791,27 +791,23 @@ For each challenge:
 - PM (Opus): 1 spawn × 50K × $15/M = $0.75
 - **Total: $1.85**
 
-**Wait, that's MORE expensive!**
+**Cost Increase Justified By:**
+- Tech Lead and PM are quality gates - worth the investment
+- Opus provides deeper adversarial reasoning
+- Developer on Haiku saves ~$0.45 per session
+- Net increase ~$0.65/session for significantly better quality
 
-**Revised Strategy:** Use Opus only for critical decisions:
+**Model Distribution:**
+| Model | Agents | % of Spawns |
+|-------|--------|-------------|
+| Haiku | Developer | ~50% |
+| Sonnet | Senior Eng, QA, Orchestrator, Validator | ~30% |
+| Opus | Tech Lead, PM, Investigator | ~20% |
 
-| Agent | Model | Revised |
-|-------|-------|---------|
-| **PM** | Sonnet (Opus for BAZINGA decision only) | Cost-effective |
-| **Tech Lead** | Sonnet (Opus for Level 3 adversarial) | Conditional upgrade |
-
-**Revised Cost:**
-- Developer (Haiku): 4 spawns × $0.05 = $0.20
-- Senior Eng (Sonnet): 1 spawn × $0.15 = $0.15
-- QA (Sonnet): 1 spawn × $0.15 = $0.15
-- Tech Lead (Sonnet): 1 spawn × $0.15 = $0.15
-- PM (Sonnet): 1 spawn × $0.15 = $0.15
-- **Total: $0.80** (33% cost reduction!)
-
-**Opus Reserved For:**
-- Tech Lead Level 3 adversarial (critical systems)
-- PM BAZINGA decision (final approval)
-- Investigator (always Opus for complex analysis)
+**Quality vs Cost Trade-off:**
+- Haiku for volume (fast, cheap implementation)
+- Sonnet for specialized work (testing, complex dev)
+- Opus for critical decisions (review, approval, completion)
 
 ---
 
@@ -953,7 +949,7 @@ For each challenge:
 **Step 4.1: Enhance Tech Lead adversarial**
 - [ ] Add 3-level adversarial (Standard, Deep, Critical)
 - [ ] Add adversarial report format
-- [ ] Add conditional Opus upgrade for Level 3
+- [ ] Confirm Opus model for all Tech Lead spawns
 
 **Step 4.2: Add PM completion adversary**
 - [ ] Add 5-point completion challenge protocol
@@ -1072,13 +1068,14 @@ For each challenge:
 | Test coverage gaps | Unknown | -60% | Self-adversarial gaps identified |
 | Security issues caught | Unknown | +100% | Level 4 challenge failures |
 
-### Cost Optimization
+### Model Distribution
 
 | Metric | Current | Target | Measurement |
 |--------|---------|--------|-------------|
-| Avg cost per session | ~$1.20 | ~$0.80 | Token tracking |
-| Haiku usage | 0% | 40% | Model distribution |
-| Opus usage | 0% | 10% | Model distribution |
+| Avg cost per session | ~$1.20 | ~$1.85 | Token tracking (quality investment) |
+| Haiku usage | 0% | ~50% | Developer spawns |
+| Sonnet usage | 100% | ~30% | Senior Eng, QA, Orchestrator |
+| Opus usage | 0% | ~20% | Tech Lead, PM, Investigator |
 
 ### Efficiency
 
