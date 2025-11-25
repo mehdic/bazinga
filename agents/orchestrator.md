@@ -286,6 +286,10 @@ Spawning Project Manager for analysis...
 
 **Note:** Task count is determined by PM during analysis, not shown at init.
 
+**Heuristics for complex vs simple format:**
+- **Use enhanced format** if ANY of: spec file input (.md, .txt), multi-file request, 3+ distinct requirements, explicit phases mentioned
+- **Use simple format** for: single feature request, bug fix, small refactor
+
 **MANDATORY: Check previous session status FIRST (before checking user intent)**
 
 Invoke bazinga-db skill to check the most recent session status:
@@ -830,43 +834,27 @@ IF status = INVESTIGATION_ONLY:
   → EXIT (no development)
 
 IF status = PLANNING_COMPLETE (PM's first response with multi-phase/complex plan):
-  → Use **Execution Plan Ready** format with **technical summary**:
+  → Use **Execution Plan Ready** format:
   ```markdown
   📋 **Execution Plan Ready**
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   **Mode:** {mode} ({N} concurrent developers)
-  **Total Tasks:** {task_count} across {phase_count} phases
-
-  **Codebase Analysis:**
-  • Project: {project_type} ({primary_language})
-  • Framework: {framework}
-  • Test framework: {test_framework}
-  • Current coverage: {baseline_coverage}%
+  **Tasks:** {task_count} across {phase_count} phases
 
   **Phases:**
-  > **Phase 1: {phase_name}**
-  >   • Group {id}: {description}
-  >   • Dependencies: {deps_or_none}
-  >
-  > **Phase 2: {phase_name}**
-  >   • Group {id}: {description}
-  >   • Dependencies: {deps_or_none}
+  > Phase 1: {phase_name} - Groups {group_ids}
+  > Phase 2: {phase_name} - Groups {group_ids}
 
   **Success Criteria:**
-  • {criterion_1} (required)
-  • {criterion_2} (required)
-  • {criterion_3_optional}
-
-  **Quality Gates Per Group:**
-  • Security scan: No critical/high issues
-  • Lint check: Max 5 warnings
-  • Coverage: >{coverage_target}% on new code
+  • {criterion_1}
+  • {criterion_2}
 
   **Starting:** Phase 1 with Groups {ids}
   ```
 
-  **Note:** Use markdown blockquotes (>) instead of box-drawing characters for compatibility.
+  **Data sources:** Extract from PM response - mode, task_groups array, success_criteria array, execution_phases.
+  **Fallback:** If phases not explicit, list all groups as single phase.
 
 IF status = PLANNING_COMPLETE (simple single-group):
   → Use compact capsule:
@@ -1435,44 +1423,33 @@ Use the Tech Lead Response Parsing section from `bazinga/templates/response_pars
 **Step 2: Select and construct capsule based on decision**
 
 IF decision = APPROVED:
-  → Use "Tech Lead Approved" template with **full technical analysis**:
+  → Use "Tech Lead Approved" template:
   ```markdown
   👔 **Technical Review: Group {id}** ✅ APPROVED
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  **Security Scan:** {security_status}
-  • Critical: {critical_count} | High: {high_count} | Medium: {medium_count}
-  • {security_details_or_none}
+  **Quality Summary:**
+  • Security: {security_summary} (e.g., "0 issues" or "2 medium issues")
+  • Lint: {lint_summary} (e.g., "clean" or "3 warnings")
+  • Coverage: {coverage}%
+  • Architecture: {architecture_verdict}
 
-  **Lint Check:** {lint_status}
-  • Issues: {lint_count} ({lint_breakdown})
-  • Style: {style_assessment}
-
-  **Test Coverage:** {coverage_pct}%
-  • New code: {new_code_coverage}%
-  • {coverage_notes}
-
-  **Architecture:** {architecture_verdict}
-  • {architecture_notes}
-
-  **Verdict:** Approved for merge | {N}/{total} groups complete
+  **Verdict:** Approved | {N}/{total} groups complete
   ```
+
+  **Data sources:** Extract from Tech Lead response - security issues count, lint issues count, coverage %, architecture assessment.
+  **Fallback:** `✅ Group {id} approved | Quality checks passed | Complete ({N}/{total})`
 
 IF decision = CHANGES_REQUESTED:
-  → Use "Tech Lead Requests Changes" template with **issue details**:
+  → Use "Tech Lead Changes" template:
   ```markdown
   👔 **Technical Review: Group {id}** ⚠️ CHANGES REQUESTED
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  **Issues Found:**
-  {issue_list_with_file_line_refs}
-
-  **Required Fixes:**
-  • {fix_1}
-  • {fix_2}
-
-  **Action:** Developer fixing → See artifacts/{session_id}/techlead_feedback_{id}.md
+  **Issues:** {issue_summary}
+  **Action:** Developer fixing
   ```
+
+  **Data sources:** Extract issue summary from Tech Lead's "Reason" or issues list.
+  **Fallback:** `⚠️ Group {id} needs changes | Issues found | Developer fixing`
 
 IF decision = SPAWN_INVESTIGATOR:
   → Use "Investigation Needed" template:
@@ -1715,44 +1692,34 @@ Use the PM Response Parsing section from `bazinga/templates/response_parsing.md`
 **Step 2: Select and construct capsule based on decision**
 
 IF decision = BAZINGA:
-  → Use "Completion" template with **technical summary**:
+  → Use "Completion" template:
   ```markdown
   ✅ **BAZINGA - Orchestration Complete!**
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  **Final Quality Summary:**
-  • Tests: {total_tests} passing ({test_coverage}% coverage)
-  • Security: {security_issues} issues (0 critical/high)
-  • Lint: {lint_issues} issues resolved
-  • Build: ✅ Passing
+  **Summary:**
+  • Groups: {groups_complete}/{total} approved
+  • Tests: {test_status} ({coverage}% coverage)
+  • Quality: All gates passed
 
-  **Deliverables:**
-  • {deliverable_1}
-  • {deliverable_2}
-
-  **Success Criteria:** All {criteria_count} criteria met ✅
-
-  [Full report in next step]
+  **Success Criteria:** {criteria_met}/{criteria_total} met ✅
   ```
+
+  **Data sources:** Extract from PM's BAZINGA response - group counts, test status, criteria validation.
+  **Fallback:** `✅ BAZINGA! All work complete | Success criteria met`
 
 IF decision = CONTINUE:
-  → Use "PM Assessment" template with **skill results**:
+  → Use "PM Assessment" template:
   ```markdown
   📋 **PM Assessment**
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  **Current Status:** {groups_complete}/{total_groups} groups approved
-
-  **Quality Metrics:**
-  • Tests: {passing}/{total} ({failing} failing)
-  • Coverage: {coverage}% ({coverage_delta} from baseline)
-  • Security: {security_status}
-
-  **Issues to Address:**
-  {issue_list}
-
-  **Next Action:** {next_action_description}
+  **Status:** {groups_complete}/{total_groups} groups approved
+  **Issues:** {issue_summary}
+  **Next:** {next_action}
   ```
+
+  **Data sources:** Extract from PM response - group status, issues mentioned, next steps.
+  **Fallback:** `📋 PM check | Work continues | {next_action}`
 
 IF decision = NEEDS_CLARIFICATION:
   → Use "Clarification" template:
