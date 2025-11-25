@@ -1337,9 +1337,9 @@ Skill(command: "bazinga-db")
   * Continue workflow automatically
 
 **IF Developer reports ESCALATE_SENIOR:**
-- **Immediately spawn Senior Software Engineer** (model="sonnet")
+- **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
 - Build prompt with: original task, developer's attempt, reason for escalation
-- Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: explicit escalation", prompt=[senior engineer prompt])
+- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: explicit escalation", prompt=[senior engineer prompt])
 - This is an explicit request, not revision-based escalation
 
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
@@ -1373,13 +1373,13 @@ Before moving to the next group or ending your message, verify:
 
 **Spawn developer Task:**
 ```
-Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: continue work", prompt=[new prompt])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: continue work", prompt=[new prompt])
 ```
 
 **IF revision count >= 1 (Developer failed once):**
-- Escalate to Senior Software Engineer (runs on Sonnet, handles complex issues)
+- Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"], handles complex issues)
 - Build prompt with: original task, developer's attempt, failure details
-- Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: escalated task", prompt=[senior engineer prompt])
+- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: escalated task", prompt=[senior engineer prompt])
 
 **IF Senior Software Engineer also fails (revision count >= 2 after Senior Eng):**
 - Spawn Tech Lead for architectural guidance
@@ -1411,7 +1411,7 @@ Let me move on to other groups first.
 Developer B reports PARTIAL (69 test failures remain).
 Spawning Developer B continuation to fix remaining tests:
 
-Task(subagent_type="general-purpose", model="haiku",
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
      description="Dev B: fix remaining test failures",
      prompt=[continuation prompt with test failure context])
 ```
@@ -1428,7 +1428,7 @@ Task(subagent_type="general-purpose", model="haiku",
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model="sonnet", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -1510,16 +1510,16 @@ Skill(command: "bazinga-db")
 
 **Spawn developer Task:**
 ```
-Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
 ```
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
-- Escalate to Senior Software Engineer (model="sonnet")
+- Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
 - Include QA's challenge level findings in prompt
 
 **IF QA reports ESCALATE_SENIOR explicitly:**
-- **Immediately spawn Senior Software Engineer** (model="sonnet")
-- Task(subagent_type="general-purpose", model="sonnet", description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
+- **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
+- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
 - This bypasses revision count check - explicit escalation from QA's challenge testing
 
 **IF Senior Software Engineer also fails (revision >= 2 after Senior Eng):**
@@ -1536,7 +1536,7 @@ Task(subagent_type="general-purpose", model="haiku", description="Dev {id}: fix 
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model="opus", description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1783,14 +1783,14 @@ Skill(command: "bazinga-db")
 
 **Build prompt and spawn Task:**
 ```
-# Model selection: haiku for developer, sonnet for QA
-Task(subagent_type="general-purpose", model="haiku|sonnet", description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
+# Model selection: use MODEL_CONFIG for appropriate agent
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
 ```
 
 **Track revision count in database (increment by 1)**
 
 **Escalation path:**
-- IF revision count == 1: Escalate to Senior Software Engineer (model="sonnet")
+- IF revision count == 1: Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
 - IF revision count == 2 AND previous was Senior Eng: Spawn Tech Lead for guidance
 - IF revision count > 2: Spawn PM to evaluate if task should be simplified
 
@@ -1830,7 +1830,7 @@ Build PM prompt with complete implementation summary and quality metrics.
 
 **Spawn:**
 ```
-Task(subagent_type="general-purpose", model="opus", description="PM final assessment", prompt=[PM prompt])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])
 ```
 
 
@@ -1951,7 +1951,7 @@ Skill(command: "bazinga-db")
   * Session ID, Group ID, Branch
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", model="opus", description="Investigate blocker", prompt=[Investigator prompt])`
+- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
 
@@ -2355,7 +2355,7 @@ Build PM prompt with:
 - All group results and commit summaries
 - Overall status check request
 
-Spawn: `Task(subagent_type="general-purpose", model="opus", description="PM overall assessment", prompt=[PM prompt])`
+Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt=[PM prompt])`
 
 
 **AFTER receiving the PM's response:**
@@ -2432,7 +2432,7 @@ Skill(command: "velocity-tracker")
   * Session ID, Group ID(s) affected, Branch(es)
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", model="opus", description="Investigate blocker", prompt=[Investigator prompt])`
+- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2B.7c if applicable)
 - Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
 
