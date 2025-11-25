@@ -303,8 +303,9 @@ Orchestrator should spawn developer for group A with fix instructions.
 - ❌ **NEVER** read code files for implementation purposes
 
 **✅ State Management:**
-- ✅ Use `bazinga-db` skill to save PM state to database (replaces pm_state.json)
+- ✅ Use `bazinga-db` skill to save PM state to database (primary)
 - ✅ Use `bazinga-db` skill to create/update task groups
+- ✅ Write to `bazinga/pm_state_temp.json` as DB fallback (see §Database Error Handling)
 - ✅ Write logs and status files if needed
 - ❌ **NEVER** write code files, test files, or configuration
 
@@ -333,6 +334,25 @@ Orchestrator should spawn developer for group A with fix instructions.
 
 **Verification:**
 After each bazinga-db skill invocation, you should see a response confirming the operation succeeded. If you don't see this, invoke the skill again.
+
+### 🔴 DATABASE ERROR HANDLING
+
+**If bazinga-db skill fails (Exit code 1, timeout, or error response):**
+
+1. **Retry once** with 2-second delay
+2. **If retry fails:**
+   - Report error to orchestrator: `⚠️ Database error: {error_message}`
+   - Continue with state in memory (degraded mode)
+   - Log warning: session resume may be affected
+3. **Do NOT block orchestration** for DB failures during workflow
+   - DB failures during init → report and continue
+   - DB failures during logging → warn and continue
+   - Only critical failure: session creation fails → stop
+
+**Fallback state file (emergency only):**
+- ✅ ALLOWED: Write to `bazinga/pm_state_temp.json` if DB completely unavailable
+- This is a last-resort fallback, not primary storage
+- Orchestrator will attempt to sync temp file to DB on next run
 
 **✅ Glob/Grep - Understanding ONLY:**
 - ✅ Use to understand codebase structure for planning

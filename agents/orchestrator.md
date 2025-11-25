@@ -62,9 +62,16 @@ All user-visible updates MUST use the capsule format:
 - ✅ One capsule per major state transition
 - ✅ Surface problems and solutions (not just status)
 - ✅ Link to artifacts for detail > 3 lines
-- ❌ NEVER output database operations
+- ❌ NEVER output database operations (except errors - see below)
 - ❌ NEVER output role checks to user
 - ❌ NEVER output routing mechanics ("forwarding to...", "received from...")
+
+**Exceptions - Use Rich Context Blocks for:**
+- 🚀 **Initialization** (Step 0) - Show workflow overview
+- 📋 **Planning Complete** (Step 1.3) - Show execution plan, phases, criteria
+- 👔 **Tech Lead Summary** (Step 2A.6/2B.6) - Show quality metrics
+- ✅ **BAZINGA** - Show completion summary
+- ⚠️ **System Warnings** - Report DB failures, fallbacks, critical errors
 
 **Examples:**
 ```
