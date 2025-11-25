@@ -37,17 +37,19 @@ These are the standard message formats for displaying orchestration progress to 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Session:** {session_id}
-**Input:** {input_description} ({task_count} tasks across {part_count} parts)
+**Input:** {source_file_or_description}
 
 **Workflow Overview:**
-1. 📋 PM analyzes requirements and creates execution plan
-2. 🔨 Developers implement (parallel or sequential based on dependencies)
-3. ✅ QA validates tests and coverage
-4. 👔 Tech Lead reviews code quality and security
-5. 📋 PM validates completion criteria
+1. 📋 PM analyzes requirements → execution plan
+2. 🔨 Developers implement in parallel
+3. ✅ QA validates tests + coverage
+4. 👔 Tech Lead reviews security + architecture
+5. 📋 PM validates criteria → BAZINGA
 
 Spawning Project Manager for analysis...
 ```
+
+**Note:** Task count is determined by PM during analysis, not shown at init.
 
 **Example:**
 ```markdown
@@ -55,14 +57,14 @@ Spawning Project Manager for analysis...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Session:** bazinga_20251125_114715
-**Input:** tasks2.md (135 tasks across 5 parts)
+**Input:** tasks2.md
 
 **Workflow Overview:**
-1. 📋 PM analyzes requirements and creates execution plan
-2. 🔨 Developers implement (parallel or sequential based on dependencies)
-3. ✅ QA validates tests and coverage
-4. 👔 Tech Lead reviews code quality and security
-5. 📋 PM validates completion criteria
+1. 📋 PM analyzes requirements → execution plan
+2. 🔨 Developers implement in parallel
+3. ✅ QA validates tests + coverage
+4. 👔 Tech Lead reviews security + architecture
+5. 📋 PM validates criteria → BAZINGA
 
 Spawning Project Manager for analysis...
 ```
@@ -71,7 +73,7 @@ Spawning Project Manager for analysis...
 
 ## Planning Phase Messages
 
-### Execution Plan Ready (NEW - After PM Planning)
+### Execution Plan Ready (After PM Planning)
 
 **Use this format after PM completes planning to show the full execution plan:**
 
@@ -79,24 +81,21 @@ Spawning Project Manager for analysis...
 📋 **Execution Plan Ready**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Mode:** {mode} ({developer_count} concurrent developer{s})
+**Mode:** {mode} ({N} concurrent developers)
+**Tasks:** {task_count} across {phase_count} phases
 
 **Phases:**
-┌──────────────────────────────────────────────────┐
-│ Phase 1: {phase_1_name}                          │
-│   • Group {id}: {description}                    │
-│   • Group {id}: {description}                    │
-├──────────────────────────────────────────────────┤
-│ Phase 2: {phase_2_name}                          │
-│   • Group {id}: {description}                    │
-│   • Group {id}: {description}                    │
-└──────────────────────────────────────────────────┘
+> Phase 1: {phase_name} - Groups {group_ids}
+> Phase 2: {phase_name} - Groups {group_ids}
 
 **Success Criteria:**
-{criteria_list}
+• {criterion_1}
+• {criterion_2}
 
-**Starting:** Phase 1 with Groups {group_ids}
+**Starting:** Phase 1 with Groups {ids}
 ```
+
+**Note:** Use markdown blockquotes (>) instead of box-drawing characters for terminal compatibility.
 
 **Example:**
 ```markdown
@@ -104,25 +103,23 @@ Spawning Project Manager for analysis...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **Mode:** Parallel (3 concurrent developers)
+**Tasks:** 12 across 2 phases
 
 **Phases:**
-┌──────────────────────────────────────────────────┐
-│ Phase 1: Foundation Setup                        │
-│   • Group A: Database schema + models            │
-│   • Group B: Authentication infrastructure       │
-│   • Group C: Core API structure                  │
-├──────────────────────────────────────────────────┤
-│ Phase 2: Feature Implementation                  │
-│   • Group D: User management endpoints           │
-│   • Group E: Product catalog service             │
-│   • Group F: Order processing logic              │
-└──────────────────────────────────────────────────┘
+> Phase 1: Foundation Setup - Groups A, B, C
+>   • Group A: Database schema + models
+>   • Group B: Authentication infrastructure
+>   • Group C: Core API structure
+>
+> Phase 2: Feature Implementation - Groups D, E, F
+>   • Group D: User management endpoints
+>   • Group E: Product catalog service
+>   • Group F: Order processing logic
 
 **Success Criteria:**
 • All tests passing (zero tolerance for failures)
 • Coverage >70% on new code
 • No high/critical security vulnerabilities
-• Build passes in CI
 
 **Starting:** Phase 1 with Groups A, B, C
 ```

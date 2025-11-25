@@ -317,6 +317,7 @@ Orchestrator outputs:
 ---
 
 **Expected status values:**
+- `PLANNING_COMPLETE` - Initial planning done, ready to start execution
 - `BAZINGA` - Work complete, all requirements met
 - `CONTINUE` - More work needed
 - `NEEDS_CLARIFICATION` - User input required
@@ -326,11 +327,14 @@ Orchestrator outputs:
 
 1. **Status** - Look for:
    ```
+   ## PM Status: PLANNING_COMPLETE
    Status: BAZINGA
    **PM Status:** CONTINUE
    PM Status: NEEDS_CLARIFICATION
    **Status:** INVESTIGATION_ONLY
    ```
+
+   **Note:** `PLANNING_COMPLETE` is PM's initial response after analyzing requirements. It includes mode decision and task groups.
 
 2. **Mode decision** (initial PM spawn) - Look for:
    ```
@@ -353,16 +357,33 @@ Orchestrator outputs:
    Blocker Type: Missing External Data
    ```
 
-**Capsule construction (mode decision):**
+**Capsule construction (PLANNING_COMPLETE - complex multi-phase):**
+
+```markdown
+📋 **Execution Plan Ready**
+
+**Mode:** {mode} ({N} concurrent developers)
+**Tasks:** {task_count} across {phase_count} phases
+
+**Phases:**
+> Phase 1: {phase_name} - Groups {ids}
+> Phase 2: {phase_name} - Groups {ids}
+
+**Success Criteria:** {criteria_summary}
+
+Starting Phase 1...
+```
+
+**Capsule construction (PLANNING_COMPLETE - simple):**
+
+```
+📋 Planning complete | Single-group: {task_summary} | Starting development
+```
+
+**Capsule construction (mode decision - legacy/fallback):**
 
 ```
 📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}
-```
-
-OR
-
-```
-📋 Planning complete | Single-group execution: {task_summary} | Starting development
 ```
 
 **Capsule construction (BAZINGA):**
