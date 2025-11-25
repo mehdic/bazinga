@@ -370,6 +370,7 @@ class BazingaSetup:
         for filename in self.ALLOWED_CONFIG_FILES:
             config_file = source_bazinga / filename
             if not config_file.exists():
+                console.print(f"[yellow]⚠️  Warning: Expected config file not found: {filename}[/yellow]")
                 continue
 
             try:

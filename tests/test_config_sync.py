@@ -25,11 +25,12 @@ def get_project_root() -> Path:
 
 def test_allowed_config_files_matches_pyproject():
     """
-    Verify that BazingaSetup.ALLOWED_CONFIG_FILES matches the JSON files
-    in pyproject.toml's force-include section.
+    Verify that BazingaSetup.ALLOWED_CONFIG_FILES matches the config files
+    in pyproject.toml's force-include section (excluding templates).
 
     This test catches the case where someone adds a new config file to
     pyproject.toml but forgets to update ALLOWED_CONFIG_FILES.
+    Supports any file type (JSON, YAML, etc.) - not just .json files.
     """
     # Import here to avoid circular imports during test collection
     from bazinga_cli import BazingaSetup
@@ -50,11 +51,12 @@ def test_allowed_config_files_matches_pyproject():
         .get("force-include", {})
     )
 
-    # Extract JSON config files from force-include keys
+    # Extract config files from force-include keys (excluding templates directory)
     # Format: "bazinga/model_selection.json" = "bazinga_cli/bazinga/model_selection.json"
+    # Templates are handled separately by copy_templates(), not ALLOWED_CONFIG_FILES
     pyproject_configs = set()
     for src_path in force_include.keys():
-        if src_path.startswith("bazinga/") and src_path.endswith(".json"):
+        if src_path.startswith("bazinga/") and "templates" not in src_path:
             # Extract just the filename
             filename = Path(src_path).name
             pyproject_configs.add(filename)
