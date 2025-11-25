@@ -25,14 +25,14 @@
       "name": "Security Adversary",
       "description": "Adversarial security testing",
       "qa_focus": ["injection_attacks", "auth_bypass", "privilege_escalation", "data_exposure"],
-      "developer_scope": "senior_engineer",
+      "developer_scope": "senior_software_engineer",
       "escalation_on_fail": true
     },
     "5": {
       "name": "Production Chaos",
       "description": "Production-like failure scenarios",
       "qa_focus": ["network_failures", "resource_exhaustion", "race_conditions", "cascading_failures"],
-      "developer_scope": "senior_engineer",
+      "developer_scope": "senior_software_engineer",
       "escalation_on_fail": true
     }
   },
@@ -49,7 +49,7 @@
     "level_1_2_pass": "advance_level",
     "level_1_2_fail": "developer_retry",
     "level_3_4_5_pass": "advance_level",
-    "level_3_4_5_fail": "escalate_to_senior_engineer"
+    "level_3_4_5_fail": "escalate_to_senior_software_engineer"
   },
   "_metadata": {
     "version": "1.0.0",
@@ -57,8 +57,8 @@
     "last_updated": "2025-11-25",
     "notes": [
       "Levels 1-2: Basic tests, developer can retry on Haiku",
-      "Levels 3-5: Advanced tests, escalate to Senior Engineer on fail",
-      "Level 4-5 always require Senior Engineer scope"
+      "Levels 3-5: Advanced tests, escalate to Senior Software Engineer on fail",
+      "Level 4-5 always require Senior Software Engineer scope"
     ]
   }
 }
