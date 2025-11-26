@@ -255,10 +255,17 @@ jobs:
 
           jq -r '.choices[0].message.content' openai_response.json > review.txt
 
-          if [ ! -s review.txt ]; then
+          # Check for meaningful content (not just whitespace/newlines)
+          REVIEW_CONTENT=$(cat review.txt | tr -d '[:space:]')
+          if [ -z "$REVIEW_CONTENT" ]; then
+            echo "Warning: OpenAI returned empty or whitespace-only content"
+            echo "Full API response:"
+            cat openai_response.json
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
-            echo "Review file is empty. OpenAI may have returned no content." >> review.txt
+            echo "OpenAI returned no meaningful content. This may indicate an API issue." >> review.txt
+            echo "" >> review.txt
+            echo "Please retry the workflow or check OpenAI API status." >> review.txt
             exit 1
           fi
 
@@ -272,8 +279,15 @@ jobs:
         run: |
           echo "Preparing to post review comment..."
 
-          if [ ! -s review.txt ]; then
-            echo "Review is empty, skipping comment."
+          # Check for meaningful content (not just whitespace)
+          if [ ! -f review.txt ]; then
+            echo "Review file not found, skipping comment."
+            exit 0
+          fi
+
+          CONTENT=$(cat review.txt | tr -d '[:space:]')
+          if [ -z "$CONTENT" ]; then
+            echo "Review is empty or whitespace-only, skipping comment."
             exit 0
           fi
 
