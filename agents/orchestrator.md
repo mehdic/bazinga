@@ -1255,8 +1255,7 @@ IF status = ESCALATE_SENIOR:
 
 **IF Developer reports BLOCKED:**
 - **Do NOT stop for user input**
-- **Immediately spawn Investigator** to diagnose and resolve the blocker
-- Follow same pattern as Step 2B.7b (Blocker Resolution):
+- **Immediately spawn Investigator** to diagnose and resolve the blocker:
   * Extract blocker description and evidence from Developer response
   * Spawn Investigator with blocker resolution request
   * After Investigator provides solution, spawn Developer again with resolution
