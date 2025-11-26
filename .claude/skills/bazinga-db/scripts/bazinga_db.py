@@ -643,7 +643,7 @@ SESSION OPERATIONS:
 LOG OPERATIONS:
   log-interaction <session> <agent> <content> [iteration] [agent_id]
                                               Log agent interaction
-  stream-logs <session> [limit] [offset]      Stream logs in markdown format
+  stream-logs <session> [limit] [offset]      Stream logs in markdown (default: limit=50, offset=0)
 
 STATE OPERATIONS:
   save-state <session> <type> <json_data>     Save state snapshot
@@ -651,7 +651,7 @@ STATE OPERATIONS:
 
 TASK GROUP OPERATIONS:
   create-task-group <group_id> <session> <name> [status] [assigned_to]
-                                              Create task group
+                                              Create task group (default: status=pending)
   update-task-group <group_id> <session> [--status X] [--assigned_to Y]
                                               Update task group
   get-task-groups <session> [status]          Get task groups
@@ -659,7 +659,7 @@ TASK GROUP OPERATIONS:
 TOKEN OPERATIONS:
   log-tokens <session> <agent> <tokens> [agent_id]
                                               Log token usage
-  token-summary <session> [by]                Get token summary (by: agent_type|agent_id)
+  token-summary <session> [by]                Get token summary (default: by=agent_type)
 
 SKILL OUTPUT OPERATIONS:
   save-skill-output <session> <skill> <json>  Save skill output
