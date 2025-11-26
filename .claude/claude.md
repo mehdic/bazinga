@@ -428,6 +428,55 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 
 ---
 
+## 🔍 PR Review Workflow
+
+**When the user pastes a GitHub PR link for review:**
+
+### Automatic Behavior
+
+1. **Fetch and analyze** the PR review comments
+2. **Ultrathink** - Apply deep critical analysis to each feedback point
+3. **Triage** feedback into categories:
+   - **Critical/Breaking** - Must fix (security issues, bugs, breaking changes)
+   - **Valid but not critical** - Document but defer (refactoring suggestions, style preferences)
+
+### Implementation Rules
+
+| Category | Action |
+|----------|--------|
+| **Critical/Breaking** | Implement immediately |
+| **Valid but not critical** | Report to user, do NOT implement unless requested |
+
+### Verification
+
+Before implementing any "fix":
+- **Check if already addressed** - Reviewers may miss existing safeguards
+- **Verify the claim** - Read the actual code, not just the review comment
+- **Assess risk/reward** - Some "improvements" add complexity without value
+
+### Output Format
+
+```
+## PR #XXX Review Analysis
+
+### Critical/Breaking Issues: [NONE | list]
+- Issue 1: [description] → [action taken]
+
+### Implemented (Minor Improvements)
+- [list of quick wins implemented]
+
+### Valid but NOT Critical (Deferred)
+| Feedback | Why Deferred |
+|----------|--------------|
+| [feedback] | [reasoning] |
+```
+
+### Documentation
+
+Always create `research/prXXX-review-analysis.md` with full ultrathink analysis.
+
+---
+
 ✅ Project context loaded successfully!
 
 📚 Research documents available in 'research/' folder
