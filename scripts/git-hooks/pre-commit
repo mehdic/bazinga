@@ -1,12 +1,17 @@
 #!/bin/bash
 #
-# Pre-commit hook to rebuild slash commands from agent source files
-# Ensures .claude/commands/ files stay in sync with agents/ source files
+# Pre-commit hook for BAZINGA development
+#
+# Handles:
+# 1. Orchestrator agent → slash command rebuilding
+# 2. Agent source files → developer.md and senior_software_engineer.md rebuilding
 
 # Get list of staged files
 STAGED_FILES=$(git diff --cached --name-only)
 
-# Check if orchestrator agent was modified
+# =============================================================================
+# 1. Orchestrator Agent → Slash Commands
+# =============================================================================
 if echo "$STAGED_FILES" | grep -q "^agents/orchestrator\.md$"; then
     echo "🔨 Detected changes to agents/orchestrator.md"
 
@@ -32,6 +37,26 @@ if echo "$STAGED_FILES" | grep -q "^agents/orchestrator\.md$"; then
     git add .claude/commands/bazinga.orchestrate.md
 
     echo "   ✅ Slash command rebuilt and staged"
+fi
+
+# =============================================================================
+# 2. Agent Source Files → Developer & Senior Agent Files
+# =============================================================================
+if echo "$STAGED_FILES" | grep -q "^agents/_sources/"; then
+    echo "🔨 Detected changes to agents/_sources/"
+
+    echo "   Rebuilding agent files..."
+
+    # Run build script
+    if ! ./scripts/build-agent-files.sh; then
+        echo "❌ ERROR: Failed to build agent files"
+        exit 1
+    fi
+
+    # Stage the generated files
+    git add agents/developer.md agents/senior_software_engineer.md
+
+    echo "   ✅ Agent files rebuilt and staged"
 fi
 
 # Allow commit to proceed

@@ -1,0 +1,135 @@
+# Validates that generated agent files are in sync with their sources
+#
+# This workflow ensures:
+# 1. developer.md matches _sources/developer.base.md
+# 2. senior_software_engineer.md is correctly generated from base + delta
+#
+# Runs on:
+# - All PRs
+# - Pushes to main branch
+
+name: Validate Agent Generation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agents/**'
+      - 'scripts/build-agent-files.sh'
+      - 'scripts/merge_agent_delta.py'
+  pull_request:
+    paths:
+      - 'agents/**'
+      - 'scripts/build-agent-files.sh'
+      - 'scripts/merge_agent_delta.py'
+
+jobs:
+  validate-agent-files:
+    name: Validate Agent Files Are In Sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check source files exist
+        run: |
+          echo "Checking source files exist..."
+
+          if [[ ! -f "agents/_sources/developer.base.md" ]]; then
+            echo "❌ Error: agents/_sources/developer.base.md not found"
+            exit 1
+          fi
+
+          if [[ ! -f "agents/_sources/senior.delta.md" ]]; then
+            echo "❌ Error: agents/_sources/senior.delta.md not found"
+            exit 1
+          fi
+
+          echo "✅ Source files found"
+
+      - name: Run build check (verification mode)
+        run: |
+          echo "Running agent file generation check..."
+          chmod +x scripts/build-agent-files.sh
+          chmod +x scripts/merge_agent_delta.py
+          ./scripts/build-agent-files.sh --check
+
+      - name: Show diff if out of sync
+        if: failure()
+        run: |
+          echo ""
+          echo "==================== DIFF OUTPUT ===================="
+          echo ""
+
+          # Generate files to temp location
+          TEMP_DIR=$(mktemp -d)
+          cp agents/_sources/developer.base.md "$TEMP_DIR/developer.md"
+          python3 scripts/merge_agent_delta.py \
+            agents/_sources/developer.base.md \
+            agents/_sources/senior.delta.md \
+            "$TEMP_DIR/senior_software_engineer.md"
+
+          echo "--- developer.md diff ---"
+          diff -u agents/developer.md "$TEMP_DIR/developer.md" || true
+
+          echo ""
+          echo "--- senior_software_engineer.md diff ---"
+          diff -u agents/senior_software_engineer.md "$TEMP_DIR/senior_software_engineer.md" || true
+
+          echo ""
+          echo "==================== FIX INSTRUCTIONS ===================="
+          echo ""
+          echo "To fix this issue, run locally:"
+          echo ""
+          echo "  ./scripts/build-agent-files.sh"
+          echo "  git add agents/developer.md agents/senior_software_engineer.md"
+          echo "  git commit --amend --no-edit"
+          echo ""
+          echo "Or install the pre-commit hook to auto-rebuild:"
+          echo ""
+          echo "  ./scripts/install-hooks.sh"
+          echo ""
+
+      - name: Verify file sizes
+        run: |
+          echo ""
+          echo "==================== FILE SIZE VERIFICATION ===================="
+          echo ""
+
+          DEV_LINES=$(wc -l < agents/developer.md)
+          SENIOR_LINES=$(wc -l < agents/senior_software_engineer.md)
+          BASE_LINES=$(wc -l < agents/_sources/developer.base.md)
+          DELTA_LINES=$(wc -l < agents/_sources/senior.delta.md)
+
+          echo "Source files:"
+          echo "  developer.base.md:  $BASE_LINES lines"
+          echo "  senior.delta.md:    $DELTA_LINES lines"
+          echo ""
+          echo "Generated files:"
+          echo "  developer.md:                 $DEV_LINES lines"
+          echo "  senior_software_engineer.md:  $SENIOR_LINES lines"
+          echo ""
+
+          # Verify senior is larger than developer (it should include everything + delta)
+          if [[ $SENIOR_LINES -lt $DEV_LINES ]]; then
+            echo "⚠️  Warning: senior_software_engineer.md ($SENIOR_LINES lines) is smaller than developer.md ($DEV_LINES lines)"
+            echo "    Senior should include ALL of developer's content plus additional sections"
+          else
+            echo "✅ Size check passed: Senior ($SENIOR_LINES) >= Developer ($DEV_LINES)"
+          fi
+
+      - name: Summary
+        if: success()
+        run: |
+          echo ""
+          echo "✅ All agent files are in sync with their sources!"
+          echo ""
+          echo "Verified:"
+          echo "  - developer.md matches _sources/developer.base.md"
+          echo "  - senior_software_engineer.md is correctly generated from base + delta"
