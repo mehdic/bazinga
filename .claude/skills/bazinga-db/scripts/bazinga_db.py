@@ -868,8 +868,79 @@ class BazingaDB:
         return [dict(row) for row in rows]
 
 
+def print_help():
+    """Print help text with all available commands."""
+    help_text = """
+BAZINGA Database Client - Available Commands:
+
+SESSION OPERATIONS:
+  create-session <id> <mode> <requirements>   Create new session (mode: simple|parallel)
+  list-sessions [limit]                       List recent sessions (default: 10)
+  update-session-status <id> <status>         Update session status
+
+LOG OPERATIONS:
+  log-interaction <session> <agent> <content> [iteration] [agent_id]
+                                              Log agent interaction
+  stream-logs <session> [limit] [offset]      Stream logs in markdown (default: limit=50, offset=0)
+
+STATE OPERATIONS:
+  save-state <session> <type> <json_data>     Save state snapshot
+  get-state <session> <type>                  Get latest state snapshot
+
+TASK GROUP OPERATIONS:
+  create-task-group <group_id> <session> <name> [status] [assigned_to]
+                                              Create task group (default: status=pending)
+  update-task-group <group_id> <session> [--status X] [--assigned_to Y]
+                                              Update task group
+  get-task-groups <session> [status]          Get task groups
+
+TOKEN OPERATIONS:
+  log-tokens <session> <agent> <tokens> [agent_id]
+                                              Log token usage
+  token-summary <session> [by]                Get token summary (default: by=agent_type)
+
+SKILL OUTPUT OPERATIONS:
+  save-skill-output <session> <skill> <json>  Save skill output
+  get-skill-output <session> <skill>          Get skill output
+
+DEVELOPMENT PLAN OPERATIONS:
+  save-development-plan <session> <prompt> <plan> <phases_json> <current> <total> [metadata]
+                                              Save development plan
+  get-development-plan <session>              Get development plan
+  update-plan-progress <session> <phase> <status>
+                                              Update plan phase status
+
+SUCCESS CRITERIA OPERATIONS:
+  save-success-criteria <session> <criteria_json>
+                                              Save success criteria
+  get-success-criteria <session>              Get success criteria
+  update-success-criterion <session> <criterion> [--status X] [--actual Y] [--evidence Z]
+                                              Update criterion
+
+QUERY OPERATIONS:
+  query <sql>                                 Execute custom SELECT query
+  dashboard-snapshot <session>                Get complete dashboard data
+
+DATABASE MAINTENANCE:
+  integrity-check                             Check database integrity
+  recover-db                                  Attempt to recover corrupted database
+
+HELP:
+  help                                        Show this help message
+
+Examples:
+  bazinga_db.py --db bazinga.db list-sessions 5
+  bazinga_db.py --db bazinga.db query "SELECT * FROM sessions LIMIT 3"
+  bazinga_db.py --db bazinga.db get-task-groups session123
+"""
+    print(help_text)
+
+
 def main():
-    parser = argparse.ArgumentParser(description='BAZINGA Database Client')
+    parser = argparse.ArgumentParser(
+        description='BAZINGA Database Client',
+        epilog='Run with "help" command to see all available commands'
+    )
     parser.add_argument('--db', required=True, help='Database path')
     parser.add_argument('--quiet', action='store_true', help='Suppress success messages, only show errors')
     parser.add_argument('command', help='Command to execute')
@@ -999,6 +1070,14 @@ def main():
                 value = cmd_args[i + 1]
                 kwargs[key] = value
             db.update_success_criterion(session_id, criterion, **kwargs)
+        elif cmd == 'query':
+            if not cmd_args:
+                print("Error: query command requires SQL statement", file=sys.stderr)
+                sys.exit(1)
+            # Join args to allow unquoted SQL: query SELECT * FROM table
+            sql = " ".join(cmd_args)
+            result = db.query(sql)
+            print(json.dumps(result, indent=2))
         elif cmd == 'integrity-check':
             result = db.check_integrity()
             print(json.dumps(result, indent=2))
@@ -1010,8 +1089,12 @@ def main():
             else:
                 print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
                 sys.exit(1)
+        elif cmd == 'help':
+            print_help()
+            sys.exit(0)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
+            print("\nRun with 'help' command to see available commands.", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
