@@ -10,9 +10,16 @@ permissions:
   pull-requests: write
   issues: write
 
+# Prevent duplicate runs on same PR
+concurrency:
+  group: openai-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest
+    # Only run on PRs from the same repo (forks can't access secrets)
+    if: github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       - name: Checkout repository
@@ -22,11 +29,28 @@ jobs:
           fetch-depth: 0
 
       - name: Compute diff
+        id: diff
         run: |
           git diff origin/${{ github.base_ref }}...HEAD > diff.patch
-          echo "Diff size: $(wc -l < diff.patch) lines, $(wc -c < diff.patch) bytes"
+          DIFF_LINES=$(wc -l < diff.patch)
+          echo "Diff size: $DIFF_LINES lines, $(wc -c < diff.patch) bytes"
+
+          # Check for empty diff
+          if [ "$DIFF_LINES" -eq 0 ]; then
+            echo "empty=true" >> $GITHUB_OUTPUT
+            echo "No changes detected in diff"
+          else
+            echo "empty=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip if empty diff
+        if: steps.diff.outputs.empty == 'true'
+        run: |
+          echo "No code changes to review. Skipping API call."
+          exit 0
 
       - name: Fetch previous OpenAI reviews from PR
+        if: steps.diff.outputs.empty != 'true'
         id: previous_openai
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,6 +72,7 @@ jobs:
           fi
 
       - name: Build prompt
+        if: steps.diff.outputs.empty != 'true'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
@@ -138,6 +163,7 @@ jobs:
           EOF
 
       - name: Call OpenAI API
+        if: steps.diff.outputs.empty != 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -275,6 +301,8 @@ jobs:
           head -n 10 review.txt
 
       - name: Post review comment
+        # Run even if API call failed (to post error messages)
+        if: always() && steps.diff.outputs.empty != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
