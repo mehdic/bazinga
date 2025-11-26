@@ -28,9 +28,12 @@ import {
   GitBranch,
   Download,
   Play,
+  Workflow,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TokenCharts } from "@/components/charts/token-charts";
+import { StateMachine } from "@/components/workflow/state-machine";
+import { LogFilters } from "@/components/logs/log-filters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -244,8 +247,12 @@ export default function SessionDetailPage() {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="tasks" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+      <Tabs defaultValue="workflow" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="workflow">
+            <Workflow className="h-4 w-4 mr-2" />
+            Workflow
+          </TabsTrigger>
           <TabsTrigger value="tasks">
             <GitBranch className="h-4 w-4 mr-2" />
             Tasks
@@ -268,9 +275,25 @@ export default function SessionDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="insights">
             <Sparkles className="h-4 w-4 mr-2" />
-            AI Insights
+            Insights
           </TabsTrigger>
         </TabsList>
+
+        {/* Workflow Tab */}
+        <TabsContent value="workflow">
+          <Card>
+            <CardHeader>
+              <CardTitle>Orchestration Workflow</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StateMachine
+                logs={session.logs || []}
+                taskGroups={taskGroups}
+                sessionStatus={session.status}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-4">
@@ -340,54 +363,7 @@ export default function SessionDetailPage() {
 
         {/* Logs Tab */}
         <TabsContent value="logs">
-          <Card>
-            <CardHeader>
-              <CardTitle>Orchestration Logs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px]">
-                <div className="space-y-2">
-                  {session.logs?.map((log, i) => (
-                    <div
-                      key={log.id}
-                      className="flex gap-4 rounded-lg border p-3 text-sm"
-                    >
-                      <div className="flex-shrink-0">
-                        <Badge variant="outline">{log.agentType}</Badge>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(log.timestamp).toLocaleTimeString()}
-                          </span>
-                          {log.statusCode && (
-                            <Badge variant="secondary" className="text-xs">
-                              {log.statusCode}
-                            </Badge>
-                          )}
-                          {log.modelTier && (
-                            <Badge variant="outline" className="text-xs">
-                              {log.modelTier}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground line-clamp-3">
-                          {log.content.slice(0, 300)}
-                          {log.content.length > 300 && "..."}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {(!session.logs || session.logs.length === 0) && (
-                    <div className="py-12 text-center">
-                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No logs yet</p>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+          <LogFilters logs={session.logs || []} />
         </TabsContent>
 
         {/* Tokens Tab */}

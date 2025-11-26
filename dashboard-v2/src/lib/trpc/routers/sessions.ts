@@ -198,4 +198,56 @@ export const sessionsRouter = router({
 
       return { breakdown, timeline };
     }),
+
+  // Get agent performance metrics across all sessions
+  getAgentMetrics: publicProcedure.query(async () => {
+    // Tokens by agent type
+    const tokensByAgent = await db
+      .select({
+        agentType: tokenUsage.agentType,
+        totalTokens: sql<number>`SUM(${tokenUsage.tokensUsed})`,
+        totalCost: sql<number>`SUM(${tokenUsage.estimatedCost})`,
+        invocations: sql<number>`COUNT(*)`,
+      })
+      .from(tokenUsage)
+      .groupBy(tokenUsage.agentType);
+
+    // Tokens by model tier
+    const tokensByModel = await db
+      .select({
+        modelTier: tokenUsage.modelTier,
+        totalTokens: sql<number>`SUM(${tokenUsage.tokensUsed})`,
+        totalCost: sql<number>`SUM(${tokenUsage.estimatedCost})`,
+        invocations: sql<number>`COUNT(*)`,
+      })
+      .from(tokenUsage)
+      .groupBy(tokenUsage.modelTier);
+
+    // Log counts by agent (activity level)
+    const logsByAgent = await db
+      .select({
+        agentType: orchestrationLogs.agentType,
+        logCount: sql<number>`COUNT(*)`,
+        blockedCount: sql<number>`SUM(CASE WHEN ${orchestrationLogs.statusCode} = 'BLOCKED' THEN 1 ELSE 0 END)`,
+        failedCount: sql<number>`SUM(CASE WHEN ${orchestrationLogs.statusCode} = 'FAILED' THEN 1 ELSE 0 END)`,
+      })
+      .from(orchestrationLogs)
+      .groupBy(orchestrationLogs.agentType);
+
+    // Revision patterns (task groups with multiple revisions)
+    const revisionStats = await db
+      .select({
+        totalGroups: sql<number>`COUNT(*)`,
+        revisedGroups: sql<number>`SUM(CASE WHEN ${taskGroups.revisionCount} > 1 THEN 1 ELSE 0 END)`,
+        avgRevisions: sql<number>`AVG(${taskGroups.revisionCount})`,
+      })
+      .from(taskGroups);
+
+    return {
+      tokensByAgent,
+      tokensByModel,
+      logsByAgent,
+      revisionStats: revisionStats[0] || { totalGroups: 0, revisedGroups: 0, avgRevisions: 0 },
+    };
+  }),
 });

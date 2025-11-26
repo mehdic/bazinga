@@ -14,11 +14,14 @@ import {
   Settings,
   Zap,
   ChevronRight,
+  ArrowLeftRight,
+  BarChart3,
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Sessions", href: "/sessions", icon: History },
+  { name: "Compare", href: "/sessions/compare", icon: ArrowLeftRight },
   { name: "Analytics", href: "/analytics", icon: Activity },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

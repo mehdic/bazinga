@@ -1,20 +1,93 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc/client";
 import { formatTokens } from "@/lib/utils";
 import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
   Activity,
   TrendingUp,
-  Clock,
   Zap,
-  BarChart3,
-  PieChart,
+  Bot,
+  AlertTriangle,
+  RefreshCw,
+  User,
+  Code,
+  TestTube,
+  GitPullRequest,
 } from "lucide-react";
+
+// Agent color palette
+const AGENT_COLORS: Record<string, string> = {
+  pm: "#8b5cf6",
+  developer: "#3b82f6",
+  qa_expert: "#22c55e",
+  tech_lead: "#f97316",
+  orchestrator: "#6b7280",
+  investigator: "#ec4899",
+  senior_engineer: "#14b8a6",
+};
+
+const MODEL_COLORS: Record<string, string> = {
+  opus: "#f97316",
+  sonnet: "#8b5cf6",
+  haiku: "#22c55e",
+};
+
+const AGENT_ICONS: Record<string, React.ElementType> = {
+  pm: User,
+  developer: Code,
+  qa_expert: TestTube,
+  tech_lead: GitPullRequest,
+  orchestrator: Bot,
+};
 
 export default function AnalyticsPage() {
   const { data: stats } = trpc.sessions.getStats.useQuery();
+  const { data: agentMetrics } = trpc.sessions.getAgentMetrics.useQuery();
   const { data: recentSessions } = trpc.sessions.list.useQuery({ limit: 10 });
+
+  // Prepare chart data
+  const tokensByAgentData = agentMetrics?.tokensByAgent.map((item) => ({
+    name: item.agentType,
+    tokens: item.totalTokens || 0,
+    cost: item.totalCost || 0,
+    invocations: item.invocations || 0,
+  })) || [];
+
+  const tokensByModelData = agentMetrics?.tokensByModel.map((item) => ({
+    name: item.modelTier || "unknown",
+    tokens: item.totalTokens || 0,
+    cost: item.totalCost || 0,
+  })) || [];
+
+  const logsByAgentData = agentMetrics?.logsByAgent.map((item) => ({
+    name: item.agentType,
+    total: item.logCount || 0,
+    blocked: item.blockedCount || 0,
+    failed: item.failedCount || 0,
+    successRate: item.logCount
+      ? (((item.logCount - (item.blockedCount || 0) - (item.failedCount || 0)) / item.logCount) * 100)
+      : 100,
+  })) || [];
+
+  const revisionRate = agentMetrics?.revisionStats.totalGroups
+    ? ((agentMetrics.revisionStats.revisedGroups || 0) / agentMetrics.revisionStats.totalGroups) * 100
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -24,7 +97,7 @@ export default function AnalyticsPage() {
           Analytics
         </h1>
         <p className="text-muted-foreground">
-          Insights and trends across all orchestration sessions
+          Agent performance metrics and insights across all sessions
         </p>
       </div>
 
@@ -58,15 +131,16 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Tokens/Session</CardTitle>
+            <CardTitle className="text-sm font-medium">Revision Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {stats?.totalSessions
-                ? formatTokens(Math.round((stats.totalTokens || 0) / stats.totalSessions))
-                : "0"}
+            <div className="text-3xl font-bold text-yellow-500">
+              {revisionRate.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">Per session average</p>
+            <p className="text-xs text-muted-foreground">
+              {agentMetrics?.revisionStats.revisedGroups || 0} of{" "}
+              {agentMetrics?.revisionStats.totalGroups || 0} groups
+            </p>
           </CardContent>
         </Card>
 
@@ -83,58 +157,218 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Charts Placeholder */}
+      {/* Charts Row */}
       <div className="grid gap-4 md:grid-cols-2">
+        {/* Token Distribution by Agent */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Sessions Over Time
+              <Zap className="h-5 w-5" />
+              Tokens by Agent
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-center justify-center rounded-lg border border-dashed">
-              <div className="text-center">
-                <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Chart visualization coming soon
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Using Recharts for interactive charts
-                </p>
+            {tokensByAgentData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={tokensByAgentData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="tokens"
+                    label={({ name, percent }) =>
+                      `${name} (${(percent * 100).toFixed(0)}%)`
+                    }
+                    labelLine={false}
+                  >
+                    {tokensByAgentData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={AGENT_COLORS[entry.name] || "#6b7280"}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => formatTokens(value)}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
+        {/* Token Distribution by Model */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <PieChart className="h-5 w-5" />
-              Token Distribution
+              <Bot className="h-5 w-5" />
+              Tokens by Model Tier
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-center justify-center rounded-lg border border-dashed">
-              <div className="text-center">
-                <PieChart className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Pie chart coming soon
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Token breakdown by agent type
-                </p>
+            {tokensByModelData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={tokensByModelData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    type="number"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickFormatter={(value) => formatTokens(value)}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    width={60}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => formatTokens(value)}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Bar dataKey="tokens" name="Tokens">
+                    {tokensByModelData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={MODEL_COLORS[entry.name] || "#6b7280"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Agent Performance Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Agent Performance Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {logsByAgentData.map((agent) => {
+              const Icon = AGENT_ICONS[agent.name] || Bot;
+              return (
+                <div
+                  key={agent.name}
+                  className="flex items-center gap-4 rounded-lg border p-4"
+                >
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${AGENT_COLORS[agent.name]}20` }}
+                  >
+                    <Icon
+                      className="h-5 w-5"
+                      style={{ color: AGENT_COLORS[agent.name] }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium capitalize">{agent.name.replace("_", " ")}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{agent.total} logs</Badge>
+                        {agent.blocked > 0 && (
+                          <Badge variant="destructive" className="gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            {agent.blocked} blocked
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Progress value={agent.successRate} className="h-2 flex-1" />
+                      <span className="text-sm text-muted-foreground w-16 text-right">
+                        {agent.successRate.toFixed(0)}% OK
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {logsByAgentData.length === 0 && (
+              <div className="py-8 text-center text-muted-foreground">
+                No agent data available yet
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Revision Insights */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            Revision Analysis
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border p-4 text-center">
+              <div className="text-3xl font-bold">
+                {agentMetrics?.revisionStats.totalGroups || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Total Task Groups</p>
+            </div>
+            <div className="rounded-lg border p-4 text-center">
+              <div className="text-3xl font-bold text-yellow-500">
+                {agentMetrics?.revisionStats.revisedGroups || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Required Revisions</p>
+            </div>
+            <div className="rounded-lg border p-4 text-center">
+              <div className="text-3xl font-bold">
+                {(agentMetrics?.revisionStats.avgRevisions || 0).toFixed(1)}
+              </div>
+              <p className="text-sm text-muted-foreground">Avg Revisions/Group</p>
+            </div>
+          </div>
+          {revisionRate > 30 && (
+            <div className="mt-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4">
+              <div className="flex items-center gap-2 text-yellow-500">
+                <AlertTriangle className="h-5 w-5" />
+                <span className="font-medium">High Revision Rate Detected</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Consider reviewing requirement clarity or adding validation checkpoints
+                to reduce the need for revisions.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Activity */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
+            <Activity className="h-5 w-5" />
             Recent Session Performance
           </CardTitle>
         </CardHeader>
@@ -154,17 +388,17 @@ export default function AnalyticsPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <span
-                    className={
+                  <Badge
+                    variant={
                       session.status === "completed"
-                        ? "text-green-500"
+                        ? "secondary"
                         : session.status === "failed"
-                        ? "text-red-500"
-                        : "text-blue-500"
+                        ? "destructive"
+                        : "default"
                     }
                   >
                     {session.status}
-                  </span>
+                  </Badge>
                 </div>
               </div>
             ))}
