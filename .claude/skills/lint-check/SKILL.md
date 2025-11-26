@@ -37,11 +37,19 @@ When invoked:
 
 ## Step 1: Execute Lint Check Script
 
-Use the **Bash** tool to run the pre-built linting script:
+Use the **Bash** tool to run the pre-built linting script.
 
+**On Unix/macOS:**
 ```bash
 bash .claude/skills/lint-check/scripts/lint.sh
 ```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/lint-check/scripts/lint.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
 - Detect project language (Python, JavaScript, Go, Ruby, Java)

@@ -37,11 +37,19 @@ When invoked:
 
 ## Step 1: Execute Security Scan Script
 
-Use the **Bash** tool to run the pre-built security scanning script:
+Use the **Bash** tool to run the pre-built security scanning script.
 
+**On Unix/macOS:**
 ```bash
 bash .claude/skills/security-scan/scripts/scan.sh
 ```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/security-scan/scripts/scan.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 The script automatically determines scan mode:
 - **Basic mode** (default): Fast scan, high/medium severity only (5-10 seconds)

@@ -37,11 +37,19 @@ When invoked:
 
 ## Step 1: Execute Pattern Mining Script
 
-Use the **Bash** tool to run the pre-built pattern mining script:
+Use the **Bash** tool to run the pre-built pattern mining script.
 
+**On Unix/macOS:**
 ```bash
-bash .claude/skills/pattern-miner/mine.sh
+bash .claude/skills/pattern-miner/scripts/mine.sh
 ```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/pattern-miner/scripts/mine.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
 - Read `bazinga/historical_metrics.json`
