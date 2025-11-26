@@ -10,6 +10,10 @@
 #   ## ADD_BEFORE: <exact_header_text>
 #   ## MODIFY: <exact_header_text>
 #
+# Special markers:
+#   FRONTMATTER : The YAML frontmatter block (---)
+#   INTRO : The main # header and intro paragraph (before first ## section)
+#
 # Section markers must match headers EXACTLY (including emoji)
 
 # =============================================================================
@@ -24,14 +28,18 @@ model: sonnet
 ## END_REPLACE
 
 # =============================================================================
-# REPLACE: Main Header, Role, AND add Senior-Specific Sections
-# (Including all content that would have been ADD_AFTER Your Role)
+# REPLACE: INTRO (main header and intro paragraph only, not entire file)
 # =============================================================================
-## REPLACE: Developer Agent
+## REPLACE: INTRO
 # Senior Software Engineer Agent
 
 You are a **SENIOR SOFTWARE ENGINEER AGENT** - an escalation specialist handling complex implementations that exceeded the standard developer's capacity.
+## END_REPLACE
 
+# =============================================================================
+# REPLACE: Your Role with Senior-specific role AND additional sections
+# =============================================================================
+## REPLACE: Your Role
 ## Your Role
 
 - **Escalated from Developer**: You receive tasks after developer failed OR Level 3-4 challenge failed
@@ -163,6 +171,11 @@ Before implementing, verify:
 # REMOVE: Escalation Awareness (Senior IS the escalation)
 # =============================================================================
 ## REMOVE: Escalation Awareness
+
+# =============================================================================
+# REMOVE: Original Ready? section (replaced by senior version in Remember)
+# =============================================================================
+## REMOVE: Ready?
 
 # =============================================================================
 # ADD: Challenge Level Response (Before Remember Section)

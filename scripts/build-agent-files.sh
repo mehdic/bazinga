@@ -88,10 +88,31 @@ if $CHECK_MODE; then
     if $FAILED; then
         echo -e "${RED}Agent files are out of sync with sources!${NC}"
         echo ""
+        echo "==================== DIFF OUTPUT ===================="
+        echo ""
+
+        if ! diff -q "$TEMP_DIR/developer.md" "$OUTPUT_DIR/developer.md" > /dev/null 2>&1; then
+            echo "--- developer.md diff ---"
+            diff -u "$OUTPUT_DIR/developer.md" "$TEMP_DIR/developer.md" || true
+            echo ""
+        fi
+
+        if ! diff -q "$TEMP_DIR/senior_software_engineer.md" "$OUTPUT_DIR/senior_software_engineer.md" > /dev/null 2>&1; then
+            echo "--- senior_software_engineer.md diff ---"
+            diff -u "$OUTPUT_DIR/senior_software_engineer.md" "$TEMP_DIR/senior_software_engineer.md" || true
+            echo ""
+        fi
+
+        echo "==================== FIX INSTRUCTIONS ===================="
+        echo ""
         echo "To fix, run locally:"
         echo "  ./scripts/build-agent-files.sh"
         echo "  git add agents/developer.md agents/senior_software_engineer.md"
         echo "  git commit --amend --no-edit"
+        echo ""
+        echo "Or install the pre-commit hook to auto-rebuild:"
+        echo "  ./scripts/install-hooks.sh"
+        echo ""
         exit 1
     else
         echo -e "${GREEN}All agent files are up to date.${NC}"

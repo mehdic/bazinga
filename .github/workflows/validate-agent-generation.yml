@@ -37,66 +37,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Check source files exist
-        run: |
-          echo "Checking source files exist..."
-
-          if [[ ! -f "agents/_sources/developer.base.md" ]]; then
-            echo "❌ Error: agents/_sources/developer.base.md not found"
-            exit 1
-          fi
-
-          if [[ ! -f "agents/_sources/senior.delta.md" ]]; then
-            echo "❌ Error: agents/_sources/senior.delta.md not found"
-            exit 1
-          fi
-
-          echo "✅ Source files found"
-
-      - name: Run build check (verification mode)
+      - name: Validate agent files
         run: |
           echo "Running agent file generation check..."
           chmod +x scripts/build-agent-files.sh
           chmod +x scripts/merge_agent_delta.py
           ./scripts/build-agent-files.sh --check
 
-      - name: Show diff if out of sync
-        if: failure()
-        run: |
-          echo ""
-          echo "==================== DIFF OUTPUT ===================="
-          echo ""
-
-          # Generate files to temp location
-          TEMP_DIR=$(mktemp -d)
-          cp agents/_sources/developer.base.md "$TEMP_DIR/developer.md"
-          python3 scripts/merge_agent_delta.py \
-            agents/_sources/developer.base.md \
-            agents/_sources/senior.delta.md \
-            "$TEMP_DIR/senior_software_engineer.md"
-
-          echo "--- developer.md diff ---"
-          diff -u agents/developer.md "$TEMP_DIR/developer.md" || true
-
-          echo ""
-          echo "--- senior_software_engineer.md diff ---"
-          diff -u agents/senior_software_engineer.md "$TEMP_DIR/senior_software_engineer.md" || true
-
-          echo ""
-          echo "==================== FIX INSTRUCTIONS ===================="
-          echo ""
-          echo "To fix this issue, run locally:"
-          echo ""
-          echo "  ./scripts/build-agent-files.sh"
-          echo "  git add agents/developer.md agents/senior_software_engineer.md"
-          echo "  git commit --amend --no-edit"
-          echo ""
-          echo "Or install the pre-commit hook to auto-rebuild:"
-          echo ""
-          echo "  ./scripts/install-hooks.sh"
-          echo ""
-
       - name: Verify file sizes
+        if: success()
         run: |
           echo ""
           echo "==================== FILE SIZE VERIFICATION ===================="
@@ -120,6 +69,7 @@ jobs:
           if [[ $SENIOR_LINES -lt $DEV_LINES ]]; then
             echo "⚠️  Warning: senior_software_engineer.md ($SENIOR_LINES lines) is smaller than developer.md ($DEV_LINES lines)"
             echo "    Senior should include ALL of developer's content plus additional sections"
+            exit 1
           else
             echo "✅ Size check passed: Senior ($SENIOR_LINES) >= Developer ($DEV_LINES)"
           fi
