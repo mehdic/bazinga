@@ -16,12 +16,12 @@ import argparse
 class BazingaDB:
     """Database client for BAZINGA orchestration."""
 
-    # SQLite errors that indicate database corruption
+    # SQLite errors that indicate ACTUAL database corruption (file is unrecoverable)
+    # NOTE: Transient errors like "database is locked" or "disk I/O error" are NOT
+    # included here - they should be retried, not trigger database deletion!
     CORRUPTION_ERRORS = [
         "database disk image is malformed",
-        "database is locked",
         "file is not a database",
-        "disk I/O error",
         "database or disk is full",
         "attempt to write a readonly database",
     ]
@@ -309,8 +309,18 @@ class BazingaDB:
     # ==================== LOG OPERATIONS ====================
 
     def log_interaction(self, session_id: str, agent_type: str, content: str,
-                       iteration: Optional[int] = None, agent_id: Optional[str] = None) -> Dict[str, Any]:
-        """Log an agent interaction with validation."""
+                       iteration: Optional[int] = None, agent_id: Optional[str] = None,
+                       _retry_count: int = 0) -> Dict[str, Any]:
+        """Log an agent interaction with validation.
+
+        Args:
+            _retry_count: Internal parameter to prevent infinite recursion. Do not set manually.
+        """
+        # Prevent infinite recursion on repeated failures
+        if _retry_count > 1:
+            self._print_error(f"Max retries exceeded for log_interaction")
+            return {"success": False, "error": "Max retries exceeded after recovery attempt"}
+
         # Validate inputs
         if not session_id or not session_id.strip():
             raise ValueError("session_id cannot be empty")
@@ -366,9 +376,10 @@ class BazingaDB:
             # Check if it's a corruption error
             if self._is_corruption_error(e):
                 if self._recover_from_corruption():
-                    # Retry once after recovery
+                    # Retry once after recovery (with incremented counter to prevent infinite loop)
                     self._print_error(f"Retrying log operation after recovery...")
-                    return self.log_interaction(session_id, agent_type, content, iteration, agent_id)
+                    return self.log_interaction(session_id, agent_type, content, iteration, agent_id,
+                                               _retry_count=_retry_count + 1)
             self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
             return {"success": False, "error": f"Database error: {str(e)}"}
         except Exception as e:
