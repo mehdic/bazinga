@@ -24,25 +24,30 @@ const WORKFLOW_STAGES = [
   { id: "tech_lead", label: "Tech Lead", icon: GitPullRequest, color: "orange" },
 ] as const;
 
+// Log entry matching actual database schema
 interface LogEntry {
   id: number;
   agentType: string;
-  statusCode: string | null;
-  timestamp: string;
+  timestamp: string | null;
+  iteration: number | null;
+  agentId: string | null;
+  content: string;
 }
 
+// Task group matching actual database schema
 interface TaskGroup {
-  groupId: string;
-  name: string | null;
-  status: string;
-  currentStage: string | null;
+  id: string;
+  name: string;
+  status: string | null;
   assignedTo: string | null;
+  revisionCount: number | null;
+  complexity: number | null;
 }
 
 interface StateMachineProps {
   logs: LogEntry[];
   taskGroups: TaskGroup[];
-  sessionStatus: string;
+  sessionStatus: string | null;
 }
 
 export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachineProps) {
@@ -50,7 +55,11 @@ export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachinePr
   const currentStage = useMemo(() => {
     if (!logs || logs.length === 0) return null;
     const sortedLogs = [...logs].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      (a, b) => {
+        const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return bTime - aTime;
+      }
     );
     return sortedLogs[0]?.agentType || null;
   }, [logs]);
@@ -61,10 +70,16 @@ export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachinePr
     if (stageLogs.length === 0) return "pending";
 
     const latestLog = stageLogs.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      (a, b) => {
+        const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return bTime - aTime;
+      }
     )[0];
 
-    if (latestLog.statusCode === "BLOCKED" || latestLog.statusCode === "FAILED") {
+    // Check log content for failure indicators (since we don't have statusCode)
+    const content = latestLog.content.toLowerCase();
+    if (content.includes("blocked") || content.includes("failed") || content.includes("error")) {
       return "failed";
     }
 
@@ -191,14 +206,15 @@ export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachinePr
           </h4>
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
             {taskGroups.map((group) => {
+              // Determine stage from assignedTo field
               const stageInfo = WORKFLOW_STAGES.find(
-                (s) => s.id === group.currentStage
+                (s) => s.id === group.assignedTo
               );
               const StageIcon = stageInfo?.icon || Circle;
 
               return (
                 <div
-                  key={group.groupId}
+                  key={group.id}
                   className="flex items-center gap-3 rounded-lg border p-3"
                 >
                   <div
@@ -220,10 +236,10 @@ export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachinePr
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
-                      {group.name || group.groupId.slice(-8)}
+                      {group.name || group.id.slice(-8)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {group.currentStage || "Pending"} • {group.assignedTo || "Unassigned"}
+                      {group.assignedTo || "Unassigned"} • Rev {group.revisionCount || 0}
                     </p>
                   </div>
                   <Badge
@@ -235,7 +251,7 @@ export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachinePr
                         : "outline"
                     }
                   >
-                    {group.status}
+                    {group.status || "pending"}
                   </Badge>
                 </div>
               );

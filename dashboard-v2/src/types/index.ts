@@ -1,97 +1,96 @@
-// Session types
+// Session types - matches actual database schema
+// Primary key is session_id (TEXT), not autoincrement id
 export interface Session {
-  id: number;
   sessionId: string;
-  startTime: string;
+  startTime: string | null;
   endTime: string | null;
-  status: string;
+  status: string | null;
   mode: string | null;
   originalRequirements: string | null;
-  developerCount: number | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
 }
 
 export interface SessionWithRelations extends Session {
   taskGroups: TaskGroup[];
   logs: OrchestrationLog[];
-  successCriteria: SuccessCriterion[];
   tokenUsage: TokenUsage[];
+  stateSnapshots: StateSnapshot[];
 }
 
-// Task Group types
+// Task Group types - matches actual database schema
+// Primary key is id (TEXT), not autoincrement integer
 export interface TaskGroup {
-  id: number;
+  id: string;  // TEXT primary key in actual DB
   sessionId: string;
-  groupId: string;
   name: string;
-  status: string;
+  status: string | null;
   assignedTo: string | null;
   revisionCount: number | null;
   complexity: number | null;
   initialTier: string | null;
-  currentStage: string | null;
   lastReviewStatus: string | null;
-  riskScore: number | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
-// Orchestration Log types
+// Orchestration Log types - matches actual database schema
+// Note: No statusCode, tokensUsed, or modelTier columns
 export interface OrchestrationLog {
   id: number;
   sessionId: string;
-  timestamp: string;
+  timestamp: string | null;
   iteration: number | null;
   agentType: string;
   agentId: string | null;
   content: string;
-  statusCode: string | null;
-  tokensUsed: number | null;
-  modelTier: string | null;
 }
 
-// Token Usage types
+// Token Usage types - matches actual database schema
+// Note: Uses tokensEstimated, no modelTier or estimatedCost
 export interface TokenUsage {
   id: number;
   sessionId: string;
-  timestamp: string;
+  timestamp: string | null;
   agentType: string;
   agentId: string | null;
-  modelTier: string;
-  tokensUsed: number;
-  estimatedCost: number | null;
+  tokensEstimated: number;
 }
 
-// Success Criteria types
-export interface SuccessCriterion {
-  id: number;
-  sessionId: string;
-  criterion: string;
-  status: string;
-  actual: string | null;
-  evidence: string | null;
-  requiredForCompletion: number | null;
-  verifiedAt: string | null;
-}
-
-// State Snapshot types
+// State Snapshot types - matches actual database schema
+// Note: Uses stateType and stateData column names
 export interface StateSnapshot {
   id: number;
   sessionId: string;
-  timestamp: string;
-  snapshotType: "pm_state" | "orchestrator_state" | "group_state";
-  data: Record<string, unknown>;
+  timestamp: string | null;
+  stateType: string;
+  stateData: string; // JSON string
 }
 
-// Quality Metrics types
-export interface QualityMetric {
+// Skill Output types
+export interface SkillOutput {
   id: number;
   sessionId: string;
-  timestamp: string;
-  metricType: "coverage" | "security" | "lint" | "review";
-  value: number;
-  details: Record<string, unknown> | null;
+  timestamp: string | null;
+  skillName: string;
+  outputData: string | Record<string, unknown>;
+}
+
+// Decision types
+export interface Decision {
+  id: number;
+  sessionId: string;
+  timestamp: string | null;
+  iteration: number | null;
+  decisionType: string;
+  decisionData: string | Record<string, unknown>;
+}
+
+// Model Config types
+export interface ModelConfig {
+  agentRole: string;
+  model: string;
+  rationale: string | null;
+  updatedAt: string | null;
 }
 
 // Dashboard Stats types
@@ -101,19 +100,16 @@ export interface DashboardStats {
   completedSessions: number;
   failedSessions: number;
   totalTokens: number;
-  totalCost: number;
-  avgDuration: number;
   successRate: number;
 }
 
 // Agent Activity types
 export interface AgentActivity {
   agentType: string;
-  agentId: string;
+  agentId: string | null;
   status: "idle" | "working" | "complete";
   currentTask: string | null;
   startTime: string | null;
-  modelTier: string;
 }
 
 // Pattern types (for AI insights)
@@ -130,4 +126,10 @@ export interface SessionUpdate {
   type: "log" | "state" | "task" | "token";
   data: unknown;
   timestamp: string;
+}
+
+// Token breakdown for charts (simplified)
+export interface TokenBreakdown {
+  agentType: string;
+  total: number;
 }

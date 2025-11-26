@@ -24,18 +24,19 @@ import {
   Bot,
 } from "lucide-react";
 
+// Log entry matching actual database schema
 interface LogEntry {
   id: number;
   agentType: string;
-  statusCode: string | null;
   content: string;
-  timestamp: string;
-  modelTier: string | null;
+  timestamp: string | null;
+  iteration: number | null;
+  agentId: string | null;
 }
 
 interface SessionReplayProps {
   logs: LogEntry[];
-  sessionStatus: string;
+  sessionStatus: string | null;
 }
 
 const AGENT_ICONS: Record<string, React.ElementType> = {
@@ -66,7 +67,11 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
   // Sort logs chronologically
   const sortedLogs = useMemo(() => {
     return [...logs].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      (a, b) => {
+        const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return aTime - bTime;
+      }
     );
   }, [logs]);
 
@@ -130,7 +135,7 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
 
   // Get elapsed time from start
   const getElapsedTime = (log: LogEntry) => {
-    if (sortedLogs.length === 0) return "0:00";
+    if (sortedLogs.length === 0 || !log.timestamp || !sortedLogs[0].timestamp) return "0:00";
     const start = new Date(sortedLogs[0].timestamp).getTime();
     const current = new Date(log.timestamp).getTime();
     const diffMs = current - start;
@@ -225,24 +230,14 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
                 </span>
               </CardTitle>
               <div className="flex items-center gap-2">
-                {currentLog.statusCode && (
-                  <Badge
-                    variant={
-                      currentLog.statusCode === "BLOCKED" ||
-                      currentLog.statusCode === "FAILED"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {currentLog.statusCode}
+                {currentLog.iteration !== null && (
+                  <Badge variant="secondary">
+                    Iter #{currentLog.iteration}
                   </Badge>
-                )}
-                {currentLog.modelTier && (
-                  <Badge variant="outline">{currentLog.modelTier}</Badge>
                 )}
                 <Badge variant="outline" className="gap-1">
                   <Clock className="h-3 w-3" />
-                  {new Date(currentLog.timestamp).toLocaleTimeString()}
+                  {currentLog.timestamp ? new Date(currentLog.timestamp).toLocaleTimeString() : "Unknown"}
                 </Badge>
               </div>
             </div>
@@ -300,16 +295,9 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
                     <span className="text-xs text-muted-foreground">
                       {getElapsedTime(log)}
                     </span>
-                    {log.statusCode && (
-                      <Badge
-                        variant={
-                          log.statusCode === "BLOCKED" || log.statusCode === "FAILED"
-                            ? "destructive"
-                            : "outline"
-                        }
-                        className="text-xs"
-                      >
-                        {log.statusCode}
+                    {log.iteration !== null && (
+                      <Badge variant="outline" className="text-xs">
+                        #{log.iteration}
                       </Badge>
                     )}
                   </button>

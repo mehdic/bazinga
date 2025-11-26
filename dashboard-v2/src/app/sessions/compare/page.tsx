@@ -63,7 +63,7 @@ export default function CompareSessionsPage() {
   const totalTokensB = tokensB?.breakdown.reduce((sum, b) => sum + (b.total || 0), 0) || 0;
 
   const getDurationMs = (session: typeof dataA) => {
-    if (!session) return 0;
+    if (!session || !session.startTime) return 0;
     const start = new Date(session.startTime).getTime();
     const end = session.endTime ? new Date(session.endTime).getTime() : Date.now();
     return end - start;
@@ -72,10 +72,9 @@ export default function CompareSessionsPage() {
   const durationA = getDurationMs(dataA);
   const durationB = getDurationMs(dataB);
 
-  const criteriaMetA = dataA?.successCriteria?.filter((c) => c.status === "met").length || 0;
-  const criteriaTotalA = dataA?.successCriteria?.length || 0;
-  const criteriaMetB = dataB?.successCriteria?.filter((c) => c.status === "met").length || 0;
-  const criteriaTotalB = dataB?.successCriteria?.length || 0;
+  // Revision-based metrics (actual DB has revisionCount, not successCriteria)
+  const totalRevisionsA = dataA?.taskGroups?.reduce((sum, g) => sum + (g.revisionCount || 0), 0) || 0;
+  const totalRevisionsB = dataB?.taskGroups?.reduce((sum, g) => sum + (g.revisionCount || 0), 0) || 0;
 
   const getTrend = (a: number, b: number, lowerIsBetter = false) => {
     if (a === b) return <Minus className="h-4 w-4 text-muted-foreground" />;
@@ -207,22 +206,14 @@ export default function CompareSessionsPage() {
                 <div className="grid grid-cols-3 gap-4 items-center">
                   <div className="text-right flex items-center justify-end gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {dataA.mode === "parallel"
-                        ? `Parallel (${dataA.developerCount})`
-                        : "Simple"}
-                    </span>
+                    <span className="capitalize">{dataA.mode || "unknown"}</span>
                   </div>
                   <div className="text-center text-sm text-muted-foreground">
                     Mode
                   </div>
                   <div className="text-left flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {dataB.mode === "parallel"
-                        ? `Parallel (${dataB.developerCount})`
-                        : "Simple"}
-                    </span>
+                    <span className="capitalize">{dataB.mode || "unknown"}</span>
                   </div>
                 </div>
 
@@ -286,66 +277,64 @@ export default function CompareSessionsPage() {
             </CardContent>
           </Card>
 
-          {/* Success Criteria Comparison */}
+          {/* Revisions Comparison */}
           <Card>
             <CardHeader>
-              <CardTitle>Success Criteria Comparison</CardTitle>
+              <CardTitle>Task Groups & Revisions</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
-                {/* Session A Criteria */}
+                {/* Session A Task Groups */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Session A</span>
                     <Badge variant="outline">
-                      {criteriaMetA}/{criteriaTotalA} met
+                      {totalRevisionsA} total revisions
                     </Badge>
                   </div>
-                  <Progress
-                    value={criteriaTotalA > 0 ? (criteriaMetA / criteriaTotalA) * 100 : 0}
-                    className="h-2"
-                  />
                   <div className="space-y-2">
-                    {dataA.successCriteria?.map((c, i) => (
+                    {dataA.taskGroups?.map((g) => (
                       <div
-                        key={i}
+                        key={g.id}
                         className="flex items-center gap-2 text-sm"
                       >
-                        {c.status === "met" ? (
+                        {g.status === "completed" ? (
                           <CheckCircle2 className="h-4 w-4 text-green-500" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <span className="truncate">{c.criterion}</span>
+                        <span className="truncate flex-1">{g.name}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {g.revisionCount || 0} rev
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Session B Criteria */}
+                {/* Session B Task Groups */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Session B</span>
                     <Badge variant="outline">
-                      {criteriaMetB}/{criteriaTotalB} met
+                      {totalRevisionsB} total revisions
                     </Badge>
                   </div>
-                  <Progress
-                    value={criteriaTotalB > 0 ? (criteriaMetB / criteriaTotalB) * 100 : 0}
-                    className="h-2"
-                  />
                   <div className="space-y-2">
-                    {dataB.successCriteria?.map((c, i) => (
+                    {dataB.taskGroups?.map((g) => (
                       <div
-                        key={i}
+                        key={g.id}
                         className="flex items-center gap-2 text-sm"
                       >
-                        {c.status === "met" ? (
+                        {g.status === "completed" ? (
                           <CheckCircle2 className="h-4 w-4 text-green-500" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <span className="truncate">{c.criterion}</span>
+                        <span className="truncate flex-1">{g.name}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {g.revisionCount || 0} rev
+                        </Badge>
                       </div>
                     ))}
                   </div>

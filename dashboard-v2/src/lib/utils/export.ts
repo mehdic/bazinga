@@ -1,41 +1,31 @@
 // Export utilities for session data
+// Updated to match actual database schema
 
 export interface ExportableSession {
   sessionId: string;
-  status: string;
+  status: string | null;
   mode: string | null;
-  startTime: string;
+  startTime: string | null;
   endTime: string | null;
   originalRequirements: string | null;
-  developerCount: number | null;
   logs?: Array<{
     id: number;
     agentType: string;
-    statusCode: string | null;
     content: string;
-    timestamp: string;
-    modelTier: string | null;
+    timestamp: string | null;
   }>;
   taskGroups?: Array<{
-    groupId: string;
-    name: string | null;
-    status: string;
-    currentStage: string | null;
+    id: string;
+    name: string;
+    status: string | null;
     revisionCount: number | null;
     assignedTo: string | null;
     complexity: number | null;
   }>;
-  successCriteria?: Array<{
-    criterion: string;
-    status: string;
-    actual: string | null;
-  }>;
   tokenUsage?: Array<{
     agentType: string;
-    modelTier: string | null;
-    tokensUsed: number;
-    estimatedCost: number | null;
-    timestamp: string;
+    tokensEstimated: number;
+    timestamp: string | null;
   }>;
 }
 
@@ -96,10 +86,8 @@ export function exportSessionLogs(
   if (!logs || logs.length === 0) return;
 
   const csvData = logs.map((log) => ({
-    timestamp: log.timestamp,
+    timestamp: log.timestamp || "",
     agentType: log.agentType,
-    statusCode: log.statusCode || "",
-    modelTier: log.modelTier || "",
     content: log.content.slice(0, 500), // Truncate for CSV
   }));
 
@@ -113,11 +101,9 @@ export function exportTokenUsage(
   if (!tokens || tokens.length === 0) return;
 
   const csvData = tokens.map((token) => ({
-    timestamp: token.timestamp,
+    timestamp: token.timestamp || "",
     agentType: token.agentType,
-    modelTier: token.modelTier || "",
-    tokensUsed: token.tokensUsed,
-    estimatedCost: token.estimatedCost?.toFixed(6) || "0",
+    tokensEstimated: token.tokensEstimated,
   }));
 
   exportToCSV(csvData, `session-${sessionId}-tokens.csv`);

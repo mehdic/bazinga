@@ -38,7 +38,7 @@ export function ActiveSession() {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (!activeSession) return;
+    if (!activeSession || !activeSession.startTime) return;
 
     const start = new Date(activeSession.startTime).getTime();
     const interval = setInterval(() => {
@@ -102,11 +102,9 @@ export function ActiveSession() {
           <span className="text-muted-foreground">
             #{activeSession.sessionId.split("_").pop()?.slice(0, 8)}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 capitalize">
             <Users className="h-3 w-3" />
-            {activeSession.mode === "parallel"
-              ? `Parallel (${activeSession.developerCount} devs)`
-              : "Simple Mode"}
+            {activeSession.mode || "unknown"} mode
           </span>
         </div>
 
@@ -135,7 +133,7 @@ export function ActiveSession() {
           <div className="space-y-1">
             {taskGroups.slice(0, 4).map((group) => (
               <div
-                key={group.groupId}
+                key={group.id}
                 className="flex items-center justify-between text-xs"
               >
                 <span className="flex items-center gap-2">
@@ -149,7 +147,7 @@ export function ActiveSession() {
                   {group.name}
                 </span>
                 <Badge variant="outline" className="text-[10px]">
-                  {group.currentStage}
+                  {group.assignedTo || "pending"}
                 </Badge>
               </div>
             ))}

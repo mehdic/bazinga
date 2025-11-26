@@ -73,7 +73,7 @@ export default function SessionDetailPage() {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (!session || session.status !== "active") return;
+    if (!session || session.status !== "active" || !session.startTime) return;
 
     const start = new Date(session.startTime).getTime();
     const interval = setInterval(() => {
@@ -170,11 +170,9 @@ export default function SessionDetailPage() {
                     startTime: session.startTime,
                     endTime: session.endTime,
                     originalRequirements: session.originalRequirements,
-                    developerCount: session.developerCount,
                     logs: session.logs,
                     taskGroups: session.taskGroups,
-                    successCriteria: session.successCriteria,
-                    tokenUsage: tokenData?.timeline,
+                    tokenUsage: session.tokenUsage,
                   })
                 }
               >
@@ -207,9 +205,7 @@ export default function SessionDetailPage() {
               <span className="text-sm text-muted-foreground">Mode</span>
               <p className="font-medium flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                {session.mode === "parallel"
-                  ? `Parallel (${session.developerCount} devs)`
-                  : "Simple Mode"}
+                {session.mode === "parallel" ? "Parallel Mode" : "Simple Mode"}
               </p>
             </div>
             <div>
@@ -218,7 +214,7 @@ export default function SessionDetailPage() {
                 <Clock className="h-4 w-4" />
                 {session.status === "active"
                   ? formatDuration(elapsed)
-                  : session.endTime
+                  : session.endTime && session.startTime
                   ? formatDuration(
                       new Date(session.endTime).getTime() -
                         new Date(session.startTime).getTime()
@@ -323,7 +319,7 @@ export default function SessionDetailPage() {
         <TabsContent value="tasks" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {taskGroups.map((group) => (
-              <Card key={group.groupId}>
+              <Card key={group.id}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{group.name}</CardTitle>
@@ -336,15 +332,11 @@ export default function SessionDetailPage() {
                           : "outline"
                       }
                     >
-                      {group.status}
+                      {group.status || "pending"}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Stage</span>
-                    <span>{group.currentStage}</span>
-                  </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Revisions</span>
                     <span
@@ -447,51 +439,17 @@ export default function SessionDetailPage() {
         <TabsContent value="quality">
           <Card>
             <CardHeader>
-              <CardTitle>Success Criteria</CardTitle>
+              <CardTitle>Quality Checks</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {session.successCriteria?.map((criterion) => (
-                  <div
-                    key={criterion.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      {criterion.status === "met" ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      ) : criterion.status === "failed" ? (
-                        <XCircle className="h-5 w-5 text-red-500" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-muted-foreground" />
-                      )}
-                      <div>
-                        <p className="font-medium">{criterion.criterion}</p>
-                        {criterion.actual && (
-                          <p className="text-sm text-muted-foreground">
-                            {criterion.actual}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Badge
-                      variant={
-                        criterion.status === "met"
-                          ? "secondary"
-                          : criterion.status === "failed"
-                          ? "destructive"
-                          : "outline"
-                      }
-                    >
-                      {criterion.status}
-                    </Badge>
-                  </div>
-                ))}
-                {(!session.successCriteria || session.successCriteria.length === 0) && (
-                  <div className="py-12 text-center">
-                    <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No success criteria defined</p>
-                  </div>
-                )}
+              <div className="py-12 text-center">
+                <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Quality metrics from skill outputs will appear here
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Check the Skills tab for detailed analysis results
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -523,11 +481,11 @@ export default function SessionDetailPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium">{log.agentType}</span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(log.timestamp).toLocaleTimeString()}
+                            {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "Unknown"}
                           </span>
-                          {log.statusCode && (
+                          {log.iteration !== null && (
                             <Badge variant="secondary" className="text-xs">
-                              {log.statusCode}
+                              Iter #{log.iteration}
                             </Badge>
                           )}
                         </div>

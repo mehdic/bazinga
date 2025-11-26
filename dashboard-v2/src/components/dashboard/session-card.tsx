@@ -39,9 +39,9 @@ export function SessionCard({ session, showDetails = false }: SessionCardProps) 
             <span className="text-muted-foreground">#</span>
             {shortId}
           </CardTitle>
-          <Badge variant={getStatusBadgeVariant(session.status)}>
-            <span className="mr-1">{statusIcon[session.status] || null}</span>
-            {session.status}
+          <Badge variant={getStatusBadgeVariant(session.status || "pending")}>
+            <span className="mr-1">{statusIcon[session.status || ""] || null}</span>
+            {session.status || "pending"}
           </Badge>
         </div>
       </CardHeader>
@@ -59,9 +59,9 @@ export function SessionCard({ session, showDetails = false }: SessionCardProps) 
             <Clock className="h-3 w-3" />
             {timeAgo(session.startTime)}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 capitalize">
             <Users className="h-3 w-3" />
-            {session.mode === "parallel" ? `${session.developerCount} devs` : "Simple"}
+            {session.mode || "unknown"}
           </span>
         </div>
 

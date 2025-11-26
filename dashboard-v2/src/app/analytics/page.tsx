@@ -15,7 +15,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -42,12 +41,6 @@ const AGENT_COLORS: Record<string, string> = {
   senior_engineer: "#14b8a6",
 };
 
-const MODEL_COLORS: Record<string, string> = {
-  opus: "#f97316",
-  sonnet: "#8b5cf6",
-  haiku: "#22c55e",
-};
-
 const AGENT_ICONS: Record<string, React.ElementType> = {
   pm: User,
   developer: Code,
@@ -61,28 +54,17 @@ export default function AnalyticsPage() {
   const { data: agentMetrics } = trpc.sessions.getAgentMetrics.useQuery();
   const { data: recentSessions } = trpc.sessions.list.useQuery({ limit: 10 });
 
-  // Prepare chart data
+  // Prepare chart data - simplified without model tier and cost data
   const tokensByAgentData = agentMetrics?.tokensByAgent.map((item) => ({
     name: item.agentType,
     tokens: item.totalTokens || 0,
-    cost: item.totalCost || 0,
     invocations: item.invocations || 0,
   })) || [];
 
-  const tokensByModelData = agentMetrics?.tokensByModel.map((item) => ({
-    name: item.modelTier || "unknown",
-    tokens: item.totalTokens || 0,
-    cost: item.totalCost || 0,
-  })) || [];
-
+  // Log counts by agent (simplified without status codes)
   const logsByAgentData = agentMetrics?.logsByAgent.map((item) => ({
     name: item.agentType,
     total: item.logCount || 0,
-    blocked: item.blockedCount || 0,
-    failed: item.failedCount || 0,
-    successRate: item.logCount
-      ? (((item.logCount - (item.blockedCount || 0) - (item.failedCount || 0)) / item.logCount) * 100)
-      : 100,
   })) || [];
 
   const revisionRate = agentMetrics?.revisionStats.totalGroups
@@ -209,45 +191,43 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Token Distribution by Model */}
+        {/* Invocations by Agent */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
-              Tokens by Model Tier
+              Agent Invocations
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {tokensByModelData.length > 0 ? (
+            {tokensByAgentData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={tokensByModelData} layout="vertical">
+                <BarChart data={tokensByAgentData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     type="number"
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
-                    tickFormatter={(value) => formatTokens(value)}
                   />
                   <YAxis
                     type="category"
                     dataKey="name"
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
-                    width={60}
+                    width={80}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatTokens(value)}
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
                     }}
                   />
-                  <Bar dataKey="tokens" name="Tokens">
-                    {tokensByModelData.map((entry, index) => (
+                  <Bar dataKey="invocations" name="Invocations">
+                    {tokensByAgentData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={MODEL_COLORS[entry.name] || "#6b7280"}
+                        fill={AGENT_COLORS[entry.name] || "#6b7280"}
                       />
                     ))}
                   </Bar>
@@ -262,18 +242,19 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Agent Performance Table */}
+      {/* Agent Activity Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Agent Performance Breakdown
+            Agent Activity Breakdown
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {logsByAgentData.map((agent) => {
               const Icon = AGENT_ICONS[agent.name] || Bot;
+              const tokenData = tokensByAgentData.find((t) => t.name === agent.name);
               return (
                 <div
                   key={agent.name}
@@ -293,18 +274,15 @@ export default function AnalyticsPage() {
                       <span className="font-medium capitalize">{agent.name.replace("_", " ")}</span>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{agent.total} logs</Badge>
-                        {agent.blocked > 0 && (
-                          <Badge variant="destructive" className="gap-1">
-                            <AlertTriangle className="h-3 w-3" />
-                            {agent.blocked} blocked
-                          </Badge>
-                        )}
+                        <Badge variant="secondary">
+                          {formatTokens(tokenData?.tokens || 0)} tokens
+                        </Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Progress value={agent.successRate} className="h-2 flex-1" />
-                      <span className="text-sm text-muted-foreground w-16 text-right">
-                        {agent.successRate.toFixed(0)}% OK
+                      <Progress value={100} className="h-2 flex-1" />
+                      <span className="text-sm text-muted-foreground w-20 text-right">
+                        {tokenData?.invocations || 0} calls
                       </span>
                     </div>
                   </div>
@@ -384,7 +362,7 @@ export default function AnalyticsPage() {
                     #{session.sessionId.split("_").pop()?.slice(0, 8)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {session.mode} mode • {new Date(session.startTime).toLocaleDateString()}
+                    {session.mode} mode • {session.startTime ? new Date(session.startTime).toLocaleDateString() : "Unknown"}
                   </p>
                 </div>
                 <div className="text-right">

@@ -21,10 +21,11 @@ import {
   Check,
 } from "lucide-react";
 
+// SkillOutput matching actual database schema
 interface SkillOutput {
   id: number;
   sessionId: string;
-  timestamp: string;
+  timestamp: string | null;
   skillName: string;
   outputData: Record<string, unknown> | string;
 }
@@ -202,7 +203,7 @@ function SkillCard({ output }: { output: SkillOutput }) {
             <div>
               <CardTitle className="text-base">{config.label}</CardTitle>
               <p className="text-xs text-muted-foreground">
-                {formatRelativeTime(new Date(output.timestamp))}
+                {output.timestamp ? formatRelativeTime(new Date(output.timestamp)) : "Unknown time"}
               </p>
             </div>
           </div>

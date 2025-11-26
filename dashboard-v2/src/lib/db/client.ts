@@ -14,7 +14,7 @@ function getDatabase() {
   if (!_sqlite) {
     try {
       _sqlite = new Database(DB_PATH, { readonly: true });
-      _sqlite.pragma("journal_mode = WAL");
+      // Note: WAL mode not set - requires write access, but we're read-only
     } catch (error) {
       // During build time or when database doesn't exist, return a mock
       console.warn(`Database not available at ${DB_PATH}:`, error);

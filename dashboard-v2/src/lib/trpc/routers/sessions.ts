@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../server";
 import { db } from "../../db/client";
-import { sessions, orchestrationLogs, taskGroups, successCriteria, tokenUsage, stateSnapshots, skillOutputs, decisions } from "../../db/schema";
+import { sessions, orchestrationLogs, taskGroups, tokenUsage, stateSnapshots, skillOutputs, decisions } from "../../db/schema";
 import { desc, eq, and, gte, lte, like, count, sql } from "drizzle-orm";
 
 export const sessionsRouter = router({
@@ -18,8 +18,6 @@ export const sessionsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = db.select().from(sessions);
-
       // Build where conditions
       const conditions = [];
       if (input.status !== "all") {
@@ -70,8 +68,8 @@ export const sessionsRouter = router({
         return null;
       }
 
-      // Fetch related data
-      const [logs, groups, criteria, tokens, snapshots] = await Promise.all([
+      // Fetch related data (no successCriteria table in actual DB)
+      const [logs, groups, tokens, snapshots] = await Promise.all([
         db
           .select()
           .from(orchestrationLogs)
@@ -82,10 +80,6 @@ export const sessionsRouter = router({
           .select()
           .from(taskGroups)
           .where(eq(taskGroups.sessionId, input.sessionId)),
-        db
-          .select()
-          .from(successCriteria)
-          .where(eq(successCriteria.sessionId, input.sessionId)),
         db
           .select()
           .from(tokenUsage)
@@ -103,7 +97,6 @@ export const sessionsRouter = router({
         ...session[0],
         logs,
         taskGroups: groups,
-        successCriteria: criteria,
         tokenUsage: tokens,
         stateSnapshots: snapshots,
       };
@@ -118,9 +111,9 @@ export const sessionsRouter = router({
       db.select({ count: count() }).from(sessions).where(eq(sessions.status, "failed")),
     ]);
 
-    // Get total tokens
+    // Get total tokens (using tokensEstimated column)
     const tokensResult = await db
-      .select({ total: sql<number>`COALESCE(SUM(${tokenUsage.tokensUsed}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${tokenUsage.tokensEstimated}), 0)` })
       .from(tokenUsage);
 
     const total = totalResult[0]?.count || 0;
@@ -176,19 +169,18 @@ export const sessionsRouter = router({
     }),
 
   // Get token usage breakdown for a session
+  // Note: Actual DB has tokensEstimated, no modelTier or estimatedCost
   getTokenBreakdown: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ input }) => {
       const breakdown = await db
         .select({
           agentType: tokenUsage.agentType,
-          modelTier: tokenUsage.modelTier,
-          total: sql<number>`SUM(${tokenUsage.tokensUsed})`,
-          cost: sql<number>`SUM(${tokenUsage.estimatedCost})`,
+          total: sql<number>`SUM(${tokenUsage.tokensEstimated})`,
         })
         .from(tokenUsage)
         .where(eq(tokenUsage.sessionId, input.sessionId))
-        .groupBy(tokenUsage.agentType, tokenUsage.modelTier);
+        .groupBy(tokenUsage.agentType);
 
       const timeline = await db
         .select()
@@ -201,35 +193,22 @@ export const sessionsRouter = router({
 
   // Get agent performance metrics across all sessions
   getAgentMetrics: publicProcedure.query(async () => {
-    // Tokens by agent type
+    // Tokens by agent type (using tokensEstimated)
     const tokensByAgent = await db
       .select({
         agentType: tokenUsage.agentType,
-        totalTokens: sql<number>`SUM(${tokenUsage.tokensUsed})`,
-        totalCost: sql<number>`SUM(${tokenUsage.estimatedCost})`,
+        totalTokens: sql<number>`SUM(${tokenUsage.tokensEstimated})`,
         invocations: sql<number>`COUNT(*)`,
       })
       .from(tokenUsage)
       .groupBy(tokenUsage.agentType);
 
-    // Tokens by model tier
-    const tokensByModel = await db
-      .select({
-        modelTier: tokenUsage.modelTier,
-        totalTokens: sql<number>`SUM(${tokenUsage.tokensUsed})`,
-        totalCost: sql<number>`SUM(${tokenUsage.estimatedCost})`,
-        invocations: sql<number>`COUNT(*)`,
-      })
-      .from(tokenUsage)
-      .groupBy(tokenUsage.modelTier);
-
     // Log counts by agent (activity level)
+    // Note: No statusCode column in actual DB
     const logsByAgent = await db
       .select({
         agentType: orchestrationLogs.agentType,
         logCount: sql<number>`COUNT(*)`,
-        blockedCount: sql<number>`SUM(CASE WHEN ${orchestrationLogs.statusCode} = 'BLOCKED' THEN 1 ELSE 0 END)`,
-        failedCount: sql<number>`SUM(CASE WHEN ${orchestrationLogs.statusCode} = 'FAILED' THEN 1 ELSE 0 END)`,
       })
       .from(orchestrationLogs)
       .groupBy(orchestrationLogs.agentType);
@@ -245,7 +224,6 @@ export const sessionsRouter = router({
 
     return {
       tokensByAgent,
-      tokensByModel,
       logsByAgent,
       revisionStats: revisionStats[0] || { totalGroups: 0, revisedGroups: 0, avgRevisions: 0 },
     };

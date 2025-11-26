@@ -83,7 +83,8 @@ export function getStatusBadgeVariant(status: string): "default" | "secondary" |
   }
 }
 
-export function timeAgo(date: Date | string): string {
+export function timeAgo(date: Date | string | null | undefined): string {
+  if (!date) return "Unknown";
   const now = new Date();
   const then = new Date(date);
   const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
@@ -95,7 +96,8 @@ export function timeAgo(date: Date | string): string {
   return then.toLocaleDateString();
 }
 
-export function formatRelativeTime(date: Date | string): string {
+export function formatRelativeTime(date: Date | string | null | undefined): string {
+  if (!date) return "Unknown";
   const now = new Date();
   const then = new Date(date);
   const diff = now.getTime() - then.getTime();

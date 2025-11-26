@@ -11,15 +11,15 @@ import { Search, X, Filter, FileText } from "lucide-react";
 
 // Agent types for filtering
 const AGENT_TYPES = ["pm", "developer", "qa_expert", "tech_lead", "orchestrator", "investigator"];
-const MODEL_TIERS = ["opus", "sonnet", "haiku"];
 
+// Log entry matching actual database schema
 interface LogEntry {
   id: number;
   agentType: string;
-  statusCode: string | null;
   content: string;
-  timestamp: string;
-  modelTier: string | null;
+  timestamp: string | null;
+  iteration: number | null;
+  agentId: string | null;
 }
 
 interface LogFiltersProps {
@@ -29,9 +29,7 @@ interface LogFiltersProps {
 export function LogFilters({ logs }: LogFiltersProps) {
   const [search, setSearch] = useState("");
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
 
-  // Filter logs based on search and selections
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       // Search filter
@@ -44,18 +42,9 @@ export function LogFilters({ logs }: LogFiltersProps) {
         return false;
       }
 
-      // Model filter
-      if (
-        selectedModels.length > 0 &&
-        log.modelTier &&
-        !selectedModels.includes(log.modelTier)
-      ) {
-        return false;
-      }
-
       return true;
     });
-  }, [logs, search, selectedAgents, selectedModels]);
+  }, [logs, search, selectedAgents]);
 
   const toggleAgent = (agent: string) => {
     setSelectedAgents((prev) =>
@@ -63,23 +52,15 @@ export function LogFilters({ logs }: LogFiltersProps) {
     );
   };
 
-  const toggleModel = (model: string) => {
-    setSelectedModels((prev) =>
-      prev.includes(model) ? prev.filter((m) => m !== model) : [...prev, model]
-    );
-  };
-
   const clearFilters = () => {
     setSearch("");
     setSelectedAgents([]);
-    setSelectedModels([]);
   };
 
-  const hasFilters = search || selectedAgents.length > 0 || selectedModels.length > 0;
+  const hasFilters = search || selectedAgents.length > 0;
 
-  // Get unique agents and models from logs
+  // Get unique agents from logs
   const availableAgents = Array.from(new Set(logs.map((l) => l.agentType)));
-  const availableModels = Array.from(new Set(logs.map((l) => l.modelTier).filter(Boolean))) as string[];
 
   return (
     <Card>
@@ -87,126 +68,98 @@ export function LogFilters({ logs }: LogFiltersProps) {
         <div className="flex items-center justify-between">
           <CardTitle>Orchestration Logs</CardTitle>
           <Badge variant="outline">
-            {filteredLogs.length} of {logs.length}
+            {filteredLogs.length} of {logs.length} logs
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search */}
+        {/* Search & Filters */}
+        <div className="flex flex-col gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search in logs..."
+              placeholder="Search logs..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-8"
             />
-            {search && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
-                onClick={() => setSearch("")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
           </div>
 
-          {/* Filter Pills */}
+          {/* Agent Filters */}
           <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Filter className="h-4 w-4" />
-              Agents:
-            </div>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Filter className="h-3 w-3" /> Agents:
+            </span>
             {availableAgents.map((agent) => (
-              <Badge
+              <Button
                 key={agent}
                 variant={selectedAgents.includes(agent) ? "default" : "outline"}
-                className="cursor-pointer"
+                size="sm"
                 onClick={() => toggleAgent(agent)}
+                className="h-6 px-2 text-xs"
               >
                 {agent}
-              </Badge>
+              </Button>
             ))}
           </div>
 
-          {availableModels.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <Filter className="h-4 w-4" />
-                Models:
-              </div>
-              {availableModels.map((model) => (
-                <Badge
-                  key={model}
-                  variant={selectedModels.includes(model) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleModel(model)}
-                >
-                  {model}
-                </Badge>
-              ))}
-            </div>
-          )}
-
           {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              <X className="h-4 w-4 mr-1" />
-              Clear filters
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="w-fit text-xs"
+            >
+              <X className="h-3 w-3 mr-1" /> Clear filters
             </Button>
           )}
         </div>
 
-        {/* Log Entries */}
+        {/* Log List */}
         <ScrollArea className="h-[500px]">
-          <div className="space-y-2">
+          <div className="space-y-2 pr-4">
             {filteredLogs.map((log) => (
               <div
                 key={log.id}
-                className="flex gap-4 rounded-lg border p-3 text-sm"
+                className="rounded-lg border bg-card p-3 space-y-2"
               >
-                <div className="flex-shrink-0">
-                  <Badge variant="outline">{log.agentType}</Badge>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                    {log.statusCode && (
-                      <Badge
-                        variant={
-                          log.statusCode === "BLOCKED" || log.statusCode === "FAILED"
-                            ? "destructive"
-                            : "secondary"
-                        }
-                        className="text-xs"
-                      >
-                        {log.statusCode}
-                      </Badge>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        log.agentType === "pm" && "bg-purple-500/20 text-purple-500",
+                        log.agentType === "developer" && "bg-blue-500/20 text-blue-500",
+                        log.agentType === "qa_expert" && "bg-green-500/20 text-green-500",
+                        log.agentType === "tech_lead" && "bg-orange-500/20 text-orange-500",
+                        log.agentType === "orchestrator" && "bg-gray-500/20"
+                      )}
+                    >
+                      {log.agentType}
+                    </Badge>
+                    {log.agentId && (
+                      <span className="text-xs text-muted-foreground">
+                        {log.agentId}
+                      </span>
                     )}
-                    {log.modelTier && (
-                      <Badge variant="outline" className="text-xs">
-                        {log.modelTier}
-                      </Badge>
+                    {log.iteration !== null && (
+                      <span className="text-xs text-muted-foreground">
+                        Iter #{log.iteration}
+                      </span>
                     )}
                   </div>
-                  <p className="text-muted-foreground">
-                    {search ? (
-                      <HighlightText text={log.content.slice(0, 300)} search={search} />
-                    ) : (
-                      <>
-                        {log.content.slice(0, 300)}
-                        {log.content.length > 300 && "..."}
-                      </>
-                    )}
-                  </p>
+                  <span className="text-xs text-muted-foreground">
+                    {log.timestamp
+                      ? new Date(log.timestamp).toLocaleTimeString()
+                      : "Unknown time"}
+                  </span>
                 </div>
+                <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+                  {log.content}
+                </p>
               </div>
             ))}
+
             {filteredLogs.length === 0 && (
               <div className="py-12 text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -219,27 +172,5 @@ export function LogFilters({ logs }: LogFiltersProps) {
         </ScrollArea>
       </CardContent>
     </Card>
-  );
-}
-
-// Helper component to highlight search matches
-function HighlightText({ text, search }: { text: string; search: string }) {
-  if (!search) return <>{text}</>;
-
-  const parts = text.split(new RegExp(`(${search})`, "gi"));
-
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.toLowerCase() === search.toLowerCase() ? (
-          <mark key={i} className="bg-yellow-500/30 rounded px-0.5">
-            {part}
-          </mark>
-        ) : (
-          part
-        )
-      )}
-      {text.length > 300 && "..."}
-    </>
   );
 }
