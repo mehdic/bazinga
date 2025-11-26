@@ -827,11 +827,13 @@ def main():
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)
                 sys.exit(1)
-            sql = cmd_args[0]
+            # Join args to allow unquoted SQL: query SELECT * FROM table
+            sql = " ".join(cmd_args)
             result = db.query(sql)
             print(json.dumps(result, indent=2))
         elif cmd == 'help':
             print_help()
+            sys.exit(0)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             print("\nRun with 'help' command to see available commands.", file=sys.stderr)
