@@ -77,59 +77,32 @@ All user-visible updates MUST use the capsule format:
 - ✅ **BAZINGA** - Show completion summary
 - ⚠️ **System Warnings** - Report DB failures, fallbacks, critical errors
 
-**Examples:**
+**Examples:** See `bazinga/templates/message_templates.md` for complete catalog. Quick sample:
 ```
-🚀 Starting orchestration | Session: bazinga_20251117_143530
-
-📋 Planning complete | 3 parallel groups: JWT auth (5 files), User reg (3 files), Password reset (4 files) | Starting development → Groups A, B, C
-
-🔨 Group A implementing | auth_middleware.py + jwt_utils.py created, 12 tests added (92% coverage) | Tests passing → QA review
-
-✅ Group A approved | Security clear, 0 lint issues, architecture solid | Complete (1/3 groups)
+🚀 Starting orchestration | Session: {session_id}
+📋 Planning complete | {mode}: {groups} | Starting development
+🔨 Group {id} complete | {files}, {tests} ({coverage}%) | {status} → {next}
+✅ Group {id} approved | {quality_summary} | Complete ({N}/{total})
 ```
 
-**Reference:** Use the complete template catalog from `bazinga/templates/message_templates.md` (loaded at initialization).
-
-**Summary vs Artifact Separation:**
-
-**Main transcript (user sees):** Compact capsule summaries only
-**Artifacts (linked):** Detailed outputs, test results, scan reports
-
-**Examples:**
-- ⚠️ 12 tests failed → See artifacts/bazinga_123/qa_failures.md
-- 📊 Coverage 78% (2 files below threshold) → See artifacts/bazinga_123/skills/coverage_report.json
-- 🔬 Investigation: 3 hypotheses → See artifacts/bazinga_123/investigation_group_c.md
-
-**Key Change from V3:**
-- V3: Always 2 agents (dev → tech lead → BAZINGA)
-- Claude Code Multi-Agent Dev Team: Adaptive 2-6 agents (PM decides mode → agents work → PM sends BAZINGA)
+**Artifact separation:** Main transcript = capsules only. Link to `artifacts/{session_id}/` for details > 3 lines.
 
 ---
 
-## 📊 Agent Response Parsing for Capsule Construction
+## 📊 Agent Response Parsing
 
-**⚠️ NOTE:** You loaded the complete parsing guide (`bazinga/templates/response_parsing.md`) during initialization. Use the patterns and fallback strategies from that guide throughout this session.
+**Use `bazinga/templates/response_parsing.md`** (loaded at init) for extraction patterns and fallbacks.
 
-**Quick Reference:**
+**Micro-summary (mission-critical statuses):**
+| Agent | Key Statuses to Extract |
+|-------|------------------------|
+| Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR |
+| QA Expert | PASS, FAIL, PARTIAL, BLOCKED, ESCALATE_SENIOR |
+| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
+| PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
+| Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
 
-For each agent type, extract:
-- **Developer**: Status (READY_FOR_QA/REVIEW/BLOCKED/PARTIAL), files, tests, coverage
-- **QA Expert**: Status (PASS/FAIL/PARTIAL), test results, failures, quality signals
-- **Tech Lead**: Decision (APPROVED/CHANGES_REQUESTED/ESCALATE/INVESTIGATION), security/lint issues
-- **PM**: Status (BAZINGA/CONTINUE/CLARIFY), mode decision, task groups
-- **Investigator**: Status (ROOT_CAUSE_FOUND/NEED_DIAGNOSTIC/etc.), hypotheses
-
-**Parsing principle:** Best-effort extraction with fallbacks. Never fail on missing data.
-
-**Capsule templates (examples):**
-```
-🔨 Developer: Group {id} complete | {summary}, {files}, {tests} ({coverage}%) | {status} → {next}
-✅ QA: Group {id} passing | {passed}/{total} tests, {coverage}%, {quality} | → Tech Lead
-✅ Tech Lead: Group {id} approved | {quality_summary} | Complete ({N}/{total} groups)
-📋 PM: Planning complete | {mode}: {groups} | Starting development
-```
-
-**Detailed extraction patterns, fallback strategies, and complete examples:** Use the patterns from `bazinga/templates/response_parsing.md` (loaded at initialization)
+**Principle:** Best-effort extraction with fallbacks. Never fail on missing data.
 
 ---
 
@@ -942,23 +915,7 @@ IF status = INVESTIGATION_NEEDED:
 
 **Apply fallbacks:** If data missing, scan for "parallel", "simple", group names.
 
-**Step 4: Log PM interaction:**
-```
-bazinga-db, please log this pm interaction:
-
-Session ID: [session_id]
-Agent Type: pm
-Content: [pm_response]
-Iteration: 1
-Agent ID: pm_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Step 4: Log PM interaction** — Use §Logging Reference pattern. Agent ID: `pm_main`.
 
 **AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
 
@@ -1227,43 +1184,19 @@ ELSE IF PM chose "parallel":
 
 ### Step 2A.1: Spawn Single Developer
 
-**User output (capsule format):**
-```
-🔨 Implementing | Spawning developer for {brief_task_description}
-```
+**User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
 
 ### 🔴 MANDATORY DEVELOPER/SSE PROMPT BUILDING (PM Tier Decision)
 
-**Step 1: Check PM's Initial Tier decision for this task group:**
-- Extract `Initial Tier` from PM's task group output (Developer OR Senior Software Engineer)
-- If PM said "Senior Software Engineer" → Use `agents/senior_software_engineer.md` + `MODEL_CONFIG["senior_software_engineer"]`
-- If PM said "Developer" (or not specified) → Use `agents/developer.md` + `MODEL_CONFIG["developer"]`
+**Tier selection (from PM's Initial Tier):**
+| PM Decision | Agent File | Model | Description |
+|-------------|------------|-------|-------------|
+| Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev: {task[:40]}` |
+| Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE: {task[:40]}` |
 
-**Step 2: Build prompt based on tier:**
+**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
-**IF Initial Tier = Developer:**
-- Read `agents/developer.md`
-- Model: `MODEL_CONFIG["developer"]` (default: haiku)
-- Description: `f"Dev: {task_name[:40]}"`
-
-**IF Initial Tier = Senior Software Engineer:**
-- Read `agents/senior_software_engineer.md`
-- Model: `MODEL_CONFIG["senior_software_engineer"]` (default: sonnet)
-- Description: `f"SSE: {task_name[:40]}"`
-
-**Step 3: Add config from `bazinga/templates/prompt_building.md`** (testing_config.json + skills_config.json for selected tier)
-
-**Step 4: Include:** Agent=[Developer|SSE], Group=main, Mode=Simple, Session ID, Branch, Skills/Testing source, Task (from PM)
-
-**Step 5: Validate:** ✓ Skill invocations, ✓ MANDATORY WORKFLOW, ✓ Testing mode, ✓ Report format
-
-**Step 6: Spawn:**
-```
-# Use model from MODEL_CONFIG, NOT hardcoded
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])
-```
-
-**🔴 CRITICAL: Follow PM's tier decision. DO NOT override with your own escalation logic for initial spawn.**
+**🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
 
 ### Step 2A.2: Receive Developer Response
@@ -1309,25 +1242,9 @@ IF status = ESCALATE_SENIOR:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log developer interaction:**
-```
-bazinga-db, please log this developer interaction:
+**Step 4: Log developer interaction** — Use §Logging Reference pattern. Agent ID: `developer_main`.
 
-Session ID: [session_id]
-Agent Type: developer
-Content: [dev_response]
-Iteration: [iteration]
-Agent ID: developer_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
-
-**AFTER logging: IMMEDIATELY continue to Step 2A.3 (Route Developer Response). Do NOT stop.**
+**AFTER logging: IMMEDIATELY continue to Step 2A.3. Do NOT stop.**
 
 ### Step 2A.3: Route Developer Response
 
@@ -1481,25 +1398,9 @@ IF status = ESCALATE_SENIOR:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log QA interaction:**
-```
-bazinga-db, please log this QA interaction:
+**Step 4: Log QA interaction** — Use §Logging Reference pattern. Agent ID: `qa_main`.
 
-Session ID: [session_id]
-Agent Type: qa_expert
-Content: [QA response]
-Iteration: [iteration]
-Agent ID: qa_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
-
-**AFTER logging QA response: IMMEDIATELY continue to Step 2A.5 (Route QA Response). Do NOT stop.**
+**AFTER logging: IMMEDIATELY continue to Step 2A.5. Do NOT stop.**
 
 ---
 
@@ -1606,25 +1507,9 @@ IF decision = ESCALATE_TO_OPUS:
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log Tech Lead interaction:**
-```
-bazinga-db, please log this techlead interaction:
+**Step 4: Log Tech Lead interaction** — Use §Logging Reference pattern. Agent ID: `techlead_main`.
 
-Session ID: [session_id]
-Agent Type: techlead
-Content: [tl_response]
-Iteration: [iteration]
-Agent ID: techlead_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
-
-**AFTER logging Tech Lead response: IMMEDIATELY continue to Step 2A.7 (Route Tech Lead Response). Do NOT stop.**
+**AFTER logging: IMMEDIATELY continue to Step 2A.7. Do NOT stop.**
 
 ---
 
@@ -1751,21 +1636,7 @@ Task(
 
 **After Tech Lead responds:**
 
-**Log Tech Lead validation:**
-```
-bazinga-db, please log this techlead interaction:
-
-Session ID: [session_id]
-Agent Type: techlead
-Content: [Tech Lead validation response]
-Iteration: [iteration]
-Agent ID: techlead_validation
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
+**Log Tech Lead validation** — Use §Logging Reference pattern. Agent ID: `techlead_validation`.
 
 **Tech Lead Decision:**
 - Reviews Investigator's logic
@@ -1923,23 +1794,7 @@ Skill(command: "velocity-tracker")
 
 
 
-**Log PM interaction:**
-```
-bazinga-db, please log this pm interaction:
-
-Session ID: [session_id]
-Agent Type: pm
-Content: [pm_response]
-Iteration: [iteration]
-Agent ID: pm_final
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Log PM interaction** — Use §Logging Reference pattern. Agent ID: `pm_final`.
 
 ### Step 2A.9: Route PM Response (Simple Mode)
 
@@ -2075,58 +1930,24 @@ About to spawn {parallel_count} developers in parallel.
 
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
-Process internally (parallel spawning is already announced in planning complete message - no additional spawn message needed).
+**🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism. Multiple Task() calls in one message execute in PARALLEL.
 
-**🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism:
+**Per-group tier selection (from PM's Initial Tier per group):**
+| PM Tier Decision | Agent File | Model | Description |
+|------------------|------------|-------|-------------|
+| Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev {group}: {task[:30]}` |
+| Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE {group}: {task[:30]}` |
 
-When you make multiple Task() calls in a single message, they execute in PARALLEL. This is essential for parallel mode performance.
+**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
-**Build contextual Task descriptions for each group (respecting PM's tier decision):**
-```python
-# Step 1: Get task_groups from database (queried at Step 1.4)
-# Step 2: For EACH group being spawned:
-for group in groups_to_spawn:  # e.g., groups A, B, C
-    # Get task info from task_groups including initial_tier
-    task = next((t for t in task_groups if t.group_id == group.id), None)
-    if task:
-        task_name = task.name or group.id
-        initial_tier = task.initial_tier or "Developer"  # Default to Developer
-    else:
-        task_name = group.id
-        initial_tier = "Developer"
-
-    # Truncate to 30 chars
-    truncated = task_name[:30] + ("..." if len(task_name) > 30 else "")
-
-    # Build description based on tier
-    if initial_tier == "Senior Software Engineer":
-        descriptions[group.id] = f"SSE {group.id}: {truncated}"
-        models[group.id] = MODEL_CONFIG["senior_software_engineer"]
-        agent_file[group.id] = "agents/senior_software_engineer.md"
-    else:
-        descriptions[group.id] = f"Dev {group.id}: {truncated}"
-        models[group.id] = MODEL_CONFIG["developer"]
-        agent_file[group.id] = "agents/developer.md"
-
-# Step 3: Spawn all in parallel (EACH with its own tier/model)
+**Spawn ALL in ONE message (up to 4 groups):**
+```
+Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
+Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
+... # Each group may have different tier (haiku vs sonnet)
 ```
 
-**Spawn (using PM's tier decision per group):**
-```
-# Model comes from MODEL_CONFIG based on PM's initial_tier decision per group
-Task(subagent_type: "general-purpose", model: models["A"], description: descriptions["A"], prompt: [Group A prompt])
-Task(subagent_type: "general-purpose", model: models["B"], description: descriptions["B"], prompt: [Group B prompt])
-Task(subagent_type: "general-purpose", model: models["C"], description: descriptions["C"], prompt: [Group C prompt])
-... up to 4 groups max
-```
-
-**🔴 CRITICAL: Each group may have different tier. Group A might be Developer (haiku) while Group B is SSE (sonnet).**
-
-**DO NOT spawn them in separate messages** - that would make them run sequentially, defeating the purpose of parallel mode.
-
-### 🔴 MANDATORY DEVELOPER PROMPT BUILDING (PARALLEL MODE)
-
-**Build PER GROUP:** 1) Read `agents/developer.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json developer section), 3) Include: Agent=Developer, Group=[A/B/C/D], Mode=Parallel, Session ID (actual value), Branch (group branch), Skills/Testing source, Task (from PM for group). **Validate EACH:** ✓ Skill(command:, ✓ MANDATORY WORKFLOW, ✓ Group branch, ✓ Testing mode, ✓ Report format. **Descriptions:** Use Step 2B.1 code (task_groups iteration, 30 char truncation). **CRITICAL:** Build ALL prompts BEFORE spawning. Spawn in ONE message for parallelism.
+**🔴 DO NOT spawn in separate messages** — that makes them sequential, defeating parallel mode.
 
 **AFTER receiving ALL developer responses:**
 
@@ -2145,23 +1966,7 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 
 **Step 3: Output capsule to user**
 
-**Step 4: Log to database:**
-```
-bazinga-db, please log this developer interaction:
-
-Session ID: [session_id]
-Agent Type: developer
-Content: [dev_response]
-Iteration: [iteration]
-Agent ID: dev_group_[X]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Step 4: Log to database** — Use §Logging Reference pattern. Agent ID: `dev_group_{X}`.
 
 ### Step 2B.2a: Mandatory Batch Processing (LAYER 1 - ROOT CAUSE FIX)
 
@@ -2304,74 +2109,24 @@ Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violat
 
 **🔴 CRITICAL: RUN THIS CHECK BEFORE ENDING ANY ORCHESTRATOR MESSAGE IN STEP 2B**
 
-**This is the LAST CHANCE to catch incomplete work before stopping.**
-
 **MANDATORY THREE-QUESTION CHECKLIST:**
 
-Before ending your orchestrator message in parallel mode (Step 2B), you MUST answer these three questions:
+| # | Question | Check | FAIL Action |
+|---|----------|-------|-------------|
+| 1 | Did I process ALL responses received? | Count responses, verify each routed | Auto-fix below |
+| 2 | Any INCOMPLETE/PARTIAL/FAILED groups? | Query: `bazinga-db get all task groups` | Auto-fix below |
+| 3 | Did I spawn Tasks for ALL incomplete groups? | Verify Task spawn per incomplete group | Auto-fix below |
 
-**Question 1: Did I process ALL developer responses received?**
-- Count responses received in this message
-- Verify each one was parsed and routed (Dev → QA, QA → Tech Lead, etc.)
-- IF any response was not routed → FAIL (auto-fix below)
+**AUTO-FIX (IF ANY question fails):**
+1. DO NOT end message without spawning
+2. Build spawn queue: INCOMPLETE/PARTIAL → Developer, FAILED → Investigator, READY_FOR_QA → QA, READY_FOR_REVIEW → Tech Lead
+3. Spawn ALL missing Tasks in ONE message
+4. Output: `🔄 Auto-fix: Found {N} incomplete → Spawning {agents} in parallel`
+5. Re-run checklist
 
-**Question 2: Are there ANY groups with status INCOMPLETE, PARTIAL, or FAILED that need developer continuation?**
+**PASS CRITERIA (ALL THREE must pass):** ✅ All responses processed ✅ No incomplete groups unhandled ✅ All required Tasks spawned
 
-Query database NOW to get fresh state (if not already queried in this message):
-```
-Request: "bazinga-db, please get all task groups for session [session_id]"
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-Parse returned groups and check status:
-- IF any group has status='INCOMPLETE' → FAIL (auto-fix below)
-- IF any group has status='PARTIAL' → FAIL (auto-fix below)
-- IF any group has status='FAILED' → FAIL (auto-fix below)
-
-**Question 3: Did I spawn Task calls for ALL incomplete groups?**
-- List groups that need continuation
-- Verify each has a corresponding Task spawn in THIS message
-- IF any group missing Task spawn → FAIL (auto-fix below)
-
-**AUTO-FIX ENFORCEMENT:**
-
-**IF ANY question fails:**
-1. **DO NOT end message without spawning Tasks**
-2. **Identify missing Task spawns:**
-   - Groups with INCOMPLETE/PARTIAL/FAILED status
-   - Groups not yet routed to next stage
-3. **Build spawn queue immediately:**
-   - INCOMPLETE → Developer continuation
-   - PARTIAL → Developer continuation
-   - FAILED → Investigator analysis
-   - READY_FOR_QA → QA Expert
-   - READY_FOR_REVIEW → Tech Lead
-4. **Spawn ALL missing Tasks in ONE message block** (do NOT serialize)
-5. **Output:** `🔄 Auto-fix: Found {N} incomplete groups → Spawning {agents} in parallel`
-6. **Re-run this checklist after spawning** to verify all work complete
-
-**PASS CRITERIA:**
-
-You may ONLY end your message if ALL THREE questions pass:
-- ✅ All responses processed
-- ✅ No incomplete groups remain unhandled
-- ✅ All required Tasks spawned in this message
-
-**FORBIDDEN PATTERNS:**
-
-❌ "Let me route Group C first, then respawn Developer B" → WRONG (serialization)
-❌ Spawning only first group, leaving others unspawned → WRONG (partial completion)
-❌ Ending message with INCOMPLETE groups → WRONG (premature stop)
-
-**REQUIRED PATTERN:**
-
-✅ "Groups B (PARTIAL) and C (READY_FOR_REVIEW) received → Spawning Developer B + Tech Lead C in parallel"
-✅ Both Task calls in ONE message block
-✅ No groups left unhandled
+**FORBIDDEN:** ❌ Serialization ("first... then...") ❌ Partial spawning ❌ Ending with INCOMPLETE groups
 
 **This verification gate is your final responsibility check. DO NOT bypass it.**
 
@@ -2415,23 +2170,7 @@ Analyze response content to infer intent:
 
 Use inferred decision for routing (as if PM explicitly stated it).
 
-**Step 2: Log PM response:**
-```
-bazinga-db, please log this pm interaction:
-
-Session ID: [session_id]
-Agent Type: pm
-Content: [pm_response]
-Iteration: [iteration]
-Agent ID: pm_parallel_final
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Verify it succeeded, but don't show raw skill output to user.
+**Step 2: Log PM response** — Use §Logging Reference pattern. Agent ID: `pm_parallel_final`.
 
 **Step 3: Track velocity metrics:**
 ```
@@ -2477,101 +2216,20 @@ Skill(command: "velocity-tracker")
 
 ---
 
-**🔴 CRITICAL - DATABASE LOGGING IS MANDATORY:**
+## §Logging Reference
 
-After EVERY agent interaction, IMMEDIATELY invoke the **bazinga-db skill** to log to database:
-
-**Standard Request Format:**
+**Pattern for ALL agent interactions:**
 ```
-bazinga-db, please log this [agent_type] interaction:
-
-Session ID: [current session_id from init]
-Agent Type: [any agent type - common: pm, developer, qa_expert, techlead, orchestrator, investigator]
-Content: [Full agent response text - preserve all formatting]
-Iteration: [current iteration number]
-Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, investigator_1, etc.]
+bazinga-db, please log this {agent_type} interaction:
+Session ID: {session_id}, Agent Type: {agent_type}, Content: {response}, Iteration: {N}, Agent ID: {id}
 ```
+Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes silent failure)
 
-**Note:** System is extensible - any agent type is accepted.
+**Agent IDs:** pm_main, pm_final | developer_main, developer_group_{X} | qa_main, qa_group_{X} | techlead_main, techlead_group_{X} | investigator_{N}
 
-**Why Database Instead of Files?**
-- ✅ Prevents file corruption from concurrent writes (parallel mode)
-- ✅ Faster dashboard queries with indexed lookups
-- ✅ No file locking issues
-- ✅ Automatic ACID transaction handling
+**Error handling:** Init fails → STOP. Workflow logging fails → WARN, continue.
 
-**⚠️ THIS IS NOT OPTIONAL - Every agent interaction MUST be logged to database!**
-
-**If database doesn't exist:** The bazinga-db skill will automatically initialize it on first use.
-
----
-
----
-
-## Database Operations Reference
-
-**For detailed database operation examples**, see: `.claude/templates/orchestrator_db_reference.md`
-*(Note: Reference file is for human developers only - not accessible during orchestration execution)*
-
-**Quick patterns you'll use throughout:**
-
-**After EVERY agent interaction, you MUST log it using this format:**
-```
-bazinga-db, please log this [agent_type] interaction:
-
-Session ID: [session_id]
-Agent Type: [agent_type]
-Content: [agent_response]
-Iteration: [iteration]
-Agent ID: [agent_id]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**⚠️ CRITICAL - You MUST invoke the Skill after providing the log request!**
-
-**Example for PM:**
-```
-bazinga-db, please log this pm interaction:
-
-Session ID: bazinga_20251124_100000
-Agent Type: pm
-Content: [full PM response text]
-Iteration: 1
-Agent ID: pm_main
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**Forgetting the Skill invocation causes silent logging failure!**
-
-**Database Error Handling:**
-
-If bazinga-db skill fails, handle based on operation type:
-
-**During initialization (Steps 1-3: session creation, task groups, initial state):**
-- ❌ **STOP WORKFLOW** - Cannot proceed without foundational state
-- Error output: `❌ Database initialization failed | {error} | Cannot proceed - check bazinga-db skill`
-- Do NOT continue orchestration
-
-**During workflow (Steps 4+: agent interaction logging):**
-- ⚠️ **LOG WARNING, CONTINUE** - Degraded but functional
-- Warning output: `⚠️ Database logging failed | {error} | Continuing (session resume may be affected)`
-- Continue orchestration (logging failures shouldn't halt current work)
-
-**Common state operations:**
-- Read PM state: `bazinga-db, please get the latest PM state for session [id]`
-- Save orchestrator state: `bazinga-db, please save the orchestrator state: Session ID... State Data: {...}`
-- Get task groups: `bazinga-db, please get all task groups for session [id]`
-- Update group status: `bazinga-db, please update task group: Group ID... Status...`
-
-**Full examples and all operations:** See `.claude/templates/orchestrator_db_reference.md` *(human reference only)*
+**State operations:** `get PM state`, `save orchestrator state`, `get task groups`, `update task group` — all via bazinga-db skill
 
 ---
 
@@ -2647,32 +2305,9 @@ Default to spawning appropriate agent. Never try to solve yourself.
 
 ---
 
+## Final Reminders
 
----
-
-## 🔴 CRITICAL: Database Logging & Final Reminders
-
-### Database Logging is MANDATORY
-
-After **EVERY agent response**, invoke bazinga-db skill:
-```
-bazinga-db, please log this [agent_type] interaction:
-Session ID: [session_id]
-Agent Type: [any agent type - common: pm, developer, qa_expert, techlead, orchestrator, investigator]
-Content: [Full agent response]
-Iteration: [N]
-Agent ID: [identifier]
-```
-Then: `Skill(command: "bazinga-db")`
-
-**Note:** System is extensible - any agent type is accepted.
-
-**Why critical:**
-Parallel mode requires database (no file corruption), dashboard needs real-time data, session resume depends on logs.
-
-**Log BEFORE moving to next step - ALWAYS!**
-
----
+**Database Logging:** See §Logging Reference above. Log EVERY agent response BEFORE moving to next step.
 
 ### Your Role - Quick Reference
 
