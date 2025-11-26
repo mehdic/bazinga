@@ -25,25 +25,32 @@ jobs:
           git fetch origin ${{ github.base_ref }}
           git diff origin/${{ github.base_ref }}...HEAD > diff.patch
 
-      - name: Find previous review analysis
-        id: previous_review
+      - name: Fetch previous Gemini reviews from PR
+        id: previous_gemini
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Find the most recent PR review analysis from this branch
-          # This ensures continuity by providing context from previous reviews
-          LATEST_REVIEW=""
+          # Fetch previous review comments from this PR posted by github-actions bot
+          # This ensures Gemini has context from its own previous reviews
+          echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
-          # Look for research/pr*-review-analysis.md files, get most recent
-          if ls research/pr*-review-analysis.md 1> /dev/null 2>&1; then
-            LATEST_REVIEW=$(ls -t research/pr*-review-analysis.md 2>/dev/null | head -1)
-          fi
+          curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            -o pr_comments.json
 
-          if [ -n "$LATEST_REVIEW" ] && [ -f "$LATEST_REVIEW" ]; then
-            echo "Found previous review: $LATEST_REVIEW"
-            echo "has_previous=true" >> $GITHUB_OUTPUT
-            echo "file=$LATEST_REVIEW" >> $GITHUB_OUTPUT
+          # Filter for github-actions bot comments (Gemini reviews)
+          # Get the most recent one (last in the array after filtering)
+          jq -r '[.[] | select(.user.login == "github-actions[bot]" or .user.login == "github-actions")] | last | .body // empty' pr_comments.json > previous_gemini_review.txt
+
+          if [ -s previous_gemini_review.txt ]; then
+            REVIEW_SIZE=$(wc -c < previous_gemini_review.txt)
+            echo "Found previous Gemini review ($REVIEW_SIZE bytes)"
+            echo "has_previous_gemini=true" >> $GITHUB_OUTPUT
           else
-            echo "No previous review analysis found"
-            echo "has_previous=false" >> $GITHUB_OUTPUT
+            echo "No previous Gemini review found on this PR"
+            echo "has_previous_gemini=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Build prompt
@@ -51,14 +58,13 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
-          HAS_PREVIOUS: ${{ steps.previous_review.outputs.has_previous }}
-          PREVIOUS_FILE: ${{ steps.previous_review.outputs.file }}
+          HAS_PREVIOUS_GEMINI: ${{ steps.previous_gemini.outputs.has_previous_gemini }}
         run: |
           # Configuration
           # Max diff size in characters - Gemini API has token limits
           # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
           MAX_DIFF_SIZE=40000
-          MAX_PREVIOUS_SIZE=8000
+          MAX_PREVIOUS_GEMINI_SIZE=8000
 
           cat > prompt_header.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request.
@@ -71,18 +77,19 @@ jobs:
           echo "Branch: $BRANCH_NAME" >> prompt_header.txt
           echo "" >> prompt_header.txt
 
-          # Include previous review context if available (for continuity)
-          if [ "$HAS_PREVIOUS" = "true" ] && [ -f "$PREVIOUS_FILE" ]; then
-            echo "## Previous Review Context" >> prompt_header.txt
+          # Include previous Gemini review from this PR (your own previous feedback)
+          if [ "$HAS_PREVIOUS_GEMINI" = "true" ] && [ -s previous_gemini_review.txt ]; then
+            echo "## Your Previous Review on This PR" >> prompt_header.txt
             echo "" >> prompt_header.txt
-            echo "A previous review analysis exists for this branch. Use it to:" >> prompt_header.txt
-            echo "- Avoid repeating issues that were already addressed" >> prompt_header.txt
-            echo "- Check if your feedback was already validated/rejected" >> prompt_header.txt
-            echo "- Ensure continuity in the review process" >> prompt_header.txt
+            echo "You already posted a review on this PR. The code has been updated since then." >> prompt_header.txt
+            echo "Use this to:" >> prompt_header.txt
+            echo "- Acknowledge issues that were FIXED in the new diff" >> prompt_header.txt
+            echo "- Avoid repeating feedback that still applies but hasn't changed" >> prompt_header.txt
+            echo "- Focus on NEW changes since your last review" >> prompt_header.txt
             echo "" >> prompt_header.txt
-            echo "Previous analysis (truncated if large):" >> prompt_header.txt
+            echo "Your previous review (truncated if large):" >> prompt_header.txt
             echo '```markdown' >> prompt_header.txt
-            head -c "$MAX_PREVIOUS_SIZE" "$PREVIOUS_FILE" >> prompt_header.txt
+            head -c "$MAX_PREVIOUS_GEMINI_SIZE" previous_gemini_review.txt >> prompt_header.txt
             echo '' >> prompt_header.txt
             echo '```' >> prompt_header.txt
             echo "" >> prompt_header.txt
@@ -96,7 +103,10 @@ jobs:
           2. Style or readability issues - Code quality and maintainability concerns
           3. Concrete suggestions for improvement - Specific, actionable recommendations
 
-          IMPORTANT: If previous review context was provided above, acknowledge what was already addressed and focus on NEW issues or remaining concerns.
+          IMPORTANT RULES:
+          - If you posted a previous review, start with "## Updates Since Last Review" acknowledging what was fixed
+          - Focus on genuinely NEW issues or unresolved concerns
+          - If everything looks good now, say so briefly
 
           Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
 
