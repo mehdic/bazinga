@@ -62,15 +62,21 @@ else
     echo "$(date): Dependencies already installed (node_modules exists)" >> "$DASHBOARD_LOG"
 fi
 
-# Start dashboard server (development mode)
-echo "$(date): Starting Next.js dashboard server on port $DASHBOARD_PORT..." >> "$DASHBOARD_LOG"
+# Start dashboard server (development mode with socket server)
+echo "$(date): Starting Next.js dashboard + Socket.io server..." >> "$DASHBOARD_LOG"
 
 cd "$DASHBOARD_DIR"
 
-# Use npm run dev for development, or npm start for production
-# Development mode provides hot reloading
-npm run dev >> "$DASHBOARD_LOG" 2>&1 &
-DASHBOARD_PID=$!
+# Use npm run dev:all to start both Next.js and Socket.io servers
+# Falls back to dev only if concurrently not available
+if npm run dev:all >> "$DASHBOARD_LOG" 2>&1 &
+then
+    DASHBOARD_PID=$!
+else
+    echo "$(date): dev:all failed, starting dev only..." >> "$DASHBOARD_LOG"
+    npm run dev >> "$DASHBOARD_LOG" 2>&1 &
+    DASHBOARD_PID=$!
+fi
 cd ..
 
 # Save PID
@@ -83,6 +89,7 @@ sleep 3
 if kill -0 $DASHBOARD_PID 2>/dev/null; then
     echo "$(date): Dashboard server started successfully (PID: $DASHBOARD_PID)" >> "$DASHBOARD_LOG"
     echo "$(date): Dashboard available at http://localhost:$DASHBOARD_PORT" >> "$DASHBOARD_LOG"
+    echo "$(date): Socket.io server on port 3001 (real-time updates)" >> "$DASHBOARD_LOG"
 else
     echo "$(date): ERROR - Failed to start dashboard server" >> "$DASHBOARD_LOG"
     rm -f "$DASHBOARD_PID_FILE"

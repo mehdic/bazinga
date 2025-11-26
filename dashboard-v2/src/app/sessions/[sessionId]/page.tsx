@@ -30,6 +30,20 @@ import {
   Play,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TokenCharts } from "@/components/charts/token-charts";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  exportToJSON,
+  exportSessionLogs,
+  exportTokenUsage,
+} from "@/lib/utils/export";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -126,10 +140,51 @@ export default function SessionDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() =>
+                  exportToJSON({
+                    sessionId: session.sessionId,
+                    status: session.status,
+                    mode: session.mode,
+                    startTime: session.startTime,
+                    endTime: session.endTime,
+                    originalRequirements: session.originalRequirements,
+                    developerCount: session.developerCount,
+                    logs: session.logs,
+                    taskGroups: session.taskGroups,
+                    successCriteria: session.successCriteria,
+                    tokenUsage: tokenData?.timeline,
+                  })
+                }
+              >
+                Full Session (JSON)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportSessionLogs(session.logs, session.sessionId)}
+                disabled={!session.logs?.length}
+              >
+                Logs Only (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  exportTokenUsage(tokenData?.timeline, session.sessionId)
+                }
+                disabled={!tokenData?.timeline?.length}
+              >
+                Token Usage (CSV)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -337,58 +392,49 @@ export default function SessionDetailPage() {
 
         {/* Tokens Tab */}
         <TabsContent value="tokens">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Token Breakdown by Agent</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {tokenData?.breakdown.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Bot className="h-4 w-4 text-muted-foreground" />
-                        <span>{item.agentType}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {item.modelTier}
-                        </Badge>
-                      </div>
-                      <span className="font-mono">
-                        {formatTokens(item.total || 0)}
-                      </span>
-                    </div>
-                  ))}
-                  {(!tokenData?.breakdown || tokenData.breakdown.length === 0) && (
-                    <div className="py-8 text-center">
-                      <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No token data yet</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Token Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Total Tokens</span>
-                    <span className="text-2xl font-bold">
-                      {formatTokens(totalTokens)}
-                    </span>
+          <div className="space-y-4">
+            {/* Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm text-muted-foreground">Total Tokens</div>
+                  <div className="text-2xl font-bold">{formatTokens(totalTokens)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm text-muted-foreground">Estimated Cost</div>
+                  <div className="text-2xl font-bold">
+                    ${((totalTokens / 1000000) * 3).toFixed(4)}
                   </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Estimated Cost</span>
-                    <span className="text-lg font-medium">
-                      ${((totalTokens / 1000000) * 3).toFixed(4)}
-                    </span>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm text-muted-foreground">Avg per Agent</div>
+                  <div className="text-2xl font-bold">
+                    {tokenData?.breakdown && tokenData.breakdown.length > 0
+                      ? formatTokens(Math.round(totalTokens / tokenData.breakdown.length))
+                      : "0"}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts */}
+            {tokenData?.breakdown && tokenData?.timeline ? (
+              <TokenCharts
+                breakdown={tokenData.breakdown}
+                timeline={tokenData.timeline}
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No token data yet</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 

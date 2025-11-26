@@ -3,16 +3,19 @@
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc/client";
+import { useSocket } from "@/lib/socket/client";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import {
-  Bell,
   Moon,
   Sun,
   RefreshCw,
   Wifi,
   WifiOff,
+  Loader2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface HeaderProps {
   title?: string;
@@ -20,31 +23,26 @@ interface HeaderProps {
 
 export function Header({ title = "Dashboard" }: HeaderProps) {
   const { theme, setTheme } = useTheme();
-  const [isConnected, setIsConnected] = useState(true);
+  const { isConnected } = useSocket();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: activeSession } = trpc.sessions.getActive.useQuery(undefined, {
     refetchInterval: 5000,
   });
 
-  const handleRefresh = () => {
-    utils.sessions.invalidate();
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await utils.sessions.invalidate();
+    setTimeout(() => setIsRefreshing(false), 500);
   };
-
-  // Simulate connection status (would be WebSocket in production)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsConnected(true);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-4">
         <h1 className="text-xl font-semibold">{title}</h1>
         {activeSession && (
-          <Badge variant="success" className="animate-pulse">
+          <Badge variant="default" className="animate-pulse bg-green-500">
             Active Session
           </Badge>
         )}
@@ -52,39 +50,62 @@ export function Header({ title = "Dashboard" }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         {/* Connection Status */}
-        <Button variant="ghost" size="icon" className="relative">
-          {isConnected ? (
-            <Wifi className="h-4 w-4 text-green-500" />
-          ) : (
-            <WifiOff className="h-4 w-4 text-red-500" />
-          )}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative cursor-default">
+              {isConnected ? (
+                <Wifi className="h-4 w-4 text-green-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {isConnected ? "Real-time updates active" : "Connecting to real-time server..."}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Refresh */}
-        <Button variant="ghost" size="icon" onClick={handleRefresh}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh data</TooltipContent>
+        </Tooltip>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          {activeSession && (
-            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary" />
-          )}
-        </Button>
+        <NotificationDropdown />
 
         {/* Theme Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </TooltipContent>
+        </Tooltip>
       </div>
     </header>
   );
