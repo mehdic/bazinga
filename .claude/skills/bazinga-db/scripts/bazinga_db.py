@@ -16,6 +16,16 @@ import argparse
 class BazingaDB:
     """Database client for BAZINGA orchestration."""
 
+    # SQLite errors that indicate ACTUAL database corruption (file is unrecoverable)
+    # NOTE: Transient errors like "database is locked" or "disk I/O error" are NOT
+    # included here - they should be retried, not trigger database deletion!
+    CORRUPTION_ERRORS = [
+        "database disk image is malformed",
+        "file is not a database",
+        "database or disk is full",
+        "attempt to write a readonly database",
+    ]
+
     def __init__(self, db_path: str, quiet: bool = False):
         self.db_path = db_path
         self.quiet = quiet
@@ -26,10 +36,98 @@ class BazingaDB:
         if not self.quiet:
             print(message)
 
+    def _print_error(self, message: str):
+        """Print error message to stderr."""
+        print(f"! {message}", file=sys.stderr)
+
+    def _is_corruption_error(self, error: Exception) -> bool:
+        """Check if an exception indicates database corruption."""
+        error_msg = str(error).lower()
+        return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
+
+    def _backup_corrupted_db(self) -> Optional[str]:
+        """Backup a corrupted database file before recovery."""
+        db_path = Path(self.db_path)
+        if not db_path.exists():
+            return None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = db_path.with_suffix(f".corrupted_{timestamp}.db")
+        try:
+            import shutil
+            shutil.copy2(self.db_path, backup_path)
+            self._print_error(f"Corrupted database backed up to: {backup_path}")
+            return str(backup_path)
+        except Exception as e:
+            self._print_error(f"Failed to backup corrupted database: {e}")
+            return None
+
+    def _recover_from_corruption(self) -> bool:
+        """Attempt to recover from database corruption by reinitializing.
+
+        Returns:
+            True if recovery succeeded, False otherwise.
+        """
+        self._print_error("Database corruption detected. Attempting recovery...")
+
+        # Backup corrupted file
+        self._backup_corrupted_db()
+
+        # Delete corrupted file
+        db_path = Path(self.db_path)
+        try:
+            if db_path.exists():
+                db_path.unlink()
+        except Exception as e:
+            self._print_error(f"Failed to remove corrupted database: {e}")
+            return False
+
+        # Reinitialize
+        try:
+            script_dir = Path(__file__).parent
+            init_script = script_dir / "init_db.py"
+
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, str(init_script), self.db_path],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                self._print_error(f"✓ Database recovered and reinitialized at {self.db_path}")
+                return True
+            else:
+                self._print_error(f"Failed to reinitialize database: {result.stderr}")
+                return False
+        except Exception as e:
+            self._print_error(f"Recovery failed: {e}")
+            return False
+
+    def check_integrity(self) -> Dict[str, Any]:
+        """Run SQLite integrity check on the database.
+
+        Returns:
+            Dict with 'ok' bool and 'details' string.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.execute("PRAGMA integrity_check;")
+            result = cursor.fetchone()[0]
+            conn.close()
+
+            if result == "ok":
+                return {"ok": True, "details": "Database integrity check passed"}
+            else:
+                return {"ok": False, "details": f"Integrity issues found: {result}"}
+        except Exception as e:
+            return {"ok": False, "details": f"Integrity check failed: {e}"}
+
     def _ensure_db_exists(self):
         """Ensure database exists and has schema, create if not."""
         db_path = Path(self.db_path)
         needs_init = False
+        is_corrupted = False
 
         if not db_path.exists():
             needs_init = True
@@ -38,20 +136,40 @@ class BazingaDB:
             needs_init = True
             print(f"Database file is empty at {self.db_path}. Auto-initializing...", file=sys.stderr)
         else:
-            # File exists and has content - check if it has tables
+            # File exists and has content - check if it has tables and is not corrupted
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     cursor = conn.cursor()
-                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
-                    if not cursor.fetchone():
+                    # First check integrity
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        is_corrupted = True
                         needs_init = True
-                        print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                        print(f"Database corrupted at {self.db_path}: {integrity}. Auto-recovering...", file=sys.stderr)
+                    else:
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+                        if not cursor.fetchone():
+                            needs_init = True
+                            print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+            except sqlite3.DatabaseError as e:
+                is_corrupted = True
+                needs_init = True
+                print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
             except Exception as e:
                 needs_init = True
                 print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
 
         if not needs_init:
             return
+
+        # If corrupted, backup and delete before reinitializing
+        if is_corrupted and db_path.exists():
+            self._backup_corrupted_db()
+            try:
+                db_path.unlink()
+                print(f"Removed corrupted database file", file=sys.stderr)
+            except Exception as e:
+                print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
 
         # Auto-initialize the database
         script_dir = Path(__file__).parent
@@ -70,12 +188,31 @@ class BazingaDB:
 
         print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Get database connection with proper settings."""
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _get_connection(self, retry_on_corruption: bool = True) -> sqlite3.Connection:
+        """Get database connection with proper settings.
+
+        Args:
+            retry_on_corruption: If True, attempt recovery on corruption errors.
+
+        Returns:
+            sqlite3.Connection with WAL mode and foreign keys enabled.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            # Enable WAL mode for better concurrency (reduces "database is locked" errors)
+            conn.execute("PRAGMA journal_mode=WAL")
+            # Enable foreign key constraints
+            conn.execute("PRAGMA foreign_keys = ON")
+            # Increase busy timeout to handle concurrent access
+            conn.execute("PRAGMA busy_timeout = 30000")
+            conn.row_factory = sqlite3.Row
+            return conn
+        except sqlite3.DatabaseError as e:
+            if retry_on_corruption and self._is_corruption_error(e):
+                if self._recover_from_corruption():
+                    # Retry connection after recovery
+                    return self._get_connection(retry_on_corruption=False)
+            raise
 
     # ==================== SESSION OPERATIONS ====================
 
@@ -172,8 +309,18 @@ class BazingaDB:
     # ==================== LOG OPERATIONS ====================
 
     def log_interaction(self, session_id: str, agent_type: str, content: str,
-                       iteration: Optional[int] = None, agent_id: Optional[str] = None) -> Dict[str, Any]:
-        """Log an agent interaction with validation."""
+                       iteration: Optional[int] = None, agent_id: Optional[str] = None,
+                       _retry_count: int = 0) -> Dict[str, Any]:
+        """Log an agent interaction with validation.
+
+        Args:
+            _retry_count: Internal parameter to prevent infinite recursion. Do not set manually.
+        """
+        # Prevent infinite recursion on repeated failures
+        if _retry_count > 1:
+            self._print_error(f"Max retries exceeded for log_interaction")
+            return {"success": False, "error": "Max retries exceeded after recovery attempt"}
+
         # Validate inputs
         if not session_id or not session_id.strip():
             raise ValueError("session_id cannot be empty")
@@ -187,8 +334,9 @@ class BazingaDB:
         # New agent types can be added without code changes.
         # Database enforces NOT NULL, which is sufficient.
 
-        conn = self._get_connection()
+        conn = None
         try:
+            conn = self._get_connection()
             cursor = conn.execute("""
                 INSERT INTO orchestration_logs (session_id, iteration, agent_type, agent_id, content)
                 VALUES (?, ?, ?, ?, ?)
@@ -219,11 +367,32 @@ class BazingaDB:
             self._print_success(f"✓ Logged {agent_type} interaction (log_id={log_id}, {result['content_length']} chars)")
             return result
 
+        except sqlite3.DatabaseError as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+            # Check if it's a corruption error
+            if self._is_corruption_error(e):
+                if self._recover_from_corruption():
+                    # Retry once after recovery (with incremented counter to prevent infinite loop)
+                    self._print_error(f"Retrying log operation after recovery...")
+                    return self.log_interaction(session_id, agent_type, content, iteration, agent_id,
+                                               _retry_count=_retry_count + 1)
+            self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
+            return {"success": False, "error": f"Database error: {str(e)}"}
         except Exception as e:
-            conn.rollback()
-            raise RuntimeError(f"Failed to log {agent_type} interaction: {str(e)}")
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+            self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
+            return {"success": False, "error": str(e)}
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def get_logs(self, session_id: str, limit: int = 50, offset: int = 0,
                  agent_type: Optional[str] = None, since: Optional[str] = None) -> List[Dict]:
@@ -298,56 +467,125 @@ class BazingaDB:
     # ==================== TASK GROUP OPERATIONS ====================
 
     def create_task_group(self, group_id: str, session_id: str, name: str,
-                         status: str = 'pending', assigned_to: Optional[str] = None) -> None:
-        """Create a new task group."""
-        conn = self._get_connection()
+                         status: str = 'pending', assigned_to: Optional[str] = None) -> Dict[str, Any]:
+        """Create or update a task group (upsert - idempotent operation).
+
+        Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
+        already exists, only name/status/assigned_to are updated - preserving
+        revision_count, last_review_status, and created_at.
+
+        Returns:
+            Dict with 'success' bool and 'task_group' data, or 'error' on failure.
+        """
+        conn = None
         try:
+            conn = self._get_connection()
+            # Use ON CONFLICT for true upsert - preserves existing metadata
             conn.execute("""
                 INSERT INTO task_groups (id, session_id, name, status, assigned_to)
                 VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id, session_id) DO UPDATE SET
+                    name = excluded.name,
+                    status = excluded.status,
+                    assigned_to = COALESCE(excluded.assigned_to, assigned_to),
+                    updated_at = CURRENT_TIMESTAMP
             """, (group_id, session_id, name, status, assigned_to))
             conn.commit()
-            self._print_success(f"✓ Task group created: {group_id} (session: {session_id[:20]}...)")
-        except sqlite3.IntegrityError:
-            print(f"! Task group already exists: {group_id} in session {session_id}", file=sys.stderr)
+
+            # Fetch and return the saved record
+            row = conn.execute("""
+                SELECT * FROM task_groups WHERE id = ? AND session_id = ?
+            """, (group_id, session_id)).fetchone()
+
+            result = dict(row) if row else None
+            self._print_success(f"✓ Task group saved: {group_id} (session: {session_id[:20]}...)")
+            return {"success": True, "task_group": result}
+
+        except Exception as e:
+            print(f"! Failed to save task group {group_id}: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def update_task_group(self, group_id: str, session_id: str, status: Optional[str] = None,
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
-                         last_review_status: Optional[str] = None) -> None:
-        """Update task group fields (requires session_id for composite key)."""
-        conn = self._get_connection()
-        updates = []
-        params = []
+                         last_review_status: Optional[str] = None,
+                         auto_create: bool = True, name: Optional[str] = None) -> Dict[str, Any]:
+        """Update task group fields (requires session_id for composite key).
 
-        if status:
-            updates.append("status = ?")
-            params.append(status)
-        if assigned_to:
-            updates.append("assigned_to = ?")
-            params.append(assigned_to)
-        if revision_count is not None:
-            updates.append("revision_count = ?")
-            params.append(revision_count)
-        if last_review_status:
-            updates.append("last_review_status = ?")
-            params.append(last_review_status)
+        Args:
+            group_id: Task group identifier
+            session_id: Session identifier
+            status: New status value
+            assigned_to: Agent assignment
+            revision_count: Number of revisions
+            last_review_status: APPROVED or CHANGES_REQUESTED
+            auto_create: If True and group doesn't exist, create it (default: True)
+            name: Name for auto-creation (defaults to group_id if not provided)
 
-        if updates:
-            updates.append("updated_at = CURRENT_TIMESTAMP")
-            query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
-            params.extend([group_id, session_id])
-            cursor = conn.execute(query, params)
-            conn.commit()
+        Returns:
+            Dict with 'success' bool and 'task_group' data, or 'error' on failure.
+        """
+        conn = None
+        try:
+            conn = self._get_connection()
+            updates = []
+            params = []
 
-            # Validate that UPDATE actually modified rows
-            if cursor.rowcount == 0:
-                print(f"! Task group not found: {group_id} in session {session_id}", file=sys.stderr)
-            else:
-                self._print_success(f"✓ Task group updated: {group_id} (session: {session_id[:20]}...)")
+            if status:
+                updates.append("status = ?")
+                params.append(status)
+            if assigned_to:
+                updates.append("assigned_to = ?")
+                params.append(assigned_to)
+            if revision_count is not None:
+                updates.append("revision_count = ?")
+                params.append(revision_count)
+            if last_review_status:
+                updates.append("last_review_status = ?")
+                params.append(last_review_status)
 
-        conn.close()
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
+                params.extend([group_id, session_id])
+                cursor = conn.execute(query, params)
+                conn.commit()
+
+                # Check if UPDATE modified any rows
+                if cursor.rowcount == 0:
+                    if auto_create:
+                        # Auto-create the task group if it doesn't exist
+                        # Close connection before delegating to create_task_group
+                        conn.close()
+                        conn = None  # Prevent double-close in finally block
+                        group_name = name or f"Task Group {group_id}"
+                        self._print_success(f"Task group {group_id} not found, auto-creating...")
+                        return self.create_task_group(
+                            group_id, session_id, group_name,
+                            status=status or 'pending',
+                            assigned_to=assigned_to
+                        )
+                    else:
+                        print(f"! Task group not found: {group_id} in session {session_id}", file=sys.stderr)
+                        return {"success": False, "error": f"Task group not found: {group_id}"}
+                else:
+                    self._print_success(f"✓ Task group updated: {group_id} (session: {session_id[:20]}...)")
+
+            # Fetch and return the updated record
+            row = conn.execute("""
+                SELECT * FROM task_groups WHERE id = ? AND session_id = ?
+            """, (group_id, session_id)).fetchone()
+
+            return {"success": True, "task_group": dict(row) if row else None}
+
+        except Exception as e:
+            print(f"! Failed to update task group {group_id}: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+        finally:
+            if conn:
+                conn.close()
 
     def get_task_groups(self, session_id: str, status: Optional[str] = None) -> List[Dict]:
         """Get task groups for a session."""
@@ -708,7 +946,8 @@ def main():
             name = cmd_args[2]
             status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
             assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
-            db.create_task_group(group_id, session_id, name, status, assigned_to)
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to)
+            print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             group_id = cmd_args[0]
             session_id = cmd_args[1]
@@ -719,8 +958,12 @@ def main():
                 # Convert revision_count to int if present
                 if key == 'revision_count':
                     value = int(value)
+                # Convert auto_create to bool
+                elif key == 'auto_create':
+                    value = value.lower() in ('true', '1', 'yes')
                 kwargs[key] = value
-            db.update_task_group(group_id, session_id, **kwargs)
+            result = db.update_task_group(group_id, session_id, **kwargs)
+            print(json.dumps(result, indent=2))
         elif cmd == 'save-development-plan':
             session_id = cmd_args[0]
             original_prompt = cmd_args[1]
@@ -756,6 +999,17 @@ def main():
                 value = cmd_args[i + 1]
                 kwargs[key] = value
             db.update_success_criterion(session_id, criterion, **kwargs)
+        elif cmd == 'integrity-check':
+            result = db.check_integrity()
+            print(json.dumps(result, indent=2))
+            if not result['ok']:
+                sys.exit(1)
+        elif cmd == 'recover-db':
+            if db._recover_from_corruption():
+                print(json.dumps({"success": True, "message": "Database recovered successfully"}, indent=2))
+            else:
+                print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
+                sys.exit(1)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             sys.exit(1)
