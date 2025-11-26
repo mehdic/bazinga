@@ -1,0 +1,314 @@
+# Automated PR review workflow using OpenAI API
+name: OpenAI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Compute diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > diff.patch
+
+      - name: Fetch previous OpenAI reviews from PR
+        id: previous_openai
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch previous review comments from this PR posted by github-actions bot
+          # This ensures OpenAI has context from its own previous reviews
+          echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
+
+          curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            -o pr_comments.json
+
+          # Filter for github-actions bot comments that contain OpenAI review marker
+          # Get the most recent one (last in the array after filtering)
+          jq -r '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("OpenAI")))] | last | .body // empty' pr_comments.json > previous_openai_review.txt
+
+          if [ -s previous_openai_review.txt ]; then
+            REVIEW_SIZE=$(wc -c < previous_openai_review.txt)
+            echo "Found previous OpenAI review ($REVIEW_SIZE bytes)"
+            echo "has_previous_openai=true" >> $GITHUB_OUTPUT
+          else
+            echo "No previous OpenAI review found on this PR"
+            echo "has_previous_openai=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build prompt
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO_NAME: ${{ github.repository }}
+          BRANCH_NAME: ${{ github.head_ref }}
+          HAS_PREVIOUS_OPENAI: ${{ steps.previous_openai.outputs.has_previous_openai }}
+        run: |
+          # Configuration
+          # Max diff size in characters - OpenAI API has token limits
+          # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
+          MAX_DIFF_SIZE=40000
+          MAX_PREVIOUS_OPENAI_SIZE=8000
+
+          cat > system_prompt.txt << 'EOF'
+          You are an expert code reviewer analyzing a pull request. Your reviews are thorough, constructive, and focus on code quality, potential bugs, and best practices.
+
+          When reviewing:
+          - Be specific and actionable in your feedback
+          - Prioritize important issues over minor style preferences
+          - Acknowledge good practices when you see them
+          - Consider security implications
+          - Think about maintainability and readability
+
+          Format your response as markdown suitable for a GitHub PR comment.
+          EOF
+
+          cat > user_prompt.txt << 'EOF'
+          EOF
+
+          # Sanitize and add PR metadata
+          echo "# Pull Request Review Request" >> user_prompt.txt
+          echo "" >> user_prompt.txt
+          echo "**Pull Request Title:** $PR_TITLE" >> user_prompt.txt
+          echo "**Repository:** $REPO_NAME" >> user_prompt.txt
+          echo "**Branch:** $BRANCH_NAME" >> user_prompt.txt
+          echo "" >> user_prompt.txt
+
+          # Include previous OpenAI review from this PR (your own previous feedback)
+          if [ "$HAS_PREVIOUS_OPENAI" = "true" ] && [ -s previous_openai_review.txt ]; then
+            echo "## Your Previous Review on This PR" >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "You already posted a review on this PR. The code has been updated since then." >> user_prompt.txt
+            echo "Use this to:" >> user_prompt.txt
+            echo "- Acknowledge issues that were FIXED in the new diff" >> user_prompt.txt
+            echo "- Avoid repeating feedback that still applies but hasn't changed" >> user_prompt.txt
+            echo "- Focus on NEW changes since your last review" >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "Your previous review (truncated if large):" >> user_prompt.txt
+            echo '```markdown' >> user_prompt.txt
+            head -c "$MAX_PREVIOUS_OPENAI_SIZE" previous_openai_review.txt >> user_prompt.txt
+            echo '' >> user_prompt.txt
+            echo '```' >> user_prompt.txt
+            echo "" >> user_prompt.txt
+          fi
+
+          cat >> user_prompt.txt << 'EOF'
+
+          ## Review Instructions
+
+          Please analyze the diff below and provide:
+          1. **Potential bugs or regressions** - Consider how these changes interact with the existing codebase
+          2. **Style or readability issues** - Code quality and maintainability concerns
+          3. **Concrete suggestions for improvement** - Specific, actionable recommendations
+          4. **Security concerns** - Any potential vulnerabilities introduced
+
+          **IMPORTANT RULES:**
+          - If you posted a previous review, start with "## Updates Since Last Review" acknowledging what was fixed
+          - Focus on genuinely NEW issues or unresolved concerns
+          - If everything looks good now, say so briefly
+          - Start your review with "## OpenAI Code Review" as the header
+
+          ## Git Diff
+
+          ```diff
+          EOF
+
+          # Truncate diff if too large (with safe command substitution)
+          DIFF_SIZE="$(wc -c < diff.patch 2>/dev/null || echo 0)"
+          if [ "$DIFF_SIZE" -gt "$MAX_DIFF_SIZE" ]; then
+            echo "" >> user_prompt.txt
+            echo "Note: The diff has been truncated to ${MAX_DIFF_SIZE} characters due to size limits." >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            head -c "$MAX_DIFF_SIZE" diff.patch >> user_prompt.txt
+          else
+            cat diff.patch >> user_prompt.txt
+          fi
+
+          cat >> user_prompt.txt << 'EOF'
+          ```
+          EOF
+
+      - name: Call OpenAI API
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set +x  # Prevent API key from appearing in logs
+
+          SYSTEM_PROMPT=$(cat system_prompt.txt | jq -Rs . 2>/dev/null)
+          USER_PROMPT=$(cat user_prompt.txt | jq -Rs . 2>/dev/null)
+
+          if [ -z "$SYSTEM_PROMPT" ] || [ -z "$USER_PROMPT" ]; then
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
+            echo "Failed to prepare prompts. Check prompt file formatting." >> review.txt
+            exit 0
+          fi
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "model": "gpt-4o",
+            "messages": [
+              {"role": "system", "content": $SYSTEM_PROMPT},
+              {"role": "user", "content": $USER_PROMPT}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 4096
+          }
+          EOF
+          )
+
+          echo "Calling OpenAI API..."
+
+          # Save response to file with extended timeout
+          # --connect-timeout 30: Allow 30s to establish connection
+          # --max-time 180: Allow 3 minutes for complete response
+          HTTP_CODE=$(curl -s \
+            --connect-timeout 30 \
+            --max-time 180 \
+            -w "%{http_code}" \
+            -o openai_response.json \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d "$PAYLOAD" \
+            https://api.openai.com/v1/chat/completions)
+
+          CURL_EXIT=$?
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Curl exit code: $CURL_EXIT"
+
+          # Handle timeout errors (exit code 28)
+          if [ "$CURL_EXIT" -eq 28 ]; then
+            echo "Error: API request timed out after 180 seconds"
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
+            echo "The OpenAI API took too long to respond (greater than 3 minutes). This can happen with large diffs or complex analysis." >> review.txt
+            echo "" >> review.txt
+            echo "**Suggestions:**" >> review.txt
+            echo "- Try reducing the diff size" >> review.txt
+            echo "- Retry the workflow" >> review.txt
+            exit 0
+          fi
+
+          # Handle other curl errors
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "Error: Curl failed with exit code $CURL_EXIT"
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
+            echo "Failed to connect to OpenAI API (curl exit code: $CURL_EXIT)." >> review.txt
+            echo "" >> review.txt
+            echo "**Please check:**" >> review.txt
+            echo "- Network connectivity" >> review.txt
+            echo "- API endpoint availability" >> review.txt
+            echo "- Retry the workflow" >> review.txt
+            exit 0
+          fi
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Error: OpenAI API returned status $HTTP_CODE"
+            cat openai_response.json
+
+            # Build error message based on HTTP status
+            if [ "$HTTP_CODE" == "429" ]; then
+              echo "## OpenAI Code Review" > review.txt
+              echo "" >> review.txt
+              echo "Rate limit exceeded. Please check your API quota at https://platform.openai.com/usage" >> review.txt
+            elif [ "$HTTP_CODE" == "401" ]; then
+              echo "## OpenAI Code Review" > review.txt
+              echo "" >> review.txt
+              echo "Authentication failed. Please verify OPENAI_API_KEY secret is configured correctly." >> review.txt
+            elif [ "$HTTP_CODE" == "403" ]; then
+              echo "## OpenAI Code Review" > review.txt
+              echo "" >> review.txt
+              echo "Access denied. Please check your API key permissions and organization settings." >> review.txt
+            elif [ "$HTTP_CODE" == "500" ] || [ "$HTTP_CODE" == "502" ] || [ "$HTTP_CODE" == "503" ]; then
+              echo "## OpenAI Code Review" > review.txt
+              echo "" >> review.txt
+              echo "OpenAI service is temporarily unavailable (HTTP $HTTP_CODE). Please retry the workflow." >> review.txt
+            else
+              echo "## OpenAI Code Review" > review.txt
+              echo "" >> review.txt
+              echo "API call failed (HTTP $HTTP_CODE). Check workflow logs for details." >> review.txt
+            fi
+
+            exit 0
+          fi
+
+          # Parse response with error handling
+          if ! jq -e '.choices[0].message.content' openai_response.json > /dev/null 2>&1; then
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
+            echo "OpenAI API returned an unexpected response format. Response:" >> review.txt
+            cat openai_response.json >> review.txt
+            exit 0
+          fi
+
+          jq -r '.choices[0].message.content' openai_response.json > review.txt
+
+          if [ ! -s review.txt ]; then
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
+            echo "Review file is empty. OpenAI may have returned no content." >> review.txt
+            exit 0
+          fi
+
+          echo "Review generated successfully ($(wc -c < review.txt) bytes)"
+          echo "Preview:"
+          head -n 10 review.txt
+
+      - name: Post review comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Preparing to post review comment..."
+
+          if [ ! -f review.txt ]; then
+            echo "Error: review.txt not found"
+            exit 1
+          fi
+
+          REVIEW_SIZE="$(wc -c < review.txt)"
+          echo "Review content length: $REVIEW_SIZE bytes"
+
+          REVIEW_BODY=$(jq -Rs . < review.txt 2>/dev/null)
+          if [ -z "$REVIEW_BODY" ]; then
+            echo "Error: Failed to encode review content as JSON"
+            exit 1
+          fi
+
+          echo "Posting comment to PR #${{ github.event.pull_request.number }}..."
+
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o comment_response.json \
+            --connect-timeout 10 \
+            --max-time 30 \
+            -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d "{\"body\": $REVIEW_BODY}")
+
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "Error: Failed to post comment (HTTP $HTTP_CODE)"
+            cat comment_response.json
+            exit 1
+          fi
+
+          echo "Comment posted successfully!"
+          jq '.html_url' comment_response.json
