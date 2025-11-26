@@ -298,56 +298,114 @@ class BazingaDB:
     # ==================== TASK GROUP OPERATIONS ====================
 
     def create_task_group(self, group_id: str, session_id: str, name: str,
-                         status: str = 'pending', assigned_to: Optional[str] = None) -> None:
-        """Create a new task group."""
+                         status: str = 'pending', assigned_to: Optional[str] = None) -> Dict[str, Any]:
+        """Create or update a task group (upsert - idempotent operation).
+
+        Uses INSERT OR REPLACE to handle duplicates gracefully. If the group
+        already exists, it will be updated with the new values.
+
+        Returns:
+            Dict with 'success' bool and 'task_group' data, or 'error' on failure.
+        """
         conn = self._get_connection()
         try:
+            # Use INSERT OR REPLACE for upsert behavior - handles "already exists" gracefully
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO task_groups (id, session_id, name, status, assigned_to, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, (group_id, session_id, name, status, assigned_to))
             conn.commit()
-            self._print_success(f"✓ Task group created: {group_id} (session: {session_id[:20]}...)")
-        except sqlite3.IntegrityError:
-            print(f"! Task group already exists: {group_id} in session {session_id}", file=sys.stderr)
+
+            # Fetch and return the saved record
+            row = conn.execute("""
+                SELECT * FROM task_groups WHERE id = ? AND session_id = ?
+            """, (group_id, session_id)).fetchone()
+
+            result = dict(row) if row else None
+            self._print_success(f"✓ Task group saved: {group_id} (session: {session_id[:20]}...)")
+            return {"success": True, "task_group": result}
+
+        except Exception as e:
+            print(f"! Failed to save task group {group_id}: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
         finally:
             conn.close()
 
     def update_task_group(self, group_id: str, session_id: str, status: Optional[str] = None,
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
-                         last_review_status: Optional[str] = None) -> None:
-        """Update task group fields (requires session_id for composite key)."""
+                         last_review_status: Optional[str] = None,
+                         auto_create: bool = True, name: Optional[str] = None) -> Dict[str, Any]:
+        """Update task group fields (requires session_id for composite key).
+
+        Args:
+            group_id: Task group identifier
+            session_id: Session identifier
+            status: New status value
+            assigned_to: Agent assignment
+            revision_count: Number of revisions
+            last_review_status: APPROVED or CHANGES_REQUESTED
+            auto_create: If True and group doesn't exist, create it (default: True)
+            name: Name for auto-creation (defaults to group_id if not provided)
+
+        Returns:
+            Dict with 'success' bool and 'task_group' data, or 'error' on failure.
+        """
         conn = self._get_connection()
-        updates = []
-        params = []
+        try:
+            updates = []
+            params = []
 
-        if status:
-            updates.append("status = ?")
-            params.append(status)
-        if assigned_to:
-            updates.append("assigned_to = ?")
-            params.append(assigned_to)
-        if revision_count is not None:
-            updates.append("revision_count = ?")
-            params.append(revision_count)
-        if last_review_status:
-            updates.append("last_review_status = ?")
-            params.append(last_review_status)
+            if status:
+                updates.append("status = ?")
+                params.append(status)
+            if assigned_to:
+                updates.append("assigned_to = ?")
+                params.append(assigned_to)
+            if revision_count is not None:
+                updates.append("revision_count = ?")
+                params.append(revision_count)
+            if last_review_status:
+                updates.append("last_review_status = ?")
+                params.append(last_review_status)
 
-        if updates:
-            updates.append("updated_at = CURRENT_TIMESTAMP")
-            query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
-            params.extend([group_id, session_id])
-            cursor = conn.execute(query, params)
-            conn.commit()
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
+                params.extend([group_id, session_id])
+                cursor = conn.execute(query, params)
+                conn.commit()
 
-            # Validate that UPDATE actually modified rows
-            if cursor.rowcount == 0:
-                print(f"! Task group not found: {group_id} in session {session_id}", file=sys.stderr)
-            else:
-                self._print_success(f"✓ Task group updated: {group_id} (session: {session_id[:20]}...)")
+                # Check if UPDATE modified any rows
+                if cursor.rowcount == 0:
+                    if auto_create:
+                        # Auto-create the task group if it doesn't exist
+                        conn.close()
+                        group_name = name or f"Task Group {group_id}"
+                        self._print_success(f"Task group {group_id} not found, auto-creating...")
+                        return self.create_task_group(
+                            group_id, session_id, group_name,
+                            status=status or 'pending',
+                            assigned_to=assigned_to
+                        )
+                    else:
+                        print(f"! Task group not found: {group_id} in session {session_id}", file=sys.stderr)
+                        return {"success": False, "error": f"Task group not found: {group_id}"}
+                else:
+                    self._print_success(f"✓ Task group updated: {group_id} (session: {session_id[:20]}...)")
 
-        conn.close()
+            # Fetch and return the updated record
+            row = conn.execute("""
+                SELECT * FROM task_groups WHERE id = ? AND session_id = ?
+            """, (group_id, session_id)).fetchone()
+
+            return {"success": True, "task_group": dict(row) if row else None}
+
+        except Exception as e:
+            print(f"! Failed to update task group {group_id}: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+        finally:
+            if conn:
+                conn.close()
 
     def get_task_groups(self, session_id: str, status: Optional[str] = None) -> List[Dict]:
         """Get task groups for a session."""
@@ -708,7 +766,8 @@ def main():
             name = cmd_args[2]
             status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
             assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
-            db.create_task_group(group_id, session_id, name, status, assigned_to)
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to)
+            print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             group_id = cmd_args[0]
             session_id = cmd_args[1]
@@ -719,8 +778,12 @@ def main():
                 # Convert revision_count to int if present
                 if key == 'revision_count':
                     value = int(value)
+                # Convert auto_create to bool
+                elif key == 'auto_create':
+                    value = value.lower() in ('true', '1', 'yes')
                 kwargs[key] = value
-            db.update_task_group(group_id, session_id, **kwargs)
+            result = db.update_task_group(group_id, session_id, **kwargs)
+            print(json.dumps(result, indent=2))
         elif cmd == 'save-development-plan':
             session_id = cmd_args[0]
             original_prompt = cmd_args[1]
