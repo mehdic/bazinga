@@ -8,8 +8,6 @@ import {
   CheckCircle2,
   XCircle,
   Zap,
-  Clock,
-  TrendingUp,
 } from "lucide-react";
 
 export function StatsCards() {

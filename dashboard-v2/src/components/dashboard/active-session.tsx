@@ -7,13 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc/client";
-import { cn, formatDuration } from "@/lib/utils";
+import { formatDuration } from "@/lib/utils";
 import {
   Play,
   Users,
   Clock,
   ChevronRight,
-  Bot,
   CheckCircle2,
   Circle,
   Loader2,
@@ -21,7 +20,7 @@ import {
 import { useEffect, useState } from "react";
 
 export function ActiveSession() {
-  const { data: session, isLoading } = trpc.sessions.getById.useQuery(
+  const { isLoading } = trpc.sessions.getById.useQuery(
     { sessionId: "" },
     { enabled: false }
   );

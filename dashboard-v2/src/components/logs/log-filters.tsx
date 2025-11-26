@@ -9,9 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Search, X, Filter, FileText } from "lucide-react";
 
-// Agent types for filtering
-const AGENT_TYPES = ["pm", "developer", "qa_expert", "tech_lead", "orchestrator", "investigator"];
-
 // Log entry matching actual database schema
 interface LogEntry {
   id: number;
