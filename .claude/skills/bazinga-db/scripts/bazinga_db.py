@@ -324,8 +324,9 @@ class BazingaDB:
         # New agent types can be added without code changes.
         # Database enforces NOT NULL, which is sufficient.
 
-        conn = self._get_connection()
+        conn = None
         try:
+            conn = self._get_connection()
             cursor = conn.execute("""
                 INSERT INTO orchestration_logs (session_id, iteration, agent_type, agent_id, content)
                 VALUES (?, ?, ?, ?, ?)
@@ -458,18 +459,25 @@ class BazingaDB:
                          status: str = 'pending', assigned_to: Optional[str] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
-        Uses INSERT OR REPLACE to handle duplicates gracefully. If the group
-        already exists, it will be updated with the new values.
+        Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
+        already exists, only name/status/assigned_to are updated - preserving
+        revision_count, last_review_status, and created_at.
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
-        conn = self._get_connection()
+        conn = None
         try:
-            # Use INSERT OR REPLACE for upsert behavior - handles "already exists" gracefully
+            conn = self._get_connection()
+            # Use ON CONFLICT for true upsert - preserves existing metadata
             conn.execute("""
-                INSERT OR REPLACE INTO task_groups (id, session_id, name, status, assigned_to, updated_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id, session_id) DO UPDATE SET
+                    name = excluded.name,
+                    status = excluded.status,
+                    assigned_to = COALESCE(excluded.assigned_to, assigned_to),
+                    updated_at = CURRENT_TIMESTAMP
             """, (group_id, session_id, name, status, assigned_to))
             conn.commit()
 
@@ -486,7 +494,8 @@ class BazingaDB:
             print(f"! Failed to save task group {group_id}: {e}", file=sys.stderr)
             return {"success": False, "error": str(e)}
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def update_task_group(self, group_id: str, session_id: str, status: Optional[str] = None,
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
@@ -507,8 +516,9 @@ class BazingaDB:
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
-        conn = self._get_connection()
+        conn = None
         try:
+            conn = self._get_connection()
             updates = []
             params = []
 
@@ -536,7 +546,9 @@ class BazingaDB:
                 if cursor.rowcount == 0:
                     if auto_create:
                         # Auto-create the task group if it doesn't exist
+                        # Close connection before delegating to create_task_group
                         conn.close()
+                        conn = None  # Prevent double-close in finally block
                         group_name = name or f"Task Group {group_id}"
                         self._print_success(f"Task group {group_id} not found, auto-creating...")
                         return self.create_task_group(
