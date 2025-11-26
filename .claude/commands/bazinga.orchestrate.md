@@ -2205,7 +2205,7 @@ Skill(command: "velocity-tracker")
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
 - Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
-- After Investigator response: Route to Tech Lead for validation (Step 2B.7c if applicable)
+- After Investigator response: Route to Tech Lead for validation (same pattern as Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
 
 **❌ DO NOT ask "Should I spawn Investigator?" - spawn immediately**
