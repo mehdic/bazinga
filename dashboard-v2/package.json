@@ -10,7 +10,10 @@
     "lint": "next lint",
     "socket": "tsx src/lib/socket/server.ts",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -56,6 +59,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^22.7.9",
     "@types/react": "^18.3.12",
