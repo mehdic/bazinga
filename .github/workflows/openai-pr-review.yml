@@ -153,7 +153,7 @@ jobs:
             exit 1
           fi
 
-          # GPT-5 with reasoning uses max_completion_tokens
+          # GPT-5 is a reasoning model - temperature is fixed at 1 (not configurable)
           PAYLOAD=$(cat <<EOF
           {
             "model": "gpt-5",
@@ -161,7 +161,6 @@ jobs:
               {"role": "system", "content": $SYSTEM_PROMPT},
               {"role": "user", "content": $USER_PROMPT}
             ],
-            "temperature": 0.3,
             "max_completion_tokens": 4096
           }
           EOF
