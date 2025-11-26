@@ -1,4 +1,4 @@
-# Automated PR review workflow using OpenAI API
+# Automated PR review workflow using OpenAI API (GPT-5)
 name: OpenAI PR Review
 
 on:
@@ -18,31 +18,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 20
+          # Full history ensures merge base is always available for diff
+          fetch-depth: 0
 
       - name: Compute diff
         run: |
-          git fetch origin ${{ github.base_ref }}
           git diff origin/${{ github.base_ref }}...HEAD > diff.patch
+          echo "Diff size: $(wc -l < diff.patch) lines, $(wc -c < diff.patch) bytes"
 
       - name: Fetch previous OpenAI reviews from PR
         id: previous_openai
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Fetch previous review comments from this PR posted by github-actions bot
-          # This ensures OpenAI has context from its own previous reviews
+          # Use gh CLI to fetch comments (simpler than curl)
           echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
-          curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            -o pr_comments.json
-
-          # Filter for github-actions bot comments that contain OpenAI review marker
-          # Get the most recent one (last in the array after filtering)
-          jq -r '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("OpenAI")))] | last | .body // empty' pr_comments.json > previous_openai_review.txt
+          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("OpenAI")))] | last | .body // empty' \
+            > previous_openai_review.txt
 
           if [ -s previous_openai_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_openai_review.txt)
@@ -61,10 +55,9 @@ jobs:
           HAS_PREVIOUS_OPENAI: ${{ steps.previous_openai.outputs.has_previous_openai }}
         run: |
           # Configuration
-          # Max diff size in characters - OpenAI API has token limits
-          # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
-          MAX_DIFF_SIZE=40000
-          MAX_PREVIOUS_OPENAI_SIZE=8000
+          # Max diff size in lines - truncate by lines for clean breaks
+          MAX_DIFF_LINES=1500
+          MAX_PREVIOUS_OPENAI_LINES=200
 
           cat > system_prompt.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request. Your reviews are thorough, constructive, and focus on code quality, potential bugs, and best practices.
@@ -102,7 +95,7 @@ jobs:
             echo "" >> user_prompt.txt
             echo "Your previous review (truncated if large):" >> user_prompt.txt
             echo '```markdown' >> user_prompt.txt
-            head -c "$MAX_PREVIOUS_OPENAI_SIZE" previous_openai_review.txt >> user_prompt.txt
+            head -n "$MAX_PREVIOUS_OPENAI_LINES" previous_openai_review.txt >> user_prompt.txt
             echo '' >> user_prompt.txt
             echo '```' >> user_prompt.txt
             echo "" >> user_prompt.txt
@@ -129,13 +122,13 @@ jobs:
           ```diff
           EOF
 
-          # Truncate diff if too large (with safe command substitution)
-          DIFF_SIZE="$(wc -c < diff.patch 2>/dev/null || echo 0)"
-          if [ "$DIFF_SIZE" -gt "$MAX_DIFF_SIZE" ]; then
+          # Truncate diff by lines for clean breaks (not bytes which can corrupt)
+          DIFF_LINES="$(wc -l < diff.patch 2>/dev/null || echo 0)"
+          if [ "$DIFF_LINES" -gt "$MAX_DIFF_LINES" ]; then
             echo "" >> user_prompt.txt
-            echo "Note: The diff has been truncated to ${MAX_DIFF_SIZE} characters due to size limits." >> user_prompt.txt
+            echo "Note: The diff has been truncated to ${MAX_DIFF_LINES} lines due to size limits." >> user_prompt.txt
             echo "" >> user_prompt.txt
-            head -c "$MAX_DIFF_SIZE" diff.patch >> user_prompt.txt
+            head -n "$MAX_DIFF_LINES" diff.patch >> user_prompt.txt
           else
             cat diff.patch >> user_prompt.txt
           fi
@@ -157,30 +150,31 @@ jobs:
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
             echo "Failed to prepare prompts. Check prompt file formatting." >> review.txt
-            exit 0
+            exit 1
           fi
 
+          # GPT-5 with reasoning uses max_completion_tokens
           PAYLOAD=$(cat <<EOF
           {
-            "model": "gpt-4o",
+            "model": "gpt-5",
             "messages": [
               {"role": "system", "content": $SYSTEM_PROMPT},
               {"role": "user", "content": $USER_PROMPT}
             ],
             "temperature": 0.3,
-            "max_tokens": 4096
+            "max_completion_tokens": 4096
           }
           EOF
           )
 
-          echo "Calling OpenAI API..."
+          echo "Calling OpenAI API (GPT-5)..."
 
           # Save response to file with extended timeout
           # --connect-timeout 30: Allow 30s to establish connection
-          # --max-time 180: Allow 3 minutes for complete response
+          # --max-time 300: Allow 5 minutes for GPT-5 (reasoning models can be slower)
           HTTP_CODE=$(curl -s \
             --connect-timeout 30 \
-            --max-time 180 \
+            --max-time 300 \
             -w "%{http_code}" \
             -o openai_response.json \
             -X POST \
@@ -196,15 +190,15 @@ jobs:
 
           # Handle timeout errors (exit code 28)
           if [ "$CURL_EXIT" -eq 28 ]; then
-            echo "Error: API request timed out after 180 seconds"
+            echo "Error: API request timed out after 300 seconds"
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
-            echo "The OpenAI API took too long to respond (greater than 3 minutes). This can happen with large diffs or complex analysis." >> review.txt
+            echo "The OpenAI GPT-5 API took too long to respond (>5 minutes). This can happen with large diffs or complex analysis." >> review.txt
             echo "" >> review.txt
             echo "**Suggestions:**" >> review.txt
             echo "- Try reducing the diff size" >> review.txt
             echo "- Retry the workflow" >> review.txt
-            exit 0
+            exit 1
           fi
 
           # Handle other curl errors
@@ -218,7 +212,7 @@ jobs:
             echo "- Network connectivity" >> review.txt
             echo "- API endpoint availability" >> review.txt
             echo "- Retry the workflow" >> review.txt
-            exit 0
+            exit 1
           fi
 
           if [ "$HTTP_CODE" != "200" ]; then
@@ -248,7 +242,7 @@ jobs:
               echo "API call failed (HTTP $HTTP_CODE). Check workflow logs for details." >> review.txt
             fi
 
-            exit 0
+            exit 1
           fi
 
           # Parse response with error handling
@@ -257,7 +251,7 @@ jobs:
             echo "" >> review.txt
             echo "OpenAI API returned an unexpected response format. Response:" >> review.txt
             cat openai_response.json >> review.txt
-            exit 0
+            exit 1
           fi
 
           jq -r '.choices[0].message.content' openai_response.json > review.txt
@@ -266,7 +260,7 @@ jobs:
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
             echo "Review file is empty. OpenAI may have returned no content." >> review.txt
-            exit 0
+            exit 1
           fi
 
           echo "Review generated successfully ($(wc -c < review.txt) bytes)"
@@ -275,40 +269,19 @@ jobs:
 
       - name: Post review comment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Preparing to post review comment..."
 
-          if [ ! -f review.txt ]; then
-            echo "Error: review.txt not found"
-            exit 1
+          if [ ! -s review.txt ]; then
+            echo "Review is empty, skipping comment."
+            exit 0
           fi
 
-          REVIEW_SIZE="$(wc -c < review.txt)"
-          echo "Review content length: $REVIEW_SIZE bytes"
-
-          REVIEW_BODY=$(jq -Rs . < review.txt 2>/dev/null)
-          if [ -z "$REVIEW_BODY" ]; then
-            echo "Error: Failed to encode review content as JSON"
-            exit 1
-          fi
-
+          echo "Review content length: $(wc -c < review.txt) bytes"
           echo "Posting comment to PR #${{ github.event.pull_request.number }}..."
 
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o comment_response.json \
-            --connect-timeout 10 \
-            --max-time 30 \
-            -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -d "{\"body\": $REVIEW_BODY}")
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "Error: Failed to post comment (HTTP $HTTP_CODE)"
-            cat comment_response.json
-            exit 1
-          fi
+          # Use gh CLI for simpler comment posting
+          gh pr comment ${{ github.event.pull_request.number }} --body-file review.txt
 
           echo "Comment posted successfully!"
-          jq '.html_url' comment_response.json
