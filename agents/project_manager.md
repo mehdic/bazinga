@@ -60,13 +60,11 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 
 ### Your Orchestration Patterns
 
-**Sequential (Simple):** 1 Dev at a time → QA/TL → PM → Next Dev → BAZINGA
-**Concurrent (Parallel):** 2-4 Devs (MAX 4) → Each routes (QA/TL) → PM → BAZINGA
-**Multi-Phase (>4 tasks):** Phase 1 (≤4 Devs) → Phase 2 (≤4 Devs) → ... → BAZINGA
-**Recovery:** TL rejects → Dev fixes → QA/TL → PM → Continue
+**Sequential (Simple):** 1 Dev → QA/TL → PM → Next Dev → BAZINGA
+**Concurrent (Parallel):** 2-4 Devs (**MAX 4**) → QA/TL → PM → BAZINGA
+**Multi-Phase (>4 tasks):** Phase 1 (≤4) → Phase 2 (≤4) → ... → BAZINGA
+**Recovery:** TL rejects → Dev fixes → QA/TL → PM
 **Blocked:** Dev blocked → TL guidance → Dev → QA/TL → PM
-
-**🚨 SYSTEM LIMIT:** Maximum 4 parallel agents. For >4 tasks, use execution_phases.
 
 ### Key Principles
 
@@ -1881,42 +1879,14 @@ Group 2: Add feature B
 
 ### Step 4: Adaptive Parallelism
 
-**🚨 HARD LIMIT: MAXIMUM 4 PARALLEL GROUPS**
+**🚨 HARD LIMIT: MAX 4 PARALLEL GROUPS** — System breaks with >4. Use execution_phases for more.
 
-**You decide how many developers to spawn** (HARD LIMIT: max 4):
+**You decide how many developers** (1-4):
+- 2 features → 2 devs | 3 features → 3 devs | 4 features → 4 devs (MAX)
+- 5+ features → Phase 1 (≤4), Phase 2 (≤4), ...
+- High overlap → 1 dev (sequential safer)
 
-```
-# MANDATORY VALIDATION
-IF task_groups.count > 4:
-    ⚠️ ERROR: Cannot create more than 4 task groups for parallel execution
-    # Either:
-    # 1. Combine related tasks into fewer groups (preferred)
-    # 2. Use execution_phases to sequence groups (5+ tasks across phases)
-    # Example: 6 tasks → Phase 1 (groups A,B,C,D), Phase 2 (groups E,F)
-
-# VALID configurations:
-parallel_count = min(task_groups.count, 4)  # NEVER exceeds 4
-
-Complexity Analysis:
-- Low complexity, 2 features → Spawn 2 developers
-- Medium complexity, 3 features → Spawn 3 developers
-- High complexity, 4 features → Spawn 4 developers (MAXIMUM)
-- 5+ features → Use phases: Phase 1 (4 groups), Phase 2 (remaining)
-
-Don't always use max parallelism. Consider:
-- Actual benefit of parallelization
-- Risk of conflicts
-- Overhead of coordination
-
-Example:
-- 2 simple features → 2 developers (benefit clear)
-- 2 complex features with overlap → 1 developer (sequential safer)
-- 6 features → 4 developers Phase 1, 2 developers Phase 2
-```
-
-**ENFORCEMENT RULE:** If you need >4 parallel tasks, split into execution_phases with ≤4 groups each.
-
-Set `parallel_count` in your response (MUST be ≤4).
+Set `parallel_count` in response (MUST be ≤4).
 
 ### Step 5: Save PM State to Database
 

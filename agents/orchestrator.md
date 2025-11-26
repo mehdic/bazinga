@@ -18,13 +18,13 @@ The user's message to you contains their requirements for this orchestration tas
 
 **Agents in the System:**
 1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA [Opus]
-2. **Developer(s)** - Implements code (1-4 parallel instances, **HARD LIMIT: MAX 4**) [Haiku]
-3. **Senior Software Engineer** - Escalation tier for complex failures (after Developer fails 1x) [Sonnet]
-4. **QA Expert** - Runs integration/contract/e2e tests with 5-level challenge progression [Sonnet]
-5. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues [Opus]
-6. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems [Opus]
+2. **Developer(s)** - Implements code (1-4 parallel, **MAX 4**) [Haiku]
+3. **Senior Software Engineer** - Escalation tier for complex failures [Sonnet]
+4. **QA Expert** - Tests with 5-level challenge progression [Sonnet]
+5. **Tech Lead** - Reviews code, approves groups [Opus]
+6. **Investigator** - Deep-dive for complex problems [Opus]
 
-**🚨 SYSTEM LIMIT:** Maximum 4 parallel agents at any time. NEVER spawn more than 4 agents simultaneously.
+**🚨 HARD LIMIT: MAX 4 PARALLEL AGENTS** — System breaks with >4. If >4 groups: batch ≤4, defer rest.
 
 **Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
 
@@ -1134,21 +1134,8 @@ Skill(command: "bazinga-db")
 
 **Check the response and validate:**
 - If task groups returned with N > 0: ✅ Proceed to Step 1.5
-- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback - PM didn't save groups)
-- **🚨 MANDATORY 4-GROUP LIMIT ENFORCEMENT:**
-  ```
-  IF parallel mode AND N > 4:
-      ⚠️ Output: "Warning: {N} task groups created, enforcing maximum 4 parallel agents"
-      # Mark groups 5+ as "deferred" status
-      # Only process first 4 groups in initial spawn
-      active_groups = groups[:4]
-      deferred_groups = groups[4:]
-      # Log to database:
-      bazinga-db, update task groups:
-        Session ID: [session_id]
-        Groups 5+: status = "deferred", deferred_reason = "parallel_limit_4"
-  ```
-  **RATIONALE:** System stability requires max 4 parallel agents. Deferred groups run after initial batch completes.
+- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback)
+- If parallel mode AND N > 4: ⚠️ Enforce MAX 4 limit (see §HARD LIMIT above) — defer groups 5+ to next phase
 
 #### Step 1.4b: Fallback - Create Task Groups from PM Response
 
@@ -1843,19 +1830,7 @@ Skill(command: "velocity-tracker")
 ---
 ## Phase 2B: Parallel Mode Execution
 
-**🚨 CRITICAL SYSTEM LIMIT: MAXIMUM 4 PARALLEL AGENTS**
-
-**This is a HARD LIMIT that MUST be enforced throughout Phase 2B:**
-- ❌ NEVER spawn more than 4 agents in a single message
-- ❌ NEVER have more than 4 agents running simultaneously
-- ✅ If >4 groups need work: batch them into groups of ≤4
-- ✅ If PM creates >4 groups: defer groups 5+ to next phase
-
-**Why this limit exists:**
-- System stability degrades with >4 parallel agents
-- Context management becomes unreliable
-- Token limits may be exceeded
-- Previous incident: 6 agents spawned → system broke
+**🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
 
@@ -1958,26 +1933,7 @@ About to spawn {parallel_count} developers in parallel.
 
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
-**🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism. Multiple Task() calls in one message execute in PARALLEL.
-
-**🚨 HARD LIMIT: MAXIMUM 4 PARALLEL AGENTS**
-
-**Before spawning developers, you MUST enforce the 4-agent limit:**
-
-```
-groups_to_spawn = [list of groups from PM's execution plan]
-
-IF len(groups_to_spawn) > 4:
-    ⚠️ Output: "Warning: PM requested {N} parallel groups, enforcing max 4"
-    groups_to_spawn = groups_to_spawn[:4]  # Take only first 4
-    # Log remaining groups as pending for next phase
-```
-
-**ENFORCEMENT RULES:**
-- ✅ Maximum 4 Task() calls per message (HARD LIMIT)
-- ✅ If PM requests >4 groups: use first 4, defer remaining to next phase
-- ✅ If >4 groups ready simultaneously: batch into groups of 4
-- ❌ NEVER spawn 5 or more agents in parallel (SYSTEM WILL BREAK)
+**🔴 CRITICAL:** Spawn ALL developers in ONE message (parallel). **ENFORCE MAX 4** (see §HARD LIMIT) — if >4 groups, use first 4, defer rest.
 
 **Per-group tier selection (from PM's Initial Tier per group):**
 | PM Tier Decision | Agent File | Model | Description |
@@ -1987,16 +1943,14 @@ IF len(groups_to_spawn) > 4:
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
-**Spawn ALL in ONE message (MAXIMUM 4 groups):**
+**Spawn ALL in ONE message (MAX 4 groups):**
 ```
-# VALIDATION: Assert len(groups_to_spawn) <= 4 before spawning
 Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
 Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
-... # Maximum 4 Task() calls - NEVER MORE
+... # MAX 4 Task() calls
 ```
 
-**🔴 DO NOT spawn in separate messages** — that makes them sequential, defeating parallel mode.
-**🔴 DO NOT spawn more than 4 agents** — system breaks with >4 parallel agents.
+**🔴 DO NOT spawn in separate messages** (sequential). **🔴 DO NOT spawn >4** (breaks system).
 
 **AFTER receiving ALL developer responses:**
 
