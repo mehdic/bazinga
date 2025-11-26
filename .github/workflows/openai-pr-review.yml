@@ -155,7 +155,6 @@ jobs:
 
           # GPT-5 is a reasoning model - temperature is fixed at 1 (not configurable)
           # Needs high max_completion_tokens because reasoning tokens count against the limit
-          # (4096 reasoning + 4096 output = 8192 minimum, using 16384 for safety)
           PAYLOAD=$(cat <<EOF
           {
             "model": "gpt-5",
@@ -163,7 +162,7 @@ jobs:
               {"role": "system", "content": $SYSTEM_PROMPT},
               {"role": "user", "content": $USER_PROMPT}
             ],
-            "max_completion_tokens": 16384
+            "max_completion_tokens": 49152
           }
           EOF
           )
