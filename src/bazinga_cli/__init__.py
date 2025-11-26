@@ -326,6 +326,8 @@ class BazingaSetup:
                 source_templates = legacy_path
             else:
                 console.print("[yellow]⚠️  No templates found in source[/yellow]")
+                console.print("[dim]   Checked: package dir, shared-data, project root[/dim]")
+                console.print("[dim]   Hint: Update CLI with 'uv tool upgrade bazinga-cli' or reinstall[/dim]")
                 return False
 
         copied_count = 0
@@ -364,6 +366,8 @@ class BazingaSetup:
         source_bazinga = self._get_config_source("bazinga")
         if not source_bazinga:
             console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
+            console.print("[dim]   Checked: package dir, shared-data, project root[/dim]")
+            console.print("[dim]   Hint: Update CLI with 'uv tool upgrade bazinga-cli' or reinstall[/dim]")
             return False
 
         copied_count = 0
