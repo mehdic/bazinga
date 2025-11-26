@@ -18,11 +18,13 @@ The user's message to you contains their requirements for this orchestration tas
 
 **Agents in the System:**
 1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA [Opus]
-2. **Developer(s)** - Implements code (1-4 parallel instances based on PM decision) [Haiku]
-3. **Senior Software Engineer** - Escalation tier for complex failures (after Developer fails 1x) [Sonnet]
-4. **QA Expert** - Runs integration/contract/e2e tests with 5-level challenge progression [Sonnet]
-5. **Tech Lead** - Reviews code quality, approves groups, spawns Investigator for complex issues [Opus]
-6. **Investigator** - Deep-dive investigation for complex, multi-hypothesis problems [Opus]
+2. **Developer(s)** - Implements code (1-4 parallel, **MAX 4**) [Haiku]
+3. **Senior Software Engineer** - Escalation tier for complex failures [Sonnet]
+4. **QA Expert** - Tests with 5-level challenge progression [Sonnet]
+5. **Tech Lead** - Reviews code, approves groups [Opus]
+6. **Investigator** - Deep-dive for complex problems [Opus]
+
+**🚨 HARD LIMIT: MAX 4 PARALLEL DEVELOPERS** — Applies to concurrent dev spawns only (not sequential QA/TL). If >4 groups: spawn first 4, defer rest (auto-resumed via Step 2B.7a).
 
 **Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
 
@@ -1132,8 +1134,8 @@ Skill(command: "bazinga-db")
 
 **Check the response and validate:**
 - If task groups returned with N > 0: ✅ Proceed to Step 1.5
-- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback - PM didn't save groups)
-- If parallel mode AND N > 4: ⚠️ Too many groups (max 4) - use first 4 only, log warning
+- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback)
+- If parallel mode AND N > 4: ⚠️ Enforce MAX 4 limit (see §HARD LIMIT above) — defer groups 5+ to next phase
 
 #### Step 1.4b: Fallback - Create Task Groups from PM Response
 
@@ -1828,6 +1830,8 @@ Skill(command: "velocity-tracker")
 ---
 ## Phase 2B: Parallel Mode Execution
 
+**🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
+
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
 
 **🔴 CRITICAL WORKFLOW RULE - NEVER STOP BETWEEN PHASES:**
@@ -1929,7 +1933,7 @@ About to spawn {parallel_count} developers in parallel.
 
 ### Step 2B.1: Spawn Multiple Developers in Parallel
 
-**🔴 CRITICAL:** Spawn ALL developers in ONE message for true parallelism. Multiple Task() calls in one message execute in PARALLEL.
+**🔴 CRITICAL:** Spawn ALL developers in ONE message (parallel). **ENFORCE MAX 4** (see §HARD LIMIT) — if >4 groups, use first 4, defer rest.
 
 **Per-group tier selection (from PM's Initial Tier per group):**
 | PM Tier Decision | Agent File | Model | Description |
@@ -1939,14 +1943,14 @@ About to spawn {parallel_count} developers in parallel.
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
-**Spawn ALL in ONE message (up to 4 groups):**
+**Spawn ALL in ONE message (MAX 4 groups):**
 ```
 Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
 Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
-... # Each group may have different tier (haiku vs sonnet)
+... # MAX 4 Task() calls
 ```
 
-**🔴 DO NOT spawn in separate messages** — that makes them sequential, defeating parallel mode.
+**🔴 DO NOT spawn in separate messages** (sequential). **🔴 DO NOT spawn >4** (breaks system).
 
 **AFTER receiving ALL developer responses:**
 
@@ -2100,7 +2104,7 @@ Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violat
 
 **🔴 MANDATORY: After Tech Lead approval, check for next phase BEFORE spawning PM**
 
-**Actions:** 1) Update group status=completed (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count, total_count.
+**Actions:** 1) Update group status=completed (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count (include "deferred" status as pending), total_count.
 
 **Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} approved | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.8. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.8, ELSE IF current_phase in_progress → output `✅ Group {id} | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.8**
 
