@@ -25,16 +25,40 @@ jobs:
           git fetch origin ${{ github.base_ref }}
           git diff origin/${{ github.base_ref }}...HEAD > diff.patch
 
+      - name: Find previous review analysis
+        id: previous_review
+        run: |
+          # Find the most recent PR review analysis from this branch
+          # This ensures continuity by providing context from previous reviews
+          LATEST_REVIEW=""
+
+          # Look for research/pr*-review-analysis.md files, get most recent
+          if ls research/pr*-review-analysis.md 1> /dev/null 2>&1; then
+            LATEST_REVIEW=$(ls -t research/pr*-review-analysis.md 2>/dev/null | head -1)
+          fi
+
+          if [ -n "$LATEST_REVIEW" ] && [ -f "$LATEST_REVIEW" ]; then
+            echo "Found previous review: $LATEST_REVIEW"
+            echo "has_previous=true" >> $GITHUB_OUTPUT
+            echo "file=$LATEST_REVIEW" >> $GITHUB_OUTPUT
+          else
+            echo "No previous review analysis found"
+            echo "has_previous=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build prompt
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
+          HAS_PREVIOUS: ${{ steps.previous_review.outputs.has_previous }}
+          PREVIOUS_FILE: ${{ steps.previous_review.outputs.file }}
         run: |
           # Configuration
           # Max diff size in characters - Gemini API has token limits
           # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
           MAX_DIFF_SIZE=40000
+          MAX_PREVIOUS_SIZE=8000
 
           cat > prompt_header.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request.
@@ -47,6 +71,23 @@ jobs:
           echo "Branch: $BRANCH_NAME" >> prompt_header.txt
           echo "" >> prompt_header.txt
 
+          # Include previous review context if available (for continuity)
+          if [ "$HAS_PREVIOUS" = "true" ] && [ -f "$PREVIOUS_FILE" ]; then
+            echo "## Previous Review Context" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "A previous review analysis exists for this branch. Use it to:" >> prompt_header.txt
+            echo "- Avoid repeating issues that were already addressed" >> prompt_header.txt
+            echo "- Check if your feedback was already validated/rejected" >> prompt_header.txt
+            echo "- Ensure continuity in the review process" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "Previous analysis (truncated if large):" >> prompt_header.txt
+            echo '```markdown' >> prompt_header.txt
+            head -c "$MAX_PREVIOUS_SIZE" "$PREVIOUS_FILE" >> prompt_header.txt
+            echo '' >> prompt_header.txt
+            echo '```' >> prompt_header.txt
+            echo "" >> prompt_header.txt
+          fi
+
           cat >> prompt_header.txt << 'EOF'
           NOTE: You are provided with the complete Git diff below. Use this diff to understand all changes in this PR.
 
@@ -54,6 +95,8 @@ jobs:
           1. Potential bugs or regressions - Consider how these changes interact with the existing codebase
           2. Style or readability issues - Code quality and maintainability concerns
           3. Concrete suggestions for improvement - Specific, actionable recommendations
+
+          IMPORTANT: If previous review context was provided above, acknowledge what was already addressed and focus on NEW issues or remaining concerns.
 
           Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
 
