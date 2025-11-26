@@ -49,8 +49,23 @@ jobs:
           echo "No code changes to review. Skipping API call."
           exit 0
 
-      - name: Fetch previous OpenAI reviews from PR
+      - name: Check API key
         if: steps.diff.outputs.empty != 'true'
+        id: api_key_check
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
+            echo "OpenAI review skipped: no API key available for this PR context." >> review.txt
+          else
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch previous OpenAI reviews from PR
+        if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
         id: previous_openai
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,9 +73,15 @@ jobs:
           # Use gh CLI to fetch comments (simpler than curl)
           echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
+          # Use precise marker "## OpenAI Code Review" to avoid false matches
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("OpenAI")))] | last | .body // empty' \
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .body // empty' \
             > previous_openai_review.txt
+
+          # Also capture comment ID for later update
+          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .id // empty' \
+            > previous_comment_id.txt
 
           if [ -s previous_openai_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_openai_review.txt)
@@ -72,7 +93,7 @@ jobs:
           fi
 
       - name: Build prompt
-        if: steps.diff.outputs.empty != 'true'
+        if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
@@ -163,7 +184,7 @@ jobs:
           EOF
 
       - name: Call OpenAI API
-        if: steps.diff.outputs.empty != 'true'
+        if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -195,35 +216,44 @@ jobs:
 
           echo "Calling OpenAI API (GPT-5)..."
 
-          # Save response to file with extended timeout
-          # --connect-timeout 30: Allow 30s to establish connection
-          # --max-time 300: Allow 5 minutes for GPT-5 (reasoning models can be slower)
-          HTTP_CODE=$(curl -s \
-            --connect-timeout 30 \
-            --max-time 300 \
-            -w "%{http_code}" \
-            -o openai_response.json \
-            -X POST \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -d "$PAYLOAD" \
-            https://api.openai.com/v1/chat/completions)
+          # Retry logic for transient errors (timeout, 429, 5xx)
+          MAX_RETRIES=3
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt of $MAX_RETRIES..."
 
-          CURL_EXIT=$?
+            HTTP_CODE=$(curl -s \
+              --connect-timeout 30 \
+              --max-time 300 \
+              -w "%{http_code}" \
+              -o openai_response.json \
+              -X POST \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $OPENAI_API_KEY" \
+              -d "$PAYLOAD" \
+              https://api.openai.com/v1/chat/completions)
 
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Curl exit code: $CURL_EXIT"
+            CURL_EXIT=$?
 
-          # Handle timeout errors (exit code 28)
+            echo "HTTP Status: $HTTP_CODE, Curl exit: $CURL_EXIT"
+
+            # Check for transient errors that warrant retry
+            if [ "$CURL_EXIT" -eq 28 ] || [ "$HTTP_CODE" = "429" ] || [ "$HTTP_CODE" = "500" ] || [ "$HTTP_CODE" = "502" ] || [ "$HTTP_CODE" = "503" ]; then
+              if [ "$attempt" -lt "$MAX_RETRIES" ]; then
+                SLEEP_TIME=$((attempt * 10))
+                echo "Transient error, retrying in ${SLEEP_TIME}s..."
+                sleep $SLEEP_TIME
+                continue
+              fi
+            fi
+            break
+          done
+
+          # Handle timeout errors (exit code 28) after all retries
           if [ "$CURL_EXIT" -eq 28 ]; then
-            echo "Error: API request timed out after 300 seconds"
+            echo "Error: API request timed out after all retries"
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
-            echo "The OpenAI GPT-5 API took too long to respond (>5 minutes). This can happen with large diffs or complex analysis." >> review.txt
-            echo "" >> review.txt
-            echo "**Suggestions:**" >> review.txt
-            echo "- Try reducing the diff size" >> review.txt
-            echo "- Retry the workflow" >> review.txt
+            echo "The OpenAI GPT-5 API took too long to respond. Please retry the workflow." >> review.txt
             exit 1
           fi
 
@@ -232,40 +262,28 @@ jobs:
             echo "Error: Curl failed with exit code $CURL_EXIT"
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
-            echo "Failed to connect to OpenAI API (curl exit code: $CURL_EXIT)." >> review.txt
-            echo "" >> review.txt
-            echo "**Please check:**" >> review.txt
-            echo "- Network connectivity" >> review.txt
-            echo "- API endpoint availability" >> review.txt
-            echo "- Retry the workflow" >> review.txt
+            echo "Failed to connect to OpenAI API. Please retry the workflow." >> review.txt
             exit 1
           fi
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "Error: OpenAI API returned status $HTTP_CODE"
-            cat openai_response.json
+            # Extract just the error message, not full response (reduces log verbosity)
+            ERROR_MSG=$(jq -r '.error.message // "Unknown error"' openai_response.json 2>/dev/null || echo "Unknown error")
+            echo "Error: OpenAI API returned status $HTTP_CODE - $ERROR_MSG"
 
             # Build error message based on HTTP status
+            echo "## OpenAI Code Review" > review.txt
+            echo "" >> review.txt
             if [ "$HTTP_CODE" == "429" ]; then
-              echo "## OpenAI Code Review" > review.txt
-              echo "" >> review.txt
               echo "Rate limit exceeded. Please check your API quota at https://platform.openai.com/usage" >> review.txt
             elif [ "$HTTP_CODE" == "401" ]; then
-              echo "## OpenAI Code Review" > review.txt
-              echo "" >> review.txt
               echo "Authentication failed. Please verify OPENAI_API_KEY secret is configured correctly." >> review.txt
             elif [ "$HTTP_CODE" == "403" ]; then
-              echo "## OpenAI Code Review" > review.txt
-              echo "" >> review.txt
               echo "Access denied. Please check your API key permissions and organization settings." >> review.txt
             elif [ "$HTTP_CODE" == "500" ] || [ "$HTTP_CODE" == "502" ] || [ "$HTTP_CODE" == "503" ]; then
-              echo "## OpenAI Code Review" > review.txt
-              echo "" >> review.txt
               echo "OpenAI service is temporarily unavailable (HTTP $HTTP_CODE). Please retry the workflow." >> review.txt
             else
-              echo "## OpenAI Code Review" > review.txt
-              echo "" >> review.txt
-              echo "API call failed (HTTP $HTTP_CODE). Check workflow logs for details." >> review.txt
+              echo "API call failed (HTTP $HTTP_CODE): $ERROR_MSG" >> review.txt
             fi
 
             exit 1
@@ -285,14 +303,16 @@ jobs:
           # Check for meaningful content (not just whitespace/newlines)
           REVIEW_CONTENT=$(cat review.txt | tr -d '[:space:]')
           if [ -z "$REVIEW_CONTENT" ]; then
-            echo "Warning: OpenAI returned empty or whitespace-only content"
-            echo "Full API response:"
-            cat openai_response.json
+            # Log finish_reason for debugging (not full response)
+            FINISH_REASON=$(jq -r '.choices[0].finish_reason // "unknown"' openai_response.json 2>/dev/null)
+            REASONING_TOKENS=$(jq -r '.usage.completion_tokens_details.reasoning_tokens // 0' openai_response.json 2>/dev/null)
+            echo "Warning: Empty content. finish_reason=$FINISH_REASON, reasoning_tokens=$REASONING_TOKENS"
+
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
-            echo "OpenAI returned no meaningful content. This may indicate an API issue." >> review.txt
+            echo "OpenAI returned no content (finish_reason: $FINISH_REASON). This may indicate the model used all tokens for reasoning." >> review.txt
             echo "" >> review.txt
-            echo "Please retry the workflow or check OpenAI API status." >> review.txt
+            echo "Please retry the workflow." >> review.txt
             exit 1
           fi
 
@@ -300,7 +320,7 @@ jobs:
           echo "Preview:"
           head -n 10 review.txt
 
-      - name: Post review comment
+      - name: Post or update review comment
         # Run even if API call failed (to post error messages)
         if: always() && steps.diff.outputs.empty != 'true'
         env:
@@ -321,9 +341,24 @@ jobs:
           fi
 
           echo "Review content length: $(wc -c < review.txt) bytes"
-          echo "Posting comment to PR #${{ github.event.pull_request.number }}..."
 
-          # Use gh CLI for simpler comment posting
-          gh pr comment ${{ github.event.pull_request.number }} --body-file review.txt
+          PR_NUMBER=${{ github.event.pull_request.number }}
 
-          echo "Comment posted successfully!"
+          # Check if we have a previous comment ID to update
+          COMMENT_ID=""
+          if [ -f previous_comment_id.txt ]; then
+            COMMENT_ID=$(cat previous_comment_id.txt | tr -d '[:space:]')
+          fi
+
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Updating existing comment $COMMENT_ID..."
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
+              -f body="$(cat review.txt)" && echo "Comment updated successfully!" || {
+              echo "Failed to update, posting new comment..."
+              gh pr comment $PR_NUMBER --body-file review.txt
+            }
+          else
+            echo "Posting new comment to PR #$PR_NUMBER..."
+            gh pr comment $PR_NUMBER --body-file review.txt
+            echo "Comment posted successfully!"
+          fi
