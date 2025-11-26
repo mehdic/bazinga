@@ -29,11 +29,14 @@ import {
   Download,
   Play,
   Workflow,
+  Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TokenCharts } from "@/components/charts/token-charts";
 import { StateMachine } from "@/components/workflow/state-machine";
 import { LogFilters } from "@/components/logs/log-filters";
+import { SessionReplay } from "@/components/replay/session-replay";
+import { SkillOutputViewer } from "@/components/skills/skill-output-viewer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +61,11 @@ export default function SessionDetailPage() {
   );
 
   const { data: tokenData } = trpc.sessions.getTokenBreakdown.useQuery(
+    { sessionId },
+    { enabled: !!sessionId }
+  );
+
+  const { data: skillOutputs } = trpc.sessions.getSkillOutputs.useQuery(
     { sessionId },
     { enabled: !!sessionId }
   );
@@ -248,33 +256,41 @@ export default function SessionDetailPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="workflow" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="workflow">
-            <Workflow className="h-4 w-4 mr-2" />
+            <Workflow className="h-4 w-4 mr-1" />
             Workflow
           </TabsTrigger>
+          <TabsTrigger value="replay">
+            <Play className="h-4 w-4 mr-1" />
+            Replay
+          </TabsTrigger>
           <TabsTrigger value="tasks">
-            <GitBranch className="h-4 w-4 mr-2" />
+            <GitBranch className="h-4 w-4 mr-1" />
             Tasks
           </TabsTrigger>
           <TabsTrigger value="logs">
-            <FileText className="h-4 w-4 mr-2" />
+            <FileText className="h-4 w-4 mr-1" />
             Logs
           </TabsTrigger>
           <TabsTrigger value="tokens">
-            <Zap className="h-4 w-4 mr-2" />
+            <Zap className="h-4 w-4 mr-1" />
             Tokens
           </TabsTrigger>
+          <TabsTrigger value="skills">
+            <Wand2 className="h-4 w-4 mr-1" />
+            Skills
+          </TabsTrigger>
           <TabsTrigger value="quality">
-            <Shield className="h-4 w-4 mr-2" />
+            <Shield className="h-4 w-4 mr-1" />
             Quality
           </TabsTrigger>
           <TabsTrigger value="timeline">
-            <BarChart3 className="h-4 w-4 mr-2" />
+            <BarChart3 className="h-4 w-4 mr-1" />
             Timeline
           </TabsTrigger>
           <TabsTrigger value="insights">
-            <Sparkles className="h-4 w-4 mr-2" />
+            <Sparkles className="h-4 w-4 mr-1" />
             Insights
           </TabsTrigger>
         </TabsList>
@@ -293,6 +309,14 @@ export default function SessionDetailPage() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Replay Tab */}
+        <TabsContent value="replay">
+          <SessionReplay
+            logs={session.logs || []}
+            sessionStatus={session.status}
+          />
         </TabsContent>
 
         {/* Tasks Tab */}
@@ -412,6 +436,11 @@ export default function SessionDetailPage() {
               </Card>
             )}
           </div>
+        </TabsContent>
+
+        {/* Skills Tab */}
+        <TabsContent value="skills">
+          <SkillOutputViewer outputs={skillOutputs || []} />
         </TabsContent>
 
         {/* Quality Tab */}

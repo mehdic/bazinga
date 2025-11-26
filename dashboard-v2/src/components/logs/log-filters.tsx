@@ -78,8 +78,8 @@ export function LogFilters({ logs }: LogFiltersProps) {
   const hasFilters = search || selectedAgents.length > 0 || selectedModels.length > 0;
 
   // Get unique agents and models from logs
-  const availableAgents = [...new Set(logs.map((l) => l.agentType))];
-  const availableModels = [...new Set(logs.map((l) => l.modelTier).filter(Boolean))] as string[];
+  const availableAgents = Array.from(new Set(logs.map((l) => l.agentType)));
+  const availableModels = Array.from(new Set(logs.map((l) => l.modelTier).filter(Boolean))) as string[];
 
   return (
     <Card>

@@ -104,6 +104,25 @@ export const qualityMetrics = sqliteTable("quality_metrics", {
   details: text("details"), // JSON string
 });
 
+// Skill Outputs table
+export const skillOutputs = sqliteTable("skill_outputs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: text("session_id").notNull(),
+  timestamp: text("timestamp").notNull(),
+  skillName: text("skill_name").notNull(),
+  outputData: text("output_data").notNull(), // JSON string
+});
+
+// Decisions table
+export const decisions = sqliteTable("decisions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: text("session_id").notNull(),
+  timestamp: text("timestamp").notNull(),
+  iteration: integer("iteration"),
+  decisionType: text("decision_type").notNull(),
+  decisionData: text("decision_data").notNull(), // JSON string
+});
+
 // Relations
 export const sessionsRelations = relations(sessions, ({ many }) => ({
   logs: many(orchestrationLogs),

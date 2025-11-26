@@ -15,7 +15,7 @@ import {
   Zap,
   ChevronRight,
   ArrowLeftRight,
-  BarChart3,
+  Settings2,
 } from "lucide-react";
 
 const navigation = [
@@ -23,6 +23,7 @@ const navigation = [
   { name: "Sessions", href: "/sessions", icon: History },
   { name: "Compare", href: "/sessions/compare", icon: ArrowLeftRight },
   { name: "Analytics", href: "/analytics", icon: Activity },
+  { name: "Config", href: "/config", icon: Settings2 },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

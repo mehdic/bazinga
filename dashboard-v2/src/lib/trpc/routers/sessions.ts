@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../server";
 import { db } from "../../db/client";
-import { sessions, orchestrationLogs, taskGroups, successCriteria, tokenUsage, stateSnapshots } from "../../db/schema";
+import { sessions, orchestrationLogs, taskGroups, successCriteria, tokenUsage, stateSnapshots, skillOutputs, decisions } from "../../db/schema";
 import { desc, eq, and, gte, lte, like, count, sql } from "drizzle-orm";
 
 export const sessionsRouter = router({
@@ -250,4 +250,48 @@ export const sessionsRouter = router({
       revisionStats: revisionStats[0] || { totalGroups: 0, revisedGroups: 0, avgRevisions: 0 },
     };
   }),
+
+  // Get skill outputs for a session
+  getSkillOutputs: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      const outputs = await db
+        .select()
+        .from(skillOutputs)
+        .where(eq(skillOutputs.sessionId, input.sessionId))
+        .orderBy(desc(skillOutputs.timestamp));
+
+      return outputs.map((output) => ({
+        ...output,
+        outputData: (() => {
+          try {
+            return JSON.parse(output.outputData);
+          } catch {
+            return output.outputData;
+          }
+        })(),
+      }));
+    }),
+
+  // Get decisions for a session
+  getDecisions: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      const result = await db
+        .select()
+        .from(decisions)
+        .where(eq(decisions.sessionId, input.sessionId))
+        .orderBy(desc(decisions.timestamp));
+
+      return result.map((decision) => ({
+        ...decision,
+        decisionData: (() => {
+          try {
+            return JSON.parse(decision.decisionData);
+          } catch {
+            return decision.decisionData;
+          }
+        })(),
+      }));
+    }),
 });
