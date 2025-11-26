@@ -16,6 +16,16 @@ import argparse
 class BazingaDB:
     """Database client for BAZINGA orchestration."""
 
+    # SQLite errors that indicate database corruption
+    CORRUPTION_ERRORS = [
+        "database disk image is malformed",
+        "database is locked",
+        "file is not a database",
+        "disk I/O error",
+        "database or disk is full",
+        "attempt to write a readonly database",
+    ]
+
     def __init__(self, db_path: str, quiet: bool = False):
         self.db_path = db_path
         self.quiet = quiet
@@ -26,10 +36,98 @@ class BazingaDB:
         if not self.quiet:
             print(message)
 
+    def _print_error(self, message: str):
+        """Print error message to stderr."""
+        print(f"! {message}", file=sys.stderr)
+
+    def _is_corruption_error(self, error: Exception) -> bool:
+        """Check if an exception indicates database corruption."""
+        error_msg = str(error).lower()
+        return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
+
+    def _backup_corrupted_db(self) -> Optional[str]:
+        """Backup a corrupted database file before recovery."""
+        db_path = Path(self.db_path)
+        if not db_path.exists():
+            return None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = db_path.with_suffix(f".corrupted_{timestamp}.db")
+        try:
+            import shutil
+            shutil.copy2(self.db_path, backup_path)
+            self._print_error(f"Corrupted database backed up to: {backup_path}")
+            return str(backup_path)
+        except Exception as e:
+            self._print_error(f"Failed to backup corrupted database: {e}")
+            return None
+
+    def _recover_from_corruption(self) -> bool:
+        """Attempt to recover from database corruption by reinitializing.
+
+        Returns:
+            True if recovery succeeded, False otherwise.
+        """
+        self._print_error("Database corruption detected. Attempting recovery...")
+
+        # Backup corrupted file
+        self._backup_corrupted_db()
+
+        # Delete corrupted file
+        db_path = Path(self.db_path)
+        try:
+            if db_path.exists():
+                db_path.unlink()
+        except Exception as e:
+            self._print_error(f"Failed to remove corrupted database: {e}")
+            return False
+
+        # Reinitialize
+        try:
+            script_dir = Path(__file__).parent
+            init_script = script_dir / "init_db.py"
+
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, str(init_script), self.db_path],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                self._print_error(f"✓ Database recovered and reinitialized at {self.db_path}")
+                return True
+            else:
+                self._print_error(f"Failed to reinitialize database: {result.stderr}")
+                return False
+        except Exception as e:
+            self._print_error(f"Recovery failed: {e}")
+            return False
+
+    def check_integrity(self) -> Dict[str, Any]:
+        """Run SQLite integrity check on the database.
+
+        Returns:
+            Dict with 'ok' bool and 'details' string.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.execute("PRAGMA integrity_check;")
+            result = cursor.fetchone()[0]
+            conn.close()
+
+            if result == "ok":
+                return {"ok": True, "details": "Database integrity check passed"}
+            else:
+                return {"ok": False, "details": f"Integrity issues found: {result}"}
+        except Exception as e:
+            return {"ok": False, "details": f"Integrity check failed: {e}"}
+
     def _ensure_db_exists(self):
         """Ensure database exists and has schema, create if not."""
         db_path = Path(self.db_path)
         needs_init = False
+        is_corrupted = False
 
         if not db_path.exists():
             needs_init = True
@@ -38,20 +136,40 @@ class BazingaDB:
             needs_init = True
             print(f"Database file is empty at {self.db_path}. Auto-initializing...", file=sys.stderr)
         else:
-            # File exists and has content - check if it has tables
+            # File exists and has content - check if it has tables and is not corrupted
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     cursor = conn.cursor()
-                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
-                    if not cursor.fetchone():
+                    # First check integrity
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        is_corrupted = True
                         needs_init = True
-                        print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                        print(f"Database corrupted at {self.db_path}: {integrity}. Auto-recovering...", file=sys.stderr)
+                    else:
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+                        if not cursor.fetchone():
+                            needs_init = True
+                            print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+            except sqlite3.DatabaseError as e:
+                is_corrupted = True
+                needs_init = True
+                print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
             except Exception as e:
                 needs_init = True
                 print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
 
         if not needs_init:
             return
+
+        # If corrupted, backup and delete before reinitializing
+        if is_corrupted and db_path.exists():
+            self._backup_corrupted_db()
+            try:
+                db_path.unlink()
+                print(f"Removed corrupted database file", file=sys.stderr)
+            except Exception as e:
+                print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
 
         # Auto-initialize the database
         script_dir = Path(__file__).parent
@@ -70,12 +188,31 @@ class BazingaDB:
 
         print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Get database connection with proper settings."""
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _get_connection(self, retry_on_corruption: bool = True) -> sqlite3.Connection:
+        """Get database connection with proper settings.
+
+        Args:
+            retry_on_corruption: If True, attempt recovery on corruption errors.
+
+        Returns:
+            sqlite3.Connection with WAL mode and foreign keys enabled.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            # Enable WAL mode for better concurrency (reduces "database is locked" errors)
+            conn.execute("PRAGMA journal_mode=WAL")
+            # Enable foreign key constraints
+            conn.execute("PRAGMA foreign_keys = ON")
+            # Increase busy timeout to handle concurrent access
+            conn.execute("PRAGMA busy_timeout = 30000")
+            conn.row_factory = sqlite3.Row
+            return conn
+        except sqlite3.DatabaseError as e:
+            if retry_on_corruption and self._is_corruption_error(e):
+                if self._recover_from_corruption():
+                    # Retry connection after recovery
+                    return self._get_connection(retry_on_corruption=False)
+            raise
 
     # ==================== SESSION OPERATIONS ====================
 
@@ -219,11 +356,31 @@ class BazingaDB:
             self._print_success(f"✓ Logged {agent_type} interaction (log_id={log_id}, {result['content_length']} chars)")
             return result
 
+        except sqlite3.DatabaseError as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+            # Check if it's a corruption error
+            if self._is_corruption_error(e):
+                if self._recover_from_corruption():
+                    # Retry once after recovery
+                    self._print_error(f"Retrying log operation after recovery...")
+                    return self.log_interaction(session_id, agent_type, content, iteration, agent_id)
+            self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
+            return {"success": False, "error": f"Database error: {str(e)}"}
         except Exception as e:
-            conn.rollback()
-            raise RuntimeError(f"Failed to log {agent_type} interaction: {str(e)}")
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+            self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
+            return {"success": False, "error": str(e)}
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def get_logs(self, session_id: str, limit: int = 50, offset: int = 0,
                  agent_type: Optional[str] = None, since: Optional[str] = None) -> List[Dict]:
@@ -819,6 +976,17 @@ def main():
                 value = cmd_args[i + 1]
                 kwargs[key] = value
             db.update_success_criterion(session_id, criterion, **kwargs)
+        elif cmd == 'integrity-check':
+            result = db.check_integrity()
+            print(json.dumps(result, indent=2))
+            if not result['ok']:
+                sys.exit(1)
+        elif cmd == 'recover-db':
+            if db._recover_from_corruption():
+                print(json.dumps({"success": True, "message": "Database recovered successfully"}, indent=2))
+            else:
+                print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
+                sys.exit(1)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             sys.exit(1)
