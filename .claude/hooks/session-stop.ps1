@@ -6,10 +6,12 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 
-$ORCHESTRATOR_FILE = "agents\orchestrator.md"
+# Use forward slashes for git compatibility (git always outputs forward slashes)
+$ORCHESTRATOR_FILE = "agents/orchestrator.md"
+$ORCHESTRATOR_FILE_WIN = "agents\orchestrator.md"
 
-# Only run if orchestrator file exists
-if (-not (Test-Path $ORCHESTRATOR_FILE)) {
+# Only run if orchestrator file exists (check both path formats)
+if (-not (Test-Path $ORCHESTRATOR_FILE) -and -not (Test-Path $ORCHESTRATOR_FILE_WIN)) {
     exit 0
 }
 
@@ -20,15 +22,16 @@ Write-Host "🔍 Session Stop: Checking if orchestrator was modified..."
 $MODIFIED = $false
 
 # Check for uncommitted changes (staged or unstaged)
-$diffOutput = & git diff --name-only HEAD $ORCHESTRATOR_FILE 2>$null
-if ($diffOutput -match [regex]::Escape($ORCHESTRATOR_FILE)) {
+# Git outputs forward slashes, so match against that
+$diffOutput = & git diff --name-only HEAD -- $ORCHESTRATOR_FILE 2>$null
+if ($diffOutput -and ($diffOutput -match "agents/orchestrator\.md")) {
     $MODIFIED = $true
     Write-Host "  → Detected uncommitted changes to $ORCHESTRATOR_FILE"
 }
 
 if (-not $MODIFIED) {
-    $cachedDiff = & git diff --name-only --cached $ORCHESTRATOR_FILE 2>$null
-    if ($cachedDiff -match [regex]::Escape($ORCHESTRATOR_FILE)) {
+    $cachedDiff = & git diff --name-only --cached -- $ORCHESTRATOR_FILE 2>$null
+    if ($cachedDiff -and ($cachedDiff -match "agents/orchestrator\.md")) {
         $MODIFIED = $true
         Write-Host "  → Detected staged changes to $ORCHESTRATOR_FILE"
     }
@@ -36,7 +39,7 @@ if (-not $MODIFIED) {
 
 # Check recent commits on current branch (last 5 commits)
 if (-not $MODIFIED) {
-    $recentChanges = & git log -5 --name-only --pretty=format: 2>$null | Select-String -Pattern ([regex]::Escape($ORCHESTRATOR_FILE)) -Quiet
+    $recentChanges = & git log -5 --name-only --pretty=format: 2>$null | Select-String -Pattern "agents/orchestrator\.md" -Quiet
     if ($recentChanges) {
         $MODIFIED = $true
         Write-Host "  → Detected recent commit(s) modifying $ORCHESTRATOR_FILE"

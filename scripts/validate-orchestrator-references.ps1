@@ -4,7 +4,7 @@
 param(
     [switch]$Fix,
     [switch]$CheckOrphans,
-    [switch]$Verbose
+    [switch]$Detailed  # Renamed from $Verbose to avoid shadowing built-in parameter
 )
 
 $ErrorActionPreference = "Continue"
@@ -78,7 +78,7 @@ function Test-LineReferences {
                 Write-Host "      Actual content: $actualLine"
                 $script:Warnings++
             }
-            elseif ($Verbose) {
+            elseif ($Detailed) {
                 Write-Host "  ✅ §line $lineNum: '$keyword' ✓" -ForegroundColor Green
             }
         }
@@ -104,7 +104,7 @@ function Test-StepReferences {
             Write-Host "      Note: §Step references cannot be auto-fixed (section structure changed)"
             $script:Errors++
         }
-        elseif ($Verbose) {
+        elseif ($Detailed) {
             Write-Host "  ✅ §Step $stepId → line $($searchResult.LineNumber)" -ForegroundColor Green
         }
     }

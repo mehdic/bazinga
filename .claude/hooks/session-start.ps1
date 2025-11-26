@@ -22,12 +22,27 @@ else {
 
 # Check config file sync (pyproject.toml vs ALLOWED_CONFIG_FILES)
 if ((Test-Path "pyproject.toml") -and (Test-Path "src\bazinga_cli\__init__.py")) {
-    # Quick sync check using Python
-    try {
-        & python3 -c @'
-import tomllib
+    # Quick sync check using Python (with tomllib/tomli fallback for Python 3.9/3.10)
+    # Detect Python command
+    $pythonCmd = if (Get-Command "python3" -ErrorAction SilentlyContinue) { "python3" }
+                 elseif (Get-Command "python" -ErrorAction SilentlyContinue) { "python" }
+                 else { $null }
+
+    if ($pythonCmd) {
+        try {
+            & $pythonCmd -c @'
 import re
 from pathlib import Path
+
+# Try tomllib (Python 3.11+), fall back to tomli (Python 3.9/3.10)
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        # Neither available, skip sync check
+        exit(0)
 
 # Get force-include configs from pyproject.toml
 with open("pyproject.toml", "rb") as f:
@@ -54,9 +69,10 @@ if pyproject_configs != allowed_configs:
         print(f"   Missing from pyproject.toml force-include: {missing_toml}")
     print("   Run: python -m pytest tests/test_config_sync.py -v")
 '@ 2>$null
-    }
-    catch {
-        # Ignore errors silently
+        }
+        catch {
+            # Ignore errors silently
+        }
     }
 }
 

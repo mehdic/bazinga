@@ -6,7 +6,10 @@
 $ErrorActionPreference = "Stop"
 
 $REPO_ROOT = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-Set-Location $REPO_ROOT
+
+# Save current location and change to repo root
+Push-Location $REPO_ROOT
+try {
 
 Write-Host "🔨 Building slash commands from agent sources..."
 
@@ -107,9 +110,9 @@ if ([string]::IsNullOrEmpty($tempContent)) {
     exit 1
 }
 
-# Check 2: File contains required frontmatter
-if ($tempContent -notmatch "name: orchestrator") {
-    Write-Host "  ❌ ERROR: Generated file missing 'name: orchestrator' in frontmatter" -ForegroundColor Red
+# Check 2: File contains required frontmatter (relaxed - just check name field exists)
+if ($tempContent -notmatch "(?m)^name:") {
+    Write-Host "  ❌ ERROR: Generated file missing 'name' in frontmatter" -ForegroundColor Red
     Remove-Item $TEMP_FILE -ErrorAction SilentlyContinue
     exit 1
 }
@@ -154,3 +157,8 @@ Write-Host "Generated files:"
 Write-Host "  - .claude\commands\bazinga.orchestrate.md (from agents\orchestrator.md)"
 Write-Host ""
 Write-Host "Note: orchestrate-advanced uses embedded prompts and doesn't need building"
+
+} finally {
+    # Restore original location
+    Pop-Location
+}

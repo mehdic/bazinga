@@ -6,9 +6,18 @@
 $ErrorActionPreference = "Stop"
 
 $REPO_ROOT = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-Set-Location $REPO_ROOT
+
+# Save current location and change to repo root
+Push-Location $REPO_ROOT
+try {
 
 Write-Host "🔧 Installing git hooks for BAZINGA development..."
+
+# Verify we're in a git repository
+if (-not (Test-Path ".git")) {
+    Write-Host "  ❌ ERROR: Not a git repository. Run this from the repository root." -ForegroundColor Red
+    exit 1
+}
 
 # Install pre-commit hook
 $hookSource = "scripts\git-hooks\pre-commit"
@@ -21,8 +30,14 @@ if (Test-Path $hookSource) {
         New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
     }
 
-    Copy-Item $hookSource $hookDest -Force
-    Write-Host "  ✅ Pre-commit hook installed" -ForegroundColor Green
+    # Read content and write with LF line endings (required for git hooks)
+    $content = Get-Content $hookSource -Raw
+    # Normalize line endings to LF only (git hooks require Unix line endings)
+    $content = $content -replace "`r`n", "`n"
+    # Write with UTF8 no BOM encoding
+    [System.IO.File]::WriteAllText($hookDest, $content, [System.Text.UTF8Encoding]::new($false))
+
+    Write-Host "  ✅ Pre-commit hook installed (with LF line endings)" -ForegroundColor Green
 }
 else {
     Write-Host "  ❌ ERROR: Hook template not found at $hookSource" -ForegroundColor Red
@@ -47,3 +62,8 @@ Write-Host ""
 
 # Note: On Windows, the pre-commit hook will be executed via Git Bash
 # which is typically installed with Git for Windows
+
+} finally {
+    # Restore original location
+    Pop-Location
+}

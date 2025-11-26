@@ -13,6 +13,51 @@ $DASHBOARD_PID_FILE = Join-Path $env:TEMP "bazinga-dashboard.pid"
 $DASHBOARD_LOG = Join-Path $env:TEMP "bazinga-dashboard.log"
 $DEPS_MARKER = "dashboard\.deps-installed"
 
+# Cross-platform Python detection
+function Get-PythonCommand {
+    # Try python3 first (Unix/macOS, some Windows)
+    if (Get-Command "python3" -ErrorAction SilentlyContinue) {
+        return "python3"
+    }
+    # Try python (Windows default)
+    if (Get-Command "python" -ErrorAction SilentlyContinue) {
+        # Verify it's Python 3
+        $version = & python --version 2>&1
+        if ($version -match "Python 3") {
+            return "python"
+        }
+    }
+    # Try py launcher (Windows Python launcher)
+    if (Get-Command "py" -ErrorAction SilentlyContinue) {
+        return "py -3"
+    }
+    return $null
+}
+
+# Cross-platform pip detection
+function Get-PipCommand {
+    if (Get-Command "pip3" -ErrorAction SilentlyContinue) {
+        return "pip3"
+    }
+    if (Get-Command "pip" -ErrorAction SilentlyContinue) {
+        return "pip"
+    }
+    # Use python -m pip as fallback
+    $python = Get-PythonCommand
+    if ($python) {
+        return "$python -m pip"
+    }
+    return $null
+}
+
+$PYTHON_CMD = Get-PythonCommand
+$PIP_CMD = Get-PipCommand
+
+if (-not $PYTHON_CMD) {
+    Write-Host "ERROR: Python 3 not found. Install Python 3 and ensure it's in PATH." -ForegroundColor Red
+    exit 1
+}
+
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -33,9 +78,27 @@ if (Test-Path $DASHBOARD_PID_FILE) {
     }
 }
 
-# Check if port is in use
-$portInUse = Get-NetTCPConnection -LocalPort $DASHBOARD_PORT -ErrorAction SilentlyContinue
-if ($portInUse) {
+# Check if port is in use (cross-platform)
+function Test-PortInUse {
+    param([int]$Port)
+    try {
+        # Try Windows-specific cmdlet first
+        if (Get-Command "Get-NetTCPConnection" -ErrorAction SilentlyContinue) {
+            $conn = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+            return $null -ne $conn
+        }
+        # Fallback: try to bind to the port
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+        $listener.Start()
+        $listener.Stop()
+        return $false
+    }
+    catch {
+        return $true
+    }
+}
+
+if (Test-PortInUse -Port $DASHBOARD_PORT) {
     Write-Log "Port $DASHBOARD_PORT already in use by another process"
     Write-Host "Port $DASHBOARD_PORT already in use by another process" -ForegroundColor Yellow
     exit 1
@@ -56,7 +119,7 @@ if (-not (Test-Path $DEPS_MARKER)) {
     # Check if Python dependencies are installed
     $depsInstalled = $true
     try {
-        & python3 -c "import flask, flask_sock, watchdog" 2>$null
+        & $PYTHON_CMD -c "import flask, flask_sock, watchdog, anthropic" 2>$null
         if ($LASTEXITCODE -ne 0) { $depsInstalled = $false }
     }
     catch {
@@ -69,7 +132,7 @@ if (-not (Test-Path $DEPS_MARKER)) {
 
         # Install dependencies
         try {
-            & pip3 install flask flask-sock watchdog anthropic 2>&1 | Out-Null
+            Invoke-Expression "$PIP_CMD install flask flask-sock watchdog anthropic" 2>&1 | Out-Null
 
             # Create marker file
             New-Item -ItemType File -Path $DEPS_MARKER -Force | Out-Null
@@ -98,7 +161,7 @@ Write-Host "Starting dashboard server on port $DASHBOARD_PORT..." -ForegroundCol
 
 Push-Location dashboard
 try {
-    $process = Start-Process -FilePath "python3" -ArgumentList "server.py" `
+    $process = Start-Process -FilePath $PYTHON_CMD -ArgumentList "server.py" `
         -RedirectStandardOutput $DASHBOARD_LOG -RedirectStandardError $DASHBOARD_LOG `
         -PassThru -WindowStyle Hidden
 

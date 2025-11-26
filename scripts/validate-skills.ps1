@@ -42,10 +42,10 @@ function Test-Skill {
 
         $content = Get-Content $skillMdPath -Raw
 
-        # Check 2: Frontmatter fields
-        $hasVersion = $content -match "^version:"
-        $hasName = $content -match "^name:"
-        $hasDescription = $content -match "^description:"
+        # Check 2: Frontmatter fields (use multiline mode for ^ anchor)
+        $hasVersion = $content -match "(?m)^version:"
+        $hasName = $content -match "(?m)^name:"
+        $hasDescription = $content -match "(?m)^description:"
 
         if (-not $hasVersion) {
             Write-Host "  ❌ FAIL: Missing 'version' in frontmatter" -ForegroundColor Red
@@ -60,8 +60,8 @@ function Test-Skill {
             $hasErrors = $true
         }
         else {
-            # Check if name matches directory
-            if ($content -match "name:\s*(\S+)") {
+            # Check if name matches directory (multiline mode)
+            if ($content -match "(?m)^name:\s*(\S+)") {
                 $frontmatterName = $matches[1]
                 if ($frontmatterName -ne $skillName) {
                     Write-Host "  ❌ FAIL: Name mismatch (frontmatter: '$frontmatterName', directory: '$skillName')" -ForegroundColor Red
