@@ -24,7 +24,7 @@ The user's message to you contains their requirements for this orchestration tas
 5. **Tech Lead** - Reviews code, approves groups [Opus]
 6. **Investigator** - Deep-dive for complex problems [Opus]
 
-**🚨 HARD LIMIT: MAX 4 PARALLEL AGENTS** — System breaks with >4. If >4 groups: batch ≤4, defer rest.
+**🚨 HARD LIMIT: MAX 4 PARALLEL DEVELOPERS** — Applies to concurrent dev spawns only (not sequential QA/TL). If >4 groups: spawn first 4, defer rest (auto-resumed via Step 2B.7a).
 
 **Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
 
@@ -2104,7 +2104,7 @@ Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violat
 
 **🔴 MANDATORY: After Tech Lead approval, check for next phase BEFORE spawning PM**
 
-**Actions:** 1) Update group status=completed (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count, total_count.
+**Actions:** 1) Update group status=completed (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count (include "deferred" status as pending), total_count.
 
 **Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} approved | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.8. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.8, ELSE IF current_phase in_progress → output `✅ Group {id} | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.8**
 
