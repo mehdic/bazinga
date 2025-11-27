@@ -782,9 +782,175 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
     return True
 
 
+def get_platform_info() -> tuple[str, str]:
+    """
+    Get current platform information for downloading pre-built releases.
+
+    Returns:
+        Tuple of (platform, arch) e.g., ("darwin", "arm64")
+    """
+    import platform as plat
+    import struct
+
+    # Determine platform
+    system = plat.system().lower()
+    if system == "windows":
+        platform = "windows"
+    elif system == "darwin":
+        platform = "darwin"
+    else:
+        platform = "linux"
+
+    # Determine architecture
+    machine = plat.machine().lower()
+    if machine in ("arm64", "aarch64"):
+        arch = "arm64"
+    elif machine in ("x86_64", "amd64"):
+        arch = "x64"
+    else:
+        # Fallback based on pointer size
+        arch = "x64" if struct.calcsize("P") == 8 else "x86"
+
+    return (platform, arch)
+
+
+def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
+    """
+    Download pre-built dashboard package from GitHub releases.
+
+    Args:
+        target_dir: Target directory for installation
+        force: Force download even if already installed
+
+    Returns:
+        True if download successful, False otherwise (should fall back to npm)
+    """
+    import json
+    import tarfile
+    import tempfile
+    import urllib.request
+    import urllib.error
+
+    dashboard_dir = target_dir / "dashboard-v2"
+    standalone_marker = dashboard_dir / ".next" / "standalone" / "server.js"
+
+    # Check if already have standalone build
+    if standalone_marker.exists() and not force:
+        console.print("  [green]✓[/green] Pre-built dashboard already installed")
+        return True
+
+    platform, arch = get_platform_info()
+
+    # Windows not yet supported for standalone
+    if platform == "windows":
+        console.print("  [dim]Pre-built packages not available for Windows, will use npm[/dim]")
+        return False
+
+    console.print(f"  [dim]Checking for pre-built dashboard ({platform}-{arch})...[/dim]")
+
+    # Query GitHub API for latest release
+    api_url = "https://api.github.com/repos/mehdic/bazinga/releases"
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "bazinga-cli"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            releases = json.loads(response.read().decode())
+    except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
+        console.print(f"  [dim]Could not check for releases: {e}[/dim]")
+        return False
+
+    # Find latest dashboard release
+    dashboard_release = None
+    for release in releases:
+        if release.get("tag_name", "").startswith("dashboard-v"):
+            dashboard_release = release
+            break
+
+    if not dashboard_release:
+        console.print("  [dim]No pre-built dashboard releases found[/dim]")
+        return False
+
+    version = dashboard_release["tag_name"].replace("dashboard-v", "")
+    console.print(f"  [dim]Found dashboard release v{version}[/dim]")
+
+    # Find the right asset for this platform
+    asset_name = f"bazinga-dashboard-{platform}-{arch}.tar.gz"
+    asset_url = None
+
+    for asset in dashboard_release.get("assets", []):
+        if asset.get("name") == asset_name:
+            asset_url = asset.get("browser_download_url")
+            break
+
+    if not asset_url:
+        console.print(f"  [dim]No pre-built package for {platform}-{arch}[/dim]")
+        return False
+
+    # Download the tarball
+    console.print(f"  Downloading pre-built dashboard v{version}...")
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        req = urllib.request.Request(asset_url, headers={"User-Agent": "bazinga-cli"})
+        with urllib.request.urlopen(req, timeout=120) as response:
+            with open(tmp_path, "wb") as f:
+                # Download with progress indication
+                total_size = int(response.headers.get("content-length", 0))
+                downloaded = 0
+                chunk_size = 8192
+
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = (downloaded / total_size) * 100
+                        console.print(f"\r  [dim]Downloaded: {downloaded // 1024}KB / {total_size // 1024}KB ({percent:.0f}%)[/dim]", end="")
+
+        console.print()  # Newline after progress
+
+        # Extract the tarball
+        console.print("  Extracting pre-built dashboard...")
+
+        # Remove existing dashboard-v2 if present (but preserve config)
+        if dashboard_dir.exists():
+            # Only remove .next folder to preserve any local config
+            next_dir = dashboard_dir / ".next"
+            if next_dir.exists():
+                shutil.rmtree(next_dir)
+
+        with tarfile.open(tmp_path, "r:gz") as tar:
+            # Extract to target directory
+            tar.extractall(path=target_dir)
+
+        # Cleanup temp file
+        os.unlink(tmp_path)
+
+        # Verify extraction
+        if standalone_marker.exists():
+            console.print(f"  [green]✓[/green] Pre-built dashboard v{version} installed (standalone mode)")
+            console.print("  [dim]No npm install required - ready to run![/dim]")
+            return True
+        else:
+            console.print("  [yellow]⚠️  Extraction may have failed, falling back to npm[/yellow]")
+            return False
+
+    except (urllib.error.URLError, tarfile.TarError, OSError) as e:
+        console.print(f"  [yellow]⚠️  Download failed: {e}[/yellow]")
+        # Cleanup temp file if exists
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        return False
+
+
 def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> bool:
     """
-    Install dashboard v2 dependencies using npm.
+    Install dashboard v2 - tries pre-built first, falls back to npm install.
 
     Args:
         target_dir: Project directory
@@ -799,6 +965,20 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     if not dashboard_dir.exists():
         console.print("  [dim]Dashboard v2 folder not found, skipping dependency installation[/dim]")
         return True
+
+    # Check for standalone build (pre-built release)
+    standalone_marker = dashboard_dir / ".next" / "standalone" / "server.js"
+    if standalone_marker.exists() and not force:
+        console.print("  [green]✓[/green] Pre-built dashboard already installed (standalone mode)")
+        return True
+
+    # Try downloading pre-built dashboard first (faster, no npm required)
+    console.print("\n[bold]Option 1: Pre-built dashboard (faster, no npm required)[/bold]")
+    if download_prebuilt_dashboard(target_dir, force):
+        return True
+
+    # Fall back to npm install
+    console.print("\n[bold]Option 2: Build from source (requires npm)[/bold]")
 
     package_json = dashboard_dir / "package.json"
     if not package_json.exists():
