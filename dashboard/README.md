@@ -102,10 +102,10 @@ Or manually:
 
 ```bash
 # Stop
-kill $(cat /tmp/bazinga-dashboard.pid)
+kill $(cat bazinga/dashboard.pid)
 
 # View logs
-tail -f /tmp/bazinga-dashboard.log
+tail -f bazinga/dashboard.log
 ```
 
 ## Documentation

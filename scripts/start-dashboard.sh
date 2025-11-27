@@ -18,9 +18,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
-DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
-DASHBOARD_LOG="/tmp/bazinga-dashboard.log"
-DASHBOARD_DIR="$PROJECT_ROOT/bazinga/dashboard-v2"
+BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+DASHBOARD_PID_FILE="$BAZINGA_DIR/dashboard.pid"
+DASHBOARD_LOG="$BAZINGA_DIR/dashboard.log"
+DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
 USE_STANDALONE="false"
 
 echo "🖥️  BAZINGA Dashboard v2 Startup" >> "$DASHBOARD_LOG"

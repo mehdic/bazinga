@@ -12,9 +12,11 @@
 set -e
 
 DASHBOARD_PORT="${DASHBOARD_PORT:-53124}"
-DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
-DASHBOARD_LOG_FILE="/tmp/bazinga-dashboard.log"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+DASHBOARD_PID_FILE="$BAZINGA_DIR/dashboard-v1.pid"
+DASHBOARD_LOG_FILE="$BAZINGA_DIR/dashboard-v1.log"
 
 # Colors
 RED='\033[0;31m'

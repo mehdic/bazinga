@@ -248,7 +248,7 @@ PM Response: BAZINGA → END
 
 ```bash
 # Check if dashboard is running
-if [ -f /tmp/bazinga-dashboard.pid ] && kill -0 $(cat /tmp/bazinga-dashboard.pid) 2>/dev/null; then
+if [ -f bazinga/dashboard.pid ] && kill -0 $(cat bazinga/dashboard.pid) 2>/dev/null; then
     echo "Dashboard already running"
 else
     # Start dashboard in background

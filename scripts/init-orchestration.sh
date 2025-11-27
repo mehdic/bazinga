@@ -486,7 +486,7 @@ echo ""
 # Check if dashboard server is running and start if needed
 echo "🖥️  Checking dashboard v2 server status..."
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
-DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
+DASHBOARD_PID_FILE="bazinga/dashboard.pid"
 
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
@@ -505,7 +505,7 @@ else
         bash bazinga/scripts/start-dashboard.sh &
         echo "   Dashboard will be available at http://localhost:$DASHBOARD_PORT"
         echo "   (Installation may take a moment if dependencies need to be installed)"
-        echo "   View logs: tail -f /tmp/bazinga-dashboard.log"
+        echo "   View logs: tail -f bazinga/dashboard.log"
     fi
 fi
 echo ""
