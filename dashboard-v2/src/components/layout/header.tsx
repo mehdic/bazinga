@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc/client";
 import { useSocket } from "@/lib/socket/client";
+import { useRefetchInterval } from "@/lib/hooks/use-smart-refetch";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import {
   Moon,
@@ -27,8 +28,11 @@ export function Header({ title = "Dashboard" }: HeaderProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const utils = trpc.useUtils();
 
+  // Smart refetch: no polling when socket connected, 5s fallback when disconnected
+  const refetchInterval = useRefetchInterval(5000);
+
   const { data: activeSession } = trpc.sessions.getActive.useQuery(undefined, {
-    refetchInterval: 5000,
+    refetchInterval,
   });
 
   const handleRefresh = async () => {

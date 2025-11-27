@@ -33,14 +33,18 @@ import { LogFilters } from "@/components/logs/log-filters";
 import { SessionReplay } from "@/components/replay/session-replay";
 import { SkillOutputViewer } from "@/components/skills/skill-output-viewer";
 import { SessionHeader } from "@/components/session/session-header";
+import { useRefetchInterval } from "@/lib/hooks/use-smart-refetch";
 
 export default function SessionDetailPage() {
   const params = useParams();
   const sessionId = params.sessionId as string;
 
+  // Smart refetch: no polling when socket connected, 5s fallback when disconnected
+  const refetchInterval = useRefetchInterval(5000);
+
   const { data: session, isLoading } = trpc.sessions.getById.useQuery(
     { sessionId },
-    { refetchInterval: 5000 }
+    { refetchInterval }
   );
 
   const { data: tokenData } = trpc.sessions.getTokenBreakdown.useQuery(

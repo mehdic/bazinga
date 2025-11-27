@@ -3,8 +3,28 @@ import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
 
-// Database path - points to existing bazinga.db
-const DB_PATH = process.env.DATABASE_URL || path.resolve(process.cwd(), "..", "bazinga", "bazinga.db");
+// Database path resolution with production validation
+function resolveDatabasePath(): string {
+  // If DATABASE_URL is set, use it directly
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  // In production, DATABASE_URL is required
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "DATABASE_URL environment variable is required in production.\n" +
+        "Set it in your deployment configuration or .env.local file.\n" +
+        "Example: DATABASE_URL=/path/to/bazinga/bazinga.db\n\n" +
+        "If using the start-dashboard.sh script, it will auto-detect the path."
+    );
+  }
+
+  // Development fallback: look for database relative to project
+  return path.resolve(process.cwd(), "..", "bazinga", "bazinga.db");
+}
+
+const DB_PATH = resolveDatabasePath();
 
 // Lazy database initialization to avoid build-time errors
 let _sqlite: Database.Database | null = null;

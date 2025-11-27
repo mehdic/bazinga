@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc/client";
 import { formatDuration } from "@/lib/utils";
+import { useRefetchInterval } from "@/lib/hooks/use-smart-refetch";
 import {
   Play,
   Users,
@@ -20,18 +21,21 @@ import {
 import { useEffect, useState } from "react";
 
 export function ActiveSession() {
+  // Smart refetch: no polling when socket connected, 3s fallback when disconnected
+  const refetchInterval = useRefetchInterval(3000);
+
   const { isLoading } = trpc.sessions.getById.useQuery(
     { sessionId: "" },
     { enabled: false }
   );
 
   const { data: activeSession } = trpc.sessions.getActive.useQuery(undefined, {
-    refetchInterval: 3000,
+    refetchInterval,
   });
 
   const { data: fullSession } = trpc.sessions.getById.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, refetchInterval: 3000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval }
   );
 
   const [elapsed, setElapsed] = useState(0);

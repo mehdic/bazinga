@@ -24,12 +24,16 @@ export interface Notification {
   read: boolean;
 }
 
+// Event listener callback type for query invalidation
+type EventCallback = (event: SocketEvent) => void;
+
 // Socket store with Zustand
 interface SocketState {
   socket: Socket | null;
   isConnected: boolean;
   notifications: Notification[];
   recentEvents: SocketEvent[];
+  eventCallbacks: Set<EventCallback>;
   connect: () => void;
   disconnect: () => void;
   subscribeToSession: (sessionId: string) => void;
@@ -37,6 +41,7 @@ interface SocketState {
   addNotification: (notification: Omit<Notification, "id" | "timestamp" | "read">) => void;
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
+  registerEventCallback: (callback: EventCallback) => () => void;
 }
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
@@ -46,6 +51,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   isConnected: false,
   notifications: [],
   recentEvents: [],
+  eventCallbacks: new Set(),
 
   connect: () => {
     const existingSocket = get().socket;
@@ -75,11 +81,20 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     // Handle events from server
     socket.on("event", (event: SocketEvent) => {
-      const { addNotification, recentEvents } = get();
+      const { addNotification, recentEvents, eventCallbacks } = get();
 
       // Add to recent events (keep last 50)
       set({
         recentEvents: [event, ...recentEvents.slice(0, 49)],
+      });
+
+      // Notify all registered callbacks (for query invalidation)
+      eventCallbacks.forEach((callback) => {
+        try {
+          callback(event);
+        } catch (e) {
+          console.error("Error in socket event callback:", e);
+        }
       });
 
       // Create notifications for important events
@@ -186,6 +201,23 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
   clearNotifications: () => {
     set({ notifications: [] });
+  },
+
+  registerEventCallback: (callback: EventCallback) => {
+    set((state) => {
+      const newCallbacks = new Set(state.eventCallbacks);
+      newCallbacks.add(callback);
+      return { eventCallbacks: newCallbacks };
+    });
+
+    // Return unregister function
+    return () => {
+      set((state) => {
+        const newCallbacks = new Set(state.eventCallbacks);
+        newCallbacks.delete(callback);
+        return { eventCallbacks: newCallbacks };
+      });
+    };
   },
 }));
 

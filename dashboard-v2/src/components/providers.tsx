@@ -6,6 +6,15 @@ import { httpBatchLink } from "@trpc/client";
 import { trpc } from "@/lib/trpc/client";
 import superjson from "superjson";
 import { ThemeProvider } from "next-themes";
+import { useSocketQuerySync } from "@/lib/hooks/use-socket-query-sync";
+
+// Inner component that uses the sync hook (needs to be inside tRPC provider)
+function SocketQuerySyncProvider({ children }: { children: React.ReactNode }) {
+  // Connect socket events to tRPC query invalidation
+  // This enables real-time updates when socket is connected
+  useSocketQuerySync();
+  return <>{children}</>;
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -14,7 +23,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 5000,
-            refetchInterval: 10000, // Auto-refresh every 10 seconds
+            // No global refetchInterval - smart refetch handles this per-query
+            // When socket connected: no polling (events trigger invalidation)
+            // When socket disconnected: components use useSmartRefetch fallback
           },
         },
       })
@@ -40,7 +51,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <SocketQuerySyncProvider>{children}</SocketQuerySyncProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </trpc.Provider>

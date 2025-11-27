@@ -62,6 +62,23 @@ else
     echo "$(date): Dependencies already installed (node_modules exists)" >> "$DASHBOARD_LOG"
 fi
 
+# Auto-detect DATABASE_URL if not set
+if [ -z "$DATABASE_URL" ]; then
+    # Look for database in common locations (relative to script execution dir)
+    if [ -f "bazinga/bazinga.db" ]; then
+        export DATABASE_URL="$(pwd)/bazinga/bazinga.db"
+        echo "$(date): Auto-detected DATABASE_URL=$DATABASE_URL" >> "$DASHBOARD_LOG"
+    elif [ -f "../bazinga/bazinga.db" ]; then
+        export DATABASE_URL="$(cd .. && pwd)/bazinga/bazinga.db"
+        echo "$(date): Auto-detected DATABASE_URL=$DATABASE_URL (parent dir)" >> "$DASHBOARD_LOG"
+    else
+        echo "$(date): WARNING - Could not auto-detect database path" >> "$DASHBOARD_LOG"
+        echo "$(date): Set DATABASE_URL environment variable if dashboard fails to load data" >> "$DASHBOARD_LOG"
+    fi
+else
+    echo "$(date): Using provided DATABASE_URL=$DATABASE_URL" >> "$DASHBOARD_LOG"
+fi
+
 # Start dashboard server (development mode with socket server)
 echo "$(date): Starting Next.js dashboard + Socket.io server..." >> "$DASHBOARD_LOG"
 
