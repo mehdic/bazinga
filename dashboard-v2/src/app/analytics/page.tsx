@@ -169,9 +169,9 @@ export default function AnalyticsPage() {
                     }
                     labelLine={false}
                   >
-                    {tokensByAgentData.map((entry, index) => (
+                    {tokensByAgentData.map((entry) => (
                       <Cell
-                        key={`cell-${index}`}
+                        key={`token-${entry.name}`}
                         fill={AGENT_COLORS_HEX[entry.name] || "#6b7280"}
                       />
                     ))}
@@ -227,9 +227,9 @@ export default function AnalyticsPage() {
                     }}
                   />
                   <Bar dataKey="total" name="Log Count">
-                    {logsByAgentData.map((entry, index) => (
+                    {logsByAgentData.map((entry) => (
                       <Cell
-                        key={`cell-${index}`}
+                        key={`log-${entry.name}`}
                         fill={AGENT_COLORS_HEX[entry.name] || "#6b7280"}
                       />
                     ))}
@@ -258,6 +258,9 @@ export default function AnalyticsPage() {
             {logsByAgentData.map((agent) => {
               const Icon = AGENT_ICONS[agent.name] || Bot;
               const tokenData = tokensByAgentData.find((t) => t.name === agent.name);
+              // Calculate relative share for progress bar
+              const maxLogs = Math.max(...logsByAgentData.map(a => a.total), 1);
+              const progressValue = (agent.total / maxLogs) * 100;
               return (
                 <div
                   key={agent.name}
@@ -283,7 +286,7 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Progress value={100} className="h-2 flex-1" />
+                      <Progress value={progressValue} className="h-2 flex-1" />
                       <span className="text-sm text-muted-foreground w-20 text-right">
                         {tokenData?.invocations || 0} calls
                       </span>
