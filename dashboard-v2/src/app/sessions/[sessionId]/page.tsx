@@ -67,6 +67,9 @@ export default function SessionDetailPage() {
     if (sessionStatus !== "active" || !sessionStartTime) return;
 
     const start = new Date(sessionStartTime).getTime();
+    // Set initial elapsed immediately to avoid hydration flash
+    setElapsed(Date.now() - start);
+
     const interval = setInterval(() => {
       setElapsed(Date.now() - start);
     }, 1000);
