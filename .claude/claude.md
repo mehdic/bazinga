@@ -477,6 +477,70 @@ Always create `research/prXXX-review-analysis.md` with full ultrathink analysis.
 
 ---
 
+## 🤖 GitHub PR Automation
+
+**When reviewing PRs and resolving comments, use the GitHub API directly.**
+
+### GitHub Token Setup
+
+**Token location:** `~/.bazinga-github-token` (not committed to repo)
+
+**Create the token file:**
+```bash
+echo "github_pat_YOUR_TOKEN_HERE" > ~/.bazinga-github-token
+chmod 600 ~/.bazinga-github-token
+```
+
+**Token requirements:**
+- Fine-grained PAT scoped to `mehdic/bazinga` only
+- Permissions: Pull requests (read/write)
+- Cannot: Merge PRs, push code, access other repos
+
+**Load token in scripts:**
+```bash
+GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
+```
+
+### Workflow: Responding to PR Review Comments
+
+**Step 1: Fetch PR comments**
+```bash
+curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/mehdic/bazinga/pulls/{PR_NUMBER}/comments"
+```
+
+**Step 2: Reply to a comment**
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/mehdic/bazinga/pulls/comments/{COMMENT_ID}/replies" \
+  -d '{"body": "Your response here"}'
+```
+
+### Response Templates
+
+| Situation | Response Prefix |
+|-----------|-----------------|
+| Fixed in commit | `✅ **Fixed in commit {hash}**` |
+| Valid but deferred | `📝 **Valid observation - Deferred**` |
+| Not a bug / By design | `📝 **Intentional** / **Not a bug**` |
+| Acknowledged low priority | `📝 **Acknowledged - Low risk**` |
+
+### Process When User Shares PR Link
+
+1. **Fetch** all review comments via API
+2. **Analyze** each comment (triage: critical vs deferred)
+3. **Fix** critical issues in code
+4. **Reply** to ALL comments via API with appropriate response
+5. **Commit & push** fixes
+6. **Report** summary to user
+
+**IMPORTANT:** Always reply to every comment, even if just acknowledging. This resolves the conversation thread.
+
+---
+
 ✅ Project context loaded successfully!
 
 📚 Research documents available in 'research/' folder
