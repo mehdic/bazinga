@@ -13,14 +13,26 @@
 
 set -e
 
+# Derive paths from script location for robustness
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
 DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
 DASHBOARD_LOG="/tmp/bazinga-dashboard.log"
-DASHBOARD_DIR="bazinga/dashboard-v2"
+DASHBOARD_DIR="$PROJECT_ROOT/bazinga/dashboard-v2"
 USE_STANDALONE="false"
 
 echo "🖥️  BAZINGA Dashboard v2 Startup" >> "$DASHBOARD_LOG"
 echo "$(date): Starting dashboard startup process..." >> "$DASHBOARD_LOG"
+echo "$(date): Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT" >> "$DASHBOARD_LOG"
+
+# Check if Node.js is available (required for standalone mode)
+if ! command -v node >/dev/null 2>&1; then
+    echo "$(date): ERROR - node not found, cannot start dashboard" >> "$DASHBOARD_LOG"
+    echo "$(date): Please install Node.js and ensure it's in your PATH" >> "$DASHBOARD_LOG"
+    exit 1
+fi
 
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
@@ -81,7 +93,7 @@ else
             echo "$(date): ERROR - npm install failed" >> "$DASHBOARD_LOG"
             exit 1
         fi
-        cd ..
+        cd - > /dev/null
     else
         echo "$(date): Dependencies already installed (node_modules exists)" >> "$DASHBOARD_LOG"
     fi
@@ -89,15 +101,13 @@ fi
 
 # Auto-detect DATABASE_URL if not set
 if [ -z "$DATABASE_URL" ]; then
-    # Look for database in common locations (relative to script execution dir)
-    if [ -f "bazinga/bazinga.db" ]; then
-        export DATABASE_URL="$(pwd)/bazinga/bazinga.db"
+    # Look for database in project root bazinga folder
+    DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
+    if [ -f "$DB_PATH" ]; then
+        export DATABASE_URL="$DB_PATH"
         echo "$(date): Auto-detected DATABASE_URL=$DATABASE_URL" >> "$DASHBOARD_LOG"
-    elif [ -f "../bazinga/bazinga.db" ]; then
-        export DATABASE_URL="$(cd .. && pwd)/bazinga/bazinga.db"
-        echo "$(date): Auto-detected DATABASE_URL=$DATABASE_URL (parent dir)" >> "$DASHBOARD_LOG"
     else
-        echo "$(date): WARNING - Could not auto-detect database path" >> "$DASHBOARD_LOG"
+        echo "$(date): WARNING - Could not find database at $DB_PATH" >> "$DASHBOARD_LOG"
         echo "$(date): Set DATABASE_URL environment variable if dashboard fails to load data" >> "$DASHBOARD_LOG"
     fi
 else
@@ -121,6 +131,9 @@ else
 
     cd "$DASHBOARD_DIR"
 
+    # Export PORT for dev mode
+    export PORT="$DASHBOARD_PORT"
+
     # Check if dev:all script exists in package.json
     if grep -q '"dev:all"' package.json 2>/dev/null; then
         npm run dev:all >> "$DASHBOARD_LOG" 2>&1 &
@@ -130,7 +143,7 @@ else
         npm run dev >> "$DASHBOARD_LOG" 2>&1 &
         DASHBOARD_PID=$!
     fi
-    cd ..
+    cd - > /dev/null
 fi
 
 # Save PID

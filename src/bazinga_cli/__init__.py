@@ -28,6 +28,9 @@ from .telemetry import track_command
 
 __version__ = "1.1.0"
 
+# GitHub repository for release downloads
+GITHUB_REPO = "mehdic/bazinga"
+
 console = Console()
 app = typer.Typer(
     name="bazinga",
@@ -826,6 +829,8 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
         True if download successful, False otherwise (should fall back to npm)
     """
     import json
+    import os
+    import shutil
     import tarfile
     import tempfile
     import urllib.request
@@ -849,7 +854,7 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
     console.print(f"  [dim]Checking for pre-built dashboard ({platform}-{arch})...[/dim]")
 
     # Query GitHub API for latest release
-    api_url = "https://api.github.com/repos/mehdic/bazinga/releases"
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
     try:
         req = urllib.request.Request(
             api_url,
@@ -890,6 +895,7 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
 
     # Download the tarball
     console.print(f"  Downloading pre-built dashboard v{version}...")
+    tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
             tmp_path = tmp.name
@@ -930,6 +936,11 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
 
         with tarfile.open(tmp_path, "r:gz") as tar:
             # Extract to bazinga directory (tarball contains dashboard-v2/)
+            # Security: Validate paths to prevent tar slip attacks
+            for member in tar.getmembers():
+                member_path = os.path.normpath(os.path.join(bazinga_dir, member.name))
+                if not member_path.startswith(str(bazinga_dir)):
+                    raise tarfile.TarError(f"Unsafe path in tarball: {member.name}")
             tar.extractall(path=bazinga_dir)
 
         # Cleanup temp file
@@ -947,7 +958,7 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
     except (urllib.error.URLError, tarfile.TarError, OSError) as e:
         console.print(f"  [yellow]⚠️  Download failed: {e}[/yellow]")
         # Cleanup temp file if exists
-        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+        if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
         return False
 
