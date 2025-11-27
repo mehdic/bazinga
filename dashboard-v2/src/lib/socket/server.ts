@@ -131,22 +131,24 @@ function pollDatabase() {
       }
     }
 
-    // Check for session status changes
+    // Check for session status changes (use end_time for completed sessions)
+    // Note: sessions table has start_time, end_time, created_at - no updated_at
     const sessions = db
       .prepare(
-        `SELECT session_id, status, updated_at
+        `SELECT session_id, status,
+                COALESCE(end_time, start_time) as last_change
          FROM sessions
-         WHERE updated_at > ?
-         ORDER BY updated_at ASC`
+         WHERE COALESCE(end_time, start_time) > ?
+         ORDER BY COALESCE(end_time, start_time) ASC`
       )
       .all(lastSessionUpdate || "1970-01-01") as Array<{
       session_id: string;
       status: string;
-      updated_at: string;
+      last_change: string;
     }>;
 
     for (const session of sessions) {
-      lastSessionUpdate = session.updated_at;
+      lastSessionUpdate = session.last_change;
 
       io.emit("event", {
         type: session.status === "completed" ? "session:completed" : "session:started",
