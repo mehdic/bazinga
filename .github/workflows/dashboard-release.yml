@@ -51,6 +51,12 @@ jobs:
         working-directory: dashboard-v2
         run: npm run build
 
+      - name: Build Socket.io server
+        working-directory: dashboard-v2
+        run: |
+          # Compile socket server for standalone use
+          npx esbuild src/lib/socket/server.ts --bundle --platform=node --target=node18 --outfile=dist/socket-server.js --external:better-sqlite3
+
       - name: Prepare release package
         working-directory: dashboard-v2
         run: |
@@ -72,6 +78,11 @@ jobs:
           # Copy scripts
           mkdir -p release-package/dashboard-v2/scripts
           cp scripts/start-standalone.sh release-package/dashboard-v2/scripts/
+
+          # Copy compiled socket server for real-time updates
+          if [ -f "dist/socket-server.js" ]; then
+            cp dist/socket-server.js release-package/dashboard-v2/
+          fi
 
           # Create version file
           VERSION="${{ inputs.version || github.ref_name }}"

@@ -903,10 +903,11 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
         req = urllib.request.Request(asset_url, headers={"User-Agent": "bazinga-cli"})
         with urllib.request.urlopen(req, timeout=120) as response:
             with open(tmp_path, "wb") as f:
-                # Download with progress indication
+                # Download with progress indication (throttled to reduce I/O)
                 total_size = int(response.headers.get("content-length", 0))
                 downloaded = 0
                 chunk_size = 8192
+                last_percent = -5  # Ensure first update shows
 
                 while True:
                     chunk = response.read(chunk_size)
@@ -915,8 +916,11 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
                     f.write(chunk)
                     downloaded += len(chunk)
                     if total_size > 0:
-                        percent = (downloaded / total_size) * 100
-                        console.print(f"\r  [dim]Downloaded: {downloaded // 1024}KB / {total_size // 1024}KB ({percent:.0f}%)[/dim]", end="")
+                        percent = int((downloaded / total_size) * 100)
+                        # Throttle: only update every 5%
+                        if percent >= last_percent + 5:
+                            last_percent = percent
+                            console.print(f"\r  [dim]Downloaded: {downloaded // 1024}KB / {total_size // 1024}KB ({percent}%)[/dim]", end="")
 
         console.print()  # Newline after progress
 

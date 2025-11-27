@@ -124,9 +124,18 @@ if [ "$USE_STANDALONE" = "true" ]; then
     DASHBOARD_PID=$!
     cd - > /dev/null
 
-    # Note: Socket.io server needs to be started separately in standalone mode
-    # For now, standalone mode only supports the main dashboard
-    echo "$(date): Note: Real-time updates may be limited in standalone mode" >> "$DASHBOARD_LOG"
+    # Start Socket.io server if compiled version exists (for real-time updates)
+    SOCKET_SERVER="$DASHBOARD_DIR/socket-server.js"
+    if [ -f "$SOCKET_SERVER" ]; then
+        echo "$(date): Starting Socket.io server for real-time updates..." >> "$DASHBOARD_LOG"
+        SOCKET_PORT="${SOCKET_PORT:-3001}"
+        DATABASE_URL="$DATABASE_URL" SOCKET_PORT="$SOCKET_PORT" node "$SOCKET_SERVER" >> "$DASHBOARD_LOG" 2>&1 &
+        SOCKET_PID=$!
+        echo $SOCKET_PID > "$BAZINGA_DIR/socket.pid"
+        echo "$(date): Socket.io server started (PID: $SOCKET_PID) on port $SOCKET_PORT" >> "$DASHBOARD_LOG"
+    else
+        echo "$(date): Note: Real-time updates limited (socket-server.js not found)" >> "$DASHBOARD_LOG"
+    fi
 else
     echo "$(date): Starting Next.js dashboard + Socket.io server (dev mode)..." >> "$DASHBOARD_LOG"
 
