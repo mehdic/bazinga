@@ -1,3 +1,7 @@
+---
+description: Configure which Skills are invoked during BAZINGA orchestration (lite/advanced/custom profiles)
+---
+
 # Bazinga Configure Skills
 
 You are helping the user configure which Skills should be invoked during BAZINGA orchestration.
