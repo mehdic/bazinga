@@ -1,3 +1,7 @@
+---
+description: Configure BAZINGA testing framework (full/minimal/skip modes, QA Expert settings)
+---
+
 # Bazinga Configure Testing
 
 You are helping the user configure the BAZINGA testing framework. This controls how much testing and quality assurance is applied during development.

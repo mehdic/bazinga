@@ -37,11 +37,19 @@ When invoked:
 
 ## Step 1: Execute Velocity Tracking Script
 
-Use the **Bash** tool to run the pre-built tracking script:
+Use the **Bash** tool to run the pre-built tracking script.
 
+**On Unix/macOS:**
 ```bash
-bash .claude/skills/velocity-tracker/track.sh
+bash .claude/skills/velocity-tracker/scripts/track.sh
 ```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/velocity-tracker/scripts/track.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
 - Read PM state from database (`bazinga/bazinga.db`)

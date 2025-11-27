@@ -382,6 +382,44 @@ cat "$OUTPUT_FILE"
 - Instructions in SKILL.md (clear workflow)
 - Separation of concerns
 
+### Cross-Platform Script Invocation
+
+For skills that use shell/PowerShell wrapper scripts (not just Python), document both options:
+
+**In SKILL.md:**
+```markdown
+## Step 1: Execute Script
+
+Use the **Bash** tool to run the pre-built script.
+
+**On Unix/macOS:**
+```bash
+bash .claude/skills/skill-name/scripts/script.sh
+```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/skill-name/scripts/script.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
+```
+
+**File Structure:**
+```
+skill-name/
+├── SKILL.md
+└── scripts/
+    ├── script.sh      # Unix/macOS version
+    └── script.ps1     # Windows version
+```
+
+**Guidelines:**
+- Both scripts must produce identical outputs
+- Use `scripts/` subdirectory (not skill root)
+- Scripts should be functionally equivalent
+- CLI installs correct version based on platform selection
+
 ---
 
 ## Common Patterns
