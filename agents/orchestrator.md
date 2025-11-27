@@ -253,7 +253,7 @@ if [ -f /tmp/bazinga-dashboard.pid ] && kill -0 $(cat /tmp/bazinga-dashboard.pid
     echo "Dashboard already running"
 else
     # Start dashboard in background
-    bash .claude/scripts/start-dashboard.sh &
+    bash bazinga/scripts/start-dashboard.sh &
     sleep 1
     echo "Dashboard started on http://localhost:3000"
 fi

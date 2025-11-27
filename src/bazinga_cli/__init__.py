@@ -153,13 +153,13 @@ class BazingaSetup:
 
     def copy_scripts(self, target_dir: Path, script_type: str = "sh") -> bool:
         """
-        Copy scripts to target .claude/scripts directory.
+        Copy scripts to target bazinga/scripts directory.
 
         Args:
             target_dir: Target directory for installation
             script_type: "sh" for POSIX shell or "ps" for PowerShell
         """
-        scripts_dir = target_dir / ".claude" / "scripts"
+        scripts_dir = target_dir / "bazinga" / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
 
         source_scripts = self.source_dir / "scripts"
