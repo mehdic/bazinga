@@ -37,12 +37,7 @@ dev = [
     "pytest-timeout>=2.1.0",
     "pytest-mock>=3.11.0",
 ]
-dashboard = [
-    "flask>=3.0.0",
-    "flask-sock>=0.7.0",
-    "watchdog>=3.0.0",
-    "anthropic>=0.39.0",  # For AI diagram feature
-]
+# Note: Dashboard v2 uses Next.js (npm), not Python packages
 
 [project.urls]
 Homepage = "https://github.com/mehdic/bazinga"
@@ -72,4 +67,4 @@ packages = ["src/bazinga_cli"]
 ".claude/templates" = "share/bazinga_cli/.claude/templates"
 "config" = "share/bazinga_cli/config"
 ".claude/skills" = "share/bazinga_cli/.claude/skills"
-"dashboard" = "share/bazinga_cli/dashboard"
+"dashboard-v2" = "share/bazinga_cli/dashboard-v2"

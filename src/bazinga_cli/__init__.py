@@ -784,7 +784,7 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
 
 def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> bool:
     """
-    Install dashboard dependencies for real-time orchestration monitoring.
+    Install dashboard v2 dependencies using npm.
 
     Args:
         target_dir: Project directory
@@ -793,97 +793,69 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     Returns:
         True if dependencies were installed successfully or skipped, False if failed
     """
-    dashboard_dir = target_dir / "dashboard"
+    dashboard_dir = target_dir / "dashboard-v2"
 
     # Check if dashboard folder exists
     if not dashboard_dir.exists():
-        console.print("  [dim]Dashboard folder not found, skipping dependency installation[/dim]")
+        console.print("  [dim]Dashboard v2 folder not found, skipping dependency installation[/dim]")
         return True
 
-    requirements_file = dashboard_dir / "requirements.txt"
-    if not requirements_file.exists():
-        console.print("  [yellow]⚠️  requirements.txt not found in dashboard folder[/yellow]")
+    package_json = dashboard_dir / "package.json"
+    if not package_json.exists():
+        console.print("  [yellow]⚠️  package.json not found in dashboard-v2 folder[/yellow]")
         return True
 
-    # Check for marker file indicating dependencies were already installed
-    marker_file = dashboard_dir / ".deps-installed"
-    if marker_file.exists() and not force:
-        console.print("  [green]✓[/green] Dashboard dependencies already installed")
+    # Check for node_modules indicating dependencies were already installed
+    node_modules = dashboard_dir / "node_modules"
+    if node_modules.exists() and not force:
+        console.print("  [green]✓[/green] Dashboard v2 dependencies already installed")
         return True
 
-    # Define required packages
-    required_packages = [
-        ("flask", "flask"),
-        ("flask-sock", "flask_sock"),
-        ("watchdog", "watchdog"),
-        ("anthropic", "anthropic"),
-    ]
-
-    # Check which packages are already installed
-    missing = []
-    for package_name, import_name in required_packages:
-        try:
-            __import__(import_name)
-        except ImportError:
-            missing.append(package_name)
-
-    if not missing:
-        console.print("  [green]✓[/green] Dashboard dependencies already installed")
-        # Create marker file so we don't check again
-        marker_file.touch()
+    # Check if npm is available
+    if not check_command_exists("npm"):
+        console.print("  [yellow]⚠️  npm not found, skipping dashboard dependencies[/yellow]")
+        console.print(f"  [dim]Install Node.js, then run: cd dashboard-v2 && npm install[/dim]")
         return True
 
-    # Show what needs to be installed
-    console.print(f"  [dim]Missing packages: {', '.join(missing)}[/dim]")
-    console.print("  [dim]These enable: real-time monitoring, workflow visualization, WebSocket updates[/dim]")
+    console.print("  [dim]Dashboard v2 uses Next.js with TypeScript[/dim]")
+    console.print("  [dim]This enables: real-time monitoring, session analytics, AI insights[/dim]")
 
     if not force:
-        if not typer.confirm("  Install dashboard dependencies?", default=True):
+        if not typer.confirm("  Install dashboard dependencies (npm install)?", default=True):
             console.print("  [yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
-            console.print(f"  [dim]You can install later with: bazinga setup-dashboard[/dim]")
+            console.print(f"  [dim]You can install later with: cd dashboard-v2 && npm install[/dim]")
             return True
 
-    # Install dependencies
+    # Install dependencies using npm
     try:
-        # Check if pip is available
-        if not check_command_exists("pip3") and not check_command_exists("pip"):
-            console.print("  [yellow]⚠️  pip not found, skipping dashboard dependencies[/yellow]")
-            console.print(f"  [dim]Install manually: cd dashboard && pip3 install -r requirements.txt[/dim]")
-            return True
-
-        pip_cmd = "pip3" if check_command_exists("pip3") else "pip"
-
-        # Install using requirements.txt
+        console.print("  Installing npm packages (this may take a minute)...")
         result = subprocess.run(
-            [pip_cmd, "install", "-q", "-r", str(requirements_file)],
+            ["npm", "install"],
             cwd=dashboard_dir,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,  # 5 minutes timeout for npm
         )
 
         if result.returncode == 0:
-            console.print("  [green]✓[/green] Dashboard dependencies installed")
-            # Create marker file to skip prompt next time
-            marker_file.touch()
+            console.print("  [green]✓[/green] Dashboard v2 dependencies installed")
             return True
         else:
-            console.print("  [yellow]⚠️  Dashboard dependency installation completed with warnings[/yellow]")
-            if result.stderr and "error" in result.stderr.lower():
+            console.print("  [yellow]⚠️  npm install completed with warnings[/yellow]")
+            if result.stderr:
+                # Only show first 200 chars of error
                 console.print(f"  [dim]{result.stderr[:200]}[/dim]")
-            # Still create marker file to avoid repeated prompts
-            marker_file.touch()
-            return True  # Still return success, dependencies might work
+            return True  # Still return success, npm often has warnings
 
     except subprocess.TimeoutExpired:
-        console.print("  [yellow]⚠️  Dashboard dependency installation timed out[/yellow]")
-        console.print(f"  [dim]Install manually: cd dashboard && pip3 install -r requirements.txt[/dim]")
-        return True  # Don't fail the whole installation
+        console.print("  [yellow]⚠️  npm install timed out[/yellow]")
+        console.print(f"  [dim]Install manually: cd dashboard-v2 && npm install[/dim]")
+        return True
 
     except Exception as e:
         console.print(f"  [yellow]⚠️  Dashboard dependency installation failed: {e}[/yellow]")
-        console.print(f"  [dim]Install manually: cd dashboard && pip3 install -r requirements.txt[/dim]")
-        return True  # Don't fail the whole installation
+        console.print(f"  [dim]Install manually: cd dashboard-v2 && npm install[/dim]")
+        return True
 
 
 def select_script_type() -> str:
@@ -1096,28 +1068,33 @@ def init(
             console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]6. Copying dashboard files[/bold cyan]")
-        source_dashboard = setup.source_dir / "dashboard"
-        target_dashboard = target_dir / "dashboard"
+        console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
+        source_dashboard = setup.source_dir / "dashboard-v2"
+        target_dashboard = target_dir / "dashboard-v2"
 
         if source_dashboard.exists():
             try:
-                shutil.copytree(source_dashboard, target_dashboard)
-                console.print("  ✓ Dashboard installed")
+                # Copy dashboard-v2 but exclude node_modules
+                shutil.copytree(
+                    source_dashboard,
+                    target_dashboard,
+                    ignore=shutil.ignore_patterns('node_modules', '.next', '*.log')
+                )
+                console.print("  ✓ Dashboard v2 installed (Next.js)")
 
                 # Copy research folder too (for documentation)
                 source_research = setup.source_dir / "research"
                 target_research = target_dir / "research"
                 if source_research.exists():
                     target_research.mkdir(parents=True, exist_ok=True)
-                    dashboard_doc = source_research / "dashboard-feature.md"
+                    dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
                     if dashboard_doc.exists():
-                        shutil.copy2(dashboard_doc, target_research / "dashboard-feature.md")
+                        shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
                         console.print("  ✓ Copied dashboard documentation")
             except Exception as e:
                 console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
         else:
-            console.print("  [yellow]⚠️  Dashboard not found in source[/yellow]")
+            console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
 
         console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
         if not setup.copy_templates(target_dir):
@@ -1743,17 +1720,22 @@ def update(
     console.print("\n[bold cyan]5. Updating configuration[/bold cyan]")
     setup.setup_config(target_dir, is_update=True)
 
-    # Copy dashboard folder
-    console.print("\n[bold cyan]6. Copying dashboard files[/bold cyan]")
-    source_dashboard = setup.source_dir / "dashboard"
-    target_dashboard = target_dir / "dashboard"
+    # Copy dashboard-v2 folder
+    console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
+    source_dashboard = setup.source_dir / "dashboard-v2"
+    target_dashboard = target_dir / "dashboard-v2"
 
     if source_dashboard.exists():
         import shutil
         try:
+            # Patterns to ignore when copying
+            ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
+
             if target_dashboard.exists():
-                # Update existing dashboard (preserve any custom modifications to server.py if any)
+                # Update existing dashboard (preserve node_modules if exists)
                 for item in source_dashboard.iterdir():
+                    if item.name in ['node_modules', '.next']:
+                        continue  # Skip these directories
                     if item.is_file():
                         shutil.copy2(item, target_dashboard / item.name)
                         console.print(f"  ✓ Updated {item.name}")
@@ -1761,12 +1743,12 @@ def update(
                         target_subdir = target_dashboard / item.name
                         if target_subdir.exists():
                             shutil.rmtree(target_subdir)
-                        shutil.copytree(item, target_subdir)
+                        shutil.copytree(item, target_subdir, ignore=ignore_patterns)
                         console.print(f"  ✓ Updated {item.name}/")
             else:
                 # Fresh copy of dashboard
-                shutil.copytree(source_dashboard, target_dashboard)
-                console.print("  ✓ Dashboard installed")
+                shutil.copytree(source_dashboard, target_dashboard, ignore=ignore_patterns)
+                console.print("  ✓ Dashboard v2 installed (Next.js)")
 
             # Copy research folder too (for documentation)
             source_research = setup.source_dir / "research"
@@ -1774,14 +1756,14 @@ def update(
             if source_research.exists():
                 if not target_research.exists():
                     target_research.mkdir(parents=True, exist_ok=True)
-                dashboard_doc = source_research / "dashboard-feature.md"
+                dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
                 if dashboard_doc.exists():
-                    shutil.copy2(dashboard_doc, target_research / "dashboard-feature.md")
+                    shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
                     console.print("  ✓ Updated dashboard documentation")
         except Exception as e:
             console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
     else:
-        console.print("  [yellow]⚠️  Dashboard not found in source[/yellow]")
+        console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
 
     # Update templates
     console.print("\n[bold cyan]7. Updating templates[/bold cyan]")
@@ -1839,21 +1821,22 @@ def update(
 @app.command()
 def setup_dashboard(
     force: bool = typer.Option(
-        False, "--force", "-f", help="Skip confirmation prompts"
+        False, "--force", "-f", help="Force reinstall dependencies"
     ),
 ):
     """
-    Install dashboard dependencies for real-time orchestration monitoring.
+    Install dashboard v2 dependencies for real-time orchestration monitoring.
 
-    This command installs the required Python packages for the BAZINGA
-    dashboard server:
-    - flask (web server)
-    - flask-sock (WebSocket support)
-    - watchdog (file system monitoring)
-    - anthropic (AI diagram generation)
+    This command installs the required npm packages for the BAZINGA
+    dashboard v2 (Next.js):
+    - next (React framework)
+    - react (UI library)
+    - tailwindcss (styling)
+    - drizzle-orm (database)
+    - trpc (type-safe API)
 
     The dashboard provides real-time monitoring of orchestration sessions
-    with workflow visualization, agent status tracking, and more.
+    with workflow visualization, session analytics, and AI insights.
     """
     target_dir = Path.cwd()
 
@@ -1865,91 +1848,52 @@ def setup_dashboard(
         )
         raise typer.Exit(1)
 
-    # Check if dashboard folder exists
-    dashboard_dir = target_dir / "dashboard"
+    # Check if dashboard-v2 folder exists
+    dashboard_dir = target_dir / "dashboard-v2"
     if not dashboard_dir.exists():
         console.print(
-            "[yellow]⚠️  Dashboard folder not found[/yellow]\n"
+            "[yellow]⚠️  Dashboard v2 folder not found[/yellow]\n"
             "[dim]The dashboard may not be installed in this project.[/dim]\n"
             "[dim]Try running 'bazinga update' first.[/dim]"
         )
         raise typer.Exit(1)
 
-    # Check for marker file indicating dependencies were already installed
-    marker_file = dashboard_dir / ".deps-installed"
-    if marker_file.exists() and not force:
-        console.print("\n[bold green]✓ Dashboard dependencies already installed![/bold green]\n")
+    # Check for node_modules indicating dependencies were already installed
+    node_modules = dashboard_dir / "node_modules"
+    if node_modules.exists() and not force:
+        console.print("\n[bold green]✓ Dashboard v2 dependencies already installed![/bold green]\n")
         console.print("[dim]You can start the dashboard with:[/dim]")
-        console.print("[dim]  cd dashboard && ./dashboard.sh start[/dim]")
-        console.print("[dim]  or: cd dashboard && python3 server.py[/dim]")
+        console.print("[dim]  cd dashboard-v2 && npm run dev[/dim]")
         console.print("\n[dim]To reinstall, use: bazinga setup-dashboard --force[/dim]")
         return
 
-    console.print("\n[bold]Dashboard Dependency Installation[/bold]\n")
+    console.print("\n[bold]Dashboard v2 Dependency Installation[/bold]\n")
 
-    # Define required packages
-    required_packages = [
-        ("flask", "3.0.0"),
-        ("flask-sock", "0.7.0"),
-        ("watchdog", "3.0.0"),
-        ("anthropic", "0.39.0"),
-    ]
+    # Check if npm is available
+    if not check_command_exists("npm"):
+        console.print("[red]✗ npm not found[/red]")
+        console.print("[yellow]Please install Node.js first (https://nodejs.org)[/yellow]")
+        raise typer.Exit(1)
 
-    # Check which packages are already installed
-    console.print("[bold cyan]Checking installed packages...[/bold cyan]\n")
+    # Check if package.json exists
+    package_json = dashboard_dir / "package.json"
+    if not package_json.exists():
+        console.print("[red]✗ package.json not found in dashboard-v2 folder[/red]")
+        raise typer.Exit(1)
 
-    installed = []
-    missing = []
-
-    for package, version in required_packages:
-        try:
-            # Try importing to check if installed
-            if package == "flask-sock":
-                import flask_sock
-                installed.append(f"{package}=={version}")
-            elif package == "flask":
-                import flask
-                installed.append(f"{package}=={version}")
-            elif package == "watchdog":
-                import watchdog
-                installed.append(f"{package}=={version}")
-            elif package == "anthropic":
-                import anthropic
-                installed.append(f"{package}=={version}")
-        except ImportError:
-            missing.append(f"{package}=={version}")
-
-    # Show status
-    if installed:
-        console.print("[green]✓ Already installed:[/green]")
-        for pkg in installed:
-            console.print(f"  [dim]• {pkg}[/dim]")
-        console.print()
-
-    if not missing:
-        console.print("[bold green]✓ All dashboard dependencies are already installed![/bold green]\n")
-        console.print("[dim]You can start the dashboard with:[/dim]")
-        console.print("[dim]  cd dashboard && ./dashboard.sh start[/dim]")
-        console.print("[dim]  or: cd dashboard && python3 server.py[/dim]")
-        return
-
-    # Show what needs to be installed
-    console.print("[bold yellow]Missing dependencies:[/bold yellow]")
-    for pkg in missing:
-        console.print(f"  • {pkg}")
-    console.print()
-
-    console.print("[dim]These packages enable:[/dim]")
-    console.print("[dim]  • Real-time WebSocket updates[/dim]")
-    console.print("[dim]  • Workflow visualization[/dim]")
-    console.print("[dim]  • Agent status tracking[/dim]")
-    console.print("[dim]  • AI-powered diagrams (optional)[/dim]")
+    console.print("[dim]Dashboard v2 uses Next.js with TypeScript[/dim]")
+    console.print("[dim]This enables:[/dim]")
+    console.print("[dim]  • Real-time session monitoring[/dim]")
+    console.print("[dim]  • Session history and analytics[/dim]")
+    console.print("[dim]  • Task group visualization[/dim]")
+    console.print("[dim]  • Token usage tracking[/dim]")
+    console.print("[dim]  • AI-powered insights[/dim]")
     console.print()
 
     # Prompt for confirmation
     if not force:
         console.print("[bold]Installation options:[/bold]")
-        console.print("  [cyan]y[/cyan] - Install dependencies now")
+        console.print("  [cyan]y[/cyan] - Install dependencies now (npm install)")
         console.print("  [cyan]n[/cyan] - Skip for now")
         console.print()
 
@@ -1963,70 +1907,48 @@ def setup_dashboard(
         if choice not in ["y", "yes"]:
             console.print("\n[yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
             console.print("\n[dim]You can install manually later:[/dim]")
-            console.print(f"[dim]  cd dashboard[/dim]")
-            console.print(f"[dim]  pip3 install -r requirements.txt[/dim]")
-            console.print("\n[dim]Or run this command again:[/dim]")
-            console.print(f"[dim]  bazinga setup-dashboard[/dim]")
+            console.print(f"[dim]  cd dashboard-v2 && npm install[/dim]")
             return
 
     # Install dependencies
-    console.print("\n[bold cyan]Installing dashboard dependencies...[/bold cyan]\n")
-
-    requirements_file = dashboard_dir / "requirements.txt"
-
-    if not requirements_file.exists():
-        console.print("[red]✗ requirements.txt not found in dashboard folder[/red]")
-        raise typer.Exit(1)
+    console.print("\n[bold cyan]Installing npm dependencies (this may take a minute)...[/bold cyan]\n")
 
     try:
-        # Check if pip is available
-        if not check_command_exists("pip3") and not check_command_exists("pip"):
-            console.print("[red]✗ pip not found[/red]")
-            console.print("[yellow]Please install pip first[/yellow]")
-            raise typer.Exit(1)
-
-        pip_cmd = "pip3" if check_command_exists("pip3") else "pip"
-
-        # Install using requirements.txt
         result = subprocess.run(
-            [pip_cmd, "install", "-r", str(requirements_file)],
+            ["npm", "install"],
             cwd=dashboard_dir,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,  # 5 minutes timeout for npm
         )
 
         if result.returncode == 0:
-            console.print("[bold green]✓ Dashboard dependencies installed successfully![/bold green]\n")
-            # Create marker file to skip prompt next time
-            marker_file.touch()
+            console.print("[bold green]✓ Dashboard v2 dependencies installed successfully![/bold green]\n")
             console.print("[bold]Next steps:[/bold]")
             console.print("  1. Start the dashboard:")
-            console.print("     [cyan]cd dashboard && ./dashboard.sh start[/cyan]")
+            console.print("     [cyan]cd dashboard-v2 && npm run dev[/cyan]")
             console.print("  2. Open in browser:")
-            console.print("     [cyan]http://localhost:53124[/cyan]")
+            console.print("     [cyan]http://localhost:3000[/cyan]")
             console.print("\n[dim]Or the dashboard will auto-start when you run orchestration:[/dim]")
             console.print("[dim]  ./scripts/init-orchestration.sh[/dim]")
         else:
-            console.print("[yellow]⚠️  Installation completed with warnings[/yellow]")
+            console.print("[yellow]⚠️  npm install completed with warnings[/yellow]")
             if result.stderr:
-                console.print(f"\n[dim]Error details:[/dim]")
+                console.print(f"\n[dim]Details:[/dim]")
                 console.print(f"[dim]{result.stderr[:500]}[/dim]")
-            # Still create marker file to avoid repeated prompts
-            marker_file.touch()
-            console.print("\n[yellow]Some dependencies may still work. Try starting the dashboard:[/yellow]")
-            console.print("  [cyan]cd dashboard && python3 server.py[/cyan]")
+            console.print("\n[yellow]Try starting the dashboard anyway:[/yellow]")
+            console.print("  [cyan]cd dashboard-v2 && npm run dev[/cyan]")
 
     except subprocess.TimeoutExpired:
-        console.print("[red]✗ Installation timed out[/red]")
+        console.print("[red]✗ npm install timed out[/red]")
         console.print("[yellow]Try installing manually:[/yellow]")
-        console.print(f"  [cyan]cd dashboard && pip3 install -r requirements.txt[/cyan]")
+        console.print(f"  [cyan]cd dashboard-v2 && npm install[/cyan]")
         raise typer.Exit(1)
 
     except Exception as e:
         console.print(f"[red]✗ Installation failed: {e}[/red]")
         console.print("\n[yellow]Try installing manually:[/yellow]")
-        console.print(f"  [cyan]cd dashboard && pip3 install -r requirements.txt[/cyan]")
+        console.print(f"  [cyan]cd dashboard-v2 && npm install[/cyan]")
         raise typer.Exit(1)
 
 

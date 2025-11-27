@@ -484,25 +484,25 @@ echo "🗄️  Database: bazinga/bazinga.db"
 echo ""
 
 # Check if dashboard server is running and start if needed
-echo "🖥️  Checking dashboard server status..."
-DASHBOARD_PORT="${DASHBOARD_PORT:-53124}"
+echo "🖥️  Checking dashboard v2 server status..."
+DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
 DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
 
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
-    echo "✓ Dashboard server already running (PID: $(cat $DASHBOARD_PID_FILE))"
+    echo "✓ Dashboard v2 server already running (PID: $(cat $DASHBOARD_PID_FILE))"
     echo "🌐 Dashboard: http://localhost:$DASHBOARD_PORT"
 else
     # Check if port is in use by another process
     if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo "⚠️  Port $DASHBOARD_PORT is already in use by another process"
         echo "   Dashboard server not started. You can manually start it with:"
-        echo "   cd dashboard && python3 server.py"
+        echo "   cd dashboard-v2 && npm run dev"
     else
         # Launch dashboard startup script in background
         # This script handles dependency installation and server startup asynchronously
-        echo "🚀 Starting dashboard server (background process)..."
-        bash .claude/scripts/start-dashboard.sh &
+        echo "🚀 Starting dashboard v2 server (background process)..."
+        bash scripts/start-dashboard.sh &
         echo "   Dashboard will be available at http://localhost:$DASHBOARD_PORT"
         echo "   (Installation may take a moment if dependencies need to be installed)"
         echo "   View logs: tail -f /tmp/bazinga-dashboard.log"
