@@ -30,7 +30,7 @@ $PLANNING_KEYWORDS = @(
 # Check if message contains any planning keywords (case-insensitive)
 $MATCHED = $false
 foreach ($keyword in $PLANNING_KEYWORDS) {
-    if ($USER_MESSAGE -match $keyword) {
+    if ($USER_MESSAGE -imatch $keyword) {
         $MATCHED = $true
         break
     }

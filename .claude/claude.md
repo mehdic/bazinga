@@ -503,14 +503,16 @@ GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
 
 ### Workflow: Responding to PR Review Comments
 
-**Step 1: Fetch PR comments**
+**Step 1: Fetch review threads with resolution status (GraphQL)**
 ```bash
-curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/mehdic/bazinga/pulls/{PR_NUMBER}/comments"
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
 ```
 
-**Step 2: Reply to a comment**
+**Step 2: Reply to a comment (REST API)**
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -518,6 +520,19 @@ curl -s -X POST \
   "https://api.github.com/repos/mehdic/bazinga/pulls/comments/{COMMENT_ID}/replies" \
   -d '{"body": "Your response here"}'
 ```
+
+**Step 3: Resolve the thread (GraphQL mutation)**
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
+```
+
+**⚠️ Note:** Fine-grained PATs don't support GraphQL mutations. Thread resolution requires:
+- Classic PAT with `repo` scope, OR
+- Manual resolution by repo owner after replies are posted
 
 ### Response Templates
 
@@ -530,14 +545,15 @@ curl -s -X POST \
 
 ### Process When User Shares PR Link
 
-1. **Fetch** all review comments via API
-2. **Analyze** each comment (triage: critical vs deferred)
+1. **Fetch** all review threads via GraphQL (includes `isResolved` status)
+2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
-4. **Reply** to ALL comments via API with appropriate response
-5. **Commit & push** fixes
-6. **Report** summary to user
+4. **Reply** to ALL unresolved comments via REST API
+5. **Resolve** each thread via GraphQL mutation
+6. **Commit & push** fixes
+7. **Report** summary to user
 
-**IMPORTANT:** Always reply to every comment, even if just acknowledging. This resolves the conversation thread.
+**IMPORTANT:** Always reply to every comment AND resolve the thread. This marks the conversation as resolved in GitHub UI.
 
 ---
 
