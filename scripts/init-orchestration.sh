@@ -497,7 +497,7 @@ else
     if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo "⚠️  Port $DASHBOARD_PORT is already in use by another process"
         echo "   Dashboard server not started. You can manually start it with:"
-        echo "   cd dashboard-v2 && npm run dev"
+        echo "   cd bazinga/dashboard-v2 && npm run dev"
     else
         # Launch dashboard startup script in background
         # This script handles dependency installation and server startup asynchronously

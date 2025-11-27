@@ -16,7 +16,7 @@ set -e
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
 DASHBOARD_PID_FILE="/tmp/bazinga-dashboard.pid"
 DASHBOARD_LOG="/tmp/bazinga-dashboard.log"
-DASHBOARD_DIR="dashboard-v2"
+DASHBOARD_DIR="bazinga/dashboard-v2"
 USE_STANDALONE="false"
 
 echo "🖥️  BAZINGA Dashboard v2 Startup" >> "$DASHBOARD_LOG"

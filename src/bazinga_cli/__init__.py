@@ -831,7 +831,7 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
     import urllib.request
     import urllib.error
 
-    dashboard_dir = target_dir / "dashboard-v2"
+    dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
     standalone_marker = dashboard_dir / ".next" / "standalone" / "server.js"
 
     # Check if already have standalone build
@@ -924,9 +924,13 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
             if next_dir.exists():
                 shutil.rmtree(next_dir)
 
+        # Ensure bazinga directory exists
+        bazinga_dir = target_dir / "bazinga"
+        bazinga_dir.mkdir(parents=True, exist_ok=True)
+
         with tarfile.open(tmp_path, "r:gz") as tar:
-            # Extract to target directory
-            tar.extractall(path=target_dir)
+            # Extract to bazinga directory (tarball contains dashboard-v2/)
+            tar.extractall(path=bazinga_dir)
 
         # Cleanup temp file
         os.unlink(tmp_path)
@@ -959,7 +963,7 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     Returns:
         True if dependencies were installed successfully or skipped, False if failed
     """
-    dashboard_dir = target_dir / "dashboard-v2"
+    dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
 
     # Check if dashboard folder exists
     if not dashboard_dir.exists():
@@ -994,7 +998,7 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     # Check if npm is available
     if not check_command_exists("npm"):
         console.print("  [yellow]⚠️  npm not found, skipping dashboard dependencies[/yellow]")
-        console.print(f"  [dim]Install Node.js, then run: cd dashboard-v2 && npm install[/dim]")
+        console.print(f"  [dim]Install Node.js, then run: cd bazinga/dashboard-v2 && npm install[/dim]")
         return True
 
     console.print("  [dim]Dashboard v2 uses Next.js with TypeScript[/dim]")
@@ -1003,7 +1007,7 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     if not force:
         if not typer.confirm("  Install dashboard dependencies (npm install)?", default=True):
             console.print("  [yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
-            console.print(f"  [dim]You can install later with: cd dashboard-v2 && npm install[/dim]")
+            console.print(f"  [dim]You can install later with: cd bazinga/dashboard-v2 && npm install[/dim]")
             return True
 
     # Install dependencies using npm
@@ -1029,12 +1033,12 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
 
     except subprocess.TimeoutExpired:
         console.print("  [yellow]⚠️  npm install timed out[/yellow]")
-        console.print(f"  [dim]Install manually: cd dashboard-v2 && npm install[/dim]")
+        console.print(f"  [dim]Install manually: cd bazinga/dashboard-v2 && npm install[/dim]")
         return True
 
     except Exception as e:
         console.print(f"  [yellow]⚠️  Dashboard dependency installation failed: {e}[/yellow]")
-        console.print(f"  [dim]Install manually: cd dashboard-v2 && npm install[/dim]")
+        console.print(f"  [dim]Install manually: cd bazinga/dashboard-v2 && npm install[/dim]")
         return True
 
 
@@ -1250,10 +1254,12 @@ def init(
 
         console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
         source_dashboard = setup.source_dir / "dashboard-v2"
-        target_dashboard = target_dir / "dashboard-v2"
+        target_dashboard = target_dir / "bazinga" / "dashboard-v2"
 
         if source_dashboard.exists():
             try:
+                # Ensure bazinga directory exists
+                (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
                 # Copy dashboard-v2 but exclude node_modules
                 shutil.copytree(
                     source_dashboard,
@@ -1903,11 +1909,13 @@ def update(
     # Copy dashboard-v2 folder
     console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
     source_dashboard = setup.source_dir / "dashboard-v2"
-    target_dashboard = target_dir / "dashboard-v2"
+    target_dashboard = target_dir / "bazinga" / "dashboard-v2"
 
     if source_dashboard.exists():
         import shutil
         try:
+            # Ensure bazinga directory exists
+            (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
             # Patterns to ignore when copying
             ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
 
@@ -2029,7 +2037,7 @@ def setup_dashboard(
         raise typer.Exit(1)
 
     # Check if dashboard-v2 folder exists
-    dashboard_dir = target_dir / "dashboard-v2"
+    dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
     if not dashboard_dir.exists():
         console.print(
             "[yellow]⚠️  Dashboard v2 folder not found[/yellow]\n"
@@ -2043,7 +2051,7 @@ def setup_dashboard(
     if node_modules.exists() and not force:
         console.print("\n[bold green]✓ Dashboard v2 dependencies already installed![/bold green]\n")
         console.print("[dim]You can start the dashboard with:[/dim]")
-        console.print("[dim]  cd dashboard-v2 && npm run dev[/dim]")
+        console.print("[dim]  cd bazinga/dashboard-v2 && npm run dev[/dim]")
         console.print("\n[dim]To reinstall, use: bazinga setup-dashboard --force[/dim]")
         return
 
@@ -2087,7 +2095,7 @@ def setup_dashboard(
         if choice not in ["y", "yes"]:
             console.print("\n[yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
             console.print("\n[dim]You can install manually later:[/dim]")
-            console.print(f"[dim]  cd dashboard-v2 && npm install[/dim]")
+            console.print(f"[dim]  cd bazinga/dashboard-v2 && npm install[/dim]")
             return
 
     # Install dependencies
@@ -2106,7 +2114,7 @@ def setup_dashboard(
             console.print("[bold green]✓ Dashboard v2 dependencies installed successfully![/bold green]\n")
             console.print("[bold]Next steps:[/bold]")
             console.print("  1. Start the dashboard:")
-            console.print("     [cyan]cd dashboard-v2 && npm run dev[/cyan]")
+            console.print("     [cyan]cd bazinga/dashboard-v2 && npm run dev[/cyan]")
             console.print("  2. Open in browser:")
             console.print("     [cyan]http://localhost:3000[/cyan]")
             console.print("\n[dim]Or the dashboard will auto-start when you run orchestration:[/dim]")
@@ -2117,18 +2125,18 @@ def setup_dashboard(
                 console.print(f"\n[dim]Details:[/dim]")
                 console.print(f"[dim]{result.stderr[:500]}[/dim]")
             console.print("\n[yellow]Try starting the dashboard anyway:[/yellow]")
-            console.print("  [cyan]cd dashboard-v2 && npm run dev[/cyan]")
+            console.print("  [cyan]cd bazinga/dashboard-v2 && npm run dev[/cyan]")
 
     except subprocess.TimeoutExpired:
         console.print("[red]✗ npm install timed out[/red]")
         console.print("[yellow]Try installing manually:[/yellow]")
-        console.print(f"  [cyan]cd dashboard-v2 && npm install[/cyan]")
+        console.print(f"  [cyan]cd bazinga/dashboard-v2 && npm install[/cyan]")
         raise typer.Exit(1)
 
     except Exception as e:
         console.print(f"[red]✗ Installation failed: {e}[/red]")
         console.print("\n[yellow]Try installing manually:[/yellow]")
-        console.print(f"  [cyan]cd dashboard-v2 && npm install[/cyan]")
+        console.print(f"  [cyan]cd bazinga/dashboard-v2 && npm install[/cyan]")
         raise typer.Exit(1)
 
 
