@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, AGENT_COLORS_TW } from "@/lib/utils";
 import {
@@ -221,7 +220,7 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
                 </span>
               </CardTitle>
               <div className="flex items-center gap-2">
-                {currentLog.iteration !== null && (
+                {currentLog.iteration != null && (
                   <Badge variant="secondary">
                     Iter #{currentLog.iteration}
                   </Badge>

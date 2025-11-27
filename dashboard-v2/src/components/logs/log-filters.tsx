@@ -139,7 +139,7 @@ export function LogFilters({ logs }: LogFiltersProps) {
                         {log.agentId}
                       </span>
                     )}
-                    {log.iteration !== null && (
+                    {log.iteration != null && (
                       <span className="text-xs text-muted-foreground">
                         Iter #{log.iteration}
                       </span>

@@ -426,7 +426,7 @@ export default function SessionDetailPage() {
                           <span className="text-xs text-muted-foreground">
                             {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "Unknown"}
                           </span>
-                          {log.iteration !== null && (
+                          {log.iteration != null && (
                             <Badge variant="secondary" className="text-xs">
                               Iter #{log.iteration}
                             </Badge>

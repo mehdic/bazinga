@@ -37,6 +37,26 @@ let connectedClients = 0;
 let lastLogId = 0;
 let lastSessionUpdate = "";
 
+// Reusable database connection (lazy initialization)
+let _db: Database.Database | null = null;
+
+function getDb(): Database.Database | null {
+  if (!_db) {
+    try {
+      _db = new Database(DB_PATH, { readonly: true });
+    } catch {
+      // Database might not exist yet
+      return null;
+    }
+  }
+  return _db;
+}
+
+// Cleanup on exit
+process.on("exit", () => {
+  if (_db) _db.close();
+});
+
 io.on("connection", (socket) => {
   connectedClients++;
   console.log(`Client connected. Total: ${connectedClients}`);
@@ -63,7 +83,8 @@ io.on("connection", (socket) => {
 // Poll database for changes and emit events
 function pollDatabase() {
   try {
-    const db = new Database(DB_PATH, { readonly: true });
+    const db = getDb();
+    if (!db) return; // Database not available yet
 
     // Check for new logs
     const newLogs = db
@@ -133,10 +154,8 @@ function pollDatabase() {
         status: session.status,
       } as SocketEvent);
     }
-
-    db.close();
-  } catch (error) {
-    // Database might not exist yet or be locked - that's ok
+  } catch {
+    // Database might be locked or unavailable - that's ok, retry next cycle
   }
 }
 

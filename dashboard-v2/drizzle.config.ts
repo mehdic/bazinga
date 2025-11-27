@@ -6,11 +6,14 @@ import path from "path";
 const dbPath = process.env.DATABASE_URL ||
   path.resolve(process.cwd(), "..", "bazinga", "bazinga.db");
 
+// Normalize path for drizzle-kit (requires file: prefix for SQLite)
+const normalizedUrl = dbPath.startsWith("file:") ? dbPath : `file:${dbPath}`;
+
 export default {
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: dbPath,
+    url: normalizedUrl,
   },
 } satisfies Config;

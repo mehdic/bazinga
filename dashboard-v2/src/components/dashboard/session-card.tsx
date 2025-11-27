@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { cn, timeAgo, getStatusBadgeVariant } from "@/lib/utils";
+import { timeAgo, getStatusBadgeVariant } from "@/lib/utils";
 import type { Session } from "@/types";
 import {
   Clock,

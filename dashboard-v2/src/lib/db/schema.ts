@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 // Sessions table - matches actual database schema

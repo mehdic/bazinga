@@ -18,12 +18,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatTokens, AGENT_COLORS_HEX } from "@/lib/utils";
 
-const MODEL_COLORS: Record<string, string> = {
-  opus: "#f97316",    // orange
-  sonnet: "#8b5cf6",  // purple
-  haiku: "#22c55e",   // green
-};
-
 // Matches actual database schema - no modelTier, cost, or estimatedCost columns
 interface TokenBreakdownItem {
   agentType: string;

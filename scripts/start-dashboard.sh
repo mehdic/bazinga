@@ -84,13 +84,12 @@ echo "$(date): Starting Next.js dashboard + Socket.io server..." >> "$DASHBOARD_
 
 cd "$DASHBOARD_DIR"
 
-# Use npm run dev:all to start both Next.js and Socket.io servers
-# Falls back to dev only if concurrently not available
-if npm run dev:all >> "$DASHBOARD_LOG" 2>&1 &
-then
+# Check if dev:all script exists in package.json
+if grep -q '"dev:all"' package.json 2>/dev/null; then
+    npm run dev:all >> "$DASHBOARD_LOG" 2>&1 &
     DASHBOARD_PID=$!
 else
-    echo "$(date): dev:all failed, starting dev only..." >> "$DASHBOARD_LOG"
+    echo "$(date): dev:all not found, starting dev only..." >> "$DASHBOARD_LOG"
     npm run dev >> "$DASHBOARD_LOG" 2>&1 &
     DASHBOARD_PID=$!
 fi

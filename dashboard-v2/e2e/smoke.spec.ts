@@ -42,8 +42,8 @@ test.describe("Build Output Verification", () => {
   test("tRPC endpoint exists", async ({ request }) => {
     // tRPC batch endpoint should be accessible (even if it returns an error for invalid request)
     const response = await request.get("/api/trpc/sessions.list?batch=1&input={}");
-    // Should return something (200 or 400), not 404
-    expect([200, 400, 500]).toContain(response.status());
+    // Should return 200 or 400 (invalid request), but NOT 404 or 500
+    expect([200, 400]).toContain(response.status());
   });
 
   test("404 page returns proper status", async ({ request }) => {
