@@ -46,7 +46,8 @@ function Test-LineReferences {
                     $newLine = $searchResult.LineNumber
                     Write-Host "  🔧 AUTO-FIX: §line $lineNum → §line $newLine (found '$keyword' at line $newLine)"
                     $fileContent = Get-Content $ORCHESTRATOR_FILE -Raw
-                    $fileContent = $fileContent -replace "§line $lineNum", "§line $newLine"
+                    # Use word boundary pattern to avoid replacing partial matches (e.g., §line 14 in §line 140)
+                    $fileContent = $fileContent -replace "§line $lineNum(?!\d)", "§line $newLine"
                     Set-Content -Path $ORCHESTRATOR_FILE -Value $fileContent
                     continue
                 }
@@ -68,7 +69,8 @@ function Test-LineReferences {
                         $newLine = $searchResult.LineNumber
                         Write-Host "  🔧 AUTO-FIX: §line $lineNum → §line $newLine (content mismatch, found '$keyword' at line $newLine)"
                         $fileContent = Get-Content $ORCHESTRATOR_FILE -Raw
-                        $fileContent = $fileContent -replace "§line $lineNum", "§line $newLine"
+                        # Use word boundary pattern to avoid replacing partial matches (e.g., §line 14 in §line 140)
+                        $fileContent = $fileContent -replace "§line $lineNum(?!\d)", "§line $newLine"
                         Set-Content -Path $ORCHESTRATOR_FILE -Value $fileContent
                         continue
                     }

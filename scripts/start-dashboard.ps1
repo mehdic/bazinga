@@ -130,9 +130,9 @@ if (-not (Test-Path $DEPS_MARKER)) {
         Write-Log "Installing Python packages..."
         Write-Host "Installing Python packages..." -ForegroundColor Yellow
 
-        # Install dependencies
+        # Install dependencies using python -m pip (safer than Invoke-Expression)
         try {
-            Invoke-Expression "$PIP_CMD install flask flask-sock watchdog anthropic" 2>&1 | Out-Null
+            & $PYTHON_CMD -m pip install flask flask-sock watchdog anthropic 2>&1 | Out-Null
 
             # Create marker file
             New-Item -ItemType File -Path $DEPS_MARKER -Force | Out-Null

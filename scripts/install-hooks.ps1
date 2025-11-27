@@ -37,7 +37,20 @@ if (Test-Path $hookSource) {
     # Write with UTF8 no BOM encoding
     [System.IO.File]::WriteAllText($hookDest, $content, [System.Text.UTF8Encoding]::new($false))
 
-    Write-Host "  ✅ Pre-commit hook installed (with LF line endings)" -ForegroundColor Green
+    # Make hook executable on Unix-like systems (required for git hooks to run)
+    if ($IsLinux -or $IsMacOS -or (-not $env:OS -or $env:OS -notmatch "Windows")) {
+        if (Get-Command "chmod" -ErrorAction SilentlyContinue) {
+            & chmod +x $hookDest
+            Write-Host "  ✅ Pre-commit hook installed (with LF line endings, executable)" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  ✅ Pre-commit hook installed (with LF line endings)" -ForegroundColor Green
+            Write-Host "  ⚠️  Note: chmod not found. Manually run: chmod +x $hookDest" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "  ✅ Pre-commit hook installed (with LF line endings)" -ForegroundColor Green
+    }
 }
 else {
     Write-Host "  ❌ ERROR: Hook template not found at $hookSource" -ForegroundColor Red

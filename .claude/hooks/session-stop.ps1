@@ -4,7 +4,7 @@
 # Runs when Claude Code session ends
 # Uses AI to intelligently check if references are broken or stale
 
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Continue"
 
 # Use forward slashes for git compatibility (git always outputs forward slashes)
 $ORCHESTRATOR_FILE = "agents/orchestrator.md"
