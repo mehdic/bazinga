@@ -8,25 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { trpc } from "@/lib/trpc/client";
-import { cn, formatDuration, timeAgo, getStatusColor, formatTokens } from "@/lib/utils";
+import { cn, formatDuration, formatTokens } from "@/lib/utils";
 import {
   ArrowLeft,
   Clock,
   Users,
   Zap,
-  CheckCircle2,
-  Circle,
   XCircle,
-  Loader2,
   Bot,
   FileText,
   BarChart3,
   Shield,
   Sparkles,
   GitBranch,
-  Download,
   Play,
   Workflow,
   Wand2,
@@ -37,19 +32,7 @@ import { StateMachine } from "@/components/workflow/state-machine";
 import { LogFilters } from "@/components/logs/log-filters";
 import { SessionReplay } from "@/components/replay/session-replay";
 import { SkillOutputViewer } from "@/components/skills/skill-output-viewer";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  exportToJSON,
-  exportSessionLogs,
-  exportTokenUsage,
-} from "@/lib/utils/export";
+import { SessionHeader } from "@/components/session/session-header";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -72,16 +55,20 @@ export default function SessionDetailPage() {
 
   const [elapsed, setElapsed] = useState(0);
 
-  useEffect(() => {
-    if (!session || session.status !== "active" || !session.startTime) return;
+  // Extract specific properties to avoid re-running effect on any session change
+  const sessionStatus = session?.status;
+  const sessionStartTime = session?.startTime;
 
-    const start = new Date(session.startTime).getTime();
+  useEffect(() => {
+    if (sessionStatus !== "active" || !sessionStartTime) return;
+
+    const start = new Date(sessionStartTime).getTime();
     const interval = setInterval(() => {
       setElapsed(Date.now() - start);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [session]);
+  }, [sessionStatus, sessionStartTime]);
 
   if (isLoading) {
     return (
@@ -115,87 +102,36 @@ export default function SessionDetailPage() {
   const progress = taskGroups.length > 0 ? (completedGroups / taskGroups.length) * 100 : 0;
   const totalTokens = tokenData?.breakdown.reduce((sum, b) => sum + (b.total || 0), 0) || 0;
 
-  const shortId = sessionId.split("_").pop()?.slice(0, 8) || sessionId;
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/sessions">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              Session #{shortId}
-              <Badge
-                variant={
-                  session.status === "active"
-                    ? "default"
-                    : session.status === "completed"
-                    ? "secondary"
-                    : "destructive"
-                }
-              >
-                {session.status === "active" && (
-                  <Play className="h-3 w-3 mr-1 animate-pulse" />
-                )}
-                {session.status}
-              </Badge>
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Started {timeAgo(session.startTime)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() =>
-                  exportToJSON({
-                    sessionId: session.sessionId,
-                    status: session.status,
-                    mode: session.mode,
-                    startTime: session.startTime,
-                    endTime: session.endTime,
-                    originalRequirements: session.originalRequirements,
-                    logs: session.logs,
-                    taskGroups: session.taskGroups,
-                    tokenUsage: session.tokenUsage,
-                  })
-                }
-              >
-                Full Session (JSON)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => exportSessionLogs(session.logs, session.sessionId)}
-                disabled={!session.logs?.length}
-              >
-                Logs Only (CSV)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  exportTokenUsage(tokenData?.timeline, session.sessionId)
-                }
-                disabled={!tokenData?.timeline?.length}
-              >
-                Token Usage (CSV)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      <SessionHeader
+        sessionId={session.sessionId}
+        status={session.status}
+        startTime={session.startTime}
+        mode={session.mode}
+        originalRequirements={session.originalRequirements}
+        logs={session.logs?.map((log) => ({
+          id: log.id,
+          agentType: log.agentType,
+          content: log.content,
+          timestamp: log.timestamp,
+        }))}
+        taskGroups={session.taskGroups?.map((group) => ({
+          id: group.id,
+          name: group.name,
+          status: group.status,
+          revisionCount: group.revisionCount,
+          assignedTo: group.assignedTo,
+          complexity: group.complexity,
+        }))}
+        tokenUsage={session.tokenUsage?.map((usage) => ({
+          agentType: usage.agentType,
+          tokensEstimated: usage.tokensEstimated,
+          timestamp: usage.timestamp,
+        }))}
+        endTime={session.endTime}
+      />
 
       {/* Session Info Card */}
       <Card>

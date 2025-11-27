@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -54,22 +55,35 @@ export default function AnalyticsPage() {
   const { data: agentMetrics } = trpc.sessions.getAgentMetrics.useQuery();
   const { data: recentSessions } = trpc.sessions.list.useQuery({ limit: 10 });
 
-  // Prepare chart data - simplified without model tier and cost data
-  const tokensByAgentData = agentMetrics?.tokensByAgent.map((item) => ({
-    name: item.agentType,
-    tokens: item.totalTokens || 0,
-    invocations: item.invocations || 0,
-  })) || [];
+  // Memoize chart data transformations to avoid recalculating on every render
+  const tokensByAgentData = useMemo(
+    () =>
+      agentMetrics?.tokensByAgent.map((item) => ({
+        name: item.agentType,
+        tokens: item.totalTokens || 0,
+        invocations: item.invocations || 0,
+      })) || [],
+    [agentMetrics?.tokensByAgent]
+  );
 
-  // Log counts by agent (simplified without status codes)
-  const logsByAgentData = agentMetrics?.logsByAgent.map((item) => ({
-    name: item.agentType,
-    total: item.logCount || 0,
-  })) || [];
+  const logsByAgentData = useMemo(
+    () =>
+      agentMetrics?.logsByAgent.map((item) => ({
+        name: item.agentType,
+        total: item.logCount || 0,
+      })) || [],
+    [agentMetrics?.logsByAgent]
+  );
 
-  const revisionRate = agentMetrics?.revisionStats.totalGroups
-    ? ((agentMetrics.revisionStats.revisedGroups || 0) / agentMetrics.revisionStats.totalGroups) * 100
-    : 0;
+  const revisionRate = useMemo(
+    () =>
+      agentMetrics?.revisionStats.totalGroups
+        ? ((agentMetrics.revisionStats.revisedGroups || 0) /
+            agentMetrics.revisionStats.totalGroups) *
+          100
+        : 0,
+    [agentMetrics?.revisionStats]
+  );
 
   return (
     <div className="space-y-6">
