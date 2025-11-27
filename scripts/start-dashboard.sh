@@ -41,7 +41,7 @@ echo "$(date): Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT" >> "$DASHBO
 # Check if Node.js is available (required for standalone mode)
 if ! command -v node >/dev/null 2>&1; then
     echo "$(date): ERROR - node not found, cannot start dashboard" >> "$DASHBOARD_LOG"
-    echo "$(date): Please install Node.js and ensure it's in your PATH" >> "$DASHBOARD_LOG"
+    echo "$(date): Please install Node.js and ensure it is in your PATH" >> "$DASHBOARD_LOG"
     exit 1
 fi
 
