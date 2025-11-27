@@ -22,28 +22,36 @@ $SOURCES_DIR = Join-Path $PROJECT_ROOT "agents\_sources"
 $OUTPUT_DIR = Join-Path $PROJECT_ROOT "agents"
 
 # Cross-platform Python detection
+# Returns array: first element is executable, rest are arguments
 function Get-PythonCommand {
     # Try python3 first (Unix/macOS, some Windows)
     if (Get-Command "python3" -ErrorAction SilentlyContinue) {
-        return "python3"
+        return @("python3")
     }
     # Try python (Windows default)
     if (Get-Command "python" -ErrorAction SilentlyContinue) {
         # Verify it's Python 3
         $version = & python --version 2>&1
         if ($version -match "Python 3") {
-            return "python"
+            return @("python")
         }
     }
     # Try py launcher (Windows Python launcher)
+    # Note: py and -3 must be separate to work with call operator
     if (Get-Command "py" -ErrorAction SilentlyContinue) {
-        return "py -3"
+        return @("py", "-3")
     }
     return $null
 }
 
-$PYTHON_CMD = Get-PythonCommand
-if (-not $PYTHON_CMD) {
+# Helper to invoke Python with correct arguments
+function Invoke-Python {
+    param([Parameter(ValueFromRemainingArguments)]$Arguments)
+    & $script:PYTHON_CMD[0] @($script:PYTHON_CMD[1..99]) @Arguments
+}
+
+$script:PYTHON_CMD = Get-PythonCommand
+if (-not $script:PYTHON_CMD) {
     Write-Host "Error: Python 3 not found. Install Python 3 and ensure it's in PATH." -ForegroundColor Red
     exit 1
 }
@@ -77,7 +85,7 @@ if ($Check) {
         Copy-Item (Join-Path $SOURCES_DIR "developer.base.md") (Join-Path $TEMP_DIR "developer.md")
 
         $mergeScript = Join-Path $SCRIPT_DIR "merge_agent_delta.py"
-        & $PYTHON_CMD $mergeScript `
+        Invoke-Python $mergeScript `
             (Join-Path $SOURCES_DIR "developer.base.md") `
             (Join-Path $SOURCES_DIR "senior.delta.md") `
             (Join-Path $TEMP_DIR "senior_software_engineer.md")
@@ -143,7 +151,7 @@ else {
     # Generate senior_software_engineer.md (base + delta)
     Write-Host "Generating senior_software_engineer.md..."
     $mergeScript = Join-Path $SCRIPT_DIR "merge_agent_delta.py"
-    & $PYTHON_CMD $mergeScript `
+    Invoke-Python $mergeScript `
         (Join-Path $SOURCES_DIR "developer.base.md") `
         (Join-Path $SOURCES_DIR "senior.delta.md") `
         (Join-Path $OUTPUT_DIR "senior_software_engineer.md")

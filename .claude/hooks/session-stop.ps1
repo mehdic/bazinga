@@ -6,6 +6,11 @@
 
 $ErrorActionPreference = "Continue"
 
+# Only run in Claude Code Web environment (consistent with session-start.ps1)
+if ($env:CLAUDE_CODE_REMOTE -ne "true") {
+    exit 0
+}
+
 # Use forward slashes for git compatibility (git always outputs forward slashes)
 $ORCHESTRATOR_FILE = "agents/orchestrator.md"
 $ORCHESTRATOR_FILE_WIN = "agents\orchestrator.md"

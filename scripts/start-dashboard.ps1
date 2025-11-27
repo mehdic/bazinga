@@ -14,46 +14,49 @@ $DASHBOARD_LOG = Join-Path $env:TEMP "bazinga-dashboard.log"
 $DEPS_MARKER = "dashboard\.deps-installed"
 
 # Cross-platform Python detection
+# Returns array: first element is executable, rest are arguments
 function Get-PythonCommand {
     # Try python3 first (Unix/macOS, some Windows)
     if (Get-Command "python3" -ErrorAction SilentlyContinue) {
-        return "python3"
+        return @("python3")
     }
     # Try python (Windows default)
     if (Get-Command "python" -ErrorAction SilentlyContinue) {
         # Verify it's Python 3
         $version = & python --version 2>&1
         if ($version -match "Python 3") {
-            return "python"
+            return @("python")
         }
     }
     # Try py launcher (Windows Python launcher)
+    # Note: py and -3 must be separate to work with call operator
     if (Get-Command "py" -ErrorAction SilentlyContinue) {
-        return "py -3"
+        return @("py", "-3")
     }
     return $null
 }
 
-# Cross-platform pip detection
-function Get-PipCommand {
-    if (Get-Command "pip3" -ErrorAction SilentlyContinue) {
-        return "pip3"
-    }
-    if (Get-Command "pip" -ErrorAction SilentlyContinue) {
-        return "pip"
-    }
-    # Use python -m pip as fallback
-    $python = Get-PythonCommand
-    if ($python) {
-        return "$python -m pip"
-    }
-    return $null
+# Helper to invoke Python with correct arguments
+function Invoke-Python {
+    param([Parameter(ValueFromRemainingArguments)]$Arguments)
+    & $script:PYTHON_CMD[0] @($script:PYTHON_CMD[1..99]) @Arguments
 }
 
-$PYTHON_CMD = Get-PythonCommand
-$PIP_CMD = Get-PipCommand
+# Get Python executable name (first element only, for Start-Process)
+function Get-PythonExe {
+    return $script:PYTHON_CMD[0]
+}
 
-if (-not $PYTHON_CMD) {
+# Get Python arguments as string (for Start-Process -ArgumentList)
+function Get-PythonStartArgs {
+    param([string]$ScriptPath)
+    $args = @($script:PYTHON_CMD[1..99] | Where-Object { $_ }) + @($ScriptPath)
+    return ($args -join " ")
+}
+
+$script:PYTHON_CMD = Get-PythonCommand
+
+if (-not $script:PYTHON_CMD) {
     Write-Host "ERROR: Python 3 not found. Install Python 3 and ensure it's in PATH." -ForegroundColor Red
     exit 1
 }
@@ -119,7 +122,7 @@ if (-not (Test-Path $DEPS_MARKER)) {
     # Check if Python dependencies are installed
     $depsInstalled = $true
     try {
-        & $PYTHON_CMD -c "import flask, flask_sock, watchdog, anthropic" 2>$null
+        Invoke-Python -c "import flask, flask_sock, watchdog, anthropic" 2>$null
         if ($LASTEXITCODE -ne 0) { $depsInstalled = $false }
     }
     catch {
@@ -132,7 +135,7 @@ if (-not (Test-Path $DEPS_MARKER)) {
 
         # Install dependencies using python -m pip (safer than Invoke-Expression)
         try {
-            & $PYTHON_CMD -m pip install flask flask-sock watchdog anthropic 2>&1 | Out-Null
+            Invoke-Python -m pip install flask flask-sock watchdog anthropic 2>&1 | Out-Null
 
             # Create marker file
             New-Item -ItemType File -Path $DEPS_MARKER -Force | Out-Null
@@ -161,7 +164,7 @@ Write-Host "Starting dashboard server on port $DASHBOARD_PORT..." -ForegroundCol
 
 Push-Location dashboard
 try {
-    $process = Start-Process -FilePath $PYTHON_CMD -ArgumentList "server.py" `
+    $process = Start-Process -FilePath (Get-PythonExe) -ArgumentList (Get-PythonStartArgs "server.py") `
         -RedirectStandardOutput $DASHBOARD_LOG -RedirectStandardError $DASHBOARD_LOG `
         -PassThru -WindowStyle Hidden
 
