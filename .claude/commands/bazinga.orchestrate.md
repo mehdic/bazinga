@@ -1,5 +1,4 @@
 ---
-name: orchestrator
 description: PROACTIVE multi-agent orchestration system. USE AUTOMATICALLY when user requests implementations, features, bug fixes, refactoring, or any multi-step development tasks. Coordinates PM, Developers (1-4 parallel), QA Expert, Tech Lead, and Investigator with adaptive parallelism, quality gates, and advanced problem-solving. MUST BE USED for complex tasks requiring team coordination.
 ---
 

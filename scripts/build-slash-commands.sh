@@ -33,6 +33,8 @@ fi
 
 # Extract frontmatter values using more robust AWK
 # Only processes the FIRST frontmatter block (between first two --- markers)
+# NOTE: We only extract 'description' for slash commands
+# The 'name' field is for agent definitions, NOT slash commands
 DESCRIPTION=$(awk '
   BEGIN { fm_count=0; in_fm=0 }
   /^---$/ {
@@ -47,25 +49,7 @@ DESCRIPTION=$(awk '
   }
 ' "$SOURCE_FILE")
 
-NAME=$(awk '
-  BEGIN { fm_count=0; in_fm=0 }
-  /^---$/ {
-    fm_count++
-    if (fm_count == 1) { in_fm=1; next }
-    if (fm_count == 2) { exit }
-  }
-  in_fm && /^name:/ {
-    print $2
-    exit
-  }
-' "$SOURCE_FILE")
-
 # Validate frontmatter was extracted
-if [ -z "$NAME" ]; then
-    echo "  ❌ ERROR: Could not extract 'name' from frontmatter in $SOURCE_FILE"
-    exit 1
-fi
-
 if [ -z "$DESCRIPTION" ]; then
     echo "  ❌ ERROR: Could not extract 'description' from frontmatter in $SOURCE_FILE"
     exit 1
@@ -96,9 +80,10 @@ if [ -z "$ORCHESTRATOR_BODY" ]; then
 fi
 
 # Generate the slash command file to temp location (atomic write)
+# NOTE: Slash commands only need 'description' in frontmatter
+# DO NOT include 'name' - that's for agent definitions only
 cat > "$TEMP_FILE" <<EOF
 ---
-name: $NAME
 description: $DESCRIPTION
 ---
 
@@ -117,14 +102,16 @@ if [ ! -s "$TEMP_FILE" ]; then
     exit 1
 fi
 
-# Check 2: File contains required frontmatter
-if ! grep -q "^name: orchestrator$" "$TEMP_FILE"; then
-    echo "  ❌ ERROR: Generated file missing 'name: orchestrator' in frontmatter"
+# Check 2: File contains required frontmatter (description only for slash commands)
+if ! grep -q "^description:" "$TEMP_FILE"; then
+    echo "  ❌ ERROR: Generated file missing description in frontmatter"
     exit 1
 fi
 
-if ! grep -q "^description:" "$TEMP_FILE"; then
-    echo "  ❌ ERROR: Generated file missing description in frontmatter"
+# Check 2b: Ensure 'name:' is NOT in the frontmatter (that's for agents, not commands)
+if grep -q "^name:" "$TEMP_FILE"; then
+    echo "  ❌ ERROR: Generated slash command should NOT have 'name:' in frontmatter"
+    echo "  'name:' is for agent definitions, not slash commands"
     exit 1
 fi
 
