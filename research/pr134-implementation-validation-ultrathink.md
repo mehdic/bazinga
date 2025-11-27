@@ -226,13 +226,13 @@ If a socket event arrives in the 0-1ms window, it won't trigger invalidation.
 
 ### Immediate (Before Merge)
 
-1. **Fix build-breaking bug** - Move validation inside `getDatabase()`
-2. **Test production build** - Run `npm run build` with NODE_ENV=production
+1. ✅ **Fix build-breaking bug** - Move validation inside `getDatabase()`
+2. ✅ **Test production build** - Run `npm run build` with NODE_ENV=production
 
-### Short-term (Next Sprint)
+### Short-term (Implemented)
 
-3. **Add debouncing** - Prevent invalidation spam
-4. **Add reconnection refresh** - Ensure data freshness after network issues
+3. ✅ **Add debouncing** - 200ms window batches rapid events, prevents API spam
+4. ✅ **Add reconnection refresh** - On reconnect, waits 500ms then refreshes all queries
 
 ### Long-term (Technical Debt)
 
