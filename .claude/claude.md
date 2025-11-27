@@ -487,14 +487,13 @@ Always create `research/prXXX-review-analysis.md` with full ultrathink analysis.
 
 **Create the token file:**
 ```bash
-echo "github_pat_YOUR_TOKEN_HERE" > ~/.bazinga-github-token
+echo "ghp_YOUR_CLASSIC_TOKEN" > ~/.bazinga-github-token
 chmod 600 ~/.bazinga-github-token
 ```
 
 **Token requirements:**
-- Fine-grained PAT scoped to `mehdic/bazinga` only
-- Permissions: Pull requests (read/write)
-- Cannot: Merge PRs, push code, access other repos
+- Classic PAT with `repo` scope (required for GraphQL thread resolution)
+- Fine-grained PATs do NOT support `resolveReviewThread` mutation
 
 **Load token in scripts:**
 ```bash
@@ -529,10 +528,6 @@ curl -s -X POST \
   "https://api.github.com/graphql" \
   -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
 ```
-
-**⚠️ Note:** Fine-grained PATs don't support GraphQL mutations. Thread resolution requires:
-- Classic PAT with `repo` scope, OR
-- Manual resolution by repo owner after replies are posted
 
 ### Response Templates
 
