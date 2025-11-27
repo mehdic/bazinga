@@ -317,7 +317,7 @@ Quality level: LOW 🚀
 
 If `bazinga/testing_config.json` doesn't exist:
 1. Show message: "Testing config not found. Running initialization..."
-2. Run: `bash scripts/init-orchestration.sh`
+2. Run: `bash bazinga/scripts/init-orchestration.sh`
 3. Confirm file created, then continue
 
 If file is corrupted (invalid JSON):
