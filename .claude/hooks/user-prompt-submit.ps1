@@ -5,8 +5,8 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 
-# Get the user's message from STDIN
-$USER_MESSAGE = $input | Out-String
+# Get the user's message from STDIN (Trim removes trailing newline from Out-String)
+$USER_MESSAGE = ($input | Out-String).Trim()
 
 # Keywords that indicate planning/brainstorming/decision-making sessions
 $PLANNING_KEYWORDS = @(

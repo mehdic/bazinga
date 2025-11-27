@@ -23,14 +23,20 @@ else {
 # Check config file sync (pyproject.toml vs ALLOWED_CONFIG_FILES)
 if ((Test-Path "pyproject.toml") -and (Test-Path "src\bazinga_cli\__init__.py")) {
     # Quick sync check using Python (with tomllib/tomli fallback for Python 3.9/3.10)
-    # Detect Python command
-    $pythonCmd = if (Get-Command "python3" -ErrorAction SilentlyContinue) { "python3" }
-                 elseif (Get-Command "python" -ErrorAction SilentlyContinue) { "python" }
-                 else { $null }
+    # Cross-platform Python detection (handles py -3 launcher on Windows)
+    $pythonCmd = $null
+    if (Get-Command "python3" -ErrorAction SilentlyContinue) {
+        $pythonCmd = @("python3")
+    } elseif (Get-Command "python" -ErrorAction SilentlyContinue) {
+        $version = & python --version 2>&1
+        if ($version -match "Python 3") { $pythonCmd = @("python") }
+    } elseif (Get-Command "py" -ErrorAction SilentlyContinue) {
+        $pythonCmd = @("py", "-3")
+    }
 
     if ($pythonCmd) {
         try {
-            & $pythonCmd -c @'
+            & $pythonCmd[0] @($pythonCmd[1..99] | Where-Object { $_ }) -c @'
 import re
 from pathlib import Path
 
@@ -54,7 +60,7 @@ pyproject_configs = {Path(k).name for k in force_include.keys() if k.startswith(
 init_content = Path("src/bazinga_cli/__init__.py").read_text()
 match = re.search(r"ALLOWED_CONFIG_FILES\s*=\s*\[(.*?)\]", init_content, re.DOTALL)
 if match:
-    allowed_configs = set(re.findall(r"\"([^\"]+)\"", match.group(1)))
+    allowed_configs = set(re.findall(r"['\"]([^'\"]+)['\"]", match.group(1)))
 else:
     allowed_configs = set()
 

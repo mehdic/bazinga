@@ -76,7 +76,8 @@ $markerDir = ".claude\session-stop-checks"
 if (-not (Test-Path $markerDir)) {
     New-Item -ItemType Directory -Path $markerDir -Force | Out-Null
 }
-"orchestrator-references" | Out-File -FilePath "$markerDir\validate-orchestrator.txt" -Encoding UTF8
+# Use WriteAllText to avoid BOM (Out-File -Encoding UTF8 adds BOM in PowerShell 5.1)
+[System.IO.File]::WriteAllText("$markerDir\validate-orchestrator.txt", "orchestrator-references", [System.Text.UTF8Encoding]::new($false))
 
 # Output a clear message for the AI to see
 @'
