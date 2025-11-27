@@ -102,14 +102,27 @@ if [ ! -s "$TEMP_FILE" ]; then
     exit 1
 fi
 
-# Check 2: File contains required frontmatter (description only for slash commands)
-if ! grep -q "^description:" "$TEMP_FILE"; then
+# Check 2: Validate frontmatter structure
+# Extract only the frontmatter section (between first two --- markers)
+FRONTMATTER=$(awk '
+  BEGIN { fm_count=0; in_fm=0 }
+  /^---$/ {
+    fm_count++
+    if (fm_count == 1) { in_fm=1; next }
+    if (fm_count == 2) { exit }
+  }
+  in_fm { print }
+' "$TEMP_FILE")
+
+# Check 2a: Frontmatter must contain description
+if ! echo "$FRONTMATTER" | grep -q "^description:"; then
     echo "  ❌ ERROR: Generated file missing description in frontmatter"
     exit 1
 fi
 
-# Check 2b: Ensure 'name:' is NOT in the frontmatter (that's for agents, not commands)
-if grep -q "^name:" "$TEMP_FILE"; then
+# Check 2b: Frontmatter must NOT contain 'name:' (that's for agents, not commands)
+# NOTE: Only checks frontmatter section to avoid false positives from body content
+if echo "$FRONTMATTER" | grep -q "^name:"; then
     echo "  ❌ ERROR: Generated slash command should NOT have 'name:' in frontmatter"
     echo "  'name:' is for agent definitions, not slash commands"
     exit 1
