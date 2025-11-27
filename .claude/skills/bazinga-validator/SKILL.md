@@ -98,13 +98,13 @@ Use Read tool to check these files.
 
 ```bash
 # Example for Node.js
-timeout 60 npm test 2>&1 | tee /tmp/bazinga_test_output.txt
+timeout 60 npm test 2>&1 | tee bazinga/test_output.txt
 
 # Example for Python
-timeout 60 pytest --tb=short 2>&1 | tee /tmp/bazinga_test_output.txt
+timeout 60 pytest --tb=short 2>&1 | tee bazinga/test_output.txt
 
 # Example for Go
-timeout 60 go test ./... 2>&1 | tee /tmp/bazinga_test_output.txt
+timeout 60 go test ./... 2>&1 | tee bazinga/test_output.txt
 ```
 
 **If timeout occurs:**

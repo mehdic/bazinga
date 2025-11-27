@@ -1,0 +1,165 @@
+# Build and release pre-built dashboard packages
+name: Dashboard Release
+
+on:
+  push:
+    tags:
+      - 'dashboard-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard-v2/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard-v2
+        run: npm ci
+
+      - name: Build standalone
+        working-directory: dashboard-v2
+        run: npm run build
+
+      - name: Build Socket.io server
+        working-directory: dashboard-v2
+        run: |
+          # Compile socket server for standalone use
+          npx esbuild src/lib/socket/server.ts --bundle --platform=node --target=node18 --outfile=dist/socket-server.js --external:better-sqlite3
+
+      - name: Prepare release package
+        working-directory: dashboard-v2
+        run: |
+          # Create release directory
+          mkdir -p release-package/dashboard-v2/.next/standalone
+          mkdir -p release-package/dashboard-v2/.next/static
+
+          # Copy standalone server
+          cp -r .next/standalone/* release-package/dashboard-v2/.next/standalone/
+
+          # Copy static files
+          cp -r .next/static release-package/dashboard-v2/.next/
+
+          # Copy public folder if exists
+          if [ -d "public" ]; then
+            cp -r public release-package/dashboard-v2/
+          fi
+
+          # Copy scripts
+          mkdir -p release-package/dashboard-v2/scripts
+          cp scripts/start-standalone.sh release-package/dashboard-v2/scripts/
+
+          # Copy compiled socket server for real-time updates
+          if [ -f "dist/socket-server.js" ]; then
+            cp dist/socket-server.js release-package/dashboard-v2/
+          fi
+
+          # Create version file
+          VERSION="${{ inputs.version || github.ref_name }}"
+          VERSION="${VERSION#dashboard-v}"
+          echo "$VERSION" > release-package/dashboard-v2/.version
+
+          # Create tarball
+          cd release-package
+          tar -czvf ../bazinga-dashboard-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz dashboard-v2
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dashboard-v2/bazinga-dashboard-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION="${{ inputs.version || github.ref_name }}"
+          VERSION="${VERSION#dashboard-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=dashboard-v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          for dir in */; do
+            for file in "$dir"*.tar.gz; do
+              if [ -f "$file" ]; then
+                sha256sum "$file" >> checksums.txt
+              fi
+            done
+          done
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Dashboard v${{ steps.version.outputs.version }}
+          body: |
+            ## BAZINGA Dashboard v${{ steps.version.outputs.version }}
+
+            Pre-built standalone dashboard packages for various platforms.
+
+            ### Installation
+
+            The bazinga CLI will automatically download the appropriate package during `bazinga install`.
+
+            ### Manual Installation
+
+            1. Download the appropriate package for your platform
+            2. Extract to your bazinga project directory
+            3. Run `scripts/start-dashboard.sh`
+
+            ### Packages
+
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | Linux    | x64          | bazinga-dashboard-linux-x64.tar.gz |
+            | macOS    | x64          | bazinga-dashboard-darwin-x64.tar.gz |
+            | macOS    | arm64        | bazinga-dashboard-darwin-arm64.tar.gz |
+
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/checksums.txt
+          draft: false
+          prerelease: false

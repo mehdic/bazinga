@@ -2,6 +2,7 @@
 
 import { io, Socket } from "socket.io-client";
 import { create } from "zustand";
+import { useEffect } from "react";
 
 // Socket event types (matching server)
 export type SocketEvent =
@@ -225,10 +226,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 export function useSocket() {
   const { connect, isConnected, notifications, recentEvents } = useSocketStore();
 
-  // Connect on first use (client-side only)
-  if (typeof window !== "undefined" && !useSocketStore.getState().socket) {
-    connect();
-  }
+  // Connect on mount using useEffect (proper React pattern)
+  // This prevents duplicate connections from React 18 double renders
+  useEffect(() => {
+    if (!useSocketStore.getState().socket) {
+      connect();
+    }
+  }, [connect]);
 
   return { isConnected, notifications, recentEvents };
 }

@@ -7,11 +7,16 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+TEST_LOG="$BAZINGA_DIR/dashboard-v1-test.log"
+
 echo "🧪 Testing BAZINGA Dashboard..."
 echo ""
 
 # Check if coordination folder exists
-if [ ! -d "../bazinga" ]; then
+if [ ! -d "$BAZINGA_DIR" ]; then
     echo "⚠️  Coordination folder not found. Running init-orchestration.sh..."
     cd ..
     ./scripts/init-orchestration.sh
@@ -42,7 +47,7 @@ else
     # Start server in background
     echo ""
     echo "🚀 Starting dashboard server..."
-    python3 server.py > /tmp/bazinga-dashboard-test.log 2>&1 &
+    python3 server.py > "$TEST_LOG" 2>&1 &
     SERVER_PID=$!
 
     # Wait for server to start
@@ -53,7 +58,7 @@ else
         echo "✅ Dashboard server started successfully (PID: $SERVER_PID)"
         echo ""
         echo "🌐 Dashboard URL: http://localhost:53124"
-        echo "📋 Server logs: tail -f /tmp/bazinga-dashboard-test.log"
+        echo "📋 Server logs: tail -f $TEST_LOG"
         echo ""
         echo "🧪 Test Steps:"
         echo "   1. Open http://localhost:53124 in your browser"
@@ -68,12 +73,12 @@ else
         trap "echo ''; echo '🛑 Stopping test server...'; kill $SERVER_PID 2>/dev/null; echo '✅ Test server stopped'; exit 0" INT TERM
 
         # Tail logs
-        tail -f /tmp/bazinga-dashboard-test.log
+        tail -f "$TEST_LOG"
     else
         echo "❌ Failed to start dashboard server"
         echo ""
         echo "📋 Check logs:"
-        cat /tmp/bazinga-dashboard-test.log
+        cat "$TEST_LOG"
         exit 1
     fi
 fi

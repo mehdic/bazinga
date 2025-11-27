@@ -28,6 +28,9 @@ from .telemetry import track_command
 
 __version__ = "1.1.0"
 
+# GitHub repository for release downloads
+GITHUB_REPO = "mehdic/bazinga"
+
 console = Console()
 app = typer.Typer(
     name="bazinga",
@@ -153,13 +156,13 @@ class BazingaSetup:
 
     def copy_scripts(self, target_dir: Path, script_type: str = "sh") -> bool:
         """
-        Copy scripts to target .claude/scripts directory.
+        Copy scripts to target bazinga/scripts directory.
 
         Args:
             target_dir: Target directory for installation
             script_type: "sh" for POSIX shell or "ps" for PowerShell
         """
-        scripts_dir = target_dir / ".claude" / "scripts"
+        scripts_dir = target_dir / "bazinga" / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
 
         source_scripts = self.source_dir / "scripts"
@@ -782,9 +785,191 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
     return True
 
 
+def get_platform_info() -> tuple[str, str]:
+    """
+    Get current platform information for downloading pre-built releases.
+
+    Returns:
+        Tuple of (platform, arch) e.g., ("darwin", "arm64")
+    """
+    import platform as plat
+    import struct
+
+    # Determine platform
+    system = plat.system().lower()
+    if system == "windows":
+        platform = "windows"
+    elif system == "darwin":
+        platform = "darwin"
+    else:
+        platform = "linux"
+
+    # Determine architecture
+    machine = plat.machine().lower()
+    if machine in ("arm64", "aarch64"):
+        arch = "arm64"
+    elif machine in ("x86_64", "amd64"):
+        arch = "x64"
+    else:
+        # Fallback based on pointer size
+        arch = "x64" if struct.calcsize("P") == 8 else "x86"
+
+    return (platform, arch)
+
+
+def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
+    """
+    Download pre-built dashboard package from GitHub releases.
+
+    Args:
+        target_dir: Target directory for installation
+        force: Force download even if already installed
+
+    Returns:
+        True if download successful, False otherwise (should fall back to npm)
+    """
+    import json
+    import os
+    import shutil
+    import tarfile
+    import tempfile
+    import urllib.request
+    import urllib.error
+
+    dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
+    standalone_marker = dashboard_dir / ".next" / "standalone" / "server.js"
+
+    # Check if already have standalone build
+    if standalone_marker.exists() and not force:
+        console.print("  [green]✓[/green] Pre-built dashboard already installed")
+        return True
+
+    platform, arch = get_platform_info()
+
+    # Windows not yet supported for standalone
+    if platform == "windows":
+        console.print("  [dim]Pre-built packages not available for Windows, will use npm[/dim]")
+        return False
+
+    console.print(f"  [dim]Checking for pre-built dashboard ({platform}-{arch})...[/dim]")
+
+    # Query GitHub API for latest release
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "bazinga-cli"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            releases = json.loads(response.read().decode())
+    except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
+        console.print(f"  [dim]Could not check for releases: {e}[/dim]")
+        return False
+
+    # Find latest dashboard release
+    dashboard_release = None
+    for release in releases:
+        if release.get("tag_name", "").startswith("dashboard-v"):
+            dashboard_release = release
+            break
+
+    if not dashboard_release:
+        console.print("  [dim]No pre-built dashboard releases found[/dim]")
+        return False
+
+    version = dashboard_release["tag_name"].replace("dashboard-v", "")
+    console.print(f"  [dim]Found dashboard release v{version}[/dim]")
+
+    # Find the right asset for this platform
+    asset_name = f"bazinga-dashboard-{platform}-{arch}.tar.gz"
+    asset_url = None
+
+    for asset in dashboard_release.get("assets", []):
+        if asset.get("name") == asset_name:
+            asset_url = asset.get("browser_download_url")
+            break
+
+    if not asset_url:
+        console.print(f"  [dim]No pre-built package for {platform}-{arch}[/dim]")
+        return False
+
+    # Download the tarball
+    console.print(f"  Downloading pre-built dashboard v{version}...")
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        req = urllib.request.Request(asset_url, headers={"User-Agent": "bazinga-cli"})
+        with urllib.request.urlopen(req, timeout=120) as response:
+            with open(tmp_path, "wb") as f:
+                # Download with progress indication (throttled to reduce I/O)
+                total_size = int(response.headers.get("content-length", 0))
+                downloaded = 0
+                chunk_size = 8192
+                last_percent = -5  # Ensure first update shows
+
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = int((downloaded / total_size) * 100)
+                        # Throttle: only update every 5%
+                        if percent >= last_percent + 5:
+                            last_percent = percent
+                            console.print(f"\r  [dim]Downloaded: {downloaded // 1024}KB / {total_size // 1024}KB ({percent}%)[/dim]", end="")
+
+        console.print()  # Newline after progress
+
+        # Extract the tarball
+        console.print("  Extracting pre-built dashboard...")
+
+        # Remove existing dashboard-v2 if present (but preserve config)
+        if dashboard_dir.exists():
+            # Only remove .next folder to preserve any local config
+            next_dir = dashboard_dir / ".next"
+            if next_dir.exists():
+                shutil.rmtree(next_dir)
+
+        # Ensure bazinga directory exists
+        bazinga_dir = target_dir / "bazinga"
+        bazinga_dir.mkdir(parents=True, exist_ok=True)
+
+        with tarfile.open(tmp_path, "r:gz") as tar:
+            # Extract to bazinga directory (tarball contains dashboard-v2/)
+            # Security: Validate paths to prevent tar slip attacks
+            for member in tar.getmembers():
+                member_path = os.path.normpath(os.path.join(bazinga_dir, member.name))
+                if not member_path.startswith(str(bazinga_dir)):
+                    raise tarfile.TarError(f"Unsafe path in tarball: {member.name}")
+            tar.extractall(path=bazinga_dir)
+
+        # Cleanup temp file
+        os.unlink(tmp_path)
+
+        # Verify extraction
+        if standalone_marker.exists():
+            console.print(f"  [green]✓[/green] Pre-built dashboard v{version} installed (standalone mode)")
+            console.print("  [dim]No npm install required - ready to run![/dim]")
+            return True
+        else:
+            console.print("  [yellow]⚠️  Extraction may have failed, falling back to npm[/yellow]")
+            return False
+
+    except (urllib.error.URLError, tarfile.TarError, OSError) as e:
+        console.print(f"  [yellow]⚠️  Download failed: {e}[/yellow]")
+        # Cleanup temp file if exists
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        return False
+
+
 def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> bool:
     """
-    Install dashboard v2 dependencies using npm.
+    Install dashboard v2 - tries pre-built first, falls back to npm install.
 
     Args:
         target_dir: Project directory
@@ -793,12 +978,26 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     Returns:
         True if dependencies were installed successfully or skipped, False if failed
     """
-    dashboard_dir = target_dir / "dashboard-v2"
+    dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
 
     # Check if dashboard folder exists
     if not dashboard_dir.exists():
         console.print("  [dim]Dashboard v2 folder not found, skipping dependency installation[/dim]")
         return True
+
+    # Check for standalone build (pre-built release)
+    standalone_marker = dashboard_dir / ".next" / "standalone" / "server.js"
+    if standalone_marker.exists() and not force:
+        console.print("  [green]✓[/green] Pre-built dashboard already installed (standalone mode)")
+        return True
+
+    # Try downloading pre-built dashboard first (faster, no npm required)
+    console.print("\n[bold]Option 1: Pre-built dashboard (faster, no npm required)[/bold]")
+    if download_prebuilt_dashboard(target_dir, force):
+        return True
+
+    # Fall back to npm install
+    console.print("\n[bold]Option 2: Build from source (requires npm)[/bold]")
 
     package_json = dashboard_dir / "package.json"
     if not package_json.exists():
@@ -814,7 +1013,7 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     # Check if npm is available
     if not check_command_exists("npm"):
         console.print("  [yellow]⚠️  npm not found, skipping dashboard dependencies[/yellow]")
-        console.print(f"  [dim]Install Node.js, then run: cd dashboard-v2 && npm install[/dim]")
+        console.print(f"  [dim]Install Node.js, then run: cd bazinga/dashboard-v2 && npm install[/dim]")
         return True
 
     console.print("  [dim]Dashboard v2 uses Next.js with TypeScript[/dim]")
@@ -823,7 +1022,7 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
     if not force:
         if not typer.confirm("  Install dashboard dependencies (npm install)?", default=True):
             console.print("  [yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
-            console.print(f"  [dim]You can install later with: cd dashboard-v2 && npm install[/dim]")
+            console.print(f"  [dim]You can install later with: cd bazinga/dashboard-v2 && npm install[/dim]")
             return True
 
     # Install dependencies using npm
@@ -849,12 +1048,12 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
 
     except subprocess.TimeoutExpired:
         console.print("  [yellow]⚠️  npm install timed out[/yellow]")
-        console.print(f"  [dim]Install manually: cd dashboard-v2 && npm install[/dim]")
+        console.print(f"  [dim]Install manually: cd bazinga/dashboard-v2 && npm install[/dim]")
         return True
 
     except Exception as e:
         console.print(f"  [yellow]⚠️  Dashboard dependency installation failed: {e}[/yellow]")
-        console.print(f"  [dim]Install manually: cd dashboard-v2 && npm install[/dim]")
+        console.print(f"  [dim]Install manually: cd bazinga/dashboard-v2 && npm install[/dim]")
         return True
 
 
@@ -1070,10 +1269,12 @@ def init(
 
         console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
         source_dashboard = setup.source_dir / "dashboard-v2"
-        target_dashboard = target_dir / "dashboard-v2"
+        target_dashboard = target_dir / "bazinga" / "dashboard-v2"
 
         if source_dashboard.exists():
             try:
+                # Ensure bazinga directory exists
+                (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
                 # Copy dashboard-v2 but exclude node_modules
                 shutil.copytree(
                     source_dashboard,
@@ -1723,11 +1924,13 @@ def update(
     # Copy dashboard-v2 folder
     console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
     source_dashboard = setup.source_dir / "dashboard-v2"
-    target_dashboard = target_dir / "dashboard-v2"
+    target_dashboard = target_dir / "bazinga" / "dashboard-v2"
 
     if source_dashboard.exists():
         import shutil
         try:
+            # Ensure bazinga directory exists
+            (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
             # Patterns to ignore when copying
             ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
 
@@ -1849,7 +2052,7 @@ def setup_dashboard(
         raise typer.Exit(1)
 
     # Check if dashboard-v2 folder exists
-    dashboard_dir = target_dir / "dashboard-v2"
+    dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
     if not dashboard_dir.exists():
         console.print(
             "[yellow]⚠️  Dashboard v2 folder not found[/yellow]\n"
@@ -1863,7 +2066,7 @@ def setup_dashboard(
     if node_modules.exists() and not force:
         console.print("\n[bold green]✓ Dashboard v2 dependencies already installed![/bold green]\n")
         console.print("[dim]You can start the dashboard with:[/dim]")
-        console.print("[dim]  cd dashboard-v2 && npm run dev[/dim]")
+        console.print("[dim]  cd bazinga/dashboard-v2 && npm run dev[/dim]")
         console.print("\n[dim]To reinstall, use: bazinga setup-dashboard --force[/dim]")
         return
 
@@ -1907,7 +2110,7 @@ def setup_dashboard(
         if choice not in ["y", "yes"]:
             console.print("\n[yellow]⏭️  Skipped dashboard dependency installation[/yellow]")
             console.print("\n[dim]You can install manually later:[/dim]")
-            console.print(f"[dim]  cd dashboard-v2 && npm install[/dim]")
+            console.print(f"[dim]  cd bazinga/dashboard-v2 && npm install[/dim]")
             return
 
     # Install dependencies
@@ -1926,7 +2129,7 @@ def setup_dashboard(
             console.print("[bold green]✓ Dashboard v2 dependencies installed successfully![/bold green]\n")
             console.print("[bold]Next steps:[/bold]")
             console.print("  1. Start the dashboard:")
-            console.print("     [cyan]cd dashboard-v2 && npm run dev[/cyan]")
+            console.print("     [cyan]cd bazinga/dashboard-v2 && npm run dev[/cyan]")
             console.print("  2. Open in browser:")
             console.print("     [cyan]http://localhost:3000[/cyan]")
             console.print("\n[dim]Or the dashboard will auto-start when you run orchestration:[/dim]")
@@ -1937,18 +2140,18 @@ def setup_dashboard(
                 console.print(f"\n[dim]Details:[/dim]")
                 console.print(f"[dim]{result.stderr[:500]}[/dim]")
             console.print("\n[yellow]Try starting the dashboard anyway:[/yellow]")
-            console.print("  [cyan]cd dashboard-v2 && npm run dev[/cyan]")
+            console.print("  [cyan]cd bazinga/dashboard-v2 && npm run dev[/cyan]")
 
     except subprocess.TimeoutExpired:
         console.print("[red]✗ npm install timed out[/red]")
         console.print("[yellow]Try installing manually:[/yellow]")
-        console.print(f"  [cyan]cd dashboard-v2 && npm install[/cyan]")
+        console.print(f"  [cyan]cd bazinga/dashboard-v2 && npm install[/cyan]")
         raise typer.Exit(1)
 
     except Exception as e:
         console.print(f"[red]✗ Installation failed: {e}[/red]")
         console.print("\n[yellow]Try installing manually:[/yellow]")
-        console.print(f"  [cyan]cd dashboard-v2 && npm install[/cyan]")
+        console.print(f"  [cyan]cd bazinga/dashboard-v2 && npm install[/cyan]")
         raise typer.Exit(1)
 
 

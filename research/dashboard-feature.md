@@ -242,7 +242,7 @@ cd /home/user/bazinga
 ```
 ✅ Dashboard server started (PID: 12345)
 🌐 Dashboard: http://localhost:8080
-📋 View logs: tail -f /tmp/bazinga-dashboard.log
+📋 View logs: tail -f bazinga/dashboard.log
 ```
 
 ### Manual Setup
@@ -300,10 +300,10 @@ Both commands use the same coordination folder, so the dashboard monitors them i
 
 ```bash
 # Find PID
-cat /tmp/bazinga-dashboard.pid
+cat bazinga/dashboard.pid
 
 # Kill process
-kill $(cat /tmp/bazinga-dashboard.pid)
+kill $(cat bazinga/dashboard.pid)
 
 # Or use pkill
 pkill -f "python3 server.py"
@@ -317,7 +317,7 @@ pkill -f "python3 server.py"
 lsof -i :8080
 
 # Check logs
-tail -f /tmp/bazinga-dashboard.log
+tail -f bazinga/dashboard.log
 
 # Restart server
 cd dashboard && python3 server.py
@@ -465,7 +465,7 @@ The dashboard is designed for local development and should NOT be exposed to the
 - Do not bind to 0.0.0.0 in production
 - Use firewall to block external access to port 8080
 - Keep API keys secure (never commit to git)
-- Clear `/tmp/bazinga-dashboard.log` periodically
+- Clear `bazinga/dashboard.log` periodically
 
 ## Future Enhancements
 
@@ -574,7 +574,7 @@ Initial release with:
 
 For issues, questions, or feature requests:
 
-1. Check logs: `tail -f /tmp/bazinga-dashboard.log`
+1. Check logs: `tail -f bazinga/dashboard.log`
 2. Review this documentation
 3. Test with minimal orchestration session
 4. Report issues with reproduction steps
@@ -630,12 +630,12 @@ cd dashboard
 
 Or manually:
 ```bash
-kill $(cat /tmp/bazinga-dashboard.pid)
+kill $(cat bazinga/dashboard.pid)
 ```
 
 ### Logs
 ```bash
-tail -f /tmp/bazinga-dashboard.log
+tail -f bazinga/dashboard.log
 ```
 
 ### Troubleshooting

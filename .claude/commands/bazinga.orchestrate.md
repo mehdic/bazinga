@@ -244,7 +244,23 @@ PM Response: BAZINGA → END
 
 ### Step 0: Initialize Session
 
-**Display start message (use enhanced format for complex tasks):**
+**FIRST: Start dashboard if not running (applies to ALL paths):**
+
+```bash
+# Check if dashboard is running
+if [ -f bazinga/dashboard.pid ] && kill -0 $(cat bazinga/dashboard.pid) 2>/dev/null; then
+    echo "Dashboard already running"
+else
+    # Start dashboard in background
+    bash bazinga/scripts/start-dashboard.sh &
+    sleep 1
+    echo "Dashboard started on http://localhost:3000"
+fi
+```
+
+**Note:** Process dashboard startup silently - no user output needed. Just ensure it's running before continuing.
+
+**THEN display start message (use enhanced format for complex tasks):**
 
 For simple requests:
 ```
@@ -630,27 +646,9 @@ Display:
    - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
    - (If successful or unknown: silent, no output)
 
-   **AFTER build baseline check: IMMEDIATELY continue to step 7 (Start dashboard). Do NOT stop.**
+   **AFTER build baseline check: IMMEDIATELY continue to step 7 (Load template guides). Do NOT stop.**
 
-7. **Start dashboard if not running:**
-
-   ```bash
-   # Check if dashboard is running
-   if [ -f /tmp/bazinga-dashboard.pid ] && kill -0 $(cat /tmp/bazinga-dashboard.pid) 2>/dev/null; then
-       echo "Dashboard already running"
-   else
-       # Start dashboard in background
-       bash scripts/start-dashboard.sh &
-       sleep 1
-       echo "Dashboard started"
-   fi
-   ```
-
-   **Note:** Process dashboard startup silently - dashboard is background infrastructure, no user output needed.
-
-   **AFTER dashboard check/start: IMMEDIATELY continue to step 8 (Load template guides). Do NOT stop.**
-
-8. **Load critical template guides:**
+7. **Load critical template guides:**
 
    **⚠️ MANDATORY: Read templates that contain runtime instructions**
 
