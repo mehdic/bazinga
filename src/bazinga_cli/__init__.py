@@ -1921,52 +1921,42 @@ def update(
     console.print("\n[bold cyan]5. Updating configuration[/bold cyan]")
     setup.setup_config(target_dir, is_update=True)
 
-    # Copy dashboard-v2 folder
-    console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
-    source_dashboard = setup.source_dir / "dashboard-v2"
-    target_dashboard = target_dir / "bazinga" / "dashboard-v2"
+    # Update dashboard from pre-built releases
+    console.print("\n[bold cyan]6. Updating dashboard v2[/bold cyan]")
+    bazinga_dir = target_dir / "bazinga"
+    bazinga_dir.mkdir(parents=True, exist_ok=True)
 
-    if source_dashboard.exists():
-        import shutil
-        try:
-            # Ensure bazinga directory exists
-            (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
-            # Patterns to ignore when copying
-            ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
-
-            if target_dashboard.exists():
-                # Update existing dashboard (preserve node_modules if exists)
-                for item in source_dashboard.iterdir():
-                    if item.name in ['node_modules', '.next']:
-                        continue  # Skip these directories
-                    if item.is_file():
-                        shutil.copy2(item, target_dashboard / item.name)
-                        console.print(f"  ✓ Updated {item.name}")
-                    elif item.is_dir():
-                        target_subdir = target_dashboard / item.name
-                        if target_subdir.exists():
-                            shutil.rmtree(target_subdir)
-                        shutil.copytree(item, target_subdir, ignore=ignore_patterns)
-                        console.print(f"  ✓ Updated {item.name}/")
-            else:
-                # Fresh copy of dashboard
-                shutil.copytree(source_dashboard, target_dashboard, ignore=ignore_patterns)
-                console.print("  ✓ Dashboard v2 installed (Next.js)")
-
-            # Copy research folder too (for documentation)
-            source_research = setup.source_dir / "research"
-            target_research = target_dir / "research"
-            if source_research.exists():
-                if not target_research.exists():
-                    target_research.mkdir(parents=True, exist_ok=True)
-                dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
-                if dashboard_doc.exists():
-                    shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
-                    console.print("  ✓ Updated dashboard documentation")
-        except Exception as e:
-            console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+    # Try to download pre-built dashboard from GitHub releases
+    if download_prebuilt_dashboard(bazinga_dir, force=True):
+        console.print("  [green]✓ Dashboard updated from release[/green]")
     else:
-        console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
+        # Fall back to copying source files if pre-built not available
+        console.print("  [dim]Pre-built not available, copying source files...[/dim]")
+        source_dashboard = setup.source_dir / "dashboard-v2"
+        target_dashboard = bazinga_dir / "dashboard-v2"
+
+        if source_dashboard.exists():
+            import shutil
+            try:
+                ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
+                if target_dashboard.exists():
+                    for item in source_dashboard.iterdir():
+                        if item.name in ['node_modules', '.next']:
+                            continue
+                        if item.is_file():
+                            shutil.copy2(item, target_dashboard / item.name)
+                        elif item.is_dir():
+                            target_subdir = target_dashboard / item.name
+                            if target_subdir.exists():
+                                shutil.rmtree(target_subdir)
+                            shutil.copytree(item, target_subdir, ignore=ignore_patterns)
+                else:
+                    shutil.copytree(source_dashboard, target_dashboard, ignore=ignore_patterns)
+                console.print("  [yellow]⚠️  Source files copied (run npm install && npm run build)[/yellow]")
+            except Exception as e:
+                console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+        else:
+            console.print("  [yellow]⚠️  Dashboard v2 not found[/yellow]")
 
     # Update templates
     console.print("\n[bold cyan]7. Updating templates[/bold cyan]")
