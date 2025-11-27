@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc/client";
-import { formatTokens } from "@/lib/utils";
+import { formatTokens, AGENT_COLORS_HEX } from "@/lib/utils";
 import {
   PieChart,
   Pie,
@@ -30,17 +30,6 @@ import {
   TestTube,
   GitPullRequest,
 } from "lucide-react";
-
-// Agent color palette
-const AGENT_COLORS: Record<string, string> = {
-  pm: "#8b5cf6",
-  developer: "#3b82f6",
-  qa_expert: "#22c55e",
-  tech_lead: "#f97316",
-  orchestrator: "#6b7280",
-  investigator: "#ec4899",
-  senior_engineer: "#14b8a6",
-};
 
 const AGENT_ICONS: Record<string, React.ElementType> = {
   pm: User,
@@ -183,7 +172,7 @@ export default function AnalyticsPage() {
                     {tokensByAgentData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={AGENT_COLORS[entry.name] || "#6b7280"}
+                        fill={AGENT_COLORS_HEX[entry.name] || "#6b7280"}
                       />
                     ))}
                   </Pie>
@@ -241,7 +230,7 @@ export default function AnalyticsPage() {
                     {tokensByAgentData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={AGENT_COLORS[entry.name] || "#6b7280"}
+                        fill={AGENT_COLORS_HEX[entry.name] || "#6b7280"}
                       />
                     ))}
                   </Bar>
@@ -276,11 +265,11 @@ export default function AnalyticsPage() {
                 >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-full"
-                    style={{ backgroundColor: `${AGENT_COLORS[agent.name]}20` }}
+                    style={{ backgroundColor: `${AGENT_COLORS_HEX[agent.name]}20` }}
                   >
                     <Icon
                       className="h-5 w-5"
-                      style={{ color: AGENT_COLORS[agent.name] }}
+                      style={{ color: AGENT_COLORS_HEX[agent.name] }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">

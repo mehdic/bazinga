@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { cn, AGENT_COLORS_TW } from "@/lib/utils";
 import {
   Play,
   Pause,
@@ -46,15 +46,6 @@ const AGENT_ICONS: Record<string, React.ElementType> = {
   tech_lead: GitPullRequest,
   orchestrator: Bot,
   investigator: Bot,
-};
-
-const AGENT_COLORS: Record<string, string> = {
-  pm: "bg-purple-500",
-  developer: "bg-blue-500",
-  qa_expert: "bg-green-500",
-  tech_lead: "bg-orange-500",
-  orchestrator: "bg-gray-500",
-  investigator: "bg-pink-500",
 };
 
 const PLAYBACK_SPEEDS = [0.5, 1, 2, 4];
@@ -220,7 +211,7 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
                 <div
                   className={cn(
                     "flex h-8 w-8 items-center justify-center rounded-full",
-                    AGENT_COLORS[currentLog.agentType] || "bg-gray-500"
+                    AGENT_COLORS_TW[currentLog.agentType] || "bg-gray-500"
                   )}
                 >
                   <CurrentIcon className="h-4 w-4 text-white" />
@@ -282,7 +273,7 @@ export function SessionReplay({ logs, sessionStatus }: SessionReplayProps) {
                     <div
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full",
-                        AGENT_COLORS[log.agentType] || "bg-gray-500"
+                        AGENT_COLORS_TW[log.agentType] || "bg-gray-500"
                       )}
                     >
                       <Icon className="h-3 w-3 text-white" />

@@ -5,6 +5,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Shared agent color palette - hex values for charts (Recharts)
+export const AGENT_COLORS_HEX: Record<string, string> = {
+  pm: "#8b5cf6",           // purple
+  developer: "#3b82f6",    // blue
+  qa_expert: "#22c55e",    // green
+  tech_lead: "#f97316",    // orange
+  orchestrator: "#6b7280", // gray
+  investigator: "#ec4899", // pink
+  senior_engineer: "#14b8a6", // teal
+};
+
+// Shared agent color palette - Tailwind classes for UI components
+export const AGENT_COLORS_TW: Record<string, string> = {
+  pm: "bg-purple-500",
+  developer: "bg-blue-500",
+  qa_expert: "bg-green-500",
+  tech_lead: "bg-orange-500",
+  orchestrator: "bg-gray-500",
+  investigator: "bg-pink-500",
+  senior_engineer: "bg-teal-500",
+};
+
 export function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);

@@ -16,18 +16,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatTokens } from "@/lib/utils";
-
-// Color palette for agents
-const AGENT_COLORS: Record<string, string> = {
-  pm: "#8b5cf6",           // purple
-  developer: "#3b82f6",    // blue
-  qa_expert: "#22c55e",    // green
-  tech_lead: "#f97316",    // orange
-  orchestrator: "#6b7280", // gray
-  investigator: "#ec4899", // pink
-  senior_engineer: "#14b8a6", // teal
-};
+import { formatTokens, AGENT_COLORS_HEX } from "@/lib/utils";
 
 const MODEL_COLORS: Record<string, string> = {
   opus: "#f97316",    // orange
@@ -90,7 +79,7 @@ export function TokenPieChart({ breakdown }: { breakdown: TokenBreakdownItem[] }
           {data.map((entry, index) => (
             <Cell
               key={`cell-${index}`}
-              fill={AGENT_COLORS[entry.name] || "#6b7280"}
+              fill={AGENT_COLORS_HEX[entry.name] || "#6b7280"}
             />
           ))}
         </Pie>
