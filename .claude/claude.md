@@ -477,6 +477,81 @@ Always create `research/prXXX-review-analysis.md` with full ultrathink analysis.
 
 ---
 
+## 🤖 GitHub PR Automation
+
+**When reviewing PRs and resolving comments, use the GitHub API directly.**
+
+### GitHub Token Setup
+
+**Token location:** `~/.bazinga-github-token` (not committed to repo)
+
+**Create the token file:**
+```bash
+echo "ghp_YOUR_CLASSIC_TOKEN" > ~/.bazinga-github-token
+chmod 600 ~/.bazinga-github-token
+```
+
+**Token requirements:**
+- Classic PAT with `repo` scope (required for GraphQL thread resolution)
+- Fine-grained PATs do NOT support `resolveReviewThread` mutation
+
+**Load token in scripts:**
+```bash
+GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
+```
+
+### Workflow: Responding to PR Review Comments
+
+**Step 1: Fetch review threads with resolution status (GraphQL)**
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
+```
+
+**Step 2: Reply to a comment (REST API)**
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/mehdic/bazinga/pulls/comments/{COMMENT_ID}/replies" \
+  -d '{"body": "Your response here"}'
+```
+
+**Step 3: Resolve the thread (GraphQL mutation)**
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
+```
+
+### Response Templates
+
+| Situation | Response Prefix |
+|-----------|-----------------|
+| Fixed in commit | `✅ **Fixed in commit {hash}**` |
+| Valid but deferred | `📝 **Valid observation - Deferred**` |
+| Not a bug / By design | `📝 **Intentional** / **Not a bug**` |
+| Acknowledged low priority | `📝 **Acknowledged - Low risk**` |
+
+### Process When User Shares PR Link
+
+1. **Fetch** all review threads via GraphQL (includes `isResolved` status)
+2. **Analyze** each unresolved comment (triage: critical vs deferred)
+3. **Fix** critical issues in code
+4. **Reply** to ALL unresolved comments via REST API
+5. **Resolve** each thread via GraphQL mutation
+6. **Commit & push** fixes
+7. **Report** summary to user
+
+**IMPORTANT:** Always reply to every comment AND resolve the thread. This marks the conversation as resolved in GitHub UI.
+
+---
+
 ✅ Project context loaded successfully!
 
 📚 Research documents available in 'research/' folder

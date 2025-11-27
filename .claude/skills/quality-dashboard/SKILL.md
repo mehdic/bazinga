@@ -36,11 +36,19 @@ When invoked:
 
 ## Step 1: Execute Quality Dashboard Script
 
-Use the **Bash** tool to run the pre-built dashboard script:
+Use the **Bash** tool to run the pre-built dashboard script.
 
+**On Unix/macOS:**
 ```bash
-bash .claude/skills/quality-dashboard/dashboard.sh
+bash .claude/skills/quality-dashboard/scripts/dashboard.sh
 ```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/quality-dashboard/scripts/dashboard.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
 - Read `bazinga/security_scan.json`

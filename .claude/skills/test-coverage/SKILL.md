@@ -37,11 +37,19 @@ When invoked:
 
 ## Step 1: Execute Coverage Script
 
-Use the **Bash** tool to run the pre-built coverage script:
+Use the **Bash** tool to run the pre-built coverage script.
 
+**On Unix/macOS:**
 ```bash
 bash .claude/skills/test-coverage/scripts/coverage.sh
 ```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/test-coverage/scripts/coverage.ps1
+```
+
+> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
 - Detect project language (Python, JavaScript, Go, Java)
