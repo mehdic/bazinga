@@ -49,7 +49,7 @@ cp bazinga/bazinga.db bazinga/bazinga.db.backup
 sqlite3 bazinga/bazinga.db <<EOF
 .headers on
 .mode csv
-.output /tmp/orchestration_logs_backup.csv
+.output bazinga/orchestration_logs_backup.csv
 SELECT * FROM orchestration_logs;
 .quit
 EOF
@@ -77,7 +77,7 @@ EOF
 # 4. Reimport data
 sqlite3 bazinga/bazinga.db <<EOF
 .mode csv
-.import /tmp/orchestration_logs_backup.csv orchestration_logs_temp
+.import bazinga/orchestration_logs_backup.csv orchestration_logs_temp
 
 -- Skip header row and reinsert
 INSERT INTO orchestration_logs (id, session_id, timestamp, iteration, agent_type, agent_id, content)
@@ -93,7 +93,7 @@ EOF
 sqlite3 bazinga/bazinga.db "SELECT COUNT(*) FROM orchestration_logs;"
 
 # 6. Clean up
-rm /tmp/orchestration_logs_backup.csv
+rm bazinga/orchestration_logs_backup.csv
 ```
 
 ### Option 3: No Action Required (For New Installations)
@@ -266,7 +266,7 @@ The system now supports all current and future agent types:
 
 **Data loss after migration:**
 - Check backup: `bazinga/bazinga.db.backup`
-- Verify export: `/tmp/orchestration_logs_backup.csv`
+- Verify export: `bazinga/orchestration_logs_backup.csv`
 - Restore: `cp bazinga/bazinga.db.backup bazinga/bazinga.db`
 
 ---
