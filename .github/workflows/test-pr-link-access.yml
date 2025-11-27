@@ -1,0 +1,35 @@
+# Test whether LLMs can access PR links directly
+# This workflow demonstrates that API-based LLMs cannot browse the web
+name: Test PR Link Access
+
+on:
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      pr_url:
+        description: 'PR URL to test (default: PR #129)'
+        required: false
+        default: 'https://github.com/mehdic/bazinga/pull/129'
+
+jobs:
+  test-openai:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run PR link access test
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python tests/test_pr_link_access.py
