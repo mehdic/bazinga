@@ -76,6 +76,25 @@ if pyproject_configs != allowed_configs:
     }
 }
 
+# Setup GitHub token for PR automation (if env var is set)
+$tokenFile = Join-Path $HOME ".bazinga-github-token"
+if (-not (Test-Path $tokenFile)) {
+    if ($env:BAZINGA_GITHUB_TOKEN) {
+        # Create token file from environment variable
+        $env:BAZINGA_GITHUB_TOKEN | Out-File -FilePath $tokenFile -Encoding ASCII -NoNewline
+        # Set permissions (Unix only)
+        if (Get-Command "chmod" -ErrorAction SilentlyContinue) {
+            & chmod 600 $tokenFile
+        }
+        Write-Host "🔑 GitHub token configured from environment variable"
+    }
+    else {
+        Write-Host ""
+        Write-Host "⚠️  GitHub PR automation not configured" -ForegroundColor Yellow
+        Write-Host "   Set BAZINGA_GITHUB_TOKEN env var or create ~/.bazinga-github-token"
+    }
+}
+
 # Remind about research folder
 if (Test-Path "research") {
     Write-Host ""
