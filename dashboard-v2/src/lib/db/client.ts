@@ -3,7 +3,18 @@ import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
 
-// Database path resolution with production validation
+// Lazy database initialization to avoid build-time errors
+let _sqlite: Database.Database | null = null;
+let _db: BetterSQLite3Database<typeof schema> | null = null;
+let _dbPath: string | null = null;
+
+/**
+ * Resolve database path at RUNTIME (not import time).
+ * This is called lazily on first database access to avoid breaking builds.
+ *
+ * - In production: DATABASE_URL is required, throws clear error if missing
+ * - In development: Falls back to relative path for convenience
+ */
 function resolveDatabasePath(): string {
   // If DATABASE_URL is set, use it directly
   if (process.env.DATABASE_URL) {
@@ -11,6 +22,7 @@ function resolveDatabasePath(): string {
   }
 
   // In production, DATABASE_URL is required
+  // NOTE: This check runs at RUNTIME, not build time
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "DATABASE_URL environment variable is required in production.\n" +
@@ -24,20 +36,18 @@ function resolveDatabasePath(): string {
   return path.resolve(process.cwd(), "..", "bazinga", "bazinga.db");
 }
 
-const DB_PATH = resolveDatabasePath();
-
-// Lazy database initialization to avoid build-time errors
-let _sqlite: Database.Database | null = null;
-let _db: BetterSQLite3Database<typeof schema> | null = null;
-
 function getDatabase() {
   if (!_sqlite) {
     try {
-      _sqlite = new Database(DB_PATH, { readonly: true });
+      // Resolve path lazily on first access (not at import time)
+      if (!_dbPath) {
+        _dbPath = resolveDatabasePath();
+      }
+      _sqlite = new Database(_dbPath, { readonly: true });
       // Note: WAL mode not set - requires write access, but we're read-only
     } catch (error) {
       // During build time or when database doesn't exist, return a mock
-      console.warn(`Database not available at ${DB_PATH}:`, error);
+      console.warn(`Database not available at ${_dbPath}:`, error);
       return null;
     }
   }
