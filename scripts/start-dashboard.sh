@@ -15,10 +15,20 @@ set -e
 
 # Derive paths from script location for robustness
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Detect if script is in bazinga/scripts/ (installed) or scripts/ (development)
+PARENT_DIR="$(basename "$(dirname "$SCRIPT_DIR")")"
+if [ "$PARENT_DIR" = "bazinga" ]; then
+    # Installed layout: PROJECT_ROOT/bazinga/scripts/start-dashboard.sh
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+else
+    # Development layout: PROJECT_ROOT/scripts/start-dashboard.sh
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+    BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+fi
 
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
-BAZINGA_DIR="$PROJECT_ROOT/bazinga"
 DASHBOARD_PID_FILE="$BAZINGA_DIR/dashboard.pid"
 DASHBOARD_LOG="$BAZINGA_DIR/dashboard.log"
 DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
