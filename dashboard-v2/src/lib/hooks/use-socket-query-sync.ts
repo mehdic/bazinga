@@ -70,7 +70,7 @@ export function useSocketQuerySync() {
   }, [utils]);
 
   // Schedule debounced flush
-  const scheduleFflush = useCallback(() => {
+  const scheduleFlush = useCallback(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -132,7 +132,7 @@ export function useSocketQuerySync() {
       }
 
       // Schedule debounced flush
-      scheduleFflush();
+      scheduleFlush();
     };
 
     // Register callback and get cleanup function
@@ -145,5 +145,5 @@ export function useSocketQuerySync() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [registerEventCallback, scheduleFflush]);
+  }, [registerEventCallback, scheduleFlush]);
 }

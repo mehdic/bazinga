@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-500">
-              {stats?.successRate.toFixed(1) || 0}%
+              {(stats?.successRate ?? 0).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">
               {stats?.completedSessions || 0} of {stats?.totalSessions || 0} sessions
@@ -203,9 +203,9 @@ export default function AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {tokensByAgentData.length > 0 ? (
+            {logsByAgentData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={tokensByAgentData} layout="vertical">
+                <BarChart data={logsByAgentData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     type="number"
@@ -226,8 +226,8 @@ export default function AnalyticsPage() {
                       borderRadius: "8px",
                     }}
                   />
-                  <Bar dataKey="invocations" name="Invocations">
-                    {tokensByAgentData.map((entry, index) => (
+                  <Bar dataKey="total" name="Log Count">
+                    {logsByAgentData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={AGENT_COLORS_HEX[entry.name] || "#6b7280"}
@@ -274,7 +274,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium capitalize">{agent.name.replace("_", " ")}</span>
+                      <span className="font-medium capitalize">{agent.name.replaceAll("_", " ")}</span>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{agent.total} logs</Badge>
                         <Badge variant="secondary">

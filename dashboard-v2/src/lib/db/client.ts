@@ -46,9 +46,22 @@ function getDatabase() {
       _sqlite = new Database(_dbPath, { readonly: true });
       // Note: WAL mode not set - requires write access, but we're read-only
     } catch (error) {
-      // During build time or when database doesn't exist, return a mock
-      console.warn(`Database not available at ${_dbPath}:`, error);
-      return null;
+      // During BUILD: return null (mock is ok for SSG)
+      // Check Next.js build phase or general build indicators
+      const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build' ||
+                           process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL;
+
+      if (isBuildPhase) {
+        console.warn(`Database not available during build at ${_dbPath}:`, error);
+        return null;
+      }
+
+      // During RUNTIME: throw clear error (fail fast)
+      throw new Error(
+        `Database connection failed: ${error}\n` +
+        `Path: ${_dbPath}\n` +
+        `Ensure DATABASE_URL is set or the database file exists.`
+      );
     }
   }
   return _sqlite;

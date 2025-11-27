@@ -24,12 +24,8 @@ export function ActiveSession() {
   // Smart refetch: no polling when socket connected, 3s fallback when disconnected
   const refetchInterval = useRefetchInterval(3000);
 
-  const { isLoading } = trpc.sessions.getById.useQuery(
-    { sessionId: "" },
-    { enabled: false }
-  );
-
-  const { data: activeSession } = trpc.sessions.getActive.useQuery(undefined, {
+  // Use getActive query for loading state (not a disabled query)
+  const { data: activeSession, isLoading: isActiveLoading } = trpc.sessions.getActive.useQuery(undefined, {
     refetchInterval,
   });
 
@@ -51,7 +47,7 @@ export function ActiveSession() {
     return () => clearInterval(interval);
   }, [activeSession]);
 
-  if (isLoading) {
+  if (isActiveLoading) {
     return (
       <Card>
         <CardHeader>
@@ -83,8 +79,16 @@ export function ActiveSession() {
   }
 
   const taskGroups = fullSession?.taskGroups || [];
+  const totalGroups = taskGroups.length;
+  // Weight progress: completed=100%, in_progress/running=50%, pending=0%
+  const progressValue = totalGroups > 0
+    ? taskGroups.reduce((acc, g) => {
+        if (g.status === "completed") return acc + 100;
+        if (g.status === "in_progress" || g.status === "running") return acc + 50;
+        return acc;
+      }, 0) / totalGroups
+    : 0;
   const completedGroups = taskGroups.filter((g) => g.status === "completed").length;
-  const progress = taskGroups.length > 0 ? (completedGroups / taskGroups.length) * 100 : 0;
 
   return (
     <Card className="border-primary/50">
@@ -128,7 +132,7 @@ export function ActiveSession() {
               {completedGroups}/{taskGroups.length} completed
             </span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progressValue} className="h-2" />
         </div>
 
         {/* Task Group List */}

@@ -69,12 +69,13 @@ export const sessionsRouter = router({
       }
 
       // Fetch related data (no successCriteria table in actual DB)
+      // Note: logs ordered ASC for chronological timeline display
       const [logs, groups, tokens, snapshots] = await Promise.all([
         db
           .select()
           .from(orchestrationLogs)
           .where(eq(orchestrationLogs.sessionId, input.sessionId))
-          .orderBy(desc(orchestrationLogs.timestamp))
+          .orderBy(orchestrationLogs.timestamp)
           .limit(200),
         db
           .select()
@@ -157,11 +158,12 @@ export const sessionsRouter = router({
         conditions.push(eq(orchestrationLogs.agentType, input.agentType));
       }
 
+      // Order ASC for chronological display, then reverse client-side if needed
       const logs = await db
         .select()
         .from(orchestrationLogs)
         .where(and(...conditions))
-        .orderBy(desc(orchestrationLogs.timestamp))
+        .orderBy(orchestrationLogs.timestamp)
         .limit(input.limit)
         .offset(input.offset);
 
@@ -252,24 +254,30 @@ export const sessionsRouter = router({
     }),
 
   // Get decisions for a session
+  // Note: decisions table may not exist in all environments - returns empty array if query fails
   getDecisions: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ input }) => {
-      const result = await db
-        .select()
-        .from(decisions)
-        .where(eq(decisions.sessionId, input.sessionId))
-        .orderBy(desc(decisions.timestamp));
+      try {
+        const result = await db
+          .select()
+          .from(decisions)
+          .where(eq(decisions.sessionId, input.sessionId))
+          .orderBy(desc(decisions.timestamp));
 
-      return result.map((decision) => ({
-        ...decision,
-        decisionData: (() => {
-          try {
-            return JSON.parse(decision.decisionData);
-          } catch {
-            return decision.decisionData;
-          }
-        })(),
-      }));
+        return result.map((decision) => ({
+          ...decision,
+          decisionData: (() => {
+            try {
+              return JSON.parse(decision.decisionData);
+            } catch {
+              return decision.decisionData;
+            }
+          })(),
+        }));
+      } catch {
+        // Table may not exist in some environments
+        return [];
+      }
     }),
 });

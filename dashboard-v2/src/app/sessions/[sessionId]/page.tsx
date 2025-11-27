@@ -44,7 +44,7 @@ export default function SessionDetailPage() {
 
   const { data: session, isLoading } = trpc.sessions.getById.useQuery(
     { sessionId },
-    { refetchInterval }
+    { enabled: !!sessionId, refetchInterval }
   );
 
   const { data: tokenData } = trpc.sessions.getTokenBreakdown.useQuery(
@@ -338,6 +338,9 @@ export default function SessionDetailPage() {
                   <div className="text-sm text-muted-foreground">Estimated Cost</div>
                   <div className="text-2xl font-bold">
                     ${((totalTokens / 1000000) * 3).toFixed(4)}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Est. at $3/1M tokens
                   </div>
                 </CardContent>
               </Card>

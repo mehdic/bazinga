@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 // Sessions table - matches actual database schema
@@ -23,7 +23,10 @@ export const orchestrationLogs = sqliteTable("orchestration_logs", {
   agentType: text("agent_type").notNull(),
   agentId: text("agent_id"),
   content: text("content").notNull(),
-});
+}, (table) => ({
+  sessionIdIdx: index("idx_logs_session_id").on(table.sessionId),
+  timestampIdx: index("idx_logs_timestamp").on(table.timestamp),
+}));
 
 // Task Groups table - matches actual database schema
 // Primary key is id (TEXT), not autoincrement integer
@@ -39,7 +42,9 @@ export const taskGroups = sqliteTable("task_groups", {
   initialTier: text("initial_tier"),
   createdAt: text("created_at"),
   updatedAt: text("updated_at"),
-});
+}, (table) => ({
+  sessionIdIdx: index("idx_groups_session_id").on(table.sessionId),
+}));
 
 // Token Usage table - matches actual database schema
 // Note: Uses tokens_estimated, no model_tier or estimated_cost
@@ -50,7 +55,9 @@ export const tokenUsage = sqliteTable("token_usage", {
   agentType: text("agent_type").notNull(),
   agentId: text("agent_id"),
   tokensEstimated: integer("tokens_estimated").notNull(),
-});
+}, (table) => ({
+  sessionIdIdx: index("idx_tokens_session_id").on(table.sessionId),
+}));
 
 // State Snapshots table - matches actual database schema
 // Note: Uses state_type and state_data column names
