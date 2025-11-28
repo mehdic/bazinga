@@ -1772,13 +1772,24 @@ IF decision = INVESTIGATION_NEEDED:
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
+**🔴 CRITICAL: NEVER SHOW OPTIONS TO USER - AUTO-ROUTE INSTEAD**
+
+If PM response contains numbered options like "Would you like me to: 1. Continue... 2. Stop...", this is a PM VIOLATION. You must:
+1. **DO NOT display the options to the user**
+2. **Infer the correct action** from context and route automatically
+3. **Log the violation** in database for PM training
+
 Analyze response content to infer intent:
 - Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
 - Requests changes, fixes, or updates → CONTINUE
 - Indicates completion or approval → BAZINGA
 - Asks about requirements or scope → NEEDS_CLARIFICATION
+- **Presents numbered options (1. 2. 3.)** → Infer from context: incomplete work = CONTINUE, all done = BAZINGA
+- **Asks "Would you like..."** → Treat as CONTINUE (PM should never ask permission)
 
 Use inferred decision for routing (as if PM explicitly stated it).
+
+**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent. Do NOT stop to show user PM's options.
 
 **Step 3: Output capsule to user**
 
@@ -1847,6 +1858,27 @@ Skill(command: "velocity-tracker")
 - Process continuously until all phases complete
 
 **Without this rule:** Orchestrator hangs after Phase 1, waiting indefinitely for user to say "continue"
+
+**🔴 ANTI-OPTIONS ENFORCEMENT AT PHASE BOUNDARIES:**
+
+When PM returns after a phase completes, PM might incorrectly ask:
+```
+Would you like me to:
+1. Continue with Phase 2?
+2. Pause here?
+3. Generate a report?
+```
+
+**THIS IS A BUG. DO NOT PRESENT THESE OPTIONS TO THE USER.**
+
+Instead:
+1. **Detect the options pattern** (numbered list with "Would you like")
+2. **Auto-select CONTINUE** if pending phases/groups exist
+3. **Auto-select BAZINGA path** if all work is complete
+4. **Immediately spawn agents** based on your inference
+5. **Output to user:** `🔄 Auto-continuing | Phase {N} complete | Starting Phase {N+1}` (NOT the options)
+
+**The user should NEVER see PM's numbered options. You always auto-route.**
 
 **REAL-WORLD BUG EXAMPLE (THE BUG WE'RE FIXING):**
 
@@ -2163,13 +2195,24 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
+**🔴 CRITICAL: NEVER SHOW OPTIONS TO USER - AUTO-ROUTE INSTEAD**
+
+If PM response contains numbered options like "Would you like me to: 1. Continue... 2. Stop...", this is a PM VIOLATION. You must:
+1. **DO NOT display the options to the user**
+2. **Infer the correct action** from context and route automatically
+3. **Log the violation** in database for PM training
+
 Analyze response content to infer intent:
 - Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
 - Requests changes, fixes, or updates → CONTINUE
 - Indicates completion or approval → BAZINGA
 - Asks about requirements or scope → NEEDS_CLARIFICATION
+- **Presents numbered options (1. 2. 3.)** → Infer from context: incomplete work = CONTINUE, all done = BAZINGA
+- **Asks "Would you like..."** → Treat as CONTINUE (PM should never ask permission)
 
 Use inferred decision for routing (as if PM explicitly stated it).
+
+**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent. Do NOT stop to show user PM's options.
 
 **Step 2: Log PM response** — Use §Logging Reference pattern. Agent ID: `pm_parallel_final`.
 
