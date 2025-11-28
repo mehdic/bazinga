@@ -63,9 +63,9 @@ fi
 # Check if port is in use (try lsof, then ss, then netstat)
 PORT_IN_USE=0
 if command -v lsof >/dev/null 2>&1; then
-    lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1 && PORT_IN_USE=1
+    lsof -Pi :"$DASHBOARD_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 && PORT_IN_USE=1
 elif command -v ss >/dev/null 2>&1; then
-    ss -lnt "sport = :$DASHBOARD_PORT" | grep -q LISTEN && PORT_IN_USE=1
+    ss -lnt "sport == :$DASHBOARD_PORT" | grep -q LISTEN && PORT_IN_USE=1
 elif command -v netstat >/dev/null 2>&1; then
     netstat -ln | grep -q ":$DASHBOARD_PORT " && PORT_IN_USE=1
 fi
@@ -117,7 +117,9 @@ if [ -f "$STANDALONE_SERVER" ]; then
 
         # Copy BUILD_ID and all manifest files
         cp "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/"
-        cp "$SOURCE_NEXT/"*.json "$STANDALONE_NEXT/" 2>/dev/null || true
+        for file in "$SOURCE_NEXT"/*.json; do
+            [ -f "$file" ] && cp "$file" "$STANDALONE_NEXT/"
+        done
         [ -f "$SOURCE_NEXT/prerender-manifest.js" ] && cp "$SOURCE_NEXT/prerender-manifest.js" "$STANDALONE_NEXT/"
 
         # Copy directories
@@ -170,15 +172,24 @@ if [ -z "$DATABASE_URL" ]; then
     DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
     if [ -f "$DB_PATH" ]; then
         export DATABASE_URL="$DB_PATH"
-        # Redact credentials if present in DATABASE_URL before logging
-        redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
+        # Redact credentials only if DATABASE_URL is a connection string (not a file path)
+        if [[ "$DATABASE_URL" =~ :// ]]; then
+            redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
+        else
+            redacted="$DATABASE_URL"
+        fi
         log "Auto-detected DATABASE_URL=$redacted"
     else
         msg "⚠️  WARNING: No database found at $DB_PATH"
         msg "   Dashboard will start but won't show data until orchestration runs"
     fi
 else
-    redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
+    # Redact credentials only if DATABASE_URL is a connection string (not a file path)
+    if [[ "$DATABASE_URL" =~ :// ]]; then
+        redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
+    else
+        redacted="$DATABASE_URL"
+    fi
     log "Using provided DATABASE_URL=$redacted"
 fi
 
