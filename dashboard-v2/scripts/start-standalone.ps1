@@ -45,8 +45,12 @@ if ((Test-Path $PUBLIC_SRC) -and (-not (Test-Path $PUBLIC_DEST))) {
 }
 
 # Set default port (DASHBOARD_PORT takes precedence over PORT for consistency)
-$PORT = if ($env:DASHBOARD_PORT) { $env:DASHBOARD_PORT } elseif ($env:PORT) { $env:PORT } else { "3000" }
-$HOSTNAME = if ($env:HOSTNAME) { $env:HOSTNAME } else { "localhost" }
+# PS 5.1 compatible syntax (ternary-style requires PS 7+)
+if ($env:DASHBOARD_PORT) { $PORT = $env:DASHBOARD_PORT }
+elseif ($env:PORT) { $PORT = $env:PORT }
+else { $PORT = "3000" }
+
+if ($env:HOSTNAME) { $HOSTNAME = $env:HOSTNAME } else { $HOSTNAME = "localhost" }
 
 # Pass through DATABASE_URL if set (mask path in logs for security)
 if ($env:DATABASE_URL) {
@@ -57,7 +61,7 @@ if ($env:DATABASE_URL) {
 $SOCKET_SERVER = Join-Path $DASHBOARD_DIR "socket-server.js"
 if (Test-Path $SOCKET_SERVER) {
     Write-Host "Starting Socket.io server for real-time updates..."
-    $SOCKET_PORT = if ($env:SOCKET_PORT) { $env:SOCKET_PORT } else { "3001" }
+    if ($env:SOCKET_PORT) { $SOCKET_PORT = $env:SOCKET_PORT } else { $SOCKET_PORT = "3001" }
     $env:SOCKET_PORT = $SOCKET_PORT
 
     # Start as a hidden background process so it doesn't block the main server

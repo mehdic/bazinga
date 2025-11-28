@@ -28,7 +28,8 @@ if ($PARENT_DIR -eq "bazinga") {
     $DASHBOARD_DIR = Join-Path $PROJECT_ROOT "dashboard-v2"
 }
 
-$DASHBOARD_PORT = if ($env:DASHBOARD_PORT) { $env:DASHBOARD_PORT } else { "3000" }
+# PS 5.1 compatible syntax (ternary-style requires PS 7+)
+if ($env:DASHBOARD_PORT) { $DASHBOARD_PORT = $env:DASHBOARD_PORT } else { $DASHBOARD_PORT = "3000" }
 $USE_STANDALONE = $false
 
 # Determine log/pid file location - use BAZINGA_DIR if writable, else TEMP
@@ -224,7 +225,7 @@ if ($USE_STANDALONE) {
     $SOCKET_SERVER = Join-Path $DASHBOARD_DIR "socket-server.js"
     if (Test-Path $SOCKET_SERVER) {
         Write-Log "Starting Socket.io server for real-time updates..."
-        $SOCKET_PORT = if ($env:SOCKET_PORT) { $env:SOCKET_PORT } else { "3001" }
+        if ($env:SOCKET_PORT) { $SOCKET_PORT = $env:SOCKET_PORT } else { $SOCKET_PORT = "3001" }
         $env:SOCKET_PORT = $SOCKET_PORT
 
         $socketProcess = Start-Process -FilePath "node" -ArgumentList $SOCKET_SERVER `
@@ -290,7 +291,7 @@ if ($serverProcess) {
         Write-Log "Dashboard server started successfully in DEV mode (PID: $($process.Id))"
         Write-Host "Dashboard server started successfully in DEV mode (PID: $($process.Id))" -ForegroundColor Green
         if ($script:DEV_ALL_STARTED) {
-            $SOCKET_PORT = if ($env:SOCKET_PORT) { $env:SOCKET_PORT } else { "3001" }
+            if ($env:SOCKET_PORT) { $SOCKET_PORT = $env:SOCKET_PORT } else { $SOCKET_PORT = "3001" }
             Write-Log "Socket.io server on port $SOCKET_PORT (real-time updates)"
             Write-Host "Socket.io server on port $SOCKET_PORT (real-time updates)" -ForegroundColor Cyan
         }
