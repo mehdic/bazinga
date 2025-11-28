@@ -186,7 +186,7 @@ After deeper analysis, the perceived blockers were not actual blockers:
 - Standalone build detection
 - Static file copying (Copy-Item instead of cp -r)
 - Environment variable handling
-- Node.js server startup with exec-equivalent
+- Node.js server startup using PowerShell call operator (`& node server.js`)
 ```
 
 ### 3. `src/bazinga_cli/__init__.py` (Lines 849-852)
@@ -279,7 +279,7 @@ Windows may have services on port 3000 (common dev port).
 | better-sqlite3 build fails | Medium | High | Document prerequisites, offer sql.js fallback |
 | Users don't have Node.js | Low | Medium | Clear docs, Docker alternative |
 | PowerShell version issues | Low | Low | Use PS 5.1+ compatible syntax |
-| Path separator issues | Low | Medium | Use Path.join, os.path throughout |
+| Path separator issues | Low | Medium | Use os.path.join (Python) / Join-Path (PowerShell) throughout |
 
 ---
 
