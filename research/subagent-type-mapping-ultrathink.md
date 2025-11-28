@@ -15,6 +15,8 @@ Currently, BAZINGA uses `subagent_type="general-purpose"` for ALL agents. Should
 
 ## Available subagent_types (from Claude Code)
 
+**Source:** Claude Code system prompt (Task tool definition). These values may change as Claude Code evolves.
+
 | subagent_type | Tools | Description | Key Characteristic |
 |---------------|-------|-------------|-------------------|
 | `general-purpose` | `*` (all) | "General-purpose agent for researching complex questions, searching for code, and **executing multi-step tasks**" | **Multi-step execution** |
@@ -23,26 +25,32 @@ Currently, BAZINGA uses `subagent_type="general-purpose"` for ALL agents. Should
 | `statusline-setup` | Read, Edit only | "Configure user's Claude Code status line setting" | **Very limited, specialized** |
 | `claude-code-guide` | Glob, Grep, Read, WebFetch, WebSearch | "Questions about Claude Code or Claude Agent SDK" | **Read-only, documentation** |
 
+**⚠️ Note:** This table was extracted from the Claude Code system prompt as of 2025-11-28. If Claude Code updates its agent types, this document should be reviewed.
+
 ### Key Observations
 
 1. **`general-purpose` = execution-focused** ("executing multi-step tasks")
 2. **`Explore`/`Plan` = exploration-focused** ("Fast agent", "finding files", "answering questions")
-3. **Both have "All tools"** - so tool access is NOT the differentiator
-4. **"Fast" suggests optimization** - possibly lighter processing, breadth over depth
-5. **`Plan` and `Explore` have identical descriptions** - unclear distinction
+3. **Both have "All tools"** - tool access is NOT the differentiator
+4. **Behavioral optimization IS the differentiator** - "Fast" suggests breadth over depth
+5. **`Plan` and `Explore` have identical descriptions** - unclear if there's any real distinction
+
+**Critical insight:** The choice between subagent_types is about **behavioral optimization** (execution vs exploration, depth vs speed), NOT about which tools are available.
 
 ---
 
 ## BAZINGA Agent Analysis
 
-### Agents That WRITE Code (Must Use general-purpose)
+### Agents That EXECUTE Multi-Step Tasks (Must Use general-purpose)
 
 | Agent | Primary Actions | Why general-purpose |
 |-------|----------------|---------------------|
-| **Developer** | Write code, create files, run tests, fix bugs | Must use Write, Edit, Bash for implementation |
-| **Senior Software Engineer** | Complex code, security-sensitive, architectural | Same as Developer but more complex |
-| **QA Expert** | Run test suites, validate behavior | Must use Bash to execute tests |
-| **Validator** | Run verification tests, check evidence | Must use Bash to execute tests |
+| **Developer** | Write code, create files, run tests, fix bugs | Needs **execution-focused** behavior for multi-step implementation |
+| **Senior Software Engineer** | Complex code, security-sensitive, architectural | Needs **depth** for complex multi-step tasks |
+| **QA Expert** | Run test suites, validate behavior | Needs **execution-focused** behavior to run test commands |
+| **Validator** | Run verification tests, check evidence | Needs **execution-focused** behavior for verification |
+
+**Note:** While `Explore` also has "All tools", its **behavioral optimization** is for fast exploration, not multi-step execution. The distinction is about how the agent approaches tasks, not tool availability.
 
 **Verdict:** ✅ These MUST remain `general-purpose`
 
@@ -186,11 +194,11 @@ This suggests these agents are optimized for:
 
 ### Why Not Differentiate?
 
-1. **Tool access is the same** - Explore/Plan have "All tools", so no restriction benefit
-2. **"Fast" trades depth for speed** - Wrong trade-off for strategic roles
-3. **Risk vs reward is unfavorable** - Small gains, significant risks
-4. **Behavioral optimization is unclear** - We don't know exactly what "fast" means internally
-5. **Consistency is valuable** - Single subagent_type reduces cognitive load
+1. **"Fast" trades depth for speed** - Wrong trade-off for strategic roles that need thoroughness
+2. **Risk vs reward is unfavorable** - Small speed gains, significant quality risks
+3. **Tool access is identical** - Explore/Plan have "All tools", so no capability restriction benefit
+4. **Behavioral optimization details are opaque** - We don't know exactly what "fast" sacrifices internally
+5. **Consistency is valuable** - Single subagent_type reduces cognitive load and debugging complexity
 
 ---
 

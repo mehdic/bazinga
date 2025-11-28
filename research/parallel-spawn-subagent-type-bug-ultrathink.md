@@ -55,17 +55,17 @@ The Task tool ONLY accepts these `subagent_type` values:
 
 ### Finding 2: Inconsistent Documentation
 
-**Simple Mode (Line 1197) - CORRECT:**
-```markdown
-**Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
-```
+**Simple Mode (Section: "Step 2A.1: Spawn Developer") - CORRECT:**
+
+    **Spawn:** Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])
+
 ✅ Explicitly includes `subagent_type="general-purpose"`
 
-**Parallel Mode (Lines 1965-1967) - MISSING subagent_type:**
-```markdown
-Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
-Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
-```
+**Parallel Mode (Section: "Step 2B.1: Spawn Multiple Developers") - MISSING subagent_type:**
+
+    Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
+    Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
+
 ❌ **Missing `subagent_type` parameter entirely!**
 
 ### Finding 3: What Happened at Runtime
@@ -94,18 +94,18 @@ This fallback is a **symptom**, not the fix. The bug is that the orchestrator tr
 
 ### Correct Patterns (with subagent_type):
 
-| Location | Pattern | Status |
-|----------|---------|--------|
-| Line 1197 (Simple Mode) | `Task(subagent_type="general-purpose", model=...)` | ✅ Correct |
-| Line 1267 (Escalation) | `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], ...)` | ✅ Correct |
-| Line 1301 (INCOMPLETE) | `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], ...)` | ✅ Correct |
-| Line 1307 (Senior Escalation) | `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], ...)` | ✅ Correct |
+| Section | Pattern | Status |
+|---------|---------|--------|
+| Step 2A.1 (Simple Mode Spawn) | `Task(subagent_type="general-purpose", model=...)` | ✅ Correct |
+| Step 2A.3 (ESCALATE_SENIOR routing) | `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], ...)` | ✅ Correct |
+| Step 2A.3 (INCOMPLETE routing) | `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], ...)` | ✅ Correct |
+| Step 2A.3 (revision escalation) | `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], ...)` | ✅ Correct |
 
 ### Incorrect Patterns (missing subagent_type):
 
-| Location | Pattern | Status |
-|----------|---------|--------|
-| Lines 1965-1967 (Parallel Spawn) | `Task(model: ..., description: ..., prompt: ...)` | ❌ **BUG** |
+| Section | Pattern | Status |
+|---------|---------|--------|
+| Step 2B.1 (Parallel Mode Spawn) | `Task(model: ..., description: ..., prompt: ...)` | ❌ **BUG** |
 
 ---
 
@@ -121,7 +121,7 @@ This fallback is a **symptom**, not the fix. The bug is that the orchestrator tr
 - Causes delay (fallback mechanism adds latency)
 - But: fallback eventually works, so not a blocker
 
-**Root Cause:** The parallel mode spawn instructions (Step 2B.1, lines 1963-1968) are missing the required `subagent_type="general-purpose"` parameter.
+**Root Cause:** The parallel mode spawn instructions (Section: "Step 2B.1: Spawn Multiple Developers in Parallel") are missing the required `subagent_type="general-purpose"` parameter.
 
 ### Why Simple Mode Works but Parallel Mode Fails
 
@@ -136,25 +136,19 @@ The orchestrator faithfully follows the instructions it's given. When instructio
 
 ### Change Required in `agents/orchestrator.md`
 
-**Current (Lines 1963-1968):**
-```markdown
-**Spawn ALL in ONE message (MAX 4 groups):**
-```
-Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
-Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
-... # MAX 4 Task() calls
-```
-```
+**Current (Section: "Step 2B.1: Spawn Multiple Developers in Parallel"):**
 
-**Fixed:**
-```markdown
-**Spawn ALL in ONE message (MAX 4 groups):**
-```
-Task(subagent_type="general-purpose", model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
-Task(subagent_type="general-purpose", model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
-... # MAX 4 Task() calls
-```
-```
+    **Spawn ALL in ONE message (MAX 4 groups):**
+    Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
+    Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
+    ... # MAX 4 Task() calls
+
+**Fixed (consistent `=` syntax for all parameters):**
+
+    **Spawn ALL in ONE message (MAX 4 groups):**
+    Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task}", prompt=[Group A prompt])
+    Task(subagent_type="general-purpose", model=models["B"], description="SSE B: {task}", prompt=[Group B prompt])
+    ... # MAX 4 Task() calls
 
 ### Additional Consistency Check
 
@@ -205,7 +199,7 @@ No "0 tool uses", no "Agent type correction" fallback, no wasted spawns.
 
 ## References
 
-- `agents/orchestrator.md` - Lines 1963-1968 (bug location)
-- `agents/orchestrator.md` - Line 1197 (correct pattern)
-- Task tool documentation in system prompt
-- User's bug report showing the symptom
+- `agents/orchestrator.md` - Section "Step 2B.1: Spawn Multiple Developers in Parallel" (bug location)
+- `agents/orchestrator.md` - Section "Step 2A.1: Spawn Developer" (correct pattern)
+- Task tool documentation in Claude Code system prompt (defines valid subagent_type values)
+- User's bug report showing the symptom (0 tool uses, fallback message)
