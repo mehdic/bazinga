@@ -34,79 +34,91 @@ DASHBOARD_LOG="$BAZINGA_DIR/dashboard.log"
 DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
 USE_STANDALONE="false"
 
-echo "🖥️  BAZINGA Dashboard v2 Startup" >> "$DASHBOARD_LOG"
-echo "$(date): Starting dashboard startup process..." >> "$DASHBOARD_LOG"
-echo "$(date): Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT" >> "$DASHBOARD_LOG"
+# Helper function: log to file AND print to stdout
+log() {
+    echo "$(date): $1" >> "$DASHBOARD_LOG"
+}
+msg() {
+    echo "$1"
+    echo "$(date): $1" >> "$DASHBOARD_LOG"
+}
+
+msg "🖥️  BAZINGA Dashboard v2 Startup"
+log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
 # Check if Node.js is available (required for standalone mode)
 if ! command -v node >/dev/null 2>&1; then
-    echo "$(date): ERROR - node not found, cannot start dashboard" >> "$DASHBOARD_LOG"
-    echo "$(date): Please install Node.js and ensure it is in your PATH" >> "$DASHBOARD_LOG"
+    msg "❌ ERROR: node not found, cannot start dashboard"
+    msg "   Please install Node.js and ensure it is in your PATH"
     exit 1
 fi
 
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
-    echo "$(date): Dashboard server already running (PID: $(cat $DASHBOARD_PID_FILE))" >> "$DASHBOARD_LOG"
+    msg "✅ Dashboard already running (PID: $(cat $DASHBOARD_PID_FILE))"
+    msg "   URL: http://localhost:$DASHBOARD_PORT"
     exit 0
 fi
 
 # Check if port is in use by another process
 if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "$(date): Port $DASHBOARD_PORT already in use by another process" >> "$DASHBOARD_LOG"
+    msg "❌ ERROR: Port $DASHBOARD_PORT already in use by another process"
+    msg "   Run: lsof -i :$DASHBOARD_PORT to see what's using it"
     exit 1
 fi
 
 # Check if dashboard folder exists
 if [ ! -d "$DASHBOARD_DIR" ]; then
-    echo "$(date): Dashboard v2 folder not found" >> "$DASHBOARD_LOG"
+    msg "❌ ERROR: Dashboard v2 folder not found at $DASHBOARD_DIR"
+    msg "   Run 'bazinga install' in your project root first"
     exit 1
 fi
 
 # Check for pre-built standalone server (preferred mode)
 STANDALONE_SERVER="$DASHBOARD_DIR/.next/standalone/server.js"
 if [ -f "$STANDALONE_SERVER" ]; then
-    echo "$(date): Found pre-built standalone server" >> "$DASHBOARD_LOG"
+    msg "📦 Found pre-built standalone server"
     USE_STANDALONE="true"
 
     # Ensure static files are copied to standalone
     if [ -d "$DASHBOARD_DIR/.next/static" ] && [ ! -d "$DASHBOARD_DIR/.next/standalone/.next/static" ]; then
-        echo "$(date): Copying static files to standalone..." >> "$DASHBOARD_LOG"
+        log "Copying static files to standalone..."
         mkdir -p "$DASHBOARD_DIR/.next/standalone/.next"
         cp -r "$DASHBOARD_DIR/.next/static" "$DASHBOARD_DIR/.next/standalone/.next/"
     fi
 
     # Copy public folder if exists
     if [ -d "$DASHBOARD_DIR/public" ] && [ ! -d "$DASHBOARD_DIR/.next/standalone/public" ]; then
-        echo "$(date): Copying public folder to standalone..." >> "$DASHBOARD_LOG"
+        log "Copying public folder to standalone..."
         cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
     fi
 else
-    echo "$(date): No standalone build found, using development mode" >> "$DASHBOARD_LOG"
+    msg "🔧 No standalone build found, using development mode"
 
     # Check if npm is available (only needed for dev mode)
     if ! command -v npm >/dev/null 2>&1; then
-        echo "$(date): ERROR - npm not found, cannot start dashboard in dev mode" >> "$DASHBOARD_LOG"
-        echo "$(date): Consider using a pre-built standalone dashboard package" >> "$DASHBOARD_LOG"
+        msg "❌ ERROR: npm not found, cannot start dashboard in dev mode"
+        msg "   Consider using a pre-built standalone dashboard package"
         exit 1
     fi
 
     # Check and install dependencies if needed (only for dev mode)
     if [ ! -d "$DASHBOARD_DIR/node_modules" ]; then
-        echo "$(date): Installing dashboard dependencies (npm install)..." >> "$DASHBOARD_LOG"
+        msg "📥 Installing dashboard dependencies (npm install)..."
 
         cd "$DASHBOARD_DIR"
         npm install >> "$DASHBOARD_LOG" 2>&1
 
         if [ $? -eq 0 ]; then
-            echo "$(date): Dependencies installed successfully" >> "$DASHBOARD_LOG"
+            msg "   ✅ Dependencies installed successfully"
         else
-            echo "$(date): ERROR - npm install failed" >> "$DASHBOARD_LOG"
+            msg "❌ ERROR: npm install failed"
+            msg "   Check $DASHBOARD_LOG for details"
             exit 1
         fi
         cd - > /dev/null
     else
-        echo "$(date): Dependencies already installed (node_modules exists)" >> "$DASHBOARD_LOG"
+        log "Dependencies already installed (node_modules exists)"
     fi
 fi
 
@@ -116,18 +128,20 @@ if [ -z "$DATABASE_URL" ]; then
     DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
     if [ -f "$DB_PATH" ]; then
         export DATABASE_URL="$DB_PATH"
-        echo "$(date): Auto-detected DATABASE_URL=$DATABASE_URL" >> "$DASHBOARD_LOG"
+        log "Auto-detected DATABASE_URL=$DATABASE_URL"
     else
-        echo "$(date): WARNING - Could not find database at $DB_PATH" >> "$DASHBOARD_LOG"
-        echo "$(date): Set DATABASE_URL environment variable if dashboard fails to load data" >> "$DASHBOARD_LOG"
+        msg "⚠️  WARNING: No database found at $DB_PATH"
+        msg "   Dashboard will start but won't show data until orchestration runs"
     fi
 else
-    echo "$(date): Using provided DATABASE_URL=$DATABASE_URL" >> "$DASHBOARD_LOG"
+    log "Using provided DATABASE_URL=$DATABASE_URL"
 fi
 
 # Start dashboard server
+msg "🚀 Starting dashboard server..."
+
 if [ "$USE_STANDALONE" = "true" ]; then
-    echo "$(date): Starting standalone Next.js server..." >> "$DASHBOARD_LOG"
+    log "Starting standalone Next.js server..."
 
     cd "$DASHBOARD_DIR/.next/standalone"
     PORT="$DASHBOARD_PORT" HOSTNAME="localhost" node server.js >> "$DASHBOARD_LOG" 2>&1 &
@@ -137,17 +151,17 @@ if [ "$USE_STANDALONE" = "true" ]; then
     # Start Socket.io server if compiled version exists (for real-time updates)
     SOCKET_SERVER="$DASHBOARD_DIR/socket-server.js"
     if [ -f "$SOCKET_SERVER" ]; then
-        echo "$(date): Starting Socket.io server for real-time updates..." >> "$DASHBOARD_LOG"
+        log "Starting Socket.io server for real-time updates..."
         SOCKET_PORT="${SOCKET_PORT:-3001}"
         DATABASE_URL="$DATABASE_URL" SOCKET_PORT="$SOCKET_PORT" node "$SOCKET_SERVER" >> "$DASHBOARD_LOG" 2>&1 &
         SOCKET_PID=$!
         echo $SOCKET_PID > "$BAZINGA_DIR/socket.pid"
-        echo "$(date): Socket.io server started (PID: $SOCKET_PID) on port $SOCKET_PORT" >> "$DASHBOARD_LOG"
+        log "Socket.io server started (PID: $SOCKET_PID) on port $SOCKET_PORT"
     else
-        echo "$(date): Note: Real-time updates limited (socket-server.js not found)" >> "$DASHBOARD_LOG"
+        log "Note: Real-time updates limited (socket-server.js not found)"
     fi
 else
-    echo "$(date): Starting Next.js dashboard + Socket.io server (dev mode)..." >> "$DASHBOARD_LOG"
+    log "Starting Next.js dashboard + Socket.io server (dev mode)..."
 
     cd "$DASHBOARD_DIR"
 
@@ -159,7 +173,7 @@ else
         npm run dev:all >> "$DASHBOARD_LOG" 2>&1 &
         DASHBOARD_PID=$!
     else
-        echo "$(date): dev:all not found, starting dev only..." >> "$DASHBOARD_LOG"
+        log "dev:all not found, starting dev only..."
         npm run dev >> "$DASHBOARD_LOG" 2>&1 &
         DASHBOARD_PID=$!
     fi
@@ -175,15 +189,21 @@ sleep 3
 # Check if server started successfully
 if kill -0 $DASHBOARD_PID 2>/dev/null; then
     if [ "$USE_STANDALONE" = "true" ]; then
-        echo "$(date): Dashboard server started successfully in STANDALONE mode (PID: $DASHBOARD_PID)" >> "$DASHBOARD_LOG"
-        echo "$(date): Dashboard available at http://localhost:$DASHBOARD_PORT" >> "$DASHBOARD_LOG"
+        log "Dashboard server started successfully in STANDALONE mode (PID: $DASHBOARD_PID)"
     else
-        echo "$(date): Dashboard server started successfully in DEV mode (PID: $DASHBOARD_PID)" >> "$DASHBOARD_LOG"
-        echo "$(date): Dashboard available at http://localhost:$DASHBOARD_PORT" >> "$DASHBOARD_LOG"
-        echo "$(date): Socket.io server on port 3001 (real-time updates)" >> "$DASHBOARD_LOG"
+        log "Dashboard server started successfully in DEV mode (PID: $DASHBOARD_PID)"
     fi
+    msg ""
+    msg "✅ Dashboard started successfully!"
+    msg "   URL: http://localhost:$DASHBOARD_PORT"
+    msg "   PID: $DASHBOARD_PID"
+    msg "   Log: $DASHBOARD_LOG"
+    msg ""
 else
-    echo "$(date): ERROR - Failed to start dashboard server" >> "$DASHBOARD_LOG"
+    msg ""
+    msg "❌ ERROR: Failed to start dashboard server"
+    msg "   Check $DASHBOARD_LOG for details"
+    msg ""
     rm -f "$DASHBOARD_PID_FILE"
     exit 1
 fi
