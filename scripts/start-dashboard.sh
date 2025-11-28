@@ -34,7 +34,7 @@ DASHBOARD_LOG="$BAZINGA_DIR/dashboard.log"
 DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
 USE_STANDALONE="false"
 
-# Helper function: log to file AND print to stdout
+# Helper functions: log() writes to file only, msg() writes to both stdout and file
 log() {
     echo "$(date): $1" >> "$DASHBOARD_LOG"
 }
@@ -55,7 +55,7 @@ fi
 
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
-    msg "✅ Dashboard already running (PID: $(cat $DASHBOARD_PID_FILE))"
+    msg "✅ Dashboard already running (PID: $(cat "$DASHBOARD_PID_FILE"))"
     msg "   URL: http://localhost:$DASHBOARD_PORT"
     exit 0
 fi
@@ -101,7 +101,13 @@ if [ -f "$STANDALONE_SERVER" ]; then
     fi
 
     # Copy required manifest files
-    for manifest in build-manifest.json prerender-manifest.json prerender-manifest.js routes-manifest.json react-loadable-manifest.json app-build-manifest.json; do
+    for manifest in \
+        build-manifest.json \
+        prerender-manifest.json \
+        prerender-manifest.js \
+        routes-manifest.json \
+        react-loadable-manifest.json \
+        app-build-manifest.json; do
         if [ -f "$SOURCE_NEXT/$manifest" ] && [ ! -f "$STANDALONE_NEXT/$manifest" ]; then
             log "Copying $manifest to standalone..."
             cp "$SOURCE_NEXT/$manifest" "$STANDALONE_NEXT/"
@@ -161,13 +167,16 @@ if [ -z "$DATABASE_URL" ]; then
     DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
     if [ -f "$DB_PATH" ]; then
         export DATABASE_URL="$DB_PATH"
-        log "Auto-detected DATABASE_URL=$DATABASE_URL"
+        # Redact credentials if present in DATABASE_URL before logging
+        redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
+        log "Auto-detected DATABASE_URL=$redacted"
     else
         msg "⚠️  WARNING: No database found at $DB_PATH"
         msg "   Dashboard will start but won't show data until orchestration runs"
     fi
 else
-    log "Using provided DATABASE_URL=$DATABASE_URL"
+    redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
+    log "Using provided DATABASE_URL=$redacted"
 fi
 
 # Start dashboard server
@@ -188,7 +197,7 @@ if [ "$USE_STANDALONE" = "true" ]; then
         SOCKET_PORT="${SOCKET_PORT:-3001}"
         DATABASE_URL="$DATABASE_URL" SOCKET_PORT="$SOCKET_PORT" node "$SOCKET_SERVER" >> "$DASHBOARD_LOG" 2>&1 &
         SOCKET_PID=$!
-        echo $SOCKET_PID > "$BAZINGA_DIR/socket.pid"
+        echo "$SOCKET_PID" > "$BAZINGA_DIR/socket.pid"
         log "Socket.io server started (PID: $SOCKET_PID) on port $SOCKET_PORT"
     else
         log "Note: Real-time updates limited (socket-server.js not found)"
