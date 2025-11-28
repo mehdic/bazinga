@@ -42,6 +42,15 @@ msg() {
     echo "$1"
     echo "$(date): $1" >> "$DASHBOARD_LOG"
 }
+# Redact credentials from database URLs (file paths pass through unchanged)
+redact_db_url() {
+    local url="$1"
+    if [[ "$url" =~ :// ]]; then
+        printf "%s" "$url" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#'
+    else
+        printf "%s" "$url"
+    fi
+}
 
 msg "🖥️  BAZINGA Dashboard v2 Startup"
 log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
@@ -172,25 +181,13 @@ if [ -z "$DATABASE_URL" ]; then
     DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
     if [ -f "$DB_PATH" ]; then
         export DATABASE_URL="$DB_PATH"
-        # Redact credentials only if DATABASE_URL is a connection string (not a file path)
-        if [[ "$DATABASE_URL" =~ :// ]]; then
-            redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
-        else
-            redacted="$DATABASE_URL"
-        fi
-        log "Auto-detected DATABASE_URL=$redacted"
+        log "Auto-detected DATABASE_URL=$(redact_db_url "$DATABASE_URL")"
     else
         msg "⚠️  WARNING: No database found at $DB_PATH"
         msg "   Dashboard will start but won't show data until orchestration runs"
     fi
 else
-    # Redact credentials only if DATABASE_URL is a connection string (not a file path)
-    if [[ "$DATABASE_URL" =~ :// ]]; then
-        redacted=$(printf "%s" "$DATABASE_URL" | sed -E 's#(://[^:]+):[^@]+@#\1:***@#')
-    else
-        redacted="$DATABASE_URL"
-    fi
-    log "Using provided DATABASE_URL=$redacted"
+    log "Using provided DATABASE_URL=$(redact_db_url "$DATABASE_URL")"
 fi
 
 # Start dashboard server
