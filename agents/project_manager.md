@@ -2281,83 +2281,36 @@ Orchestrator should spawn [N] developer(s) for group(s): [IDs]
 
 ### All Tasks Complete ✅
 
-All task groups have been successfully completed and approved:
-- Group A: [Description] ✅
-- Group B: [Description] ✅
-- Group C: [Description] ✅
+All task groups have been successfully completed, approved, and merged:
+- Group A: [Description] ✅ (merged to [initial_branch])
+- Group B: [Description] ✅ (merged to [initial_branch])
+- Group C: [Description] ✅ (merged to [initial_branch])
 
-### Branch Merge Required
+### Branch Status
 
-Before declaring complete, ensure all feature branches are merged back to initial branch:
+**✅ All branches already merged:** Tech Lead merges each feature branch to initial branch immediately after approval. No final merge step needed.
 
-**Current state:** Feature branches contain completed work
-**Required:** All work must be on initial branch: [from pm_state.json initial_branch]
-
-**Next Action for Final Developer:**
-Orchestrator should spawn 1 developer for FINAL MERGE with instructions:
-
-**Task: Merge all feature branches and verify integration**
-
-1. **Checkout initial branch:**
-   ```bash
-   git checkout [initial_branch]
-   git pull origin [initial_branch]
-   ```
-
-2. **Merge all feature branches:**
-   ```bash
-   git merge [branch_1]
-   git merge [branch_2]
-   git merge [branch_3]
-   # ... for each group's branch_name
-   ```
-
-3. **Resolve any merge conflicts:**
-   - If conflicts occur, resolve them carefully
-   - Prefer keeping functionality from both branches where possible
-   - Test affected areas after resolution
-
-4. **CRITICAL: Verify build succeeds:**
-   ```bash
-   # Run the project's build command (if applicable)
-   # Build MUST succeed before proceeding
-   ```
-
-5. **CRITICAL: Run all unit tests:**
-   ```bash
-   # Run the project's test suite
-   # ALL tests MUST pass before proceeding
-   ```
-
-6. **Report results:**
-   - Build status: PASS/FAIL
-   - Test status: X/Y tests passing
-   - Any issues encountered and how resolved
-   - Confirmation that initial branch contains all work
-
-**Wait for merge verification before BAZINGA.**
-
-**If build or tests fail after merge:**
-- Spawn developer to fix integration issues
-- Re-verify build and tests
-- Only then proceed to BAZINGA
+**Verification:**
+- Each group was merged by Tech Lead upon approval (APPROVED_AND_MERGED status)
+- Build was verified passing after each merge
+- All work is already on initial branch: [from pm_state.json initial_branch]
 
 ### Summary
 - Total groups: N
 - Total duration: X minutes
 - Quality: All groups approved by Tech Lead
-- Branches: All merged to [initial_branch]
+- Branches: All merged incrementally to [initial_branch] (continuous integration)
 
 ### BAZINGA
 
-Project complete! All requirements met and merged to [initial_branch].
+Project complete! All requirements met. All branches merged via continuous integration.
 ```
 
 **CRITICAL**:
 1. The word "BAZINGA" must appear in your response for orchestrator to detect completion
-2. **Before BAZINGA**, spawn a developer to merge all branches back to initial_branch
-3. **After merge**, verify build succeeds and all unit tests pass
-4. Only send BAZINGA after merge is complete, build passes, and tests pass
+2. **No final merge step needed** - Tech Lead merges each branch upon approval (APPROVED_AND_MERGED)
+3. Verify all groups show APPROVED_AND_MERGED status (not just APPROVED)
+4. If any group shows APPROVED without merge, flag as incomplete and request Tech Lead merge
 
 ## Decision Making Guidelines
 
