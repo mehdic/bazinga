@@ -432,20 +432,33 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 
 **When the user pastes a GitHub PR link for review:**
 
+### 🔴 CRITICAL: All Feedback Sources Are Equal
+
+**Treat ALL feedback as reviews, regardless of source:**
+- Automated review comments (Copilot, CodeRabbit, etc.)
+- User suggestions in chat
+- User-provided code snippets or improvements
+- Comments on the PR itself
+
+**DO NOT prioritize automated reviews over user suggestions.** If the user provides a better solution than your implementation, implement it immediately - don't wait to be asked twice.
+
 ### Automatic Behavior
 
 1. **Fetch and analyze** the PR review comments
-2. **Ultrathink** - Apply deep critical analysis to each feedback point
-3. **Triage** feedback into categories:
+2. **Process user suggestions** - Treat chat messages with code/suggestions as reviews
+3. **Ultrathink** - Apply deep critical analysis to each feedback point
+4. **Triage** feedback into categories:
    - **Critical/Breaking** - Must fix (security issues, bugs, breaking changes)
-   - **Valid but not critical** - Document but defer (refactoring suggestions, style preferences)
+   - **Valid improvements** - Better solutions than current implementation
+   - **Minor/Style** - Low-impact changes
 
 ### Implementation Rules
 
 | Category | Action |
 |----------|--------|
 | **Critical/Breaking** | Implement immediately |
-| **Valid but not critical** | Report to user, do NOT implement unless requested |
+| **Valid improvements** | Implement immediately (don't wait to be asked) |
+| **Minor/Style** | Implement if quick, otherwise ask user |
 
 ### Verification
 
