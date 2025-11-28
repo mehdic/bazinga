@@ -174,7 +174,7 @@ CREATE TABLE task_groups (
     revision_count INTEGER DEFAULT 0,
     last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
     feature_branch TEXT,
-    merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),
+    merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),
     complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
     initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

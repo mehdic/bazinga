@@ -180,7 +180,7 @@ ALTER TABLE task_groups ADD COLUMN feature_branch TEXT;
 
 -- Migration 2: Add merge_status column (tracks merge state)
 ALTER TABLE task_groups ADD COLUMN merge_status TEXT
-    CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL))
+    CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL))
     DEFAULT NULL;
 
 -- Migration 3: Update status enum (recreate table due to SQLite CHECK constraint)
@@ -202,7 +202,7 @@ CREATE TABLE task_groups_new (
     revision_count INTEGER DEFAULT 0,
     last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
     feature_branch TEXT,           -- NEW: developer's feature branch
-    merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),  -- NEW
+    merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),  -- NEW
     complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
     initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -301,7 +301,7 @@ def migrate(db_path: str):
     try:
         cursor.execute("""
             ALTER TABLE task_groups ADD COLUMN merge_status TEXT
-            CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL))
+            CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL))
         """)
         print("✓ Added task_groups.merge_status")
     except sqlite3.OperationalError as e:
@@ -332,7 +332,7 @@ def migrate(db_path: str):
                 revision_count INTEGER DEFAULT 0,
                 last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
                 feature_branch TEXT,
-                merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),
+                merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),
                 complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
                 initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
