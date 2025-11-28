@@ -1721,9 +1721,12 @@ You are a Developer performing a merge task.
 1. Checkout initial branch: `git checkout {initial_branch}`
 2. Pull latest: `git pull origin {initial_branch}`
 3. Merge feature branch: `git merge {feature_branch} --no-edit`
-4. IF merge succeeds: Run tests, then push
-5. IF merge conflicts: Abort with `git merge --abort`
-6. IF tests fail: Reset with `git reset --hard HEAD~1`
+4. IF merge conflicts: Abort with `git merge --abort` → Report MERGE_CONFLICT
+5. IF merge succeeds: Run tests
+6. IF tests pass: Push with `git push origin {initial_branch}` → Report MERGE_SUCCESS
+7. IF tests fail (BEFORE pushing): Reset with `git reset --hard HEAD~1` → Report MERGE_TEST_FAILURE
+
+**⚠️ CRITICAL:** Never push before tests pass. The reset is only safe if the merge hasn't been pushed.
 
 **Response Format:**
 Report one of:
@@ -1783,13 +1786,22 @@ IF status = MERGE_TEST_FAILURE:
   ```
   → Update task_group in database:
     - status: "in_progress"
-    - merge_status: "conflict"
+    - merge_status: "test_failure"  # NOT "conflict" - these are distinct issues
   → **Spawn Developer** with test failure context:
     * Include test output and failures
     * Instructions: Fix integration issues, push to feature_branch
     * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
 
 **Step 3: Log Developer merge interaction** — Use §Logging Reference pattern. Agent ID: `dev_merge_group_{X}`.
+
+**Step 4: Escalation for Repeated Merge Failures**
+
+Track merge retry count in task_group metadata. If a group fails merge 2+ times:
+- On 2nd failure: Escalate to **Senior Software Engineer** for conflict/test analysis
+- On 3rd failure: Escalate to **Tech Lead** for architectural guidance
+- On 4th+ failure: Escalate to **PM** to evaluate if task should be simplified or deprioritized
+
+This prevents infinite merge retry loops and brings in higher-tier expertise when merges are persistently problematic.
 
 ### Step 2A.8: Spawn PM for Final Check
 

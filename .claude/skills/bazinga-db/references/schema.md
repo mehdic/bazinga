@@ -196,7 +196,7 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 - `revision_count`: Number of revision cycles (for escalation)
 - `last_review_status`: Tech Lead review result (APPROVED or CHANGES_REQUESTED)
 - `feature_branch`: Developer's feature branch for this group (e.g., `feature/group-A-jwt-auth`)
-- `merge_status`: Tracks merge state (`pending`, `in_progress`, `merged`, `conflict`, NULL)
+- `merge_status`: Tracks merge state (`pending`, `in_progress`, `merged`, `conflict`, `test_failure`, NULL)
 - `complexity`: Task complexity score (1-10), set by PM
 - `initial_tier`: Initial implementation tier (`Developer` or `Senior Software Engineer`), set by PM
 - `created_at`: When task group was created
@@ -214,9 +214,11 @@ NULL (not yet approved)
   ↓
 pending (TL approved, waiting for merge)
   ↓
-in_progress (Merge Developer working)
+in_progress (Developer performing merge)
   ↓
-merged (success) OR conflict (failed, needs dev fix)
+merged (success)
+OR conflict (git merge conflicts → dev fixes conflicts)
+OR test_failure (tests failed after merge → dev fixes tests)
 ```
 
 **Usage Example:**
