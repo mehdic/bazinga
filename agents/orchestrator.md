@@ -1725,9 +1725,9 @@ You are a Developer performing a merge task.
 4. IF merge conflicts: Abort with `git merge --abort` → Report MERGE_CONFLICT
 5. IF merge succeeds: Run tests
 6. IF tests pass: Push with `git push origin {initial_branch}` → Report MERGE_SUCCESS
-7. IF tests fail (BEFORE pushing): Reset with `git reset --hard HEAD~1` → Report MERGE_TEST_FAILURE
+7. IF tests fail (BEFORE pushing): Reset with `git reset --hard ORIG_HEAD` → Report MERGE_TEST_FAILURE
 
-**⚠️ CRITICAL:** Never push before tests pass. The reset is only safe if the merge hasn't been pushed.
+**⚠️ CRITICAL:** Never push before tests pass. `ORIG_HEAD` points to the commit before the merge, making the reset safe and explicit.
 
 **Response Format:**
 Report one of:
@@ -2286,7 +2286,7 @@ Task(
 
 **Actions:** 1) Update group status=completed, merge_status=merged (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count (include "deferred" status as pending), total_count.
 
-**Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} merged | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.9. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.9, ELSE IF current_phase in_progress → output `✅ Group {id} merged | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.9**
+**Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} merged | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.8. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.8, ELSE IF current_phase in_progress → output `✅ Group {id} merged | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.8**
 
 ### Step 2B.7c: Pre-Stop Verification Gate (LAYER 3 - FINAL SAFETY NET)
 

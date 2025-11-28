@@ -148,17 +148,20 @@ def init_database(db_path: str) -> None:
                 else:
                     raise
 
-            # 3. Add merge_status to task_groups
+            # 3. Add merge_status to task_groups (without CHECK - SQLite limitation)
+            # NOTE: ALTER TABLE cannot add CHECK constraints in SQLite
+            # The CHECK constraint is applied in step 4 when we recreate the table
             try:
                 cursor.execute("ALTER TABLE task_groups ADD COLUMN merge_status TEXT")
-                print("   ✓ Added task_groups.merge_status")
+                print("   ✓ Added task_groups.merge_status (CHECK constraint applied in step 4)")
             except sqlite3.OperationalError as e:
                 if "duplicate column" in str(e).lower():
                     print("   ⊘ task_groups.merge_status already exists")
                 else:
                     raise
 
-            # 4. Recreate task_groups with expanded status enum
+            # 4. Recreate task_groups with expanded status enum AND proper CHECK constraints
+            # This step applies CHECK constraints that couldn't be added via ALTER TABLE
             cursor.execute("SELECT sql FROM sqlite_master WHERE name='task_groups'")
             schema = cursor.fetchone()[0]
 
