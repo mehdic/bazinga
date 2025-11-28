@@ -126,15 +126,15 @@ if [ -f "$STANDALONE_SERVER" ]; then
         [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
         [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
 
+        # Sync public folder (must update along with build artifacts)
+        if [ -d "$DASHBOARD_DIR/public" ]; then
+            rm -rf "$DASHBOARD_DIR/.next/standalone/public"
+            cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
+        fi
+
         log "Build artifacts synced successfully"
     else
         log "Standalone artifacts are up to date"
-    fi
-
-    # Copy public folder if exists (separate from .next)
-    if [ -d "$DASHBOARD_DIR/public" ] && [ ! -d "$DASHBOARD_DIR/.next/standalone/public" ]; then
-        log "Copying public folder to standalone..."
-        cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
     fi
 else
     msg "🔧 No standalone build found, using development mode"
