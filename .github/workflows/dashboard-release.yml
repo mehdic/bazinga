@@ -69,12 +69,16 @@ jobs:
 
           # Copy BUILD_ID and manifest files (required for Next.js production mode)
           cp .next/BUILD_ID release-package/dashboard-v2/.next/
-          cp .next/*.json release-package/dashboard-v2/.next/ 2>/dev/null || true
+          for f in .next/*.json; do
+            [ -e "$f" ] && cp "$f" release-package/dashboard-v2/.next/
+          done
           [ -f .next/prerender-manifest.js ] && cp .next/prerender-manifest.js release-package/dashboard-v2/.next/
 
           # Also copy into standalone/.next for self-contained operation
           cp .next/BUILD_ID release-package/dashboard-v2/.next/standalone/.next/
-          cp .next/*.json release-package/dashboard-v2/.next/standalone/.next/ 2>/dev/null || true
+          for f in .next/*.json; do
+            [ -e "$f" ] && cp "$f" release-package/dashboard-v2/.next/standalone/.next/
+          done
           [ -f .next/prerender-manifest.js ] && cp .next/prerender-manifest.js release-package/dashboard-v2/.next/standalone/.next/
 
           # Copy static files (both locations for compatibility)

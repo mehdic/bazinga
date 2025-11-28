@@ -92,9 +92,14 @@ wait_for_server() {
                 return 0
             fi
         else
-            # Fallback: just check process is alive after delay
+            # Fallback: without network tools, check process stability
+            # Don't return early - wait through all attempts to catch delayed crashes
             sleep 1
-            if kill -0 "$pid" 2>/dev/null; then
+            if ! kill -0 "$pid" 2>/dev/null; then
+                return 1  # Process died
+            fi
+            # Only return success on the last attempt if process survived
+            if [ $attempt -eq $max_attempts ]; then
                 return 0
             fi
         fi
@@ -191,6 +196,8 @@ if [ -f "$STANDALONE_SERVER" ]; then
         # Source exists but standalone not ready - sync needed
         msg "🔄 Syncing build artifacts to standalone..."
 
+        # Clean destination to avoid mixing versions (with validation)
+        safe_rm_rf "$STANDALONE_NEXT" || { msg "❌ ERROR: Failed to clean standalone directory"; exit 1; }
         mkdir -p "$STANDALONE_NEXT"
 
         # Copy BUILD_ID and all manifest files
