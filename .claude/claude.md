@@ -460,6 +460,35 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 | **Valid improvements** | Implement immediately (don't wait to be asked) |
 | **Minor/Style** | Implement if quick, otherwise ask user |
 
+### 🔴 MANDATORY: Validation Checklist
+
+**Before saying "done" or moving on, you MUST:**
+
+1. **Extract ALL suggestions** - Create a numbered list of EVERY suggestion from:
+   - PR review comments (automated)
+   - User messages in chat
+   - Code snippets user provided
+
+2. **Explicitly address each one** - For each item, state:
+   - `✅ Implemented in commit {hash}` - if fixed
+   - `⏭️ Skipped: {reason}` - if intentionally skipped (must justify)
+   - `❌ Missed` - if you forgot (then go fix it!)
+
+3. **Count check** - Verify: `Items extracted == Items addressed`
+
+**Example validation:**
+```
+## Validation Checklist
+User provided 3 suggestions:
+1. Smart BUILD_ID sync → ✅ Implemented in commit abc123
+2. Robust port check → ✅ Implemented in commit abc123
+3. Public folder sync → ✅ Implemented in commit def456
+
+Count: 3 extracted, 3 addressed ✓
+```
+
+**If count doesn't match, STOP and fix before proceeding.**
+
 ### Verification
 
 Before implementing any "fix":
