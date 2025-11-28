@@ -229,7 +229,7 @@ echo $DASHBOARD_PID > "$DASHBOARD_PID_FILE"
 sleep 3
 
 # Check if server started successfully
-if kill -0 $DASHBOARD_PID 2>/dev/null; then
+if kill -0 "$DASHBOARD_PID" 2>/dev/null; then
     if [ "$USE_STANDALONE" = "true" ]; then
         log "Dashboard server started successfully in STANDALONE mode (PID: $DASHBOARD_PID)"
     else
