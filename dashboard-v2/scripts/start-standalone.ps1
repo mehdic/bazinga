@@ -6,6 +6,18 @@ $ErrorActionPreference = "Stop"
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DASHBOARD_DIR = Split-Path -Parent $SCRIPT_DIR
 
+# Check Node.js version (requires 18+)
+if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: Node.js not found. Install Node.js 18+ and ensure it's in PATH." -ForegroundColor Red
+    exit 1
+}
+$nodeVersion = (node --version) -replace '^v', ''
+$majorVersion = [int]($nodeVersion -split '\.')[0]
+if ($majorVersion -lt 18) {
+    Write-Host "Error: Node.js 18+ required (found v$nodeVersion)" -ForegroundColor Red
+    exit 1
+}
+
 # Check if standalone build exists
 $STANDALONE_DIR = Join-Path $DASHBOARD_DIR ".next\standalone"
 if (-not (Test-Path $STANDALONE_DIR)) {
@@ -32,13 +44,13 @@ if ((Test-Path $PUBLIC_SRC) -and (-not (Test-Path $PUBLIC_DEST))) {
     Copy-Item -Path $PUBLIC_SRC -Destination $PUBLIC_DEST -Recurse -Force
 }
 
-# Set default port
-$PORT = if ($env:PORT) { $env:PORT } else { "3000" }
+# Set default port (DASHBOARD_PORT takes precedence over PORT for consistency)
+$PORT = if ($env:DASHBOARD_PORT) { $env:DASHBOARD_PORT } elseif ($env:PORT) { $env:PORT } else { "3000" }
 $HOSTNAME = if ($env:HOSTNAME) { $env:HOSTNAME } else { "localhost" }
 
-# Pass through DATABASE_URL if set
+# Pass through DATABASE_URL if set (mask path in logs for security)
 if ($env:DATABASE_URL) {
-    Write-Host "Using DATABASE_URL: $($env:DATABASE_URL)"
+    Write-Host "Using DATABASE_URL: [configured]"
 }
 
 # Start Socket.io server if exists (background process for real-time updates)

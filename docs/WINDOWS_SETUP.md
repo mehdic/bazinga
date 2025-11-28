@@ -41,7 +41,7 @@ This downloads `bazinga-dashboard-windows-x64.tar.gz` and extracts it automatica
    # Using built-in tar (Windows 10 1803+)
    tar -xzf bazinga-dashboard-windows-x64.tar.gz
 
-   # Or use 7-Zip, WinRAR, or right-click → Extract
+   # Or use 7-Zip or WinRAR (Windows Explorer cannot extract .tar.gz natively)
    ```
 
 3. Move to your project:

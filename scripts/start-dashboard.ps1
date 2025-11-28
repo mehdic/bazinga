@@ -69,6 +69,16 @@ if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+# Check Node.js version (requires 18+)
+$nodeVersion = (node --version) -replace '^v', ''
+$majorVersion = [int]($nodeVersion -split '\.')[0]
+if ($majorVersion -lt 18) {
+    Write-Log "ERROR - Node.js 18+ required (found v$nodeVersion)"
+    Write-Host "ERROR: Node.js 18+ required (found v$nodeVersion)" -ForegroundColor Red
+    exit 1
+}
+Write-Log "Node.js version: v$nodeVersion"
+
 # Check if server is already running
 if (Test-Path $DASHBOARD_PID_FILE) {
     $existingPid = Get-Content $DASHBOARD_PID_FILE -ErrorAction SilentlyContinue
@@ -179,13 +189,13 @@ if (-not $env:DATABASE_URL) {
     $DB_PATH = Join-Path (Join-Path $PROJECT_ROOT "bazinga") "bazinga.db"
     if (Test-Path $DB_PATH) {
         $env:DATABASE_URL = $DB_PATH
-        Write-Log "Auto-detected DATABASE_URL=$DB_PATH"
+        Write-Log "Auto-detected DATABASE_URL=[local bazinga.db]"
     } else {
-        Write-Log "WARNING - Could not find database at $DB_PATH"
+        Write-Log "WARNING - Could not find database at expected location"
         Write-Log "Set DATABASE_URL environment variable if dashboard fails to load data"
     }
 } else {
-    Write-Log "Using provided DATABASE_URL=$($env:DATABASE_URL)"
+    Write-Log "Using provided DATABASE_URL=[configured]"
 }
 
 # Start dashboard server
