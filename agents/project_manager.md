@@ -501,10 +501,7 @@ Phase 4 complete! Would you like me to:
 - P1-CHECKOUT: Frontend needed (~8h estimated)
 - Phases 5-10: Pending
 
-**Status:** CONTINUE
 **Next Action:** Orchestrator should spawn developers for P1-CHECKOUT frontend
-
-**NOTE:** Automatically continuing with remaining work. No user input needed.
 ```
 
 **The difference:**
