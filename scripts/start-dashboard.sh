@@ -124,7 +124,7 @@ if [ -f "$STANDALONE_SERVER" ]; then
             [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
             [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
 
-            # Sync public folder
+            # Sync public folder (must update along with build artifacts)
             if [ -d "$DASHBOARD_DIR/public" ]; then
                 rm -rf "$DASHBOARD_DIR/.next/standalone/public"
                 cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
@@ -149,7 +149,7 @@ if [ -f "$STANDALONE_SERVER" ]; then
         [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
         [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
 
-        # Sync public folder
+        # Sync public folder (must update along with build artifacts)
         if [ -d "$DASHBOARD_DIR/public" ]; then
             rm -rf "$DASHBOARD_DIR/.next/standalone/public"
             cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
