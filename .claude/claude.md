@@ -512,8 +512,9 @@ curl -s -X POST \
   -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
 ```
 
-**Step 2: Reply to a comment (REST API)**
+**Step 2: Reply to a comment (REST API) - ⚠️ MAY RETURN 404**
 ```bash
+# Note: REST API replies may return 404 in Claude Code Web environment
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github+json" \
@@ -521,13 +522,27 @@ curl -s -X POST \
   -d '{"body": "Your response here"}'
 ```
 
-**Step 3: Resolve the thread (GraphQL mutation)**
+**Step 3: Resolve the thread (GraphQL mutation) - ✅ ALWAYS WORKS**
 ```bash
+# GraphQL mutations work reliably - use this to resolve threads
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
   -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
+```
+
+**Batch resolve multiple threads:**
+```bash
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+for thread_id in PRRT_xxx PRRT_yyy PRRT_zzz; do
+  curl -s -X POST \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Content-Type: application/json" \
+    "https://api.github.com/graphql" \
+    -d "{\"query\": \"mutation { resolveReviewThread(input: {threadId: \\\"$thread_id\\\"}) { thread { id isResolved } } }\"}"
+done
 ```
 
 ### Response Templates
@@ -544,12 +559,11 @@ curl -s -X POST \
 1. **Fetch** all review threads via GraphQL (includes `isResolved` status)
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
-4. **Reply** to ALL unresolved comments via REST API
-5. **Resolve** each thread via GraphQL mutation
-6. **Commit & push** fixes
-7. **Report** summary to user
+4. **Commit & push** fixes
+5. **Resolve** each thread via GraphQL mutation (this always works)
+6. **Report** summary to user
 
-**IMPORTANT:** Always reply to every comment AND resolve the thread. This marks the conversation as resolved in GitHub UI.
+**Note:** REST API replies may return 404 in Claude Code Web. If replies fail, just resolve the threads directly - the code changes speak for themselves.
 
 ---
 
