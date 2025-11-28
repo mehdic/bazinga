@@ -503,7 +503,7 @@ GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
 
 ### Workflow: Responding to PR Review Comments
 
-**Step 1: Fetch review threads with resolution status (GraphQL)**
+**Step 1: Fetch review threads (GraphQL)**
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -512,19 +512,8 @@ curl -s -X POST \
   -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
 ```
 
-**Step 2: Reply to a comment (REST API) - ⚠️ MAY RETURN 404**
+**Step 2: Resolve threads (GraphQL mutation)**
 ```bash
-# Note: REST API replies may return 404 in Claude Code Web environment
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/mehdic/bazinga/pulls/comments/{COMMENT_ID}/replies" \
-  -d '{"body": "Your response here"}'
-```
-
-**Step 3: Resolve the thread (GraphQL mutation) - ✅ ALWAYS WORKS**
-```bash
-# GraphQL mutations work reliably - use this to resolve threads
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
@@ -545,6 +534,8 @@ for thread_id in PRRT_xxx PRRT_yyy PRRT_zzz; do
 done
 ```
 
+**Note:** REST API doesn't work in Claude Code Web - use GraphQL only.
+
 ### Response Templates
 
 | Situation | Response Prefix |
@@ -560,10 +551,8 @@ done
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
 4. **Commit & push** fixes
-5. **Resolve** each thread via GraphQL mutation (this always works)
+5. **Resolve** each thread via GraphQL mutation
 6. **Report** summary to user
-
-**Note:** REST API replies may return 404 in Claude Code Web. If replies fail, just resolve the threads directly - the code changes speak for themselves.
 
 ---
 
