@@ -3,7 +3,16 @@
 **Date:** 2025-11-28
 **Context:** User identified that Tech Lead approval should trigger immediate merge, not batch at end
 **Decision:** Implement "merge on approval" pattern
-**Status:** Proposed
+**Status:** ⚠️ SUPERSEDED - See later research documents
+
+---
+
+**Note (2025-11-28):** This initial analysis proposed Tech Lead performing merges. After critical analysis, this was revised:
+- See `merge-on-approval-critical-analysis.md` for identified flaws
+- See `initial-branch-propagation-and-merge-architecture.md` for clean architecture
+- See `merge-simplification-ultrathink.md` for final implementation (Developer handles merge)
+
+The implementation uses a **regular Developer** for merge tasks, not Tech Lead.
 
 ---
 

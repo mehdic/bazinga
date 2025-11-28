@@ -1700,6 +1700,12 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 
 ### 🔴 MANDATORY MERGE TASK PROMPT (Inline - No Separate Agent File)
 
+**Variable sources:**
+- `{session_id}` - Current session ID (from orchestrator state)
+- `{initial_branch}` - From `sessions.initial_branch` in database (set at session creation, defaults to 'main')
+- `{feature_branch}` - From `task_groups.feature_branch` in database (set by Developer when creating branch)
+- `{group_id}` - Current group being merged (e.g., "A", "B", "main")
+
 **Build prompt with this inline template:**
 ```markdown
 ## Your Task: Merge Feature Branch

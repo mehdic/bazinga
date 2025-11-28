@@ -809,50 +809,52 @@ PM sees all 4 groups merged → BAZINGA
 
 ## Implementation Checklist
 
+**Implementation Status (2025-11-28):** ✅ COMPLETED with simplification - used regular Developer with inline merge prompt instead of separate Merge Developer agent. See `research/merge-simplification-ultrathink.md`.
+
 ### Database Changes
 
-- [ ] Add `initial_branch` column to `sessions` table
-- [ ] Add migration script
-- [ ] Update schema.md documentation
-- [ ] Add `approved_pending_merge` and `merging` to task_groups status enum
+- [x] Add `initial_branch` column to `sessions` table ✅
+- [x] Add migration script (Schema v5) ✅
+- [x] Update schema.md documentation ✅
+- [x] Add `feature_branch` and `merge_status` columns to task_groups ✅
 
 ### bazinga-db Skill Changes
 
-- [ ] Update `create-session` to accept `initial_branch` parameter
-- [ ] Add `get-initial-branch` command
-- [ ] Update `update-task-group` to support new statuses
+- [x] Update `create-session` to accept `initial_branch` parameter ✅
+- [x] Add `get-initial-branch` command ✅
+- [x] Update `update-task-group` to support new merge_status ✅
 
 ### Orchestrator Changes
 
-- [ ] Capture `initial_branch` at initialization (Step 0)
-- [ ] Save `initial_branch` to DB when creating session
-- [ ] Include `initial_branch` in ALL agent spawn prompts
-- [ ] Add Step 2A.7b: Route Merge Developer Response
-- [ ] Implement merge queue logic for parallel mode
-- [ ] Update Step 2A.7 to spawn Merge Developer instead of expecting TL merge
+- [x] Capture `initial_branch` at initialization (Step 0) ✅
+- [x] Save `initial_branch` to DB when creating session ✅
+- [x] Include `initial_branch` in merge task spawn prompts ✅
+- [x] Add Step 2A.7a: Spawn Developer for Merge ✅
+- [x] Add Step 2B.7a: Spawn Developer for Merge (Parallel) ✅
+- [x] Route merge response (MERGE_SUCCESS/CONFLICT/FAILURE) ✅
 
 ### Agent Prompt Template
 
-- [ ] Create universal "Session Context" block
-- [ ] Add to prompt_building.md
+- [x] Create inline merge prompt in orchestrator (Step 2A.7a) ✅
+- [ ] Universal session context block - deferred (not critical)
 
-### Merge Developer
+### Merge Developer → SIMPLIFIED
 
-- [ ] Create merge developer prompt template
-- [ ] Define in agents/ folder OR as inline prompt in orchestrator
+- [x] ~~Create merge developer prompt template~~ → Used inline prompt in orchestrator ✅
+- [x] ~~Define in agents/ folder~~ → Simplified: Regular Developer handles merge tasks ✅
 
 ### Revert Current Implementation
 
-- [ ] Revert techlead.md merge changes (back to just APPROVED)
-- [ ] Revert orchestrator.md APPROVED_AND_MERGED status
-- [ ] Revert project_manager.md merge references
-- [ ] Keep APPROVED as the only approval status
+- [x] Revert techlead.md merge changes (back to just APPROVED) ✅
+- [x] Revert orchestrator.md APPROVED_AND_MERGED status ✅
+- [x] Revert project_manager.md merge references ✅
+- [x] Keep APPROVED as the only review status ✅
 
 ### Documentation Updates
 
-- [ ] Update ARCHITECTURE.md with merge flow
-- [ ] Update examples/EXAMPLES.md with branch context
-- [ ] Update agents' workflow diagrams
+- [x] Update response_parsing.md with Developer (Merge Task) section ✅
+- [ ] Update ARCHITECTURE.md with merge flow - deferred
+- [ ] Update examples/EXAMPLES.md with branch context - deferred
 
 ---
 
