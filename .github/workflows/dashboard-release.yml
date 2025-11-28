@@ -29,8 +29,15 @@ jobs:
           - os: macos-14
             platform: darwin
             arch: arm64
+          - os: windows-latest
+            platform: windows
+            arch: x64
 
     runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repository
@@ -75,9 +82,12 @@ jobs:
             cp -r public release-package/dashboard-v2/
           fi
 
-          # Copy scripts
+          # Copy scripts (both bash and PowerShell for cross-platform support)
           mkdir -p release-package/dashboard-v2/scripts
           cp scripts/start-standalone.sh release-package/dashboard-v2/scripts/
+          if [ -f "scripts/start-standalone.ps1" ]; then
+            cp scripts/start-standalone.ps1 release-package/dashboard-v2/scripts/
+          fi
 
           # Copy compiled socket server for real-time updates
           if [ -f "dist/socket-server.js" ]; then
@@ -148,7 +158,9 @@ jobs:
 
             1. Download the appropriate package for your platform
             2. Extract to your bazinga project directory
-            3. Run `scripts/start-dashboard.sh`
+            3. Run startup script:
+               - **Linux/macOS:** `scripts/start-dashboard.sh`
+               - **Windows:** `scripts/start-dashboard.ps1` (PowerShell)
 
             ### Packages
 
@@ -157,6 +169,13 @@ jobs:
             | Linux    | x64          | bazinga-dashboard-linux-x64.tar.gz |
             | macOS    | x64          | bazinga-dashboard-darwin-x64.tar.gz |
             | macOS    | arm64        | bazinga-dashboard-darwin-arm64.tar.gz |
+            | Windows  | x64          | bazinga-dashboard-windows-x64.tar.gz |
+
+            ### Windows Notes
+
+            - Extract using: `tar -xzf bazinga-dashboard-windows-x64.tar.gz`
+            - Or use 7-Zip, WinRAR, or Windows Explorer (right-click → Extract)
+            - Requires Node.js 18+ installed
 
           files: |
             artifacts/**/*.tar.gz

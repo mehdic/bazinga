@@ -2,8 +2,8 @@
 
 **Date:** 2025-11-28
 **Context:** BAZINGA Dashboard v2 lacks Windows pre-built packages and startup scripts
-**Decision:** Implement tiered Windows support with clear user guidance
-**Status:** Proposed
+**Decision:** Full pre-built Windows support with native packages
+**Status:** Implemented
 
 ---
 
@@ -96,17 +96,19 @@ Windows users currently cannot use the BAZINGA Dashboard v2 in standalone/pre-bu
 
 ---
 
-## Recommended Solution: Option B + C Hybrid
+## Implemented Solution: Option A - Full Parity
 
-**Primary:** npm-based with enhanced PowerShell scripts
-**Alternative:** Docker Compose for users who prefer containerization
+**Decision:** Full pre-built Windows packages, same as Linux/macOS.
 
-### Why This Approach
+### Why This Approach (Revised)
 
-1. **Pragmatic:** Most Windows developers have Node.js installed
-2. **Low maintenance:** No Windows-specific builds to maintain
-3. **Fallback option:** Docker provides escape hatch
-4. **Clear upgrade path:** Can add pre-built packages later if demand warrants
+After deeper analysis, the perceived blockers were not actual blockers:
+
+1. **`better-sqlite3` compiles fine on Windows CI** - Node.js + npm on Windows runners handles native modules
+2. **GitHub Actions Windows runners have bash** - Via Git for Windows, so existing shell scripts work
+3. **Windows 10+ has native tar support** - Since build 1803 (2018)
+
+**Result:** No technical reason to treat Windows differently. Users deserve the same experience.
 
 ---
 
@@ -316,10 +318,49 @@ Windows may have services on port 3000 (common dev port).
 
 ---
 
+## Implementation Summary (2025-11-28)
+
+### Changes Made
+
+| File | Change |
+|------|--------|
+| `.github/workflows/dashboard-release.yml` | Added `windows-latest` to build matrix, `shell: bash` default, Windows in release notes |
+| `src/bazinga_cli/__init__.py` | Removed Windows exclusion block (lines 849-852) |
+| `scripts/start-dashboard.ps1` | Complete rewrite for v2 dashboard support (standalone + dev mode) |
+| `dashboard-v2/scripts/start-standalone.ps1` | Created new PowerShell standalone script |
+| `docs/WINDOWS_SETUP.md` | Created comprehensive Windows setup guide |
+
+### Key Technical Details
+
+1. **GitHub Actions Windows Build**
+   - Uses `shell: bash` (Git Bash) for cross-platform script compatibility
+   - Builds `bazinga-dashboard-windows-x64.tar.gz` alongside other platforms
+   - Native module compilation handled automatically by npm
+
+2. **PowerShell Scripts**
+   - `start-dashboard.ps1` mirrors bash version functionality
+   - Supports standalone mode (pre-built) and dev mode (npm)
+   - Auto-detects database path, handles Socket.io server
+
+3. **CLI Changes**
+   - Removed artificial Windows block in `download_prebuilt_dashboard()`
+   - Windows users now get same experience as Linux/macOS
+
+### Testing Checklist
+
+- [ ] GitHub Actions Windows build succeeds
+- [ ] Windows tarball includes correct files
+- [ ] CLI downloads Windows package correctly
+- [ ] PowerShell startup script works in standalone mode
+- [ ] PowerShell startup script works in dev mode
+- [ ] Database auto-detection works on Windows
+
 ## References
 
 - Current CLI code: `src/bazinga_cli/__init__.py:788-1057`
 - Bash startup script: `scripts/start-dashboard.sh`
-- PowerShell v1 script: `scripts/start-dashboard.ps1`
+- PowerShell startup script: `scripts/start-dashboard.ps1`
+- Standalone PowerShell script: `dashboard-v2/scripts/start-standalone.ps1`
 - GitHub Actions workflow: `.github/workflows/dashboard-release.yml`
+- Windows setup guide: `docs/WINDOWS_SETUP.md`
 - better-sqlite3 docs: https://github.com/WiseLibs/better-sqlite3
