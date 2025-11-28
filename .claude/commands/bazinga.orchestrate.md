@@ -1771,13 +1771,27 @@ IF decision = INVESTIGATION_NEEDED:
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
-Analyze response content to infer intent:
-- Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
-- Requests changes, fixes, or updates → CONTINUE
-- Indicates completion or approval → BAZINGA
-- Asks about requirements or scope → NEEDS_CLARIFICATION
+**🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
 
-Use inferred decision for routing (as if PM explicitly stated it).
+**PRECEDENCE:** If PM includes explicit status code (CONTINUE, BAZINGA, NEEDS_CLARIFICATION), use that status. Only apply inference when status is missing.
+
+**Detect PERMISSION-SEEKING patterns (auto-route these):**
+- "Would you like me to continue/proceed/start/resume..."
+- "Should I spawn/assign/begin..."
+- "Do you want me to keep going..."
+
+**DO NOT auto-route PRODUCT/TECHNICAL questions:**
+- "Would you like Postgres or MySQL?" → NEEDS_CLARIFICATION (legitimate)
+- "Should the API use REST or GraphQL?" → NEEDS_CLARIFICATION (legitimate)
+
+**Inference rules (only when no explicit status):**
+- Mentions failures, errors, blockers → INVESTIGATION_NEEDED
+- Requests changes, fixes, updates → CONTINUE
+- Indicates completion or approval → BAZINGA
+- Asks about requirements/scope/technical choices → NEEDS_CLARIFICATION
+- **Permission-seeking pattern detected** → CONTINUE (PM shouldn't ask permission)
+
+**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent.
 
 **Step 3: Output capsule to user**
 
@@ -1846,6 +1860,11 @@ Skill(command: "velocity-tracker")
 - Process continuously until all phases complete
 
 **Without this rule:** Orchestrator hangs after Phase 1, waiting indefinitely for user to say "continue"
+
+**🔴 PHASE BOUNDARY AUTO-CONTINUATION:**
+
+If PM asks "Would you like me to continue with Phase N?" → Auto-select CONTINUE if pending work exists.
+Output: `🔄 Auto-continuing | Phase {N} complete | Starting Phase {N+1}`
 
 **REAL-WORLD BUG EXAMPLE (THE BUG WE'RE FIXING):**
 
@@ -2162,13 +2181,27 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
-Analyze response content to infer intent:
-- Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
-- Requests changes, fixes, or updates → CONTINUE
-- Indicates completion or approval → BAZINGA
-- Asks about requirements or scope → NEEDS_CLARIFICATION
+**🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
 
-Use inferred decision for routing (as if PM explicitly stated it).
+**PRECEDENCE:** If PM includes explicit status code (CONTINUE, BAZINGA, NEEDS_CLARIFICATION), use that status. Only apply inference when status is missing.
+
+**Detect PERMISSION-SEEKING patterns (auto-route these):**
+- "Would you like me to continue/proceed/start/resume..."
+- "Should I spawn/assign/begin..."
+- "Do you want me to keep going..."
+
+**DO NOT auto-route PRODUCT/TECHNICAL questions:**
+- "Would you like Postgres or MySQL?" → NEEDS_CLARIFICATION (legitimate)
+- "Should the API use REST or GraphQL?" → NEEDS_CLARIFICATION (legitimate)
+
+**Inference rules (only when no explicit status):**
+- Mentions failures, errors, blockers → INVESTIGATION_NEEDED
+- Requests changes, fixes, updates → CONTINUE
+- Indicates completion or approval → BAZINGA
+- Asks about requirements/scope/technical choices → NEEDS_CLARIFICATION
+- **Permission-seeking pattern detected** → CONTINUE (PM shouldn't ask permission)
+
+**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent.
 
 **Step 2: Log PM response** — Use §Logging Reference pattern. Agent ID: `pm_parallel_final`.
 

@@ -483,12 +483,13 @@ Always create `research/prXXX-review-analysis.md` with full ultrathink analysis.
 
 ### GitHub Token Setup
 
-**Token location:** `~/.bazinga-github-token` (not committed to repo)
+**Token sources (in order of preference):**
+1. Environment variable: `BAZINGA_GITHUB_TOKEN` (Claude Code Web)
+2. File: `~/.bazinga-github-token` (local development)
 
-**Create the token file:**
+**Load token in scripts:**
 ```bash
-echo "ghp_YOUR_CLASSIC_TOKEN" > ~/.bazinga-github-token
-chmod 600 ~/.bazinga-github-token
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
 ```
 
 **Token requirements:**
