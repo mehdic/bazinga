@@ -25,10 +25,31 @@ if ($PARENT_DIR -eq "bazinga") {
 }
 
 $DASHBOARD_PORT = if ($env:DASHBOARD_PORT) { $env:DASHBOARD_PORT } else { "3000" }
-$DASHBOARD_PID_FILE = Join-Path $BAZINGA_DIR "dashboard.pid"
-$DASHBOARD_LOG = Join-Path $BAZINGA_DIR "dashboard.log"
 $DASHBOARD_DIR = Join-Path $BAZINGA_DIR "dashboard-v2"
 $USE_STANDALONE = $false
+
+# Determine log/pid file location - use BAZINGA_DIR if writable, else TEMP
+function Test-DirectoryWritable {
+    param([string]$Path)
+    try {
+        if (-not (Test-Path $Path)) { return $false }
+        $testFile = Join-Path $Path ".write-test-$(Get-Random)"
+        [System.IO.File]::WriteAllText($testFile, "test")
+        Remove-Item $testFile -Force
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+if (Test-DirectoryWritable $BAZINGA_DIR) {
+    $DASHBOARD_PID_FILE = Join-Path $BAZINGA_DIR "dashboard.pid"
+    $DASHBOARD_LOG = Join-Path $BAZINGA_DIR "dashboard.log"
+} else {
+    # Fallback to TEMP directory if BAZINGA_DIR is not writable
+    $DASHBOARD_PID_FILE = Join-Path $env:TEMP "bazinga-dashboard.pid"
+    $DASHBOARD_LOG = Join-Path $env:TEMP "bazinga-dashboard.log"
+}
 
 function Write-Log {
     param([string]$Message)

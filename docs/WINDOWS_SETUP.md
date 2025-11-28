@@ -14,8 +14,9 @@ This guide covers installing and running the BAZINGA Dashboard on Windows.
 
 - **npm** - Comes bundled with Node.js
 - **Visual Studio Build Tools** - Only needed if npm install fails for native modules
-  - Install via: `npm install -g windows-build-tools` (run as Administrator)
-  - Or download from [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/)
+  - **Preferred:** Select "Tools for Native Modules" checkbox during Node.js installation
+  - Or download from [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/) → "Build Tools for Visual Studio"
+  - Legacy: `npm install -g windows-build-tools` (deprecated, may not work on newer systems)
 
 ## Installation Methods
 
@@ -104,16 +105,19 @@ Node.js is not installed or not in PATH.
 
 The `better-sqlite3` package needs to compile C++ code.
 
-**Solution:**
+**Solution (Preferred):**
+Re-run the Node.js installer and select "Tools for Native Modules" checkbox.
+
+**Alternative:**
+1. Download "Build Tools for Visual Studio" from [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/)
+2. Install with "Desktop development with C++" workload
+3. Restart and retry `npm install`
+
+**Legacy (deprecated):**
 ```powershell
-# Run as Administrator
+# May not work on newer Windows/Node.js versions
 npm install -g windows-build-tools
 ```
-
-Or manually install:
-1. Visual Studio Build Tools
-2. Python 3.x
-3. Restart and retry `npm install`
 
 ### Port already in use
 

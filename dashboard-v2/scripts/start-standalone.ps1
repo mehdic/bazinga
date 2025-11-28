@@ -41,6 +41,18 @@ if ($env:DATABASE_URL) {
     Write-Host "Using DATABASE_URL: $($env:DATABASE_URL)"
 }
 
+# Start Socket.io server if exists (background process for real-time updates)
+$SOCKET_SERVER = Join-Path $DASHBOARD_DIR "socket-server.js"
+if (Test-Path $SOCKET_SERVER) {
+    Write-Host "Starting Socket.io server for real-time updates..."
+    $SOCKET_PORT = if ($env:SOCKET_PORT) { $env:SOCKET_PORT } else { "3001" }
+    $env:SOCKET_PORT = $SOCKET_PORT
+
+    # Start as a hidden background process so it doesn't block the main server
+    Start-Process -FilePath "node" -ArgumentList $SOCKET_SERVER -WindowStyle Hidden
+    Write-Host "Socket.io server started on port $SOCKET_PORT"
+}
+
 Write-Host "Starting standalone dashboard server on ${HOSTNAME}:${PORT}..."
 
 # Set environment variables for Node.js
