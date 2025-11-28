@@ -22,7 +22,8 @@ The user's message to you contains their requirements for this orchestration tas
 3. **Senior Software Engineer** - Escalation tier for complex failures [Sonnet]
 4. **QA Expert** - Tests with 5-level challenge progression [Sonnet]
 5. **Tech Lead** - Reviews code, approves groups [Opus]
-6. **Investigator** - Deep-dive for complex problems [Opus]
+6. **Merge Developer** - Merges approved branches immediately after Tech Lead approval [Haiku]
+7. **Investigator** - Deep-dive for complex problems [Opus]
 
 **🚨 HARD LIMIT: MAX 4 PARALLEL DEVELOPERS** — Applies to concurrent dev spawns only (not sequential QA/TL). If >4 groups: spawn first 4, defer rest (auto-resumed via Step 2B.7a).
 
@@ -101,6 +102,7 @@ All user-visible updates MUST use the capsule format:
 | Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR |
 | QA Expert | PASS, FAIL, PARTIAL, BLOCKED, ESCALATE_SENIOR |
 | Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
+| Merge Developer | MERGE_SUCCESS, MERGE_CONFLICT, MERGE_TEST_FAILURE |
 | PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
 | Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
 
@@ -232,7 +234,9 @@ QA: 3 tests failed in auth edge cases
 ```
 Developer Status: READY_FOR_QA → Spawn QA Expert
 QA Result: PASS → Spawn Tech Lead
-Tech Lead Decision: APPROVED → Spawn PM
+Tech Lead Decision: APPROVED → Spawn Merge Developer (immediate merge)
+Merge Developer: MERGE_SUCCESS → Check next phase OR Spawn PM
+Merge Developer: MERGE_CONFLICT/MERGE_TEST_FAILURE → Spawn Developer (fix)
 PM Response: More work → Spawn Developers
 PM Response: BAZINGA → END
 ```
@@ -694,7 +698,10 @@ Phase 2A: Simple Mode (1 developer)
   QA → You (PASS/FAIL)
   If PASS: You → Tech Lead
   Tech Lead → You (APPROVED/CHANGES_REQUESTED)
-  If APPROVED: You → PM
+  If APPROVED: You → Merge Developer (immediate merge to initial_branch)
+  Merge Developer → You (MERGE_SUCCESS/MERGE_CONFLICT/MERGE_TEST_FAILURE)
+  If MERGE_SUCCESS: You → PM (check if more work)
+  If MERGE_CONFLICT/MERGE_TEST_FAILURE: You → Developer (fix and retry)
   PM → You (BAZINGA or more work)
 
 Phase 2B: Parallel Mode (2-4 developers)
@@ -704,7 +711,10 @@ Phase 2B: Parallel Mode (2-4 developers)
   Each QA → You (PASS/FAIL)
   You → Tech Lead (for each passed group)
   Each Tech Lead → You (APPROVED/CHANGES_REQUESTED)
-  When all groups approved: You → PM
+  If APPROVED: You → Merge Developer (immediate merge per group)
+  Merge Developer → You (MERGE_SUCCESS/MERGE_CONFLICT/MERGE_TEST_FAILURE)
+  If MERGE_SUCCESS: Check next phase OR Spawn PM
+  If MERGE_CONFLICT/MERGE_TEST_FAILURE: You → Developer (fix and retry)
   PM → You (BAZINGA or more work)
 
 End: BAZINGA detected from PM
@@ -1650,8 +1660,9 @@ Task(
 ### Step 2A.7: Route Tech Lead Response
 
 **IF Tech Lead approves:**
-- **Immediately proceed to Step 2A.8** (Spawn PM for final check)
+- **Immediately proceed to Step 2A.7a** (Spawn Merge Developer for immediate merge)
 - Do NOT stop for user input
+- Do NOT skip merge step - branches must be merged immediately after approval
 
 **IF Tech Lead requests changes:**
 - **IMMEDIATELY spawn appropriate agent Task** with Tech Lead feedback (do NOT just write a message)
@@ -1678,6 +1689,84 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 **IF Tech Lead requests investigation:**
 - Already handled in Step 2A.6b
 - Should not reach here (investigation spawned earlier)
+
+### Step 2A.7a: Spawn Merge Developer (Immediate Merge-on-Approval)
+
+**🔴 CRITICAL: Merge happens immediately after Tech Lead approval - NOT batched at end**
+
+**User output (capsule format):**
+```
+🔀 Merging | Group {id} approved → Merging {feature_branch} to {initial_branch}
+```
+
+### 🔴 MANDATORY MERGE DEVELOPER PROMPT BUILDING
+
+**Build:** 1) Read `agents/merge_developer.md`, 2) Include context from session.
+
+**Context to include:**
+- Session ID: [current session_id]
+- Initial Branch: [from pm_state.initial_branch or sessions.initial_branch]
+- Group ID: [current group_id]
+- Feature Branch: [from task_group.feature_branch]
+
+**Spawn:**
+```
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["developer"],  # Merge Developer uses Haiku (simple task)
+  description: "MergeDev {group_id}: merge to {initial_branch}",
+  prompt: [Merge Developer prompt with context]
+)
+```
+
+**AFTER receiving the Merge Developer's response:**
+
+**Step 1: Parse response and output capsule to user**
+
+Extract status from response:
+- **MERGE_SUCCESS** - Branch merged, tests pass
+- **MERGE_CONFLICT** - Git merge conflicts
+- **MERGE_TEST_FAILURE** - Tests fail after merge
+
+**Step 2: Select and construct capsule based on status**
+
+IF status = MERGE_SUCCESS:
+  → Use "Merge Success" template:
+  ```
+  ✅ Group {id} merged | {feature_branch} → {initial_branch} | Tests passing → PM check
+  ```
+  → Update task_group in database:
+    - status: "completed"
+    - merge_status: "merged"
+  → **Proceed to Step 2A.8** (Spawn PM for final check)
+
+IF status = MERGE_CONFLICT:
+  → Use "Merge Conflict" template:
+  ```
+  ⚠️ Group {id} merge conflict | {conflict_files} | Developer fixing → Retry merge
+  ```
+  → Update task_group in database:
+    - status: "in_progress"
+    - merge_status: "conflict"
+  → **Spawn Developer** with conflict resolution context:
+    * Include conflicting files list
+    * Instructions: Pull initial_branch, resolve conflicts, push feature_branch
+    * After Developer fixes: Route back through QA → Tech Lead → Merge Developer
+
+IF status = MERGE_TEST_FAILURE:
+  → Use "Merge Test Failure" template:
+  ```
+  ⚠️ Group {id} merge failed tests | {test_failures} | Developer fixing → Retry merge
+  ```
+  → Update task_group in database:
+    - status: "in_progress"
+    - merge_status: "conflict"
+  → **Spawn Developer** with test failure context:
+    * Include test output and failures
+    * Instructions: Fix integration issues, push to feature_branch
+    * After Developer fixes: Route back through QA → Tech Lead → Merge Developer
+
+**Step 3: Log Merge Developer interaction** — Use §Logging Reference pattern. Agent ID: `merge_dev_group_{X}`.
 
 ### Step 2A.8: Spawn PM for Final Check
 
@@ -2117,15 +2206,41 @@ Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violat
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
-### Step 2B.7a: Phase Continuation Check (CRITICAL - PREVENTS HANG)
+### Step 2B.7a: Spawn Merge Developer (Parallel Mode - Per Group)
 
-**🔴 MANDATORY: After Tech Lead approval, check for next phase BEFORE spawning PM**
+**🔴 CRITICAL: In Parallel Mode, after Tech Lead approval, spawn Merge Developer BEFORE phase continuation check**
 
-**Actions:** 1) Update group status=completed (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count (include "deferred" status as pending), total_count.
+**This is the same process as Step 2A.7a but for each parallel group.**
 
-**Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} approved | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.8. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.8, ELSE IF current_phase in_progress → output `✅ Group {id} | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.8**
+**User output (capsule format):**
+```
+🔀 Merging | Group {id} approved → Merging {feature_branch} to {initial_branch}
+```
 
-### Step 2B.7b: Pre-Stop Verification Gate (LAYER 3 - FINAL SAFETY NET)
+**Spawn Merge Developer:** (Same as Step 2A.7a)
+```
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["developer"],
+  description: "MergeDev {group_id}: merge to {initial_branch}",
+  prompt: [Merge Developer prompt with context]
+)
+```
+
+**Route Merge Developer Response:** (Same status handling as Step 2A.7a)
+- MERGE_SUCCESS → Update group status="completed", merge_status="merged" → Continue to Step 2B.7b
+- MERGE_CONFLICT → Spawn Developer with conflict context → Back to Dev→QA→TL→Merge
+- MERGE_TEST_FAILURE → Spawn Developer with test failures → Back to Dev→QA→TL→Merge
+
+### Step 2B.7b: Phase Continuation Check (CRITICAL - PREVENTS HANG)
+
+**🔴 MANDATORY: After MERGE_SUCCESS, check for next phase BEFORE spawning PM**
+
+**Actions:** 1) Update group status=completed, merge_status=merged (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count (include "deferred" status as pending), total_count.
+
+**Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} merged | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.9. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.9, ELSE IF current_phase in_progress → output `✅ Group {id} merged | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.9**
+
+### Step 2B.7c: Pre-Stop Verification Gate (LAYER 3 - FINAL SAFETY NET)
 
 **🔴 CRITICAL: RUN THIS CHECK BEFORE ENDING ANY ORCHESTRATOR MESSAGE IN STEP 2B**
 

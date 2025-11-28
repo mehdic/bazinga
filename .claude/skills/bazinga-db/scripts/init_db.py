@@ -11,7 +11,7 @@ import tempfile
 import shutil
 
 # Current schema version
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -124,11 +124,104 @@ def init_database(db_path: str) -> None:
             # Table will be created below with CREATE TABLE IF NOT EXISTS
             print("✓ Migration to v4 complete (success_criteria table added)")
 
+        # Handle v4→v5 migration (merge-on-approval architecture)
+        if current_version == 4:
+            print("🔄 Migrating schema from v4 to v5...")
+
+            # 1. Add initial_branch to sessions
+            try:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN initial_branch TEXT DEFAULT 'main'")
+                print("   ✓ Added sessions.initial_branch")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" in str(e).lower():
+                    print("   ⊘ sessions.initial_branch already exists")
+                else:
+                    raise
+
+            # 2. Add feature_branch to task_groups
+            try:
+                cursor.execute("ALTER TABLE task_groups ADD COLUMN feature_branch TEXT")
+                print("   ✓ Added task_groups.feature_branch")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" in str(e).lower():
+                    print("   ⊘ task_groups.feature_branch already exists")
+                else:
+                    raise
+
+            # 3. Add merge_status to task_groups
+            try:
+                cursor.execute("ALTER TABLE task_groups ADD COLUMN merge_status TEXT")
+                print("   ✓ Added task_groups.merge_status")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" in str(e).lower():
+                    print("   ⊘ task_groups.merge_status already exists")
+                else:
+                    raise
+
+            # 4. Recreate task_groups with expanded status enum
+            cursor.execute("SELECT sql FROM sqlite_master WHERE name='task_groups'")
+            schema = cursor.fetchone()[0]
+
+            if 'approved_pending_merge' not in schema:
+                print("   Recreating task_groups with expanded status enum...")
+
+                # Create new table with expanded status enum
+                cursor.execute("""
+                    CREATE TABLE task_groups_new (
+                        id TEXT NOT NULL,
+                        session_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        status TEXT CHECK(status IN (
+                            'pending', 'in_progress', 'completed', 'failed',
+                            'approved_pending_merge', 'merging'
+                        )) DEFAULT 'pending',
+                        assigned_to TEXT,
+                        revision_count INTEGER DEFAULT 0,
+                        last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+                        feature_branch TEXT,
+                        merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),
+                        complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+                        initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id, session_id),
+                        FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                    )
+                """)
+
+                # Get existing columns in task_groups
+                cursor.execute("PRAGMA table_info(task_groups)")
+                existing_cols = [row[1] for row in cursor.fetchall()]
+
+                # Build column list for migration (only columns that exist)
+                all_cols = ['id', 'session_id', 'name', 'status', 'assigned_to', 'revision_count',
+                           'last_review_status', 'feature_branch', 'merge_status', 'complexity',
+                           'initial_tier', 'created_at', 'updated_at']
+                cols_to_copy = [c for c in all_cols if c in existing_cols]
+                cols_str = ', '.join(cols_to_copy)
+
+                # Copy data
+                cursor.execute(f"""
+                    INSERT INTO task_groups_new ({cols_str})
+                    SELECT {cols_str} FROM task_groups
+                """)
+
+                # Swap tables
+                cursor.execute("DROP TABLE task_groups")
+                cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
+                cursor.execute("CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status)")
+
+                print("   ✓ Recreated task_groups with expanded status enum")
+            else:
+                print("   ⊘ task_groups status enum already expanded")
+
+            print("✓ Migration to v5 complete (merge-on-approval architecture)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Add success_criteria table for BAZINGA validation"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Merge-on-approval architecture"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -145,6 +238,7 @@ def init_database(db_path: str) -> None:
             mode TEXT CHECK(mode IN ('simple', 'parallel')),
             original_requirements TEXT,
             status TEXT CHECK(status IN ('active', 'completed', 'failed')) DEFAULT 'active',
+            initial_branch TEXT DEFAULT 'main',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -197,10 +291,17 @@ def init_database(db_path: str) -> None:
             id TEXT NOT NULL,
             session_id TEXT NOT NULL,
             name TEXT NOT NULL,
-            status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'failed')) DEFAULT 'pending',
+            status TEXT CHECK(status IN (
+                'pending', 'in_progress', 'completed', 'failed',
+                'approved_pending_merge', 'merging'
+            )) DEFAULT 'pending',
             assigned_to TEXT,
             revision_count INTEGER DEFAULT 0,
             last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+            feature_branch TEXT,
+            merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),
+            complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+            initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),
