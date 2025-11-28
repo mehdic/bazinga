@@ -101,27 +101,41 @@ if [ -f "$STANDALONE_SERVER" ]; then
     STANDALONE_NEXT="$DASHBOARD_DIR/.next/standalone/.next"
     SOURCE_NEXT="$DASHBOARD_DIR/.next"
 
-    # Check if BUILD_ID exists (required for Next.js to recognize a production build)
-    if [ ! -f "$SOURCE_NEXT/BUILD_ID" ]; then
-        msg "❌ ERROR: No BUILD_ID found - standalone build is incomplete"
-        msg "   Run 'npm run build' in dashboard-v2 to create a proper build"
-        exit 1
-    fi
+    # Check if standalone is already complete (pre-packaged release)
+    if [ -f "$STANDALONE_NEXT/BUILD_ID" ]; then
+        log "Standalone build is pre-packaged and ready"
 
-    # Check if we need to sync (destination missing OR build ID mismatch)
-    SHOULD_SYNC="false"
-    if [ ! -f "$STANDALONE_NEXT/BUILD_ID" ]; then
-        SHOULD_SYNC="true"
-    elif ! cmp -s "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/BUILD_ID"; then
-        # Build IDs differ - new build detected
-        SHOULD_SYNC="true"
-    fi
+        # Check if source exists and differs (new local build)
+        if [ -f "$SOURCE_NEXT/BUILD_ID" ] && ! cmp -s "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/BUILD_ID"; then
+            msg "🔄 New build detected, syncing artifacts..."
 
-    if [ "$SHOULD_SYNC" = "true" ]; then
+            # Clean destination to avoid mixing versions
+            rm -rf "$STANDALONE_NEXT"
+            mkdir -p "$STANDALONE_NEXT"
+
+            # Copy BUILD_ID and all manifest files
+            cp "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/"
+            for file in "$SOURCE_NEXT"/*.json; do
+                [ -f "$file" ] && cp "$file" "$STANDALONE_NEXT/"
+            done
+            [ -f "$SOURCE_NEXT/prerender-manifest.js" ] && cp "$SOURCE_NEXT/prerender-manifest.js" "$STANDALONE_NEXT/"
+
+            # Copy directories
+            [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
+            [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
+
+            # Sync public folder
+            if [ -d "$DASHBOARD_DIR/public" ]; then
+                rm -rf "$DASHBOARD_DIR/.next/standalone/public"
+                cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
+            fi
+
+            log "Build artifacts synced successfully"
+        fi
+    elif [ -f "$SOURCE_NEXT/BUILD_ID" ]; then
+        # Source exists but standalone not ready - sync needed
         msg "🔄 Syncing build artifacts to standalone..."
 
-        # Clean destination to avoid mixing versions
-        rm -rf "$STANDALONE_NEXT"
         mkdir -p "$STANDALONE_NEXT"
 
         # Copy BUILD_ID and all manifest files
@@ -135,7 +149,7 @@ if [ -f "$STANDALONE_SERVER" ]; then
         [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
         [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
 
-        # Sync public folder (must update along with build artifacts)
+        # Sync public folder
         if [ -d "$DASHBOARD_DIR/public" ]; then
             rm -rf "$DASHBOARD_DIR/.next/standalone/public"
             cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
@@ -143,7 +157,11 @@ if [ -f "$STANDALONE_SERVER" ]; then
 
         log "Build artifacts synced successfully"
     else
-        log "Standalone artifacts are up to date"
+        # Neither source nor standalone has BUILD_ID - broken package
+        msg "❌ ERROR: No BUILD_ID found - standalone build is incomplete"
+        msg "   The dashboard package may be corrupted or outdated"
+        msg "   Try: bazinga update --force"
+        exit 1
     fi
 else
     msg "🔧 No standalone build found, using development mode"
