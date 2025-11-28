@@ -159,8 +159,8 @@ jobs:
             1. Download the appropriate package for your platform
             2. Extract to your bazinga project directory
             3. Run startup script:
-               - **Linux/macOS:** `scripts/start-dashboard.sh`
-               - **Windows:** `scripts/start-dashboard.ps1` (PowerShell)
+               - **Linux/macOS:** `dashboard-v2/scripts/start-standalone.sh`
+               - **Windows:** `dashboard-v2/scripts/start-standalone.ps1` (PowerShell)
 
             ### Packages
 

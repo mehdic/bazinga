@@ -176,7 +176,7 @@ if (Test-Path $STANDALONE_SERVER) {
 
 # Auto-detect DATABASE_URL if not set
 if (-not $env:DATABASE_URL) {
-    $DB_PATH = Join-Path $PROJECT_ROOT "bazinga\bazinga.db"
+    $DB_PATH = Join-Path (Join-Path $PROJECT_ROOT "bazinga") "bazinga.db"
     if (Test-Path $DB_PATH) {
         $env:DATABASE_URL = $DB_PATH
         Write-Log "Auto-detected DATABASE_URL=$DB_PATH"
@@ -233,13 +233,24 @@ if ($USE_STANDALONE) {
         $env:PORT = $DASHBOARD_PORT
 
         # Check if dev:all script exists in package.json
-        $packageJson = Get-Content "package.json" -Raw
-        if ($packageJson -match '"dev:all"') {
+        try {
+            $packageJson = Get-Content "package.json" -Raw -ErrorAction Stop
+        } catch {
+            Write-Log "ERROR - Unable to read package.json in $DASHBOARD_DIR"
+            Write-Host "ERROR - Unable to read package.json" -ForegroundColor Red
+            Pop-Location
+            exit 1
+        }
+
+        $hasDevAll = $packageJson -match '"dev:all"'
+        $script:DEV_ALL_STARTED = $false
+        if ($hasDevAll) {
             $process = Start-Process -FilePath "npm" -ArgumentList "run", "dev:all" `
                 -RedirectStandardOutput $DASHBOARD_LOG -RedirectStandardError $DASHBOARD_LOG `
                 -PassThru -WindowStyle Hidden
+            $script:DEV_ALL_STARTED = $true
         } else {
-            Write-Log "dev:all not found, starting dev only..."
+            Write-Log "dev:all not found, starting dev only (no Socket.io server)..."
             $process = Start-Process -FilePath "npm" -ArgumentList "run", "dev" `
                 -RedirectStandardOutput $DASHBOARD_LOG -RedirectStandardError $DASHBOARD_LOG `
                 -PassThru -WindowStyle Hidden
@@ -264,8 +275,12 @@ if ($serverProcess) {
         Write-Host "Dashboard server started successfully in STANDALONE mode (PID: $($process.Id))" -ForegroundColor Green
     } else {
         Write-Log "Dashboard server started successfully in DEV mode (PID: $($process.Id))"
-        Write-Log "Socket.io server on port 3001 (real-time updates)"
         Write-Host "Dashboard server started successfully in DEV mode (PID: $($process.Id))" -ForegroundColor Green
+        if ($script:DEV_ALL_STARTED) {
+            $SOCKET_PORT = if ($env:SOCKET_PORT) { $env:SOCKET_PORT } else { "3001" }
+            Write-Log "Socket.io server on port $SOCKET_PORT (real-time updates)"
+            Write-Host "Socket.io server on port $SOCKET_PORT (real-time updates)" -ForegroundColor Cyan
+        }
     }
     Write-Log "Dashboard available at http://localhost:$DASHBOARD_PORT"
     Write-Host "Dashboard available at http://localhost:$DASHBOARD_PORT" -ForegroundColor Cyan
