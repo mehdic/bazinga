@@ -60,10 +60,19 @@ if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/n
     exit 0
 fi
 
-# Check if port is in use by another process
-if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+# Check if port is in use (try lsof, then ss, then netstat)
+PORT_IN_USE=0
+if command -v lsof >/dev/null 2>&1; then
+    lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1 && PORT_IN_USE=1
+elif command -v ss >/dev/null 2>&1; then
+    ss -lnt "sport = :$DASHBOARD_PORT" | grep -q LISTEN && PORT_IN_USE=1
+elif command -v netstat >/dev/null 2>&1; then
+    netstat -ln | grep -q ":$DASHBOARD_PORT " && PORT_IN_USE=1
+fi
+
+if [ "$PORT_IN_USE" -eq 1 ]; then
     msg "❌ ERROR: Port $DASHBOARD_PORT already in use by another process"
-    msg "   Run: lsof -i :$DASHBOARD_PORT to see what's using it"
+    msg "   Check what's using the port and stop it first"
     exit 1
 fi
 
@@ -90,43 +99,37 @@ if [ -f "$STANDALONE_SERVER" ]; then
         exit 1
     fi
 
-    # Copy required build artifacts to standalone/.next/
-    # Next.js standalone needs these files to recognize a valid production build
-    mkdir -p "$STANDALONE_NEXT"
-
-    # Copy BUILD_ID (required)
+    # Check if we need to sync (destination missing OR build ID mismatch)
+    SHOULD_SYNC="false"
     if [ ! -f "$STANDALONE_NEXT/BUILD_ID" ]; then
-        log "Copying BUILD_ID to standalone..."
+        SHOULD_SYNC="true"
+    elif ! cmp -s "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/BUILD_ID"; then
+        # Build IDs differ - new build detected
+        SHOULD_SYNC="true"
+    fi
+
+    if [ "$SHOULD_SYNC" = "true" ]; then
+        msg "🔄 Syncing build artifacts to standalone..."
+
+        # Clean destination to avoid mixing versions
+        rm -rf "$STANDALONE_NEXT"
+        mkdir -p "$STANDALONE_NEXT"
+
+        # Copy BUILD_ID and all manifest files
         cp "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/"
+        cp "$SOURCE_NEXT/"*.json "$STANDALONE_NEXT/" 2>/dev/null || true
+        [ -f "$SOURCE_NEXT/prerender-manifest.js" ] && cp "$SOURCE_NEXT/prerender-manifest.js" "$STANDALONE_NEXT/"
+
+        # Copy directories
+        [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
+        [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
+
+        log "Build artifacts synced successfully"
+    else
+        log "Standalone artifacts are up to date"
     fi
 
-    # Copy required manifest files
-    for manifest in \
-        build-manifest.json \
-        prerender-manifest.json \
-        prerender-manifest.js \
-        routes-manifest.json \
-        react-loadable-manifest.json \
-        app-build-manifest.json; do
-        if [ -f "$SOURCE_NEXT/$manifest" ] && [ ! -f "$STANDALONE_NEXT/$manifest" ]; then
-            log "Copying $manifest to standalone..."
-            cp "$SOURCE_NEXT/$manifest" "$STANDALONE_NEXT/"
-        fi
-    done
-
-    # Copy static files
-    if [ -d "$SOURCE_NEXT/static" ] && [ ! -d "$STANDALONE_NEXT/static" ]; then
-        log "Copying static files to standalone..."
-        cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
-    fi
-
-    # Copy server directory (contains compiled pages/routes)
-    if [ -d "$SOURCE_NEXT/server" ] && [ ! -d "$STANDALONE_NEXT/server" ]; then
-        log "Copying server files to standalone..."
-        cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
-    fi
-
-    # Copy public folder if exists
+    # Copy public folder if exists (separate from .next)
     if [ -d "$DASHBOARD_DIR/public" ] && [ ! -d "$DASHBOARD_DIR/.next/standalone/public" ]; then
         log "Copying public folder to standalone..."
         cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
