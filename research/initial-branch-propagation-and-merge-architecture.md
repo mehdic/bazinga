@@ -132,7 +132,17 @@ Step 3: MERGE (After Tech Lead Approval)
 
 ## Database Schema Changes
 
-### sessions table - Add initial_branch column
+### Complete Database Changes Summary
+
+| Table | Change | Type |
+|-------|--------|------|
+| `sessions` | Add `initial_branch` column | New column |
+| `task_groups` | Add values to `status` enum | Enum update |
+| `task_groups` | Add `merge_status` column | New column |
+| `task_groups` | Add `feature_branch` column | New column |
+| `task_groups.last_review_status` | **NO CHANGE** | Keep as-is |
+
+### 1. sessions table - Add initial_branch column
 
 ```sql
 -- Current schema
@@ -146,35 +156,280 @@ CREATE TABLE sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- NEW schema (add column)
+-- Migration: Add initial_branch column
 ALTER TABLE sessions ADD COLUMN initial_branch TEXT DEFAULT 'main';
 ```
 
-### Migration Script
+### 2. task_groups table - Add merge tracking columns
+
+```sql
+-- Current task_groups schema
+CREATE TABLE task_groups (
+    id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'failed')) DEFAULT 'pending',
+    assigned_to TEXT,
+    revision_count INTEGER DEFAULT 0,
+    last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+    -- ... other columns
+);
+
+-- Migration 1: Add feature_branch column (tracks developer's branch)
+ALTER TABLE task_groups ADD COLUMN feature_branch TEXT;
+
+-- Migration 2: Add merge_status column (tracks merge state)
+ALTER TABLE task_groups ADD COLUMN merge_status TEXT
+    CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL))
+    DEFAULT NULL;
+
+-- Migration 3: Update status enum (recreate table due to SQLite CHECK constraint)
+-- SQLite doesn't support ALTER COLUMN, need to recreate table
+
+CREATE TABLE task_groups_new (
+    id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT CHECK(status IN (
+        'pending',
+        'in_progress',
+        'completed',
+        'failed',
+        'approved_pending_merge',  -- NEW: TL approved, waiting for merge slot
+        'merging'                  -- NEW: merge in progress
+    )) DEFAULT 'pending',
+    assigned_to TEXT,
+    revision_count INTEGER DEFAULT 0,
+    last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+    feature_branch TEXT,           -- NEW: developer's feature branch
+    merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),  -- NEW
+    complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+    initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, session_id),
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+);
+
+-- Copy data
+INSERT INTO task_groups_new SELECT
+    id, session_id, name, status, assigned_to, revision_count, last_review_status,
+    NULL, NULL,  -- feature_branch, merge_status (new columns)
+    complexity, initial_tier, created_at, updated_at
+FROM task_groups;
+
+-- Swap tables
+DROP TABLE task_groups;
+ALTER TABLE task_groups_new RENAME TO task_groups;
+
+-- Recreate index
+CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
+```
+
+### 3. last_review_status - NO CHANGE NEEDED
+
+```sql
+-- Current constraint (KEEP AS-IS)
+last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL))
+```
+
+**Why no change?**
+- Tech Lead only uses `APPROVED` or `CHANGES_REQUESTED`
+- My design keeps Tech Lead as pure reviewer (no merge)
+- Merge Developer status stored in separate `merge_status` column
+
+### Migration Script (Complete)
 
 ```python
-# File: .claude/skills/bazinga-db/scripts/migrate_initial_branch.py
+# File: .claude/skills/bazinga-db/scripts/migrate_merge_architecture.py
 
-def migrate():
-    """Add initial_branch column to sessions table."""
-    cursor.execute("""
-        ALTER TABLE sessions
-        ADD COLUMN initial_branch TEXT DEFAULT 'main'
-    """)
+import sqlite3
+from datetime import datetime
 
-    # Backfill existing sessions from pm_state if available
+def migrate(db_path: str):
+    """
+    Migration for merge-on-approval architecture.
+
+    Changes:
+    1. Add initial_branch to sessions
+    2. Add feature_branch to task_groups
+    3. Add merge_status to task_groups
+    4. Expand task_groups.status enum
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    print("Starting merge architecture migration...")
+
+    # 1. Add initial_branch to sessions
+    try:
+        cursor.execute("ALTER TABLE sessions ADD COLUMN initial_branch TEXT DEFAULT 'main'")
+        print("✓ Added sessions.initial_branch")
+    except sqlite3.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            print("⊘ sessions.initial_branch already exists")
+        else:
+            raise
+
+    # 2. Backfill initial_branch from pm_state if available
     cursor.execute("""
         UPDATE sessions
-        SET initial_branch = (
-            SELECT json_extract(state_data, '$.initial_branch')
-            FROM state_snapshots
-            WHERE state_snapshots.session_id = sessions.session_id
-            AND state_type = 'pm'
-            ORDER BY timestamp DESC
-            LIMIT 1
+        SET initial_branch = COALESCE(
+            (SELECT json_extract(state_data, '$.initial_branch')
+             FROM state_snapshots
+             WHERE state_snapshots.session_id = sessions.session_id
+             AND state_type = 'pm'
+             ORDER BY timestamp DESC
+             LIMIT 1),
+            'main'
         )
-        WHERE initial_branch IS NULL
+        WHERE initial_branch IS NULL OR initial_branch = ''
     """)
+    print(f"✓ Backfilled initial_branch for {cursor.rowcount} sessions")
+
+    # 3. Add feature_branch to task_groups
+    try:
+        cursor.execute("ALTER TABLE task_groups ADD COLUMN feature_branch TEXT")
+        print("✓ Added task_groups.feature_branch")
+    except sqlite3.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            print("⊘ task_groups.feature_branch already exists")
+        else:
+            raise
+
+    # 4. Add merge_status to task_groups
+    try:
+        cursor.execute("""
+            ALTER TABLE task_groups ADD COLUMN merge_status TEXT
+            CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL))
+        """)
+        print("✓ Added task_groups.merge_status")
+    except sqlite3.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            print("⊘ task_groups.merge_status already exists")
+        else:
+            raise
+
+    # 5. Recreate task_groups with expanded status enum
+    # Check if migration already done by looking for new status values
+    cursor.execute("SELECT sql FROM sqlite_master WHERE name='task_groups'")
+    schema = cursor.fetchone()[0]
+
+    if 'approved_pending_merge' not in schema:
+        print("Recreating task_groups with expanded status enum...")
+
+        # Create new table
+        cursor.execute("""
+            CREATE TABLE task_groups_new (
+                id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                status TEXT CHECK(status IN (
+                    'pending', 'in_progress', 'completed', 'failed',
+                    'approved_pending_merge', 'merging'
+                )) DEFAULT 'pending',
+                assigned_to TEXT,
+                revision_count INTEGER DEFAULT 0,
+                last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+                feature_branch TEXT,
+                merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', NULL)),
+                complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+                initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id, session_id),
+                FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+            )
+        """)
+
+        # Copy data (handle missing columns gracefully)
+        cursor.execute("""
+            INSERT INTO task_groups_new
+            SELECT id, session_id, name, status, assigned_to, revision_count, last_review_status,
+                   feature_branch, merge_status, complexity, initial_tier, created_at, updated_at
+            FROM task_groups
+        """)
+
+        # Swap tables
+        cursor.execute("DROP TABLE task_groups")
+        cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
+        cursor.execute("CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status)")
+
+        print("✓ Recreated task_groups with expanded status enum")
+    else:
+        print("⊘ task_groups status enum already expanded")
+
+    conn.commit()
+    conn.close()
+    print("Migration complete!")
+
+if __name__ == "__main__":
+    migrate("bazinga/bazinga.db")
+```
+
+### Database State Transitions
+
+```
+task_groups.status flow:
+─────────────────────────
+
+pending → in_progress → completed
+                    ↘ failed
+
+NEW flow with merge:
+pending → in_progress → approved_pending_merge → merging → completed
+                                              ↘ in_progress (conflict, back to dev)
+
+
+task_groups.merge_status flow:
+──────────────────────────────
+
+NULL (not yet approved)
+  ↓
+pending (TL approved, waiting for merge)
+  ↓
+in_progress (Merge Developer working)
+  ↓
+merged (success) OR conflict (failed, needs dev fix)
+```
+
+### bazinga-db Skill Updates Required
+
+```python
+# New commands needed in bazinga_db.py:
+
+# 1. Create session with initial_branch
+def create_session(session_id, mode, requirements, initial_branch='main'):
+    cursor.execute("""
+        INSERT INTO sessions (session_id, mode, original_requirements, initial_branch)
+        VALUES (?, ?, ?, ?)
+    """, (session_id, mode, requirements, initial_branch))
+
+# 2. Get initial_branch for session
+def get_initial_branch(session_id):
+    cursor.execute("SELECT initial_branch FROM sessions WHERE session_id = ?", (session_id,))
+    return cursor.fetchone()[0]
+
+# 3. Update task group with feature_branch
+def update_task_group(group_id, session_id, feature_branch=None, merge_status=None, **kwargs):
+    # ... existing logic plus new columns
+
+# 4. Get merge queue (groups waiting to merge)
+def get_merge_queue(session_id):
+    cursor.execute("""
+        SELECT id, feature_branch FROM task_groups
+        WHERE session_id = ? AND status = 'approved_pending_merge'
+        ORDER BY updated_at ASC
+    """, (session_id,))
+    return cursor.fetchall()
+
+# 5. Check if merge in progress
+def is_merge_in_progress(session_id):
+    cursor.execute("""
+        SELECT COUNT(*) FROM task_groups
+        WHERE session_id = ? AND status = 'merging'
+    """, (session_id,))
+    return cursor.fetchone()[0] > 0
 ```
 
 ---
