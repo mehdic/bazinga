@@ -5,14 +5,16 @@
 # Sends analysis/plan documents to OpenAI and Gemini for review,
 # then returns their feedback for integration.
 #
-# Usage: ./scripts/ultrathink-review.sh <plan_file> [additional_files...]
+# Usage: ./dev-scripts/llm-reviews.sh <plan_file> [additional_files...]
 #
 # Environment variables required:
 #   OPENAI_API_KEY - OpenAI API key
 #   GEMINI_API_KEY - Google Gemini API key
 #
 # Example:
-#   ./scripts/ultrathink-review.sh research/my-plan.md scripts/foo.sh src/bar.py
+#   ./dev-scripts/llm-reviews.sh research/my-plan.md scripts/foo.sh src/bar.py
+#
+# Note: This script is for BAZINGA development only, not copied to clients.
 
 set -e
 
@@ -23,8 +25,8 @@ cd "$REPO_ROOT"
 # Configuration
 # -----------------------------------------------------------------------------
 
-OPENAI_MODEL="gpt-4o"
-GEMINI_MODEL="gemini-1.5-pro"
+OPENAI_MODEL="gpt-5"
+GEMINI_MODEL="gemini-3-pro-preview"
 OUTPUT_DIR="$REPO_ROOT/tmp/ultrathink-reviews"
 AGENTS_DIR="$REPO_ROOT/agents"
 
@@ -46,7 +48,7 @@ if [ $# -lt 1 ]; then
     echo "Usage: $0 <plan_file> [additional_files...]"
     echo ""
     echo "Example:"
-    echo "  $0 research/my-plan.md scripts/foo.sh"
+    echo "  $0 research/my-plan.md dev-scripts/foo.sh"
     exit 1
 fi
 

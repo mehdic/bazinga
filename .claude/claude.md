@@ -379,8 +379,8 @@ export GEMINI_API_KEY="..."
 
 **Step 3: Get External Reviews**
 ```bash
-# Run the multi-LLM review script
-./scripts/ultrathink-review.sh research/{your-plan}.md [additional-files...]
+# Run the multi-LLM review script (dev-only, not copied to clients)
+./dev-scripts/llm-reviews.sh research/{your-plan}.md [additional-files...]
 
 # The script automatically includes:
 # - All agent files from agents/*.md
@@ -398,6 +398,12 @@ export GEMINI_API_KEY="..."
 - Update the research document with integrated feedback
 - Mark status as reviewed
 
+**Step 6: Cleanup**
+- Delete the temporary review files (no longer needed after integration)
+```bash
+rm -rf tmp/ultrathink-reviews/
+```
+
 ### Document Structure
 ```markdown
 # {Title}: {Analysis Type}
@@ -406,7 +412,7 @@ export GEMINI_API_KEY="..."
 **Context:** {Brief context}
 **Decision:** {What was decided}
 **Status:** {Proposed/Reviewed/Implemented/Abandoned}
-**Reviewed by:** OpenAI GPT-4o, Google Gemini 1.5 Pro
+**Reviewed by:** OpenAI GPT-5, Google Gemini 3 Pro
 
 ---
 
@@ -456,13 +462,13 @@ export GEMINI_API_KEY="..."
 
 ### Script Reference
 
-**Location:** `scripts/ultrathink-review.sh`
+**Location:** `dev-scripts/llm-reviews.sh` (dev-only, not copied to clients)
 
 **What it does:**
 1. Gathers all agent definitions from `agents/*.md`
 2. Includes any additional files you specify
-3. Sends plan + context to OpenAI GPT-4o
-4. Sends plan + context to Google Gemini 1.5 Pro
+3. Sends plan + context to OpenAI GPT-5
+4. Sends plan + context to Google Gemini 3 Pro
 5. Saves individual reviews and combined summary
 
 **Output files:**
@@ -473,13 +479,13 @@ export GEMINI_API_KEY="..."
 **Usage examples:**
 ```bash
 # Basic: Just the plan (agents included automatically)
-./scripts/ultrathink-review.sh research/my-plan.md
+./dev-scripts/llm-reviews.sh research/my-plan.md
 
 # With additional scripts
-./scripts/ultrathink-review.sh research/my-plan.md scripts/build.sh
+./dev-scripts/llm-reviews.sh research/my-plan.md scripts/build.sh
 
 # With code files
-./scripts/ultrathink-review.sh research/api-design.md src/api/routes.py src/models/user.py
+./dev-scripts/llm-reviews.sh research/api-design.md src/api/routes.py src/models/user.py
 ```
 
 ### Why This Matters
