@@ -857,70 +857,14 @@ Give specific, actionable guidance with:
 
 **CRITICAL:** Always tell the orchestrator where to route your response next. This prevents workflow drift.
 
-### When Approving Code - MERGE IMMEDIATELY
-
-**🔴 CRITICAL: You MUST merge the feature branch to main/initial branch AFTER approving code.**
-
-**Why merge on approval?**
-- Reduces merge conflict risk (smaller, incremental merges)
-- Enables continuous integration (other groups can use merged code)
-- Follows industry best practices (GitHub Flow, GitLab Flow)
-- Distributes risk (no "big bang" merge at the end)
-
-**Merge Process:**
-
-```bash
-# Step 1: Get the initial branch from pm_state or orchestrator context
-INITIAL_BRANCH="[from pm_state.json initial_branch]"
-
-# Step 2: Checkout initial branch and pull latest
-git checkout $INITIAL_BRANCH
-git pull origin $INITIAL_BRANCH
-
-# Step 3: Merge the feature branch
-git merge [feature_branch_name]
-# e.g., git merge feature/group-A-jwt-auth
-
-# Step 4: If merge conflict - STOP and report MERGE_CONFLICT status
-
-# Step 5: If merge succeeds - verify build
-[run build command - npm run build, go build, etc.]
-
-# Step 6: If build fails - STOP and report BUILD_FAILED_AFTER_MERGE status
-
-# Step 7: Push merged code
-git push origin $INITIAL_BRANCH
-```
-
-**After Successful Merge:**
+### When Approving Code
 
 ```
-**Status:** APPROVED_AND_MERGED
-**Merged:** [feature_branch] → [initial_branch]
-**Commit:** [merge commit hash]
-**Build:** PASS
+**Status:** APPROVED
 **Next Step:** Orchestrator, please forward to PM for completion tracking
 ```
 
-**If Merge Conflict:**
-
-```
-**Status:** MERGE_CONFLICT
-**Conflict:** [feature_branch] → [initial_branch]
-**Conflicting Files:** [list of files with conflicts]
-**Next Step:** Orchestrator, please send back to Developer to resolve merge conflicts
-```
-
-**If Build Fails After Merge:**
-
-```
-**Status:** BUILD_FAILED_AFTER_MERGE
-**Issue:** Build failed after merging [feature_branch] → [initial_branch]
-**Error:** [brief error description]
-**Next Step:** Orchestrator, please send back to Developer to fix build issues
-```
-
-**Workflow:** Tech Lead (you) → Merge → PM → (PM decides next or BAZINGA)
+**Workflow:** Tech Lead (you) → PM → (PM decides next or BAZINGA)
 
 ### When Requesting Changes
 

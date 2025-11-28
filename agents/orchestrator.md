@@ -100,7 +100,7 @@ All user-visible updates MUST use the capsule format:
 |-------|------------------------|
 | Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR |
 | QA Expert | PASS, FAIL, PARTIAL, BLOCKED, ESCALATE_SENIOR |
-| Tech Lead | APPROVED_AND_MERGED, APPROVED, MERGE_CONFLICT, BUILD_FAILED_AFTER_MERGE, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
+| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
 | PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
 | Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
 
@@ -232,14 +232,10 @@ QA: 3 tests failed in auth edge cases
 ```
 Developer Status: READY_FOR_QA → Spawn QA Expert
 QA Result: PASS → Spawn Tech Lead
-Tech Lead Decision: APPROVED_AND_MERGED → Spawn PM (branch merged ✅)
-Tech Lead Decision: MERGE_CONFLICT → Spawn Developer (resolve conflicts)
-Tech Lead Decision: BUILD_FAILED_AFTER_MERGE → Spawn Developer (fix build)
+Tech Lead Decision: APPROVED → Spawn PM
 PM Response: More work → Spawn Developers
 PM Response: BAZINGA → END
 ```
-
-**Note:** Tech Lead now merges each feature branch immediately after approval (continuous integration). No "final merge developer" step needed.
 
 **NEVER skip steps. NEVER directly instruct agents. ALWAYS spawn.**
 
@@ -1653,30 +1649,11 @@ Task(
 
 ### Step 2A.7: Route Tech Lead Response
 
-**IF Tech Lead reports APPROVED_AND_MERGED:**
-- Feature branch has been merged to initial branch ✅
-- Build verified passing ✅
+**IF Tech Lead approves:**
 - **Immediately proceed to Step 2A.8** (Spawn PM for final check)
 - Do NOT stop for user input
 
-**IF Tech Lead reports APPROVED (legacy - no merge):**
-- **Immediately proceed to Step 2A.8** (Spawn PM for final check)
-- Note: New workflow expects APPROVED_AND_MERGED; APPROVED is backwards-compatible
-- Do NOT stop for user input
-
-**IF Tech Lead reports MERGE_CONFLICT:**
-- **IMMEDIATELY spawn Developer** to resolve merge conflicts
-- Include conflict details from Tech Lead response
-- Developer resolves conflicts → QA retests → Tech Lead re-reviews
-- Do NOT stop for user input
-
-**IF Tech Lead reports BUILD_FAILED_AFTER_MERGE:**
-- **IMMEDIATELY spawn Developer** to fix build issues
-- Include build error details from Tech Lead response
-- Developer fixes → QA retests → Tech Lead re-reviews
-- Do NOT stop for user input
-
-**IF Tech Lead requests changes (CHANGES_REQUESTED):**
+**IF Tech Lead requests changes:**
 - **IMMEDIATELY spawn appropriate agent Task** with Tech Lead feedback (do NOT just write a message)
 
 **Determine which agent to spawn:**
