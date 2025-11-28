@@ -232,7 +232,9 @@ if ($USE_STANDALONE) {
             -RedirectStandardOutput $DASHBOARD_LOG -RedirectStandardError $DASHBOARD_LOG `
             -PassThru -WindowStyle Hidden
 
-        $SOCKET_PID_FILE = Join-Path $BAZINGA_DIR "socket.pid"
+        # Use same directory as DASHBOARD_PID_FILE (respects TEMP fallback)
+        $PID_DIR = Split-Path -Parent $DASHBOARD_PID_FILE
+        $SOCKET_PID_FILE = Join-Path $PID_DIR "socket.pid"
         $socketProcess.Id | Out-File -FilePath $SOCKET_PID_FILE -Encoding ASCII
         Write-Log "Socket.io server started (PID: $($socketProcess.Id)) on port $SOCKET_PORT"
     } else {
