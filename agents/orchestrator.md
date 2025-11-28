@@ -1772,24 +1772,27 @@ IF decision = INVESTIGATION_NEEDED:
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
-**🔴 CRITICAL: NEVER SHOW OPTIONS TO USER - AUTO-ROUTE INSTEAD**
+**🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
 
-If PM response contains numbered options like "Would you like me to: 1. Continue... 2. Stop...", this is a PM VIOLATION. You must:
-1. **DO NOT display the options to the user**
-2. **Infer the correct action** from context and route automatically
-3. **Log the violation** in database for PM training
+**PRECEDENCE:** If PM includes explicit status code (CONTINUE, BAZINGA, NEEDS_CLARIFICATION), use that status. Only apply inference when status is missing.
 
-Analyze response content to infer intent:
-- Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
-- Requests changes, fixes, or updates → CONTINUE
+**Detect PERMISSION-SEEKING patterns (auto-route these):**
+- "Would you like me to continue/proceed/start/resume..."
+- "Should I spawn/assign/begin..."
+- "Do you want me to keep going..."
+
+**DO NOT auto-route PRODUCT/TECHNICAL questions:**
+- "Would you like Postgres or MySQL?" → NEEDS_CLARIFICATION (legitimate)
+- "Should the API use REST or GraphQL?" → NEEDS_CLARIFICATION (legitimate)
+
+**Inference rules (only when no explicit status):**
+- Mentions failures, errors, blockers → INVESTIGATION_NEEDED
+- Requests changes, fixes, updates → CONTINUE
 - Indicates completion or approval → BAZINGA
-- Asks about requirements or scope → NEEDS_CLARIFICATION
-- **Presents numbered options (1. 2. 3.)** → Infer from context: incomplete work = CONTINUE, all done = BAZINGA
-- **Asks "Would you like..."** → Treat as CONTINUE (PM should never ask permission)
+- Asks about requirements/scope/technical choices → NEEDS_CLARIFICATION
+- **Permission-seeking pattern detected** → CONTINUE (PM shouldn't ask permission)
 
-Use inferred decision for routing (as if PM explicitly stated it).
-
-**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent. Do NOT stop to show user PM's options.
+**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent.
 
 **Step 3: Output capsule to user**
 
@@ -1859,26 +1862,10 @@ Skill(command: "velocity-tracker")
 
 **Without this rule:** Orchestrator hangs after Phase 1, waiting indefinitely for user to say "continue"
 
-**🔴 ANTI-OPTIONS ENFORCEMENT AT PHASE BOUNDARIES:**
+**🔴 PHASE BOUNDARY AUTO-CONTINUATION:**
 
-When PM returns after a phase completes, PM might incorrectly ask:
-```
-Would you like me to:
-1. Continue with Phase 2?
-2. Pause here?
-3. Generate a report?
-```
-
-**THIS IS A BUG. DO NOT PRESENT THESE OPTIONS TO THE USER.**
-
-Instead:
-1. **Detect the options pattern** (numbered list with "Would you like")
-2. **Auto-select CONTINUE** if pending phases/groups exist
-3. **Auto-select BAZINGA path** if all work is complete
-4. **Immediately spawn agents** based on your inference
-5. **Output to user:** `🔄 Auto-continuing | Phase {N} complete | Starting Phase {N+1}` (NOT the options)
-
-**The user should NEVER see PM's numbered options. You always auto-route.**
+If PM asks "Would you like me to continue with Phase N?" → Auto-select CONTINUE if pending work exists.
+Output: `🔄 Auto-continuing | Phase {N} complete | Starting Phase {N+1}`
 
 **REAL-WORLD BUG EXAMPLE (THE BUG WE'RE FIXING):**
 
@@ -2195,24 +2182,27 @@ Use §PM Response Parsing to extract decision, assessment, feedback.
 
 **IF PM response lacks explicit status code OR presents options/questions:**
 
-**🔴 CRITICAL: NEVER SHOW OPTIONS TO USER - AUTO-ROUTE INSTEAD**
+**🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
 
-If PM response contains numbered options like "Would you like me to: 1. Continue... 2. Stop...", this is a PM VIOLATION. You must:
-1. **DO NOT display the options to the user**
-2. **Infer the correct action** from context and route automatically
-3. **Log the violation** in database for PM training
+**PRECEDENCE:** If PM includes explicit status code (CONTINUE, BAZINGA, NEEDS_CLARIFICATION), use that status. Only apply inference when status is missing.
 
-Analyze response content to infer intent:
-- Mentions failures, errors, blockers, or unknown root cause → INVESTIGATION_NEEDED
-- Requests changes, fixes, or updates → CONTINUE
+**Detect PERMISSION-SEEKING patterns (auto-route these):**
+- "Would you like me to continue/proceed/start/resume..."
+- "Should I spawn/assign/begin..."
+- "Do you want me to keep going..."
+
+**DO NOT auto-route PRODUCT/TECHNICAL questions:**
+- "Would you like Postgres or MySQL?" → NEEDS_CLARIFICATION (legitimate)
+- "Should the API use REST or GraphQL?" → NEEDS_CLARIFICATION (legitimate)
+
+**Inference rules (only when no explicit status):**
+- Mentions failures, errors, blockers → INVESTIGATION_NEEDED
+- Requests changes, fixes, updates → CONTINUE
 - Indicates completion or approval → BAZINGA
-- Asks about requirements or scope → NEEDS_CLARIFICATION
-- **Presents numbered options (1. 2. 3.)** → Infer from context: incomplete work = CONTINUE, all done = BAZINGA
-- **Asks "Would you like..."** → Treat as CONTINUE (PM should never ask permission)
+- Asks about requirements/scope/technical choices → NEEDS_CLARIFICATION
+- **Permission-seeking pattern detected** → CONTINUE (PM shouldn't ask permission)
 
-Use inferred decision for routing (as if PM explicitly stated it).
-
-**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent. Do NOT stop to show user PM's options.
+**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent.
 
 **Step 2: Log PM response** — Use §Logging Reference pattern. Agent ID: `pm_parallel_final`.
 
