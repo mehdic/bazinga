@@ -1776,7 +1776,13 @@ IF status = MERGE_CONFLICT:
     - merge_status: "conflict"
   → **Spawn Developer** with conflict resolution context:
     * Include conflicting files list
-    * Instructions: Pull initial_branch, resolve conflicts, push feature_branch
+    * Instructions:
+      1. Checkout feature_branch: `git checkout {feature_branch}`
+      2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
+      3. Resolve all conflicts
+      4. Commit the resolution: `git commit -m "Resolve merge conflicts with {initial_branch}"`
+      5. Push feature_branch: `git push origin {feature_branch}`
+    * **CRITICAL:** This ensures feature_branch is up-to-date with initial_branch before retry merge
     * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
 
 IF status = MERGE_TEST_FAILURE:
@@ -1789,7 +1795,13 @@ IF status = MERGE_TEST_FAILURE:
     - merge_status: "test_failure"  # NOT "conflict" - these are distinct issues
   → **Spawn Developer** with test failure context:
     * Include test output and failures
-    * Instructions: Fix integration issues, push to feature_branch
+    * Instructions:
+      1. Checkout feature_branch: `git checkout {feature_branch}`
+      2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
+      3. Fix the integration test failures
+      4. Run tests locally to verify fixes
+      5. Commit and push: `git add . && git commit -m "Fix integration test failures" && git push origin {feature_branch}`
+    * **CRITICAL:** This ensures feature_branch incorporates latest initial_branch changes before retry
     * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
 
 **Step 3: Log Developer merge interaction** — Use §Logging Reference pattern. Agent ID: `dev_merge_group_{X}`.
