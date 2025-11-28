@@ -80,11 +80,44 @@ if [ -f "$STANDALONE_SERVER" ]; then
     msg "📦 Found pre-built standalone server"
     USE_STANDALONE="true"
 
-    # Ensure static files are copied to standalone
-    if [ -d "$DASHBOARD_DIR/.next/static" ] && [ ! -d "$DASHBOARD_DIR/.next/standalone/.next/static" ]; then
+    STANDALONE_NEXT="$DASHBOARD_DIR/.next/standalone/.next"
+    SOURCE_NEXT="$DASHBOARD_DIR/.next"
+
+    # Check if BUILD_ID exists (required for Next.js to recognize a production build)
+    if [ ! -f "$SOURCE_NEXT/BUILD_ID" ]; then
+        msg "❌ ERROR: No BUILD_ID found - standalone build is incomplete"
+        msg "   Run 'npm run build' in dashboard-v2 to create a proper build"
+        exit 1
+    fi
+
+    # Copy required build artifacts to standalone/.next/
+    # Next.js standalone needs these files to recognize a valid production build
+    mkdir -p "$STANDALONE_NEXT"
+
+    # Copy BUILD_ID (required)
+    if [ ! -f "$STANDALONE_NEXT/BUILD_ID" ]; then
+        log "Copying BUILD_ID to standalone..."
+        cp "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/"
+    fi
+
+    # Copy required manifest files
+    for manifest in build-manifest.json prerender-manifest.json prerender-manifest.js routes-manifest.json react-loadable-manifest.json app-build-manifest.json; do
+        if [ -f "$SOURCE_NEXT/$manifest" ] && [ ! -f "$STANDALONE_NEXT/$manifest" ]; then
+            log "Copying $manifest to standalone..."
+            cp "$SOURCE_NEXT/$manifest" "$STANDALONE_NEXT/"
+        fi
+    done
+
+    # Copy static files
+    if [ -d "$SOURCE_NEXT/static" ] && [ ! -d "$STANDALONE_NEXT/static" ]; then
         log "Copying static files to standalone..."
-        mkdir -p "$DASHBOARD_DIR/.next/standalone/.next"
-        cp -r "$DASHBOARD_DIR/.next/static" "$DASHBOARD_DIR/.next/standalone/.next/"
+        cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
+    fi
+
+    # Copy server directory (contains compiled pages/routes)
+    if [ -d "$SOURCE_NEXT/server" ] && [ ! -d "$STANDALONE_NEXT/server" ]; then
+        log "Copying server files to standalone..."
+        cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
     fi
 
     # Copy public folder if exists
