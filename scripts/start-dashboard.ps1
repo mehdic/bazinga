@@ -16,16 +16,19 @@ $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PARENT_DIR = Split-Path -Leaf (Split-Path -Parent $SCRIPT_DIR)
 if ($PARENT_DIR -eq "bazinga") {
     # Installed layout: PROJECT_ROOT/bazinga/scripts/start-dashboard.ps1
+    # Dashboard at: PROJECT_ROOT/bazinga/dashboard-v2
     $PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $SCRIPT_DIR)
     $BAZINGA_DIR = Join-Path $PROJECT_ROOT "bazinga"
+    $DASHBOARD_DIR = Join-Path $BAZINGA_DIR "dashboard-v2"
 } else {
     # Development layout: PROJECT_ROOT/scripts/start-dashboard.ps1
+    # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside bazinga/)
     $PROJECT_ROOT = Split-Path -Parent $SCRIPT_DIR
     $BAZINGA_DIR = Join-Path $PROJECT_ROOT "bazinga"
+    $DASHBOARD_DIR = Join-Path $PROJECT_ROOT "dashboard-v2"
 }
 
 $DASHBOARD_PORT = if ($env:DASHBOARD_PORT) { $env:DASHBOARD_PORT } else { "3000" }
-$DASHBOARD_DIR = Join-Path $BAZINGA_DIR "dashboard-v2"
 $USE_STANDALONE = $false
 
 # Determine log/pid file location - use BAZINGA_DIR if writable, else TEMP
