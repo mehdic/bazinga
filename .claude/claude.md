@@ -489,6 +489,31 @@ Count: 3 extracted, 3 addressed ✓
 
 **If count doesn't match, STOP and fix before proceeding.**
 
+### 🔴 MANDATORY: Final Summary Table
+
+**When finishing PR review, you MUST present a complete table of ALL suggestions:**
+
+```markdown
+## PR #XXX - Complete Suggestions Table
+
+| # | File:Line | Suggestion | Action |
+|---|-----------|------------|--------|
+| 1 | file.sh:42 | Quote variable $FOO | ✅ Fixed in commit abc123 |
+| 2 | file.sh:55 | Add error handling | ✅ Fixed in commit abc123 |
+| 3 | file.sh:78 | Use different approach | ⏭️ Skipped - current approach is correct |
+| ... | ... | ... | ... |
+
+**Count: X extracted, X addressed ✓**
+```
+
+**This table MUST include:**
+- Every single suggestion from PR review threads
+- File path and line number
+- Brief description of suggestion
+- Action taken (✅ Fixed / ⏭️ Skipped with reason)
+
+**Present this table to the user before declaring the PR review complete.**
+
 ### Verification
 
 Before implementing any "fix":
