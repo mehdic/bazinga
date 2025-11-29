@@ -432,20 +432,111 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 
 **When the user pastes a GitHub PR link for review:**
 
+### 🔴 CRITICAL: All Feedback Sources Are Equal
+
+**Treat ALL feedback as reviews, regardless of source:**
+- Automated review comments (Copilot, CodeRabbit, etc.)
+- User suggestions in chat
+- User-provided code snippets or improvements
+- Comments on the PR itself
+
+**DO NOT prioritize automated reviews over user suggestions.** If the user provides a better solution than your implementation, implement it immediately - don't wait to be asked twice.
+
+### 🔴 CRITICAL: Fetch ALL Feedback Sources Completely
+
+**You MUST fetch and read the FULL body of ALL three sources:**
+
+| Source | GraphQL Field | What It Contains |
+|--------|--------------|------------------|
+| `reviewThreads` | Inline code comments | Line-specific suggestions |
+| `reviews` | Review summary bodies | **Often contains detailed analysis from bots** |
+| `comments` | PR comments | **Bot analysis, "Updates Since Last Review"** |
+
+**❌ NEVER truncate comment bodies** - Bot reviewers (Copilot, GitHub Actions) post multi-paragraph analyses with issues buried 20+ lines deep.
+
+**When fetching, display FULL content:**
+```bash
+# ❌ WRONG - truncates to first line, misses issues
+jq '.body | split("\n")[0]'
+
+# ✅ CORRECT - show full body for analysis
+jq '.body'
+```
+
+**Search for keywords in ALL bodies:** "fix", "issue", "regression", "missing", "should", "consider"
+
 ### Automatic Behavior
 
-1. **Fetch and analyze** the PR review comments
-2. **Ultrathink** - Apply deep critical analysis to each feedback point
-3. **Triage** feedback into categories:
+1. **Fetch ALL THREE sources** - reviewThreads, reviews, AND comments (full bodies)
+2. **Read complete content** - Never truncate, bot analysis is often multi-paragraph
+3. **Process user suggestions** - Treat chat messages with code/suggestions as reviews
+4. **Ultrathink** - Apply deep critical analysis to each feedback point
+5. **Triage** feedback into categories:
    - **Critical/Breaking** - Must fix (security issues, bugs, breaking changes)
-   - **Valid but not critical** - Document but defer (refactoring suggestions, style preferences)
+   - **Valid improvements** - Better solutions than current implementation
+   - **Minor/Style** - Low-impact changes
 
 ### Implementation Rules
 
 | Category | Action |
 |----------|--------|
 | **Critical/Breaking** | Implement immediately |
-| **Valid but not critical** | Report to user, do NOT implement unless requested |
+| **Valid improvements** | Implement immediately (don't wait to be asked) |
+| **Minor/Style** | Implement if quick, otherwise ask user |
+
+### 🔴 MANDATORY: Validation Checklist
+
+**Before saying "done" or moving on, you MUST:**
+
+1. **Extract ALL suggestions** - Create a numbered list of EVERY suggestion from:
+   - PR review comments (automated)
+   - User messages in chat
+   - Code snippets user provided
+
+2. **Explicitly address each one** - For each item, state:
+   - `✅ Implemented in commit {hash}` - if fixed
+   - `⏭️ Skipped: {reason}` - if intentionally skipped (must justify)
+   - `❌ Missed` - if you forgot (then go fix it!)
+
+3. **Count check** - Verify: `Items extracted == Items addressed`
+
+**Example validation:**
+```
+## Validation Checklist
+User provided 3 suggestions:
+1. Smart BUILD_ID sync → ✅ Implemented in commit abc123
+2. Robust port check → ✅ Implemented in commit abc123
+3. Public folder sync → ✅ Implemented in commit def456
+
+Count: 3 extracted, 3 addressed ✓
+```
+
+**If count doesn't match, STOP and fix before proceeding.**
+
+### 🔴 MANDATORY: Final Summary Table
+
+**When finishing PR review, you MUST present a complete table of ALL suggestions:**
+
+```markdown
+## PR #XXX - Complete Suggestions Table
+
+| # | File:Line | Suggestion | Action |
+|---|-----------|------------|--------|
+| 1 | file.sh:42 | Quote variable $FOO | ✅ Fixed in commit abc123 |
+| 2 | file.sh:55 | Add error handling | ✅ Fixed in commit abc123 |
+| 3 | file.sh:78 | Use different approach | ⏭️ Skipped - current approach is correct |
+| ... | ... | ... | ... |
+
+**Count: X extracted, X addressed ✓**
+```
+
+**This table MUST include:**
+- Every single suggestion from PR review threads
+- File path and line number
+- Brief description of suggestion
+- Action taken (✅ Fixed / ⏭️ Skipped with reason)
+
+**Present this table to the user before declaring the PR review complete.**
 
 ### Verification
 
@@ -503,7 +594,7 @@ GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
 
 ### Workflow: Responding to PR Review Comments
 
-**Step 1: Fetch review threads with resolution status (GraphQL)**
+**Step 1: Fetch review threads (GraphQL)**
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -512,16 +603,7 @@ curl -s -X POST \
   -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
 ```
 
-**Step 2: Reply to a comment (REST API)**
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/mehdic/bazinga/pulls/comments/{COMMENT_ID}/replies" \
-  -d '{"body": "Your response here"}'
-```
-
-**Step 3: Resolve the thread (GraphQL mutation)**
+**Step 2: Resolve threads (GraphQL mutation)**
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -529,6 +611,21 @@ curl -s -X POST \
   "https://api.github.com/graphql" \
   -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
 ```
+
+**Batch resolve multiple threads:**
+```bash
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+for thread_id in PRRT_xxx PRRT_yyy PRRT_zzz; do
+  curl -s -X POST \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Content-Type: application/json" \
+    "https://api.github.com/graphql" \
+    -d "{\"query\": \"mutation { resolveReviewThread(input: {threadId: \\\"$thread_id\\\"}) { thread { id isResolved } } }\"}"
+done
+```
+
+**Note:** REST API doesn't work in Claude Code Web - use GraphQL only.
 
 ### Response Templates
 
@@ -544,12 +641,9 @@ curl -s -X POST \
 1. **Fetch** all review threads via GraphQL (includes `isResolved` status)
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
-4. **Reply** to ALL unresolved comments via REST API
+4. **Commit & push** fixes
 5. **Resolve** each thread via GraphQL mutation
-6. **Commit & push** fixes
-7. **Report** summary to user
-
-**IMPORTANT:** Always reply to every comment AND resolve the thread. This marks the conversation as resolved in GitHub UI.
+6. **Report** summary to user
 
 ---
 
