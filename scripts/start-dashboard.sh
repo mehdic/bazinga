@@ -225,6 +225,7 @@ if [ -f "$STANDALONE_SERVER" ]; then
         # Neither source nor standalone has BUILD_ID - standalone is incomplete
         # Fall back to dev mode instead of failing
         msg "⚠️  Standalone build incomplete (missing BUILD_ID), falling back to dev mode..."
+        msg "   Tip: run 'bazinga update --force' to fetch a complete standalone build"
         USE_STANDALONE="false"
     fi
 fi

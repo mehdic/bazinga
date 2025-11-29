@@ -945,11 +945,19 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
         # Cleanup temp file
         os.unlink(tmp_path)
 
-        # Verify extraction
-        if standalone_marker.exists():
+        # Verify extraction - check both server.js AND BUILD_ID exist
+        build_id_marker = dashboard_dir / ".next" / "BUILD_ID"
+        standalone_build_id = dashboard_dir / ".next" / "standalone" / ".next" / "BUILD_ID"
+
+        if standalone_marker.exists() and (build_id_marker.exists() or standalone_build_id.exists()):
             console.print(f"  [green]✓[/green] Pre-built dashboard v{version} installed (standalone mode)")
             console.print("  [dim]No npm install required - ready to run![/dim]")
             return True
+        elif standalone_marker.exists():
+            # server.js exists but BUILD_ID missing - incomplete artifact
+            console.print(f"  [yellow]⚠️  Release artifact incomplete (missing BUILD_ID)[/yellow]")
+            console.print("  [dim]Falling back to npm install...[/dim]")
+            return False
         else:
             console.print("  [yellow]⚠️  Extraction may have failed, falling back to npm[/yellow]")
             return False
@@ -1920,6 +1928,22 @@ def update(
     console.print("\n[bold cyan]6. Updating dashboard v2[/bold cyan]")
     bazinga_dir = target_dir / "bazinga"
     bazinga_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check for orphaned dashboard from previous buggy update (extracted to wrong path)
+    orphaned_dashboard = bazinga_dir / "bazinga" / "dashboard-v2"
+    if orphaned_dashboard.exists():
+        console.print("  [yellow]⚠️  Found orphaned dashboard at bazinga/bazinga/dashboard-v2[/yellow]")
+        console.print("  [dim]This was created by a previous buggy update. Removing...[/dim]")
+        import shutil
+        try:
+            shutil.rmtree(orphaned_dashboard)
+            # Also remove empty parent if it exists
+            orphaned_parent = bazinga_dir / "bazinga"
+            if orphaned_parent.exists() and not any(orphaned_parent.iterdir()):
+                orphaned_parent.rmdir()
+            console.print("  [green]✓ Orphaned dashboard removed[/green]")
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Could not remove orphaned dashboard: {e}[/yellow]")
 
     # Try to download pre-built dashboard from GitHub releases
     # Note: Pass target_dir (project root), not bazinga_dir - function adds /bazinga/dashboard-v2
