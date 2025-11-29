@@ -45,6 +45,15 @@ iso_date() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
+# Validate model name contains only safe URL characters
+validate_model_name() {
+    local model="$1"
+    if [[ ! "$model" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        echo "❌ ERROR: Invalid model name '$model' - contains unsafe characters"
+        exit 1
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Validation
 # -----------------------------------------------------------------------------
@@ -58,6 +67,10 @@ if [ -z "$GEMINI_API_KEY" ]; then
     echo "❌ ERROR: GEMINI_API_KEY environment variable not set"
     exit 1
 fi
+
+# Validate model names for URL safety
+validate_model_name "$OPENAI_MODEL"
+validate_model_name "$GEMINI_MODEL"
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <plan_file> [additional_files...]"
@@ -246,7 +259,7 @@ elif [ "$OPENAI_HTTP_CODE" -ge 400 ]; then
     OPENAI_REVIEW="[OpenAI review failed - HTTP $OPENAI_HTTP_CODE]"
 else
     OPENAI_REVIEW=$(jq -r '.choices[0].message.content // "ERROR: Failed to parse response"' "$OUTPUT_DIR/openai-raw.json")
-    if [[ "$OPENAI_REVIEW" == "ERROR:"* ]] || [[ "$OPENAI_REVIEW" == "null" ]]; then
+    if [[ "$OPENAI_REVIEW" == "ERROR:"* ]]; then
         echo "  ⚠️ OpenAI API response parsing error"
         OPENAI_REVIEW="[OpenAI review failed - invalid response]"
     else
@@ -293,7 +306,7 @@ GEMINI_PAYLOAD=$(jq -n \
 GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
     -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
     -H "Content-Type: application/json" \
-    -H "x-goog-api-key: $GEMINI_API_KEY" \
+    -H "X-Goog-Api-Key: $GEMINI_API_KEY" \
     -d "$GEMINI_PAYLOAD")
 CURL_EXIT_CODE=$?
 
@@ -306,7 +319,7 @@ elif [ "$GEMINI_HTTP_CODE" -ge 400 ]; then
     GEMINI_REVIEW="[Gemini review failed - HTTP $GEMINI_HTTP_CODE]"
 else
     GEMINI_REVIEW=$(jq -r '.candidates[0].content.parts[0].text // "ERROR: Failed to parse response"' "$OUTPUT_DIR/gemini-raw.json")
-    if [[ "$GEMINI_REVIEW" == "ERROR:"* ]] || [[ "$GEMINI_REVIEW" == "null" ]]; then
+    if [[ "$GEMINI_REVIEW" == "ERROR:"* ]]; then
         echo "  ⚠️ Gemini API response parsing error"
         GEMINI_REVIEW="[Gemini review failed - invalid response]"
     else
