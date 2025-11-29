@@ -442,12 +442,36 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 
 **DO NOT prioritize automated reviews over user suggestions.** If the user provides a better solution than your implementation, implement it immediately - don't wait to be asked twice.
 
+### 🔴 CRITICAL: Fetch ALL Feedback Sources Completely
+
+**You MUST fetch and read the FULL body of ALL three sources:**
+
+| Source | GraphQL Field | What It Contains |
+|--------|--------------|------------------|
+| `reviewThreads` | Inline code comments | Line-specific suggestions |
+| `reviews` | Review summary bodies | **Often contains detailed analysis from bots** |
+| `comments` | PR comments | **Bot analysis, "Updates Since Last Review"** |
+
+**❌ NEVER truncate comment bodies** - Bot reviewers (Copilot, GitHub Actions) post multi-paragraph analyses with issues buried 20+ lines deep.
+
+**When fetching, display FULL content:**
+```bash
+# ❌ WRONG - truncates to first line, misses issues
+jq '.body | split("\n")[0]'
+
+# ✅ CORRECT - show full body for analysis
+jq '.body'
+```
+
+**Search for keywords in ALL bodies:** "fix", "issue", "regression", "missing", "should", "consider"
+
 ### Automatic Behavior
 
-1. **Fetch and analyze** the PR review comments
-2. **Process user suggestions** - Treat chat messages with code/suggestions as reviews
-3. **Ultrathink** - Apply deep critical analysis to each feedback point
-4. **Triage** feedback into categories:
+1. **Fetch ALL THREE sources** - reviewThreads, reviews, AND comments (full bodies)
+2. **Read complete content** - Never truncate, bot analysis is often multi-paragraph
+3. **Process user suggestions** - Treat chat messages with code/suggestions as reviews
+4. **Ultrathink** - Apply deep critical analysis to each feedback point
+5. **Triage** feedback into categories:
    - **Critical/Breaking** - Must fix (security issues, bugs, breaking changes)
    - **Valid improvements** - Better solutions than current implementation
    - **Minor/Style** - Low-impact changes
@@ -488,6 +512,31 @@ Count: 3 extracted, 3 addressed ✓
 ```
 
 **If count doesn't match, STOP and fix before proceeding.**
+
+### 🔴 MANDATORY: Final Summary Table
+
+**When finishing PR review, you MUST present a complete table of ALL suggestions:**
+
+```markdown
+## PR #XXX - Complete Suggestions Table
+
+| # | File:Line | Suggestion | Action |
+|---|-----------|------------|--------|
+| 1 | file.sh:42 | Quote variable $FOO | ✅ Fixed in commit abc123 |
+| 2 | file.sh:55 | Add error handling | ✅ Fixed in commit abc123 |
+| 3 | file.sh:78 | Use different approach | ⏭️ Skipped - current approach is correct |
+| ... | ... | ... | ... |
+
+**Count: X extracted, X addressed ✓**
+```
+
+**This table MUST include:**
+- Every single suggestion from PR review threads
+- File path and line number
+- Brief description of suggestion
+- Action taken (✅ Fixed / ⏭️ Skipped with reason)
+
+**Present this table to the user before declaring the PR review complete.**
 
 ### Verification
 
