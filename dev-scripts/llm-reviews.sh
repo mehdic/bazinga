@@ -25,8 +25,11 @@ cd "$REPO_ROOT"
 # Configuration
 # -----------------------------------------------------------------------------
 
-OPENAI_MODEL="gpt-5"
-GEMINI_MODEL="gemini-3-pro-preview"
+# Model names (update when newer models become available)
+# OpenAI: gpt-4o is current flagship (uses max_completion_tokens parameter)
+# Gemini: 1.5 models retired Apr 2025, 2.5 is current generation
+OPENAI_MODEL="gpt-4o"
+GEMINI_MODEL="gemini-2.5-flash"
 OUTPUT_DIR="$REPO_ROOT/tmp/ultrathink-reviews"
 AGENTS_DIR="$REPO_ROOT/agents"
 MAX_FILE_SIZE_KB=100  # Warn if files exceed this size
@@ -240,7 +243,7 @@ jq -n \
             {role: "user", content: $content}
         ],
         temperature: 0.7,
-        max_tokens: 4096
+        max_completion_tokens: 4096
     }' > "$OPENAI_PAYLOAD_FILE"
 
 # Call API with error detection (use @file to avoid cmdline size limits)

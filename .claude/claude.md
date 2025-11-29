@@ -471,7 +471,7 @@ rm -rf tmp/ultrathink-reviews/
 **Context:** {Brief context}
 **Decision:** {What was decided}
 **Status:** {Proposed/Reviewed/Implemented/Abandoned}
-**Reviewed by:** OpenAI GPT-5, Google Gemini 3 Pro
+**Reviewed by:** OpenAI GPT-4o, Google Gemini 2.5 Flash
 
 ---
 
@@ -526,8 +526,8 @@ rm -rf tmp/ultrathink-reviews/
 **What it does:**
 1. Gathers all agent definitions from `agents/*.md`
 2. Includes any additional files you specify
-3. Sends plan + context to OpenAI GPT-5
-4. Sends plan + context to Google Gemini 3 Pro
+3. Sends plan + context to OpenAI GPT-4o
+4. Sends plan + context to Google Gemini 2.5 Flash
 5. Saves individual reviews and combined summary
 
 **Output files:**
