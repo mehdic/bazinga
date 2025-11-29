@@ -20,18 +20,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(basename "$(dirname "$SCRIPT_DIR")")"
 if [ "$PARENT_DIR" = "bazinga" ]; then
     # Installed layout: PROJECT_ROOT/bazinga/scripts/start-dashboard.sh
+    # Dashboard at: PROJECT_ROOT/bazinga/dashboard-v2
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
     BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+    DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
 else
     # Development layout: PROJECT_ROOT/scripts/start-dashboard.sh
+    # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside bazinga/)
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
     BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+    DASHBOARD_DIR="$PROJECT_ROOT/dashboard-v2"
 fi
 
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
 DASHBOARD_PID_FILE="$BAZINGA_DIR/dashboard.pid"
 DASHBOARD_LOG="$BAZINGA_DIR/dashboard.log"
-DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
 USE_STANDALONE="false"
 
 # Helper functions: log() writes to file only, msg() writes to both stdout and file
