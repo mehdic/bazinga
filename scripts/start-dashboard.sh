@@ -222,14 +222,20 @@ if [ -f "$STANDALONE_SERVER" ]; then
 
         log "Build artifacts synced successfully"
     else
-        # Neither source nor standalone has BUILD_ID - broken package
-        msg "❌ ERROR: No BUILD_ID found - standalone build is incomplete"
-        msg "   The dashboard package may be corrupted or outdated"
-        msg "   Try: bazinga update --force"
-        exit 1
+        # Neither source nor standalone has BUILD_ID - standalone is incomplete
+        # Fall back to dev mode instead of failing
+        msg "⚠️  Standalone build incomplete (missing BUILD_ID), falling back to dev mode..."
+        msg "   Tip: run 'bazinga update --force' to fetch a complete standalone build"
+        USE_STANDALONE="false"
     fi
-else
-    msg "🔧 No standalone build found, using development mode"
+fi
+
+# Dev mode fallback or primary dev mode (when no standalone exists)
+if [ "$USE_STANDALONE" != "true" ]; then
+    # Only show this message if we didn't already show the fallback message
+    if [ ! -f "$STANDALONE_SERVER" ]; then
+        msg "🔧 No standalone build found, using development mode"
+    fi
 
     # Check if npm is available (only needed for dev mode)
     if ! command -v npm >/dev/null 2>&1; then
