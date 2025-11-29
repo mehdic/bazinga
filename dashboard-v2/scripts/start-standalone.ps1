@@ -64,9 +64,14 @@ if (Test-Path $SOCKET_SERVER) {
     if ($env:SOCKET_PORT) { $SOCKET_PORT = $env:SOCKET_PORT } else { $SOCKET_PORT = "3001" }
     $env:SOCKET_PORT = $SOCKET_PORT
 
+    # Log to separate file for debugging (in standalone dir)
+    $SOCKET_LOG = Join-Path $STANDALONE_DIR "socket.log"
+
     # Start as a hidden background process so it doesn't block the main server
-    Start-Process -FilePath "node" -ArgumentList $SOCKET_SERVER -WindowStyle Hidden
-    Write-Host "Socket.io server started on port $SOCKET_PORT"
+    Start-Process -FilePath "node" -ArgumentList $SOCKET_SERVER `
+        -RedirectStandardOutput $SOCKET_LOG -RedirectStandardError $SOCKET_LOG `
+        -WindowStyle Hidden
+    Write-Host "Socket.io server started on port $SOCKET_PORT (Log: $SOCKET_LOG)"
 }
 
 Write-Host "Starting standalone dashboard server on ${HOSTNAME}:${PORT}..."

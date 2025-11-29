@@ -203,6 +203,7 @@ if (-not $env:DATABASE_URL) {
 }
 
 # Start dashboard server
+$process = $null  # Initialize to avoid undefined variable errors
 if ($USE_STANDALONE) {
     Write-Log "Starting standalone Next.js server..."
     Write-Host "Starting standalone Next.js server on port $DASHBOARD_PORT..." -ForegroundColor Cyan
@@ -228,15 +229,19 @@ if ($USE_STANDALONE) {
         if ($env:SOCKET_PORT) { $SOCKET_PORT = $env:SOCKET_PORT } else { $SOCKET_PORT = "3001" }
         $env:SOCKET_PORT = $SOCKET_PORT
 
+        # Use separate log file to avoid file locking conflicts on Windows
+        $LOG_DIR = Split-Path -Parent $DASHBOARD_LOG
+        $SOCKET_LOG = Join-Path $LOG_DIR "socket.log"
+
         $socketProcess = Start-Process -FilePath "node" -ArgumentList $SOCKET_SERVER `
-            -RedirectStandardOutput $DASHBOARD_LOG -RedirectStandardError $DASHBOARD_LOG `
+            -RedirectStandardOutput $SOCKET_LOG -RedirectStandardError $SOCKET_LOG `
             -PassThru -WindowStyle Hidden
 
         # Use same directory as DASHBOARD_PID_FILE (respects TEMP fallback)
         $PID_DIR = Split-Path -Parent $DASHBOARD_PID_FILE
         $SOCKET_PID_FILE = Join-Path $PID_DIR "socket.pid"
         $socketProcess.Id | Out-File -FilePath $SOCKET_PID_FILE -Encoding ASCII
-        Write-Log "Socket.io server started (PID: $($socketProcess.Id)) on port $SOCKET_PORT"
+        Write-Log "Socket.io server started (PID: $($socketProcess.Id)) on port $SOCKET_PORT (Log: $SOCKET_LOG)"
     } else {
         Write-Log "Note: Real-time updates limited (socket-server.js not found)"
     }
