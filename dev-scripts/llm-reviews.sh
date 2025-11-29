@@ -25,11 +25,11 @@ cd "$REPO_ROOT"
 # Configuration
 # -----------------------------------------------------------------------------
 
-# Model names (update when newer models become available)
-# OpenAI: gpt-4o is current flagship (uses max_completion_tokens parameter)
-# Gemini: 1.5 models retired Apr 2025, 2.5 is current generation
-OPENAI_MODEL="gpt-4o"
-GEMINI_MODEL="gemini-2.5-flash"
+# Model names (matching GitHub Actions workflow configuration)
+# OpenAI: gpt-5 is reasoning model (temperature fixed at 1, needs high max_completion_tokens)
+# Gemini: gemini-3-pro-preview (latest preview model)
+OPENAI_MODEL="gpt-5"
+GEMINI_MODEL="gemini-3-pro-preview"
 OUTPUT_DIR="$REPO_ROOT/tmp/ultrathink-reviews"
 AGENTS_DIR="$REPO_ROOT/agents"
 MAX_FILE_SIZE_KB=100  # Warn if files exceed this size
@@ -234,6 +234,8 @@ echo "🤖 Calling OpenAI ($OPENAI_MODEL)..."
 
 # Build payload using temp file to handle large prompts
 OPENAI_PAYLOAD_FILE=$(mktemp)
+# GPT-5 is a reasoning model - temperature is fixed at 1 (not configurable)
+# Needs high max_completion_tokens because reasoning tokens count against the limit
 jq -n \
     --arg model "$OPENAI_MODEL" \
     --rawfile content "$PROMPT_TEMP_FILE" \
@@ -242,8 +244,7 @@ jq -n \
         messages: [
             {role: "user", content: $content}
         ],
-        temperature: 0.7,
-        max_completion_tokens: 4096
+        max_completion_tokens: 49152
     }' > "$OPENAI_PAYLOAD_FILE"
 
 # Call API with error detection (use @file to avoid cmdline size limits)
@@ -312,7 +313,7 @@ jq -n \
 GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
     -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
     -H "Content-Type: application/json" \
-    -H "X-Goog-Api-Key: $GEMINI_API_KEY" \
+    -H "x-goog-api-key: $GEMINI_API_KEY" \
     --data @"$GEMINI_PAYLOAD_FILE")
 CURL_EXIT_CODE=$?
 rm -f "$GEMINI_PAYLOAD_FILE"
