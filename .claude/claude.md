@@ -173,6 +173,65 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 
 ---
 
+## 🔴 CRITICAL: Path Layout - Dev vs Installed Mode
+
+**When working with dashboard scripts or any path-sensitive code, understand these two layouts:**
+
+### Dev Mode (Running from bazinga repo)
+
+```
+/home/user/bazinga/              <- REPO_ROOT (could be any name)
+├── .claude/                     <- Claude-related files
+├── bazinga/                     <- Config files (NOT the installed bazinga folder)
+│   ├── challenge_levels.json
+│   ├── model_selection.json
+│   └── skills_config.json
+├── dashboard-v2/                <- Dashboard at REPO ROOT
+│   └── scripts/
+│       ├── start-standalone.sh
+│       └── start-standalone.ps1
+├── scripts/                     <- Main startup scripts
+│   ├── start-dashboard.sh
+│   └── start-dashboard.ps1
+└── src/
+```
+
+**Key paths in dev mode:**
+- `DASHBOARD_DIR = REPO_ROOT/dashboard-v2`
+- `BAZINGA_DIR = REPO_ROOT/bazinga` (config only)
+
+### Installed Mode (Client project after `bazinga install`)
+
+```
+/home/user/my-project/           <- PROJECT_ROOT
+├── bazinga/                     <- Everything installed here
+│   ├── challenge_levels.json
+│   ├── model_selection.json
+│   ├── skills_config.json
+│   ├── dashboard-v2/            <- Dashboard INSIDE bazinga/
+│   │   └── scripts/
+│   │       ├── start-standalone.sh
+│   │       └── start-standalone.ps1
+│   └── scripts/                 <- Scripts INSIDE bazinga/
+│       ├── start-dashboard.sh
+│       └── start-dashboard.ps1
+└── .claude/                     <- Claude files at project root (NOT in bazinga/)
+```
+
+**Key paths in installed mode:**
+- `DASHBOARD_DIR = PROJECT_ROOT/bazinga/dashboard-v2`
+- `BAZINGA_DIR = PROJECT_ROOT/bazinga`
+
+### Detection Logic
+
+Scripts detect mode by checking if their parent directory is named "bazinga":
+- Parent is "bazinga" → **Installed mode** → Dashboard at `BAZINGA_DIR/dashboard-v2`
+- Parent is NOT "bazinga" → **Dev mode** → Dashboard at `PROJECT_ROOT/dashboard-v2`
+
+**⚠️ Edge case:** If the bazinga repo itself is cloned as a folder named "bazinga", it will be detected as "installed" mode, but paths still work correctly because both modes resolve to the same location.
+
+---
+
 ## 🔴 CRITICAL: Orchestrator Development Workflow
 
 **Single Source of Truth:**
