@@ -547,3 +547,72 @@ For each agent response:
 
 Example: "Developer Group A complete | Implementation finished | Ready for review"
 ```
+
+---
+
+## Developer (Merge Task) Response Parsing
+
+**Context:** After Tech Lead approves a group, a Developer is spawned with a merge task (not implementation).
+
+**Expected status values:**
+- `MERGE_SUCCESS` - Feature branch merged to initial branch, tests pass
+- `MERGE_CONFLICT` - Git merge conflicts encountered
+- `MERGE_TEST_FAILURE` - Merge succeeded but tests failed
+
+**Information to extract:**
+
+1. **Status** - Look for:
+   ```
+   Status: MERGE_SUCCESS
+   **Status:** MERGE_CONFLICT
+   MERGE_TEST_FAILURE
+   ```
+
+2. **Conflict files** (if MERGE_CONFLICT) - Look for:
+   ```
+   Conflicting files: file1.py, file2.js
+   Conflicts in: [list]
+   ```
+
+3. **Test failures** (if MERGE_TEST_FAILURE) - Look for:
+   ```
+   Failed tests: test_name, test_name2
+   Failures: [list]
+   ```
+
+4. **Files changed** - Look for merge summary
+
+**Capsule construction (MERGE_SUCCESS):**
+
+```
+✅ Group {id} merged | {feature_branch} → {initial_branch} | Tests passing → PM check
+```
+
+**Capsule construction (MERGE_CONFLICT):**
+
+```
+⚠️ Group {id} merge conflict | {conflict_files} | Developer fixing → Retry merge
+```
+
+**Capsule construction (MERGE_TEST_FAILURE):**
+
+```
+⚠️ Group {id} merge failed tests | {test_failures} | Developer fixing → Retry merge
+```
+
+**Examples:**
+
+Successful merge:
+```
+✅ Group A merged | feature/jwt-auth → main | Tests passing → PM check
+```
+
+Conflict:
+```
+⚠️ Group B merge conflict | auth.py, config.py | Developer fixing → Retry merge
+```
+
+Test failure:
+```
+⚠️ Group C merge failed tests | test_auth_integration, test_login | Developer fixing → Retry merge
+```
