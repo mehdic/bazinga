@@ -955,11 +955,11 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
             return True
         elif standalone_marker.exists():
             # server.js exists but BUILD_ID missing - incomplete artifact
-            console.print(f"  [yellow]⚠️  Release artifact incomplete (missing BUILD_ID)[/yellow]")
-            console.print("  [dim]Falling back to npm install...[/dim]")
+            console.print("  [yellow]⚠️  Release artifact incomplete (missing BUILD_ID)[/yellow]")
+            console.print("  [dim]Falling back to source/dev mode...[/dim]")
             return False
         else:
-            console.print("  [yellow]⚠️  Extraction may have failed, falling back to npm[/yellow]")
+            console.print("  [yellow]⚠️  Extraction may have failed, falling back to source/dev mode[/yellow]")
             return False
 
     except (urllib.error.URLError, tarfile.TarError, OSError) as e:
@@ -1932,16 +1932,26 @@ def update(
     # Check for orphaned dashboard from previous buggy update (extracted to wrong path)
     orphaned_dashboard = bazinga_dir / "bazinga" / "dashboard-v2"
     if orphaned_dashboard.exists():
-        console.print("  [yellow]⚠️  Found orphaned dashboard at bazinga/bazinga/dashboard-v2[/yellow]")
-        console.print("  [dim]This was created by a previous buggy update. Removing...[/dim]")
+        # Safety guards: ensure it's a directory, not a symlink, and within expected path
+        import os
         import shutil
         try:
-            shutil.rmtree(orphaned_dashboard)
-            # Also remove empty parent if it exists
-            orphaned_parent = bazinga_dir / "bazinga"
-            if orphaned_parent.exists() and not any(orphaned_parent.iterdir()):
-                orphaned_parent.rmdir()
-            console.print("  [green]✓ Orphaned dashboard removed[/green]")
+            is_safe_to_remove = (
+                orphaned_dashboard.is_dir()
+                and not orphaned_dashboard.is_symlink()
+                and os.path.commonpath([str(orphaned_dashboard.resolve()), str(bazinga_dir.resolve())]) == str(bazinga_dir.resolve())
+            )
+            if is_safe_to_remove:
+                console.print("  [yellow]⚠️  Found orphaned dashboard at bazinga/bazinga/dashboard-v2[/yellow]")
+                console.print("  [dim]This was created by a previous buggy update. Removing...[/dim]")
+                shutil.rmtree(orphaned_dashboard)
+                # Also remove empty parent if it exists
+                orphaned_parent = bazinga_dir / "bazinga"
+                if orphaned_parent.exists() and not any(orphaned_parent.iterdir()):
+                    orphaned_parent.rmdir()
+                console.print("  [green]✓ Orphaned dashboard removed[/green]")
+            else:
+                console.print("  [yellow]⚠️  Skipping orphan removal (unexpected path or symlink)[/yellow]")
         except Exception as e:
             console.print(f"  [yellow]⚠️  Could not remove orphaned dashboard: {e}[/yellow]")
 
