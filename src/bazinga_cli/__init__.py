@@ -1922,7 +1922,8 @@ def update(
     bazinga_dir.mkdir(parents=True, exist_ok=True)
 
     # Try to download pre-built dashboard from GitHub releases
-    if download_prebuilt_dashboard(bazinga_dir, force=True):
+    # Note: Pass target_dir (project root), not bazinga_dir - function adds /bazinga/dashboard-v2
+    if download_prebuilt_dashboard(target_dir, force=True):
         console.print("  [green]✓ Dashboard updated from release[/green]")
     else:
         # Fall back to copying source files if pre-built not available
