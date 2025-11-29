@@ -846,11 +846,6 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
 
     platform, arch = get_platform_info()
 
-    # Windows not yet supported for standalone
-    if platform == "windows":
-        console.print("  [dim]Pre-built packages not available for Windows, will use npm[/dim]")
-        return False
-
     console.print(f"  [dim]Checking for pre-built dashboard ({platform}-{arch})...[/dim]")
 
     # Query GitHub API for latest release

@@ -39,6 +39,7 @@ CREATE TABLE sessions (
     mode TEXT CHECK(mode IN ('simple', 'parallel')),
     original_requirements TEXT,
     status TEXT CHECK(status IN ('active', 'completed', 'failed')) DEFAULT 'active',
+    initial_branch TEXT DEFAULT 'main',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ```
@@ -50,6 +51,7 @@ CREATE TABLE sessions (
 - `mode`: Execution mode (`simple` or `parallel`)
 - `original_requirements`: Original user request text
 - `status`: Current session status
+- `initial_branch`: Base branch all work merges back to (captured at session start)
 - `created_at`: Record creation timestamp
 
 **Usage Example:**
@@ -161,17 +163,23 @@ Normalized task group tracking (extracted from `pm_state.json`).
 
 ```sql
 CREATE TABLE task_groups (
-    id TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
     session_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'failed')) DEFAULT 'pending',
+    status TEXT CHECK(status IN (
+        'pending', 'in_progress', 'completed', 'failed',
+        'approved_pending_merge', 'merging'
+    )) DEFAULT 'pending',
     assigned_to TEXT,
     revision_count INTEGER DEFAULT 0,
     last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+    feature_branch TEXT,
+    merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),
     complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
     initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, session_id),
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 )
 
@@ -183,14 +191,35 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 - `id`: Unique task group identifier (e.g., `group_a`)
 - `session_id`: Foreign key to sessions table
 - `name`: Human-readable task group name
-- `status`: Current status
+- `status`: Current status (`pending`, `in_progress`, `completed`, `failed`, `approved_pending_merge`, `merging`)
 - `assigned_to`: Agent ID assigned to this group
 - `revision_count`: Number of revision cycles (for escalation)
-- `last_review_status`: Tech Lead review result
+- `last_review_status`: Tech Lead review result (APPROVED or CHANGES_REQUESTED)
+- `feature_branch`: Developer's feature branch for this group (e.g., `feature/group-A-jwt-auth`)
+- `merge_status`: Tracks merge state (`pending`, `in_progress`, `merged`, `conflict`, `test_failure`, NULL)
 - `complexity`: Task complexity score (1-10), set by PM
 - `initial_tier`: Initial implementation tier (`Developer` or `Senior Software Engineer`), set by PM
 - `created_at`: When task group was created
 - `updated_at`: Last modification timestamp
+
+**Status Flow (Merge-on-Approval):**
+```
+pending → in_progress → approved_pending_merge → merging → completed
+                                             ↘ in_progress (conflict, back to dev)
+```
+
+**Merge Status Flow:**
+```
+NULL (not yet approved)
+  ↓
+pending (TL approved, waiting for merge)
+  ↓
+in_progress (Developer performing merge)
+  ↓
+merged (success)
+OR conflict (git merge conflicts → dev fixes conflicts)
+OR test_failure (tests failed after merge → dev fixes tests)
+```
 
 **Usage Example:**
 ```python
