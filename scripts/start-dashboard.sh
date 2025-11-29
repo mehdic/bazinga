@@ -42,7 +42,24 @@ msg() {
     echo "$1"
     echo "$(date): $1" >> "$DASHBOARD_LOG"
 }
+
+# Safe rm -rf with path validation
+safe_rm_rf() {
+    local path="$1"
+    # Validate path is non-empty and within expected directory
+    if [ -z "$path" ] || [ "$path" = "/" ] || [ "$path" = "$HOME" ]; then
+        log "ERROR: Refusing to remove unsafe path: $path"
+        return 1
+    fi
+    # Ensure path is within DASHBOARD_DIR
+    case "$path" in
+        "$DASHBOARD_DIR"/*) rm -rf "$path" ;;
+        *) log "ERROR: Path outside dashboard directory: $path"; return 1 ;;
+    esac
+}
+
 # Redact credentials from database URLs (file paths pass through unchanged)
+# Handles scheme URLs (postgres://user:pass@host) - file paths are passed through as-is
 redact_db_url() {
     local url="$1"
     if [[ "$url" =~ :// ]]; then
@@ -50,6 +67,49 @@ redact_db_url() {
     else
         printf "%s" "$url"
     fi
+}
+
+# Wait for server to be ready with health check
+wait_for_server() {
+    local pid="$1"
+    local port="$2"
+    local max_attempts=10
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        # Check if process is still running
+        if ! kill -0 "$pid" 2>/dev/null; then
+            return 1  # Process died
+        fi
+
+        # Check if port is listening
+        if command -v lsof >/dev/null 2>&1; then
+            if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+                return 0  # Server ready
+            fi
+        elif command -v ss >/dev/null 2>&1; then
+            if ss -lnt "sport == :$port" | grep -q LISTEN; then
+                return 0
+            fi
+        else
+            # Fallback: without network tools, check process stability
+            # Don't return early - wait through all attempts to catch delayed crashes
+            sleep 1
+            if ! kill -0 "$pid" 2>/dev/null; then
+                return 1  # Process died
+            fi
+            # Only return success on the last attempt if process survived
+            if [ $attempt -eq $max_attempts ]; then
+                return 0
+            fi
+        fi
+
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+
+    # Final check - process alive means likely success
+    kill -0 "$pid" 2>/dev/null
 }
 
 msg "🖥️  BAZINGA Dashboard v2 Startup"
@@ -101,27 +161,43 @@ if [ -f "$STANDALONE_SERVER" ]; then
     STANDALONE_NEXT="$DASHBOARD_DIR/.next/standalone/.next"
     SOURCE_NEXT="$DASHBOARD_DIR/.next"
 
-    # Check if BUILD_ID exists (required for Next.js to recognize a production build)
-    if [ ! -f "$SOURCE_NEXT/BUILD_ID" ]; then
-        msg "❌ ERROR: No BUILD_ID found - standalone build is incomplete"
-        msg "   Run 'npm run build' in dashboard-v2 to create a proper build"
-        exit 1
-    fi
+    # Check if standalone is already complete (pre-packaged release)
+    if [ -f "$STANDALONE_NEXT/BUILD_ID" ]; then
+        log "Standalone build is pre-packaged and ready"
 
-    # Check if we need to sync (destination missing OR build ID mismatch)
-    SHOULD_SYNC="false"
-    if [ ! -f "$STANDALONE_NEXT/BUILD_ID" ]; then
-        SHOULD_SYNC="true"
-    elif ! cmp -s "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/BUILD_ID"; then
-        # Build IDs differ - new build detected
-        SHOULD_SYNC="true"
-    fi
+        # Check if source exists and differs (new local build)
+        if [ -f "$SOURCE_NEXT/BUILD_ID" ] && ! cmp -s "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/BUILD_ID"; then
+            msg "🔄 New build detected, syncing artifacts..."
 
-    if [ "$SHOULD_SYNC" = "true" ]; then
+            # Clean destination to avoid mixing versions (with validation)
+            safe_rm_rf "$STANDALONE_NEXT" || { msg "❌ ERROR: Failed to clean standalone directory"; exit 1; }
+            mkdir -p "$STANDALONE_NEXT"
+
+            # Copy BUILD_ID and all manifest files
+            cp "$SOURCE_NEXT/BUILD_ID" "$STANDALONE_NEXT/"
+            for file in "$SOURCE_NEXT"/*.json; do
+                [ -f "$file" ] && cp "$file" "$STANDALONE_NEXT/"
+            done
+            [ -f "$SOURCE_NEXT/prerender-manifest.js" ] && cp "$SOURCE_NEXT/prerender-manifest.js" "$STANDALONE_NEXT/"
+
+            # Copy directories
+            [ -d "$SOURCE_NEXT/static" ] && cp -r "$SOURCE_NEXT/static" "$STANDALONE_NEXT/"
+            [ -d "$SOURCE_NEXT/server" ] && cp -r "$SOURCE_NEXT/server" "$STANDALONE_NEXT/"
+
+            # Sync public folder (must update along with build artifacts)
+            if [ -d "$DASHBOARD_DIR/public" ]; then
+                safe_rm_rf "$DASHBOARD_DIR/.next/standalone/public" || true
+                cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
+            fi
+
+            log "Build artifacts synced successfully"
+        fi
+    elif [ -f "$SOURCE_NEXT/BUILD_ID" ]; then
+        # Source exists but standalone not ready - sync needed
         msg "🔄 Syncing build artifacts to standalone..."
 
-        # Clean destination to avoid mixing versions
-        rm -rf "$STANDALONE_NEXT"
+        # Clean destination to avoid mixing versions (with validation)
+        safe_rm_rf "$STANDALONE_NEXT" || { msg "❌ ERROR: Failed to clean standalone directory"; exit 1; }
         mkdir -p "$STANDALONE_NEXT"
 
         # Copy BUILD_ID and all manifest files
@@ -137,13 +213,17 @@ if [ -f "$STANDALONE_SERVER" ]; then
 
         # Sync public folder (must update along with build artifacts)
         if [ -d "$DASHBOARD_DIR/public" ]; then
-            rm -rf "$DASHBOARD_DIR/.next/standalone/public"
+            safe_rm_rf "$DASHBOARD_DIR/.next/standalone/public" || true
             cp -r "$DASHBOARD_DIR/public" "$DASHBOARD_DIR/.next/standalone/"
         fi
 
         log "Build artifacts synced successfully"
     else
-        log "Standalone artifacts are up to date"
+        # Neither source nor standalone has BUILD_ID - broken package
+        msg "❌ ERROR: No BUILD_ID found - standalone build is incomplete"
+        msg "   The dashboard package may be corrupted or outdated"
+        msg "   Try: bazinga update --force"
+        exit 1
     fi
 else
     msg "🔧 No standalone build found, using development mode"
@@ -160,13 +240,13 @@ else
         msg "📥 Installing dashboard dependencies (npm install)..."
 
         cd "$DASHBOARD_DIR"
-        npm install >> "$DASHBOARD_LOG" 2>&1
-
-        if [ $? -eq 0 ]; then
+        # Use || pattern to handle failure with set -e
+        if npm install >> "$DASHBOARD_LOG" 2>&1; then
             msg "   ✅ Dependencies installed successfully"
         else
             msg "❌ ERROR: npm install failed"
-            msg "   Check $DASHBOARD_LOG for details"
+            msg "   Last few lines from log:"
+            tail -5 "$DASHBOARD_LOG" 2>/dev/null | while read -r line; do msg "   $line"; done
             exit 1
         fi
         cd - > /dev/null
@@ -236,11 +316,9 @@ fi
 # Save PID
 echo $DASHBOARD_PID > "$DASHBOARD_PID_FILE"
 
-# Wait a moment for server to start
-sleep 3
-
-# Check if server started successfully
-if kill -0 "$DASHBOARD_PID" 2>/dev/null; then
+# Wait for server to be ready (health check with timeout)
+msg "   Waiting for server to be ready..."
+if wait_for_server "$DASHBOARD_PID" "$DASHBOARD_PORT"; then
     if [ "$USE_STANDALONE" = "true" ]; then
         log "Dashboard server started successfully in STANDALONE mode (PID: $DASHBOARD_PID)"
     else
@@ -255,7 +333,8 @@ if kill -0 "$DASHBOARD_PID" 2>/dev/null; then
 else
     msg ""
     msg "❌ ERROR: Failed to start dashboard server"
-    msg "   Check $DASHBOARD_LOG for details"
+    msg "   Last few lines from log:"
+    tail -5 "$DASHBOARD_LOG" 2>/dev/null | while read -r line; do msg "   $line"; done
     msg ""
     rm -f "$DASHBOARD_PID_FILE"
     exit 1
