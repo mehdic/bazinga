@@ -408,13 +408,22 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 
 ---
 
-## 🧠 ULTRATHINK: Deep Analysis Documentation
+## 🧠 ULTRATHINK: Deep Analysis with Multi-LLM Review
 
 **When the user includes the keyword "ultrathink" in their request, you MUST:**
 
 1. **Perform deep critical analysis** of the problem/solution
-2. **Create a research document** immediately after completing the analysis  
-3. **Save to research folder** with descriptive filename
+2. **Get external LLM reviews** (OpenAI + Gemini) on your analysis
+3. **Integrate feedback** from external reviewers
+4. **Save the refined document** to research folder
+
+### Environment Setup Required
+
+```bash
+# User must set these environment variables:
+export OPENAI_API_KEY="sk-..."
+export GEMINI_API_KEY="..."
+```
 
 ### Process
 
@@ -423,21 +432,46 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 - Be critical, pragmatic, and thorough
 - Consider pros/cons, alternatives, trade-offs
 
-**Step 2: Document (automatic)**
-- Create markdown file in `research/` folder
+**Step 2: Save Draft**
+- Create initial markdown file in `research/` folder
 - Filename format: `{topic}-{analysis-type}.md`
-  - Example: `bazinga-validator-agent-design.md`
-  - Example: `authentication-strategy-analysis.md`
-  - Example: `performance-optimization-approach.md`
 
-**Step 3: Structure**
+**Step 3: Get External Reviews**
+```bash
+# Run the multi-LLM review script (dev-only, not copied to clients)
+./dev-scripts/llm-reviews.sh research/{your-plan}.md [additional-files...]
+
+# The script automatically includes:
+# - All agent files from agents/*.md
+# - Any additional files you specify (scripts, code, etc.)
+```
+
+**Step 4: Integrate Feedback**
+- Read the combined review from `tmp/ultrathink-reviews/combined-review.md`
+- Identify consensus points (both OpenAI and Gemini agree)
+- Evaluate conflicting opinions objectively
+- Update your plan with valid improvements
+- Add a "## Multi-LLM Review Integration" section documenting what was incorporated
+
+**Step 5: Finalize**
+- Update the research document with integrated feedback
+- Mark status as reviewed
+
+**Step 6: Cleanup**
+- Delete the temporary review files (no longer needed after integration)
+```bash
+rm -rf tmp/ultrathink-reviews/
+```
+
+### Document Structure
 ```markdown
 # {Title}: {Analysis Type}
 
 **Date:** YYYY-MM-DD
 **Context:** {Brief context}
 **Decision:** {What was decided}
-**Status:** {Proposed/Implemented/Abandoned}
+**Status:** {Proposed/Reviewed/Implemented/Abandoned}
+**Reviewed by:** OpenAI GPT-5, Google Gemini 3 Pro Preview
 
 ---
 
@@ -461,6 +495,16 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 ## Decision Rationale
 {Why this is the right approach}
 
+## Multi-LLM Review Integration
+### Consensus Points (Both Agreed)
+- {Points where OpenAI and Gemini aligned}
+
+### Incorporated Feedback
+- {Specific improvements integrated from reviews}
+
+### Rejected Suggestions (With Reasoning)
+- {Suggestions not incorporated and why}
+
 ## Lessons Learned
 {What this teaches us}
 
@@ -475,6 +519,34 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 ✅ "ultrathink: should we refactor or rewrite?"
 ✅ "ultrathink about the best approach here"
 
+### Script Reference
+
+**Location:** `dev-scripts/llm-reviews.sh` (dev-only, not copied to clients)
+
+**What it does:**
+1. Gathers all agent definitions from `agents/*.md`
+2. Includes any additional files you specify
+3. Sends plan + context to OpenAI GPT-5
+4. Sends plan + context to Google Gemini 3 Pro Preview
+5. Saves individual reviews and combined summary
+
+**Output files:**
+- `tmp/ultrathink-reviews/openai-review.md`
+- `tmp/ultrathink-reviews/gemini-review.md`
+- `tmp/ultrathink-reviews/combined-review.md`
+
+**Usage examples:**
+```bash
+# Basic: Just the plan (agents included automatically)
+./dev-scripts/llm-reviews.sh research/my-plan.md
+
+# With additional scripts
+./dev-scripts/llm-reviews.sh research/my-plan.md scripts/build.sh
+
+# With code files
+./dev-scripts/llm-reviews.sh research/api-design.md src/api/routes.py src/models/user.py
+```
+
 ### Why This Matters
 
 **Benefits:**
@@ -482,6 +554,8 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 - **Avoids repeating analysis** - Don't re-solve same problems
 - **Knowledge sharing** - Team can understand decisions
 - **Audit trail** - Track why choices were made
+- **Multiple perspectives** - OpenAI and Gemini catch different blind spots
+- **Reduced bias** - External review challenges assumptions
 
 **The research folder becomes a living knowledge base of critical decisions.**
 
