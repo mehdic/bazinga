@@ -230,7 +230,8 @@ echo ""
 echo "🤖 Calling OpenAI ($OPENAI_MODEL)..."
 
 # Build payload using temp file to handle large prompts
-OPENAI_PAYLOAD=$(jq -n \
+OPENAI_PAYLOAD_FILE=$(mktemp)
+jq -n \
     --arg model "$OPENAI_MODEL" \
     --rawfile content "$PROMPT_TEMP_FILE" \
     '{
@@ -240,15 +241,16 @@ OPENAI_PAYLOAD=$(jq -n \
         ],
         temperature: 0.7,
         max_tokens: 4096
-    }')
+    }' > "$OPENAI_PAYLOAD_FILE"
 
-# Call API with error detection (-f flag for HTTP errors)
+# Call API with error detection (use @file to avoid cmdline size limits)
 OPENAI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/openai-raw.json" \
     -X POST "https://api.openai.com/v1/chat/completions" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -H "Content-Type: application/json" \
-    -d "$OPENAI_PAYLOAD")
+    --data @"$OPENAI_PAYLOAD_FILE")
 CURL_EXIT_CODE=$?
+rm -f "$OPENAI_PAYLOAD_FILE"
 
 if [ $CURL_EXIT_CODE -ne 0 ]; then
     echo "  ⚠️ OpenAI API network error (curl exit code $CURL_EXIT_CODE)"
@@ -290,7 +292,8 @@ echo ""
 echo "🤖 Calling Gemini ($GEMINI_MODEL)..."
 
 # Build payload using temp file to handle large prompts
-GEMINI_PAYLOAD=$(jq -n \
+GEMINI_PAYLOAD_FILE=$(mktemp)
+jq -n \
     --rawfile content "$PROMPT_TEMP_FILE" \
     '{
         contents: [
@@ -300,15 +303,16 @@ GEMINI_PAYLOAD=$(jq -n \
             temperature: 0.7,
             maxOutputTokens: 4096
         }
-    }')
+    }' > "$GEMINI_PAYLOAD_FILE"
 
 # Call API with X-API-Key header (not in URL for security)
 GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
     -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
     -H "Content-Type: application/json" \
     -H "X-Goog-Api-Key: $GEMINI_API_KEY" \
-    -d "$GEMINI_PAYLOAD")
+    --data @"$GEMINI_PAYLOAD_FILE")
 CURL_EXIT_CODE=$?
+rm -f "$GEMINI_PAYLOAD_FILE"
 
 if [ $CURL_EXIT_CODE -ne 0 ]; then
     echo "  ⚠️ Gemini API network error (curl exit code $CURL_EXIT_CODE)"
