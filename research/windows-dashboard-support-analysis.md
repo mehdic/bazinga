@@ -219,14 +219,13 @@ if platform == "windows":
 ```
 
 **Implemented (Full Parity):**
-```markdown
+
 | Platform | Architecture | File |
 |----------|--------------|------|
 | Linux    | x64          | bazinga-dashboard-linux-x64.tar.gz |
 | macOS    | x64          | bazinga-dashboard-darwin-x64.tar.gz |
 | macOS    | arm64        | bazinga-dashboard-darwin-arm64.tar.gz |
 | Windows  | x64          | bazinga-dashboard-windows-x64.tar.gz |
-```
 
 ---
 
