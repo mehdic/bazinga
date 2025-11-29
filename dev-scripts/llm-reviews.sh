@@ -9,7 +9,11 @@
 #
 # Environment variables required:
 #   OPENAI_API_KEY - OpenAI API key
-#   GEMINI_API_KEY - Google Gemini API key
+#   GEMINI_API_KEY - Google Gemini API key (optional if ENABLE_GEMINI=false)
+#
+# Optional environment variables:
+#   ENABLE_GEMINI  - Set to "false" to skip Gemini review (default: true)
+#                    Use in Claude Code Web where Gemini API is blocked.
 #
 # Example:
 #   ./dev-scripts/llm-reviews.sh research/my-plan.md scripts/foo.sh src/bar.py
@@ -31,6 +35,10 @@ cd "$REPO_ROOT"
 OPENAI_MODEL="gpt-5"
 GEMINI_MODEL="gemini-3-pro-preview"
 OUTPUT_DIR="$REPO_ROOT/tmp/ultrathink-reviews"
+
+# Enable/disable Gemini (default: true)
+# Set ENABLE_GEMINI=false in Claude Code Web where Gemini API is blocked
+ENABLE_GEMINI="${ENABLE_GEMINI:-true}"
 AGENTS_DIR="$REPO_ROOT/agents"
 MAX_FILE_SIZE_KB=100  # Warn if files exceed this size
 
@@ -66,14 +74,17 @@ if [ -z "$OPENAI_API_KEY" ]; then
     exit 1
 fi
 
-if [ -z "$GEMINI_API_KEY" ]; then
-    echo "❌ ERROR: GEMINI_API_KEY environment variable not set"
+# Gemini API key only required if Gemini is enabled
+if [ "$ENABLE_GEMINI" = "true" ] && [ -z "$GEMINI_API_KEY" ]; then
+    echo "❌ ERROR: GEMINI_API_KEY environment variable not set (or set ENABLE_GEMINI=false to skip)"
     exit 1
 fi
 
 # Validate model names for URL safety
 validate_model_name "$OPENAI_MODEL"
-validate_model_name "$GEMINI_MODEL"
+if [ "$ENABLE_GEMINI" = "true" ]; then
+    validate_model_name "$GEMINI_MODEL"
+fi
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <plan_file> [additional_files...]"
@@ -292,53 +303,54 @@ echo "  → Saved to: $OPENAI_OUTPUT"
 # Call Gemini API (using X-API-Key header for security)
 # -----------------------------------------------------------------------------
 
-echo ""
-echo "🤖 Calling Gemini ($GEMINI_MODEL)..."
+if [ "$ENABLE_GEMINI" = "true" ]; then
+    echo ""
+    echo "🤖 Calling Gemini ($GEMINI_MODEL)..."
 
-# Build payload using temp file to handle large prompts
-GEMINI_PAYLOAD_FILE=$(mktemp)
-jq -n \
-    --rawfile content "$PROMPT_TEMP_FILE" \
-    '{
-        contents: [
-            {parts: [{text: $content}]}
-        ],
-        generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096
-        }
-    }' > "$GEMINI_PAYLOAD_FILE"
+    # Build payload using temp file to handle large prompts
+    GEMINI_PAYLOAD_FILE=$(mktemp)
+    jq -n \
+        --rawfile content "$PROMPT_TEMP_FILE" \
+        '{
+            contents: [
+                {parts: [{text: $content}]}
+            ],
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 4096
+            }
+        }' > "$GEMINI_PAYLOAD_FILE"
 
-# Call API with X-API-Key header (not in URL for security)
-GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
-    -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
-    -H "Content-Type: application/json" \
-    -H "x-goog-api-key: $GEMINI_API_KEY" \
-    --data @"$GEMINI_PAYLOAD_FILE")
-CURL_EXIT_CODE=$?
-rm -f "$GEMINI_PAYLOAD_FILE"
+    # Call API with X-API-Key header (not in URL for security)
+    GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
+        -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
+        -H "Content-Type: application/json" \
+        -H "x-goog-api-key: $GEMINI_API_KEY" \
+        --data @"$GEMINI_PAYLOAD_FILE")
+    CURL_EXIT_CODE=$?
+    rm -f "$GEMINI_PAYLOAD_FILE"
 
-if [ $CURL_EXIT_CODE -ne 0 ]; then
-    echo "  ⚠️ Gemini API network error (curl exit code $CURL_EXIT_CODE)"
-    GEMINI_REVIEW="[Gemini review failed - network error]"
-elif [ "$GEMINI_HTTP_CODE" -ge 400 ]; then
-    echo "  ⚠️ Gemini API HTTP error (status $GEMINI_HTTP_CODE):"
-    jq -r '.error.message // "Unknown error"' "$OUTPUT_DIR/gemini-raw.json" 2>/dev/null || cat "$OUTPUT_DIR/gemini-raw.json"
-    GEMINI_REVIEW="[Gemini review failed - HTTP $GEMINI_HTTP_CODE]"
-else
-    GEMINI_REVIEW=$(jq -r '.candidates[0].content.parts[0].text // "ERROR: Failed to parse response"' "$OUTPUT_DIR/gemini-raw.json")
-    if [[ "$GEMINI_REVIEW" == "ERROR:"* ]]; then
-        echo "  ⚠️ Gemini API response parsing error"
-        GEMINI_REVIEW="[Gemini review failed - invalid response]"
+    if [ $CURL_EXIT_CODE -ne 0 ]; then
+        echo "  ⚠️ Gemini API network error (curl exit code $CURL_EXIT_CODE)"
+        GEMINI_REVIEW="[Gemini review failed - network error]"
+    elif [ "$GEMINI_HTTP_CODE" -ge 400 ]; then
+        echo "  ⚠️ Gemini API HTTP error (status $GEMINI_HTTP_CODE):"
+        jq -r '.error.message // "Unknown error"' "$OUTPUT_DIR/gemini-raw.json" 2>/dev/null || cat "$OUTPUT_DIR/gemini-raw.json"
+        GEMINI_REVIEW="[Gemini review failed - HTTP $GEMINI_HTTP_CODE]"
     else
-        echo "  ✅ Gemini review received"
+        GEMINI_REVIEW=$(jq -r '.candidates[0].content.parts[0].text // "ERROR: Failed to parse response"' "$OUTPUT_DIR/gemini-raw.json")
+        if [[ "$GEMINI_REVIEW" == "ERROR:"* ]]; then
+            echo "  ⚠️ Gemini API response parsing error"
+            GEMINI_REVIEW="[Gemini review failed - invalid response]"
+        else
+            echo "  ✅ Gemini review received"
+        fi
     fi
-fi
-rm -f "$OUTPUT_DIR/gemini-raw.json"
+    rm -f "$OUTPUT_DIR/gemini-raw.json"
 
-# Save Gemini response
-GEMINI_OUTPUT="$OUTPUT_DIR/gemini-review.md"
-cat > "$GEMINI_OUTPUT" <<EOF
+    # Save Gemini response
+    GEMINI_OUTPUT="$OUTPUT_DIR/gemini-review.md"
+    cat > "$GEMINI_OUTPUT" <<EOF
 # Gemini Review ($GEMINI_MODEL)
 
 **Plan reviewed:** $PLAN_FILE
@@ -348,7 +360,25 @@ cat > "$GEMINI_OUTPUT" <<EOF
 
 $GEMINI_REVIEW
 EOF
-echo "  → Saved to: $GEMINI_OUTPUT"
+    echo "  → Saved to: $GEMINI_OUTPUT"
+else
+    echo ""
+    echo "⏭️  Skipping Gemini review (ENABLE_GEMINI=false)"
+    GEMINI_REVIEW="[Gemini review skipped - ENABLE_GEMINI=false]"
+    GEMINI_OUTPUT="$OUTPUT_DIR/gemini-review.md"
+    cat > "$GEMINI_OUTPUT" <<EOF
+# Gemini Review (Skipped)
+
+**Plan reviewed:** $PLAN_FILE
+**Date:** $(iso_date)
+
+---
+
+Gemini review was skipped because ENABLE_GEMINI=false.
+This is expected in Claude Code Web where Gemini API is blocked.
+EOF
+    echo "  → Saved to: $GEMINI_OUTPUT"
+fi
 
 # -----------------------------------------------------------------------------
 # Generate Combined Summary
