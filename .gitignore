@@ -76,6 +76,11 @@ bazinga/
 bazinga/artifacts/
 bazinga/bazinga.db*
 
+# Dashboard runtime files (created during testing in dev mode)
+dashboard.log
+dashboard.pid
+socket.pid
+
 # Coordination folder (legacy - templates now in bazinga/templates/)
 coordination/
 !coordination/templates/

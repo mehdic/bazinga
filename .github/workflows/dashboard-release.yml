@@ -68,14 +68,32 @@ jobs:
         working-directory: dashboard-v2
         run: |
           # Create release directory
-          mkdir -p release-package/dashboard-v2/.next/standalone
+          mkdir -p release-package/dashboard-v2/.next/standalone/.next
           mkdir -p release-package/dashboard-v2/.next/static
 
           # Copy standalone server
           cp -r .next/standalone/* release-package/dashboard-v2/.next/standalone/
 
-          # Copy static files
+          # Copy BUILD_ID and manifest files (required for Next.js production mode)
+          cp .next/BUILD_ID release-package/dashboard-v2/.next/
+          for f in .next/*.json; do
+            [ -e "$f" ] && cp "$f" release-package/dashboard-v2/.next/
+          done
+          [ -f .next/prerender-manifest.js ] && cp .next/prerender-manifest.js release-package/dashboard-v2/.next/
+
+          # Also copy into standalone/.next for self-contained operation
+          cp .next/BUILD_ID release-package/dashboard-v2/.next/standalone/.next/
+          for f in .next/*.json; do
+            [ -e "$f" ] && cp "$f" release-package/dashboard-v2/.next/standalone/.next/
+          done
+          [ -f .next/prerender-manifest.js ] && cp .next/prerender-manifest.js release-package/dashboard-v2/.next/standalone/.next/
+
+          # Copy static files (both locations for compatibility)
           cp -r .next/static release-package/dashboard-v2/.next/
+          cp -r .next/static release-package/dashboard-v2/.next/standalone/.next/
+
+          # Copy server directory for standalone
+          cp -r .next/server release-package/dashboard-v2/.next/standalone/.next/
 
           # Copy public folder if exists
           if [ -d "public" ]; then
