@@ -27,9 +27,9 @@ cd "$REPO_ROOT"
 
 # Model names (matching GitHub Actions workflow configuration)
 # OpenAI: gpt-5 is reasoning model (temperature fixed at 1, needs high max_completion_tokens)
-# Gemini: gemini-3-pro-preview (latest preview model)
+# Gemini: gemini-1.5-pro (stable production model)
 OPENAI_MODEL="gpt-5"
-GEMINI_MODEL="gemini-3-pro-preview"
+GEMINI_MODEL="gemini-1.5-pro"
 OUTPUT_DIR="$REPO_ROOT/tmp/ultrathink-reviews"
 AGENTS_DIR="$REPO_ROOT/agents"
 MAX_FILE_SIZE_KB=100  # Warn if files exceed this size
