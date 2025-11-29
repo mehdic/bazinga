@@ -44,10 +44,10 @@ MAX_FILE_SIZE_KB=100  # Warn if files exceed this size
 
 # Temp files for large prompts (cleaned up on exit)
 PROMPT_TEMP_FILE=""
+CONTEXT_TEMP_FILE=""
 cleanup() {
-    if [ -n "$PROMPT_TEMP_FILE" ] && [ -f "$PROMPT_TEMP_FILE" ]; then
-        rm -f "$PROMPT_TEMP_FILE"
-    fi
+    [ -n "$PROMPT_TEMP_FILE" ] && [ -f "$PROMPT_TEMP_FILE" ] && rm -f "$PROMPT_TEMP_FILE"
+    [ -n "$CONTEXT_TEMP_FILE" ] && [ -f "$CONTEXT_TEMP_FILE" ] && rm -f "$CONTEXT_TEMP_FILE"
 }
 trap cleanup EXIT
 
@@ -63,6 +63,48 @@ validate_model_name() {
         echo "❌ ERROR: Invalid model name '$model' - contains unsafe characters"
         exit 1
     fi
+}
+
+# Retry logic with exponential backoff
+# Usage: retry_curl <output_file> <curl_args...>
+# Returns: curl exit code (0 = success), prints HTTP code to stdout
+retry_curl() {
+    local output_file="$1"
+    shift
+    local max_retries=3
+    local retry_count=0
+    local delay=2
+    local http_code
+    local curl_exit
+
+    while [ $retry_count -le $max_retries ]; do
+        http_code=$(curl -s -w "%{http_code}" -o "$output_file" "$@")
+        curl_exit=$?
+
+        # Success
+        if [ $curl_exit -eq 0 ] && [ "$http_code" -lt 400 ]; then
+            echo "$http_code"
+            return 0
+        fi
+
+        # Don't retry client errors (except rate limits)
+        if [ $curl_exit -eq 0 ] && [ "$http_code" -ge 400 ] && [ "$http_code" -lt 500 ] && [ "$http_code" -ne 429 ]; then
+            echo "$http_code"
+            return 0  # Return success but with error code for caller to handle
+        fi
+
+        # Retryable error (network, 5xx, or 429)
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -le $max_retries ]; then
+            echo "  ⚠️ Attempt $retry_count failed (curl=$curl_exit, http=$http_code), retrying in ${delay}s..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+        fi
+    done
+
+    # Final failure
+    echo "$http_code"
+    return $curl_exit
 }
 
 # -----------------------------------------------------------------------------
@@ -119,7 +161,7 @@ check_file_size() {
 mkdir -p "$OUTPUT_DIR"
 
 # -----------------------------------------------------------------------------
-# Gather Context
+# Gather Context (using temp file to avoid shell memory issues)
 # -----------------------------------------------------------------------------
 
 echo "🔍 Gathering context for review..."
@@ -127,14 +169,21 @@ echo "🔍 Gathering context for review..."
 # Check plan file size
 check_file_size "$PLAN_FILE"
 
-# Read the plan (with error handling)
-if ! PLAN_CONTENT=$(cat "$PLAN_FILE" 2>&1); then
-    echo "❌ ERROR: Failed to read plan file: $PLAN_CONTENT"
-    exit 1
-fi
+# Create temp file for context (will be cleaned up on exit)
+CONTEXT_TEMP_FILE=$(mktemp)
 
-# Gather all agent files (using nullglob for safe handling of empty directories)
-AGENT_CONTEXT=""
+# Write project header
+cat > "$CONTEXT_TEMP_FILE" <<'EOF'
+=== PROJECT: BAZINGA Multi-Agent Orchestration System ===
+Repository: https://github.com/mehdic/bazinga
+
+This is a Claude Code multi-agent orchestration system where specialized agents
+(PM, Developer, QA, Tech Lead) collaborate on software development tasks.
+
+=== AGENT DEFINITIONS ===
+EOF
+
+# Gather all agent files (append directly to temp file)
 shopt -s nullglob
 agent_files=("$AGENTS_DIR"/*.md)
 shopt -u nullglob
@@ -146,48 +195,37 @@ else
         AGENT_NAME=$(basename "$agent_file")
         echo "  → Including agent: $AGENT_NAME"
         check_file_size "$agent_file"
-        AGENT_CONTEXT+="
-=== FILE: agents/$AGENT_NAME ===
-$(cat "$agent_file")
-"
+        echo "" >> "$CONTEXT_TEMP_FILE"
+        echo "=== FILE: agents/$AGENT_NAME ===" >> "$CONTEXT_TEMP_FILE"
+        cat "$agent_file" >> "$CONTEXT_TEMP_FILE"
     done
 fi
 
 # Gather additional files
-ADDITIONAL_CONTEXT=""
+echo "" >> "$CONTEXT_TEMP_FILE"
+echo "=== ADDITIONAL CODE/SCRIPTS ===" >> "$CONTEXT_TEMP_FILE"
+
 for file in "${ADDITIONAL_FILES[@]}"; do
     if [ -f "$file" ]; then
         echo "  → Including: $file"
         check_file_size "$file"
-        ADDITIONAL_CONTEXT+="
-=== FILE: $file ===
-$(cat "$file")
-"
+        echo "" >> "$CONTEXT_TEMP_FILE"
+        echo "=== FILE: $file ===" >> "$CONTEXT_TEMP_FILE"
+        cat "$file" >> "$CONTEXT_TEMP_FILE"
     else
         echo "  ⚠️ Warning: File not found: $file"
     fi
 done
 
-# Build the full context
-FULL_CONTEXT="
-=== PROJECT: BAZINGA Multi-Agent Orchestration System ===
-Repository: https://github.com/mehdic/bazinga
-
-This is a Claude Code multi-agent orchestration system where specialized agents
-(PM, Developer, QA, Tech Lead) collaborate on software development tasks.
-
-=== AGENT DEFINITIONS ===
-$AGENT_CONTEXT
-
-=== ADDITIONAL CODE/SCRIPTS ===
-$ADDITIONAL_CONTEXT
-"
-
 # -----------------------------------------------------------------------------
 # Build Review Prompt (using temp file for large content)
 # -----------------------------------------------------------------------------
 
-REVIEW_PROMPT="You are a senior software architect and system design expert reviewing a technical plan/analysis.
+PROMPT_TEMP_FILE=$(mktemp)
+
+# Write prompt header
+cat > "$PROMPT_TEMP_FILE" <<'EOF'
+You are a senior software architect and system design expert reviewing a technical plan/analysis.
 
 ## Your Task
 
@@ -201,11 +239,19 @@ Review the following ULTRATHINK analysis document and provide critical feedback:
 
 ## Project Context
 
-$FULL_CONTEXT
+EOF
 
-## Document to Review
+# Append context from temp file
+cat "$CONTEXT_TEMP_FILE" >> "$PROMPT_TEMP_FILE"
 
-$PLAN_CONTENT
+# Append document to review
+echo "" >> "$PROMPT_TEMP_FILE"
+echo "## Document to Review" >> "$PROMPT_TEMP_FILE"
+echo "" >> "$PROMPT_TEMP_FILE"
+cat "$PLAN_FILE" >> "$PROMPT_TEMP_FILE"
+
+# Append output format instructions
+cat >> "$PROMPT_TEMP_FILE" <<'EOF'
 
 ## Output Format
 
@@ -230,11 +276,7 @@ Provide your review in the following structured format:
 
 ### Overall Assessment
 [Brief summary: Is this plan sound? What's the confidence level?]
-"
-
-# Write prompt to temp file to avoid command-line size limits
-PROMPT_TEMP_FILE=$(mktemp)
-echo "$REVIEW_PROMPT" > "$PROMPT_TEMP_FILE"
+EOF
 
 # -----------------------------------------------------------------------------
 # Call OpenAI API
@@ -258,8 +300,8 @@ jq -n \
         max_completion_tokens: 49152
     }' > "$OPENAI_PAYLOAD_FILE"
 
-# Call API with error detection (use @file to avoid cmdline size limits)
-OPENAI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/openai-raw.json" \
+# Call API with retry logic (use @file to avoid cmdline size limits)
+OPENAI_HTTP_CODE=$(retry_curl "$OUTPUT_DIR/openai-raw.json" \
     -X POST "https://api.openai.com/v1/chat/completions" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -H "Content-Type: application/json" \
@@ -268,8 +310,8 @@ CURL_EXIT_CODE=$?
 rm -f "$OPENAI_PAYLOAD_FILE"
 
 if [ $CURL_EXIT_CODE -ne 0 ]; then
-    echo "  ⚠️ OpenAI API network error (curl exit code $CURL_EXIT_CODE)"
-    OPENAI_REVIEW="[OpenAI review failed - network error]"
+    echo "  ⚠️ OpenAI API failed after retries (curl exit code $CURL_EXIT_CODE)"
+    OPENAI_REVIEW="[OpenAI review failed - network error after retries]"
 elif [ "$OPENAI_HTTP_CODE" -ge 400 ]; then
     echo "  ⚠️ OpenAI API HTTP error (status $OPENAI_HTTP_CODE):"
     jq -r '.error.message // "Unknown error"' "$OUTPUT_DIR/openai-raw.json" 2>/dev/null || cat "$OUTPUT_DIR/openai-raw.json"
@@ -321,8 +363,8 @@ if [ "$ENABLE_GEMINI" = "true" ]; then
             }
         }' > "$GEMINI_PAYLOAD_FILE"
 
-    # Call API with X-API-Key header (not in URL for security)
-    GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
+    # Call API with retry logic (X-API-Key header for security)
+    GEMINI_HTTP_CODE=$(retry_curl "$OUTPUT_DIR/gemini-raw.json" \
         -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
         -H "Content-Type: application/json" \
         -H "x-goog-api-key: $GEMINI_API_KEY" \
@@ -331,8 +373,8 @@ if [ "$ENABLE_GEMINI" = "true" ]; then
     rm -f "$GEMINI_PAYLOAD_FILE"
 
     if [ $CURL_EXIT_CODE -ne 0 ]; then
-        echo "  ⚠️ Gemini API network error (curl exit code $CURL_EXIT_CODE)"
-        GEMINI_REVIEW="[Gemini review failed - network error]"
+        echo "  ⚠️ Gemini API failed after retries (curl exit code $CURL_EXIT_CODE)"
+        GEMINI_REVIEW="[Gemini review failed - network error after retries]"
     elif [ "$GEMINI_HTTP_CODE" -ge 400 ]; then
         echo "  ⚠️ Gemini API HTTP error (status $GEMINI_HTTP_CODE):"
         jq -r '.error.message // "Unknown error"' "$OUTPUT_DIR/gemini-raw.json" 2>/dev/null || cat "$OUTPUT_DIR/gemini-raw.json"
