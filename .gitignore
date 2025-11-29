@@ -84,3 +84,6 @@ socket.pid
 # Coordination folder (legacy - templates now in bazinga/templates/)
 coordination/
 !coordination/templates/
+
+# Temporary files (ultrathink reviews, etc.)
+tmp/
