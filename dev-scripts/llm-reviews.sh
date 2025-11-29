@@ -16,7 +16,7 @@
 #
 # Note: This script is for BAZINGA development only, not copied to clients.
 
-set -e
+# Don't use set -e to allow explicit error handling for API calls
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -29,6 +29,21 @@ OPENAI_MODEL="gpt-5"
 GEMINI_MODEL="gemini-3-pro-preview"
 OUTPUT_DIR="$REPO_ROOT/tmp/ultrathink-reviews"
 AGENTS_DIR="$REPO_ROOT/agents"
+MAX_FILE_SIZE_KB=100  # Warn if files exceed this size
+
+# Temp files for large prompts (cleaned up on exit)
+PROMPT_TEMP_FILE=""
+cleanup() {
+    if [ -n "$PROMPT_TEMP_FILE" ] && [ -f "$PROMPT_TEMP_FILE" ]; then
+        rm -f "$PROMPT_TEMP_FILE"
+    fi
+}
+trap cleanup EXIT
+
+# Cross-platform date function (works on GNU and BSD/macOS)
+iso_date() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
 
 # -----------------------------------------------------------------------------
 # Validation
@@ -61,6 +76,18 @@ if [ ! -f "$PLAN_FILE" ]; then
     exit 1
 fi
 
+# Check file size and warn if too large
+check_file_size() {
+    local file="$1"
+    local size_kb
+    if [ -f "$file" ]; then
+        size_kb=$(du -k "$file" | cut -f1)
+        if [ "$size_kb" -gt "$MAX_FILE_SIZE_KB" ]; then
+            echo "  ⚠️ Warning: $file is ${size_kb}KB (>${MAX_FILE_SIZE_KB}KB) - may exceed API limits"
+        fi
+    fi
+}
+
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
@@ -70,27 +97,41 @@ mkdir -p "$OUTPUT_DIR"
 
 echo "🔍 Gathering context for review..."
 
-# Read the plan
-PLAN_CONTENT=$(cat "$PLAN_FILE")
+# Check plan file size
+check_file_size "$PLAN_FILE"
 
-# Gather all agent files
+# Read the plan (with error handling)
+if ! PLAN_CONTENT=$(cat "$PLAN_FILE" 2>&1); then
+    echo "❌ ERROR: Failed to read plan file: $PLAN_CONTENT"
+    exit 1
+fi
+
+# Gather all agent files (using nullglob for safe handling of empty directories)
 AGENT_CONTEXT=""
-for agent_file in "$AGENTS_DIR"/*.md; do
-    if [ -f "$agent_file" ]; then
+shopt -s nullglob
+agent_files=("$AGENTS_DIR"/*.md)
+shopt -u nullglob
+
+if [ ${#agent_files[@]} -eq 0 ]; then
+    echo "  ⚠️ Warning: No agent files found in $AGENTS_DIR"
+else
+    for agent_file in "${agent_files[@]}"; do
         AGENT_NAME=$(basename "$agent_file")
         echo "  → Including agent: $AGENT_NAME"
+        check_file_size "$agent_file"
         AGENT_CONTEXT+="
 === FILE: agents/$AGENT_NAME ===
 $(cat "$agent_file")
 "
-    fi
-done
+    done
+fi
 
 # Gather additional files
 ADDITIONAL_CONTEXT=""
 for file in "${ADDITIONAL_FILES[@]}"; do
     if [ -f "$file" ]; then
         echo "  → Including: $file"
+        check_file_size "$file"
         ADDITIONAL_CONTEXT+="
 === FILE: $file ===
 $(cat "$file")
@@ -116,7 +157,7 @@ $ADDITIONAL_CONTEXT
 "
 
 # -----------------------------------------------------------------------------
-# Build Review Prompt
+# Build Review Prompt (using temp file for large content)
 # -----------------------------------------------------------------------------
 
 REVIEW_PROMPT="You are a senior software architect and system design expert reviewing a technical plan/analysis.
@@ -164,6 +205,10 @@ Provide your review in the following structured format:
 [Brief summary: Is this plan sound? What's the confidence level?]
 "
 
+# Write prompt to temp file to avoid command-line size limits
+PROMPT_TEMP_FILE=$(mktemp)
+echo "$REVIEW_PROMPT" > "$PROMPT_TEMP_FILE"
+
 # -----------------------------------------------------------------------------
 # Call OpenAI API
 # -----------------------------------------------------------------------------
@@ -171,9 +216,10 @@ Provide your review in the following structured format:
 echo ""
 echo "🤖 Calling OpenAI ($OPENAI_MODEL)..."
 
+# Build payload using temp file to handle large prompts
 OPENAI_PAYLOAD=$(jq -n \
     --arg model "$OPENAI_MODEL" \
-    --arg content "$REVIEW_PROMPT" \
+    --rawfile content "$PROMPT_TEMP_FILE" \
     '{
         model: $model,
         messages: [
@@ -183,20 +229,31 @@ OPENAI_PAYLOAD=$(jq -n \
         max_tokens: 4096
     }')
 
-OPENAI_RESPONSE=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
+# Call API with error detection (-f flag for HTTP errors)
+OPENAI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/openai-raw.json" \
+    -X POST "https://api.openai.com/v1/chat/completions" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -H "Content-Type: application/json" \
     -d "$OPENAI_PAYLOAD")
+CURL_EXIT_CODE=$?
 
-OPENAI_REVIEW=$(echo "$OPENAI_RESPONSE" | jq -r '.choices[0].message.content // "ERROR: Failed to get response"')
-
-if [[ "$OPENAI_REVIEW" == "ERROR:"* ]] || [[ "$OPENAI_REVIEW" == "null" ]]; then
-    echo "  ⚠️ OpenAI API error:"
-    echo "$OPENAI_RESPONSE" | jq -r '.error.message // "Unknown error"'
-    OPENAI_REVIEW="[OpenAI review failed - see logs]"
+if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "  ⚠️ OpenAI API network error (curl exit code $CURL_EXIT_CODE)"
+    OPENAI_REVIEW="[OpenAI review failed - network error]"
+elif [ "$OPENAI_HTTP_CODE" -ge 400 ]; then
+    echo "  ⚠️ OpenAI API HTTP error (status $OPENAI_HTTP_CODE):"
+    jq -r '.error.message // "Unknown error"' "$OUTPUT_DIR/openai-raw.json" 2>/dev/null || cat "$OUTPUT_DIR/openai-raw.json"
+    OPENAI_REVIEW="[OpenAI review failed - HTTP $OPENAI_HTTP_CODE]"
 else
-    echo "  ✅ OpenAI review received"
+    OPENAI_REVIEW=$(jq -r '.choices[0].message.content // "ERROR: Failed to parse response"' "$OUTPUT_DIR/openai-raw.json")
+    if [[ "$OPENAI_REVIEW" == "ERROR:"* ]] || [[ "$OPENAI_REVIEW" == "null" ]]; then
+        echo "  ⚠️ OpenAI API response parsing error"
+        OPENAI_REVIEW="[OpenAI review failed - invalid response]"
+    else
+        echo "  ✅ OpenAI review received"
+    fi
 fi
+rm -f "$OUTPUT_DIR/openai-raw.json"
 
 # Save OpenAI response
 OPENAI_OUTPUT="$OUTPUT_DIR/openai-review.md"
@@ -204,7 +261,7 @@ cat > "$OPENAI_OUTPUT" <<EOF
 # OpenAI Review ($OPENAI_MODEL)
 
 **Plan reviewed:** $PLAN_FILE
-**Date:** $(date -Iseconds)
+**Date:** $(iso_date)
 
 ---
 
@@ -213,14 +270,15 @@ EOF
 echo "  → Saved to: $OPENAI_OUTPUT"
 
 # -----------------------------------------------------------------------------
-# Call Gemini API
+# Call Gemini API (using X-API-Key header for security)
 # -----------------------------------------------------------------------------
 
 echo ""
 echo "🤖 Calling Gemini ($GEMINI_MODEL)..."
 
+# Build payload using temp file to handle large prompts
 GEMINI_PAYLOAD=$(jq -n \
-    --arg content "$REVIEW_PROMPT" \
+    --rawfile content "$PROMPT_TEMP_FILE" \
     '{
         contents: [
             {parts: [{text: $content}]}
@@ -231,19 +289,31 @@ GEMINI_PAYLOAD=$(jq -n \
         }
     }')
 
-GEMINI_RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent?key=$GEMINI_API_KEY" \
+# Call API with X-API-Key header (not in URL for security)
+GEMINI_HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/gemini-raw.json" \
+    -X POST "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent" \
     -H "Content-Type: application/json" \
+    -H "x-goog-api-key: $GEMINI_API_KEY" \
     -d "$GEMINI_PAYLOAD")
+CURL_EXIT_CODE=$?
 
-GEMINI_REVIEW=$(echo "$GEMINI_RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "ERROR: Failed to get response"')
-
-if [[ "$GEMINI_REVIEW" == "ERROR:"* ]] || [[ "$GEMINI_REVIEW" == "null" ]]; then
-    echo "  ⚠️ Gemini API error:"
-    echo "$GEMINI_RESPONSE" | jq -r '.error.message // "Unknown error"'
-    GEMINI_REVIEW="[Gemini review failed - see logs]"
+if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "  ⚠️ Gemini API network error (curl exit code $CURL_EXIT_CODE)"
+    GEMINI_REVIEW="[Gemini review failed - network error]"
+elif [ "$GEMINI_HTTP_CODE" -ge 400 ]; then
+    echo "  ⚠️ Gemini API HTTP error (status $GEMINI_HTTP_CODE):"
+    jq -r '.error.message // "Unknown error"' "$OUTPUT_DIR/gemini-raw.json" 2>/dev/null || cat "$OUTPUT_DIR/gemini-raw.json"
+    GEMINI_REVIEW="[Gemini review failed - HTTP $GEMINI_HTTP_CODE]"
 else
-    echo "  ✅ Gemini review received"
+    GEMINI_REVIEW=$(jq -r '.candidates[0].content.parts[0].text // "ERROR: Failed to parse response"' "$OUTPUT_DIR/gemini-raw.json")
+    if [[ "$GEMINI_REVIEW" == "ERROR:"* ]] || [[ "$GEMINI_REVIEW" == "null" ]]; then
+        echo "  ⚠️ Gemini API response parsing error"
+        GEMINI_REVIEW="[Gemini review failed - invalid response]"
+    else
+        echo "  ✅ Gemini review received"
+    fi
 fi
+rm -f "$OUTPUT_DIR/gemini-raw.json"
 
 # Save Gemini response
 GEMINI_OUTPUT="$OUTPUT_DIR/gemini-review.md"
@@ -251,7 +321,7 @@ cat > "$GEMINI_OUTPUT" <<EOF
 # Gemini Review ($GEMINI_MODEL)
 
 **Plan reviewed:** $PLAN_FILE
-**Date:** $(date -Iseconds)
+**Date:** $(iso_date)
 
 ---
 
@@ -271,7 +341,7 @@ cat > "$COMBINED_OUTPUT" <<EOF
 # Multi-LLM Review Summary
 
 **Plan reviewed:** $PLAN_FILE
-**Date:** $(date -Iseconds)
+**Date:** $(iso_date)
 **Reviewers:** OpenAI $OPENAI_MODEL, Google $GEMINI_MODEL
 
 ---
