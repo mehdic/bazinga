@@ -834,17 +834,52 @@ This is intentional behavior because [explanation].
 The graceful degradation allows the dashboard to start even when [reason].
 ```
 
-### For PR Comments (no resolve buttons)
+### For PR Comments (LLM Reviews)
 
-**Post a comprehensive response table:**
+**🔴 CRITICAL: Use specific headers for each LLM reviewer:**
+
+Responses to LLM reviews MUST use these exact headers so the workflows can filter them:
+- `## Response to OpenAI Code Review` - for OpenAI feedback
+- `## Response to Gemini Code Review` - for Gemini feedback
+
+This enables timestamp-windowed filtering: each LLM only sees responses to ITS OWN reviews.
+
+**Post via GraphQL (required in Claude Code Web):**
 ```bash
 GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+# Get PR node ID first
+PR_NODE_ID=$(curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { id } } }"}' \
+  | jq -r '.data.repository.pullRequest.id')
+
+# Post response with proper header
+BODY="## Response to OpenAI Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Fix X | ✅ Fixed in abc123 |
+| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |
+
+## Response to Gemini Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Issue Z | ✅ Fixed in def456 |"
+
+QUERY=$(jq -n --arg body "$BODY" '{
+  query: "mutation($body: String!) { addComment(input: {subjectId: \"'$PR_NODE_ID'\", body: $body}) { commentEdge { node { url } } } }",
+  variables: { body: $body }
+}')
 
 curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
-  "https://api.github.com/repos/mehdic/bazinga/issues/PR_NUMBER/comments" \
-  -d '{"body": "## Response to Review Feedback\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Fix X | ✅ Fixed in abc123 |\n| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |\n| 3 | Consider Z | ✅ Implemented |"}'
+  "https://api.github.com/graphql" \
+  -d "$QUERY"
 ```
 
 ### Response Templates

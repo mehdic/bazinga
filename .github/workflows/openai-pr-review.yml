@@ -75,42 +75,59 @@ jobs:
           echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
           # Use precise marker "## OpenAI Code Review" to avoid false matches
-          # Fetch previous review for context (we always post new comments, never update)
+          # Fetch previous review for context AND timestamp for response filtering
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .body // empty' \
-            > previous_openai_review.txt
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | {body: .body, created_at: .created_at, id: .id}' \
+            > previous_openai_review.json
+
+          # Extract body for prompt context
+          jq -r '.body // empty' previous_openai_review.json > previous_openai_review.txt
+
+          # Extract timestamp for response filtering
+          PREV_REVIEW_TIMESTAMP=$(jq -r '.created_at // empty' previous_openai_review.json)
+          echo "prev_review_timestamp=$PREV_REVIEW_TIMESTAMP" >> $GITHUB_OUTPUT
 
           if [ -s previous_openai_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_openai_review.txt)
-            echo "Found previous OpenAI review ($REVIEW_SIZE bytes)"
+            echo "Found previous OpenAI review ($REVIEW_SIZE bytes) at $PREV_REVIEW_TIMESTAMP"
             echo "has_previous_openai=true" >> $GITHUB_OUTPUT
           else
             echo "No previous OpenAI review found on this PR"
             echo "has_previous_openai=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Fetch responses to reviews (explains fixed/skipped items)
+      - name: Fetch responses to OpenAI review
         if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
         id: review_responses
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREV_REVIEW_TIMESTAMP: ${{ steps.previous_openai.outputs.prev_review_timestamp }}
         run: |
-          # Fetch ALL PR comments to find responses explaining what was done
-          # These responses (posted by humans or Claude) explain which items were
-          # implemented vs skipped and why
-          echo "Fetching review responses from PR #${{ github.event.pull_request.number }}..."
+          # Fetch responses to THIS bot's review only (not all responses)
+          # Uses hybrid approach: timestamp window + marker filter
+          echo "Fetching responses to OpenAI review from PR #${{ github.event.pull_request.number }}..."
 
-          # Look for comments containing response markers (✅ Fixed, ⏭️ Skipped, Response to Review)
+          if [ -z "$PREV_REVIEW_TIMESTAMP" ]; then
+            echo "No previous review timestamp, skipping response fetch"
+            echo "has_responses=false" >> $GITHUB_OUTPUT
+            touch review_responses.txt
+            exit 0
+          fi
+
+          echo "Looking for responses after: $PREV_REVIEW_TIMESTAMP"
+
+          # Filter: posted AFTER our last review AND contains "Response to OpenAI"
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select(.body | (contains("✅") or contains("⏭️") or contains("Response to Review") or contains("Fixed in commit") or contains("Skipped -")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' \
+            --jq --arg since "$PREV_REVIEW_TIMESTAMP" \
+            '[.[] | select(.created_at > $since and (.body | contains("Response to OpenAI")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' \
             > review_responses.txt
 
           if [ -s review_responses.txt ]; then
             RESP_SIZE=$(wc -c < review_responses.txt)
-            echo "Found review responses ($RESP_SIZE bytes)"
+            echo "Found responses to OpenAI review ($RESP_SIZE bytes)"
             echo "has_responses=true" >> $GITHUB_OUTPUT
           else
-            echo "No review responses found"
+            echo "No responses to OpenAI review found"
             echo "has_responses=false" >> $GITHUB_OUTPUT
           fi
 
