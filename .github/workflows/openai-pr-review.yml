@@ -289,57 +289,68 @@ jobs:
 
           EOF
 
-          # Include complete source of workflow files touched in this PR (most common source of confusion)
-          # Limit: 200 lines per file, max 3 files
+          # Include complete source of key files touched in this PR
+          # Priority: 1) Agent files (.md in agents/), 2) Scripts (.sh, .ps1, .py), 3) Other code
+          # Limits: Agent files get 500 lines (critical), others get 200 lines
+          MAX_AGENT_LINES=500
           MAX_SOURCE_LINES=200
-          MAX_SOURCE_FILES=3
+          MAX_SOURCE_FILES=5
           SOURCE_COUNT=0
 
           # Get list of changed files from diff
-          CHANGED_FILES=$(grep "^diff --git" diff.patch | sed 's/diff --git a\/\([^ ]*\) b\/.*/\1/' | head -20)
+          CHANGED_FILES=$(grep "^diff --git" diff.patch | sed 's/diff --git a\/\([^ ]*\) b\/.*/\1/' | head -30)
 
-          for file in $CHANGED_FILES; do
-            # Prioritize workflow files (most likely source of "missing feature" confusion)
-            if [[ "$file" == .github/workflows/*.yml ]] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
-              if [ -f "$file" ]; then
-                echo "### Complete file: \`$file\`" >> user_prompt.txt
+          # Helper function to add a file to the prompt
+          add_source_file() {
+            local file="$1"
+            local lang="$2"
+            local max_lines="$3"
+            if [ -f "$file" ] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
+              echo "### Complete file: \`$file\`" >> user_prompt.txt
+              echo "" >> user_prompt.txt
+              echo "\`\`\`$lang" >> user_prompt.txt
+              head -n "$max_lines" "$file" >> user_prompt.txt
+              FILE_LINES=$(wc -l < "$file")
+              if [ "$FILE_LINES" -gt "$max_lines" ]; then
                 echo "" >> user_prompt.txt
-                echo '```yaml' >> user_prompt.txt
-                head -n "$MAX_SOURCE_LINES" "$file" >> user_prompt.txt
-                FILE_LINES=$(wc -l < "$file")
-                if [ "$FILE_LINES" -gt "$MAX_SOURCE_LINES" ]; then
-                  echo "" >> user_prompt.txt
-                  echo "... (truncated, showing first $MAX_SOURCE_LINES of $FILE_LINES lines)" >> user_prompt.txt
-                fi
-                echo '```' >> user_prompt.txt
-                echo "" >> user_prompt.txt
-                SOURCE_COUNT=$((SOURCE_COUNT + 1))
+                echo "... (truncated, showing first $max_lines of $FILE_LINES lines)" >> user_prompt.txt
               fi
+              echo '```' >> user_prompt.txt
+              echo "" >> user_prompt.txt
+              SOURCE_COUNT=$((SOURCE_COUNT + 1))
+            fi
+          }
+
+          # Priority 1: Agent files (the heart of this project) - get more lines
+          for file in $CHANGED_FILES; do
+            if [[ "$file" == *agents/*.md ]]; then
+              add_source_file "$file" "markdown" "$MAX_AGENT_LINES"
             fi
           done
 
-          # If no workflow files, include other important files (TypeScript, Python configs)
-          if [ "$SOURCE_COUNT" -eq 0 ]; then
-            for file in $CHANGED_FILES; do
-              if [[ "$file" == *.ts || "$file" == *.py || "$file" == *.yml ]] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
-                if [ -f "$file" ]; then
-                  EXT="${file##*.}"
-                  echo "### Complete file: \`$file\`" >> user_prompt.txt
-                  echo "" >> user_prompt.txt
-                  echo "\`\`\`$EXT" >> user_prompt.txt
-                  head -n "$MAX_SOURCE_LINES" "$file" >> user_prompt.txt
-                  FILE_LINES=$(wc -l < "$file")
-                  if [ "$FILE_LINES" -gt "$MAX_SOURCE_LINES" ]; then
-                    echo "" >> user_prompt.txt
-                    echo "... (truncated, showing first $MAX_SOURCE_LINES of $FILE_LINES lines)" >> user_prompt.txt
-                  fi
-                  echo '```' >> user_prompt.txt
-                  echo "" >> user_prompt.txt
-                  SOURCE_COUNT=$((SOURCE_COUNT + 1))
-                fi
-              fi
-            done
-          fi
+          # Priority 2: Scripts (.sh, .ps1, .py)
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.sh) add_source_file "$file" "bash" "$MAX_SOURCE_LINES" ;;
+              *.ps1) add_source_file "$file" "powershell" "$MAX_SOURCE_LINES" ;;
+              *.py) add_source_file "$file" "python" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
+
+          # Priority 3: TypeScript/JavaScript files
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.ts) add_source_file "$file" "typescript" "$MAX_SOURCE_LINES" ;;
+              *.js) add_source_file "$file" "javascript" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
+
+          # Priority 4: Config/workflow files (yml/yaml)
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.yml|*.yaml) add_source_file "$file" "yaml" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
 
       - name: Call OpenAI API
         if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
