@@ -135,6 +135,16 @@ if ! command -v node >/dev/null 2>&1; then
     exit 0
 fi
 
+# Check Node.js version (requires 18+)
+NODE_VERSION=$(node --version 2>/dev/null | sed 's/^v//')
+NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
+if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ] 2>/dev/null; then
+    msg "⚠️  Node.js 18+ required for dashboard (found v$NODE_VERSION)"
+    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'"
+    exit 0
+fi
+
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
     msg "✅ Dashboard already running (PID: $(cat "$DASHBOARD_PID_FILE"))"

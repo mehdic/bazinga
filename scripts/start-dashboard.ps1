@@ -161,11 +161,11 @@ if (Test-Path $STANDALONE_SERVER) {
 
     # Check if npm is available (only needed for dev mode)
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
-        Write-Log "ERROR - npm not found, cannot start dashboard in dev mode"
-        Write-Log "Consider using a pre-built standalone dashboard package"
-        Write-Host "ERROR: npm not found. Cannot start dashboard in dev mode." -ForegroundColor Red
-        Write-Host "Consider downloading a pre-built dashboard package." -ForegroundColor Yellow
-        exit 1
+        Write-Log "npm not found, cannot start dashboard in dev mode"
+        Write-Host "npm not found, cannot start dashboard in dev mode" -ForegroundColor Yellow
+        Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+        Write-Host "  To enable: install Node.js with npm, or download a pre-built dashboard package" -ForegroundColor DarkGray
+        exit 0
     }
 
     # Check and install dependencies if needed (only for dev mode)

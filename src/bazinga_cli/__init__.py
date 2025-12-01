@@ -2094,6 +2094,9 @@ def setup_dashboard(
     force: bool = typer.Option(
         False, "--force", "-f", help="Force reinstall dependencies"
     ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmation prompts (for CI/automation)"
+    ),
 ):
     """
     Install dashboard v2 dependencies for real-time orchestration monitoring.
@@ -2128,7 +2131,7 @@ def setup_dashboard(
         )
         # Offer to download/install the dashboard
         console.print("[bold]Would you like to install the dashboard now?[/bold]")
-        if not force:
+        if not force and not yes:
             if not typer.confirm("  Install dashboard?", default=True):
                 console.print("[yellow]Cancelled[/yellow]")
                 console.print("[dim]You can install later with: bazinga setup-dashboard[/dim]")
@@ -2182,8 +2185,8 @@ def setup_dashboard(
     console.print("[dim]  • AI-powered insights[/dim]")
     console.print()
 
-    # Prompt for confirmation
-    if not force:
+    # Prompt for confirmation (skip if --force or --yes)
+    if not force and not yes:
         console.print("[bold]Installation options:[/bold]")
         console.print("  [cyan]y[/cyan] - Install dependencies now (npm install)")
         console.print("  [cyan]n[/cyan] - Skip for now")
