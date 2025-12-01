@@ -208,7 +208,8 @@ const NOOP_QUERY = new Proxy({}, {
 });
 
 // NOOP DML result for run() calls - matches better-sqlite3 RunResult shape
-const NOOP_RUN_RESULT = { changes: 0, lastInsertRowid: 0n };
+// Note: Using BigInt(0) instead of 0n for ES target compatibility
+const NOOP_RUN_RESULT = { changes: 0, lastInsertRowid: BigInt(0) };
 
 // NOOP Drizzle-like object for when DB is unavailable
 // Note: transaction passes NOOP_DRIZZLE as tx so (tx) => tx.select()... works
@@ -263,7 +264,7 @@ export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
 const NOOP_STATEMENT = {
   all: () => [],
   get: () => undefined,
-  run: () => ({ changes: 0, lastInsertRowid: 0n }),
+  run: () => ({ changes: 0, lastInsertRowid: BigInt(0) }),
 };
 
 const NOOP_SQLITE: DatabaseInstance = {
