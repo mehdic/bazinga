@@ -83,9 +83,11 @@ All user-visible updates MUST use the capsule format:
 ```
 🚀 Starting orchestration | Session: {session_id}
 📋 Planning complete | {mode}: {groups} | Starting development
-🔨 Group {id} complete | {files}, {tests} ({coverage}%) | {status} → {next}
+🔨 Group {id} [{tier}/{model}] complete | {files}, {tests} ({coverage}%) | {status} → {next}
 ✅ Group {id} approved | {quality_summary} | Complete ({N}/{total})
 ```
+
+**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
 
 **Artifact separation:** Main transcript = capsules only. Link to `artifacts/{session_id}/` for details > 3 lines.
 
@@ -1200,8 +1202,8 @@ ELSE IF PM chose "parallel":
 **Tier selection (from PM's Initial Tier):**
 | PM Decision | Agent File | Model | Description |
 |-------------|------------|-------|-------------|
-| Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev: {task[:40]}` |
-| Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE: {task[:40]}` |
+| Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev: {task[:90]}` |
+| Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE: {task[:90]}` |
 
 **Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
@@ -1226,19 +1228,19 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 IF status = READY_FOR_QA OR READY_FOR_REVIEW:
   → Use "Developer Work Complete" template:
   ```
-  🔨 Group {id} complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
+  🔨 Group {id} [{tier}/{model}] complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
   ```
 
 IF status = PARTIAL:
   → Use "Work in Progress" template:
   ```
-  🔨 Group {id} implementing | {what's done} | {current_status}
+  🔨 Group {id} [{tier}/{model}] implementing | {what's done} | {current_status}
   ```
 
 IF status = BLOCKED:
   → Use "Blocker" template:
   ```
-  ⚠️ Group {id} blocked | {blocker_description} | Investigating
+  ⚠️ Group {id} [{tier}/{model}] blocked | {blocker_description} | Investigating
   ```
 
 IF status = ESCALATE_SENIOR:
@@ -1246,6 +1248,8 @@ IF status = ESCALATE_SENIOR:
   ```
   🔺 Group {id} escalating | {reason} | → Senior Software Engineer (Sonnet)
   ```
+
+**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
 
@@ -2068,10 +2072,28 @@ Orchestrator output:
 
 **Output to user:**
 ```
-📊 **Context Optimization Point**
-About to spawn {parallel_count} developers in parallel.
-💡 For optimal performance, consider running `/compact` now.
+🔨 **Phase {N} starting** | Spawning {parallel_count} developers in parallel
+
+📋 **Developer Assignments:**
+• {group_id}: {tier_name} ({model}) - {task[:60]}
+[repeat for each group]
+
+💡 For ≥3 developers, consider `/compact` first.
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
+```
+
+**Example output:**
+```
+🔨 **Phase 1 starting** | Spawning 4 developers in parallel
+
+📋 **Developer Assignments:**
+• P0-NURSE-FE: Senior Software Engineer (Sonnet) - Nurse App Frontend with auth integration
+• P0-NURSE-BE: Senior Software Engineer (Sonnet) - Nurse Backend Services with API endpoints
+• P0-MSG-BE: Senior Software Engineer (Sonnet) - Messaging Backend with WhatsApp channel
+• P1-DOCTOR-FE: Developer (Haiku) - Doctor Frontend basic components
+
+💡 For ≥3 developers, consider `/compact` first.
+⏳ Continuing immediately...
 ```
 
 **Then IMMEDIATELY continue to Step 2B.1** - do NOT wait for user input.
@@ -2092,17 +2114,19 @@ About to spawn {parallel_count} developers in parallel.
 **Per-group tier selection (from PM's Initial Tier per group):**
 | PM Tier Decision | Agent File | Model | Description |
 |------------------|------------|-------|-------------|
-| Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev {group}: {task[:30]}` |
-| Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE {group}: {task[:30]}` |
+| Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev {group}: {task[:90]}` |
+| Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE {group}: {task[:90]}` |
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
 **Spawn ALL in ONE message (MAX 4 groups):**
 ```
-Task(model: models["A"], description: "Dev A: {task}", prompt: [Group A prompt])
-Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
-... # MAX 4 Task() calls
+Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=[Group A prompt])
+Task(subagent_type="general-purpose", model=models["B"], description="SSE B: {task[:90]}", prompt=[Group B prompt])
+... # MAX 4 Task() calls in ONE message
 ```
+
+**🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
 
 **🔴 DO NOT spawn in separate messages** (sequential). **🔴 DO NOT spawn >4** (breaks system).
 
@@ -2117,9 +2141,9 @@ Task(model: models["B"], description: "SSE B: {task}", prompt: [Group B prompt])
 Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
-- READY_FOR_QA/REVIEW: `🔨 Group {id} complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
-- PARTIAL: `🔨 Group {id} implementing | {what's done} | {current_status}`
-- BLOCKED: `⚠️ Group {id} blocked | {blocker} | Investigating`
+- READY_FOR_QA/REVIEW: `🔨 Group {id} [{tier}/{model}] complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
+- PARTIAL: `🔨 Group {id} [{tier}/{model}] implementing | {what's done} | {current_status}`
+- BLOCKED: `⚠️ Group {id} [{tier}/{model}] blocked | {blocker} | Investigating`
 
 **Step 3: Output capsule to user**
 
