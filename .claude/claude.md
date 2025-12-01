@@ -1024,7 +1024,9 @@ echo "PR Node ID: $PR_NODE_ID"
 
 **Step 2: Write JSON to temp file and patch with jq (cross-platform)**
 ```bash
-cat > /tmp/pr_comment.json << 'ENDJSON'
+# Use mktemp for secure temp file creation
+TMPFILE=$(mktemp)
+cat > "$TMPFILE" << 'ENDJSON'
 {
   "query": "mutation($body: String!, $id: ID!) { addComment(input: {subjectId: $id, body: $body}) { commentEdge { node { url } } } }",
   "variables": {
@@ -1035,8 +1037,8 @@ cat > /tmp/pr_comment.json << 'ENDJSON'
 ENDJSON
 
 # Use jq to replace placeholder (cross-platform, unlike sed -i)
-jq --arg id "$PR_NODE_ID" '.variables.id = $id' /tmp/pr_comment.json > /tmp/pr_comment.patched.json
-mv /tmp/pr_comment.patched.json /tmp/pr_comment.json
+jq --arg id "$PR_NODE_ID" '.variables.id = $id' "$TMPFILE" > "${TMPFILE}.patched"
+mv "${TMPFILE}.patched" "$TMPFILE"
 ```
 
 **Step 3: Post the comment (with error detection)**
@@ -1045,7 +1047,10 @@ RESPONSE=$(curl -sSf -X POST \
   -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d @/tmp/pr_comment.json)
+  -d @"$TMPFILE")
+
+# Cleanup temp file
+rm -f "$TMPFILE"
 
 # Check for GraphQL errors
 if echo "$RESPONSE" | jq -e '.errors' > /dev/null 2>&1; then
