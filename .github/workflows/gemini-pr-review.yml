@@ -113,10 +113,11 @@ jobs:
         run: |
           # Configuration
           # Max diff size in characters - Gemini API has token limits
-          # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
-          MAX_DIFF_SIZE=40000
-          MAX_PREVIOUS_GEMINI_SIZE=8000
-          MAX_RESPONSES_SIZE=6000
+          # 80k chars ≈ 20k tokens, Gemini 3 Pro has 1M context window
+          # Increased limits to avoid losing context
+          MAX_DIFF_SIZE=80000
+          MAX_PREVIOUS_GEMINI_SIZE=16000
+          MAX_RESPONSES_SIZE=12000
 
           cat > prompt_header.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request.
@@ -134,6 +135,13 @@ jobs:
           If unchanged code exists outside the diff, you cannot see it. Do NOT assume
           features are missing just because they don't appear with "+" in the diff.
           If unsure, say "I cannot verify from the diff whether X exists."
+
+          OUTPUT FORMAT - MANDATORY:
+          You MUST use structured bullet points and tables. DO NOT write prose paragraphs.
+          - Use numbered lists for issues (not narrative paragraphs)
+          - Use markdown tables for summaries
+          - Be concise: 1-2 sentences per issue maximum
+          - Every issue MUST include: file:line, what's wrong, how to fix
 
           EOF
 
@@ -194,19 +202,53 @@ jobs:
           cat >> prompt_header.txt << 'EOF'
           NOTE: You are provided with the complete Git diff below. Use this diff to understand all changes in this PR.
 
-          Please analyze the diff and provide:
-          1. Potential bugs or regressions - Consider how these changes interact with the existing codebase
-          2. Style or readability issues - Code quality and maintainability concerns
-          3. Concrete suggestions for improvement - Specific, actionable recommendations
+          Analyze the diff and provide feedback using THIS EXACT FORMAT:
 
-          IMPORTANT RULES:
-          - If you posted a previous review, start with "## Updates Since Last Review" acknowledging what was fixed
-          - Focus on genuinely NEW issues or unresolved concerns
-          - If everything looks good now, say so briefly
+          ```
+          ## Gemini Code Review
 
-          Format your response as a concise, markdown-formatted code review suitable for posting as a PR comment.
+          _Reviewed commit: {sha}_
 
-          Below is the Git diff of the changes:
+          ### Summary
+
+          | Category | Count |
+          |----------|-------|
+          | 🔴 Critical | N |
+          | 🟡 Suggestions | N |
+          | ✅ Good Practices | N |
+
+          ### 🔴 Critical Issues (MUST FIX)
+
+          1. **[file:line]** Issue title
+             - Problem: What's wrong (1 sentence)
+             - Fix: How to fix it (1 sentence)
+
+          ### 🟡 Suggestions (SHOULD CONSIDER)
+
+          1. **[file:line]** Suggestion title
+             - Current: What the code does now
+             - Better: What would be better
+
+          ### ✅ Good Practices Observed
+
+          - [Brief acknowledgment of good patterns]
+
+          ### Updates Since Last Review (if applicable)
+
+          | Previous Issue | Status |
+          |----------------|--------|
+          | Issue X | ✅ Fixed in this commit |
+          | Issue Y | ⏭️ Acknowledged as deferred |
+          ```
+
+          **CRITICAL RULES:**
+          - Use BULLET POINTS, not prose paragraphs
+          - Every issue MUST have file:line reference
+          - Be CONCISE: max 2 sentences per issue
+          - If no issues in a category, write "None found"
+          - Start with "## Gemini Code Review" header
+
+          ## Git Diff
 
           ```diff
           EOF
@@ -238,10 +280,11 @@ jobs:
 
           # Include complete source of key files touched in this PR
           # Priority: 1) Agent files (.md in agents/), 2) Scripts (.sh, .ps1, .py), 3) Other code
-          # Limits: Agent files get 500 lines (critical), others get 200 lines
-          MAX_AGENT_LINES=500
-          MAX_SOURCE_LINES=200
-          MAX_SOURCE_FILES=5
+          # Limits: Agent files get 800 lines (critical), others get 400 lines
+          # Increased limits to provide full context (Gemini 3 Pro has 1M context)
+          MAX_AGENT_LINES=800
+          MAX_SOURCE_LINES=400
+          MAX_SOURCE_FILES=8
           SOURCE_COUNT=0
 
           # Get list of changed files from diff
