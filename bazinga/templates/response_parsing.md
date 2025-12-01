@@ -68,8 +68,10 @@
 **Capsule construction:**
 
 ```
-🔨 Group {id} complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
+🔨 Group {id} [{tier}/{model}] complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
 ```
+
+**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer. Bracket is optional for backward compatibility - omit if tier/model unavailable.
 
 **Fallback logic:**
 
@@ -78,12 +80,13 @@ If missing:
 - **Tests**: Say "with tests" or "no new tests" based on status
 - **Coverage**: Omit coverage mention
 - **Summary**: Use "Implementation complete" or extract from first paragraph
+- **Tier/Model**: Omit bracket entirely (e.g., `🔨 Group A complete | ...`)
 
 **Examples:**
 
 Full data available:
 ```
-🔨 Group A complete | JWT auth implemented, 3 files created, 12 tests added (92% coverage) | No blockers → QA review
+🔨 Group A [SSE/Sonnet] complete | JWT auth implemented, 3 files created, 12 tests added (92% coverage) | No blockers → QA review
 ```
 
 Minimal data (only status available):
@@ -93,7 +96,7 @@ Minimal data (only status available):
 
 Files but no test count:
 ```
-🔨 Group C complete | Password reset in password_reset.py, with tests | Ready → QA testing
+🔨 Group C [Dev/Haiku] complete | Password reset in password_reset.py, with tests | Ready → QA testing
 ```
 
 ---

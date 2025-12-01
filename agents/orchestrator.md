@@ -75,6 +75,7 @@ All user-visible updates MUST use the capsule format:
 **Exceptions - Use Rich Context Blocks for:**
 - 🚀 **Initialization** (Step 0) - Show workflow overview
 - 📋 **Planning Complete** (Step 1.3) - Show execution plan, phases, criteria
+- 🔨 **Developer Spawn Summary** (Step 2B.0) - Show tier assignments when spawning ≥3 developers
 - 👔 **Tech Lead Summary** (Step 2A.6/2B.6) - Show quality metrics
 - ✅ **BAZINGA** - Show completion summary
 - ⚠️ **System Warnings** - Report DB failures, fallbacks, critical errors
@@ -2075,7 +2076,7 @@ Orchestrator output:
 🔨 **Phase {N} starting** | Spawning {parallel_count} developers in parallel
 
 📋 **Developer Assignments:**
-• {group_id}: {tier_name} ({model}) - {task[:60]}
+• {group_id}: {tier_name} ({model}) - {task[:90]}
 [repeat for each group]
 
 💡 For ≥3 developers, consider `/compact` first.
