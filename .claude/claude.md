@@ -644,6 +644,15 @@ jq '.body'
 - Update status as you go: `❌ Pending` → `🔄 In Progress` → `✅ Fixed` or `⏭️ Skipped`
 - NEVER skip a row without explicit justification
 
+**🔴 CRITICAL: Never Dismiss Entire Reviews**
+
+If you find ONE false positive in a review, DO NOT dismiss the entire review:
+- ❌ WRONG: "The LLM is wrong about X, so I'll ignore this review"
+- ✅ CORRECT: Mark that item as `⏭️ False Positive`, but STILL extract and address ALL other items
+
+**Common failure mode:** Getting distracted proving one claim wrong, then never returning
+to address the valid issues in the same review. ALWAYS complete the full extraction table.
+
 #### Step 4: Final Verification
 ```markdown
 ## Final Count Verification
