@@ -153,9 +153,10 @@ jobs:
         run: |
           # Configuration
           # Max diff size in lines - truncate by lines for clean breaks
-          MAX_DIFF_LINES=1500
-          MAX_PREVIOUS_OPENAI_LINES=200
-          MAX_RESPONSES_LINES=150
+          # Increased limits to avoid losing context (GPT-5 has 128k context)
+          MAX_DIFF_LINES=3000
+          MAX_PREVIOUS_OPENAI_LINES=400
+          MAX_RESPONSES_LINES=300
 
           cat > system_prompt.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request. Your reviews are thorough, constructive, and focus on code quality, potential bugs, and best practices.
@@ -180,6 +181,13 @@ jobs:
           If unchanged code exists outside the diff, you cannot see it. Do NOT assume
           features are missing just because they don't appear with "+" in the diff.
           If unsure, say "I cannot verify from the diff whether X exists."
+
+          OUTPUT FORMAT - MANDATORY:
+          You MUST use structured bullet points and tables. DO NOT write prose paragraphs.
+          - Use numbered lists for issues (not narrative paragraphs)
+          - Use markdown tables for summaries
+          - Be concise: 1-2 sentences per issue maximum
+          - Every issue MUST include: file:line, what's wrong, how to fix
 
           Format your response as markdown suitable for a GitHub PR comment.
           EOF
@@ -247,17 +255,51 @@ jobs:
 
           ## Review Instructions
 
-          Please analyze the diff below and provide:
-          1. **Potential bugs or regressions** - Consider how these changes interact with the existing codebase
-          2. **Style or readability issues** - Code quality and maintainability concerns
-          3. **Concrete suggestions for improvement** - Specific, actionable recommendations
-          4. **Security concerns** - Any potential vulnerabilities introduced
+          Analyze the diff and provide feedback using THIS EXACT FORMAT:
 
-          **IMPORTANT RULES:**
-          - If you posted a previous review, start with "## Updates Since Last Review" acknowledging what was fixed
-          - Focus on genuinely NEW issues or unresolved concerns
-          - If everything looks good now, say so briefly
-          - Start your review with "## OpenAI Code Review" as the header
+          ```
+          ## OpenAI Code Review
+
+          _Reviewed commit: {sha}_
+
+          ### Summary
+
+          | Category | Count |
+          |----------|-------|
+          | 🔴 Critical | N |
+          | 🟡 Suggestions | N |
+          | ✅ Good Practices | N |
+
+          ### 🔴 Critical Issues (MUST FIX)
+
+          1. **[file:line]** Issue title
+             - Problem: What's wrong (1 sentence)
+             - Fix: How to fix it (1 sentence)
+
+          ### 🟡 Suggestions (SHOULD CONSIDER)
+
+          1. **[file:line]** Suggestion title
+             - Current: What the code does now
+             - Better: What would be better
+
+          ### ✅ Good Practices Observed
+
+          - [Brief acknowledgment of good patterns]
+
+          ### Updates Since Last Review (if applicable)
+
+          | Previous Issue | Status |
+          |----------------|--------|
+          | Issue X | ✅ Fixed in this commit |
+          | Issue Y | ⏭️ Acknowledged as deferred |
+          ```
+
+          **CRITICAL RULES:**
+          - Use BULLET POINTS, not prose paragraphs
+          - Every issue MUST have file:line reference
+          - Be CONCISE: max 2 sentences per issue
+          - If no issues in a category, write "None found"
+          - Start with "## OpenAI Code Review" header
 
           ## Git Diff
 
@@ -291,10 +333,11 @@ jobs:
 
           # Include complete source of key files touched in this PR
           # Priority: 1) Agent files (.md in agents/), 2) Scripts (.sh, .ps1, .py), 3) Other code
-          # Limits: Agent files get 500 lines (critical), others get 200 lines
-          MAX_AGENT_LINES=500
-          MAX_SOURCE_LINES=200
-          MAX_SOURCE_FILES=5
+          # Limits: Agent files get 800 lines (critical), others get 400 lines
+          # Increased limits to provide full context (GPT-5 has 128k context)
+          MAX_AGENT_LINES=800
+          MAX_SOURCE_LINES=400
+          MAX_SOURCE_FILES=8
           SOURCE_COUNT=0
 
           # Get list of changed files from diff
@@ -359,10 +402,8 @@ jobs:
         run: |
           set +x  # Prevent API key from appearing in logs
 
-          SYSTEM_PROMPT=$(cat system_prompt.txt | jq -Rs . 2>/dev/null)
-          USER_PROMPT=$(cat user_prompt.txt | jq -Rs . 2>/dev/null)
-
-          if [ -z "$SYSTEM_PROMPT" ] || [ -z "$USER_PROMPT" ]; then
+          # Validate prompt files exist and are non-empty
+          if [ ! -s system_prompt.txt ] || [ ! -s user_prompt.txt ]; then
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
             echo "Failed to prepare prompts. Check prompt file formatting." >> review.txt
@@ -371,19 +412,22 @@ jobs:
 
           # GPT-5 is a reasoning model - temperature is fixed at 1 (not configurable)
           # Needs high max_completion_tokens because reasoning tokens count against the limit
-          PAYLOAD=$(cat <<EOF
-          {
-            "model": "gpt-5",
-            "messages": [
-              {"role": "system", "content": $SYSTEM_PROMPT},
-              {"role": "user", "content": $USER_PROMPT}
-            ],
-            "max_completion_tokens": 49152
-          }
-          EOF
-          )
+          # Build payload using jq with --rawfile to avoid "Argument list too long" error
+          # --rawfile reads file content directly without shell variable intermediary
+          jq -n \
+            --rawfile system system_prompt.txt \
+            --rawfile user user_prompt.txt \
+            '{
+              model: "gpt-5",
+              messages: [
+                {role: "system", content: $system},
+                {role: "user", content: $user}
+              ],
+              max_completion_tokens: 49152
+            }' > openai_payload.json
 
           echo "Calling OpenAI API (GPT-5)..."
+          echo "Payload size: $(wc -c < openai_payload.json) bytes"
 
           # Retry logic for transient errors (timeout, 429, 5xx)
           MAX_RETRIES=3
@@ -398,7 +442,7 @@ jobs:
               -X POST \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $OPENAI_API_KEY" \
-              -d "$PAYLOAD" \
+              -d @openai_payload.json \
               https://api.openai.com/v1/chat/completions)
 
             CURL_EXIT=$?
