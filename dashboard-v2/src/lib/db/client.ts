@@ -1,3 +1,4 @@
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
 
@@ -15,19 +16,12 @@ type DatabaseInstance = {
 };
 type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 
-// Drizzle types (loaded dynamically to avoid triggering better-sqlite3 import)
-type DrizzleFunction = (client: DatabaseInstance, config: { schema: typeof schema }) => DrizzleDatabase;
-type DrizzleDatabase = {
-  select: () => unknown;
-  insert: () => unknown;
-  update: () => unknown;
-  delete: () => unknown;
-  query: Record<string, unknown>;
-};
+// Drizzle function type (actual BetterSQLite3Database type imported above)
+type DrizzleFunction = (client: DatabaseInstance, config: { schema: typeof schema }) => BetterSQLite3Database<typeof schema>;
 
 // Lazy database initialization to avoid build-time and architecture errors
 let _sqlite: DatabaseInstance | null = null;
-let _db: DrizzleDatabase | null = null;
+let _db: BetterSQLite3Database<typeof schema> | null = null;
 let _dbPath: string | null = null;
 let _moduleLoadFailed = false;
 let _DatabaseClass: DatabaseConstructor | null = null;
@@ -146,7 +140,7 @@ function getDatabase(): DatabaseInstance | null {
   }
 }
 
-function getDrizzle(): DrizzleDatabase | null {
+function getDrizzle(): BetterSQLite3Database<typeof schema> | null {
   if (_db) return _db;
   if (_moduleLoadFailed) return null;
 
@@ -162,7 +156,7 @@ function getDrizzle(): DrizzleDatabase | null {
 }
 
 // Export lazy-initialized db with mock fallback
-export const db = new Proxy({} as DrizzleDatabase, {
+export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
   get(_, prop) {
     const drizzleDb = getDrizzle();
     if (!drizzleDb) {
