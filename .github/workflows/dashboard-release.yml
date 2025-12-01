@@ -69,13 +69,16 @@ jobs:
 
           # Copy the native module AND its runtime dependencies
           # better-sqlite3 requires 'bindings' package at runtime to locate .node files
-          # Note: Using rsync -a instead of cp -a for macOS compatibility (BSD cp doesn't support -a)
+          # Note: rsync preferred but falls back to cp -R for Windows compatibility
           mkdir -p dist/node_modules
-          rsync -a node_modules/better-sqlite3 dist/node_modules/
-          rsync -a node_modules/bindings dist/node_modules/
-          # file-uri-to-path is a dependency of bindings (may not exist in all versions)
-          if [ -d node_modules/file-uri-to-path ]; then
-            rsync -a node_modules/file-uri-to-path dist/node_modules/
+          if command -v rsync >/dev/null 2>&1; then
+            rsync -a node_modules/better-sqlite3 dist/node_modules/
+            rsync -a node_modules/bindings dist/node_modules/
+            [ -d node_modules/file-uri-to-path ] && rsync -a node_modules/file-uri-to-path dist/node_modules/
+          else
+            cp -R node_modules/better-sqlite3 dist/node_modules/
+            cp -R node_modules/bindings dist/node_modules/
+            [ -d node_modules/file-uri-to-path ] && cp -R node_modules/file-uri-to-path dist/node_modules/
           fi
 
       - name: Prepare release package
@@ -124,9 +127,13 @@ jobs:
           # Copy compiled socket server and its dependencies for real-time updates
           if [ -f "dist/socket-server.js" ]; then
             cp dist/socket-server.js release-package/dashboard-v2/
-            # Copy native modules with preserved permissions (rsync for macOS compatibility)
+            # Copy native modules with preserved permissions (rsync preferred, cp -R fallback for Windows)
             if [ -d "dist/node_modules" ]; then
-              rsync -a dist/node_modules release-package/dashboard-v2/
+              if command -v rsync >/dev/null 2>&1; then
+                rsync -a dist/node_modules release-package/dashboard-v2/
+              else
+                cp -R dist/node_modules release-package/dashboard-v2/
+              fi
             fi
           fi
 
