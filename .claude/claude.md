@@ -884,8 +884,14 @@ done
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
 4. **Commit & push** fixes
-5. **Resolve & Respond** to ALL feedback (see sections below)
-6. **Report** summary to user
+5. **🔴 Post response to PR via GraphQL** (BEFORE any merge - see "Post via GraphQL" section below)
+6. **Resolve** inline threads if applicable
+7. **Report** summary to user
+
+**🔴 CRITICAL: Always post PR response via GraphQL BEFORE merging.** This ensures:
+- LLM reviewers see your response in subsequent reviews
+- Audit trail exists for all addressed/skipped items
+- No feedback is silently ignored
 
 ### 🔴 MANDATORY: Respond to ALL Feedback (Fixed AND Skipped)
 
