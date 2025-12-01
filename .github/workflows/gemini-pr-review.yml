@@ -121,6 +121,20 @@ jobs:
           cat > prompt_header.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request.
 
+          CRITICAL RULE - Diff Interpretation:
+          You are reviewing a DIFF, not the full file. The diff only shows CHANGED lines.
+          - Lines with "+" are ADDITIONS in this PR
+          - Lines with "-" are DELETIONS from this PR
+          - Lines without +/- are CONTEXT (they exist but weren't changed)
+
+          NEVER claim something is "missing" unless:
+          1. The diff shows it being DELETED (line starts with "-"), OR
+          2. The diff shows NEW code that should include it but doesn't
+
+          If unchanged code exists outside the diff, you cannot see it. Do NOT assume
+          features are missing just because they don't appear with "+" in the diff.
+          If unsure, say "I cannot verify from the diff whether X exists."
+
           EOF
 
           # Sanitize and add PR metadata
