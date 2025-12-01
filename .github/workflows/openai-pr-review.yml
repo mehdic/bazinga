@@ -76,8 +76,9 @@ jobs:
 
           # Use precise marker "## OpenAI Code Review" to avoid false matches
           # Fetch previous review for context AND timestamp for response filtering
+          # Note: (last // {}) handles case when no previous reviews exist (avoids jq null error)
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | {body: .body, created_at: .created_at, id: .id}' \
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | (last // {}) | {body: .body, created_at: .created_at, id: .id}' \
             > previous_openai_review.json
 
           # Extract body for prompt context

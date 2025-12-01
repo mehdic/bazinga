@@ -4,25 +4,62 @@
 import { Server } from "socket.io";
 import { createServer } from "http";
 import path from "path";
+import fs from "fs";
 
 // Types for better-sqlite3 (imported dynamically to handle architecture mismatch)
 type DatabaseInstance = {
   prepare: (sql: string) => {
     all: (...args: unknown[]) => unknown[];
     get: (...args: unknown[]) => unknown;
-    run: (...args: unknown[]) => { changes: number; lastInsertRowid: number | bigint };
+    run: (...args: unknown[]) => { changes: number; lastInsertRowid: bigint };
   };
   close: () => void;
   exec: (sql: string) => void;
   pragma: (pragma: string, options?: { simple?: boolean }) => unknown;
-  transaction: <T>(fn: () => T) => () => T;
+  transaction: <A extends unknown[], T>(fn: (...args: A) => T) => (...args: A) => T;
 };
 type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 
 const PORT = process.env.SOCKET_PORT || 3001;
-// Use __dirname for deterministic path resolution (not affected by how process is launched)
-// __dirname = dashboard-v2/src/lib/socket, so we go up 4 levels to project root
-const DB_PATH = process.env.DATABASE_URL || path.resolve(__dirname, "..", "..", "..", "..", "bazinga", "bazinga.db");
+
+/**
+ * Resolve database path robustly for both dev and bundled (dist) environments.
+ * After esbuild bundles to dist/, __dirname changes from src/lib/socket to dist.
+ */
+function resolveDbPath(): string {
+  // Environment variable takes precedence
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  // Candidate paths for different runtime scenarios
+  const candidates = [
+    // Running from dashboard-v2 root (dev): cwd = dashboard-v2, db at ../bazinga/bazinga.db
+    path.resolve(process.cwd(), "..", "bazinga", "bazinga.db"),
+    // Running from dist/socket-server.js (prod): __dirname = dist, db at ../bazinga/bazinga.db
+    path.resolve(__dirname, "..", "bazinga", "bazinga.db"),
+    // Running from src/lib/socket (ts-node dev): __dirname = src/lib/socket
+    path.resolve(__dirname, "..", "..", "..", "..", "bazinga", "bazinga.db"),
+    // Extra fallback: two levels up from dist
+    path.resolve(__dirname, "..", "..", "bazinga", "bazinga.db"),
+  ];
+
+  // Find first existing path
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    } catch {
+      // Ignore access errors
+    }
+  }
+
+  // Fallback to first candidate for error messages
+  return candidates[0];
+}
+
+const DB_PATH = resolveDbPath();
 
 // Event types
 export type SocketEvent =

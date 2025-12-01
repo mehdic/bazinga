@@ -7,12 +7,12 @@ type DatabaseInstance = {
   prepare: (sql: string) => {
     all: (...args: unknown[]) => unknown[];
     get: (...args: unknown[]) => unknown;
-    run: (...args: unknown[]) => { changes: number; lastInsertRowid: number | bigint };
+    run: (...args: unknown[]) => { changes: number; lastInsertRowid: bigint };
   };
   close: () => void;
   exec: (sql: string) => void;
   pragma: (pragma: string, options?: { simple?: boolean }) => unknown;
-  transaction: <T>(fn: () => T) => () => T;
+  transaction: <A extends unknown[], T>(fn: (...args: A) => T) => (...args: A) => T;
 };
 type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 
@@ -207,7 +207,7 @@ const NOOP_SQLITE: DatabaseInstance = {
   close: () => {},
   exec: () => {},
   pragma: () => undefined,
-  transaction: <T>(fn: () => T) => fn,
+  transaction: <A extends unknown[], T>(fn: (...args: A) => T) => (...args: A) => fn(...args),
 };
 
 // Export for direct SQL queries if needed (also lazy)
