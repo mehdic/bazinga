@@ -598,6 +598,53 @@ jq '.body'
 
 **Search for keywords in ALL bodies:** "fix", "issue", "regression", "missing", "should", "consider"
 
+### 📋 Expected LLM Review Format (OpenAI & Gemini)
+
+Both OpenAI and Gemini reviews are configured to use this structured format (makes extraction easier):
+
+```markdown
+## OpenAI Code Review  (or "## Gemini Code Review")
+
+_Reviewed commit: {sha}_
+
+### Summary
+
+| Category | Count |
+|----------|-------|
+| 🔴 Critical | N |
+| 🟡 Suggestions | N |
+| ✅ Good Practices | N |
+
+### 🔴 Critical Issues (MUST FIX)
+
+1. **[file:line]** Issue title
+   - Problem: What's wrong (1 sentence)
+   - Fix: How to fix it (1 sentence)
+
+### 🟡 Suggestions (SHOULD CONSIDER)
+
+1. **[file:line]** Suggestion title
+   - Current: What the code does now
+   - Better: What would be better
+
+### ✅ Good Practices Observed
+
+- [Brief acknowledgment of good patterns]
+
+### Updates Since Last Review (if applicable)
+
+| Previous Issue | Status |
+|----------------|--------|
+| Issue X | ✅ Fixed in this commit |
+| Issue Y | ⏭️ Acknowledged as deferred |
+```
+
+**Extraction tips:**
+- Look for `### 🔴 Critical` section first - these are MUST FIX
+- Count items in Summary table to verify you extracted all
+- Each issue has `**[file:line]**` format for easy location
+- If review doesn't follow format, extract manually from prose
+
 ### Automatic Behavior
 
 1. **Fetch ALL THREE sources** - reviewThreads, reviews, AND comments (full bodies)
@@ -884,8 +931,14 @@ done
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
 4. **Commit & push** fixes
-5. **Resolve & Respond** to ALL feedback (see sections below)
-6. **Report** summary to user
+5. **🔴 Post response to PR via GraphQL** (BEFORE any merge - see "Post via GraphQL" section below)
+6. **Resolve** inline threads if applicable
+7. **Report** summary to user
+
+**🔴 CRITICAL: Always post PR response via GraphQL BEFORE merging.** This ensures:
+- LLM reviewers see your response in subsequent reviews
+- Audit trail exists for all addressed/skipped items
+- No feedback is silently ignored
 
 ### 🔴 MANDATORY: Respond to ALL Feedback (Fixed AND Skipped)
 
@@ -938,42 +991,77 @@ Responses to LLM reviews MUST use these exact headers so the workflows can filte
 This enables timestamp-windowed filtering: each LLM only sees responses to ITS OWN reviews.
 
 **Post via GraphQL (required in Claude Code Web):**
+
+**Step 0: Validate prerequisites**
 ```bash
-GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+# Set PR number (replace with actual number)
+PR_NUMBER=155
 
-# Get PR node ID first
-PR_NODE_ID=$(curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/graphql" \
-  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { id } } }"}' \
-  | jq -r '.data.repository.pullRequest.id')
-
-# Post response with proper header
-BODY="## Response to OpenAI Code Review
-
-| # | Suggestion | Action |
-|---|------------|--------|
-| 1 | Fix X | ✅ Fixed in abc123 |
-| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |
-
-## Response to Gemini Code Review
-
-| # | Suggestion | Action |
-|---|------------|--------|
-| 1 | Issue Z | ✅ Fixed in def456 |"
-
-QUERY=$(jq -n --arg body "$BODY" '{
-  query: "mutation($body: String!) { addComment(input: {subjectId: \"'$PR_NODE_ID'\", body: $body}) { commentEdge { node { url } } } }",
-  variables: { body: $body }
-}')
-
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/graphql" \
-  -d "$QUERY"
+# Validate token exists
+if [ -z "${BAZINGA_GITHUB_TOKEN:-}" ]; then
+  echo "ERROR: BAZINGA_GITHUB_TOKEN is not set" >&2
+  exit 1
+fi
 ```
+
+**Step 1: Get PR node ID (with error handling)**
+```bash
+RESPONSE=$(curl -sSf -X POST \
+  -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { id } } }\"}")
+
+PR_NODE_ID=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.id')
+
+# Validate PR node ID was retrieved
+if [ -z "$PR_NODE_ID" ] || [ "$PR_NODE_ID" = "null" ]; then
+  echo "ERROR: Could not resolve PR node ID. Response: $RESPONSE" >&2
+  exit 1
+fi
+echo "PR Node ID: $PR_NODE_ID"
+```
+
+**Step 2: Write JSON to temp file and patch with jq (cross-platform)**
+```bash
+# Use mktemp for secure temp file creation
+TMPFILE=$(mktemp)
+cat > "$TMPFILE" << 'ENDJSON'
+{
+  "query": "mutation($body: String!, $id: ID!) { addComment(input: {subjectId: $id, body: $body}) { commentEdge { node { url } } } }",
+  "variables": {
+    "id": "PLACEHOLDER_ID",
+    "body": "## Response to OpenAI Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Fix X | ✅ Fixed in abc123 |\n| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |\n\n## Response to Gemini Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Issue Z | ✅ Fixed in def456 |"
+  }
+}
+ENDJSON
+
+# Use jq to replace placeholder (cross-platform, unlike sed -i)
+jq --arg id "$PR_NODE_ID" '.variables.id = $id' "$TMPFILE" > "${TMPFILE}.patched"
+mv "${TMPFILE}.patched" "$TMPFILE"
+```
+
+**Step 3: Post the comment (with error detection)**
+```bash
+RESPONSE=$(curl -sSf -X POST \
+  -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d @"$TMPFILE")
+
+# Cleanup temp file
+rm -f "$TMPFILE"
+
+# Check for GraphQL errors
+if echo "$RESPONSE" | jq -e '.errors' > /dev/null 2>&1; then
+  echo "ERROR: GraphQL mutation failed: $RESPONSE" >&2
+  exit 1
+fi
+
+echo "$RESPONSE" | jq -r '.data.addComment.commentEdge.node.url'
+```
+
+**Note:** Use `\n` for newlines in the JSON body. The jq patching method is cross-platform (works on Linux and macOS).
 
 ### Response Templates
 
