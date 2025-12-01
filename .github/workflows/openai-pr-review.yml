@@ -117,8 +117,9 @@ jobs:
           echo "Looking for responses after: $PREV_REVIEW_TIMESTAMP"
 
           # Filter: posted AFTER our last review AND contains "Response to OpenAI"
+          # Note: gh api --jq doesn't support --arg, so pipe to jq separately
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq --arg since "$PREV_REVIEW_TIMESTAMP" \
+            | jq -r --arg since "$PREV_REVIEW_TIMESTAMP" \
             '[.[] | select(.created_at > $since and (.body | contains("Response to OpenAI")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' \
             > review_responses.txt
 
