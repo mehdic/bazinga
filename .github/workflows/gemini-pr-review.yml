@@ -21,37 +21,84 @@ jobs:
           fetch-depth: 20
 
       - name: Compute diff
+        id: diff
         run: |
           git fetch origin ${{ github.base_ref }}
+
+          # Capture the commit SHA being reviewed (important for staleness detection)
+          REVIEW_SHA=$(git rev-parse HEAD)
+          REVIEW_SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "review_sha=$REVIEW_SHA" >> $GITHUB_OUTPUT
+          echo "review_sha_short=$REVIEW_SHA_SHORT" >> $GITHUB_OUTPUT
+          echo "Reviewing commit: $REVIEW_SHA_SHORT ($REVIEW_SHA)"
+
           # Exclude package-lock.json (large, auto-generated) from review diff
           git diff origin/${{ github.base_ref }}...HEAD -- . ':!**/package-lock.json' > diff.patch
 
       - name: Fetch previous Gemini reviews from PR
         id: previous_gemini
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Fetch previous review comments from this PR posted by github-actions bot
           # This ensures Gemini has context from its own previous reviews
           echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
-          curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            -o pr_comments.json
+          # Fetch previous review for context AND timestamp for response filtering
+          # Note: (last // {}) handles case when no previous reviews exist (avoids jq null error)
+          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## Gemini Code Review")))] | (last // {}) | {body: .body, created_at: .created_at, id: .id}' \
+            > previous_gemini_review.json
 
-          # Filter for github-actions bot comments (Gemini reviews)
-          # Get the most recent one (last in the array after filtering)
-          jq -r '[.[] | select(.user.login == "github-actions[bot]" or .user.login == "github-actions")] | last | .body // empty' pr_comments.json > previous_gemini_review.txt
+          # Extract body for prompt context
+          jq -r '.body // empty' previous_gemini_review.json > previous_gemini_review.txt
+
+          # Extract timestamp for response filtering
+          PREV_REVIEW_TIMESTAMP=$(jq -r '.created_at // empty' previous_gemini_review.json)
+          echo "prev_review_timestamp=$PREV_REVIEW_TIMESTAMP" >> $GITHUB_OUTPUT
 
           if [ -s previous_gemini_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_gemini_review.txt)
-            echo "Found previous Gemini review ($REVIEW_SIZE bytes)"
+            echo "Found previous Gemini review ($REVIEW_SIZE bytes) at $PREV_REVIEW_TIMESTAMP"
             echo "has_previous_gemini=true" >> $GITHUB_OUTPUT
           else
             echo "No previous Gemini review found on this PR"
             echo "has_previous_gemini=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch responses to Gemini review
+        id: review_responses
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREV_REVIEW_TIMESTAMP: ${{ steps.previous_gemini.outputs.prev_review_timestamp }}
+        run: |
+          # Fetch responses to THIS bot's review only (not all responses)
+          # Uses hybrid approach: timestamp window + marker filter
+          echo "Fetching responses to Gemini review from PR #${{ github.event.pull_request.number }}..."
+
+          if [ -z "$PREV_REVIEW_TIMESTAMP" ]; then
+            echo "No previous review timestamp, skipping response fetch"
+            echo "has_responses=false" >> $GITHUB_OUTPUT
+            touch review_responses.txt
+            exit 0
+          fi
+
+          echo "Looking for responses after: $PREV_REVIEW_TIMESTAMP"
+
+          # Filter: posted AFTER our last review AND contains "Response to Gemini"
+          # Note: gh api --jq doesn't support --arg, so pipe to jq separately
+          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            | jq -r --arg since "$PREV_REVIEW_TIMESTAMP" \
+            '[.[] | select(.created_at > $since and (.body | contains("Response to Gemini")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' \
+            > review_responses.txt
+
+          if [ -s review_responses.txt ]; then
+            RESP_SIZE=$(wc -c < review_responses.txt)
+            echo "Found responses to Gemini review ($RESP_SIZE bytes)"
+            echo "has_responses=true" >> $GITHUB_OUTPUT
+          else
+            echo "No responses to Gemini review found"
+            echo "has_responses=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Build prompt
@@ -59,16 +106,34 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
+          REVIEW_SHA: ${{ steps.diff.outputs.review_sha }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
           HAS_PREVIOUS_GEMINI: ${{ steps.previous_gemini.outputs.has_previous_gemini }}
+          HAS_RESPONSES: ${{ steps.review_responses.outputs.has_responses }}
         run: |
           # Configuration
           # Max diff size in characters - Gemini API has token limits
           # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
           MAX_DIFF_SIZE=40000
           MAX_PREVIOUS_GEMINI_SIZE=8000
+          MAX_RESPONSES_SIZE=6000
 
           cat > prompt_header.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request.
+
+          CRITICAL RULE - Diff Interpretation:
+          You are reviewing a DIFF, not the full file. The diff only shows CHANGED lines.
+          - Lines with "+" are ADDITIONS in this PR
+          - Lines with "-" are DELETIONS from this PR
+          - Lines without +/- are CONTEXT (they exist but weren't changed)
+
+          NEVER claim something is "missing" unless:
+          1. The diff shows it being DELETED (line starts with "-"), OR
+          2. The diff shows NEW code that should include it but doesn't
+
+          If unchanged code exists outside the diff, you cannot see it. Do NOT assume
+          features are missing just because they don't appear with "+" in the diff.
+          If unsure, say "I cannot verify from the diff whether X exists."
 
           EOF
 
@@ -76,6 +141,9 @@ jobs:
           echo "Pull Request Title: $PR_TITLE" >> prompt_header.txt
           echo "Repository: $REPO_NAME" >> prompt_header.txt
           echo "Branch: $BRANCH_NAME" >> prompt_header.txt
+          echo "Reviewing Commit: $REVIEW_SHA_SHORT" >> prompt_header.txt
+          echo "" >> prompt_header.txt
+          echo "⚠️ Note: This review is for commit $REVIEW_SHA_SHORT. If newer commits exist, this review may be stale." >> prompt_header.txt
           echo "" >> prompt_header.txt
 
           # Include previous Gemini review from this PR (your own previous feedback)
@@ -91,6 +159,33 @@ jobs:
             echo "Your previous review (truncated if large):" >> prompt_header.txt
             echo '```markdown' >> prompt_header.txt
             head -c "$MAX_PREVIOUS_GEMINI_SIZE" previous_gemini_review.txt >> prompt_header.txt
+            echo '' >> prompt_header.txt
+            echo '```' >> prompt_header.txt
+            echo "" >> prompt_header.txt
+          fi
+
+          # Include responses explaining what was fixed/skipped
+          if [ "$HAS_RESPONSES" = "true" ] && [ -s review_responses.txt ]; then
+            echo "## Responses to Review Feedback" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "The developer posted responses explaining which issues were addressed:" >> prompt_header.txt
+            echo "- ✅ = Fixed/Implemented" >> prompt_header.txt
+            echo "- ⏭️ = Intentionally skipped (with explanation)" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "🔴 **CRITICAL RULES FOR RESPONDED ITEMS:**" >> prompt_header.txt
+            echo "1. Items marked ✅ Fixed: Do NOT mention again. Verify fix exists in diff, then move on." >> prompt_header.txt
+            echo "2. Items marked ⏭️ Skipped: Do NOT re-raise UNLESS it causes:" >> prompt_header.txt
+            echo "   - Security vulnerabilities (authentication bypass, injection, etc.)" >> prompt_header.txt
+            echo "   - Runtime crashes or data loss" >> prompt_header.txt
+            echo "   - Breaking changes to public APIs" >> prompt_header.txt
+            echo "3. If re-raising a skipped item, you MUST explain why it's CRITICAL, not just 'better practice'" >> prompt_header.txt
+            echo "4. Acknowledge responded items briefly: 'Acknowledged as addressed/deferred: [list]'" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "Focus your review on genuinely NEW issues in the diff, not previously discussed items." >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "Responses:" >> prompt_header.txt
+            echo '```' >> prompt_header.txt
+            head -c "$MAX_RESPONSES_SIZE" review_responses.txt >> prompt_header.txt
             echo '' >> prompt_header.txt
             echo '```' >> prompt_header.txt
             echo "" >> prompt_header.txt
@@ -129,7 +224,80 @@ jobs:
 
           cat >> prompt_header.txt << 'EOF'
           ```
+
+          ## Complete Source Files (Current State AFTER Changes)
+
+          The diff above only shows CHANGES. Below are the COMPLETE current versions of key
+          modified files, so you can verify what code actually exists (not just what changed).
+
+          ⚠️ **IMPORTANT**: Use these complete files to verify claims before saying something
+          is "missing". If you see code here that wasn't in the diff, it means it already
+          existed before this PR (unchanged).
+
           EOF
+
+          # Include complete source of key files touched in this PR
+          # Priority: 1) Agent files (.md in agents/), 2) Scripts (.sh, .ps1, .py), 3) Other code
+          # Limits: Agent files get 500 lines (critical), others get 200 lines
+          MAX_AGENT_LINES=500
+          MAX_SOURCE_LINES=200
+          MAX_SOURCE_FILES=5
+          SOURCE_COUNT=0
+
+          # Get list of changed files from diff
+          CHANGED_FILES=$(grep "^diff --git" diff.patch | sed 's/diff --git a\/\([^ ]*\) b\/.*/\1/' | head -30)
+
+          # Helper function to add a file to the prompt
+          add_source_file() {
+            local file="$1"
+            local lang="$2"
+            local max_lines="$3"
+            if [ -f "$file" ] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
+              echo "### Complete file: \`$file\`" >> prompt_header.txt
+              echo "" >> prompt_header.txt
+              echo "\`\`\`$lang" >> prompt_header.txt
+              head -n "$max_lines" "$file" >> prompt_header.txt
+              FILE_LINES=$(wc -l < "$file")
+              if [ "$FILE_LINES" -gt "$max_lines" ]; then
+                echo "" >> prompt_header.txt
+                echo "... (truncated, showing first $max_lines of $FILE_LINES lines)" >> prompt_header.txt
+              fi
+              echo '```' >> prompt_header.txt
+              echo "" >> prompt_header.txt
+              SOURCE_COUNT=$((SOURCE_COUNT + 1))
+            fi
+          }
+
+          # Priority 1: Agent files (the heart of this project) - get more lines
+          for file in $CHANGED_FILES; do
+            if [[ "$file" == *agents/*.md ]]; then
+              add_source_file "$file" "markdown" "$MAX_AGENT_LINES"
+            fi
+          done
+
+          # Priority 2: Scripts (.sh, .ps1, .py)
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.sh) add_source_file "$file" "bash" "$MAX_SOURCE_LINES" ;;
+              *.ps1) add_source_file "$file" "powershell" "$MAX_SOURCE_LINES" ;;
+              *.py) add_source_file "$file" "python" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
+
+          # Priority 3: TypeScript/JavaScript files
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.ts) add_source_file "$file" "typescript" "$MAX_SOURCE_LINES" ;;
+              *.js) add_source_file "$file" "javascript" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
+
+          # Priority 4: Config/workflow files (yml/yaml)
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.yml|*.yaml) add_source_file "$file" "yaml" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
 
       - name: Call Gemini API
         env:
@@ -156,10 +324,12 @@ jobs:
 
           # Save response to file with extended timeout for Gemini 3 Pro
           # --connect-timeout 30: Allow 30s to establish connection
-          # --max-time 210: Allow 3.5 minutes for complete response (Gemini 3 Pro can be slow)
+          # --max-time 240: Allow 4 minutes for complete response (Gemini 3 Pro can be slow)
+          # Note: Capture exit code explicitly to prevent bash -e from exiting on curl failure
+          set +e
           HTTP_CODE=$(curl -s \
             --connect-timeout 30 \
-            --max-time 210 \
+            --max-time 240 \
             -w "%{http_code}" \
             -o gemini_response.json \
             -X POST \
@@ -167,18 +337,18 @@ jobs:
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             -d "$PAYLOAD" \
             https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent)
-
           CURL_EXIT=$?
+          set -e
 
           echo "HTTP Status: $HTTP_CODE"
           echo "Curl exit code: $CURL_EXIT"
 
           # Handle timeout errors (exit code 28)
           if [ "$CURL_EXIT" -eq 28 ]; then
-            echo "Error: API request timed out after 210 seconds"
+            echo "Error: API request timed out after 240 seconds"
             echo "## ⚠️ Gemini API Timeout" > review.txt
             echo "" >> review.txt
-            echo "The Gemini 3 Pro model took too long to respond (greater than 3.5 minutes). This can happen with large diffs or complex analysis." >> review.txt
+            echo "The Gemini 3 Pro model took too long to respond (greater than 4 minutes). This can happen with large diffs or complex analysis." >> review.txt
             echo "" >> review.txt
             echo "**Suggestions:**" >> review.txt
             echo "- Try reducing the diff size" >> review.txt
@@ -242,41 +412,46 @@ jobs:
           head -n 10 review.txt
 
       - name: Post review comment
+        # Run even if API call failed (to post error messages)
+        if: always()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
         run: |
           echo "Preparing to post review comment..."
 
           if [ ! -f review.txt ]; then
-            echo "Error: review.txt not found"
-            exit 1
+            echo "Review file not found, skipping comment."
+            exit 0
+          fi
+
+          # Check for meaningful content (not just whitespace)
+          CONTENT=$(cat review.txt | tr -d '[:space:]')
+          if [ -z "$CONTENT" ]; then
+            echo "Review is empty or whitespace-only, skipping comment."
+            exit 0
           fi
 
           REVIEW_SIZE="$(wc -c < review.txt)"
           echo "Review content length: $REVIEW_SIZE bytes"
 
-          REVIEW_BODY=$(jq -Rs . < review.txt 2>/dev/null)
-          if [ -z "$REVIEW_BODY" ]; then
-            echo "Error: Failed to encode review content as JSON"
-            exit 1
+          # Add prefix with commit SHA to identify which commit was reviewed
+          # This helps identify stale reviews when newer commits exist
+          # NOTE: Header must start with "## Gemini Code Review" for marker matching
+          if grep -q "^## Gemini Code Review" review.txt; then
+            echo "Review already has Gemini header, using as-is"
+            cp review.txt prefixed_review.txt
+          else
+            echo "Adding Gemini header prefix with commit SHA"
+            echo "## Gemini Code Review" > prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            echo "_Reviewed commit: ${REVIEW_SHA_SHORT:-unknown}_" >> prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            cat review.txt >> prefixed_review.txt
           fi
 
-          echo "Posting comment to PR #${{ github.event.pull_request.number }}..."
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "Posting comment to PR #$PR_NUMBER..."
 
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o comment_response.json \
-            --connect-timeout 10 \
-            --max-time 30 \
-            -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -d "{\"body\": $REVIEW_BODY}")
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "Error: Failed to post comment (HTTP $HTTP_CODE)"
-            cat comment_response.json
-            exit 1
-          fi
-
-          echo "✅ Comment posted successfully!"
-          jq '.html_url' comment_response.json
+          gh pr comment $PR_NUMBER --body-file prefixed_review.txt
+          echo "Comment posted successfully!"

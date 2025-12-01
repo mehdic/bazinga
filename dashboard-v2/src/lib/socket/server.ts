@@ -3,11 +3,63 @@
 
 import { Server } from "socket.io";
 import { createServer } from "http";
-import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
+
+// Types for better-sqlite3 (imported dynamically to handle architecture mismatch)
+type DatabaseInstance = {
+  prepare: (sql: string) => {
+    all: (...args: unknown[]) => unknown[];
+    get: (...args: unknown[]) => unknown;
+    run: (...args: unknown[]) => { changes: number; lastInsertRowid: bigint };
+  };
+  close: () => void;
+  exec: (sql: string) => void;
+  pragma: (pragma: string, options?: { simple?: boolean }) => unknown;
+  transaction: <A extends unknown[], T>(fn: (...args: A) => T) => (...args: A) => T;
+};
+type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 
 const PORT = process.env.SOCKET_PORT || 3001;
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "..", "bazinga", "bazinga.db");
+
+/**
+ * Resolve database path robustly for both dev and bundled (dist) environments.
+ * After esbuild bundles to dist/, __dirname changes from src/lib/socket to dist.
+ */
+function resolveDbPath(): string {
+  // Environment variable takes precedence
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  // Candidate paths for different runtime scenarios
+  const candidates = [
+    // Running from dashboard-v2 root (dev): cwd = dashboard-v2, db at ../bazinga/bazinga.db
+    path.resolve(process.cwd(), "..", "bazinga", "bazinga.db"),
+    // Running from dist/socket-server.js (prod): __dirname = dist, db at ../bazinga/bazinga.db
+    path.resolve(__dirname, "..", "bazinga", "bazinga.db"),
+    // Running from src/lib/socket (ts-node dev): __dirname = src/lib/socket
+    path.resolve(__dirname, "..", "..", "..", "..", "bazinga", "bazinga.db"),
+    // Extra fallback: two levels up from dist
+    path.resolve(__dirname, "..", "..", "bazinga", "bazinga.db"),
+  ];
+
+  // Find first existing path
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    } catch {
+      // Ignore access errors
+    }
+  }
+
+  // Fallback to first candidate for error messages
+  return candidates[0];
+}
+
+const DB_PATH = resolveDbPath();
 
 // Event types
 export type SocketEvent =
@@ -38,18 +90,73 @@ let lastLogId = 0;
 let lastSessionUpdate = "";
 
 // Reusable database connection (lazy initialization)
-let _db: Database.Database | null = null;
+let _db: DatabaseInstance | null = null;
+let _moduleLoadFailed = false;
+let _DatabaseClass: DatabaseConstructor | null = null;
 
-function getDb(): Database.Database | null {
-  if (!_db) {
-    try {
-      _db = new Database(DB_PATH, { readonly: true });
-    } catch {
-      // Database might not exist yet
-      return null;
+/**
+ * Dynamically load better-sqlite3 to handle:
+ * - Architecture mismatch (arm64 binary on x86_64 or vice versa)
+ * - Module not found errors
+ */
+function loadDatabaseModule(): DatabaseConstructor | null {
+  if (_moduleLoadFailed) return null;
+  if (_DatabaseClass) return _DatabaseClass;
+
+  try {
+    // Use require() for dynamic loading - catches architecture mismatch errors
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _DatabaseClass = require("better-sqlite3") as DatabaseConstructor;
+    return _DatabaseClass;
+  } catch (error) {
+    // Classify error using error codes (preferred) with string fallback
+    const err = error as NodeJS.ErrnoException;
+    const code = err?.code;
+    const msg = String(err?.message || error || "");
+
+    // Determine if this is a permanent (sticky) failure or potentially transient
+    const isModuleNotFound = code === "MODULE_NOT_FOUND" || msg.includes("Cannot find module");
+    const isArchMismatch = code === "ERR_DLOPEN_FAILED" ||
+      /incompatible architecture|Mach-O|ELF|wrong architecture|arm64.*x86_64|x86_64.*arm64/i.test(msg);
+
+    // Only mark as permanently failed for architecture mismatches (not transient errors)
+    if (isArchMismatch) {
+      _moduleLoadFailed = true;
+      console.warn(
+        `Database module architecture mismatch detected.\n` +
+        `The better-sqlite3 native binary was compiled for a different CPU architecture.\n` +
+        `To fix: cd dashboard-v2 && npm rebuild better-sqlite3\n` +
+        `Socket server will run without database access.`
+      );
+    } else if (isModuleNotFound) {
+      // Module not found could be transient (npm install pending) - don't mark sticky
+      console.warn(
+        `Database module not found. Run: cd dashboard-v2 && npm install\n` +
+        `Socket server will run without database access.`
+      );
+    } else {
+      // Unknown error - log but allow retry
+      console.warn(`Database module failed to load: ${error}`);
     }
+
+    return null;
   }
-  return _db;
+}
+
+function getDb(): DatabaseInstance | null {
+  if (_db) return _db;
+  if (_moduleLoadFailed) return null;
+
+  const Database = loadDatabaseModule();
+  if (!Database) return null;
+
+  try {
+    _db = new Database(DB_PATH, { readonly: true });
+    return _db;
+  } catch (error) {
+    console.warn(`Database not available at ${DB_PATH}: ${error}`);
+    return null;
+  }
 }
 
 // Cleanup on exit

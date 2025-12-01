@@ -31,6 +31,13 @@ jobs:
       - name: Compute diff
         id: diff
         run: |
+          # Capture the commit SHA being reviewed (important for staleness detection)
+          REVIEW_SHA=$(git rev-parse HEAD)
+          REVIEW_SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "review_sha=$REVIEW_SHA" >> $GITHUB_OUTPUT
+          echo "review_sha_short=$REVIEW_SHA_SHORT" >> $GITHUB_OUTPUT
+          echo "Reviewing commit: $REVIEW_SHA_SHORT ($REVIEW_SHA)"
+
           # Exclude package-lock.json (large, auto-generated) from review diff
           git diff origin/${{ github.base_ref }}...HEAD -- . ':!**/package-lock.json' > diff.patch
           DIFF_LINES=$(wc -l < diff.patch)
@@ -75,22 +82,62 @@ jobs:
           echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
           # Use precise marker "## OpenAI Code Review" to avoid false matches
+          # Fetch previous review for context AND timestamp for response filtering
+          # Note: (last // {}) handles case when no previous reviews exist (avoids jq null error)
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .body // empty' \
-            > previous_openai_review.txt
+            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | (last // {}) | {body: .body, created_at: .created_at, id: .id}' \
+            > previous_openai_review.json
 
-          # Also capture comment ID for later update
-          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .id // empty' \
-            > previous_comment_id.txt
+          # Extract body for prompt context
+          jq -r '.body // empty' previous_openai_review.json > previous_openai_review.txt
+
+          # Extract timestamp for response filtering
+          PREV_REVIEW_TIMESTAMP=$(jq -r '.created_at // empty' previous_openai_review.json)
+          echo "prev_review_timestamp=$PREV_REVIEW_TIMESTAMP" >> $GITHUB_OUTPUT
 
           if [ -s previous_openai_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_openai_review.txt)
-            echo "Found previous OpenAI review ($REVIEW_SIZE bytes)"
+            echo "Found previous OpenAI review ($REVIEW_SIZE bytes) at $PREV_REVIEW_TIMESTAMP"
             echo "has_previous_openai=true" >> $GITHUB_OUTPUT
           else
             echo "No previous OpenAI review found on this PR"
             echo "has_previous_openai=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch responses to OpenAI review
+        if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
+        id: review_responses
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREV_REVIEW_TIMESTAMP: ${{ steps.previous_openai.outputs.prev_review_timestamp }}
+        run: |
+          # Fetch responses to THIS bot's review only (not all responses)
+          # Uses hybrid approach: timestamp window + marker filter
+          echo "Fetching responses to OpenAI review from PR #${{ github.event.pull_request.number }}..."
+
+          if [ -z "$PREV_REVIEW_TIMESTAMP" ]; then
+            echo "No previous review timestamp, skipping response fetch"
+            echo "has_responses=false" >> $GITHUB_OUTPUT
+            touch review_responses.txt
+            exit 0
+          fi
+
+          echo "Looking for responses after: $PREV_REVIEW_TIMESTAMP"
+
+          # Filter: posted AFTER our last review AND contains "Response to OpenAI"
+          # Note: gh api --jq doesn't support --arg, so pipe to jq separately
+          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            | jq -r --arg since "$PREV_REVIEW_TIMESTAMP" \
+            '[.[] | select(.created_at > $since and (.body | contains("Response to OpenAI")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' \
+            > review_responses.txt
+
+          if [ -s review_responses.txt ]; then
+            RESP_SIZE=$(wc -c < review_responses.txt)
+            echo "Found responses to OpenAI review ($RESP_SIZE bytes)"
+            echo "has_responses=true" >> $GITHUB_OUTPUT
+          else
+            echo "No responses to OpenAI review found"
+            echo "has_responses=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Build prompt
@@ -99,12 +146,16 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
+          REVIEW_SHA: ${{ steps.diff.outputs.review_sha }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
           HAS_PREVIOUS_OPENAI: ${{ steps.previous_openai.outputs.has_previous_openai }}
+          HAS_RESPONSES: ${{ steps.review_responses.outputs.has_responses }}
         run: |
           # Configuration
           # Max diff size in lines - truncate by lines for clean breaks
           MAX_DIFF_LINES=1500
           MAX_PREVIOUS_OPENAI_LINES=200
+          MAX_RESPONSES_LINES=150
 
           cat > system_prompt.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request. Your reviews are thorough, constructive, and focus on code quality, potential bugs, and best practices.
@@ -115,6 +166,20 @@ jobs:
           - Acknowledge good practices when you see them
           - Consider security implications
           - Think about maintainability and readability
+
+          CRITICAL RULE - Diff Interpretation:
+          You are reviewing a DIFF, not the full file. The diff only shows CHANGED lines.
+          - Lines with "+" are ADDITIONS in this PR
+          - Lines with "-" are DELETIONS from this PR
+          - Lines without +/- are CONTEXT (they exist but weren't changed)
+
+          NEVER claim something is "missing" unless:
+          1. The diff shows it being DELETED (line starts with "-"), OR
+          2. The diff shows NEW code that should include it but doesn't
+
+          If unchanged code exists outside the diff, you cannot see it. Do NOT assume
+          features are missing just because they don't appear with "+" in the diff.
+          If unsure, say "I cannot verify from the diff whether X exists."
 
           Format your response as markdown suitable for a GitHub PR comment.
           EOF
@@ -128,6 +193,9 @@ jobs:
           echo "**Pull Request Title:** $PR_TITLE" >> user_prompt.txt
           echo "**Repository:** $REPO_NAME" >> user_prompt.txt
           echo "**Branch:** $BRANCH_NAME" >> user_prompt.txt
+          echo "**Reviewing Commit:** $REVIEW_SHA_SHORT" >> user_prompt.txt
+          echo "" >> user_prompt.txt
+          echo "⚠️ **Note:** This review is for commit $REVIEW_SHA_SHORT. If newer commits exist, this review may be stale." >> user_prompt.txt
           echo "" >> user_prompt.txt
 
           # Include previous OpenAI review from this PR (your own previous feedback)
@@ -143,6 +211,33 @@ jobs:
             echo "Your previous review (truncated if large):" >> user_prompt.txt
             echo '```markdown' >> user_prompt.txt
             head -n "$MAX_PREVIOUS_OPENAI_LINES" previous_openai_review.txt >> user_prompt.txt
+            echo '' >> user_prompt.txt
+            echo '```' >> user_prompt.txt
+            echo "" >> user_prompt.txt
+          fi
+
+          # Include responses explaining what was fixed/skipped
+          if [ "$HAS_RESPONSES" = "true" ] && [ -s review_responses.txt ]; then
+            echo "## Responses to Review Feedback" >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "The developer posted responses explaining which issues were addressed:" >> user_prompt.txt
+            echo "- ✅ = Fixed/Implemented" >> user_prompt.txt
+            echo "- ⏭️ = Intentionally skipped (with explanation)" >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "🔴 **CRITICAL RULES FOR RESPONDED ITEMS:**" >> user_prompt.txt
+            echo "1. Items marked ✅ Fixed: Do NOT mention again. Verify fix exists in diff, then move on." >> user_prompt.txt
+            echo "2. Items marked ⏭️ Skipped: Do NOT re-raise UNLESS it causes:" >> user_prompt.txt
+            echo "   - Security vulnerabilities (authentication bypass, injection, etc.)" >> user_prompt.txt
+            echo "   - Runtime crashes or data loss" >> user_prompt.txt
+            echo "   - Breaking changes to public APIs" >> user_prompt.txt
+            echo "3. If re-raising a skipped item, you MUST explain why it's CRITICAL, not just 'better practice'" >> user_prompt.txt
+            echo "4. Acknowledge responded items briefly: 'Acknowledged as addressed/deferred: [list]'" >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "Focus your review on genuinely NEW issues in the diff, not previously discussed items." >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "Responses:" >> user_prompt.txt
+            echo '```' >> user_prompt.txt
+            head -n "$MAX_RESPONSES_LINES" review_responses.txt >> user_prompt.txt
             echo '' >> user_prompt.txt
             echo '```' >> user_prompt.txt
             echo "" >> user_prompt.txt
@@ -182,7 +277,80 @@ jobs:
 
           cat >> user_prompt.txt << 'EOF'
           ```
+
+          ## Complete Source Files (Current State AFTER Changes)
+
+          The diff above only shows CHANGES. Below are the COMPLETE current versions of key
+          modified files, so you can verify what code actually exists (not just what changed).
+
+          ⚠️ **IMPORTANT**: Use these complete files to verify claims before saying something
+          is "missing". If you see code here that wasn't in the diff, it means it already
+          existed before this PR (unchanged).
+
           EOF
+
+          # Include complete source of key files touched in this PR
+          # Priority: 1) Agent files (.md in agents/), 2) Scripts (.sh, .ps1, .py), 3) Other code
+          # Limits: Agent files get 500 lines (critical), others get 200 lines
+          MAX_AGENT_LINES=500
+          MAX_SOURCE_LINES=200
+          MAX_SOURCE_FILES=5
+          SOURCE_COUNT=0
+
+          # Get list of changed files from diff
+          CHANGED_FILES=$(grep "^diff --git" diff.patch | sed 's/diff --git a\/\([^ ]*\) b\/.*/\1/' | head -30)
+
+          # Helper function to add a file to the prompt
+          add_source_file() {
+            local file="$1"
+            local lang="$2"
+            local max_lines="$3"
+            if [ -f "$file" ] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
+              echo "### Complete file: \`$file\`" >> user_prompt.txt
+              echo "" >> user_prompt.txt
+              echo "\`\`\`$lang" >> user_prompt.txt
+              head -n "$max_lines" "$file" >> user_prompt.txt
+              FILE_LINES=$(wc -l < "$file")
+              if [ "$FILE_LINES" -gt "$max_lines" ]; then
+                echo "" >> user_prompt.txt
+                echo "... (truncated, showing first $max_lines of $FILE_LINES lines)" >> user_prompt.txt
+              fi
+              echo '```' >> user_prompt.txt
+              echo "" >> user_prompt.txt
+              SOURCE_COUNT=$((SOURCE_COUNT + 1))
+            fi
+          }
+
+          # Priority 1: Agent files (the heart of this project) - get more lines
+          for file in $CHANGED_FILES; do
+            if [[ "$file" == *agents/*.md ]]; then
+              add_source_file "$file" "markdown" "$MAX_AGENT_LINES"
+            fi
+          done
+
+          # Priority 2: Scripts (.sh, .ps1, .py)
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.sh) add_source_file "$file" "bash" "$MAX_SOURCE_LINES" ;;
+              *.ps1) add_source_file "$file" "powershell" "$MAX_SOURCE_LINES" ;;
+              *.py) add_source_file "$file" "python" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
+
+          # Priority 3: TypeScript/JavaScript files
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.ts) add_source_file "$file" "typescript" "$MAX_SOURCE_LINES" ;;
+              *.js) add_source_file "$file" "javascript" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
+
+          # Priority 4: Config/workflow files (yml/yaml)
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              *.yml|*.yaml) add_source_file "$file" "yaml" "$MAX_SOURCE_LINES" ;;
+            esac
+          done
 
       - name: Call OpenAI API
         if: steps.diff.outputs.empty != 'true' && steps.api_key_check.outputs.has_key == 'true'
@@ -326,6 +494,7 @@ jobs:
         if: always() && steps.diff.outputs.empty != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
         run: |
           echo "Preparing to post review comment..."
 
@@ -345,21 +514,23 @@ jobs:
 
           PR_NUMBER=${{ github.event.pull_request.number }}
 
-          # Check if we have a previous comment ID to update
-          COMMENT_ID=""
-          if [ -f previous_comment_id.txt ]; then
-            COMMENT_ID=$(cat previous_comment_id.txt | tr -d '[:space:]')
+          # Add prefix with commit SHA to identify which commit was reviewed
+          # This helps identify stale reviews when newer commits exist
+          # NOTE: Header must start with "## OpenAI Code Review" for marker matching
+          if grep -q "^## OpenAI Code Review" review.txt; then
+            echo "Review already has OpenAI header, using as-is"
+            cp review.txt prefixed_review.txt
+          else
+            echo "Adding OpenAI header prefix with commit SHA"
+            echo "## OpenAI Code Review" > prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            echo "_Reviewed commit: ${REVIEW_SHA_SHORT:-unknown}_" >> prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            cat review.txt >> prefixed_review.txt
           fi
 
-          if [ -n "$COMMENT_ID" ]; then
-            echo "Updating existing comment $COMMENT_ID..."
-            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
-              -f body="$(cat review.txt)" && echo "Comment updated successfully!" || {
-              echo "Failed to update, posting new comment..."
-              gh pr comment $PR_NUMBER --body-file review.txt
-            }
-          else
-            echo "Posting new comment to PR #$PR_NUMBER..."
-            gh pr comment $PR_NUMBER --body-file review.txt
-            echo "Comment posted successfully!"
-          fi
+          # Always post new comment (don't update existing)
+          # This ensures new feedback is visible and not hidden in updated comments
+          echo "Posting new comment to PR #$PR_NUMBER..."
+          gh pr comment $PR_NUMBER --body-file prefixed_review.txt
+          echo "Comment posted successfully!"

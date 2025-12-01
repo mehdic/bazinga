@@ -609,13 +609,106 @@ jq '.body'
    - **Valid improvements** - Better solutions than current implementation
    - **Minor/Style** - Low-impact changes
 
+### 🔴 MANDATORY: Extraction-First Workflow (BEFORE Implementation)
+
+**⚠️ ROOT CAUSE OF MISSED ITEMS:** Jumping straight to implementation without systematic extraction causes items to be lost. Long reviews (200+ lines) have issues buried in the middle that get skipped.
+
+**THE FIX: Create extraction table BEFORE touching any code.**
+
+#### Step 1: Fetch ALL Reviews
+```bash
+# Fetch from ALL three sources (OpenAI, Gemini, Copilot, inline comments)
+# Use GraphQL to get full bodies - NEVER truncate
+```
+
+#### Step 2: Create Master Extraction Table (BEFORE ANY IMPLEMENTATION)
+```markdown
+## PR #XXX - Master Extraction Table
+
+**Sources:** OpenAI (X items), Gemini (Y items), Copilot (Z items)
+**Total: N items to address**
+
+| # | Source | Category | Suggestion | Status |
+|---|--------|----------|------------|--------|
+| 1 | OpenAI | Critical | Shape-accurate no-ops | ❌ Pending |
+| 2 | OpenAI | Type Safety | Use import type | ❌ Pending |
+| 3 | Gemini | Style | Extract shared loader | ❌ Pending |
+| 4 | Copilot | Bug | Fix null check | ❌ Pending |
+| ... | ... | ... | ... | ... |
+
+**Announce:** "Found N items: X from OpenAI, Y from Gemini, Z from Copilot"
+```
+
+#### Step 3: ONLY THEN Implement
+- Work through the table row by row
+- Update status as you go: `❌ Pending` → `🔄 In Progress` → `✅ Fixed` or `⏭️ Skipped`
+- NEVER skip a row without explicit justification
+
+**🔴 CRITICAL: Never Dismiss Entire Reviews**
+
+If you find ONE false positive in a review, DO NOT dismiss the entire review:
+- ❌ WRONG: "The LLM is wrong about X, so I'll ignore this review"
+- ✅ CORRECT: Mark that item as `⏭️ False Positive`, but STILL extract and address ALL other items
+
+**Common failure mode:** Getting distracted proving one claim wrong, then never returning
+to address the valid issues in the same review. ALWAYS complete the full extraction table.
+
+#### Step 4: Final Verification
+```markdown
+## Final Count Verification
+- Items extracted: N
+- Items addressed: N
+- ✅ All items accounted for
+
+| Status | Count |
+|--------|-------|
+| ✅ Fixed | X |
+| ⏭️ Skipped | Y |
+| ❌ Missed | 0 |  ← MUST be zero
+```
+
+**🔴 IF "Missed" > 0: STOP and fix before proceeding.**
+
+#### Step 5: Post Response to PR (MANDATORY)
+**After committing fixes, you MUST post a response comment to the PR.**
+
+Use headers that match the LLM reviewer:
+- `## Response to OpenAI Code Review`
+- `## Response to Gemini Code Review`
+
+```markdown
+## Response to OpenAI Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Fix X | ✅ Fixed in {commit} |
+| 2 | Add Y | ⏭️ Skipped - by design: [reason] |
+
+## Response to Gemini Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Issue Z | ✅ Fixed in {commit} |
+```
+
+**Why this matters:**
+- LLMs see your responses in their next review (via timestamp filtering)
+- Prevents re-raising of already-addressed items
+- Creates audit trail for future developers
+
+#### Why This Works
+1. **Forces enumeration** - Can't skip what's in the table
+2. **Visual accountability** - Pending items are visible
+3. **Count verification** - Math doesn't lie
+4. **Prevents "I'll get to it later"** - Everything tracked upfront
+
 ### Implementation Rules
 
 | Category | Action |
 |----------|--------|
 | **Critical/Breaking** | Implement immediately |
 | **Valid improvements** | Implement immediately (don't wait to be asked) |
-| **Minor/Style** | Implement if quick, otherwise ask user |
+| **Minor/Style** | Track in table, implement if quick, otherwise mark `⏭️ Skipped - Minor` |
 
 ### 🔴 MANDATORY: Validation Checklist
 
@@ -670,6 +763,22 @@ Count: 3 extracted, 3 addressed ✓
 - Action taken (✅ Fixed / ⏭️ Skipped with reason)
 
 **Present this table to the user before declaring the PR review complete.**
+
+### 🔴 CRITICAL: Always Re-check Before Declaring Complete
+
+Before telling the user "no new reviews":
+1. **Re-fetch ALL review sources** - threads, reviews, AND issue comments
+2. **Compare timestamps** - any comments after your last response?
+3. **If new comments exist** - evaluate them before declaring complete
+
+**Why this matters:** Automated reviewers (OpenAI, Gemini) may post comments minutes after you check. A 2-minute gap can mean missing important feedback.
+
+**Example failure mode:**
+```
+09:08:42 - You check for reviews, see none
+09:10:41 - OpenAI posts a review
+09:11:00 - You tell user "no new reviews" ← WRONG!
+```
 
 ### Verification
 
@@ -775,8 +884,140 @@ done
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
 4. **Commit & push** fixes
-5. **Resolve** each thread via GraphQL mutation
+5. **Resolve & Respond** to ALL feedback (see sections below)
 6. **Report** summary to user
+
+### 🔴 MANDATORY: Respond to ALL Feedback (Fixed AND Skipped)
+
+**CRITICAL: You MUST respond to EVERY piece of feedback, whether implemented or skipped.**
+
+This serves two purposes:
+1. **Audit trail** - Reviewers see what was done and why
+2. **LLM context** - Responses are included in subsequent LLM reviews via `llm-reviews.sh`
+
+### For Inline Code Comments (with resolve buttons)
+
+**Step 1: Reply to the thread explaining your action**
+```bash
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+# Reply to a review thread (use the comment's node_id)
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "mutation { addPullRequestReviewComment(input: {pullRequestReviewId: \"PRR_xxx\", inReplyTo: \"PRRC_xxx\", body: \"✅ Fixed in commit abc123\"}) { comment { id } } }"}'
+```
+
+**Step 2: Resolve the thread (only if FIXED)**
+```bash
+# Only resolve if you actually fixed it
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"PRRT_xxx\"}) { thread { id isResolved } } }"}'
+```
+
+**For SKIPPED items: Reply but do NOT resolve**
+```
+⏭️ **Skipped - By Design**
+
+This is intentional behavior because [explanation].
+The graceful degradation allows the dashboard to start even when [reason].
+```
+
+### For PR Comments (LLM Reviews)
+
+**🔴 CRITICAL: Use specific headers for each LLM reviewer:**
+
+Responses to LLM reviews MUST use these exact headers so the workflows can filter them:
+- `## Response to OpenAI Code Review` - for OpenAI feedback
+- `## Response to Gemini Code Review` - for Gemini feedback
+
+This enables timestamp-windowed filtering: each LLM only sees responses to ITS OWN reviews.
+
+**Post via GraphQL (required in Claude Code Web):**
+```bash
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+# Get PR node ID first
+PR_NODE_ID=$(curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { id } } }"}' \
+  | jq -r '.data.repository.pullRequest.id')
+
+# Post response with proper header
+BODY="## Response to OpenAI Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Fix X | ✅ Fixed in abc123 |
+| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |
+
+## Response to Gemini Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Issue Z | ✅ Fixed in def456 |"
+
+QUERY=$(jq -n --arg body "$BODY" '{
+  query: "mutation($body: String!) { addComment(input: {subjectId: \"'$PR_NODE_ID'\", body: $body}) { commentEdge { node { url } } } }",
+  variables: { body: $body }
+}')
+
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "$QUERY"
+```
+
+### Response Templates
+
+| Action | Response Format |
+|--------|-----------------|
+| **Fixed** | `✅ **Fixed in commit {hash}** - [brief description of fix]` |
+| **Skipped (by design)** | `⏭️ **Skipped - By Design** - [detailed explanation why this is intentional]` |
+| **Skipped (low risk)** | `⏭️ **Skipped - Low Risk** - [explanation of why impact is minimal]` |
+| **Skipped (deferred)** | `📝 **Deferred** - Valid suggestion, will address in future PR` |
+
+### 🔴 CRITICAL: Skipped Items MUST Have Detailed Explanations
+
+**❌ WRONG (too brief):**
+```
+⏭️ Skipped - intentional
+```
+
+**✅ CORRECT (detailed):**
+```
+⏭️ **Skipped - By Design**
+
+Silent failure is intentional here. The dashboard should gracefully degrade
+when the database module fails to load (e.g., architecture mismatch).
+Throwing an error would prevent the dashboard from starting entirely,
+which is worse than running with limited functionality.
+
+The warning message in console provides debugging info for developers.
+```
+
+### Why Respond to Everything?
+
+1. **LLM Review Context** - The `llm-reviews.sh` script includes previous responses, so OpenAI/Gemini see your reasoning
+2. **Prevents Re-raising** - Reviewers won't flag the same issue again if they see it was considered
+3. **Knowledge Base** - Future developers understand why decisions were made
+4. **Accountability** - Shows thorough review, not just cherry-picking easy fixes
+
+### Summary: Actions for Each Feedback Type
+
+| Feedback Type | Reply Required? | Resolve Thread? |
+|--------------|-----------------|-----------------|
+| Fixed inline comment | ✅ Yes (explain fix) | ✅ Yes |
+| Skipped inline comment | ✅ Yes (explain why) | ❌ No (leave open) |
+| PR comment (any) | ✅ Yes (response table) | N/A |
+| Bot analysis | ✅ Yes (response table) | N/A |
 
 ---
 

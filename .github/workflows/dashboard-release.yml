@@ -23,7 +23,9 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x64
-          - os: macos-latest
+          # IMPORTANT: macos-13 is Intel, macos-14+ is Apple Silicon
+          # macos-latest now points to macos-14 (arm64), so we must use macos-13 for x64
+          - os: macos-13
             platform: darwin
             arch: x64
           - os: macos-14
@@ -62,7 +64,19 @@ jobs:
         working-directory: dashboard-v2
         run: |
           # Compile socket server for standalone use
+          # Note: better-sqlite3 is external because native addons can't be bundled
           npx esbuild src/lib/socket/server.ts --bundle --platform=node --target=node18 --outfile=dist/socket-server.js --external:better-sqlite3
+
+          # Copy the native module AND its runtime dependencies
+          # better-sqlite3 requires 'bindings' package at runtime to locate .node files
+          # Note: Using rsync -a instead of cp -a for macOS compatibility (BSD cp doesn't support -a)
+          mkdir -p dist/node_modules
+          rsync -a node_modules/better-sqlite3 dist/node_modules/
+          rsync -a node_modules/bindings dist/node_modules/
+          # file-uri-to-path is a dependency of bindings (may not exist in all versions)
+          if [ -d node_modules/file-uri-to-path ]; then
+            rsync -a node_modules/file-uri-to-path dist/node_modules/
+          fi
 
       - name: Prepare release package
         working-directory: dashboard-v2
@@ -107,9 +121,13 @@ jobs:
             cp scripts/start-standalone.ps1 release-package/dashboard-v2/scripts/
           fi
 
-          # Copy compiled socket server for real-time updates
+          # Copy compiled socket server and its dependencies for real-time updates
           if [ -f "dist/socket-server.js" ]; then
             cp dist/socket-server.js release-package/dashboard-v2/
+            # Copy native modules with preserved permissions (rsync for macOS compatibility)
+            if [ -d "dist/node_modules" ]; then
+              rsync -a dist/node_modules release-package/dashboard-v2/
+            fi
           fi
 
           # Create version file

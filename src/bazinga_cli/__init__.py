@@ -996,8 +996,11 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
 
     # Try downloading pre-built dashboard first (faster, no npm required)
     console.print("\n[bold]Option 1: Pre-built dashboard (faster, no npm required)[/bold]")
-    if download_prebuilt_dashboard(target_dir, force):
-        return True
+    try:
+        if download_prebuilt_dashboard(target_dir, force):
+            return True
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to npm.[/yellow]")
 
     # Fall back to npm install
     console.print("\n[bold]Option 2: Build from source (requires npm)[/bold]")
@@ -1270,35 +1273,48 @@ def init(
             console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]6. Copying dashboard v2 files[/bold cyan]")
-        source_dashboard = setup.source_dir / "dashboard-v2"
-        target_dashboard = target_dir / "bazinga" / "dashboard-v2"
+        console.print("\n[bold cyan]6. Installing dashboard v2[/bold cyan]")
+        # Ensure bazinga directory exists
+        (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
 
-        if source_dashboard.exists():
-            try:
-                # Ensure bazinga directory exists
-                (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
-                # Copy dashboard-v2 but exclude node_modules
-                shutil.copytree(
-                    source_dashboard,
-                    target_dashboard,
-                    ignore=shutil.ignore_patterns('node_modules', '.next', '*.log')
-                )
-                console.print("  ✓ Dashboard v2 installed (Next.js)")
+        # Try downloading pre-built dashboard first (faster, no npm required)
+        prebuilt_ok = False
+        try:
+            prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
 
-                # Copy research folder too (for documentation)
-                source_research = setup.source_dir / "research"
-                target_research = target_dir / "research"
-                if source_research.exists():
-                    target_research.mkdir(parents=True, exist_ok=True)
-                    dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
-                    if dashboard_doc.exists():
-                        shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
-                        console.print("  ✓ Copied dashboard documentation")
-            except Exception as e:
-                console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+        if prebuilt_ok:
+            console.print("  [green]✓[/green] Dashboard installed from pre-built release")
         else:
-            console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
+            # Fall back to copying source files
+            console.print("  [dim]Pre-built not available, copying source files...[/dim]")
+            source_dashboard = setup.source_dir / "dashboard-v2"
+            target_dashboard = target_dir / "bazinga" / "dashboard-v2"
+
+            if source_dashboard.exists():
+                try:
+                    # Copy dashboard-v2 but exclude node_modules
+                    shutil.copytree(
+                        source_dashboard,
+                        target_dashboard,
+                        ignore=shutil.ignore_patterns('node_modules', '.next', '*.log')
+                    )
+                    console.print("  ✓ Dashboard v2 source copied (requires npm install && npm run build)")
+                except Exception as e:
+                    console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+            else:
+                console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
+
+        # Copy research folder for documentation
+        source_research = setup.source_dir / "research"
+        target_research = target_dir / "research"
+        if source_research.exists():
+            target_research.mkdir(parents=True, exist_ok=True)
+            dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
+            if dashboard_doc.exists():
+                shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
+                console.print("  ✓ Copied dashboard documentation")
 
         console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
         if not setup.copy_templates(target_dir):
@@ -1957,7 +1973,13 @@ def update(
 
     # Try to download pre-built dashboard from GitHub releases
     # Note: Pass target_dir (project root), not bazinga_dir - function adds /bazinga/dashboard-v2
-    if download_prebuilt_dashboard(target_dir, force=True):
+    prebuilt_ok = False
+    try:
+        prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
+
+    if prebuilt_ok:
         console.print("  [green]✓ Dashboard updated from release[/green]")
     else:
         # Fall back to copying source files if pre-built not available
