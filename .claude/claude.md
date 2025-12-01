@@ -660,6 +660,33 @@ jq '.body'
 
 **🔴 IF "Missed" > 0: STOP and fix before proceeding.**
 
+#### Step 5: Post Response to PR (MANDATORY)
+**After committing fixes, you MUST post a response comment to the PR.**
+
+Use headers that match the LLM reviewer:
+- `## Response to OpenAI Code Review`
+- `## Response to Gemini Code Review`
+
+```markdown
+## Response to OpenAI Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Fix X | ✅ Fixed in {commit} |
+| 2 | Add Y | ⏭️ Skipped - by design: [reason] |
+
+## Response to Gemini Code Review
+
+| # | Suggestion | Action |
+|---|------------|--------|
+| 1 | Issue Z | ✅ Fixed in {commit} |
+```
+
+**Why this matters:**
+- LLMs see your responses in their next review (via timestamp filtering)
+- Prevents re-raising of already-addressed items
+- Creates audit trail for future developers
+
 #### Why This Works
 1. **Forces enumeration** - Can't skip what's in the table
 2. **Visual accountability** - Pending items are visible
