@@ -598,12 +598,12 @@ jq '.body'
 
 **Search for keywords in ALL bodies:** "fix", "issue", "regression", "missing", "should", "consider"
 
-### 📋 Expected OpenAI Review Format
+### 📋 Expected LLM Review Format (OpenAI & Gemini)
 
-OpenAI reviews are configured to use this structured format (makes extraction easier):
+Both OpenAI and Gemini reviews are configured to use this structured format (makes extraction easier):
 
 ```markdown
-## OpenAI Code Review
+## OpenAI Code Review  (or "## Gemini Code Review")
 
 _Reviewed commit: {sha}_
 
