@@ -65,12 +65,23 @@ Write-Log "BAZINGA Dashboard v2 Startup (PowerShell)"
 Write-Log "Starting dashboard startup process..."
 Write-Log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
-# Check if Node.js is available (required for standalone mode)
+# Check if dashboard folder exists FIRST (before other checks)
+# Dashboard is an experimental feature - gracefully skip if not installed
+if (-not (Test-Path $DASHBOARD_DIR)) {
+    Write-Log "Dashboard not installed, skipping startup"
+    Write-Host "Dashboard not installed, skipping startup" -ForegroundColor Yellow
+    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  To install: bazinga setup-dashboard" -ForegroundColor DarkGray
+    exit 0
+}
+
+# Check if Node.js is available (required for dashboard)
 if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
-    Write-Log "ERROR - node not found, cannot start dashboard"
-    Write-Log "Please install Node.js and ensure it is in your PATH"
-    Write-Host "ERROR: Node.js not found. Install Node.js 18+ and ensure it's in PATH." -ForegroundColor Red
-    exit 1
+    Write-Log "Node.js not found, cannot start dashboard"
+    Write-Host "Node.js not found, cannot start dashboard" -ForegroundColor Yellow
+    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  To enable: install Node.js and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
+    exit 0
 }
 
 # Check Node.js version (requires 18+)
@@ -117,13 +128,6 @@ function Test-PortInUse {
 if (Test-PortInUse -Port $DASHBOARD_PORT) {
     Write-Log "Port $DASHBOARD_PORT already in use by another process"
     Write-Host "Port $DASHBOARD_PORT already in use by another process" -ForegroundColor Yellow
-    exit 1
-}
-
-# Check if dashboard folder exists
-if (-not (Test-Path $DASHBOARD_DIR)) {
-    Write-Log "Dashboard v2 folder not found at $DASHBOARD_DIR"
-    Write-Host "Dashboard v2 folder not found" -ForegroundColor Red
     exit 1
 }
 

@@ -548,6 +548,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ⚡ Database migration safety checks
 - ⚡ Test pattern analysis
 
+**Experimental (early development):**
+- ⚠️ Real-time Dashboard - Visual monitoring interface for orchestration sessions
+  - Under active initial development and not yet reliable
+  - Provides reporting/monitoring only - no impact on BAZINGA core functionality
+  - Included by default; skip with: `bazinga init --no-dashboard`
+
 ---
 
 ## Support & Getting Help
