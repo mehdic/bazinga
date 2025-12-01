@@ -65,21 +65,42 @@ Write-Log "BAZINGA Dashboard v2 Startup (PowerShell)"
 Write-Log "Starting dashboard startup process..."
 Write-Log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
-# Check if Node.js is available (required for standalone mode)
+# Check if dashboard folder exists FIRST (before other checks)
+# Dashboard is an experimental feature - gracefully skip if not installed
+if (-not (Test-Path $DASHBOARD_DIR)) {
+    Write-Log "Dashboard not installed, skipping startup"
+    Write-Host "Dashboard not installed, skipping startup" -ForegroundColor Yellow
+    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  To install: bazinga setup-dashboard" -ForegroundColor DarkGray
+    # Respect DASHBOARD_STRICT for CI that requires dashboard
+    if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
+}
+
+# Check if Node.js is available (required for dashboard)
 if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
-    Write-Log "ERROR - node not found, cannot start dashboard"
-    Write-Log "Please install Node.js and ensure it is in your PATH"
-    Write-Host "ERROR: Node.js not found. Install Node.js 18+ and ensure it's in PATH." -ForegroundColor Red
-    exit 1
+    Write-Log "Node.js not found, cannot start dashboard"
+    Write-Host "Node.js not found, cannot start dashboard" -ForegroundColor Yellow
+    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  To enable: install Node.js and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
+    # Respect DASHBOARD_STRICT for CI that requires dashboard
+    if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
 
 # Check Node.js version (requires 18+)
+# Use regex guard to avoid [int] exception on nonstandard version strings
 $nodeVersion = (node --version) -replace '^v', ''
-$majorVersion = [int]($nodeVersion -split '\.')[0]
-if ($majorVersion -lt 18) {
-    Write-Log "ERROR - Node.js 18+ required (found v$nodeVersion)"
-    Write-Host "ERROR: Node.js 18+ required (found v$nodeVersion)" -ForegroundColor Red
-    exit 1
+if ($nodeVersion -match '^\d+') {
+    $majorVersion = [int]$Matches[0]
+} else {
+    $majorVersion = $null
+}
+if (-not $majorVersion -or $majorVersion -lt 18) {
+    Write-Log "Node.js 18+ required (found v$nodeVersion), skipping dashboard"
+    Write-Host "Node.js 18+ required for dashboard (found v$nodeVersion)" -ForegroundColor Yellow
+    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
+    # Respect DASHBOARD_STRICT for CI that requires dashboard
+    if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
 Write-Log "Node.js version: v$nodeVersion"
 
@@ -120,13 +141,6 @@ if (Test-PortInUse -Port $DASHBOARD_PORT) {
     exit 1
 }
 
-# Check if dashboard folder exists
-if (-not (Test-Path $DASHBOARD_DIR)) {
-    Write-Log "Dashboard v2 folder not found at $DASHBOARD_DIR"
-    Write-Host "Dashboard v2 folder not found" -ForegroundColor Red
-    exit 1
-}
-
 # Check for pre-built standalone server (preferred mode)
 $STANDALONE_SERVER = Join-Path $DASHBOARD_DIR ".next\standalone\server.js"
 if (Test-Path $STANDALONE_SERVER) {
@@ -155,11 +169,12 @@ if (Test-Path $STANDALONE_SERVER) {
 
     # Check if npm is available (only needed for dev mode)
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
-        Write-Log "ERROR - npm not found, cannot start dashboard in dev mode"
-        Write-Log "Consider using a pre-built standalone dashboard package"
-        Write-Host "ERROR: npm not found. Cannot start dashboard in dev mode." -ForegroundColor Red
-        Write-Host "Consider downloading a pre-built dashboard package." -ForegroundColor Yellow
-        exit 1
+        Write-Log "npm not found, cannot start dashboard in dev mode"
+        Write-Host "npm not found, cannot start dashboard in dev mode" -ForegroundColor Yellow
+        Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+        Write-Host "  To enable: install Node.js with npm, or download a pre-built dashboard package" -ForegroundColor DarkGray
+        # Respect DASHBOARD_STRICT for CI that requires dashboard
+        if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
     }
 
     # Check and install dependencies if needed (only for dev mode)

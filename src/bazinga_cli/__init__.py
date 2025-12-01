@@ -829,8 +829,6 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
         True if download successful, False otherwise (should fall back to npm)
     """
     import json
-    import os
-    import shutil
     import tarfile
     import tempfile
     import urllib.request
@@ -1137,6 +1135,11 @@ def init(
     no_git: bool = typer.Option(
         False, "--no-git", help="Skip git repository initialization"
     ),
+    dashboard: bool = typer.Option(
+        False,
+        "--dashboard",
+        help="Install experimental dashboard (early development, no impact on BAZINGA functionality)",
+    ),
     testing_mode: str = typer.Option(
         "minimal",
         "--testing",
@@ -1273,48 +1276,52 @@ def init(
             console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]6. Installing dashboard v2[/bold cyan]")
-        # Ensure bazinga directory exists
-        (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
+        console.print("\n[bold cyan]6. Dashboard v2[/bold cyan]")
+        if dashboard:
+            console.print("  [dim]Installing (early experimental feature)...[/dim]")
+            # Ensure bazinga directory exists
+            (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
 
-        # Try downloading pre-built dashboard first (faster, no npm required)
-        prebuilt_ok = False
-        try:
-            prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
-        except Exception as e:
-            console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
+            # Try downloading pre-built dashboard first (faster, no npm required)
+            prebuilt_ok = False
+            try:
+                prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+            except Exception as e:
+                console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
 
-        if prebuilt_ok:
-            console.print("  [green]✓[/green] Dashboard installed from pre-built release")
-        else:
-            # Fall back to copying source files
-            console.print("  [dim]Pre-built not available, copying source files...[/dim]")
-            source_dashboard = setup.source_dir / "dashboard-v2"
-            target_dashboard = target_dir / "bazinga" / "dashboard-v2"
-
-            if source_dashboard.exists():
-                try:
-                    # Copy dashboard-v2 but exclude node_modules
-                    shutil.copytree(
-                        source_dashboard,
-                        target_dashboard,
-                        ignore=shutil.ignore_patterns('node_modules', '.next', '*.log')
-                    )
-                    console.print("  ✓ Dashboard v2 source copied (requires npm install && npm run build)")
-                except Exception as e:
-                    console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+            if prebuilt_ok:
+                console.print("  [green]✓[/green] Dashboard installed from pre-built release")
             else:
-                console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
+                # Fall back to copying source files
+                console.print("  [dim]Pre-built not available, copying source files...[/dim]")
+                source_dashboard = setup.source_dir / "dashboard-v2"
+                target_dashboard = target_dir / "bazinga" / "dashboard-v2"
 
-        # Copy research folder for documentation
-        source_research = setup.source_dir / "research"
-        target_research = target_dir / "research"
-        if source_research.exists():
-            target_research.mkdir(parents=True, exist_ok=True)
-            dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
-            if dashboard_doc.exists():
-                shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
-                console.print("  ✓ Copied dashboard documentation")
+                if source_dashboard.exists():
+                    try:
+                        # Copy dashboard-v2 but exclude node_modules
+                        shutil.copytree(
+                            source_dashboard,
+                            target_dashboard,
+                            ignore=shutil.ignore_patterns('node_modules', '.next', '*.log')
+                        )
+                        console.print("  ✓ Dashboard v2 source copied (requires npm install && npm run build)")
+                    except Exception as e:
+                        console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+                else:
+                    console.print("  [yellow]⚠️  Dashboard v2 not found in source[/yellow]")
+
+            # Copy research folder for documentation
+            source_research = setup.source_dir / "research"
+            target_research = target_dir / "research"
+            if source_research.exists():
+                target_research.mkdir(parents=True, exist_ok=True)
+                dashboard_doc = source_research / "new-database-dashboard-ultrathink.md"
+                if dashboard_doc.exists():
+                    shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
+                    console.print("  ✓ Copied dashboard documentation")
+        else:
+            console.print("  [dim]Skipped (experimental; install later: 'bazinga setup-dashboard')[/dim]")
 
         console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
         if not setup.copy_templates(target_dir):
@@ -1393,8 +1400,11 @@ def init(
         install_analysis_tools(target_dir, detected_language, force)
 
     # Install dashboard dependencies
-    console.print("\n[bold cyan]9. Installing dashboard dependencies[/bold cyan]")
-    install_dashboard_dependencies(target_dir, force)
+    console.print("\n[bold cyan]9. Dashboard dependencies[/bold cyan]")
+    if dashboard:
+        install_dashboard_dependencies(target_dir, force)
+    else:
+        console.print("  [dim]Skipped[/dim]")
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
@@ -1798,6 +1808,11 @@ def update(
     branch: Optional[str] = typer.Option(
         None, "-b", help="Git branch to update from (e.g., 'develop', 'feature/xyz')"
     ),
+    dashboard: bool = typer.Option(
+        False,
+        "--dashboard",
+        help="Update experimental dashboard (early development, no impact on BAZINGA functionality)",
+    ),
 ):
     """
     Update BAZINGA components in the current project.
@@ -1941,74 +1956,79 @@ def update(
     setup.setup_config(target_dir, is_update=True)
 
     # Update dashboard from pre-built releases
-    console.print("\n[bold cyan]6. Updating dashboard v2[/bold cyan]")
+    console.print("\n[bold cyan]6. Dashboard v2[/bold cyan]")
+    # Auto-detect existing dashboard installation
     bazinga_dir = target_dir / "bazinga"
-    bazinga_dir.mkdir(parents=True, exist_ok=True)
+    dashboard_installed = (bazinga_dir / "dashboard-v2").exists()
 
-    # Check for orphaned dashboard from previous buggy update (extracted to wrong path)
-    orphaned_dashboard = bazinga_dir / "bazinga" / "dashboard-v2"
-    if orphaned_dashboard.exists():
-        # Safety guards: ensure it's a directory, not a symlink, and within expected path
-        import os
-        import shutil
-        try:
-            is_safe_to_remove = (
-                orphaned_dashboard.is_dir()
-                and not orphaned_dashboard.is_symlink()
-                and os.path.commonpath([str(orphaned_dashboard.resolve()), str(bazinga_dir.resolve())]) == str(bazinga_dir.resolve())
-            )
-            if is_safe_to_remove:
-                console.print("  [yellow]⚠️  Found orphaned dashboard at bazinga/bazinga/dashboard-v2[/yellow]")
-                console.print("  [dim]This was created by a previous buggy update. Removing...[/dim]")
-                shutil.rmtree(orphaned_dashboard)
-                # Also remove empty parent if it exists
-                orphaned_parent = bazinga_dir / "bazinga"
-                if orphaned_parent.exists() and not any(orphaned_parent.iterdir()):
-                    orphaned_parent.rmdir()
-                console.print("  [green]✓ Orphaned dashboard removed[/green]")
-            else:
-                console.print("  [yellow]⚠️  Skipping orphan removal (unexpected path or symlink)[/yellow]")
-        except Exception as e:
-            console.print(f"  [yellow]⚠️  Could not remove orphaned dashboard: {e}[/yellow]")
-
-    # Try to download pre-built dashboard from GitHub releases
-    # Note: Pass target_dir (project root), not bazinga_dir - function adds /bazinga/dashboard-v2
-    prebuilt_ok = False
-    try:
-        prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
-    except Exception as e:
-        console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
-
-    if prebuilt_ok:
-        console.print("  [green]✓ Dashboard updated from release[/green]")
+    if not dashboard and not dashboard_installed:
+        console.print("  [dim]Skipped (experimental; install: 'bazinga setup-dashboard')[/dim]")
     else:
-        # Fall back to copying source files if pre-built not available
-        console.print("  [dim]Pre-built not available, copying source files...[/dim]")
-        source_dashboard = setup.source_dir / "dashboard-v2"
-        target_dashboard = bazinga_dir / "dashboard-v2"
+        if dashboard_installed and not dashboard:
+            console.print("  [dim]Existing dashboard detected, updating...[/dim]")
+        bazinga_dir.mkdir(parents=True, exist_ok=True)
 
-        if source_dashboard.exists():
-            import shutil
+        # Check for orphaned dashboard from previous buggy update (extracted to wrong path)
+        orphaned_dashboard = bazinga_dir / "bazinga" / "dashboard-v2"
+        if orphaned_dashboard.exists():
+            # Safety guards: ensure it's a directory, not a symlink, and within expected path
             try:
-                ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
-                if target_dashboard.exists():
-                    for item in source_dashboard.iterdir():
-                        if item.name in ['node_modules', '.next']:
-                            continue
-                        if item.is_file():
-                            shutil.copy2(item, target_dashboard / item.name)
-                        elif item.is_dir():
-                            target_subdir = target_dashboard / item.name
-                            if target_subdir.exists():
-                                shutil.rmtree(target_subdir)
-                            shutil.copytree(item, target_subdir, ignore=ignore_patterns)
+                is_safe_to_remove = (
+                    orphaned_dashboard.is_dir()
+                    and not orphaned_dashboard.is_symlink()
+                    and os.path.commonpath([str(orphaned_dashboard.resolve()), str(bazinga_dir.resolve())]) == str(bazinga_dir.resolve())
+                )
+                if is_safe_to_remove:
+                    console.print("  [yellow]⚠️  Found orphaned dashboard at bazinga/bazinga/dashboard-v2[/yellow]")
+                    console.print("  [dim]This was created by a previous buggy update. Removing...[/dim]")
+                    shutil.rmtree(orphaned_dashboard)
+                    # Also remove empty parent if it exists
+                    orphaned_parent = bazinga_dir / "bazinga"
+                    if orphaned_parent.exists() and not any(orphaned_parent.iterdir()):
+                        orphaned_parent.rmdir()
+                    console.print("  [green]✓ Orphaned dashboard removed[/green]")
                 else:
-                    shutil.copytree(source_dashboard, target_dashboard, ignore=ignore_patterns)
-                console.print("  [yellow]⚠️  Source files copied (run npm install && npm run build)[/yellow]")
+                    console.print("  [yellow]⚠️  Skipping orphan removal (unexpected path or symlink)[/yellow]")
             except Exception as e:
-                console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+                console.print(f"  [yellow]⚠️  Could not remove orphaned dashboard: {e}[/yellow]")
+
+        # Try to download pre-built dashboard from GitHub releases
+        # Note: Pass target_dir (project root), not bazinga_dir - function adds /bazinga/dashboard-v2
+        prebuilt_ok = False
+        try:
+            prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
+
+        if prebuilt_ok:
+            console.print("  [green]✓ Dashboard updated from release[/green]")
         else:
-            console.print("  [yellow]⚠️  Dashboard v2 not found[/yellow]")
+            # Fall back to copying source files if pre-built not available
+            console.print("  [dim]Pre-built not available, copying source files...[/dim]")
+            source_dashboard = setup.source_dir / "dashboard-v2"
+            target_dashboard = bazinga_dir / "dashboard-v2"
+
+            if source_dashboard.exists():
+                try:
+                    ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
+                    if target_dashboard.exists():
+                        for item in source_dashboard.iterdir():
+                            if item.name in ['node_modules', '.next']:
+                                continue
+                            if item.is_file():
+                                shutil.copy2(item, target_dashboard / item.name)
+                            elif item.is_dir():
+                                target_subdir = target_dashboard / item.name
+                                if target_subdir.exists():
+                                    shutil.rmtree(target_subdir)
+                                shutil.copytree(item, target_subdir, ignore=ignore_patterns)
+                    else:
+                        shutil.copytree(source_dashboard, target_dashboard, ignore=ignore_patterns)
+                    console.print("  [yellow]⚠️  Source files copied (run npm install && npm run build)[/yellow]")
+                except Exception as e:
+                    console.print(f"  [yellow]⚠️  Failed to copy dashboard: {e}[/yellow]")
+            else:
+                console.print("  [yellow]⚠️  Dashboard v2 not found[/yellow]")
 
     # Update templates
     console.print("\n[bold cyan]7. Updating templates[/bold cyan]")
@@ -2025,8 +2045,12 @@ def update(
         console.print("  [yellow]⚠️  No config files found[/yellow]")
 
     # Update dashboard dependencies
-    console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
-    install_dashboard_dependencies(target_dir, force)
+    console.print("\n[bold cyan]8. Dashboard dependencies[/bold cyan]")
+    # Use same auto-detection: update if --dashboard OR dashboard was previously installed
+    if dashboard or dashboard_installed:
+        install_dashboard_dependencies(target_dir, force)
+    else:
+        console.print("  [dim]Skipped[/dim]")
 
     # Success message
     success_message = (
@@ -2068,6 +2092,9 @@ def setup_dashboard(
     force: bool = typer.Option(
         False, "--force", "-f", help="Force reinstall dependencies"
     ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmation prompts (for CI/automation)"
+    ),
 ):
     """
     Install dashboard v2 dependencies for real-time orchestration monitoring.
@@ -2098,10 +2125,31 @@ def setup_dashboard(
     if not dashboard_dir.exists():
         console.print(
             "[yellow]⚠️  Dashboard v2 folder not found[/yellow]\n"
-            "[dim]The dashboard may not be installed in this project.[/dim]\n"
-            "[dim]Try running 'bazinga update' first.[/dim]"
+            "[dim]The dashboard was not installed during init (it's opt-in).[/dim]\n"
         )
-        raise typer.Exit(1)
+        # Offer to download/install the dashboard
+        console.print("[bold]Would you like to install the dashboard now?[/bold]")
+        if not force and not yes:
+            if not typer.confirm("  Install dashboard?", default=True):
+                console.print("[yellow]Cancelled[/yellow]")
+                console.print("[dim]You can install later with: bazinga setup-dashboard[/dim]")
+                raise typer.Exit(0)
+
+        # Download pre-built dashboard
+        console.print("\n[bold]Installing dashboard v2...[/bold]")
+        prebuilt_ok = False
+        try:
+            prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Pre-built download failed: {e}[/yellow]")
+
+        if prebuilt_ok:
+            console.print("  [green]✓[/green] Dashboard installed from pre-built release")
+        else:
+            # Fall back to copying source files if we have access to them
+            console.print("  [yellow]⚠️  Pre-built not available[/yellow]")
+            console.print("  [dim]Try running 'bazinga update --dashboard' instead[/dim]")
+            raise typer.Exit(1)
 
     # Check for node_modules indicating dependencies were already installed
     node_modules = dashboard_dir / "node_modules"
@@ -2135,8 +2183,8 @@ def setup_dashboard(
     console.print("[dim]  • AI-powered insights[/dim]")
     console.print()
 
-    # Prompt for confirmation
-    if not force:
+    # Prompt for confirmation (skip if --force or --yes)
+    if not force and not yes:
         console.print("[bold]Installation options:[/bold]")
         console.print("  [cyan]y[/cyan] - Install dependencies now (npm install)")
         console.print("  [cyan]n[/cyan] - Skip for now")

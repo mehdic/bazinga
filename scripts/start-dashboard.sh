@@ -118,11 +118,34 @@ wait_for_server() {
 msg "🖥️  BAZINGA Dashboard v2 Startup"
 log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
-# Check if Node.js is available (required for standalone mode)
+# Support strict mode for CI that requires dashboard
+STRICT="${DASHBOARD_STRICT:-0}"
+
+# Check if dashboard folder exists FIRST (before other checks)
+# Dashboard is an experimental feature - gracefully skip if not installed
+if [ ! -d "$DASHBOARD_DIR" ]; then
+    msg "⏭️  Dashboard not installed, skipping startup"
+    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   To install: bazinga setup-dashboard"
+    [ "$STRICT" = "1" ] && exit 1 || exit 0
+fi
+
+# Check if Node.js is available (required for dashboard)
 if ! command -v node >/dev/null 2>&1; then
-    msg "❌ ERROR: node not found, cannot start dashboard"
-    msg "   Please install Node.js and ensure it is in your PATH"
-    exit 1
+    msg "⚠️  Node.js not found, cannot start dashboard"
+    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   To enable: install Node.js and run 'bazinga setup-dashboard'"
+    [ "$STRICT" = "1" ] && exit 1 || exit 0
+fi
+
+# Check Node.js version (requires 18+)
+NODE_VERSION=$(node --version 2>/dev/null | sed 's/^v//')
+NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
+if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ] 2>/dev/null; then
+    msg "⚠️  Node.js 18+ required for dashboard (found v$NODE_VERSION)"
+    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'"
+    [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
 # Check if server is already running
@@ -145,13 +168,6 @@ fi
 if [ "$PORT_IN_USE" -eq 1 ]; then
     msg "❌ ERROR: Port $DASHBOARD_PORT already in use by another process"
     msg "   Check what's using the port and stop it first"
-    exit 1
-fi
-
-# Check if dashboard folder exists
-if [ ! -d "$DASHBOARD_DIR" ]; then
-    msg "❌ ERROR: Dashboard v2 folder not found at $DASHBOARD_DIR"
-    msg "   Run 'bazinga install' in your project root first"
     exit 1
 fi
 
@@ -239,9 +255,10 @@ if [ "$USE_STANDALONE" != "true" ]; then
 
     # Check if npm is available (only needed for dev mode)
     if ! command -v npm >/dev/null 2>&1; then
-        msg "❌ ERROR: npm not found, cannot start dashboard in dev mode"
-        msg "   Consider using a pre-built standalone dashboard package"
-        exit 1
+        msg "⚠️  npm not found, cannot start dashboard in dev mode"
+        msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+        msg "   To enable: install npm, or download a pre-built dashboard package"
+        [ "$STRICT" = "1" ] && exit 1 || exit 0
     fi
 
     # Check and install dependencies if needed (only for dev mode)
