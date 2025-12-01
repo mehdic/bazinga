@@ -394,7 +394,8 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
 
           # Add prefix to distinguish from Gemini reviews
-          echo "## OpenAI Review" > prefixed_review.txt
+          # NOTE: Must match the marker used in "Fetch previous OpenAI reviews" step
+          echo "## OpenAI Code Review" > prefixed_review.txt
           echo "" >> prefixed_review.txt
           cat review.txt >> prefixed_review.txt
 

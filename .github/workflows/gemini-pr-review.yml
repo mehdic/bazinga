@@ -41,9 +41,9 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
             -o pr_comments.json
 
-          # Filter for github-actions bot comments (Gemini reviews)
-          # Get the most recent one (last in the array after filtering)
-          jq -r '[.[] | select(.user.login == "github-actions[bot]" or .user.login == "github-actions")] | last | .body // empty' pr_comments.json > previous_gemini_review.txt
+          # Filter for github-actions bot comments that are specifically Gemini reviews
+          # (identified by "## Gemini Code Review" marker to distinguish from OpenAI reviews)
+          jq -r '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## Gemini Code Review")))] | last | .body // empty' pr_comments.json > previous_gemini_review.txt
 
           if [ -s previous_gemini_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_gemini_review.txt)
@@ -310,7 +310,8 @@ jobs:
           echo "Review content length: $REVIEW_SIZE bytes"
 
           # Add prefix to distinguish from OpenAI reviews
-          echo "## Gemini Review" > prefixed_review.txt
+          # NOTE: Must match the marker used in "Fetch previous Gemini reviews" step
+          echo "## Gemini Code Review" > prefixed_review.txt
           echo "" >> prefixed_review.txt
           cat review.txt >> prefixed_review.txt
 
