@@ -118,13 +118,16 @@ wait_for_server() {
 msg "🖥️  BAZINGA Dashboard v2 Startup"
 log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
+# Support strict mode for CI that requires dashboard
+STRICT="${DASHBOARD_STRICT:-0}"
+
 # Check if dashboard folder exists FIRST (before other checks)
 # Dashboard is an experimental feature - gracefully skip if not installed
 if [ ! -d "$DASHBOARD_DIR" ]; then
     msg "⏭️  Dashboard not installed, skipping startup"
     msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
     msg "   To install: bazinga setup-dashboard"
-    exit 0
+    [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
 # Check if Node.js is available (required for dashboard)
@@ -132,7 +135,7 @@ if ! command -v node >/dev/null 2>&1; then
     msg "⚠️  Node.js not found, cannot start dashboard"
     msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
     msg "   To enable: install Node.js and run 'bazinga setup-dashboard'"
-    exit 0
+    [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
 # Check Node.js version (requires 18+)
@@ -142,7 +145,7 @@ if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ] 2>/dev/null; then
     msg "⚠️  Node.js 18+ required for dashboard (found v$NODE_VERSION)"
     msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
     msg "   To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'"
-    exit 0
+    [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
 # Check if server is already running
@@ -252,9 +255,10 @@ if [ "$USE_STANDALONE" != "true" ]; then
 
     # Check if npm is available (only needed for dev mode)
     if ! command -v npm >/dev/null 2>&1; then
-        msg "❌ ERROR: npm not found, cannot start dashboard in dev mode"
-        msg "   Consider using a pre-built standalone dashboard package"
-        exit 1
+        msg "⚠️  npm not found, cannot start dashboard in dev mode"
+        msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+        msg "   To enable: install npm, or download a pre-built dashboard package"
+        [ "$STRICT" = "1" ] && exit 1 || exit 0
     fi
 
     # Check and install dependencies if needed (only for dev mode)

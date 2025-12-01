@@ -72,7 +72,8 @@ if (-not (Test-Path $DASHBOARD_DIR)) {
     Write-Host "Dashboard not installed, skipping startup" -ForegroundColor Yellow
     Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
     Write-Host "  To install: bazinga setup-dashboard" -ForegroundColor DarkGray
-    exit 0
+    # Respect DASHBOARD_STRICT for CI that requires dashboard
+    if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
 
 # Check if Node.js is available (required for dashboard)
@@ -81,18 +82,25 @@ if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
     Write-Host "Node.js not found, cannot start dashboard" -ForegroundColor Yellow
     Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
     Write-Host "  To enable: install Node.js and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
-    exit 0
+    # Respect DASHBOARD_STRICT for CI that requires dashboard
+    if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
 
 # Check Node.js version (requires 18+)
+# Use regex guard to avoid [int] exception on nonstandard version strings
 $nodeVersion = (node --version) -replace '^v', ''
-$majorVersion = [int]($nodeVersion -split '\.')[0]
-if ($majorVersion -lt 18) {
+if ($nodeVersion -match '^\d+') {
+    $majorVersion = [int]$Matches[0]
+} else {
+    $majorVersion = $null
+}
+if (-not $majorVersion -or $majorVersion -lt 18) {
     Write-Log "Node.js 18+ required (found v$nodeVersion), skipping dashboard"
     Write-Host "Node.js 18+ required for dashboard (found v$nodeVersion)" -ForegroundColor Yellow
     Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
     Write-Host "  To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
-    exit 0
+    # Respect DASHBOARD_STRICT for CI that requires dashboard
+    if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
 Write-Log "Node.js version: v$nodeVersion"
 
@@ -165,7 +173,8 @@ if (Test-Path $STANDALONE_SERVER) {
         Write-Host "npm not found, cannot start dashboard in dev mode" -ForegroundColor Yellow
         Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
         Write-Host "  To enable: install Node.js with npm, or download a pre-built dashboard package" -ForegroundColor DarkGray
-        exit 0
+        # Respect DASHBOARD_STRICT for CI that requires dashboard
+        if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
     }
 
     # Check and install dependencies if needed (only for dev mode)

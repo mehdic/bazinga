@@ -1276,9 +1276,9 @@ def init(
             console.print("[red]✗ Failed to setup configuration[/red]")
             raise typer.Exit(1)
 
-        console.print("\n[bold cyan]6. Installing dashboard v2[/bold cyan]")
+        console.print("\n[bold cyan]6. Dashboard v2[/bold cyan]")
         if dashboard:
-            console.print("  [yellow]⚠️  Dashboard is an early experimental feature[/yellow]")
+            console.print("  [dim]Installing (early experimental feature)...[/dim]")
             # Ensure bazinga directory exists
             (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
 
@@ -1321,9 +1321,7 @@ def init(
                     shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
                     console.print("  ✓ Copied dashboard documentation")
         else:
-            console.print("  [dim]Skipped (use --dashboard to install)[/dim]")
-            console.print("  [dim]Dashboard is experimental - no impact on BAZINGA functionality[/dim]")
-            console.print("  [dim]To install later: bazinga setup-dashboard[/dim]")
+            console.print("  [dim]Skipped (experimental; install later: 'bazinga setup-dashboard')[/dim]")
 
         console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
         if not setup.copy_templates(target_dir):
@@ -1402,11 +1400,11 @@ def init(
         install_analysis_tools(target_dir, detected_language, force)
 
     # Install dashboard dependencies
-    console.print("\n[bold cyan]9. Installing dashboard dependencies[/bold cyan]")
+    console.print("\n[bold cyan]9. Dashboard dependencies[/bold cyan]")
     if dashboard:
         install_dashboard_dependencies(target_dir, force)
     else:
-        console.print("  [dim]Skipped (use --dashboard to install)[/dim]")
+        console.print("  [dim]Skipped[/dim]")
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
@@ -1958,13 +1956,13 @@ def update(
     setup.setup_config(target_dir, is_update=True)
 
     # Update dashboard from pre-built releases
-    console.print("\n[bold cyan]6. Updating dashboard v2[/bold cyan]")
+    console.print("\n[bold cyan]6. Dashboard v2[/bold cyan]")
     # Auto-detect existing dashboard installation
     bazinga_dir = target_dir / "bazinga"
     dashboard_installed = (bazinga_dir / "dashboard-v2").exists()
 
     if not dashboard and not dashboard_installed:
-        console.print("  [dim]Skipped (use --dashboard to update)[/dim]")
+        console.print("  [dim]Skipped (experimental; install: 'bazinga setup-dashboard')[/dim]")
     else:
         if dashboard_installed and not dashboard:
             console.print("  [dim]Existing dashboard detected, updating...[/dim]")
@@ -2047,12 +2045,12 @@ def update(
         console.print("  [yellow]⚠️  No config files found[/yellow]")
 
     # Update dashboard dependencies
-    console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
+    console.print("\n[bold cyan]8. Dashboard dependencies[/bold cyan]")
     # Use same auto-detection: update if --dashboard OR dashboard was previously installed
     if dashboard or dashboard_installed:
         install_dashboard_dependencies(target_dir, force)
     else:
-        console.print("  [dim]Skipped (use --dashboard to update)[/dim]")
+        console.print("  [dim]Skipped[/dim]")
 
     # Success message
     success_message = (
