@@ -69,12 +69,13 @@ jobs:
 
           # Copy the native module AND its runtime dependencies
           # better-sqlite3 requires 'bindings' package at runtime to locate .node files
+          # Note: Using rsync -a instead of cp -a for macOS compatibility (BSD cp doesn't support -a)
           mkdir -p dist/node_modules
-          cp -a node_modules/better-sqlite3 dist/node_modules/
-          cp -a node_modules/bindings dist/node_modules/
+          rsync -a node_modules/better-sqlite3 dist/node_modules/
+          rsync -a node_modules/bindings dist/node_modules/
           # file-uri-to-path is a dependency of bindings (may not exist in all versions)
           if [ -d node_modules/file-uri-to-path ]; then
-            cp -a node_modules/file-uri-to-path dist/node_modules/
+            rsync -a node_modules/file-uri-to-path dist/node_modules/
           fi
 
       - name: Prepare release package
@@ -123,9 +124,9 @@ jobs:
           # Copy compiled socket server and its dependencies for real-time updates
           if [ -f "dist/socket-server.js" ]; then
             cp dist/socket-server.js release-package/dashboard-v2/
-            # Copy native modules with preserved permissions (-a flag)
+            # Copy native modules with preserved permissions (rsync for macOS compatibility)
             if [ -d "dist/node_modules" ]; then
-              cp -a dist/node_modules release-package/dashboard-v2/
+              rsync -a dist/node_modules release-package/dashboard-v2/
             fi
           fi
 

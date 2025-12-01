@@ -163,32 +163,58 @@ function getDrizzle(): BetterSQLite3Database<typeof schema> | null {
   return null;
 }
 
+// Shape-accurate NOOP for Drizzle query builder chains
+// Supports any order of chaining: db.select().from().where().orderBy().limit().offset()
+// Returns itself for builder methods, empty results for terminal methods
+const createNoopQueryBuilder = (): unknown => {
+  const builder: Record<string, unknown> = {};
+
+  // Terminal methods - return empty results
+  const terminals = {
+    all: () => [],
+    get: () => undefined,
+    execute: () => Promise.resolve([]),
+    then: (resolve: (value: unknown[]) => void) => Promise.resolve([]).then(resolve),
+  };
+
+  // Builder methods - return self for continued chaining
+  const chainMethods = [
+    "from", "where", "orderBy", "groupBy", "having",
+    "limit", "offset", "leftJoin", "rightJoin", "innerJoin",
+    "fullJoin", "as", "distinct", "for",
+  ];
+
+  // Assign terminal methods
+  Object.assign(builder, terminals);
+
+  // Assign chain methods (return builder for any arguments)
+  for (const method of chainMethods) {
+    builder[method] = () => builder;
+  }
+
+  return builder;
+};
+
+// NOOP Drizzle-like object for when DB is unavailable
+const NOOP_DRIZZLE = {
+  select: () => createNoopQueryBuilder(),
+  insert: () => ({ values: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }),
+  update: () => ({ set: () => ({ where: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }) }),
+  delete: () => ({ where: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }),
+  transaction: <T>(fn: () => T) => fn(),
+};
+
 // Export lazy-initialized db with mock fallback
 export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
   get(_, prop) {
     const drizzleDb = getDrizzle();
     if (!drizzleDb) {
-      // Return a mock that returns empty results
-      if (prop === "select") {
-        return () => ({
-          from: () => ({
-            where: () => ({
-              orderBy: () => ({
-                limit: () => Promise.resolve([]),
-                offset: () => Promise.resolve([]),
-              }),
-              limit: () => Promise.resolve([]),
-            }),
-            orderBy: () => ({
-              limit: () => ({
-                offset: () => Promise.resolve([]),
-              }),
-            }),
-            limit: () => Promise.resolve([]),
-            groupBy: () => Promise.resolve([]),
-          }),
-        });
+      // Return shape-accurate NOOP to prevent crashes during method chaining
+      const noopValue = (NOOP_DRIZZLE as Record<string, unknown>)[prop as string];
+      if (noopValue !== undefined) {
+        return noopValue;
       }
+      // Fallback for unknown properties
       return () => Promise.resolve([]);
     }
     return (drizzleDb as unknown as Record<string, unknown>)[prop as string];
