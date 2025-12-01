@@ -224,7 +224,69 @@ jobs:
 
           cat >> prompt_header.txt << 'EOF'
           ```
+
+          ## Complete Source Files (Current State AFTER Changes)
+
+          The diff above only shows CHANGES. Below are the COMPLETE current versions of key
+          modified files, so you can verify what code actually exists (not just what changed).
+
+          ⚠️ **IMPORTANT**: Use these complete files to verify claims before saying something
+          is "missing". If you see code here that wasn't in the diff, it means it already
+          existed before this PR (unchanged).
+
           EOF
+
+          # Include complete source of workflow files touched in this PR (most common source of confusion)
+          # Limit: 200 lines per file, max 3 files
+          MAX_SOURCE_LINES=200
+          MAX_SOURCE_FILES=3
+          SOURCE_COUNT=0
+
+          # Get list of changed files from diff
+          CHANGED_FILES=$(grep "^diff --git" diff.patch | sed 's/diff --git a\/\([^ ]*\) b\/.*/\1/' | head -20)
+
+          for file in $CHANGED_FILES; do
+            # Prioritize workflow files (most likely source of "missing feature" confusion)
+            if [[ "$file" == .github/workflows/*.yml ]] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
+              if [ -f "$file" ]; then
+                echo "### Complete file: \`$file\`" >> prompt_header.txt
+                echo "" >> prompt_header.txt
+                echo '```yaml' >> prompt_header.txt
+                head -n "$MAX_SOURCE_LINES" "$file" >> prompt_header.txt
+                FILE_LINES=$(wc -l < "$file")
+                if [ "$FILE_LINES" -gt "$MAX_SOURCE_LINES" ]; then
+                  echo "" >> prompt_header.txt
+                  echo "... (truncated, showing first $MAX_SOURCE_LINES of $FILE_LINES lines)" >> prompt_header.txt
+                fi
+                echo '```' >> prompt_header.txt
+                echo "" >> prompt_header.txt
+                SOURCE_COUNT=$((SOURCE_COUNT + 1))
+              fi
+            fi
+          done
+
+          # If no workflow files, include other important files (TypeScript, Python configs)
+          if [ "$SOURCE_COUNT" -eq 0 ]; then
+            for file in $CHANGED_FILES; do
+              if [[ "$file" == *.ts || "$file" == *.py || "$file" == *.yml ]] && [ "$SOURCE_COUNT" -lt "$MAX_SOURCE_FILES" ]; then
+                if [ -f "$file" ]; then
+                  EXT="${file##*.}"
+                  echo "### Complete file: \`$file\`" >> prompt_header.txt
+                  echo "" >> prompt_header.txt
+                  echo "\`\`\`$EXT" >> prompt_header.txt
+                  head -n "$MAX_SOURCE_LINES" "$file" >> prompt_header.txt
+                  FILE_LINES=$(wc -l < "$file")
+                  if [ "$FILE_LINES" -gt "$MAX_SOURCE_LINES" ]; then
+                    echo "" >> prompt_header.txt
+                    echo "... (truncated, showing first $MAX_SOURCE_LINES of $FILE_LINES lines)" >> prompt_header.txt
+                  fi
+                  echo '```' >> prompt_header.txt
+                  echo "" >> prompt_header.txt
+                  SOURCE_COUNT=$((SOURCE_COUNT + 1))
+                fi
+              fi
+            done
+          fi
 
       - name: Call Gemini API
         env:
