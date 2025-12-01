@@ -67,9 +67,13 @@ jobs:
           # Note: better-sqlite3 is external because native addons can't be bundled
           npx esbuild src/lib/socket/server.ts --bundle --platform=node --target=node18 --outfile=dist/socket-server.js --external:better-sqlite3
 
-          # Copy the native module so socket server can find it at runtime
+          # Copy the native module AND its runtime dependencies
+          # better-sqlite3 requires 'bindings' package at runtime to locate .node files
           mkdir -p dist/node_modules
-          cp -r node_modules/better-sqlite3 dist/node_modules/
+          cp -a node_modules/better-sqlite3 dist/node_modules/
+          cp -a node_modules/bindings dist/node_modules/
+          # file-uri-to-path is a dependency of bindings
+          [ -d node_modules/file-uri-to-path ] && cp -a node_modules/file-uri-to-path dist/node_modules/
 
       - name: Prepare release package
         working-directory: dashboard-v2
@@ -117,9 +121,9 @@ jobs:
           # Copy compiled socket server and its dependencies for real-time updates
           if [ -f "dist/socket-server.js" ]; then
             cp dist/socket-server.js release-package/dashboard-v2/
-            # Copy better-sqlite3 native module for socket server
+            # Copy native modules with preserved permissions (-a flag)
             if [ -d "dist/node_modules" ]; then
-              cp -r dist/node_modules release-package/dashboard-v2/
+              cp -a dist/node_modules release-package/dashboard-v2/
             fi
           fi
 

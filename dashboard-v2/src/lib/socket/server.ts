@@ -7,8 +7,15 @@ import path from "path";
 
 // Types for better-sqlite3 (imported dynamically to handle architecture mismatch)
 type DatabaseInstance = {
-  prepare: (sql: string) => { all: (...args: unknown[]) => unknown[] };
+  prepare: (sql: string) => {
+    all: (...args: unknown[]) => unknown[];
+    get: (...args: unknown[]) => unknown;
+    run: (...args: unknown[]) => { changes: number; lastInsertRowid: number | bigint };
+  };
   close: () => void;
+  exec: (sql: string) => void;
+  pragma: (pragma: string, options?: { simple?: boolean }) => unknown;
+  transaction: <T>(fn: () => T) => () => T;
 };
 type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 

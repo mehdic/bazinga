@@ -1,35 +1,59 @@
-import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
 
 // Types for better-sqlite3 (imported dynamically to handle architecture mismatch)
 type DatabaseInstance = {
-  prepare: (sql: string) => { all: (...args: unknown[]) => unknown[]; get: (...args: unknown[]) => unknown };
+  prepare: (sql: string) => {
+    all: (...args: unknown[]) => unknown[];
+    get: (...args: unknown[]) => unknown;
+    run: (...args: unknown[]) => { changes: number; lastInsertRowid: number | bigint };
+  };
   close: () => void;
+  exec: (sql: string) => void;
+  pragma: (pragma: string, options?: { simple?: boolean }) => unknown;
+  transaction: <T>(fn: () => T) => () => T;
 };
 type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 
+// Drizzle types (loaded dynamically to avoid triggering better-sqlite3 import)
+type DrizzleFunction = (client: DatabaseInstance, config: { schema: typeof schema }) => DrizzleDatabase;
+type DrizzleDatabase = {
+  select: () => unknown;
+  insert: () => unknown;
+  update: () => unknown;
+  delete: () => unknown;
+  query: Record<string, unknown>;
+};
+
 // Lazy database initialization to avoid build-time and architecture errors
 let _sqlite: DatabaseInstance | null = null;
-let _db: BetterSQLite3Database<typeof schema> | null = null;
+let _db: DrizzleDatabase | null = null;
 let _dbPath: string | null = null;
 let _moduleLoadFailed = false;
 let _DatabaseClass: DatabaseConstructor | null = null;
+let _drizzle: DrizzleFunction | null = null;
 
 /**
- * Dynamically load better-sqlite3 to handle:
+ * Dynamically load better-sqlite3 AND drizzle-orm to handle:
  * - Build-time errors (module not available during SSG)
  * - Architecture mismatch (arm64 binary on x86_64 or vice versa)
+ *
+ * NOTE: drizzle-orm/better-sqlite3 statically imports better-sqlite3,
+ * so we must load it dynamically too to catch architecture errors.
  */
-function loadDatabaseModule(): DatabaseConstructor | null {
+function loadDatabaseModules(): { Database: DatabaseConstructor; drizzle: DrizzleFunction } | null {
   if (_moduleLoadFailed) return null;
-  if (_DatabaseClass) return _DatabaseClass;
+  if (_DatabaseClass && _drizzle) return { Database: _DatabaseClass, drizzle: _drizzle };
 
   try {
     // Use require() for dynamic loading - catches architecture mismatch errors
+    // Must load better-sqlite3 first to catch errors before drizzle tries to import it
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     _DatabaseClass = require("better-sqlite3") as DatabaseConstructor;
-    return _DatabaseClass;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const drizzleModule = require("drizzle-orm/better-sqlite3") as { drizzle: DrizzleFunction };
+    _drizzle = drizzleModule.drizzle;
+    return { Database: _DatabaseClass, drizzle: _drizzle };
   } catch (error) {
     _moduleLoadFailed = true;
     const errorMessage = String(error);
@@ -89,16 +113,16 @@ function getDatabase(): DatabaseInstance | null {
   if (_sqlite) return _sqlite;
   if (_moduleLoadFailed) return null;
 
-  // First, try to load the module
-  const Database = loadDatabaseModule();
-  if (!Database) return null;
+  // First, try to load the modules
+  const modules = loadDatabaseModules();
+  if (!modules) return null;
 
   try {
     // Resolve path lazily on first access (not at import time)
     if (!_dbPath) {
       _dbPath = resolveDatabasePath();
     }
-    _sqlite = new Database(_dbPath, { readonly: true });
+    _sqlite = new modules.Database(_dbPath, { readonly: true });
     // Note: WAL mode not set - requires write access, but we're read-only
     return _sqlite;
   } catch (error) {
@@ -122,18 +146,23 @@ function getDatabase(): DatabaseInstance | null {
   }
 }
 
-function getDrizzle() {
-  if (!_db) {
-    const sqlite = getDatabase();
-    if (sqlite) {
-      _db = drizzle(sqlite, { schema });
-    }
+function getDrizzle(): DrizzleDatabase | null {
+  if (_db) return _db;
+  if (_moduleLoadFailed) return null;
+
+  const sqlite = getDatabase();
+  if (!sqlite) return null;
+
+  // drizzle is already loaded by loadDatabaseModules()
+  if (_drizzle) {
+    _db = _drizzle(sqlite, { schema });
+    return _db;
   }
-  return _db;
+  return null;
 }
 
-// Export lazy-initialized db
-export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
+// Export lazy-initialized db with mock fallback
+export const db = new Proxy({} as DrizzleDatabase, {
   get(_, prop) {
     const drizzleDb = getDrizzle();
     if (!drizzleDb) {

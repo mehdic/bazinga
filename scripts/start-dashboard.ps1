@@ -229,9 +229,14 @@ if ($USE_STANDALONE) {
         if ($env:SOCKET_PORT) { $SOCKET_PORT = $env:SOCKET_PORT } else { $SOCKET_PORT = "3001" }
         $env:SOCKET_PORT = $SOCKET_PORT
 
-        # Set NODE_PATH so socket server can find better-sqlite3 native module
+        # Prepend NODE_PATH so socket server can find better-sqlite3 native module
+        # Use prepend (not overwrite) to preserve existing NODE_PATH dependencies
         $SOCKET_NODE_PATH = Join-Path $DASHBOARD_DIR "node_modules"
-        $env:NODE_PATH = $SOCKET_NODE_PATH
+        if ($env:NODE_PATH) {
+            $env:NODE_PATH = "$SOCKET_NODE_PATH;$env:NODE_PATH"
+        } else {
+            $env:NODE_PATH = $SOCKET_NODE_PATH
+        }
 
         # Use separate log file to avoid file locking conflicts on Windows
         $LOG_DIR = Split-Path -Parent $DASHBOARD_LOG
