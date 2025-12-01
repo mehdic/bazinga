@@ -775,8 +775,105 @@ done
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
 4. **Commit & push** fixes
-5. **Resolve** each thread via GraphQL mutation
+5. **Resolve & Respond** to ALL feedback (see sections below)
 6. **Report** summary to user
+
+### 🔴 MANDATORY: Respond to ALL Feedback (Fixed AND Skipped)
+
+**CRITICAL: You MUST respond to EVERY piece of feedback, whether implemented or skipped.**
+
+This serves two purposes:
+1. **Audit trail** - Reviewers see what was done and why
+2. **LLM context** - Responses are included in subsequent LLM reviews via `llm-reviews.sh`
+
+### For Inline Code Comments (with resolve buttons)
+
+**Step 1: Reply to the thread explaining your action**
+```bash
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+# Reply to a review thread (use the comment's node_id)
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "mutation { addPullRequestReviewComment(input: {pullRequestReviewId: \"PRR_xxx\", inReplyTo: \"PRRC_xxx\", body: \"✅ Fixed in commit abc123\"}) { comment { id } } }"}'
+```
+
+**Step 2: Resolve the thread (only if FIXED)**
+```bash
+# Only resolve if you actually fixed it
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"PRRT_xxx\"}) { thread { id isResolved } } }"}'
+```
+
+**For SKIPPED items: Reply but do NOT resolve**
+```
+⏭️ **Skipped - By Design**
+
+This is intentional behavior because [explanation].
+The graceful degradation allows the dashboard to start even when [reason].
+```
+
+### For PR Comments (no resolve buttons)
+
+**Post a comprehensive response table:**
+```bash
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+curl -s -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/repos/mehdic/bazinga/issues/PR_NUMBER/comments" \
+  -d '{"body": "## Response to Review Feedback\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Fix X | ✅ Fixed in abc123 |\n| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |\n| 3 | Consider Z | ✅ Implemented |"}'
+```
+
+### Response Templates
+
+| Action | Response Format |
+|--------|-----------------|
+| **Fixed** | `✅ **Fixed in commit {hash}** - [brief description of fix]` |
+| **Skipped (by design)** | `⏭️ **Skipped - By Design** - [detailed explanation why this is intentional]` |
+| **Skipped (low risk)** | `⏭️ **Skipped - Low Risk** - [explanation of why impact is minimal]` |
+| **Skipped (deferred)** | `📝 **Deferred** - Valid suggestion, will address in future PR` |
+
+### 🔴 CRITICAL: Skipped Items MUST Have Detailed Explanations
+
+**❌ WRONG (too brief):**
+```
+⏭️ Skipped - intentional
+```
+
+**✅ CORRECT (detailed):**
+```
+⏭️ **Skipped - By Design**
+
+Silent failure is intentional here. The dashboard should gracefully degrade
+when the database module fails to load (e.g., architecture mismatch).
+Throwing an error would prevent the dashboard from starting entirely,
+which is worse than running with limited functionality.
+
+The warning message in console provides debugging info for developers.
+```
+
+### Why Respond to Everything?
+
+1. **LLM Review Context** - The `llm-reviews.sh` script includes previous responses, so OpenAI/Gemini see your reasoning
+2. **Prevents Re-raising** - Reviewers won't flag the same issue again if they see it was considered
+3. **Knowledge Base** - Future developers understand why decisions were made
+4. **Accountability** - Shows thorough review, not just cherry-picking easy fixes
+
+### Summary: Actions for Each Feedback Type
+
+| Feedback Type | Reply Required? | Resolve Thread? |
+|--------------|-----------------|-----------------|
+| Fixed inline comment | ✅ Yes (explain fix) | ✅ Yes |
+| Skipped inline comment | ✅ Yes (explain why) | ❌ No (leave open) |
+| PR comment (any) | ✅ Yes (response table) | N/A |
+| Bot analysis | ✅ Yes (response table) | N/A |
 
 ---
 

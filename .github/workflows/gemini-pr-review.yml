@@ -54,18 +54,42 @@ jobs:
             echo "has_previous_gemini=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Fetch responses to reviews (explains fixed/skipped items)
+        id: review_responses
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch ALL PR comments to find responses explaining what was done
+          # These responses (posted by humans or Claude) explain which items were
+          # implemented vs skipped and why
+          echo "Fetching review responses from PR #${{ github.event.pull_request.number }}..."
+
+          # Look for comments containing response markers (✅ Fixed, ⏭️ Skipped, Response to Review)
+          jq -r '[.[] | select(.body | (contains("✅") or contains("⏭️") or contains("Response to Review") or contains("Fixed in commit") or contains("Skipped -")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' pr_comments.json > review_responses.txt
+
+          if [ -s review_responses.txt ]; then
+            RESP_SIZE=$(wc -c < review_responses.txt)
+            echo "Found review responses ($RESP_SIZE bytes)"
+            echo "has_responses=true" >> $GITHUB_OUTPUT
+          else
+            echo "No review responses found"
+            echo "has_responses=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build prompt
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
           HAS_PREVIOUS_GEMINI: ${{ steps.previous_gemini.outputs.has_previous_gemini }}
+          HAS_RESPONSES: ${{ steps.review_responses.outputs.has_responses }}
         run: |
           # Configuration
           # Max diff size in characters - Gemini API has token limits
           # 40k chars ≈ 10k tokens, leaving headroom for prompt + response
           MAX_DIFF_SIZE=40000
           MAX_PREVIOUS_GEMINI_SIZE=8000
+          MAX_RESPONSES_SIZE=6000
 
           cat > prompt_header.txt << 'EOF'
           You are an expert code reviewer analyzing a pull request.
@@ -91,6 +115,27 @@ jobs:
             echo "Your previous review (truncated if large):" >> prompt_header.txt
             echo '```markdown' >> prompt_header.txt
             head -c "$MAX_PREVIOUS_GEMINI_SIZE" previous_gemini_review.txt >> prompt_header.txt
+            echo '' >> prompt_header.txt
+            echo '```' >> prompt_header.txt
+            echo "" >> prompt_header.txt
+          fi
+
+          # Include responses explaining what was fixed/skipped
+          if [ "$HAS_RESPONSES" = "true" ] && [ -s review_responses.txt ]; then
+            echo "## Responses to Review Feedback" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "The developer posted responses explaining which issues were addressed:" >> prompt_header.txt
+            echo "- ✅ = Fixed/Implemented" >> prompt_header.txt
+            echo "- ⏭️ = Intentionally skipped (with explanation)" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "Use these responses to:" >> prompt_header.txt
+            echo "- NOT re-raise issues that were explained as intentional/by-design" >> prompt_header.txt
+            echo "- Verify claimed fixes actually appear in the new diff" >> prompt_header.txt
+            echo "- Focus only on genuinely NEW issues" >> prompt_header.txt
+            echo "" >> prompt_header.txt
+            echo "Responses:" >> prompt_header.txt
+            echo '```' >> prompt_header.txt
+            head -c "$MAX_RESPONSES_SIZE" review_responses.txt >> prompt_header.txt
             echo '' >> prompt_header.txt
             echo '```' >> prompt_header.txt
             echo "" >> prompt_header.txt
