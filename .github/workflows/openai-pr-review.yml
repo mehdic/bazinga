@@ -393,6 +393,11 @@ jobs:
 
           PR_NUMBER=${{ github.event.pull_request.number }}
 
+          # Add prefix to distinguish from Gemini reviews
+          echo "## OpenAI Review" > prefixed_review.txt
+          echo "" >> prefixed_review.txt
+          cat review.txt >> prefixed_review.txt
+
           # Check if we have a previous comment ID to update
           COMMENT_ID=""
           if [ -f previous_comment_id.txt ]; then
@@ -402,12 +407,12 @@ jobs:
           if [ -n "$COMMENT_ID" ]; then
             echo "Updating existing comment $COMMENT_ID..."
             gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
-              -f body="$(cat review.txt)" && echo "Comment updated successfully!" || {
+              -f body="$(cat prefixed_review.txt)" && echo "Comment updated successfully!" || {
               echo "Failed to update, posting new comment..."
-              gh pr comment $PR_NUMBER --body-file review.txt
+              gh pr comment $PR_NUMBER --body-file prefixed_review.txt
             }
           else
             echo "Posting new comment to PR #$PR_NUMBER..."
-            gh pr comment $PR_NUMBER --body-file review.txt
+            gh pr comment $PR_NUMBER --body-file prefixed_review.txt
             echo "Comment posted successfully!"
           fi

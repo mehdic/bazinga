@@ -287,41 +287,35 @@ jobs:
           head -n 10 review.txt
 
       - name: Post review comment
+        # Run even if API call failed (to post error messages)
+        if: always()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Preparing to post review comment..."
 
           if [ ! -f review.txt ]; then
-            echo "Error: review.txt not found"
-            exit 1
+            echo "Review file not found, skipping comment."
+            exit 0
+          fi
+
+          # Check for meaningful content (not just whitespace)
+          CONTENT=$(cat review.txt | tr -d '[:space:]')
+          if [ -z "$CONTENT" ]; then
+            echo "Review is empty or whitespace-only, skipping comment."
+            exit 0
           fi
 
           REVIEW_SIZE="$(wc -c < review.txt)"
           echo "Review content length: $REVIEW_SIZE bytes"
 
-          REVIEW_BODY=$(jq -Rs . < review.txt 2>/dev/null)
-          if [ -z "$REVIEW_BODY" ]; then
-            echo "Error: Failed to encode review content as JSON"
-            exit 1
-          fi
+          # Add prefix to distinguish from OpenAI reviews
+          echo "## Gemini Review" > prefixed_review.txt
+          echo "" >> prefixed_review.txt
+          cat review.txt >> prefixed_review.txt
 
-          echo "Posting comment to PR #${{ github.event.pull_request.number }}..."
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "Posting comment to PR #$PR_NUMBER..."
 
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o comment_response.json \
-            --connect-timeout 10 \
-            --max-time 30 \
-            -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -d "{\"body\": $REVIEW_BODY}")
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "Error: Failed to post comment (HTTP $HTTP_CODE)"
-            cat comment_response.json
-            exit 1
-          fi
-
-          echo "✅ Comment posted successfully!"
-          jq '.html_url' comment_response.json
+          gh pr comment $PR_NUMBER --body-file prefixed_review.txt
+          echo "Comment posted successfully!"

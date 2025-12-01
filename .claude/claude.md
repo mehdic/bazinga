@@ -671,6 +671,22 @@ Count: 3 extracted, 3 addressed ✓
 
 **Present this table to the user before declaring the PR review complete.**
 
+### 🔴 CRITICAL: Always Re-check Before Declaring Complete
+
+Before telling the user "no new reviews":
+1. **Re-fetch ALL review sources** - threads, reviews, AND issue comments
+2. **Compare timestamps** - any comments after your last response?
+3. **If new comments exist** - evaluate them before declaring complete
+
+**Why this matters:** Automated reviewers (OpenAI, Gemini) may post comments minutes after you check. A 2-minute gap can mean missing important feedback.
+
+**Example failure mode:**
+```
+09:08:42 - You check for reviews, see none
+09:10:41 - OpenAI posts a review
+09:11:00 - You tell user "no new reviews" ← WRONG!
+```
+
 ### Verification
 
 Before implementing any "fix":
