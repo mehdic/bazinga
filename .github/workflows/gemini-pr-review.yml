@@ -348,15 +348,15 @@ jobs:
         run: |
           set +x  # Prevent API key from appearing in logs
 
-          PROMPT=$(cat prompt_header.txt | jq -Rs . 2>/dev/null)
-          if [ -z "$PROMPT" ]; then
+          # Validate prompt file exists and is non-empty
+          if [ ! -s prompt_header.txt ]; then
             echo "⚠️ Failed to prepare prompt. Check prompt_header.txt formatting." > review.txt
             exit 0
           fi
 
-          # Write payload to file to avoid "Argument list too long" error with large diffs
-          # Note: Use --argjson since PROMPT is already a JSON string
-          jq -n --argjson prompt "$PROMPT" '{
+          # Build payload using jq with --rawfile to avoid "Argument list too long" error
+          # --rawfile reads file content directly without shell variable intermediary
+          jq -n --rawfile prompt prompt_header.txt '{
             contents: [{
               parts: [{text: $prompt}]
             }]

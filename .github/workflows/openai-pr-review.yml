@@ -402,10 +402,8 @@ jobs:
         run: |
           set +x  # Prevent API key from appearing in logs
 
-          SYSTEM_PROMPT=$(cat system_prompt.txt | jq -Rs . 2>/dev/null)
-          USER_PROMPT=$(cat user_prompt.txt | jq -Rs . 2>/dev/null)
-
-          if [ -z "$SYSTEM_PROMPT" ] || [ -z "$USER_PROMPT" ]; then
+          # Validate prompt files exist and are non-empty
+          if [ ! -s system_prompt.txt ] || [ ! -s user_prompt.txt ]; then
             echo "## OpenAI Code Review" > review.txt
             echo "" >> review.txt
             echo "Failed to prepare prompts. Check prompt file formatting." >> review.txt
@@ -414,11 +412,11 @@ jobs:
 
           # GPT-5 is a reasoning model - temperature is fixed at 1 (not configurable)
           # Needs high max_completion_tokens because reasoning tokens count against the limit
-          # Write payload to file to avoid "Argument list too long" error with large diffs
-          # Note: Use --argjson since SYSTEM_PROMPT and USER_PROMPT are already JSON strings
+          # Build payload using jq with --rawfile to avoid "Argument list too long" error
+          # --rawfile reads file content directly without shell variable intermediary
           jq -n \
-            --argjson system "$SYSTEM_PROMPT" \
-            --argjson user "$USER_PROMPT" \
+            --rawfile system system_prompt.txt \
+            --rawfile user user_prompt.txt \
             '{
               model: "gpt-5",
               messages: [
