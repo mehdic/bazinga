@@ -829,8 +829,6 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
         True if download successful, False otherwise (should fall back to npm)
     """
     import json
-    import os
-    import shutil
     import tarfile
     import tempfile
     import urllib.request
@@ -1961,18 +1959,21 @@ def update(
 
     # Update dashboard from pre-built releases
     console.print("\n[bold cyan]6. Updating dashboard v2[/bold cyan]")
-    if not dashboard:
+    # Auto-detect existing dashboard installation
+    bazinga_dir = target_dir / "bazinga"
+    dashboard_installed = (bazinga_dir / "dashboard-v2").exists()
+
+    if not dashboard and not dashboard_installed:
         console.print("  [dim]Skipped (use --dashboard to update)[/dim]")
     else:
-        bazinga_dir = target_dir / "bazinga"
+        if dashboard_installed and not dashboard:
+            console.print("  [dim]Existing dashboard detected, updating...[/dim]")
         bazinga_dir.mkdir(parents=True, exist_ok=True)
 
         # Check for orphaned dashboard from previous buggy update (extracted to wrong path)
         orphaned_dashboard = bazinga_dir / "bazinga" / "dashboard-v2"
         if orphaned_dashboard.exists():
             # Safety guards: ensure it's a directory, not a symlink, and within expected path
-            import os
-            import shutil
             try:
                 is_safe_to_remove = (
                     orphaned_dashboard.is_dir()
@@ -2010,7 +2011,6 @@ def update(
             target_dashboard = bazinga_dir / "dashboard-v2"
 
             if source_dashboard.exists():
-                import shutil
                 try:
                     ignore_patterns = shutil.ignore_patterns('node_modules', '.next', '*.log')
                     if target_dashboard.exists():
@@ -2048,7 +2048,8 @@ def update(
 
     # Update dashboard dependencies
     console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
-    if dashboard:
+    # Use same auto-detection: update if --dashboard OR dashboard was previously installed
+    if dashboard or dashboard_installed:
         install_dashboard_dependencies(target_dir, force)
     else:
         console.print("  [dim]Skipped (use --dashboard to update)[/dim]")
@@ -2123,10 +2124,31 @@ def setup_dashboard(
     if not dashboard_dir.exists():
         console.print(
             "[yellow]⚠️  Dashboard v2 folder not found[/yellow]\n"
-            "[dim]The dashboard may not be installed in this project.[/dim]\n"
-            "[dim]Try running 'bazinga update' first.[/dim]"
+            "[dim]The dashboard was not installed during init (it's opt-in).[/dim]\n"
         )
-        raise typer.Exit(1)
+        # Offer to download/install the dashboard
+        console.print("[bold]Would you like to install the dashboard now?[/bold]")
+        if not force:
+            if not typer.confirm("  Install dashboard?", default=True):
+                console.print("[yellow]Cancelled[/yellow]")
+                console.print("[dim]You can install later with: bazinga setup-dashboard[/dim]")
+                raise typer.Exit(0)
+
+        # Download pre-built dashboard
+        console.print("\n[bold]Installing dashboard v2...[/bold]")
+        prebuilt_ok = False
+        try:
+            prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Pre-built download failed: {e}[/yellow]")
+
+        if prebuilt_ok:
+            console.print("  [green]✓[/green] Dashboard installed from pre-built release")
+        else:
+            # Fall back to copying source files if we have access to them
+            console.print("  [yellow]⚠️  Pre-built not available[/yellow]")
+            console.print("  [dim]Try running 'bazinga update --dashboard' instead[/dim]")
+            raise typer.Exit(1)
 
     # Check for node_modules indicating dependencies were already installed
     node_modules = dashboard_dir / "node_modules"

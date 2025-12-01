@@ -88,9 +88,11 @@ if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
 $nodeVersion = (node --version) -replace '^v', ''
 $majorVersion = [int]($nodeVersion -split '\.')[0]
 if ($majorVersion -lt 18) {
-    Write-Log "ERROR - Node.js 18+ required (found v$nodeVersion)"
-    Write-Host "ERROR: Node.js 18+ required (found v$nodeVersion)" -ForegroundColor Red
-    exit 1
+    Write-Log "Node.js 18+ required (found v$nodeVersion), skipping dashboard"
+    Write-Host "Node.js 18+ required for dashboard (found v$nodeVersion)" -ForegroundColor Yellow
+    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
+    exit 0
 }
 Write-Log "Node.js version: v$nodeVersion"
 

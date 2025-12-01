@@ -26,31 +26,33 @@
 
 ## Solution
 
-### Part 1: Add `--no-dashboard` CLI Flag
+### Part 1: Add `--dashboard` CLI Flag (Opt-In)
+
+> **Note:** This section was updated after user feedback to change from opt-out (`--no-dashboard`) to opt-in (`--dashboard`).
 
 **File:** `src/bazinga_cli/__init__.py`
 
 **Changes:**
 1. Add new option to `init` command:
    ```python
-   no_dashboard: bool = typer.Option(
-       False, "--no-dashboard", help="Skip dashboard installation (experimental feature)"
+   dashboard: bool = typer.Option(
+       False, "--dashboard", help="Install experimental dashboard (not included by default)"
    )
    ```
 
-2. Conditionally skip dashboard installation steps:
-   - Step 6: Skip `download_prebuilt_dashboard()` and source copy
-   - Step 9: Skip `install_dashboard_dependencies()`
+2. Conditionally run dashboard installation steps only if `dashboard` is True:
+   - Step 6: Run `download_prebuilt_dashboard()` and source copy if `dashboard`
+   - Step 9: Run `install_dashboard_dependencies()` if `dashboard`
 
-3. Add same option to `update` command for consistency
+3. Add same option to `update` command (with auto-detection of existing installation)
 
 **User Experience:**
 ```bash
-# Default: dashboard installed (with clear experimental warning)
+# Default: dashboard NOT installed
 bazinga init my-project
 
-# Skip dashboard entirely
-bazinga init my-project --no-dashboard
+# Install dashboard (experimental)
+bazinga init my-project --dashboard
 ```
 
 ### Part 2: Update Documentation
@@ -73,17 +75,17 @@ bazinga init my-project --no-dashboard
 ### Pros ✅
 
 1. **User autonomy** - Users choose what gets installed
-2. **Faster installs** - `--no-dashboard` saves 30-60 seconds
+2. **Faster installs** - Default skips dashboard, saving 30-60 seconds
 3. **Clear expectations** - Experimental status is explicit
 4. **Reduced confusion** - Users without node.js get cleaner experience
-5. **Lower bandwidth** - Skip ~50MB download if not needed
-6. **Production safety** - Teams can skip unstable features in CI/CD
+5. **Lower bandwidth** - Default skips ~50MB download
+6. **Production safety** - CI/CD pipelines unaffected by default
 
 ### Cons ⚠️
 
 1. **Additional flag** - Slight increase in CLI complexity
 2. **Documentation maintenance** - Must update when dashboard becomes stable
-3. **Feature discovery** - Users might never try dashboard if opt-out is prominent
+3. **Feature discovery** - Users must know to use `--dashboard` flag
 
 ### Verdict
 **PROCEED** - Benefits clearly outweigh costs. User autonomy and clear communication are essential for experimental features.
@@ -92,9 +94,11 @@ bazinga init my-project --no-dashboard
 
 ## Implementation Details
 
+> **Note:** These examples reflect the final opt-in implementation using `--dashboard`.
+
 ### Code Changes in `__init__.py`
 
-**Location 1: `init` command signature (line ~1126)**
+**Location 1: `init` command signature**
 ```python
 @app.command()
 def init(
@@ -102,55 +106,53 @@ def init(
     here: bool = typer.Option(...),
     force: bool = typer.Option(...),
     no_git: bool = typer.Option(...),
-    no_dashboard: bool = typer.Option(
+    dashboard: bool = typer.Option(
         False,
-        "--no-dashboard",
-        help="Skip dashboard installation (early experimental feature, no impact on BAZINGA functionality)"
+        "--dashboard",
+        help="Install experimental dashboard (not included by default)"
     ),
     testing_mode: str = typer.Option(...),
     profile: str = typer.Option(...),
 ):
 ```
 
-**Location 2: Step 6 - Dashboard copy (line ~1276)**
+**Location 2: Step 6 - Dashboard copy**
 ```python
-if not no_dashboard:
-    console.print("\n[bold cyan]6. Installing dashboard v2[/bold cyan]")
+if dashboard:
     console.print("  [yellow]⚠️  Dashboard is an early experimental feature[/yellow]")
-    # ... existing dashboard installation code ...
+    # ... dashboard installation code ...
 else:
-    console.print("\n[bold cyan]6. Dashboard installation[/bold cyan]")
-    console.print("  [dim]Skipped (--no-dashboard flag)[/dim]")
+    console.print("  [dim]Skipped (use --dashboard to install)[/dim]")
 ```
 
-**Location 3: Step 9 - Dashboard dependencies (line ~1396)**
+**Location 3: Step 9 - Dashboard dependencies**
 ```python
-if not no_dashboard:
-    console.print("\n[bold cyan]9. Installing dashboard dependencies[/bold cyan]")
-    console.print("  [yellow]⚠️  Dashboard is experimental - reporting only, no impact on BAZINGA[/yellow]")
+if dashboard:
     install_dashboard_dependencies(target_dir, force)
 else:
-    console.print("\n[bold cyan]9. Dashboard dependencies[/bold cyan]")
-    console.print("  [dim]Skipped (--no-dashboard flag)[/dim]")
+    console.print("  [dim]Skipped (use --dashboard to install)[/dim]")
 ```
 
 ### Documentation Updates
 
 **README.md - Add under "Development Status" section:**
 ```markdown
-**Experimental (opt-in reporting only):**
+**Experimental (early development):**
 - ⚠️ Real-time Dashboard - Visual monitoring interface for orchestration sessions
   - Under active development, not yet stable
   - No impact on BAZINGA core functionality if not installed
-  - Skip with: `bazinga init --no-dashboard`
+  - Not installed by default; opt-in with: `bazinga init --dashboard`
 ```
 
 **dashboard-v2/README.md - Add at top after title:**
 ```markdown
 > ⚠️ **EXPERIMENTAL**: This dashboard is under initial development and not yet reliable.
 > It provides reporting/monitoring only - skipping it has no impact on BAZINGA's core
-> multi-agent orchestration functionality. Install with `bazinga init` (included by default)
-> or skip with `bazinga init --no-dashboard`.
+> multi-agent orchestration functionality.
+>
+> - **Not installed by default** - opt-in with: `bazinga init my-project --dashboard`
+> - **Install later:** `bazinga setup-dashboard`
+> - **Update:** `bazinga update --dashboard`
 ```
 
 ---
@@ -158,7 +160,7 @@ else:
 ## Comparison to Alternatives
 
 ### Alternative 1: Make Dashboard Opt-In (not opt-out)
-**Rejected** - Would require users to know about dashboard before installing. Current default-on with clear messaging is better for feature discovery while still allowing opt-out.
+**ACCEPTED** - User requested dashboard to be opt-in after initial review. This makes more sense for an experimental feature - users explicitly choose to install it rather than having to know to skip it.
 
 ### Alternative 2: Remove Dashboard from CLI Install Entirely
 **Rejected** - Dashboard has value for users who want to monitor orchestration. Removal would harm user experience for those who want it.
@@ -170,11 +172,11 @@ else:
 
 ## Decision Rationale
 
-1. **Flag approach is standard** - Follows patterns like `--no-git` in the same CLI
-2. **Default behavior unchanged** - Users who don't specify flag get dashboard (with warning)
-3. **Clear messaging** - Experimental status is communicated at install time and in docs
+1. **Opt-in for experimental features** - Experimental features should require explicit user action
+2. **Default behavior is clean** - Users who don't need dashboard get faster installs
+3. **Clear messaging** - Experimental status is communicated in docs and when using `--dashboard`
 4. **No functional impact** - Core BAZINGA works identically with or without dashboard
-5. **Future-proof** - When dashboard stabilizes, we can remove experimental warnings without changing API
+5. **Future-proof** - When dashboard stabilizes, we can change default to opt-in or remove flag
 
 ---
 
@@ -183,23 +185,23 @@ else:
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | Users confused by flag | Low | Low | Clear help text explaining experimental status |
-| Dashboard never used | Low | Low | Default-on ensures discovery; good dashboard drives adoption |
+| Dashboard never used | Low | Low | Clear documentation and messaging encourage adoption |
 | Users expect dashboard to work | Medium | Medium | Prominent warnings in docs and install output |
-| CI/CD pipelines break | Very Low | Low | Flag is opt-out, not opt-in; default unchanged |
+| CI/CD pipelines break | Very Low | Low | Default is no dashboard, so pipelines unaffected |
 
 ---
 
 ## Implementation Checklist
 
-1. [ ] Add `--no-dashboard` option to `init` command
-2. [ ] Add `--no-dashboard` option to `update` command
-3. [ ] Conditionally skip dashboard steps in init
-4. [ ] Conditionally skip dashboard steps in update
-5. [ ] Add experimental warning during dashboard install
-6. [ ] Update README.md Development Status section
-7. [ ] Update dashboard-v2/README.md with warning banner
-8. [ ] Test install with and without flag
-9. [ ] Test update with and without flag
+1. [x] Add `--dashboard` option to `init` command (opt-in)
+2. [x] Add `--dashboard` option to `update` command (with auto-detection)
+3. [x] Conditionally run dashboard steps in init only if `--dashboard`
+4. [x] Conditionally run dashboard steps in update if `--dashboard` OR existing installation
+5. [x] Add experimental warning during dashboard install
+6. [x] Update README.md Development Status section
+7. [x] Update dashboard-v2/README.md with warning banner
+8. [x] Harden start-dashboard scripts (exit 0 if dashboard not installed)
+9. [x] Fix setup-dashboard to download dashboard if not present
 
 ---
 
@@ -208,16 +210,20 @@ else:
 1. `src/bazinga_cli/__init__.py` - CLI changes
 2. `README.md` - Development status update
 3. `dashboard-v2/README.md` - Experimental warning
+4. `scripts/start-dashboard.sh` - Graceful exit when dashboard not installed
+5. `scripts/start-dashboard.ps1` - Same for Windows
 
 ---
 
 ## Test Plan
 
-1. **Test default install** - Dashboard should install with warning
-2. **Test --no-dashboard** - Dashboard should be skipped cleanly
-3. **Test update with dashboard** - Should update dashboard
-4. **Test update --no-dashboard** - Should skip dashboard update
-5. **Verify messaging** - All warnings are clear and consistent
+1. **Test default install** - Dashboard should NOT install unless `--dashboard` is specified
+2. **Test --dashboard** - Dashboard should be installed cleanly when flag is provided
+3. **Test update --dashboard** - Should update dashboard when flag is provided
+4. **Test update (no flag, existing dashboard)** - Should auto-detect and update
+5. **Test update (no flag, no dashboard)** - Should skip dashboard update by default
+6. **Test setup-dashboard after init without --dashboard** - Should download and install
+7. **Verify messaging** - All warnings are clear and consistent
 
 ---
 
