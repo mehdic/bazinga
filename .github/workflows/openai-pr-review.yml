@@ -393,11 +393,17 @@ jobs:
 
           PR_NUMBER=${{ github.event.pull_request.number }}
 
-          # Add prefix to distinguish from Gemini reviews
+          # Add prefix to distinguish from Gemini reviews (only if not already present)
           # NOTE: Must match the marker used in "Fetch previous OpenAI reviews" step
-          echo "## OpenAI Code Review" > prefixed_review.txt
-          echo "" >> prefixed_review.txt
-          cat review.txt >> prefixed_review.txt
+          if grep -q "^## OpenAI Code Review" review.txt; then
+            echo "Review already has OpenAI header, using as-is"
+            cp review.txt prefixed_review.txt
+          else
+            echo "Adding OpenAI header prefix"
+            echo "## OpenAI Code Review" > prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            cat review.txt >> prefixed_review.txt
+          fi
 
           # Check if we have a previous comment ID to update
           COMMENT_ID=""

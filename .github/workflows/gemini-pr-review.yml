@@ -309,11 +309,17 @@ jobs:
           REVIEW_SIZE="$(wc -c < review.txt)"
           echo "Review content length: $REVIEW_SIZE bytes"
 
-          # Add prefix to distinguish from OpenAI reviews
+          # Add prefix to distinguish from OpenAI reviews (only if not already present)
           # NOTE: Must match the marker used in "Fetch previous Gemini reviews" step
-          echo "## Gemini Code Review" > prefixed_review.txt
-          echo "" >> prefixed_review.txt
-          cat review.txt >> prefixed_review.txt
+          if grep -q "^## Gemini Code Review" review.txt; then
+            echo "Review already has Gemini header, using as-is"
+            cp review.txt prefixed_review.txt
+          else
+            echo "Adding Gemini header prefix"
+            echo "## Gemini Code Review" > prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            cat review.txt >> prefixed_review.txt
+          fi
 
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "Posting comment to PR #$PR_NUMBER..."
