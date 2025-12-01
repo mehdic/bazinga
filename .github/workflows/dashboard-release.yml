@@ -23,12 +23,12 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x64
-          # IMPORTANT: macos-13 is Intel, macos-14+ is Apple Silicon
-          # macos-latest now points to macos-14 (arm64), so we must use macos-13 for x64
-          - os: macos-13
+          # macos-15-intel is the last supported Intel image (until Aug 2027)
+          # macos-13 deprecated Dec 2025, macos-14+ are Apple Silicon only
+          - os: macos-15-intel
             platform: darwin
             arch: x64
-          - os: macos-14
+          - os: macos-15
             platform: darwin
             arch: arm64
           - os: windows-latest
