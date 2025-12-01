@@ -996,8 +996,11 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
 
     # Try downloading pre-built dashboard first (faster, no npm required)
     console.print("\n[bold]Option 1: Pre-built dashboard (faster, no npm required)[/bold]")
-    if download_prebuilt_dashboard(target_dir, force):
-        return True
+    try:
+        if download_prebuilt_dashboard(target_dir, force):
+            return True
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to npm.[/yellow]")
 
     # Fall back to npm install
     console.print("\n[bold]Option 2: Build from source (requires npm)[/bold]")
@@ -1275,7 +1278,13 @@ def init(
         (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
 
         # Try downloading pre-built dashboard first (faster, no npm required)
-        if download_prebuilt_dashboard(target_dir, force=True):
+        prebuilt_ok = False
+        try:
+            prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
+
+        if prebuilt_ok:
             console.print("  [green]✓[/green] Dashboard installed from pre-built release")
         else:
             # Fall back to copying source files
@@ -1964,7 +1973,13 @@ def update(
 
     # Try to download pre-built dashboard from GitHub releases
     # Note: Pass target_dir (project root), not bazinga_dir - function adds /bazinga/dashboard-v2
-    if download_prebuilt_dashboard(target_dir, force=True):
+    prebuilt_ok = False
+    try:
+        prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Pre-built download failed: {e}. Falling back to source copy.[/yellow]")
+
+    if prebuilt_ok:
         console.print("  [green]✓ Dashboard updated from release[/green]")
     else:
         # Fall back to copying source files if pre-built not available

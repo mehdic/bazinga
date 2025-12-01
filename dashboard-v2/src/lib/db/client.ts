@@ -49,25 +49,33 @@ function loadDatabaseModules(): { Database: DatabaseConstructor; drizzle: Drizzl
     _drizzle = drizzleModule.drizzle;
     return { Database: _DatabaseClass, drizzle: _drizzle };
   } catch (error) {
-    _moduleLoadFailed = true;
-    const errorMessage = String(error);
+    // Classify error using error codes (preferred) with string fallback
+    const err = error as NodeJS.ErrnoException;
+    const code = err?.code;
+    const msg = String(err?.message || error || "");
 
-    // Detect architecture mismatch
-    if (errorMessage.includes("incompatible architecture") ||
-        errorMessage.includes("arm64") ||
-        errorMessage.includes("x86_64")) {
+    // Determine if this is a permanent (sticky) failure or potentially transient
+    const isModuleNotFound = code === "MODULE_NOT_FOUND" || msg.includes("Cannot find module");
+    const isArchMismatch = code === "ERR_DLOPEN_FAILED" ||
+      /incompatible architecture|Mach-O|ELF|wrong architecture|arm64.*x86_64|x86_64.*arm64/i.test(msg);
+
+    // Only mark as permanently failed for architecture mismatches (not transient errors)
+    if (isArchMismatch) {
+      _moduleLoadFailed = true;
       console.warn(
         `Database module architecture mismatch detected.\n` +
         `The better-sqlite3 native binary was compiled for a different CPU architecture.\n` +
         `To fix: cd dashboard-v2 && npm rebuild better-sqlite3\n` +
         `Dashboard will run without database access.`
       );
-    } else if (errorMessage.includes("Cannot find module")) {
+    } else if (isModuleNotFound) {
+      // Module not found could be transient (npm install pending) - don't mark sticky
       console.warn(
         `Database module not found. Run: cd dashboard-v2 && npm install\n` +
         `Dashboard will run without database access.`
       );
     } else {
+      // Unknown error - log but allow retry
       console.warn(`Database module failed to load: ${error}`);
     }
 

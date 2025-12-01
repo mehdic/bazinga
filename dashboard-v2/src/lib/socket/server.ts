@@ -20,7 +20,9 @@ type DatabaseInstance = {
 type DatabaseConstructor = new (path: string, options?: { readonly?: boolean }) => DatabaseInstance;
 
 const PORT = process.env.SOCKET_PORT || 3001;
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "..", "bazinga", "bazinga.db");
+// Use __dirname for deterministic path resolution (not affected by how process is launched)
+// __dirname = dashboard-v2/src/lib/socket, so we go up 4 levels to project root
+const DB_PATH = process.env.DATABASE_URL || path.resolve(__dirname, "..", "..", "..", "..", "bazinga", "bazinga.db");
 
 // Event types
 export type SocketEvent =
@@ -70,25 +72,33 @@ function loadDatabaseModule(): DatabaseConstructor | null {
     _DatabaseClass = require("better-sqlite3") as DatabaseConstructor;
     return _DatabaseClass;
   } catch (error) {
-    _moduleLoadFailed = true;
-    const errorMessage = String(error);
+    // Classify error using error codes (preferred) with string fallback
+    const err = error as NodeJS.ErrnoException;
+    const code = err?.code;
+    const msg = String(err?.message || error || "");
 
-    // Detect architecture mismatch
-    if (errorMessage.includes("incompatible architecture") ||
-        errorMessage.includes("arm64") ||
-        errorMessage.includes("x86_64")) {
+    // Determine if this is a permanent (sticky) failure or potentially transient
+    const isModuleNotFound = code === "MODULE_NOT_FOUND" || msg.includes("Cannot find module");
+    const isArchMismatch = code === "ERR_DLOPEN_FAILED" ||
+      /incompatible architecture|Mach-O|ELF|wrong architecture|arm64.*x86_64|x86_64.*arm64/i.test(msg);
+
+    // Only mark as permanently failed for architecture mismatches (not transient errors)
+    if (isArchMismatch) {
+      _moduleLoadFailed = true;
       console.warn(
         `Database module architecture mismatch detected.\n` +
         `The better-sqlite3 native binary was compiled for a different CPU architecture.\n` +
         `To fix: cd dashboard-v2 && npm rebuild better-sqlite3\n` +
         `Socket server will run without database access.`
       );
-    } else if (errorMessage.includes("Cannot find module")) {
+    } else if (isModuleNotFound) {
+      // Module not found could be transient (npm install pending) - don't mark sticky
       console.warn(
         `Database module not found. Run: cd dashboard-v2 && npm install\n` +
         `Socket server will run without database access.`
       );
     } else {
+      // Unknown error - log but allow retry
       console.warn(`Database module failed to load: ${error}`);
     }
 

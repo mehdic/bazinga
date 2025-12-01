@@ -609,13 +609,70 @@ jq '.body'
    - **Valid improvements** - Better solutions than current implementation
    - **Minor/Style** - Low-impact changes
 
+### 🔴 MANDATORY: Extraction-First Workflow (BEFORE Implementation)
+
+**⚠️ ROOT CAUSE OF MISSED ITEMS:** Jumping straight to implementation without systematic extraction causes items to be lost. Long reviews (200+ lines) have issues buried in the middle that get skipped.
+
+**THE FIX: Create extraction table BEFORE touching any code.**
+
+#### Step 1: Fetch ALL Reviews
+```bash
+# Fetch from ALL three sources (OpenAI, Gemini, Copilot, inline comments)
+# Use GraphQL to get full bodies - NEVER truncate
+```
+
+#### Step 2: Create Master Extraction Table (BEFORE ANY IMPLEMENTATION)
+```markdown
+## PR #XXX - Master Extraction Table
+
+**Sources:** OpenAI (X items), Gemini (Y items), Copilot (Z items)
+**Total: N items to address**
+
+| # | Source | Category | Suggestion | Status |
+|---|--------|----------|------------|--------|
+| 1 | OpenAI | Critical | Shape-accurate no-ops | ❌ Pending |
+| 2 | OpenAI | Type Safety | Use import type | ❌ Pending |
+| 3 | Gemini | Style | Extract shared loader | ❌ Pending |
+| 4 | Copilot | Bug | Fix null check | ❌ Pending |
+| ... | ... | ... | ... | ... |
+
+**Announce:** "Found N items: X from OpenAI, Y from Gemini, Z from Copilot"
+```
+
+#### Step 3: ONLY THEN Implement
+- Work through the table row by row
+- Update status as you go: `❌ Pending` → `🔄 In Progress` → `✅ Fixed` or `⏭️ Skipped`
+- NEVER skip a row without explicit justification
+
+#### Step 4: Final Verification
+```markdown
+## Final Count Verification
+- Items extracted: N
+- Items addressed: N
+- ✅ All items accounted for
+
+| Status | Count |
+|--------|-------|
+| ✅ Fixed | X |
+| ⏭️ Skipped | Y |
+| ❌ Missed | 0 |  ← MUST be zero
+```
+
+**🔴 IF "Missed" > 0: STOP and fix before proceeding.**
+
+#### Why This Works
+1. **Forces enumeration** - Can't skip what's in the table
+2. **Visual accountability** - Pending items are visible
+3. **Count verification** - Math doesn't lie
+4. **Prevents "I'll get to it later"** - Everything tracked upfront
+
 ### Implementation Rules
 
 | Category | Action |
 |----------|--------|
 | **Critical/Breaking** | Implement immediately |
 | **Valid improvements** | Implement immediately (don't wait to be asked) |
-| **Minor/Style** | Implement if quick, otherwise ask user |
+| **Minor/Style** | Track in table, implement if quick, otherwise mark `⏭️ Skipped - Minor` |
 
 ### 🔴 MANDATORY: Validation Checklist
 
