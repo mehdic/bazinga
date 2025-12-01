@@ -4,9 +4,9 @@
 > It provides reporting/monitoring only - skipping it has **no impact** on BAZINGA's core
 > multi-agent orchestration functionality.
 >
-> - **Included by default:** `bazinga init my-project`
-> - **Skip installation:** `bazinga init my-project --no-dashboard`
+> - **Not installed by default** - opt-in with: `bazinga init my-project --dashboard`
 > - **Install later:** `bazinga setup-dashboard`
+> - **Update:** `bazinga update --dashboard`
 
 Modern, real-time orchestration monitoring dashboard built with Next.js 14.
 

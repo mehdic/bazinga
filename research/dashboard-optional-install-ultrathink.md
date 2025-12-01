@@ -2,7 +2,7 @@
 
 **Date:** 2025-12-01
 **Context:** Dashboard v2 is under active development and not yet stable. Need to clarify this in docs and add CLI option to skip installation.
-**Decision:** Add `--no-dashboard` flag to CLI, harden startup scripts, and update documentation with experimental status warnings
+**Decision:** Make dashboard opt-in with `--dashboard` flag (not installed by default), harden startup scripts, and update documentation with experimental status warnings
 **Status:** Reviewed
 **Reviewed by:** OpenAI GPT-5 (2025-12-01)
 
@@ -250,12 +250,15 @@ else:
 
 1. **⏭️ Settings.json persistence** - Adds complexity; users can remember the flag for now. Can be added in future enhancement.
 2. **⏭️ `bazinga dashboard install/remove/status` subcommands** - Scope creep; existing `setup-dashboard` command can be enhanced later.
-3. **⏭️ CI auto-detection** - Nice-to-have but adds complexity; users can set `--no-dashboard` in CI scripts.
-4. **⏭️ Opt-in instead of opt-out** - Changes default behavior which could surprise existing users. Opt-out preserves backwards compatibility.
+3. **⏭️ CI auto-detection** - Nice-to-have but adds complexity; users can set flags in CI scripts.
+
+### Accepted (After User Feedback)
+
+1. **✅ Opt-in instead of opt-out** - User requested dashboard to be opt-in (`--dashboard`) rather than opt-out (`--no-dashboard`). Dashboard is experimental, so opt-in makes more sense.
 
 ### Revised Implementation Plan
 
-1. Add `--no-dashboard` flag to `init` and `update` commands
+1. Add `--dashboard` flag to `init` and `update` commands (opt-in, not installed by default)
 2. Harden `scripts/start-dashboard.sh` - check dashboard exists before starting
 3. Harden `scripts/start-dashboard.ps1` - same check for Windows
 4. Print "install later" guidance when dashboard is skipped

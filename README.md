@@ -552,7 +552,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ⚠️ Real-time Dashboard - Visual monitoring interface for orchestration sessions
   - Under active initial development and not yet reliable
   - Provides reporting/monitoring only - no impact on BAZINGA core functionality
-  - Included by default; skip with: `bazinga init --no-dashboard`
+  - Not installed by default; opt-in with: `bazinga init --dashboard`
 
 ---
 

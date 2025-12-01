@@ -1137,10 +1137,10 @@ def init(
     no_git: bool = typer.Option(
         False, "--no-git", help="Skip git repository initialization"
     ),
-    no_dashboard: bool = typer.Option(
+    dashboard: bool = typer.Option(
         False,
-        "--no-dashboard",
-        help="Skip dashboard installation (experimental feature, no impact on BAZINGA functionality)",
+        "--dashboard",
+        help="Install experimental dashboard (early development, no impact on BAZINGA functionality)",
     ),
     testing_mode: str = typer.Option(
         "minimal",
@@ -1279,11 +1279,7 @@ def init(
             raise typer.Exit(1)
 
         console.print("\n[bold cyan]6. Installing dashboard v2[/bold cyan]")
-        if no_dashboard:
-            console.print("  [dim]Skipped (--no-dashboard flag)[/dim]")
-            console.print("  [dim]Dashboard is experimental - no impact on BAZINGA functionality[/dim]")
-            console.print("  [dim]To install later: bazinga setup-dashboard[/dim]")
-        else:
+        if dashboard:
             console.print("  [yellow]⚠️  Dashboard is an early experimental feature[/yellow]")
             # Ensure bazinga directory exists
             (target_dir / "bazinga").mkdir(parents=True, exist_ok=True)
@@ -1326,6 +1322,10 @@ def init(
                 if dashboard_doc.exists():
                     shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
                     console.print("  ✓ Copied dashboard documentation")
+        else:
+            console.print("  [dim]Skipped (use --dashboard to install)[/dim]")
+            console.print("  [dim]Dashboard is experimental - no impact on BAZINGA functionality[/dim]")
+            console.print("  [dim]To install later: bazinga setup-dashboard[/dim]")
 
         console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
         if not setup.copy_templates(target_dir):
@@ -1405,10 +1405,10 @@ def init(
 
     # Install dashboard dependencies
     console.print("\n[bold cyan]9. Installing dashboard dependencies[/bold cyan]")
-    if no_dashboard:
-        console.print("  [dim]Skipped (--no-dashboard flag)[/dim]")
-    else:
+    if dashboard:
         install_dashboard_dependencies(target_dir, force)
+    else:
+        console.print("  [dim]Skipped (use --dashboard to install)[/dim]")
 
     # Initialize git if requested
     if not no_git and check_command_exists("git"):
@@ -1812,10 +1812,10 @@ def update(
     branch: Optional[str] = typer.Option(
         None, "-b", help="Git branch to update from (e.g., 'develop', 'feature/xyz')"
     ),
-    no_dashboard: bool = typer.Option(
+    dashboard: bool = typer.Option(
         False,
-        "--no-dashboard",
-        help="Skip dashboard update (experimental feature, no impact on BAZINGA functionality)",
+        "--dashboard",
+        help="Update experimental dashboard (early development, no impact on BAZINGA functionality)",
     ),
 ):
     """
@@ -1961,8 +1961,8 @@ def update(
 
     # Update dashboard from pre-built releases
     console.print("\n[bold cyan]6. Updating dashboard v2[/bold cyan]")
-    if no_dashboard:
-        console.print("  [dim]Skipped (--no-dashboard flag)[/dim]")
+    if not dashboard:
+        console.print("  [dim]Skipped (use --dashboard to update)[/dim]")
     else:
         bazinga_dir = target_dir / "bazinga"
         bazinga_dir.mkdir(parents=True, exist_ok=True)
@@ -2048,10 +2048,10 @@ def update(
 
     # Update dashboard dependencies
     console.print("\n[bold cyan]8. Installing dashboard dependencies[/bold cyan]")
-    if no_dashboard:
-        console.print("  [dim]Skipped (--no-dashboard flag)[/dim]")
-    else:
+    if dashboard:
         install_dashboard_dependencies(target_dir, force)
+    else:
+        console.print("  [dim]Skipped (use --dashboard to update)[/dim]")
 
     # Success message
     success_message = (
