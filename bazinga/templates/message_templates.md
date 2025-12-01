@@ -173,7 +173,7 @@ Spawning Project Manager for analysis...
 🔨 Group {id} [{tier}/{model}] implementing | {files_created/modified}, {tests_added} ({coverage}% coverage) | {current_status}
 ```
 
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
+**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer. For backward compatibility, brackets are optional and may be omitted if tier/model information is unavailable.
 
 **Examples:**
 ```

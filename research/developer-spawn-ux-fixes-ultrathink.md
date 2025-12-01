@@ -290,7 +290,7 @@ New: Task(subagent_type="general-purpose", model=models["A"], description=...)
 2. **Fix 2 (spawn message):** Replace inline table with compact tier list:
    ```
    🔨 Phase {N} | Spawning {k} developers:
-   • {group}: {tier} ({model}) - {task[:60]}
+   • {group}: {tier} ({model}) - {task[:90]}
    ```
 3. **Fix 3 (status capsules):** Add `[{tier}/{model}]` AFTER "Group {id}":
    ```

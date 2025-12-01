@@ -955,17 +955,20 @@ PR_NODE_ID=$(curl -s -X POST \
   | jq -r '.data.repository.pullRequest.id')
 ```
 
-**Step 2: Write JSON to temp file (avoids bash escaping issues with `!`)**
+**Step 2: Write JSON to temp file (replace `YOUR_PR_NODE_ID` with value from Step 1)**
 ```bash
 cat > /tmp/pr_comment.json << 'ENDJSON'
 {
   "query": "mutation($body: String!, $id: ID!) { addComment(input: {subjectId: $id, body: $body}) { commentEdge { node { url } } } }",
   "variables": {
-    "id": "PR_kwDOxxxxxx",
+    "id": "YOUR_PR_NODE_ID",
     "body": "## Response to OpenAI Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Fix X | ✅ Fixed in abc123 |\n| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |\n\n## Response to Gemini Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Issue Z | ✅ Fixed in def456 |"
   }
 }
 ENDJSON
+
+# Replace placeholder with actual PR node ID
+sed -i "s/YOUR_PR_NODE_ID/$PR_NODE_ID/" /tmp/pr_comment.json
 ```
 
 **Step 3: Post the comment**

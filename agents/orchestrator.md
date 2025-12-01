@@ -1247,7 +1247,7 @@ IF status = BLOCKED:
 IF status = ESCALATE_SENIOR:
   → Use "Escalation" template:
   ```
-  🔺 Group {id} escalating | {reason} | → Senior Software Engineer (Sonnet)
+  🔺 Group {id} [{tier}/{model}] escalating | {reason} | → Senior Software Engineer (Sonnet)
   ```
 
 **Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
@@ -1404,7 +1404,7 @@ IF status = BLOCKED:
 IF status = ESCALATE_SENIOR:
   → Use "Challenge Escalation" template:
   ```
-  🔺 Group {id} challenge failed | Level {level} failure: {reason} | → Senior Software Engineer (Sonnet)
+  🔺 Group {id} [{tier}/{model}] challenge failed | Level {level} failure: {reason} | → Senior Software Engineer (Sonnet)
   ```
 
 **Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
