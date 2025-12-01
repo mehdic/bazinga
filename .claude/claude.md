@@ -938,42 +938,40 @@ Responses to LLM reviews MUST use these exact headers so the workflows can filte
 This enables timestamp-windowed filtering: each LLM only sees responses to ITS OWN reviews.
 
 **Post via GraphQL (required in Claude Code Web):**
-```bash
-GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
 
-# Get PR node ID first
+**Step 1: Get PR node ID**
+```bash
 PR_NODE_ID=$(curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
   -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { id } } }"}' \
   | jq -r '.data.repository.pullRequest.id')
+```
 
-# Post response with proper header
-BODY="## Response to OpenAI Code Review
+**Step 2: Write JSON to temp file (avoids bash escaping issues with `!`)**
+```bash
+cat > /tmp/pr_comment.json << 'ENDJSON'
+{
+  "query": "mutation($body: String!, $id: ID!) { addComment(input: {subjectId: $id, body: $body}) { commentEdge { node { url } } } }",
+  "variables": {
+    "id": "PR_kwDOxxxxxx",
+    "body": "## Response to OpenAI Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Fix X | ✅ Fixed in abc123 |\n| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |\n\n## Response to Gemini Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Issue Z | ✅ Fixed in def456 |"
+  }
+}
+ENDJSON
+```
 
-| # | Suggestion | Action |
-|---|------------|--------|
-| 1 | Fix X | ✅ Fixed in abc123 |
-| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |
-
-## Response to Gemini Code Review
-
-| # | Suggestion | Action |
-|---|------------|--------|
-| 1 | Issue Z | ✅ Fixed in def456 |"
-
-QUERY=$(jq -n --arg body "$BODY" '{
-  query: "mutation($body: String!) { addComment(input: {subjectId: \"'$PR_NODE_ID'\", body: $body}) { commentEdge { node { url } } } }",
-  variables: { body: $body }
-}')
-
+**Step 3: Post the comment**
+```bash
 curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d "$QUERY"
+  -d @/tmp/pr_comment.json | jq '.data.addComment.commentEdge.node.url'
 ```
+
+**Note:** Use `\n` for newlines in the JSON body. The file method avoids jq escaping issues with `!` characters in bash.
 
 ### Response Templates
 
