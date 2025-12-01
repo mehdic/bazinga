@@ -195,13 +195,24 @@ const createNoopQueryBuilder = (): unknown => {
   return builder;
 };
 
+// NOOP query object for db.query.<table>.findMany/findFirst patterns
+const NOOP_QUERY = new Proxy({}, {
+  get: () => ({
+    findMany: () => Promise.resolve([]),
+    findFirst: () => Promise.resolve(undefined),
+    findUnique: () => Promise.resolve(undefined),
+  }),
+});
+
 // NOOP Drizzle-like object for when DB is unavailable
-const NOOP_DRIZZLE = {
+// Note: transaction passes NOOP_DRIZZLE as tx so (tx) => tx.select()... works
+const NOOP_DRIZZLE: Record<string, unknown> = {
   select: () => createNoopQueryBuilder(),
   insert: () => ({ values: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }),
   update: () => ({ set: () => ({ where: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }) }),
   delete: () => ({ where: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }),
-  transaction: <T>(fn: () => T) => fn(),
+  transaction: <T>(fn: (tx: unknown) => T) => fn(NOOP_DRIZZLE),
+  query: NOOP_QUERY,
 };
 
 // Export lazy-initialized db with mock fallback

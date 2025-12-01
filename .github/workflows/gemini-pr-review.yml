@@ -324,10 +324,12 @@ jobs:
 
           # Save response to file with extended timeout for Gemini 3 Pro
           # --connect-timeout 30: Allow 30s to establish connection
-          # --max-time 210: Allow 3.5 minutes for complete response (Gemini 3 Pro can be slow)
+          # --max-time 240: Allow 4 minutes for complete response (Gemini 3 Pro can be slow)
+          # Note: Capture exit code explicitly to prevent bash -e from exiting on curl failure
+          set +e
           HTTP_CODE=$(curl -s \
             --connect-timeout 30 \
-            --max-time 210 \
+            --max-time 240 \
             -w "%{http_code}" \
             -o gemini_response.json \
             -X POST \
@@ -335,18 +337,18 @@ jobs:
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             -d "$PAYLOAD" \
             https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent)
-
           CURL_EXIT=$?
+          set -e
 
           echo "HTTP Status: $HTTP_CODE"
           echo "Curl exit code: $CURL_EXIT"
 
           # Handle timeout errors (exit code 28)
           if [ "$CURL_EXIT" -eq 28 ]; then
-            echo "Error: API request timed out after 210 seconds"
+            echo "Error: API request timed out after 240 seconds"
             echo "## ⚠️ Gemini API Timeout" > review.txt
             echo "" >> review.txt
-            echo "The Gemini 3 Pro model took too long to respond (greater than 3.5 minutes). This can happen with large diffs or complex analysis." >> review.txt
+            echo "The Gemini 3 Pro model took too long to respond (greater than 4 minutes). This can happen with large diffs or complex analysis." >> review.txt
             echo "" >> review.txt
             echo "**Suggestions:**" >> review.txt
             echo "- Try reducing the diff size" >> review.txt
