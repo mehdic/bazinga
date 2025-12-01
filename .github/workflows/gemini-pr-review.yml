@@ -21,8 +21,17 @@ jobs:
           fetch-depth: 20
 
       - name: Compute diff
+        id: diff
         run: |
           git fetch origin ${{ github.base_ref }}
+
+          # Capture the commit SHA being reviewed (important for staleness detection)
+          REVIEW_SHA=$(git rev-parse HEAD)
+          REVIEW_SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "review_sha=$REVIEW_SHA" >> $GITHUB_OUTPUT
+          echo "review_sha_short=$REVIEW_SHA_SHORT" >> $GITHUB_OUTPUT
+          echo "Reviewing commit: $REVIEW_SHA_SHORT ($REVIEW_SHA)"
+
           # Exclude package-lock.json (large, auto-generated) from review diff
           git diff origin/${{ github.base_ref }}...HEAD -- . ':!**/package-lock.json' > diff.patch
 
@@ -97,6 +106,8 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
+          REVIEW_SHA: ${{ steps.diff.outputs.review_sha }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
           HAS_PREVIOUS_GEMINI: ${{ steps.previous_gemini.outputs.has_previous_gemini }}
           HAS_RESPONSES: ${{ steps.review_responses.outputs.has_responses }}
         run: |
@@ -116,6 +127,9 @@ jobs:
           echo "Pull Request Title: $PR_TITLE" >> prompt_header.txt
           echo "Repository: $REPO_NAME" >> prompt_header.txt
           echo "Branch: $BRANCH_NAME" >> prompt_header.txt
+          echo "Reviewing Commit: $REVIEW_SHA_SHORT" >> prompt_header.txt
+          echo "" >> prompt_header.txt
+          echo "⚠️ Note: This review is for commit $REVIEW_SHA_SHORT. If newer commits exist, this review may be stale." >> prompt_header.txt
           echo "" >> prompt_header.txt
 
           # Include previous Gemini review from this PR (your own previous feedback)
@@ -313,6 +327,7 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
         run: |
           echo "Preparing to post review comment..."
 
@@ -331,14 +346,17 @@ jobs:
           REVIEW_SIZE="$(wc -c < review.txt)"
           echo "Review content length: $REVIEW_SIZE bytes"
 
-          # Add prefix to distinguish from OpenAI reviews (only if not already present)
-          # NOTE: Must match the marker used in "Fetch previous Gemini reviews" step
+          # Add prefix with commit SHA to identify which commit was reviewed
+          # This helps identify stale reviews when newer commits exist
+          # NOTE: Header must start with "## Gemini Code Review" for marker matching
           if grep -q "^## Gemini Code Review" review.txt; then
             echo "Review already has Gemini header, using as-is"
             cp review.txt prefixed_review.txt
           else
-            echo "Adding Gemini header prefix"
+            echo "Adding Gemini header prefix with commit SHA"
             echo "## Gemini Code Review" > prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            echo "_Reviewed commit: ${REVIEW_SHA_SHORT:-unknown}_" >> prefixed_review.txt
             echo "" >> prefixed_review.txt
             cat review.txt >> prefixed_review.txt
           fi

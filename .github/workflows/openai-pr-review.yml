@@ -31,6 +31,13 @@ jobs:
       - name: Compute diff
         id: diff
         run: |
+          # Capture the commit SHA being reviewed (important for staleness detection)
+          REVIEW_SHA=$(git rev-parse HEAD)
+          REVIEW_SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "review_sha=$REVIEW_SHA" >> $GITHUB_OUTPUT
+          echo "review_sha_short=$REVIEW_SHA_SHORT" >> $GITHUB_OUTPUT
+          echo "Reviewing commit: $REVIEW_SHA_SHORT ($REVIEW_SHA)"
+
           # Exclude package-lock.json (large, auto-generated) from review diff
           git diff origin/${{ github.base_ref }}...HEAD -- . ':!**/package-lock.json' > diff.patch
           DIFF_LINES=$(wc -l < diff.patch)
@@ -139,6 +146,8 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO_NAME: ${{ github.repository }}
           BRANCH_NAME: ${{ github.head_ref }}
+          REVIEW_SHA: ${{ steps.diff.outputs.review_sha }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
           HAS_PREVIOUS_OPENAI: ${{ steps.previous_openai.outputs.has_previous_openai }}
           HAS_RESPONSES: ${{ steps.review_responses.outputs.has_responses }}
         run: |
@@ -170,6 +179,9 @@ jobs:
           echo "**Pull Request Title:** $PR_TITLE" >> user_prompt.txt
           echo "**Repository:** $REPO_NAME" >> user_prompt.txt
           echo "**Branch:** $BRANCH_NAME" >> user_prompt.txt
+          echo "**Reviewing Commit:** $REVIEW_SHA_SHORT" >> user_prompt.txt
+          echo "" >> user_prompt.txt
+          echo "⚠️ **Note:** This review is for commit $REVIEW_SHA_SHORT. If newer commits exist, this review may be stale." >> user_prompt.txt
           echo "" >> user_prompt.txt
 
           # Include previous OpenAI review from this PR (your own previous feedback)
@@ -395,6 +407,7 @@ jobs:
         if: always() && steps.diff.outputs.empty != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
         run: |
           echo "Preparing to post review comment..."
 
@@ -414,14 +427,17 @@ jobs:
 
           PR_NUMBER=${{ github.event.pull_request.number }}
 
-          # Add prefix to distinguish from Gemini reviews (only if not already present)
-          # NOTE: Must match the marker used in "Fetch previous OpenAI reviews" step
+          # Add prefix with commit SHA to identify which commit was reviewed
+          # This helps identify stale reviews when newer commits exist
+          # NOTE: Header must start with "## OpenAI Code Review" for marker matching
           if grep -q "^## OpenAI Code Review" review.txt; then
             echo "Review already has OpenAI header, using as-is"
             cp review.txt prefixed_review.txt
           else
-            echo "Adding OpenAI header prefix"
+            echo "Adding OpenAI header prefix with commit SHA"
             echo "## OpenAI Code Review" > prefixed_review.txt
+            echo "" >> prefixed_review.txt
+            echo "_Reviewed commit: ${REVIEW_SHA_SHORT:-unknown}_" >> prefixed_review.txt
             echo "" >> prefixed_review.txt
             cat review.txt >> prefixed_review.txt
           fi
