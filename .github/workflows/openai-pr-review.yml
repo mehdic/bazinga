@@ -197,10 +197,16 @@ jobs:
             echo "- ✅ = Fixed/Implemented" >> user_prompt.txt
             echo "- ⏭️ = Intentionally skipped (with explanation)" >> user_prompt.txt
             echo "" >> user_prompt.txt
-            echo "Use these responses to:" >> user_prompt.txt
-            echo "- NOT re-raise issues that were explained as intentional/by-design" >> user_prompt.txt
-            echo "- Verify claimed fixes actually appear in the new diff" >> user_prompt.txt
-            echo "- Focus only on genuinely NEW issues" >> user_prompt.txt
+            echo "🔴 **CRITICAL RULES FOR RESPONDED ITEMS:**" >> user_prompt.txt
+            echo "1. Items marked ✅ Fixed: Do NOT mention again. Verify fix exists in diff, then move on." >> user_prompt.txt
+            echo "2. Items marked ⏭️ Skipped: Do NOT re-raise UNLESS it causes:" >> user_prompt.txt
+            echo "   - Security vulnerabilities (authentication bypass, injection, etc.)" >> user_prompt.txt
+            echo "   - Runtime crashes or data loss" >> user_prompt.txt
+            echo "   - Breaking changes to public APIs" >> user_prompt.txt
+            echo "3. If re-raising a skipped item, you MUST explain why it's CRITICAL, not just 'better practice'" >> user_prompt.txt
+            echo "4. Acknowledge responded items briefly: 'Acknowledged as addressed/deferred: [list]'" >> user_prompt.txt
+            echo "" >> user_prompt.txt
+            echo "Focus your review on genuinely NEW issues in the diff, not previously discussed items." >> user_prompt.txt
             echo "" >> user_prompt.txt
             echo "Responses:" >> user_prompt.txt
             echo '```' >> user_prompt.txt
