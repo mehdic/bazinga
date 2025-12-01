@@ -187,11 +187,29 @@ export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
   },
 });
 
+// Shape-accurate no-ops for sqlite fallback (prevents crashes)
+const NOOP_STATEMENT = {
+  all: () => [],
+  get: () => undefined,
+  run: () => ({ changes: 0, lastInsertRowid: 0n }),
+};
+
+const NOOP_SQLITE: DatabaseInstance = {
+  prepare: () => NOOP_STATEMENT,
+  close: () => {},
+  exec: () => {},
+  pragma: () => undefined,
+  transaction: <T>(fn: () => T) => fn,
+};
+
 // Export for direct SQL queries if needed (also lazy)
 export const sqlite = new Proxy({} as DatabaseInstance, {
   get(_, prop) {
     const db = getDatabase();
-    if (!db) return () => [];
+    if (!db) {
+      // Return shape-accurate no-ops to prevent crashes like [].all()
+      return (NOOP_SQLITE as unknown as Record<string, unknown>)[prop as string];
+    }
     return (db as unknown as Record<string, unknown>)[prop as string];
   },
 });
