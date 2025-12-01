@@ -598,6 +598,53 @@ jq '.body'
 
 **Search for keywords in ALL bodies:** "fix", "issue", "regression", "missing", "should", "consider"
 
+### 📋 Expected OpenAI Review Format
+
+OpenAI reviews are configured to use this structured format (makes extraction easier):
+
+```markdown
+## OpenAI Code Review
+
+_Reviewed commit: {sha}_
+
+### Summary
+
+| Category | Count |
+|----------|-------|
+| 🔴 Critical | N |
+| 🟡 Suggestions | N |
+| ✅ Good Practices | N |
+
+### 🔴 Critical Issues (MUST FIX)
+
+1. **[file:line]** Issue title
+   - Problem: What's wrong (1 sentence)
+   - Fix: How to fix it (1 sentence)
+
+### 🟡 Suggestions (SHOULD CONSIDER)
+
+1. **[file:line]** Suggestion title
+   - Current: What the code does now
+   - Better: What would be better
+
+### ✅ Good Practices Observed
+
+- [Brief acknowledgment of good patterns]
+
+### Updates Since Last Review (if applicable)
+
+| Previous Issue | Status |
+|----------------|--------|
+| Issue X | ✅ Fixed in this commit |
+| Issue Y | ⏭️ Acknowledged as deferred |
+```
+
+**Extraction tips:**
+- Look for `### 🔴 Critical` section first - these are MUST FIX
+- Count items in Summary table to verify you extracted all
+- Each issue has `**[file:line]**` format for easy location
+- If review doesn't follow format, extract manually from prose
+
 ### Automatic Behavior
 
 1. **Fetch ALL THREE sources** - reviewThreads, reviews, AND comments (full bodies)
