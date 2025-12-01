@@ -170,11 +170,14 @@ const createNoopQueryBuilder = (): unknown => {
   const builder: Record<string, unknown> = {};
 
   // Terminal methods - return empty results
+  // Includes promise-like methods (then/catch/finally) for thenable compatibility
   const terminals = {
     all: () => [],
     get: () => undefined,
     execute: () => Promise.resolve([]),
     then: (resolve: (value: unknown[]) => void) => Promise.resolve([]).then(resolve),
+    catch: (reject: (reason: unknown) => void) => Promise.resolve([]).catch(reject),
+    finally: (cb: () => void) => Promise.resolve([]).finally(cb),
   };
 
   // Builder methods - return self for continued chaining
@@ -204,13 +207,37 @@ const NOOP_QUERY = new Proxy({}, {
   }),
 });
 
+// NOOP DML result for run() calls - matches better-sqlite3 RunResult shape
+const NOOP_RUN_RESULT = { changes: 0, lastInsertRowid: 0n };
+
 // NOOP Drizzle-like object for when DB is unavailable
 // Note: transaction passes NOOP_DRIZZLE as tx so (tx) => tx.select()... works
+// DML chains support: returning(), execute(), and run() for complete compatibility
 const NOOP_DRIZZLE: Record<string, unknown> = {
   select: () => createNoopQueryBuilder(),
-  insert: () => ({ values: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }),
-  update: () => ({ set: () => ({ where: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }) }),
-  delete: () => ({ where: () => ({ returning: () => [], execute: () => Promise.resolve([]) }) }),
+  insert: () => ({
+    values: () => ({
+      returning: () => [],
+      execute: () => Promise.resolve([]),
+      run: () => NOOP_RUN_RESULT,
+    }),
+  }),
+  update: () => ({
+    set: () => ({
+      where: () => ({
+        returning: () => [],
+        execute: () => Promise.resolve([]),
+        run: () => NOOP_RUN_RESULT,
+      }),
+    }),
+  }),
+  delete: () => ({
+    where: () => ({
+      returning: () => [],
+      execute: () => Promise.resolve([]),
+      run: () => NOOP_RUN_RESULT,
+    }),
+  }),
   transaction: <T>(fn: (tx: unknown) => T) => fn(NOOP_DRIZZLE),
   query: NOOP_QUERY,
 };
