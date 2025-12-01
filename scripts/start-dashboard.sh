@@ -295,7 +295,9 @@ if [ "$USE_STANDALONE" = "true" ]; then
     if [ -f "$SOCKET_SERVER" ]; then
         log "Starting Socket.io server for real-time updates..."
         SOCKET_PORT="${SOCKET_PORT:-3001}"
-        DATABASE_URL="$DATABASE_URL" SOCKET_PORT="$SOCKET_PORT" node "$SOCKET_SERVER" >> "$DASHBOARD_LOG" 2>&1 &
+        # Set NODE_PATH so socket server can find better-sqlite3 native module
+        SOCKET_NODE_PATH="$DASHBOARD_DIR/node_modules"
+        NODE_PATH="$SOCKET_NODE_PATH" DATABASE_URL="$DATABASE_URL" SOCKET_PORT="$SOCKET_PORT" node "$SOCKET_SERVER" >> "$DASHBOARD_LOG" 2>&1 &
         SOCKET_PID=$!
         echo "$SOCKET_PID" > "$BAZINGA_DIR/socket.pid"
         log "Socket.io server started (PID: $SOCKET_PID) on port $SOCKET_PORT"
