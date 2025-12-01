@@ -72,8 +72,10 @@ jobs:
           mkdir -p dist/node_modules
           cp -a node_modules/better-sqlite3 dist/node_modules/
           cp -a node_modules/bindings dist/node_modules/
-          # file-uri-to-path is a dependency of bindings
-          [ -d node_modules/file-uri-to-path ] && cp -a node_modules/file-uri-to-path dist/node_modules/
+          # file-uri-to-path is a dependency of bindings (may not exist in all versions)
+          if [ -d node_modules/file-uri-to-path ]; then
+            cp -a node_modules/file-uri-to-path dist/node_modules/
+          fi
 
       - name: Prepare release package
         working-directory: dashboard-v2
