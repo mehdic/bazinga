@@ -354,16 +354,16 @@ jobs:
             exit 0
           fi
 
-          PAYLOAD=$(cat <<EOF
-          {
-            "contents": [{
-              "parts": [{"text": $PROMPT}]
+          # Write payload to file to avoid "Argument list too long" error with large diffs
+          # Note: Use --argjson since PROMPT is already a JSON string
+          jq -n --argjson prompt "$PROMPT" '{
+            contents: [{
+              parts: [{text: $prompt}]
             }]
-          }
-          EOF
-          )
+          }' > gemini_payload.json
 
           echo "Calling Gemini API..."
+          echo "Payload size: $(wc -c < gemini_payload.json) bytes"
 
           # Save response to file with extended timeout for Gemini 3 Pro
           # --connect-timeout 30: Allow 30s to establish connection
@@ -378,7 +378,7 @@ jobs:
             -X POST \
             -H "Content-Type: application/json" \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
-            -d "$PAYLOAD" \
+            -d @gemini_payload.json \
             https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent)
           CURL_EXIT=$?
           set -e

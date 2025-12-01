@@ -414,19 +414,22 @@ jobs:
 
           # GPT-5 is a reasoning model - temperature is fixed at 1 (not configurable)
           # Needs high max_completion_tokens because reasoning tokens count against the limit
-          PAYLOAD=$(cat <<EOF
-          {
-            "model": "gpt-5",
-            "messages": [
-              {"role": "system", "content": $SYSTEM_PROMPT},
-              {"role": "user", "content": $USER_PROMPT}
-            ],
-            "max_completion_tokens": 49152
-          }
-          EOF
-          )
+          # Write payload to file to avoid "Argument list too long" error with large diffs
+          # Note: Use --argjson since SYSTEM_PROMPT and USER_PROMPT are already JSON strings
+          jq -n \
+            --argjson system "$SYSTEM_PROMPT" \
+            --argjson user "$USER_PROMPT" \
+            '{
+              model: "gpt-5",
+              messages: [
+                {role: "system", content: $system},
+                {role: "user", content: $user}
+              ],
+              max_completion_tokens: 49152
+            }' > openai_payload.json
 
           echo "Calling OpenAI API (GPT-5)..."
+          echo "Payload size: $(wc -c < openai_payload.json) bytes"
 
           # Retry logic for transient errors (timeout, 429, 5xx)
           MAX_RETRIES=3
@@ -441,7 +444,7 @@ jobs:
               -X POST \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $OPENAI_API_KEY" \
-              -d "$PAYLOAD" \
+              -d @openai_payload.json \
               https://api.openai.com/v1/chat/completions)
 
             CURL_EXIT=$?
