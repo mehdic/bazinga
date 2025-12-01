@@ -2070,7 +2070,9 @@ Orchestrator output:
 
 **Purpose:** Large parallel spawns consume significant context. This checkpoint gives users the option to compact first.
 
-**Output to user:**
+**🔴 GUARD:** Only emit this multi-line summary when `parallel_count >= 3`. For 1-2 developers, use a single capsule and continue.
+
+**Output to user (when parallel_count >= 3):**
 ```
 🔨 **Phase {N} starting** | Spawning {parallel_count} developers in parallel
 
@@ -2082,7 +2084,7 @@ Orchestrator output:
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
 ```
 
-**Example output:**
+**Example output (4 developers):**
 ```
 🔨 **Phase 1 starting** | Spawning 4 developers in parallel
 
@@ -2093,7 +2095,7 @@ Orchestrator output:
 • P1-DOCTOR-FE: Developer (Haiku) - Doctor Frontend basic components
 
 💡 For ≥3 developers, consider `/compact` first.
-⏳ Continuing immediately...
+⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
 ```
 
 **Then IMMEDIATELY continue to Step 2B.1** - do NOT wait for user input.

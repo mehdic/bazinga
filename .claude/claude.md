@@ -945,42 +945,71 @@ This enables timestamp-windowed filtering: each LLM only sees responses to ITS O
 
 **Post via GraphQL (required in Claude Code Web):**
 
-**Step 1: Get PR node ID**
+**Step 0: Validate prerequisites**
 ```bash
-PR_NODE_ID=$(curl -s -X POST \
+# Set PR number (replace with actual number)
+PR_NUMBER=155
+
+# Validate token exists
+if [ -z "${BAZINGA_GITHUB_TOKEN:-}" ]; then
+  echo "ERROR: BAZINGA_GITHUB_TOKEN is not set" >&2
+  exit 1
+fi
+```
+
+**Step 1: Get PR node ID (with error handling)**
+```bash
+RESPONSE=$(curl -sSf -X POST \
   -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { id } } }"}' \
-  | jq -r '.data.repository.pullRequest.id')
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { id } } }\"}")
+
+PR_NODE_ID=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.id')
+
+# Validate PR node ID was retrieved
+if [ -z "$PR_NODE_ID" ] || [ "$PR_NODE_ID" = "null" ]; then
+  echo "ERROR: Could not resolve PR node ID. Response: $RESPONSE" >&2
+  exit 1
+fi
+echo "PR Node ID: $PR_NODE_ID"
 ```
 
-**Step 2: Write JSON to temp file (replace `YOUR_PR_NODE_ID` with value from Step 1)**
+**Step 2: Write JSON to temp file and patch with jq (cross-platform)**
 ```bash
 cat > /tmp/pr_comment.json << 'ENDJSON'
 {
   "query": "mutation($body: String!, $id: ID!) { addComment(input: {subjectId: $id, body: $body}) { commentEdge { node { url } } } }",
   "variables": {
-    "id": "YOUR_PR_NODE_ID",
+    "id": "PLACEHOLDER_ID",
     "body": "## Response to OpenAI Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Fix X | ✅ Fixed in abc123 |\n| 2 | Add Y | ⏭️ Skipped - by design: [explanation] |\n\n## Response to Gemini Code Review\n\n| # | Suggestion | Action |\n|---|------------|--------|\n| 1 | Issue Z | ✅ Fixed in def456 |"
   }
 }
 ENDJSON
 
-# Replace placeholder with actual PR node ID
-sed -i "s/YOUR_PR_NODE_ID/$PR_NODE_ID/" /tmp/pr_comment.json
+# Use jq to replace placeholder (cross-platform, unlike sed -i)
+jq --arg id "$PR_NODE_ID" '.variables.id = $id' /tmp/pr_comment.json > /tmp/pr_comment.patched.json
+mv /tmp/pr_comment.patched.json /tmp/pr_comment.json
 ```
 
-**Step 3: Post the comment**
+**Step 3: Post the comment (with error detection)**
 ```bash
-curl -s -X POST \
+RESPONSE=$(curl -sSf -X POST \
   -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d @/tmp/pr_comment.json | jq '.data.addComment.commentEdge.node.url'
+  -d @/tmp/pr_comment.json)
+
+# Check for GraphQL errors
+if echo "$RESPONSE" | jq -e '.errors' > /dev/null 2>&1; then
+  echo "ERROR: GraphQL mutation failed: $RESPONSE" >&2
+  exit 1
+fi
+
+echo "$RESPONSE" | jq -r '.data.addComment.commentEdge.node.url'
 ```
 
-**Note:** Use `\n` for newlines in the JSON body. The file method avoids jq escaping issues with `!` characters in bash.
+**Note:** Use `\n` for newlines in the JSON body. The jq patching method is cross-platform (works on Linux and macOS).
 
 ### Response Templates
 

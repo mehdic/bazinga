@@ -65,34 +65,42 @@ About to spawn {parallel_count} developers in parallel.
 ⏳ Continuing immediately...
 ```
 
-**Proposed spawn message:**
+**Initial proposal (explored but rejected - table with 60 chars):**
 ```
-🔨 **Phase {N} starting** | Spawning {parallel_count} developers in parallel
-
 📋 **Developer Assignments:**
 | Group | Tier | Model | Task |
 |-------|------|-------|------|
 | {group_id} | {tier_name} | {model} | {task[:60]} |
+```
+*Note: This table format was rejected in favor of the bullet list below for token efficiency and better readability.*
+
+**Implemented spawn message (bullet list with 90 chars):**
+```
+🔨 **Phase {N} starting** | Spawning {parallel_count} developers in parallel
+
+📋 **Developer Assignments:**
+• {group_id}: {tier_name} ({model}) - {task[:90]}
 ...
 
 💡 For ≥3 developers, consider `/compact` first.
 ⏳ Continuing immediately...
 ```
 
-**Example:**
+**Example (implemented format):**
 ```
 🔨 **Phase 1 starting** | Spawning 4 developers in parallel
 
 📋 **Developer Assignments:**
-| Group | Tier | Model | Task |
-|-------|------|-------|------|
-| P0-NURSE-FE | Senior Software Engineer | Sonnet | Nurse App Frontend with auth integration |
-| P0-NURSE-BE | Senior Software Engineer | Sonnet | Nurse Backend Services with API endpoints |
-| P0-MSG-BE | Senior Software Engineer | Sonnet | Messaging Backend with WhatsApp channel |
-| P1-DOCTOR-FE | Developer | Haiku | Doctor Frontend basic components |
+• P0-NURSE-FE: Senior Software Engineer (Sonnet) - Nurse App Frontend with auth integration
+• P0-NURSE-BE: Senior Software Engineer (Sonnet) - Nurse Backend Services with API endpoints
+• P0-MSG-BE: Senior Software Engineer (Sonnet) - Messaging Backend with WhatsApp channel
+• P1-DOCTOR-FE: Developer (Haiku) - Doctor Frontend basic components
+
+💡 For ≥3 developers, consider `/compact` first.
+⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
 ```
 
-**Rationale:** User sees upfront which tier handles which task, with full model name instead of abbreviation.
+**Rationale:** Bullet list is more token-efficient than table format. User sees upfront which tier handles which task.
 
 ### Fix 3: Include Tier in Status Updates
 
