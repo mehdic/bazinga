@@ -75,14 +75,10 @@ jobs:
           echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
 
           # Use precise marker "## OpenAI Code Review" to avoid false matches
+          # Fetch previous review for context (we always post new comments, never update)
           gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
             --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .body // empty' \
             > previous_openai_review.txt
-
-          # Also capture comment ID for later update
-          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## OpenAI Code Review")))] | last | .id // empty' \
-            > previous_comment_id.txt
 
           if [ -s previous_openai_review.txt ]; then
             REVIEW_SIZE=$(wc -c < previous_openai_review.txt)
@@ -405,21 +401,8 @@ jobs:
             cat review.txt >> prefixed_review.txt
           fi
 
-          # Check if we have a previous comment ID to update
-          COMMENT_ID=""
-          if [ -f previous_comment_id.txt ]; then
-            COMMENT_ID=$(cat previous_comment_id.txt | tr -d '[:space:]')
-          fi
-
-          if [ -n "$COMMENT_ID" ]; then
-            echo "Updating existing comment $COMMENT_ID..."
-            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
-              -f body="$(cat prefixed_review.txt)" && echo "Comment updated successfully!" || {
-              echo "Failed to update, posting new comment..."
-              gh pr comment $PR_NUMBER --body-file prefixed_review.txt
-            }
-          else
-            echo "Posting new comment to PR #$PR_NUMBER..."
-            gh pr comment $PR_NUMBER --body-file prefixed_review.txt
-            echo "Comment posted successfully!"
-          fi
+          # Always post new comment (don't update existing)
+          # This ensures new feedback is visible and not hidden in updated comments
+          echo "Posting new comment to PR #$PR_NUMBER..."
+          gh pr comment $PR_NUMBER --body-file prefixed_review.txt
+          echo "Comment posted successfully!"
