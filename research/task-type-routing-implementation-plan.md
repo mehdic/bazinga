@@ -758,12 +758,44 @@ PM saves research criteria:
 
 ### Confidence Level
 
-**Medium-High** after revisions:
+**High** after all phases complete:
 - ✅ No new PM status code (major risk eliminated)
 - ✅ Leverages existing tier-based spawning (minimal new code)
 - ✅ Explicit [R] marker reduces misclassification
-- ✅ Offline fallback handles restricted environments
-- ⚠️ Token budget still tight for orchestrator.md
+- ✅ Security override ensures SSE + TL for sensitive tasks
+- ✅ Architecture tasks use research flow (no new infrastructure)
+
+---
+
+## Phase 2: Security Override ✅ COMPLETE
+
+**Implemented in same session as Phase 1:**
+
+- [x] PM: Add security keyword detection ("auth", "security", "crypto", etc.)
+- [x] PM: Add `security_sensitive: true` flag to task groups
+- [x] PM: Force SSE tier for security tasks (override complexity scoring)
+- [x] Orchestrator: Add security override to QA routing (Step 2A.5)
+- [x] Orchestrator: Add security override to TL routing (Step 2A.7)
+- [x] model_selection.json: Add security task type routing
+
+**Security tasks now:**
+1. Always spawn SSE (never Haiku Developer)
+2. Always require TL review (cannot skip)
+3. Return to SSE on failure (never downgrade to Developer)
+
+---
+
+## Phase 3: Architecture as Research ✅ COMPLETE
+
+**Implemented in same session:**
+
+- [x] PM: Add architecture keywords ("design", "architecture", "API design", "schema design")
+- [x] PM: Document architecture → research → TL validation flow
+- [x] model_selection.json: Add architecture to research markers
+
+**Architecture tasks now:**
+- Treated as research type (same flow)
+- Route to RE → produce design doc → TL validates → implementation begins
 
 ---
 

@@ -1275,14 +1275,28 @@ if task_group.get("security_sensitive"):
 - [x] Add spawn override: if `type == "research"`, spawn RE instead of Dev ✅
 - [x] **NO new status handling** (uses existing READY_FOR_REVIEW → TL flow) ✅
 
-### Phase 2: Security Override
+### Phase 2: Security Override ✅ COMPLETE
 
 **project_manager.md:**
-- [ ] Add `security_sensitive: true` flag recognition
-- [ ] Force SSE tier for security tasks
+- [x] Add `security_sensitive: true` flag recognition ✅
+- [x] Force SSE tier for security tasks ✅
 
 **orchestrator.md:**
-- [ ] Add TL approval enforcement for security-flagged groups
+- [x] Add TL approval enforcement for security-flagged groups ✅
+
+**model_selection.json:**
+- [x] Add security task type routing with markers and flags ✅
+
+### Phase 3: Architecture as Research ✅ COMPLETE
+
+**project_manager.md:**
+- [x] Add architecture keywords ("design", "architecture", "API design", "schema design") ✅
+- [x] Document architecture → research → TL validation flow ✅
+
+**model_selection.json:**
+- [x] Add architecture keywords to research task routing ✅
+
+**Note:** Architecture tasks use the same flow as research tasks - no additional infrastructure needed.
 
 ### Verification Tests
 

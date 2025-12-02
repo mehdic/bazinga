@@ -92,6 +92,15 @@ For each task group, classify the type FIRST:
 - **Execution Phase:** 1 (before implementation)
 - **NOTE:** "investigation" is NOT a research keyword - use Investigator for debugging
 
+**Architecture Tasks** (treated as research):
+- Task name contains: "design", "architecture", "API design", "schema design", "data model"
+- Task produces: design document, architecture decision record (ADR)
+- **Type:** `research` (use same flow as research tasks)
+- **Initial Tier:** requirements_engineer (Sonnet)
+- **Execution Phase:** 1 (before implementation)
+- **Tech Lead Validation:** MANDATORY (architecture decisions require TL approval)
+- **Example:** "API Design [R]" → RE produces design doc → TL validates → Implementation begins
+
 **Implementation Tasks** (`type: implementation`):
 - Default for all other tasks
 - Task requires: code writing, test creation, file modifications
@@ -134,6 +143,37 @@ When creating Phase 2+ implementation groups that depend on Phase 1 research:
 - Include `**Research Reference:** bazinga/artifacts/{session}/research_group_{id}.md` in the group description
 - Developers MUST read the research deliverable before starting implementation
 - This ensures research findings inform implementation decisions
+
+### Step 0.5: Security Classification (AFTER Type, BEFORE Complexity)
+
+**🔴 CRITICAL: Flag security-sensitive tasks for mandatory SSE + Tech Lead review.**
+
+**Security Tasks** (`security_sensitive: true`):
+- Task name contains: "auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "token", "JWT", "OAuth", "SAML", "SSO"
+- Task involves: user data, credentials, access control, session management
+- **Initial Tier:** senior_software_engineer (ALWAYS - overrides complexity scoring)
+- **Tech Lead Review:** MANDATORY (even after QA passes)
+
+**Detection:**
+```
+IF task_name contains security keywords OR task touches auth/security files:
+  → security_sensitive: true
+  → initial_tier: senior_software_engineer (force SSE, ignore complexity score)
+```
+
+**Task Group Format with Security Flag:**
+```markdown
+**Group AUTH:** Implement JWT Authentication
+- **Type:** implementation
+- **Security Sensitive:** true  ← Forces SSE + mandatory TL review
+- **Initial Tier:** senior_software_engineer (forced by security flag)
+- **Execution Phase:** 2
+```
+
+**🔴 CRITICAL: Security Override Rules**
+1. Security flag OVERRIDES complexity scoring (always SSE, never Haiku)
+2. Tech Lead MUST approve security tasks (cannot skip to PM)
+3. Failed security reviews return to SSE (not regular Developer)
 
 ## Task Complexity Scoring (Developer Assignment)
 

@@ -108,6 +108,8 @@ All user-visible updates MUST use the capsule format:
 | Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
 | Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
 
+**🔴 SECURITY TASKS:** If PM marks `security_sensitive: true`, enforce SSE + mandatory TL review (see Steps 2A.5, 2A.7).
+
 **Principle:** Best-effort extraction with fallbacks. Never fail on missing data.
 
 ---
@@ -1449,6 +1451,10 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 - Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
 - This bypasses revision count check - explicit escalation from QA's challenge testing
 
+**🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
+- ALWAYS spawn Senior Software Engineer for fixes (never regular Developer)
+- Security tasks bypass normal revision count escalation - SSE from the start
+
 **IF Senior Software Engineer also fails (revision >= 2 after Senior Eng):**
 - Spawn Tech Lead for guidance
 
@@ -1691,6 +1697,11 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 - IF revision count == 1: Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
 - IF revision count == 2 AND previous was Senior Eng: Spawn Tech Lead for guidance
 - IF revision count > 2: Spawn PM to evaluate if task should be simplified
+
+**🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
+- ALWAYS spawn Senior Software Engineer (never regular Developer)
+- On failure, escalate directly to Tech Lead (skip revision count check)
+- Security tasks CANNOT be simplified by PM - must be completed by SSE
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the Tech Lead's feedback" and stop
 
