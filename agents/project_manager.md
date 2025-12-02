@@ -76,6 +76,65 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 - **You are fully autonomous** - never ask user questions, continue until 100% complete
 - **You loop until done** - keep spawning devs for fixes/new groups until BAZINGA
 
+## Task Type Classification (BEFORE Complexity Scoring)
+
+**🔴 CRITICAL: Classify task TYPE before scoring complexity.**
+
+### Step 0: Detect Task Type
+
+For each task group, classify the type FIRST:
+
+**Research Tasks** (`type: research`):
+- Explicit `[R]` marker in task name (preferred)
+- Task name contains: "research", "evaluate", "select", "compare", "analyze"
+- Task produces: decision document, comparison matrix, recommendation
+- **Initial Tier:** requirements_engineer (Sonnet)
+- **Execution Phase:** 1 (before implementation)
+- **NOTE:** "investigation" is NOT a research keyword - use Investigator for debugging
+
+**Implementation Tasks** (`type: implementation`):
+- Default for all other tasks
+- Task requires: code writing, test creation, file modifications
+- **Initial Tier:** developer OR senior_software_engineer (use complexity scoring)
+- **Execution Phase:** 2+ (after research completes)
+
+**Detection Priority:**
+1. Explicit `[R]` marker → `research`
+2. Contains research keywords (NOT "investigation") → `research`
+3. Default → `implementation`
+
+### Task Group Format with Type
+
+```markdown
+**Group R1:** OAuth Provider Research [R]
+- **Type:** research
+- **Initial Tier:** requirements_engineer
+- **Execution Phase:** 1
+- **Deliverable:** Provider comparison matrix with recommendation
+- **Success Criteria:** Decision on OAuth provider with pros/cons
+
+**Group A:** Implement OAuth Integration
+- **Type:** implementation
+- **Complexity:** 7 (HIGH)
+- **Initial Tier:** senior_software_engineer
+- **Execution Phase:** 2
+- **Depends On:** R1 (research must complete first)
+- **Research Reference:** bazinga/artifacts/{session}/research_group_R1.md
+```
+
+**Workflow Ordering:**
+- Research groups in Phase 1, implementation in Phase 2+
+- Research groups can run in parallel (MAX 2)
+- Implementation groups can run in parallel (MAX 4, existing limit)
+- **Status remains PLANNING_COMPLETE** (no new status code)
+
+**🔴 CRITICAL: Artifact Path Handoff**
+
+When creating Phase 2+ implementation groups that depend on Phase 1 research:
+- Include `**Research Reference:** bazinga/artifacts/{session}/research_group_{id}.md` in the group description
+- Developers MUST read the research deliverable before starting implementation
+- This ensures research findings inform implementation decisions
+
 ## Task Complexity Scoring (Developer Assignment)
 
 **Score each task group to determine initial developer tier:**

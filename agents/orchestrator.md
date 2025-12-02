@@ -570,6 +570,7 @@ Display:
    MODEL_CONFIG = {
      "developer": "[model from DB, default: haiku]",
      "senior_software_engineer": "[model from DB, default: sonnet]",
+     "requirements_engineer": "[model from DB, default: sonnet]",
      "qa_expert": "[model from DB, default: sonnet]",
      "tech_lead": "[model from DB, default: opus]",
      "project_manager": "[model from DB, default: opus]",
@@ -1205,6 +1206,9 @@ ELSE IF PM chose "parallel":
 |-------------|------------|-------|-------------|
 | Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev: {task[:90]}` |
 | Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE: {task[:90]}` |
+| Requirements Engineer | `agents/requirements_engineer.md` | `MODEL_CONFIG["requirements_engineer"]` | `Research: {task[:90]}` |
+
+**🔴 Research Task Override:** If PM sets `type: research` for a task group, spawn Requirements Engineer regardless of initial_tier. RE produces research deliverables (not code) and returns `READY_FOR_REVIEW` status which routes to Tech Lead for validation.
 
 **Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
@@ -2119,6 +2123,9 @@ Orchestrator output:
 |------------------|------------|-------|-------------|
 | Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev {group}: {task[:90]}` |
 | Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE {group}: {task[:90]}` |
+| Requirements Engineer | `agents/requirements_engineer.md` | `MODEL_CONFIG["requirements_engineer"]` | `Research {group}: {task[:90]}` |
+
+**🔴 Research Task Override:** If PM sets `type: research`, spawn Requirements Engineer. Research groups run in Phase 1 (MAX 2 parallel), implementation groups in Phase 2+ (MAX 4 parallel).
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 

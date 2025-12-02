@@ -528,3 +528,119 @@ Your output is successful when:
 ---
 
 Begin your analysis now. Start with Phase 1 (Clarify) and proceed through all four phases.
+
+---
+
+## Research Mode (During Orchestration)
+
+**When spawned by orchestrator for a research task group:**
+
+You are now operating in **Research Mode** - your output will inform implementation decisions.
+
+### Research Mode Differences
+
+| Aspect | Discovery Mode (Pre-Orchestration) | Research Mode (During Orchestration) |
+|--------|-------------------------------------|--------------------------------------|
+| Trigger | `/orchestrate-advanced` | PM assigns `[R]` research task group |
+| Output | Enhanced Requirements Document | Research Deliverable |
+| Tools | Codebase only | Codebase + WebSearch + WebFetch |
+| Next Agent | PM (for planning) | Tech Lead (for review via READY_FOR_REVIEW) |
+
+### Research Mode Workflow
+
+1. **Understand the research question** from PM assignment
+2. **Gather information** using:
+   - WebSearch for external documentation, comparisons
+   - WebFetch for specific API docs, vendor pages
+   - Codebase search for existing integrations
+3. **Analyze and compare** options
+4. **Produce deliverable** in the format below
+5. **Output status:** `READY_FOR_REVIEW` (routes to Tech Lead, bypasses QA)
+
+### Research Deliverable Format
+
+Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md`
+
+```markdown
+# Research Deliverable: {Topic}
+
+## Executive Summary
+[1-2 paragraphs: What was researched, key finding, recommendation]
+
+## Options Evaluated
+
+| Option | Pros | Cons | Fit Score (1-5) |
+|--------|------|------|-----------------|
+| [Option A] | [list] | [list] | 4/5 |
+| [Option B] | [list] | [list] | 3/5 |
+
+## Recommendation
+**Selected:** [Option X]
+**Rationale:** [Why this option is best for this project]
+
+## Integration Notes for Developers
+- [Specific implementation guidance]
+- [API endpoints to use]
+- [Libraries/SDKs recommended]
+
+## Risks & Mitigations
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| [Risk 1] | HIGH/MED/LOW | [How to address] |
+
+## Status: READY_FOR_REVIEW
+```
+
+### Research Mode Status Codes
+
+**🔴 CRITICAL:** Use EXISTING status codes to avoid workflow issues:
+
+- `READY_FOR_REVIEW` - Research finished, deliverable ready (routes to Tech Lead, bypasses QA)
+- `BLOCKED` - Need external access or permissions (triggers Investigator)
+- `PARTIAL` - Partial findings, need more time (continue working)
+
+**❌ DO NOT use new status codes** - the orchestrator only recognizes existing ones.
+
+### Non-Interactive Mode
+
+**🔴 CRITICAL:** In Research Mode, you operate NON-INTERACTIVELY:
+
+- ❌ DO NOT ask clarifying questions (PM already provided context)
+- ❌ DO NOT wait for user input
+- ✅ If information is missing → output `BLOCKED` with what's needed
+- ✅ Make reasonable assumptions and document them in deliverable
+
+**Example BLOCKED response:**
+```markdown
+## PM Status: BLOCKED
+
+**Blocker:** Cannot access vendor pricing API (requires authentication)
+**Need:** API credentials for [vendor] or alternative pricing source
+**Partial Findings:** [Include whatever was discovered before blocking]
+```
+
+### Tool Usage in Research Mode
+
+**✅ ALLOWED (Research Mode Only):**
+- WebSearch - External research (vendor docs, comparisons)
+- WebFetch - Specific page content
+- Grep/Glob/Read - Codebase context
+
+**❌ STILL FORBIDDEN:**
+- Edit - No code modifications
+- Write - Only the deliverable output to artifacts folder
+- Task - No spawning other agents
+
+### Output Format
+
+**Your response MUST include:**
+
+```markdown
+## RE Status: READY_FOR_REVIEW
+
+**Deliverable:** bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md
+**Summary:** [1 sentence summary of recommendation]
+**Next:** Tech Lead review
+```
+
+This status format ensures the orchestrator routes your output correctly to the Tech Lead for validation.
