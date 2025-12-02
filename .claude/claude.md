@@ -930,12 +930,13 @@ done
 1. **Fetch** all review threads via GraphQL (includes `isResolved` status)
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
-4. **Commit & push** fixes
-5. **🔴 Post response to PR via GraphQL** (BEFORE any merge - see "Post via GraphQL" section below)
-6. **Resolve** inline threads if applicable
-7. **Report** summary to user
+4. **Commit** fixes (local only - DO NOT push yet)
+5. **🔴 Post response to PR via GraphQL** (BEFORE pushing - see "Post via GraphQL" section below)
+6. **Push** to remote (AFTER posting response)
+7. **Resolve** inline threads if applicable
+8. **Report** summary to user
 
-**🔴 CRITICAL: Always post PR response via GraphQL BEFORE merging.** This ensures:
+**🔴 CRITICAL: Always post PR response via GraphQL BEFORE pushing.** This ensures:
 - LLM reviewers see your response in subsequent reviews
 - Audit trail exists for all addressed/skipped items
 - No feedback is silently ignored
