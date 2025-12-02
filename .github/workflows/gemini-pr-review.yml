@@ -35,6 +35,20 @@ jobs:
           # Exclude package-lock.json (large, auto-generated) from review diff
           git diff origin/${{ github.base_ref }}...HEAD -- . ':!**/package-lock.json' > diff.patch
 
+      - name: Check API key
+        id: api_key_check
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "## Gemini Code Review" > review.txt
+            echo "" >> review.txt
+            echo "Gemini review skipped: no API key available for this PR context." >> review.txt
+          else
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Fetch previous Gemini reviews from PR
         id: previous_gemini
         env:
@@ -353,6 +367,7 @@ jobs:
           done
 
       - name: Call Gemini API
+        if: steps.api_key_check.outputs.has_key == 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -377,12 +392,12 @@ jobs:
 
           # Save response to file with extended timeout for Gemini 3 Pro
           # --connect-timeout 30: Allow 30s to establish connection
-          # --max-time 240: Allow 4 minutes for complete response (Gemini 3 Pro can be slow)
+          # --max-time 360: Allow 6 minutes for complete response (Gemini 3 Pro can be slow)
           # Note: Capture exit code explicitly to prevent bash -e from exiting on curl failure
           set +e
           HTTP_CODE=$(curl -s \
             --connect-timeout 30 \
-            --max-time 240 \
+            --max-time 360 \
             -w "%{http_code}" \
             -o gemini_response.json \
             -X POST \

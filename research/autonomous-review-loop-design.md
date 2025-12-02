@@ -64,7 +64,7 @@ This creates friction and delays. The user shouldn't have to babysit the review 
 | **SUCCESS** | All 3 reviews present AND no critical/actionable items | Exit loop, report "All reviews passed" |
 | **PARTIAL SUCCESS** | Some reviews present, no issues in available reviews | Continue waiting up to timeout |
 | **WORKFLOW FAILURE** | Review contains "API Error", "Timeout", "503" | Exit loop, inform user to check CI |
-| **TIMEOUT** | 6 attempts (6 minutes) with <3 reviews | Exit loop, report which reviews missing |
+| **TIMEOUT** | 10 attempts (10 minutes) with <3 reviews | Exit loop, report which reviews missing |
 | **ISSUES FOUND** | Critical or actionable items extracted | Restart full workflow (steps 1-9) |
 
 ### Critical Design Decisions
@@ -80,12 +80,13 @@ This creates friction and delays. The user shouldn't have to babysit the review 
 **Alternative considered:** Webhook-based notification
 - Rejected: Adds infrastructure complexity, not feasible in Claude Code environment
 
-#### 2. Max Attempts: 6 (6 minutes total)
+#### 2. Max Attempts: 10 (10 minutes total)
 
 **Rationale:**
 - Most CI completes within 3-4 minutes
-- 6 minutes covers edge cases (cold starts, queued jobs)
-- Beyond 6 minutes, likely a real failure requiring user intervention
+- 10 minutes covers edge cases (cold starts, queued jobs, LLM API retries)
+- Gemini 3 Pro can be slow (up to 6 minutes with retries)
+- Beyond 10 minutes, likely a real failure requiring user intervention
 
 #### 3. Track Push Timestamp, Not Just Commit
 
@@ -151,7 +152,7 @@ def is_actionable(item):
 |------|------------|--------|------------|
 | Infinite loop (always new issues) | Medium | High | Only process actionable items, skip style |
 | API rate limit | Low | Medium | 60s polling interval |
-| Context exhaustion | Medium | High | Exit after 6 minutes regardless |
+| Context exhaustion | Medium | High | Exit after 10 minutes regardless |
 | Review pipeline failure | Medium | Low | Detect and exit gracefully |
 
 ### Verdict
@@ -299,7 +300,7 @@ fi
 
 ## Decision Rationale
 
-The polling-based approach with 60-second intervals and 6 attempts provides:
+The polling-based approach with 60-second intervals and 10 attempts provides:
 
 1. **Simplicity** - Easy to understand and debug
 2. **Reliability** - No external dependencies
@@ -311,7 +312,7 @@ The key insight is that this is a **bounded automation** - it will always termin
 ## Open Questions
 
 1. **Should we allow user interrupt?** Currently no mechanism to break out of loop.
-   - Recommendation: No - loop is max 6 minutes, acceptable to wait
+   - Recommendation: No - loop is max 10 minutes, acceptable to wait
 
 2. **Should we process partial reviews?** If only 2/3 reviews arrive, should we process them?
    - Recommendation: Yes, after timeout - some feedback is better than none

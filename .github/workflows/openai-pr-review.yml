@@ -446,7 +446,7 @@ jobs:
 
             HTTP_CODE=$(curl -s \
               --connect-timeout 30 \
-              --max-time 300 \
+              --max-time 360 \
               -w "%{http_code}" \
               -o openai_response.json \
               -X POST \

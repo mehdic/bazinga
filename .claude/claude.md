@@ -1136,9 +1136,10 @@ rerun_workflow() {
     "OpenAI PR Review") WORKFLOW_PATH=".github/workflows/openai-pr-review.yml" ;;
   esac
 
+  # Sort by run_number descending to get the most recent run (not first match)
   RUN_ID=$(curl -sSf -H "Authorization: Bearer $GITHUB_TOKEN" \
     "https://api.github.com/repos/mehdic/bazinga/actions/runs?event=pull_request&head_sha=$HEAD_SHA" | \
-    jq -r ".workflow_runs[] | select(.path == \"$WORKFLOW_PATH\") | .id" | head -1)
+    jq -r "[.workflow_runs[] | select(.path == \"$WORKFLOW_PATH\")] | sort_by(.run_number) | last | .id")
 
   if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
     # Trigger rerun and check HTTP status (expect 201 Created)
