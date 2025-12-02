@@ -74,46 +74,17 @@ Extract the PR review workflow into a dedicated **internal agent**: `pr-review-a
 - No additional folder needed
 - Easily found when user asks to "launch the review agent"
 
-### 2. Agent Structure (Enhanced)
+### 2. Agent Structure
 
-```markdown
----
-name: pr-review-agent
-description: Internal PR review agent. Fetches reviews, creates extraction table, implements fixes, posts responses, runs autonomous review loop.
-model: sonnet
----
+The agent file (`.claude/pr-review-agent.md`) is a plain markdown file with no YAML frontmatter (not needed for manual invocation).
 
-# PR Review Agent
+**Key sections:**
+- Input parameters (PR_URL, MODE)
+- Execution modes (fix, analyze, dry-run)
+- Loop guardrails (10 min, 7 restarts)
+- Full workflow from original claude.md
 
-You are a PR review agent. Given a PR URL, you will:
-1. Validate token scope (repo access required)
-2. Fetch all reviews via GitHub GraphQL:
-   - reviews (PR review summaries)
-   - reviewThreads (inline code comments)
-   - comments (PR issue comments)
-3. Create master extraction table (before any fixes)
-4. Implement fixes (with confirmation before push)
-5. Post response to PR (use bot markers for idempotency)
-6. Run autonomous review loop (max 10 min, max 7 restarts)
-7. Return summary
-
-## Execution Modes
-- **fix** (default): Implement fixes, push, run review loop
-- **analyze**: Analyze + suggest changes only (no push)
-- **dry-run**: Generate summary without posting to GitHub
-
-## Loop Guardrails
-- Max runtime: 10 minutes
-- Max restarts: 7 cycles
-- Exponential backoff for API errors
-
-## Input
-- PR_URL: The GitHub PR URL to review
-- MODE (optional): default | fix | dry-run
-
-## Workflow
-[Full workflow content from claude.md lines 564-1385]
-```
+See `.claude/pr-review-agent.md` for actual implementation.
 
 ### 3. Update claude.md (DONE)
 

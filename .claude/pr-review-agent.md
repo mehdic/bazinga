@@ -732,9 +732,12 @@ This enables timestamp-windowed filtering: each LLM only sees responses to ITS O
 # Set PR number (replace with actual number)
 PR_NUMBER=155
 
+# Load token with fallback (consistent with other sections)
+GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
 # Validate token exists
-if [ -z "${BAZINGA_GITHUB_TOKEN:-}" ]; then
-  echo "ERROR: BAZINGA_GITHUB_TOKEN is not set" >&2
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "ERROR: GITHUB_TOKEN not set (need BAZINGA_GITHUB_TOKEN or ~/.bazinga-github-token)" >&2
   exit 1
 fi
 ```
@@ -742,7 +745,7 @@ fi
 **Step 1: Get PR node ID (with error handling)**
 ```bash
 RESPONSE=$(curl -sSf -X POST \
-  -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
   -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { id } } }\"}")
@@ -779,7 +782,7 @@ mv "${TMPFILE}.patched" "$TMPFILE"
 **Step 3: Post the comment (with error detection)**
 ```bash
 RESPONSE=$(curl -sSf -X POST \
-  -H "Authorization: Bearer $BAZINGA_GITHUB_TOKEN" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
   -d @"$TMPFILE")
