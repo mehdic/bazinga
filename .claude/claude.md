@@ -967,9 +967,19 @@ loop_state = {
     "push_time": "<ISO timestamp of push>",
     "head_sha": "<PR headRefOid at loop start>",  # Track for mid-loop changes
     "attempts": 0,
-    "max_attempts": 6,
+    "max_attempts": 10,  # 10 x 60s = 10 minutes (increased from 6)
     "restart_count": 0,
-    "max_restarts": 3  # Global cap to prevent infinite loops
+    "max_restarts": 3,  # Global cap to prevent infinite loops
+    # Per-reviewer tracking
+    "openai_ready": False,
+    "gemini_ready": False,
+    "copilot_ready": False,
+    # Workflow rerun tracking (only attempt once per reviewer)
+    "gemini_rerun_triggered": False,
+    "openai_rerun_triggered": False,
+    # Grace period for Copilot when OpenAI+Gemini pass
+    "grace_attempts": 0,
+    "max_grace_attempts": 3  # 3 minutes grace for Copilot
 }
 ```
 
@@ -983,12 +993,15 @@ LOOP_START:
     EXIT LOOP → return control to user
 
   attempts = 0
+  openai_ready = gemini_ready = copilot_ready = False
+  gemini_rerun_triggered = openai_rerun_triggered = False
+  grace_attempts = 0
 
   WHILE attempts < max_attempts:
     sleep 60 seconds
     attempts += 1
 
-    output: "⏳ Review check {attempts}/6 - Checking for new reviews..."
+    output: "⏳ Review check {attempts}/10 - Checking for new reviews..."
 
     # Fetch reviews + comments (with headRefOid)
     fetch_reviews(PR_NUMBER) -> /tmp/pr_data.json
@@ -1007,53 +1020,88 @@ LOOP_START:
     openai_review = check_comment(author=test("github-actions"), contains="OpenAI Code Review", after=push_time)
     gemini_review = check_comment(author=test("github-actions"), contains="Gemini Code Review", after=push_time)
 
-    # Check for workflow failures
-    IF any_review_contains("API Error", "Timeout", "503", "workflow failed"):
-      output: "❌ Review workflow failed. Please check CI and restart manually."
-      EXIT LOOP → return control to user
+    # === WORKFLOW FAILURE DETECTION AND RERUN ===
+    # Check for 503 errors in Gemini and trigger workflow rerun
+    IF gemini_review contains "503" or "API Error" or "Timeout":
+      IF NOT gemini_rerun_triggered:
+        output: "🔄 Gemini API failed (503). Triggering workflow rerun..."
+        rerun_workflow("Gemini PR Review", head_sha)  # See rerun function below
+        gemini_rerun_triggered = True
+        gemini_ready = False  # Wait for new review
+        CONTINUE
 
-    # Count available reviews
-    reviews_ready = count([copilot_review, openai_review, gemini_review])
+    # Check for failures in OpenAI
+    IF openai_review contains "API Error" or "Timeout":
+      IF NOT openai_rerun_triggered:
+        output: "🔄 OpenAI API failed. Triggering workflow rerun..."
+        rerun_workflow("OpenAI PR Review", head_sha)
+        openai_rerun_triggered = True
+        openai_ready = False
+        CONTINUE
 
+    # Update ready status (only if review is valid, not error)
+    openai_ready = openai_review exists AND NOT contains("API Error", "Timeout")
+    gemini_ready = gemini_review exists AND NOT contains("503", "API Error", "Timeout")
+    copilot_ready = copilot_review exists
+
+    reviews_ready = count([openai_ready, gemini_ready, copilot_ready])
+    output: "⏳ {reviews_ready}/3 reviews ready"
+
+    # === EARLY-START OPTIMIZATION ===
+    # If OpenAI and Gemini are ready, we can start fixing without waiting for Copilot
+    IF openai_ready AND gemini_ready:
+      items = extract_all_items(openai_review, gemini_review)
+      items = deduplicate(items, key=lambda i: f"{i.file}:{i.line}")
+      critical_items = [i for i in items if i.category == "Critical"]
+      actionable_items = [i for i in items if i.actionable]
+
+      IF len(actionable_items) > 0:
+        # Start fixing immediately (don't wait for Copilot)
+        output: "🔧 OpenAI+Gemini have {len(actionable_items)} issue(s). Starting fixes..."
+        process_and_fix(actionable_items)
+        push_fixes()
+        # Update head_sha after push
+        head_sha = get_new_head_sha()
+        openai_ready = gemini_ready = copilot_ready = False
+        restart_count += 1
+        GOTO LOOP_START  # Reset timer for next cycle
+
+      ELSE IF copilot_ready:
+        # All 3 ready, no issues
+        output: "✅ All 3 reviews passed - no critical issues or actionable items!"
+        EXIT LOOP → return control to user (SUCCESS)
+
+      ELSE:
+        # === QUORUM+GRACE: OpenAI+Gemini passed, wait short grace for Copilot ===
+        grace_attempts += 1
+        IF grace_attempts <= max_grace_attempts:
+          output: "⏳ OpenAI+Gemini passed. Waiting for Copilot (grace {grace_attempts}/3)..."
+          CONTINUE
+        ELSE:
+          # Grace period expired - proceed with 2/3 pass
+          output: "✅ OpenAI+Gemini passed. Copilot not received (grace expired)."
+          EXIT LOOP → return control to user (SUCCESS)
+
+    # Not enough reviews yet
     IF reviews_ready == 0:
-      output: "⏳ No reviews yet ({attempts}/6)..."
-      CONTINUE
+      output: "⏳ No reviews yet ({attempts}/10)..."
 
-    IF reviews_ready < 3 AND attempts < max_attempts:
-      output: "⏳ {reviews_ready}/3 reviews ready, waiting for others..."
-      CONTINUE
+    CONTINUE
 
-    # At least some reviews are ready - analyze them
-    output: "📋 Analyzing {reviews_ready} review(s)..."
-
-    # Extract all items using Master Extraction Table workflow
-    items = extract_all_items(copilot_review, openai_review, gemini_review)
-
-    # Deduplicate items (same file:line from multiple reviewers)
-    items = deduplicate(items, key=lambda i: f"{i.file}:{i.line}")
-
-    critical_items = [i for i in items if i.category == "Critical"]
-    valid_items = [i for i in items if i.category in ["Critical", "Suggestion"] AND i.actionable]
-
-    IF len(critical_items) == 0 AND len(valid_items) == 0:
-      output: "✅ All reviews passed - no critical issues or actionable items!"
-      EXIT LOOP → return control to user (SUCCESS)
-
-    IF len(valid_items) > 0:
-      output: "🔧 Found {len(valid_items)} item(s) to address. Restarting workflow (cycle {restart_count+1}/3)..."
-      restart_count += 1
-
-      # Restart the full workflow (steps 1-9)
-      GOTO step 1 (Fetch all review threads)
-      # After step 9 completes, return to LOOP_START
-
-  # Max attempts reached
+  # Max attempts reached (10 minutes)
   IF attempts >= max_attempts:
-    output: "⏱️ Timeout: 6 minutes elapsed. Reviews status:"
-    output: "  - Copilot: {copilot_review ? '✅' : '❌'}"
-    output: "  - OpenAI: {openai_review ? '✅' : '❌'}"
-    output: "  - Gemini: {gemini_review ? '✅' : '❌'}"
-    output: "Please check CI pipelines and restart review if needed."
+    output: "⏱️ Timeout: 10 minutes elapsed. Reviews status:"
+    output: "  - Copilot: {copilot_ready ? '✅' : '❌'}"
+    output: "  - OpenAI: {openai_ready ? '✅' : '❌'}"
+    output: "  - Gemini: {gemini_ready ? '✅' : '❌'}"
+    # Process whatever reviews are available
+    IF openai_ready OR gemini_ready:
+      output: "📋 Processing available reviews..."
+      items = extract_all_items(available_reviews)
+      IF len(items) > 0:
+        process_and_fix(items)
+        # Don't restart - just exit after fixing
+    output: "Please check CI pipelines if reviews are missing."
     EXIT LOOP → return control to user
 ```
 
@@ -1062,11 +1110,48 @@ LOOP_START:
 | Condition | Action |
 |-----------|--------|
 | **All 3 reviews passed** (no critical/actionable items) | ✅ Exit loop, report success |
-| **Review workflow failed** (API error, timeout in CI) | ❌ Exit loop, inform user to check CI |
-| **6 minute timeout** (reviews not appearing) | ⏱️ Exit loop, report which reviews missing |
+| **OpenAI+Gemini passed + grace expired** (Copilot slow/missing) | ✅ Exit loop with quorum (2/3 pass) |
+| **Review workflow failed** (API error, 503) | 🔄 Trigger workflow rerun (once per reviewer) |
+| **10 minute timeout** (reviews not appearing) | ⏱️ Exit loop, process available reviews |
 | **Max restarts reached** (3 cycles) | 🛑 Exit loop, prevent infinite loop |
 | **PR head changed** (force push) | 🔄 Reset loop for new head |
-| **Items found** | 🔄 Restart workflow (steps 1-9), increment restart_count |
+| **OpenAI+Gemini have issues** | 🔧 Start fixing immediately (early-start), don't wait for Copilot |
+
+#### Workflow Rerun Function
+
+When a review workflow fails (503, timeout), trigger a rerun via REST API:
+
+```bash
+rerun_workflow() {
+  WORKFLOW_NAME=$1  # e.g., "Gemini PR Review"
+  HEAD_SHA=$2
+  GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+  # Find the workflow run by name and head_sha
+  # Use workflow file path for reliable matching
+  WORKFLOW_PATH=""
+  case "$WORKFLOW_NAME" in
+    "Gemini PR Review") WORKFLOW_PATH=".github/workflows/gemini-pr-review.yml" ;;
+    "OpenAI PR Review") WORKFLOW_PATH=".github/workflows/openai-pr-review.yml" ;;
+  esac
+
+  RUN_ID=$(curl -sSf -H "Authorization: Bearer $GITHUB_TOKEN" \
+    "https://api.github.com/repos/mehdic/bazinga/actions/runs?event=pull_request&head_sha=$HEAD_SHA" | \
+    jq -r ".workflow_runs[] | select(.path == \"$WORKFLOW_PATH\") | .id" | head -1)
+
+  if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
+    # Trigger rerun
+    curl -sSf -X POST \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      "https://api.github.com/repos/mehdic/bazinga/actions/runs/$RUN_ID/rerun"
+    echo "✅ Workflow rerun triggered: $WORKFLOW_NAME (Run ID: $RUN_ID)"
+    return 0
+  else
+    echo "⚠️ Could not find workflow run for: $WORKFLOW_NAME"
+    return 1
+  fi
+}
+```
 
 #### Implementation Notes
 

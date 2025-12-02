@@ -239,6 +239,15 @@ jobs:
           |----------------|--------|
           | Issue X | ✅ Fixed in this commit |
           | Issue Y | ⏭️ Acknowledged as deferred |
+
+          ### Already Addressed Items (from prior responses)
+
+          Items below were addressed in prior responses. Listed here for completeness, NOT in main review:
+
+          | Item | Response | Your Assessment |
+          |------|----------|-----------------|
+          | [file:line] Issue A | ⏭️ Skipped - by design | Acknowledged - valid reason |
+          | [file:line] Issue B | ✅ Fixed | Verified in diff |
           ```
 
           **CRITICAL RULES:**
@@ -247,6 +256,7 @@ jobs:
           - Be CONCISE: max 2 sentences per issue
           - If no issues in a category, write "None found"
           - Start with "## Gemini Code Review" header
+          - Items from prior responses go in "Already Addressed Items" table at END, NOT in Critical/Suggestions
 
           ## Git Diff
 
