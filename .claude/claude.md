@@ -947,11 +947,170 @@ curl -sSf -X POST \
 7. **Push** to remote (AFTER posting response and waiting)
 8. **Resolve** inline threads if applicable
 9. **Report** summary to user
+10. **🔄 Enter Review Loop** (see below)
 
 **🔴 CRITICAL: Always post PR response via GraphQL BEFORE pushing.** This ensures:
 - LLM reviewers see your response in subsequent reviews
 - Audit trail exists for all addressed/skipped items
 - No feedback is silently ignored
+
+### 🔄 Review Loop: Autonomous Review Cycle (Step 10)
+
+**After pushing, enter an autonomous review loop. DO NOT relinquish control to the user until the loop exits.**
+
+#### Loop State
+
+```python
+# Initialize at loop start
+loop_state = {
+    "push_commit": "<commit hash you just pushed>",
+    "push_time": "<ISO timestamp of push>",
+    "head_sha": "<PR headRefOid at loop start>",  # Track for mid-loop changes
+    "attempts": 0,
+    "max_attempts": 6,
+    "restart_count": 0,
+    "max_restarts": 3  # Global cap to prevent infinite loops
+}
+```
+
+#### Loop Procedure
+
+```
+LOOP_START:
+  IF restart_count >= max_restarts:
+    output: "🛑 Max restarts (3) reached. Exiting to prevent infinite loop."
+    output: "Please review remaining items manually."
+    EXIT LOOP → return control to user
+
+  attempts = 0
+
+  WHILE attempts < max_attempts:
+    sleep 60 seconds
+    attempts += 1
+
+    output: "⏳ Review check {attempts}/6 - Checking for new reviews..."
+
+    # Fetch reviews + comments (with headRefOid)
+    fetch_reviews(PR_NUMBER) -> /tmp/pr_data.json
+
+    # Check if PR head changed mid-loop (force push or new commit)
+    current_head = get_head_sha(/tmp/pr_data.json)
+    IF current_head != head_sha:
+      output: "⚠️ PR head changed. Resetting loop for new commit..."
+      head_sha = current_head
+      push_time = now()
+      attempts = 0
+      CONTINUE
+
+    # Check for reviews (use test() for author to match both variants)
+    copilot_review = check_review(author="copilot-pull-request-reviewer", commit=push_commit)
+    openai_review = check_comment(author=test("github-actions"), contains="OpenAI Code Review", after=push_time)
+    gemini_review = check_comment(author=test("github-actions"), contains="Gemini Code Review", after=push_time)
+
+    # Check for workflow failures
+    IF any_review_contains("API Error", "Timeout", "503", "workflow failed"):
+      output: "❌ Review workflow failed. Please check CI and restart manually."
+      EXIT LOOP → return control to user
+
+    # Count available reviews
+    reviews_ready = count([copilot_review, openai_review, gemini_review])
+
+    IF reviews_ready == 0:
+      output: "⏳ No reviews yet ({attempts}/6)..."
+      CONTINUE
+
+    IF reviews_ready < 3 AND attempts < max_attempts:
+      output: "⏳ {reviews_ready}/3 reviews ready, waiting for others..."
+      CONTINUE
+
+    # At least some reviews are ready - analyze them
+    output: "📋 Analyzing {reviews_ready} review(s)..."
+
+    # Extract all items using Master Extraction Table workflow
+    items = extract_all_items(copilot_review, openai_review, gemini_review)
+
+    # Deduplicate items (same file:line from multiple reviewers)
+    items = deduplicate(items, key=lambda i: f"{i.file}:{i.line}")
+
+    critical_items = [i for i in items if i.category == "Critical"]
+    valid_items = [i for i in items if i.category in ["Critical", "Suggestion"] AND i.actionable]
+
+    IF len(critical_items) == 0 AND len(valid_items) == 0:
+      output: "✅ All reviews passed - no critical issues or actionable items!"
+      EXIT LOOP → return control to user (SUCCESS)
+
+    IF len(valid_items) > 0:
+      output: "🔧 Found {len(valid_items)} item(s) to address. Restarting workflow (cycle {restart_count+1}/3)..."
+      restart_count += 1
+
+      # Restart the full workflow (steps 1-9)
+      GOTO step 1 (Fetch all review threads)
+      # After step 9 completes, return to LOOP_START
+
+  # Max attempts reached
+  IF attempts >= max_attempts:
+    output: "⏱️ Timeout: 6 minutes elapsed. Reviews status:"
+    output: "  - Copilot: {copilot_review ? '✅' : '❌'}"
+    output: "  - OpenAI: {openai_review ? '✅' : '❌'}"
+    output: "  - Gemini: {gemini_review ? '✅' : '❌'}"
+    output: "Please check CI pipelines and restart review if needed."
+    EXIT LOOP → return control to user
+```
+
+#### Exit Conditions
+
+| Condition | Action |
+|-----------|--------|
+| **All 3 reviews passed** (no critical/actionable items) | ✅ Exit loop, report success |
+| **Review workflow failed** (API error, timeout in CI) | ❌ Exit loop, inform user to check CI |
+| **6 minute timeout** (reviews not appearing) | ⏱️ Exit loop, report which reviews missing |
+| **Max restarts reached** (3 cycles) | 🛑 Exit loop, prevent infinite loop |
+| **PR head changed** (force push) | 🔄 Reset loop for new head |
+| **Items found** | 🔄 Restart workflow (steps 1-9), increment restart_count |
+
+#### Implementation Notes
+
+```bash
+# Check for reviews on specific commit
+check_for_reviews() {
+  PR_NUMBER=$1
+  PUSH_COMMIT=$2
+  PUSH_TIME=$3
+
+  # Fetch fresh data (include headRefOid)
+  curl -sSf -X POST \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Content-Type: application/json" \
+    "https://api.github.com/graphql" \
+    -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { headRefOid reviews(last: 20) { nodes { author { login } body commit { oid } createdAt } } comments(last: 30) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+
+  # Get current head SHA
+  HEAD_SHA=$(jq -r '.data.repository.pullRequest.headRefOid' /tmp/pr_data.json)
+
+  # Check Copilot (reviews on our commit)
+  COPILOT=$(jq -r ".data.repository.pullRequest.reviews.nodes[] | select(.author.login == \"copilot-pull-request-reviewer\") | select(.commit.oid | startswith(\"$PUSH_COMMIT\"))" /tmp/pr_data.json)
+
+  # Check OpenAI/Gemini (use test() to match both "github-actions" and "github-actions[bot]")
+  OPENAI=$(jq -r ".data.repository.pullRequest.comments.nodes[] | select(.author.login | test(\"github-actions\")) | select(.createdAt > \"$PUSH_TIME\") | select(.body | contains(\"OpenAI Code Review\"))" /tmp/pr_data.json)
+
+  GEMINI=$(jq -r ".data.repository.pullRequest.comments.nodes[] | select(.author.login | test(\"github-actions\")) | select(.createdAt > \"$PUSH_TIME\") | select(.body | contains(\"Gemini Code Review\"))" /tmp/pr_data.json)
+
+  echo "Head SHA: $HEAD_SHA"
+  echo "Copilot: $([ -n "$COPILOT" ] && echo "ready" || echo "waiting")"
+  echo "OpenAI: $([ -n "$OPENAI" ] && echo "ready" || echo "waiting")"
+  echo "Gemini: $([ -n "$GEMINI" ] && echo "ready" || echo "waiting")"
+}
+```
+
+#### Key Rules
+
+1. **DO NOT relinquish control** - Stay in the loop, don't ask user "should I check again?"
+2. **Sleep between checks** - `sleep 60` to avoid hammering the API
+3. **Track head SHA** - If PR head changes mid-loop, reset for new commit
+4. **Global restart cap** - Max 3 full workflow restarts to prevent infinite loops
+5. **Author matching** - Use `test("github-actions")` to match both variants
+6. **Deduplicate items** - Same file:line from multiple reviewers counts once
+7. **Report progress** - Output status each minute so user knows it's working
 
 ### 🔴 MANDATORY: Respond to ALL Feedback (Fixed AND Skipped)
 
