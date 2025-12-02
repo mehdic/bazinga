@@ -82,9 +82,10 @@ User Request → PM → Complexity Score → Developer (Haiku) OR SSE (Sonnet)
 |-----------|-------------|------------|---------------|
 | model_selection.json | Add `requirements_engineer` agent | LOW | Remove entry |
 | project_manager.md | Add task-type detection section (~30 lines) | MEDIUM | Remove section |
-| orchestrator.md | Add RESEARCH_COMPLETE status + routing (~20 lines) | MEDIUM | Remove status handling |
-| requirements_engineer.md | Add "Research Mode" section (~40 lines) | LOW | Remove section |
-| response_parsing.md | Add RE status patterns (~5 lines) | LOW | Remove patterns |
+| orchestrator.md | Add RE to tier table + MODEL_CONFIG (~5 lines) | LOW | Remove entries |
+| requirements_engineer.md | Add "Research Mode" section (~100 lines) | LOW | Remove section |
+
+> **⚠️ REVISED:** Original plan proposed new RESEARCH_COMPLETE status. Final implementation reuses existing `READY_FOR_REVIEW` status to avoid QA Trap.
 
 ### What Does NOT Change (Critical Preservation)
 
@@ -99,13 +100,13 @@ User Request → PM → Complexity Score → Developer (Haiku) OR SSE (Sonnet)
 
 ### References That Need Updates
 
-| Reference | Location | Update Needed |
-|-----------|----------|---------------|
-| Agent status table | orchestrator.md:104 | Add RE status |
-| MODEL_CONFIG | orchestrator.md:570-577 | Add `requirements_engineer` |
-| Tier selection table | orchestrator.md:1204-1207 | Add RE tier |
-| PM Output format | templates/pm_output_format.md | Add RESEARCH_ASSIGNED status |
-| Response parsing | templates/response_parsing.md | Add RE parsing patterns |
+| Reference | Location | Update Needed | Status |
+|-----------|----------|---------------|--------|
+| Agent status table | orchestrator.md:110 | Add RE status | ✅ Done |
+| MODEL_CONFIG | orchestrator.md:570-577 | Add `requirements_engineer` | ✅ Done |
+| Tier selection table | orchestrator.md:1204-1207 | Add RE tier | ✅ Done |
+
+> **⚠️ REVISED:** Original plan mentioned adding RESEARCH_ASSIGNED to PM output format. Final implementation uses existing `PLANNING_COMPLETE` status - PM just adds `type: research` field to task groups.
 
 ---
 
@@ -380,8 +381,10 @@ You are now operating in **Research Mode** - your output will inform implementat
 |------|----------|------------|
 | [Risk 1] | HIGH/MED/LOW | [How to address] |
 
-## Status: RESEARCH_COMPLETE
+## Status: READY_FOR_REVIEW
 ```
+
+> **⚠️ CRITICAL:** Use `READY_FOR_REVIEW` (not `RESEARCH_COMPLETE`) to ensure orchestrator routes correctly to Tech Lead.
 
 ### Research Mode Status Codes
 
@@ -426,15 +429,17 @@ You are now operating in **Research Mode** - your output will inform implementat
 **Extract from RE response:**
 | Field | Pattern | Fallback |
 |-------|---------|----------|
-| Status | `Status: (RESEARCH_COMPLETE\|RESEARCH_BLOCKED\|NEEDS_MORE_INFO)` | Scan for "complete", "blocked" |
+| Status | `Status: (READY_FOR_REVIEW\|BLOCKED\|PARTIAL)` | Scan for "review", "blocked" |
 | Recommendation | `## Recommendation` section | First non-header paragraph after options table |
 | Deliverable | Full markdown content | Store in artifacts folder |
 
 **Route after parsing:**
-- RESEARCH_COMPLETE → Continue to next research group OR start implementation
-- RESEARCH_BLOCKED → Spawn Investigator
-- NEEDS_MORE_INFO → Route to PM
+- READY_FOR_REVIEW → Route to Tech Lead for validation
+- BLOCKED → Spawn Investigator
+- PARTIAL → Continue RE work
 ```
+
+> **⚠️ REVISED:** Uses existing status codes (not RESEARCH_* variants) for orchestrator compatibility.
 
 ---
 
@@ -479,7 +484,7 @@ User Request → PM
 
 ```
 Phase 1: Research
-  PM → RE (Sonnet) → RESEARCH_COMPLETE
+  PM → RE (Sonnet) → READY_FOR_REVIEW → TL validates
        ↓
 Phase 2: Implementation
   PM → Developer (uses RE findings) → QA → TL → PM → BAZINGA
@@ -488,9 +493,9 @@ Phase 2: Implementation
 ### Parallel Mode with Research
 
 ```
-Phase 1: Research (Sequential)
-  PM → RE_1 (OAuth Research) → RESEARCH_COMPLETE
-     → RE_2 (DB Research) → RESEARCH_COMPLETE
+Phase 1: Research (MAX 2 parallel)
+  PM → RE_1 (OAuth Research) → READY_FOR_REVIEW → TL
+     → RE_2 (DB Research) → READY_FOR_REVIEW → TL
        ↓
 Phase 2: Implementation (Parallel, MAX 4)
   PM → Dev_A (OAuth Impl) ─┐

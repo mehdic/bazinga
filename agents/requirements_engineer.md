@@ -591,6 +591,8 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 ## Status: READY_FOR_REVIEW
 ```
 
+**🔴 CRITICAL:** The deliverable should end with `## Status: READY_FOR_REVIEW` (standard format) - NOT agent-specific prefixes.
+
 ### Research Mode Status Codes
 
 **🔴 CRITICAL:** Use EXISTING status codes to avoid workflow issues:
@@ -612,7 +614,7 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 
 **Example BLOCKED response:**
 ```markdown
-## PM Status: BLOCKED
+## Status: BLOCKED
 
 **Blocker:** Cannot access vendor pricing API (requires authentication)
 **Need:** API credentials for [vendor] or alternative pricing source
@@ -636,11 +638,11 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 **Your response MUST include:**
 
 ```markdown
-## RE Status: READY_FOR_REVIEW
+## Status: READY_FOR_REVIEW
 
 **Deliverable:** bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md
 **Summary:** [1 sentence summary of recommendation]
 **Next:** Tech Lead review
 ```
 
-This status format ensures the orchestrator routes your output correctly to the Tech Lead for validation.
+**🔴 IMPORTANT:** Use standard `## Status:` header (NOT `## RE Status:` or agent-specific prefixes) so the orchestrator can parse your response correctly.

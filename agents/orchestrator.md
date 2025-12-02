@@ -107,6 +107,7 @@ All user-visible updates MUST use the capsule format:
 | Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
 | PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
 | Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
+| Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
 
 **Principle:** Best-effort extraction with fallbacks. Never fail on missing data.
 
