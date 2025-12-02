@@ -88,7 +88,8 @@ For each task group, classify the type FIRST:
 - Explicit `[R]` marker in task name (preferred)
 - Task name contains: "research", "evaluate", "select", "compare"
 - Task produces: decision document, comparison matrix, recommendation
-- **Initial Tier:** requirements_engineer (Sonnet)
+- **DB Initial Tier:** `developer` (DB constraint - Orchestrator reads `Type: research` and spawns RE instead)
+- **Agent Spawned:** Requirements Engineer (Sonnet)
 - **Execution Phase:** 1 (before implementation)
 - **NOTE:** "investigation" and "analyze" are NOT research keywords - too generic, causes misrouting
 
@@ -96,7 +97,8 @@ For each task group, classify the type FIRST:
 - Task name contains: "design", "architecture", "API design", "schema design", "data model"
 - Task produces: design document, architecture decision record (ADR)
 - **Type:** `research` (use same flow as research tasks)
-- **Initial Tier:** requirements_engineer (Sonnet)
+- **DB Initial Tier:** `developer` (DB constraint - Orchestrator spawns RE based on Type)
+- **Agent Spawned:** Requirements Engineer (Sonnet)
 - **Execution Phase:** 1 (before implementation)
 - **Tech Lead Validation:** MANDATORY (architecture decisions require TL approval)
 - **Example:** "API Design [R]" → RE produces design doc → TL validates → Implementation begins
@@ -117,7 +119,7 @@ For each task group, classify the type FIRST:
 ```markdown
 **Group R1:** OAuth Provider Research [R]
 - **Type:** research
-- **Initial Tier:** requirements_engineer
+- **Initial Tier:** developer  ← DB value (Orchestrator overrides to spawn RE)
 - **Execution Phase:** 1
 - **Deliverable:** Provider comparison matrix with recommendation
 - **Success Criteria:** Decision on OAuth provider with pros/cons
@@ -140,6 +142,7 @@ For each task group, classify the type FIRST:
 **🔴 IMPORTANT CLARIFICATIONS:**
 1. **Execution Phase ≠ Orchestrator Workflow Phase**: "Phase 1" here means task execution order, NOT orchestrator's internal workflow phases (Planning/Implementation)
 2. **Metadata is markdown-only**: `Type`, `Security Sensitive`, `Execution Phase` fields are for task description markdown ONLY - do NOT pass these as database columns to bazinga-db tool
+3. **DB initial_tier constraint**: Database only accepts `developer` or `senior_software_engineer`. For research tasks, use `developer` as DB value - Orchestrator reads `Type: research` from description and spawns Requirements Engineer instead
 
 **🔴 CRITICAL: Artifact Path Handoff**
 

@@ -108,6 +108,8 @@ All user-visible updates MUST use the capsule format:
 | Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
 | Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
 
+**🔴 RE ROUTING:** Requirements Engineer outputs READY_FOR_REVIEW → bypasses QA → routes directly to Tech Lead (research deliverables don't need testing).
+
 **🔴 SECURITY TASKS:** If PM marks `security_sensitive: true`, enforce SSE + mandatory TL review (see Steps 2A.5, 2A.7).
 
 **Principle:** Best-effort extraction with fallbacks. Never fail on missing data.
@@ -2142,10 +2144,12 @@ Orchestrator output:
 
 **🔴 Enforcement Rule (before spawning):**
 ```
+# Read g.type from PM's markdown description (e.g., "**Type:** research")
+# NOT from database column (DB only stores initial_tier: developer/senior_software_engineer)
 research_groups = [g for g in groups if g.type == "research"]
 impl_groups = [g for g in groups if g.type != "research"]
-IF len(research_groups) > 2: ERROR("PM should not plan >2 research groups")
-IF len(impl_groups) > 4: defer_excess_groups()  # spawn in batches
+IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not error
+IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
