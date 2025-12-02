@@ -2151,8 +2151,9 @@ Orchestrator output:
 # Parse type from PM's markdown description (e.g., "**Type:** research")
 # NOT from database column (DB only stores initial_tier: developer/senior_software_engineer)
 def get_task_type(pm_markdown):
-    # Look for "**Type:** X" pattern in PM's description
-    if "**Type:** research" in pm_markdown.lower():
+    # Look for "**Type:** X" pattern in PM's description (case-insensitive)
+    # Note: search string MUST be lowercase since we call .lower() on input
+    if "**type:** research" in pm_markdown.lower():
         return "research"
     return "implementation"  # default
 
