@@ -106,6 +106,11 @@ All user-visible updates MUST use the capsule format:
 | Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
 | PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
 | Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
+| Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
+
+**🔴 RE ROUTING:** Requirements Engineer outputs READY_FOR_REVIEW → bypasses QA → routes directly to Tech Lead (research deliverables don't need testing).
+
+**🔴 SECURITY TASKS:** If PM marks `security_sensitive: true`, enforce SSE + mandatory TL review (see Steps 2A.5, 2A.7).
 
 **Principle:** Best-effort extraction with fallbacks. Never fail on missing data.
 
@@ -569,6 +574,7 @@ Display:
    MODEL_CONFIG = {
      "developer": "[model from DB, default: haiku]",
      "senior_software_engineer": "[model from DB, default: sonnet]",
+     "requirements_engineer": "[model from DB, default: sonnet]",
      "qa_expert": "[model from DB, default: sonnet]",
      "tech_lead": "[model from DB, default: opus]",
      "project_manager": "[model from DB, default: opus]",
@@ -1204,6 +1210,13 @@ ELSE IF PM chose "parallel":
 |-------------|------------|-------|-------------|
 | Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev: {task[:90]}` |
 | Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE: {task[:90]}` |
+| Requirements Engineer | `agents/requirements_engineer.md` | `MODEL_CONFIG["requirements_engineer"]` | `Research: {task[:90]}` |
+
+**🔴 Research Task Override:** If PM sets `type: research` for a task group, spawn Requirements Engineer regardless of initial_tier. RE produces research deliverables (not code) and returns `READY_FOR_REVIEW` status which routes to Tech Lead for validation.
+
+**🔴 Type Precedence:** If a task is both research AND security-sensitive (e.g., "Research OAuth vulnerabilities"), `type: research` takes precedence for agent selection (spawn RE, not SSE). The security_sensitive flag still ensures mandatory TL review, but the research nature determines the agent type.
+
+**🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
 
 **Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
@@ -1443,6 +1456,10 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 - **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
 - Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
 - This bypasses revision count check - explicit escalation from QA's challenge testing
+
+**🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
+- ALWAYS spawn Senior Software Engineer for fixes (never regular Developer)
+- Security tasks bypass normal revision count escalation - SSE from the start
 
 **IF Senior Software Engineer also fails (revision >= 2 after Senior Eng):**
 - Spawn Tech Lead for guidance
@@ -1686,6 +1703,11 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 - IF revision count == 1: Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
 - IF revision count == 2 AND previous was Senior Eng: Spawn Tech Lead for guidance
 - IF revision count > 2: Spawn PM to evaluate if task should be simplified
+
+**🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
+- ALWAYS spawn Senior Software Engineer (never regular Developer)
+- On failure, escalate directly to Tech Lead (skip revision count check)
+- Security tasks CANNOT be simplified by PM - must be completed by SSE
 
 **🔴 CRITICAL:** SPAWN the Task - don't write "Fix the Tech Lead's feedback" and stop
 
@@ -2118,6 +2140,28 @@ Orchestrator output:
 |------------------|------------|-------|-------------|
 | Developer (default) | `agents/developer.md` | `MODEL_CONFIG["developer"]` | `Dev {group}: {task[:90]}` |
 | Senior Software Engineer | `agents/senior_software_engineer.md` | `MODEL_CONFIG["senior_software_engineer"]` | `SSE {group}: {task[:90]}` |
+| Requirements Engineer | `agents/requirements_engineer.md` | `MODEL_CONFIG["requirements_engineer"]` | `Research {group}: {task[:90]}` |
+
+**🔴 Research Task Override:** If PM sets `type: research`, spawn Requirements Engineer. Research groups run in Phase 1 (MAX 2 parallel), implementation groups in Phase 2+ (MAX 4 parallel).
+
+**Parallelism Enforcement:** PM enforces MAX 2 research groups during planning. Orchestrator enforces MAX 4 implementation groups. Do NOT schedule >2 research groups concurrently.
+
+**🔴 Enforcement Rule (before spawning):**
+```
+# Parse type from PM's markdown description (e.g., "**Type:** research")
+# NOT from database column (DB only stores initial_tier: developer/senior_software_engineer)
+def get_task_type(pm_markdown):
+    # Look for "**Type:** X" pattern in PM's description (case-insensitive)
+    # Note: search string MUST be lowercase since we call .lower() on input
+    if "**type:** research" in pm_markdown.lower():
+        return "research"
+    return "implementation"  # default
+
+research_groups = [g for g in groups if get_task_type(g.pm_markdown) == "research"]
+impl_groups = [g for g in groups if get_task_type(g.pm_markdown) != "research"]
+IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not error
+IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
+```
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 

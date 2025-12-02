@@ -876,42 +876,54 @@ GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)
 - Classic PAT with `repo` scope (required for GraphQL thread resolution)
 - Fine-grained PATs do NOT support `resolveReviewThread` mutation
 
-**Load token in scripts:**
-```bash
-GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
-```
+### Workflow: Fetching PR Reviews (WORKING PATTERN)
 
-### Workflow: Responding to PR Review Comments
+**🔴 CRITICAL: Always save to file first, then process with jq. Piping directly causes failures.**
 
-**Step 1: Fetch review threads (GraphQL)**
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/graphql" \
-  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
-```
-
-**Step 2: Resolve threads (GraphQL mutation)**
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/graphql" \
-  -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
-```
-
-**Batch resolve multiple threads:**
+**Step 1: Fetch reviews + comments (combined query)**
 ```bash
 GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+PR_NUMBER=XXX
 
-for thread_id in PRRT_xxx PRRT_yyy PRRT_zzz; do
-  curl -s -X POST \
-    -H "Authorization: Bearer $GITHUB_TOKEN" \
-    -H "Content-Type: application/json" \
-    "https://api.github.com/graphql" \
-    -d "{\"query\": \"mutation { resolveReviewThread(input: {threadId: \\\"$thread_id\\\"}) { thread { id isResolved } } }\"}"
-done
+curl -sSf -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 30) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+
+# List reviews (author | commit | date)
+# Note: Use null-coalescing (//) to handle reviews with null commit
+jq -r '.data.repository.pullRequest.reviews.nodes[] | "\(.author.login) | \((.commit.oid // "")[0:7]) | \(.createdAt)"' /tmp/pr_data.json
+
+# List comments (author | date)
+jq -r '.data.repository.pullRequest.comments.nodes[] | "\(.author.login) | \(.createdAt)"' /tmp/pr_data.json
+
+# Get specific review body
+jq -r '.data.repository.pullRequest.reviews.nodes[-1].body' /tmp/pr_data.json
+
+# Get github-actions comments after timestamp (OpenAI/Gemini reviews)
+jq -r '.data.repository.pullRequest.comments.nodes[] | select(.author.login == "github-actions") | select(.createdAt > "2025-12-02T13:00:00Z") | .body' /tmp/pr_data.json
+```
+
+**Step 2: Fetch inline threads (separate query - larger payload)**
+```bash
+curl -sSf -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviewThreads(last: 20) { nodes { id isResolved path line comments(first: 2) { nodes { author { login } body } } } } } } }\"}" > /tmp/pr_threads.json
+
+# Show unresolved threads
+jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | "[\(.path):\(.line)]\n\(.comments.nodes[0].body)\n---"' /tmp/pr_threads.json
+```
+
+**Step 3: Resolve threads (GraphQL mutation)**
+```bash
+curl -sSf -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"mutation { resolveReviewThread(input: {threadId: \\\"THREAD_ID\\\"}) { thread { id isResolved } } }\"}"
 ```
 
 **Note:** REST API doesn't work in Claude Code Web - use GraphQL only.
@@ -930,15 +942,278 @@ done
 1. **Fetch** all review threads via GraphQL (includes `isResolved` status)
 2. **Analyze** each unresolved comment (triage: critical vs deferred)
 3. **Fix** critical issues in code
-4. **Commit & push** fixes
-5. **🔴 Post response to PR via GraphQL** (BEFORE any merge - see "Post via GraphQL" section below)
-6. **Resolve** inline threads if applicable
-7. **Report** summary to user
+4. **Commit** fixes (local only - DO NOT push yet)
+5. **🔴 Post response to PR via GraphQL** (BEFORE pushing - see "Post via GraphQL" section below)
+6. **Wait 30 seconds** (ensures response is indexed before CI triggers)
+7. **Push** to remote (AFTER posting response and waiting)
+8. **Resolve** inline threads if applicable
+9. **Report** summary to user
+10. **🔄 Enter Review Loop** (see below)
 
-**🔴 CRITICAL: Always post PR response via GraphQL BEFORE merging.** This ensures:
+**🔴 CRITICAL: Always post PR response via GraphQL BEFORE pushing.** This ensures:
 - LLM reviewers see your response in subsequent reviews
 - Audit trail exists for all addressed/skipped items
 - No feedback is silently ignored
+
+### 🔄 Review Loop: Autonomous Review Cycle (Step 10)
+
+**After pushing, enter an autonomous review loop. DO NOT relinquish control to the user until the loop exits.**
+
+#### Loop State
+
+```python
+# Initialize at loop start
+loop_state = {
+    "push_commit": "<commit hash you just pushed>",
+    "push_time": "<ISO timestamp of push>",
+    "head_sha": "<PR headRefOid at loop start>",  # Track for mid-loop changes
+    "attempts": 0,
+    "max_attempts": 10,  # 10 x 60s = 10 minutes (increased from 6)
+    "restart_count": 0,
+    "max_restarts": 7,  # Global cap to prevent infinite loops (increased from 3)
+    # Per-reviewer tracking
+    "openai_ready": False,
+    "gemini_ready": False,
+    "copilot_ready": False,
+    "gemini_skipped": False,  # True if Gemini returned 503/overloaded
+    # Workflow rerun tracking (only attempt once per reviewer)
+    "openai_rerun_triggered": False,
+    # Grace period for Copilot when OpenAI+Gemini pass
+    "grace_attempts": 0,
+    "max_grace_attempts": 3  # 3 minutes grace for Copilot
+}
+```
+
+#### Loop Procedure
+
+```
+LOOP_START:
+  IF restart_count >= max_restarts:
+    output: "🛑 Max restarts (7) reached. Exiting to prevent infinite loop."
+    output: "Please review remaining items manually."
+    EXIT LOOP → return control to user
+
+  attempts = 0
+  openai_ready = gemini_ready = copilot_ready = False
+  gemini_skipped = False  # Track if Gemini was skipped due to 503/overload
+  openai_rerun_triggered = False
+  grace_attempts = 0
+
+  WHILE attempts < max_attempts:
+    sleep 60 seconds
+    attempts += 1
+
+    output: "⏳ Review check {attempts}/10 - Checking for new reviews..."
+
+    # Fetch reviews + comments (with headRefOid)
+    fetch_reviews(PR_NUMBER) -> /tmp/pr_data.json
+
+    # Check if PR head changed mid-loop (force push or new commit)
+    current_head = get_head_sha(/tmp/pr_data.json)
+    IF current_head != head_sha:
+      output: "⚠️ PR head changed. Resetting loop for new commit..."
+      head_sha = current_head
+      push_time = now()
+      attempts = 0
+      CONTINUE
+
+    # Check for reviews (use test() for author to match both variants)
+    copilot_review = check_review(author="copilot-pull-request-reviewer", commit=push_commit)
+    openai_review = check_comment(author=test("github-actions"), contains="OpenAI Code Review", after=push_time)
+    gemini_review = check_comment(author=test("github-actions"), contains="Gemini Code Review", after=push_time)
+
+    # === WORKFLOW FAILURE DETECTION ===
+    # Gemini workflow auto-retries with fallback model (gemini-2.5-flash) on 503
+    # If both models fail, we still get a review (with error message)
+
+    # Check if Gemini completely failed (both primary and fallback)
+    IF gemini_review contains "Fallback model" and contains "also failed":
+      output: "⏭️ Gemini API unavailable (both primary and fallback failed). Proceeding with OpenAI only."
+      gemini_ready = True  # Mark as "received" (workflow completed, even if with error)
+      gemini_skipped = True
+
+    # Check for failures in OpenAI
+    IF openai_review contains "API Error" or "Timeout":
+      IF NOT openai_rerun_triggered:
+        output: "🔄 OpenAI API failed. Triggering workflow rerun..."
+        rerun_workflow("OpenAI PR Review", head_sha)
+        openai_rerun_triggered = True
+        openai_ready = False
+        CONTINUE
+
+    # Update ready status (only if review is valid, not error)
+    openai_ready = openai_review exists AND NOT contains("API Error", "Timeout")
+    IF NOT gemini_skipped:
+      gemini_ready = gemini_review exists AND NOT contains("503", "overloaded", "Timeout")
+    copilot_ready = copilot_review exists
+
+    reviews_ready = count([openai_ready, gemini_ready, copilot_ready])
+    output: "⏳ {reviews_ready}/3 reviews ready"
+
+    # === EARLY-START OPTIMIZATION ===
+    # If OpenAI and Gemini are ready, we can start fixing without waiting for Copilot
+    IF openai_ready AND gemini_ready:
+      items = extract_all_items(openai_review, gemini_review)
+      items = deduplicate(items, key=lambda i: f"{i.file}:{i.line}")
+      critical_items = [i for i in items if i.category == "Critical"]
+      actionable_items = [i for i in items if i.actionable]
+
+      IF len(actionable_items) > 0:
+        # Start fixing immediately (don't wait for Copilot)
+        output: "🔧 OpenAI+Gemini have {len(actionable_items)} issue(s). Starting fixes..."
+        process_and_fix(actionable_items)
+        push_fixes()
+        # Update head_sha after push
+        head_sha = get_new_head_sha()
+        openai_ready = gemini_ready = copilot_ready = False
+        restart_count += 1
+        GOTO LOOP_START  # Reset timer for next cycle
+
+      ELSE IF copilot_ready:
+        # All 3 ready, no issues
+        output: "✅ All 3 reviews passed - no critical issues or actionable items!"
+        EXIT LOOP → return control to user (SUCCESS)
+
+      ELSE:
+        # === QUORUM+GRACE: OpenAI+Gemini passed, wait short grace for Copilot ===
+        grace_attempts += 1
+        IF grace_attempts <= max_grace_attempts:
+          output: "⏳ OpenAI+Gemini passed. Waiting for Copilot (grace {grace_attempts}/3)..."
+          CONTINUE
+        ELSE:
+          # Grace period expired - proceed with 2/3 pass
+          output: "✅ OpenAI+Gemini passed. Copilot not received (grace expired)."
+          EXIT LOOP → return control to user (SUCCESS)
+
+    # Not enough reviews yet
+    IF reviews_ready == 0:
+      output: "⏳ No reviews yet ({attempts}/10)..."
+
+    CONTINUE
+
+  # Max attempts reached (10 minutes)
+  IF attempts >= max_attempts:
+    output: "⏱️ Timeout: 10 minutes elapsed. Reviews status:"
+    output: "  - Copilot: {copilot_ready ? '✅' : '❌'}"
+    output: "  - OpenAI: {openai_ready ? '✅' : '❌'}"
+    output: "  - Gemini: {gemini_ready ? '✅' : '❌'}"
+    # Process whatever reviews are available
+    IF openai_ready OR gemini_ready:
+      output: "📋 Processing available reviews..."
+      items = extract_all_items(available_reviews)
+      IF len(items) > 0:
+        process_and_fix(items)
+        # Don't restart - just exit after fixing
+    output: "Please check CI pipelines if reviews are missing."
+    EXIT LOOP → return control to user
+```
+
+#### Exit Conditions
+
+| Condition | Action |
+|-----------|--------|
+| **All 3 reviews passed** (no critical/actionable items) | ✅ Exit loop, report success |
+| **OpenAI+Gemini passed + grace expired** (Copilot slow/missing) | ✅ Exit loop with quorum (2/3 pass) |
+| **Review workflow failed** (API error, 503) | 🔄 Trigger workflow rerun (once per reviewer) |
+| **10 minute timeout** (reviews not appearing) | ⏱️ Exit loop, process available reviews |
+| **Max restarts reached** (7 cycles) | 🛑 Exit loop, prevent infinite loop |
+| **PR head changed** (force push) | 🔄 Reset loop for new head |
+| **OpenAI+Gemini have issues** | 🔧 Start fixing immediately (early-start), don't wait for Copilot |
+
+#### Workflow Rerun Function
+
+When a review workflow fails (503, timeout), trigger a rerun via REST API:
+
+```bash
+rerun_workflow() {
+  WORKFLOW_NAME=$1  # e.g., "Gemini PR Review"
+  HEAD_SHA=$2
+  GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+
+  # Find the workflow run by name and head_sha
+  # Use workflow file path for reliable matching
+  WORKFLOW_PATH=""
+  case "$WORKFLOW_NAME" in
+    "Gemini PR Review") WORKFLOW_PATH=".github/workflows/gemini-pr-review.yml" ;;
+    "OpenAI PR Review") WORKFLOW_PATH=".github/workflows/openai-pr-review.yml" ;;
+  esac
+
+  # Sort by run_number descending to get the most recent run (not first match)
+  RUN_ID=$(curl -sSf -H "Authorization: Bearer $GITHUB_TOKEN" \
+    "https://api.github.com/repos/mehdic/bazinga/actions/runs?event=pull_request&head_sha=$HEAD_SHA" | \
+    jq -r "[.workflow_runs[] | select(.path == \"$WORKFLOW_PATH\")] | sort_by(.run_number) | last | .id")
+
+  if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
+    # Trigger rerun and check HTTP status (expect 201 Created)
+    HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/rerun_response.json -X POST \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      "https://api.github.com/repos/mehdic/bazinga/actions/runs/$RUN_ID/rerun")
+
+    if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
+      echo "✅ Workflow rerun triggered: $WORKFLOW_NAME (Run ID: $RUN_ID)"
+      return 0
+    else
+      echo "⚠️ Workflow rerun failed (HTTP $HTTP_CODE): $WORKFLOW_NAME"
+      return 1
+    fi
+  else
+    echo "⚠️ Could not find workflow run for: $WORKFLOW_NAME"
+    return 1
+  fi
+}
+```
+
+#### Implementation Notes
+
+```bash
+# Check for reviews on specific commit
+check_for_reviews() {
+  PR_NUMBER=$1
+  PUSH_COMMIT=$2
+  PUSH_TIME=$3
+
+  # Initialize GITHUB_TOKEN (critical - needed for API calls)
+  GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+  if [ -z "$GITHUB_TOKEN" ]; then
+    echo "ERROR: GITHUB_TOKEN not set" >&2
+    return 1
+  fi
+
+  # Fetch fresh data (include headRefOid)
+  curl -sSf -X POST \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Content-Type: application/json" \
+    "https://api.github.com/graphql" \
+    -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { headRefOid reviews(last: 30) { nodes { author { login } body commit { oid } createdAt } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+
+  # Get current head SHA
+  HEAD_SHA=$(jq -r '.data.repository.pullRequest.headRefOid' /tmp/pr_data.json)
+
+  # Check Copilot (reviews on our commit)
+  # Note: Use optional accessor (.oid?) and null-coalescing to handle reviews with null commit
+  COPILOT=$(jq -r ".data.repository.pullRequest.reviews.nodes[] | select(.author.login == \"copilot-pull-request-reviewer\") | select((.commit.oid? // \"\") | startswith(\"$PUSH_COMMIT\"))" /tmp/pr_data.json)
+
+  # Check OpenAI/Gemini (use test() to match both "github-actions" and "github-actions[bot]")
+  OPENAI=$(jq -r ".data.repository.pullRequest.comments.nodes[] | select(.author.login | test(\"github-actions\")) | select(.createdAt > \"$PUSH_TIME\") | select(.body | contains(\"OpenAI Code Review\"))" /tmp/pr_data.json)
+
+  GEMINI=$(jq -r ".data.repository.pullRequest.comments.nodes[] | select(.author.login | test(\"github-actions\")) | select(.createdAt > \"$PUSH_TIME\") | select(.body | contains(\"Gemini Code Review\"))" /tmp/pr_data.json)
+
+  echo "Head SHA: $HEAD_SHA"
+  echo "Copilot: $([ -n "$COPILOT" ] && echo "ready" || echo "waiting")"
+  echo "OpenAI: $([ -n "$OPENAI" ] && echo "ready" || echo "waiting")"
+  echo "Gemini: $([ -n "$GEMINI" ] && echo "ready" || echo "waiting")"
+}
+```
+
+#### Key Rules
+
+1. **DO NOT relinquish control** - Stay in the loop, don't ask user "should I check again?"
+2. **Sleep between checks** - `sleep 60` to avoid hammering the API
+3. **Track head SHA** - If PR head changes mid-loop, reset for new commit
+4. **Global restart cap** - Max 7 full workflow restarts to prevent infinite loops
+5. **Author matching** - Use `test("github-actions")` to match both variants
+6. **Deduplicate items** - Same file:line from multiple reviewers counts once
+7. **Report progress** - Output status each minute so user knows it's working
 
 ### 🔴 MANDATORY: Respond to ALL Feedback (Fixed AND Skipped)
 

@@ -24,6 +24,10 @@
       "model": "opus",
       "rationale": "Complex debugging and root cause analysis"
     },
+    "requirements_engineer": {
+      "model": "sonnet",
+      "rationale": "Research and evaluation tasks requiring deep reasoning"
+    },
     "validator": {
       "model": "sonnet",
       "rationale": "Independent BAZINGA verification - spawned only by PM"
@@ -50,15 +54,41 @@
       "description": "Escalate after Senior Software Engineer struggles twice"
     }
   },
+  "task_type_routing": {
+    "research": {
+      "agent": "requirements_engineer",
+      "model": "sonnet",
+      "markers": ["[R]", "research", "evaluate", "select", "compare", "design", "architecture"],
+      "matching": "case-insensitive",
+      "note": "Removed 'analyze' - too generic (e.g., 'analyze logs', 'analyze test results' matched research but should be debugging). Prefer explicit [R] marker.",
+      "description": "External research, vendor comparison, technology decisions, architecture design"
+    },
+    "implementation": {
+      "agent": "developer",
+      "model": "from_complexity_score",
+      "description": "Default for code implementation (uses complexity scoring)"
+    },
+    "security": {
+      "agent": "senior_software_engineer",
+      "model": "sonnet",
+      "markers": ["auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "jwt", "oauth", "saml", "sso", "bearer", "credential"],
+      "note": "Removed generic 'token' - too broad (matches CSRF token, string token). Added 'bearer', 'credential' instead.",
+      "matching": "case-insensitive",
+      "flags": {"security_sensitive": true},
+      "description": "Security-sensitive tasks - always SSE + mandatory TL review"
+    }
+  },
   "_metadata": {
-    "version": "1.0.0",
-    "description": "Model selection and escalation rules for BAZINGA agents",
-    "last_updated": "2025-11-25",
+    "version": "1.2.0",
+    "description": "Model selection, escalation rules, and task type routing for BAZINGA agents",
+    "last_updated": "2025-12-02",
     "notes": [
       "Tech Lead and PM are ALWAYS on Opus - non-negotiable",
       "Developer starts on Haiku for cost efficiency",
       "Senior Software Engineer on Sonnet handles escalated complexity",
-      "Escalation triggers after 1 failure (not 2)"
+      "Escalation triggers after 1 failure (not 2)",
+      "Security tasks always use SSE + mandatory TL review",
+      "Research/architecture tasks route to Requirements Engineer"
     ]
   }
 }
