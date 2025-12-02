@@ -932,9 +932,10 @@ done
 3. **Fix** critical issues in code
 4. **Commit** fixes (local only - DO NOT push yet)
 5. **🔴 Post response to PR via GraphQL** (BEFORE pushing - see "Post via GraphQL" section below)
-6. **Push** to remote (AFTER posting response)
-7. **Resolve** inline threads if applicable
-8. **Report** summary to user
+6. **Wait 30 seconds** (ensures response is indexed before CI triggers)
+7. **Push** to remote (AFTER posting response and waiting)
+8. **Resolve** inline threads if applicable
+9. **Report** summary to user
 
 **🔴 CRITICAL: Always post PR response via GraphQL BEFORE pushing.** This ensures:
 - LLM reviewers see your response in subsequent reviews
