@@ -1253,27 +1253,27 @@ if task_group.get("security_sensitive"):
 
 ## Final Implementation Checklist (Revised with All Feedback)
 
-### Phase 1: Research Routing
+### Phase 1: Research Routing ✅ COMPLETE (commit 122af0e)
 
 **requirements_engineer.md:**
-- [ ] Add "Research Mode" section
-- [ ] **CRITICAL (Gemini):** Output status `READY_FOR_REVIEW` (not `RESEARCH_COMPLETE`)
-- [ ] **CRITICAL (Gemini):** Add instruction: "Non-interactive - mark BLOCKED if info missing"
-- [ ] Define research deliverable format (markdown with recommendations)
+- [x] Add "Research Mode" section ✅
+- [x] **CRITICAL (Gemini):** Output status `READY_FOR_REVIEW` (not `RESEARCH_COMPLETE`) ✅
+- [x] **CRITICAL (Gemini):** Add instruction: "Non-interactive - mark BLOCKED if info missing" ✅
+- [x] Define research deliverable format (markdown with recommendations) ✅
 
 **project_manager.md:**
-- [ ] Add `[R]` tag detection for research tasks
-- [ ] Add `type: research` field to task groups in PM state
-- [ ] Ensure research tasks assigned to Phase 1
-- [ ] **CRITICAL (Gemini):** Include artifact paths in Phase 2 task descriptions
+- [x] Add `[R]` tag detection for research tasks ✅
+- [x] Add `type: research` field to task groups in PM state ✅
+- [x] Ensure research tasks assigned to Phase 1 ✅
+- [x] **CRITICAL (Gemini):** Include artifact paths in Phase 2 task descriptions ✅
 
 **model_selection.json:**
-- [ ] Add `requirements_engineer` entry with `sonnet` model
+- [x] Add `requirements_engineer` entry with `sonnet` model ✅
 
 **orchestrator.md:**
-- [ ] Add `requirements_engineer` to tier_selection table (1 line)
-- [ ] Add spawn override: if `type == "research"`, spawn RE instead of Dev
-- [ ] **NO new status handling** (uses existing READY_FOR_REVIEW → TL flow)
+- [x] Add `requirements_engineer` to tier_selection table (1 line) ✅
+- [x] Add spawn override: if `type == "research"`, spawn RE instead of Dev ✅
+- [x] **NO new status handling** (uses existing READY_FOR_REVIEW → TL flow) ✅
 
 ### Phase 2: Security Override
 
