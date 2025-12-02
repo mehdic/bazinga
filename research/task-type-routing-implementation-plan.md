@@ -132,7 +132,7 @@ User Request → PM → Complexity Score → Developer (Haiku) OR SSE (Sonnet)
     "research": {
       "agent": "requirements_engineer",
       "model": "sonnet",
-      "keywords": ["research", "evaluate", "select", "compare", "analyze", "discovery", "investigation"],
+      "keywords": ["research", "evaluate", "select", "compare", "analyze", "discovery"],
       "description": "External research, vendor comparison, technology decisions"
     },
     "implementation": {
@@ -201,9 +201,13 @@ For each task group, classify the type FIRST:
 
 **Workflow Ordering:**
 - Research groups in Phase 1, implementation in Phase 2+
-- Research groups can run in parallel (MAX 2)
-- Implementation groups can run in parallel (MAX 4)
+- Research groups can run in parallel (MAX 2, enforced by PM when assigning phase groups)
+- Implementation groups can run in parallel (MAX 4, existing orchestrator limit)
 - **Status remains PLANNING_COMPLETE** (no new status code)
+
+> **Note:** MAX 2 research parallelism is a PM planning constraint, not an orchestrator semaphore.
+> PM assigns at most 2 research groups per execution phase. Orchestrator's existing MAX 4
+> parallel limit applies to implementation groups only.
 ```
 
 #### Step 2.2: Add Research Success Criteria
@@ -381,8 +385,12 @@ You are now operating in **Research Mode** - your output will inform implementat
 
 ### Research Mode Status Codes
 
-- `RESEARCH_COMPLETE` - Research finished, deliverable ready
-- `RESEARCH_BLOCKED` - Need external access or permissions
+> **⚠️ REVISED:** Per GPT-5/Gemini review, RE should use **existing** status codes to avoid QA Trap:
+> - Use `READY_FOR_REVIEW` instead of `RESEARCH_COMPLETE` (routes to TL, bypasses QA)
+> - Use `BLOCKED` instead of `RESEARCH_BLOCKED` (triggers Investigator)
+
+- `READY_FOR_REVIEW` - Research finished, deliverable ready (routes to Tech Lead)
+- `BLOCKED` - Need external access or permissions (triggers Investigator)
 - `NEEDS_MORE_INFO` - Need clarification from PM (rare)
 
 ### Tool Usage in Research Mode
@@ -396,6 +404,12 @@ You are now operating in **Research Mode** - your output will inform implementat
 - Edit - No code modifications
 - Write - Only the deliverable output
 - Task - No spawning other agents
+
+> **Security Guardrails (OpenAI Review):**
+> - WebSearch/WebFetch require `web_research: true` in skills_config.json (feature flag)
+> - If skills_config disables web research, RE falls back to codebase-only discovery
+> - Research outputs should not include PII, credentials, or secrets from fetched pages
+> - Rate limiting: implicit via Claude Code's built-in WebFetch caching (15-min TTL)
 ```
 
 ### Phase 5: Template Updates
@@ -523,9 +537,10 @@ Phase 2: Implementation (Parallel, MAX 4)
    - Input: "[R] Database Selection" → Output: `type: research`
 
 2. **Orchestrator Status Routing**
-   - Status: RESEARCH_ASSIGNED → Spawns RE
-   - Status: RESEARCH_COMPLETE → Routes to next group or implementation
-   - Status: RESEARCH_BLOCKED → Spawns Investigator
+   > **⚠️ REVISED:** Uses existing statuses per GPT-5/Gemini review
+   - Task type: `research` + tier: `requirements_engineer` → Spawns RE
+   - Status: READY_FOR_REVIEW → Routes to Tech Lead for validation
+   - Status: BLOCKED → Spawns Investigator
 
 3. **Model Selection**
    - Research task → MODEL_CONFIG["requirements_engineer"] → sonnet
@@ -556,16 +571,17 @@ Phase 2: Implementation (Parallel, MAX 4)
 
 ### Phase 2: PM Changes (Day 1-2)
 - [ ] Add task-type classification section to PM (30 lines)
-- [ ] Add RESEARCH_ASSIGNED status format (15 lines)
+- [ ] Add `type: research` field to task groups in PM state
 - [ ] Test PM output with research task
 - [ ] Verify existing complexity scoring unchanged
 
 ### Phase 3: Orchestrator Changes (Day 2-3)
+> **⚠️ REVISED:** Minimal changes - NO new status handling needed
 - [ ] Add RE to agent status table (1 line)
 - [ ] Add RE to MODEL_CONFIG (1 line)
-- [ ] Add RESEARCH_ASSIGNED handling (25 lines)
+- [ ] Add spawn override: if `type == "research"`, spawn RE (10 lines)
 - [ ] Add RE to tier selection table (1 line)
-- [ ] Test status routing with mock responses
+- [ ] Test tier-based spawning with mock responses
 - [ ] Verify existing workflows unchanged
 
 ### Phase 4: RE Updates (Day 3)

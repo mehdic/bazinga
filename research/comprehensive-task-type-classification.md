@@ -4,7 +4,7 @@
 **Context:** Expanding task-type routing beyond research/implementation to all task categories
 **Decision:** Define complete task taxonomy with optimal agent routing for each type
 **Status:** Reviewed and Revised
-**Reviewed by:** OpenAI GPT-5 (2025-12-02)
+**Reviewed by:** OpenAI GPT-5 (2025-12-02), Google Gemini (2025-12-02)
 
 ---
 
@@ -573,9 +573,17 @@ PM → Phase 1: [RE, RE] parallel (max 2) → Findings
 
 ## Database and Workflow Impact Analysis
 
+> **⚠️ STATUS: REJECTED FOR PHASE 1**
+>
+> Per GPT-5 review, Phase 1 implements research routing **without any DB changes**.
+> The task_type is stored in PM state only. This section documents the original
+> analysis for future reference if DB persistence is needed in Phase 3+.
+>
+> **See "Multi-LLM Review Integration" section for the revised minimal approach.**
+
 ### Current Database Schema
 
-**Schema Version:** 5 (requires v6 for task type routing)
+**Schema Version:** 5 (requires v6 for task type routing - **DEFERRED**)
 
 **Affected Table:** `task_groups`
 

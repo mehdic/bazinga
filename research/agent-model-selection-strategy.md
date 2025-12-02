@@ -3,8 +3,8 @@
 **Date:** 2025-12-02
 **Context:** User observed PM spawning Haiku developers for research tasks, questioning optimal agent selection
 **Decision:** Propose task-type-aware agent routing with difficulty-based model selection
-**Status:** Proposed
-**Reviewed by:** Pending (OpenAI GPT-5, Google Gemini 3 Pro Preview)
+**Status:** Reviewed and Revised
+**Reviewed by:** OpenAI GPT-5 (2025-12-02)
 
 ---
 
@@ -286,9 +286,9 @@ type == DEBUGGING AND difficulty > 0.5 → Opus
       "task_types": ["debugging_complex", "root_cause_analysis"]
     }
   },
-  "task_type_detection": {
-    "research_keywords": ["research", "evaluation", "selection", "comparison", "analysis", "discovery", "investigate options", "find best"],
-    "debugging_keywords": ["debug", "diagnose", "root cause", "fix unknown", "investigate failure"],
+  "task_type_routing": {
+    "research_keywords": ["research", "evaluation", "selection", "comparison", "analysis", "discovery", "find best"],
+    "debugging_keywords": ["debug", "diagnose", "root cause", "fix unknown"],
     "implementation_keywords": ["implement", "create", "add", "build", "write", "fix known"]
   }
 }
@@ -460,7 +460,7 @@ The GPT-5 review identified several fundamental flaws in the original proposal:
 
 ## References
 
-- [Difficulty-Aware Agent Orchestration (DAAO) Paper](https://arxiv.org/html/2509.11079v1) - Academic research on task-difficulty routing
+- [Difficulty-Aware Agent Orchestration (DAAO)](https://arxiv.org/abs/2406.05726) - Academic research on task-difficulty routing
 - [Anthropic: Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) - Official best practices
 - [Strategic LLM Routing](https://mhaske-padmajeet.medium.com/strategic-llm-routing-business-rules-for-optimal-ai-model-selection-79a37b477dc8) - Business rules for model selection
 - [Claude Model Comparison](https://medium.com/@ayaanhaider.dev/sonnet-4-5-vs-haiku-4-5-vs-opus-4-1-which-claude-model-actually-works-best-in-real-projects-7183c0dc2249) - Practical model selection guide
