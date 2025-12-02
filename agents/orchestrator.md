@@ -1215,6 +1215,10 @@ ELSE IF PM chose "parallel":
 
 **🔴 Research Task Override:** If PM sets `type: research` for a task group, spawn Requirements Engineer regardless of initial_tier. RE produces research deliverables (not code) and returns `READY_FOR_REVIEW` status which routes to Tech Lead for validation.
 
+**🔴 Type Precedence:** If a task is both research AND security-sensitive (e.g., "Research OAuth vulnerabilities"), `type: research` takes precedence for agent selection (spawn RE, not SSE). The security_sensitive flag still ensures mandatory TL review, but the research nature determines the agent type.
+
+**🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
+
 **Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
@@ -2145,10 +2149,16 @@ Orchestrator output:
 
 **🔴 Enforcement Rule (before spawning):**
 ```
-# Read g.type from PM's markdown description (e.g., "**Type:** research")
+# Parse type from PM's markdown description (e.g., "**Type:** research")
 # NOT from database column (DB only stores initial_tier: developer/senior_software_engineer)
-research_groups = [g for g in groups if g.type == "research"]
-impl_groups = [g for g in groups if g.type != "research"]
+def get_task_type(pm_markdown):
+    # Look for "**Type:** X" pattern in PM's description
+    if "**Type:** research" in pm_markdown.lower():
+        return "research"
+    return "implementation"  # default
+
+research_groups = [g for g in groups if get_task_type(g.pm_markdown) == "research"]
+impl_groups = [g for g in groups if get_task_type(g.pm_markdown) != "research"]
 IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not error
 IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```

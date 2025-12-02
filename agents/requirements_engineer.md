@@ -600,10 +600,14 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 ## Research Status (for readers): READY_FOR_REVIEW
 ```
 
-**🔴 CRITICAL:**
-- The **deliverable file** uses "Research Status (for readers):" - NOT parsed by orchestrator
-- Your **agent response** must include `## Status: READY_FOR_REVIEW` - THIS is what orchestrator parses
-- This prevents duplicate status tokens from confusing the parser
+**🔴 CRITICAL:** Two different status outputs - don't confuse them:
+
+| Output Type | Format | Parsed by Orchestrator? |
+|-------------|--------|------------------------|
+| **Deliverable file** | `## Research Status (for readers): READY_FOR_REVIEW` | ❌ No (human-readable) |
+| **Agent response** | `## Status: READY_FOR_REVIEW` | ✅ Yes (controls workflow) |
+
+Only the agent response status controls workflow routing.
 
 ### Research Mode Status Codes
 
@@ -642,9 +646,13 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 **✅ CONDITIONALLY ALLOWED (check skills_config.web_research):**
 - WebSearch - External research (vendor docs, comparisons)
 - WebFetch - Specific page content
+  - **Note:** WebFetch is a built-in Claude Code tool with its own URL validation
+  - **Best practice:** Only fetch URLs from trusted sources (official vendor docs, reputable tech blogs)
+  - **Avoid:** User-provided URLs without verification, internal/localhost URLs, IP addresses
 
 **🔴 WEB RESEARCH GATING:**
 ```
+# skills_config is passed in your prompt by the Orchestrator (from bazinga/skills_config.json)
 IF skills_config.web_research == true:
   → Use WebSearch/WebFetch for external research
 ELSE:

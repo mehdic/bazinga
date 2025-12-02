@@ -876,42 +876,53 @@ GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)
 - Classic PAT with `repo` scope (required for GraphQL thread resolution)
 - Fine-grained PATs do NOT support `resolveReviewThread` mutation
 
-**Load token in scripts:**
-```bash
-GITHUB_TOKEN=$(cat ~/.bazinga-github-token)
-```
+### Workflow: Fetching PR Reviews (WORKING PATTERN)
 
-### Workflow: Responding to PR Review Comments
+**🔴 CRITICAL: Always save to file first, then process with jq. Piping directly causes failures.**
 
-**Step 1: Fetch review threads (GraphQL)**
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/graphql" \
-  -d '{"query": "query { repository(owner: \"mehdic\", name: \"bazinga\") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { id databaseId body author { login } } } } } } } }"}'
-```
-
-**Step 2: Resolve threads (GraphQL mutation)**
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://api.github.com/graphql" \
-  -d '{"query": "mutation { resolveReviewThread(input: {threadId: \"THREAD_ID\"}) { thread { id isResolved } } }"}'
-```
-
-**Batch resolve multiple threads:**
+**Step 1: Fetch reviews + comments (combined query)**
 ```bash
 GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+PR_NUMBER=XXX
 
-for thread_id in PRRT_xxx PRRT_yyy PRRT_zzz; do
-  curl -s -X POST \
-    -H "Authorization: Bearer $GITHUB_TOKEN" \
-    -H "Content-Type: application/json" \
-    "https://api.github.com/graphql" \
-    -d "{\"query\": \"mutation { resolveReviewThread(input: {threadId: \\\"$thread_id\\\"}) { thread { id isResolved } } }\"}"
-done
+curl -sSf -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 10) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 20) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+
+# List reviews (author | commit | date)
+jq -r '.data.repository.pullRequest.reviews.nodes[] | "\(.author.login) | \(.commit.oid[0:7]) | \(.createdAt)"' /tmp/pr_data.json
+
+# List comments (author | date)
+jq -r '.data.repository.pullRequest.comments.nodes[] | "\(.author.login) | \(.createdAt)"' /tmp/pr_data.json
+
+# Get specific review body
+jq -r '.data.repository.pullRequest.reviews.nodes[-1].body' /tmp/pr_data.json
+
+# Get github-actions comments after timestamp (OpenAI/Gemini reviews)
+jq -r '.data.repository.pullRequest.comments.nodes[] | select(.author.login == "github-actions") | select(.createdAt > "2025-12-02T13:00:00Z") | .body' /tmp/pr_data.json
+```
+
+**Step 2: Fetch inline threads (separate query - larger payload)**
+```bash
+curl -sSf -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviewThreads(last: 20) { nodes { id isResolved path line comments(first: 2) { nodes { author { login } body } } } } } } }\"}" > /tmp/pr_threads.json
+
+# Show unresolved threads
+jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | "[\(.path):\(.line)]\n\(.comments.nodes[0].body)\n---"' /tmp/pr_threads.json
+```
+
+**Step 3: Resolve threads (GraphQL mutation)**
+```bash
+curl -sSf -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.github.com/graphql" \
+  -d "{\"query\": \"mutation { resolveReviewThread(input: {threadId: \\\"THREAD_ID\\\"}) { thread { id isResolved } } }\"}"
 ```
 
 **Note:** REST API doesn't work in Claude Code Web - use GraphQL only.

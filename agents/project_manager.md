@@ -155,7 +155,7 @@ When creating Phase 2+ implementation groups that depend on Phase 1 research:
 ```
 Sanitize IDs before use in paths:
 - SESSION_ID/GROUP_ID must match: [A-Za-z0-9_] only
-- Replace invalid chars with underscore: id.replace(/[^A-Za-z0-9_]/g, '_')
+- Replace any character NOT in [A-Za-z0-9_] with underscore ("_")
 - ❌ NEVER allow "../" (path traversal)
 ```
 

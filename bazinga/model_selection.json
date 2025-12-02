@@ -60,7 +60,7 @@
       "model": "sonnet",
       "markers": ["[R]", "research", "evaluate", "select", "compare", "design", "architecture"],
       "matching": "case-insensitive",
-      "note": "Removed 'analyze' - too generic, causes misrouting. Prefer explicit [R] marker.",
+      "note": "Removed 'analyze' - too generic (e.g., 'analyze logs', 'analyze test results' matched research but should be debugging). Prefer explicit [R] marker.",
       "description": "External research, vendor comparison, technology decisions, architecture design"
     },
     "implementation": {
