@@ -86,11 +86,11 @@ For each task group, classify the type FIRST:
 
 **Research Tasks** (`type: research`):
 - Explicit `[R]` marker in task name (preferred)
-- Task name contains: "research", "evaluate", "select", "compare", "analyze"
+- Task name contains: "research", "evaluate", "select", "compare"
 - Task produces: decision document, comparison matrix, recommendation
 - **Initial Tier:** requirements_engineer (Sonnet)
 - **Execution Phase:** 1 (before implementation)
-- **NOTE:** "investigation" is NOT a research keyword - use Investigator for debugging
+- **NOTE:** "investigation" and "analyze" are NOT research keywords - too generic, causes misrouting
 
 **Architecture Tasks** (treated as research):
 - Task name contains: "design", "architecture", "API design", "schema design", "data model"
@@ -128,19 +128,23 @@ For each task group, classify the type FIRST:
 - **Initial Tier:** senior_software_engineer
 - **Execution Phase:** 2
 - **Depends On:** R1 (research must complete first)
-- **Research Reference:** bazinga/artifacts/{session}/research_group_R1.md
+- **Research Reference:** bazinga/artifacts/{SESSION_ID}/research_group_R1.md
 ```
 
 **Workflow Ordering:**
 - Research groups in Phase 1, implementation in Phase 2+
-- Research groups can run in parallel (MAX 2)
+- Research groups can run in parallel (MAX 2) - PM enforces this limit
 - Implementation groups can run in parallel (MAX 4, existing limit)
 - **Status remains PLANNING_COMPLETE** (no new status code)
+
+**🔴 IMPORTANT CLARIFICATIONS:**
+1. **Execution Phase ≠ Orchestrator Workflow Phase**: "Phase 1" here means task execution order, NOT orchestrator's internal workflow phases (Planning/Implementation)
+2. **Metadata is markdown-only**: `Type`, `Security Sensitive`, `Execution Phase` fields are for task description markdown ONLY - do NOT pass these as database columns to bazinga-db tool
 
 **🔴 CRITICAL: Artifact Path Handoff**
 
 When creating Phase 2+ implementation groups that depend on Phase 1 research:
-- Include `**Research Reference:** bazinga/artifacts/{session}/research_group_{id}.md` in the group description
+- Include `**Research Reference:** bazinga/artifacts/{SESSION_ID}/research_group_{id}.md` in the group description
 - Developers MUST read the research deliverable before starting implementation
 - This ensures research findings inform implementation decisions
 

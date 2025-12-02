@@ -58,7 +58,8 @@
     "research": {
       "agent": "requirements_engineer",
       "model": "sonnet",
-      "markers": ["[R]", "research", "evaluate", "select", "compare", "analyze", "design", "architecture"],
+      "markers": ["[R]", "research", "evaluate", "select", "compare", "design", "architecture"],
+      "note": "Removed 'analyze' - too generic, causes misrouting. Prefer explicit [R] marker.",
       "description": "External research, vendor comparison, technology decisions, architecture design"
     },
     "implementation": {
@@ -69,7 +70,8 @@
     "security": {
       "agent": "senior_software_engineer",
       "model": "sonnet",
-      "markers": ["auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "token", "JWT", "OAuth", "SAML", "SSO"],
+      "markers": ["auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "token", "jwt", "oauth", "saml", "sso"],
+      "matching": "case-insensitive",
       "flags": {"security_sensitive": true},
       "description": "Security-sensitive tasks - always SSE + mandatory TL review"
     }

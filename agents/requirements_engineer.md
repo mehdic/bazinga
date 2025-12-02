@@ -561,6 +561,11 @@ You are now operating in **Research Mode** - your output will inform implementat
 
 Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md`
 
+**Before writing:**
+1. Create directory: `mkdir -p bazinga/artifacts/{SESSION_ID}`
+2. Sanitize IDs: SESSION_ID and GROUP_ID must be alphanumeric/underscore only (`[A-Za-z0-9_]`)
+3. ❌ NEVER use `../` or absolute paths - prevents path traversal
+
 ```markdown
 # Research Deliverable: {Topic}
 
@@ -627,11 +632,21 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 - WebSearch - External research (vendor docs, comparisons)
 - WebFetch - Specific page content
 - Grep/Glob/Read - Codebase context
+- Write - ONLY for deliverable output to `bazinga/artifacts/{SESSION_ID}/` folder
 
 **❌ STILL FORBIDDEN:**
 - Edit - No code modifications
-- Write - Only the deliverable output to artifacts folder
 - Task - No spawning other agents
+- Write to paths outside artifacts folder
+
+**🔴 PRIVACY GUARDRAILS:**
+- ❌ DO NOT include secrets, API keys, or credentials in deliverables
+- ❌ DO NOT copy proprietary vendor content verbatim (cite sources instead)
+- ❌ DO NOT include PII (names, emails, internal usernames)
+- ✅ Redact any sensitive information discovered during research
+- ✅ Cite sources for external information
+
+**Note:** WebSearch/WebFetch are built-in Claude tools, not skills requiring skills_config.json.
 
 ### Output Format
 

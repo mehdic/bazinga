@@ -2139,6 +2139,8 @@ Orchestrator output:
 
 **🔴 Research Task Override:** If PM sets `type: research`, spawn Requirements Engineer. Research groups run in Phase 1 (MAX 2 parallel), implementation groups in Phase 2+ (MAX 4 parallel).
 
+**Parallelism Enforcement:** PM enforces MAX 2 research groups during planning. Orchestrator enforces MAX 4 implementation groups. Do NOT schedule >2 research groups concurrently.
+
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
 **Spawn ALL in ONE message (MAX 4 groups):**
