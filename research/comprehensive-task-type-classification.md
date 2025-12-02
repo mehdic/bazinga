@@ -936,8 +936,7 @@ rm /tmp/test_bazinga.db
 
 ## Multi-LLM Review Integration
 
-**Reviewed by:** OpenAI GPT-5 on 2025-12-02
-**Gemini:** Skipped (ENABLE_GEMINI=false)
+**Reviewed by:** OpenAI GPT-5 on 2025-12-02, Google Gemini on 2025-12-02
 
 ### Critical Issues Identified by GPT-5
 
@@ -951,6 +950,55 @@ GPT-5 identified **6 critical issues** that require plan revision:
 | 4 | **Unaligned phase management** - Two sources of truth: task_groups.execution_phase vs PM.state.execution_phases | HIGH | **REVISED**: Use PM.state.execution_phases exclusively. No new DB column |
 | 5 | **New statuses not wired** - RESEARCH_COMPLETE not in orchestrator's routing tables | HIGH | **REVISED**: Reuse existing READY_FOR_REVIEW status with deliverable path |
 | 6 | **Token budget risk** - orchestrator.md and project_manager.md near limits | MEDIUM | **REVISED**: Minimal changes to large files. ~10 lines each max |
+
+### Critical Issues Identified by Gemini
+
+Gemini identified **2 critical flaws** not caught by GPT-5:
+
+| # | Issue | Severity | Resolution |
+|---|-------|----------|------------|
+| 7 | **"QA Trap" - Status Routing Void** - If RE returns RESEARCH_COMPLETE (a new status), orchestrator won't know how to handle it and will halt. If RE returns READY_FOR_QA, QA Expert will try to run unit tests on a Markdown document and fail. | CRITICAL | **REVISED**: RE must return `READY_FOR_REVIEW` to bypass QA and route directly to Tech Lead |
+| 8 | **"Blind Developer" Risk** - Phase 2 developers won't know research artifacts exist. Orchestrator doesn't pass artifact paths between phases. | HIGH | **REVISED**: PM must include artifact paths in Phase 2 task descriptions |
+
+#### The QA Trap Explained
+
+**The Problem:**
+The orchestrator has a rigid state machine:
+```
+READY_FOR_QA → Spawns QA Expert (runs tests)
+READY_FOR_REVIEW → Spawns Tech Lead (bypasses QA)
+RESEARCH_COMPLETE → ??? (no handler - system halts)
+```
+
+**The Trap:**
+- If RE returns `READY_FOR_QA` → QA Expert spawns → tries to run `pytest` on `research.md` → FAILS
+- If RE returns `RESEARCH_COMPLETE` → Orchestrator doesn't recognize status → HALTS
+
+**The Fix: Status Masquerading**
+Have Requirements Engineer return `READY_FOR_REVIEW` (an existing status). This:
+1. Bypasses QA Expert (no tests to run on markdown)
+2. Routes to Tech Lead (capable of reviewing text documents)
+3. Requires ZERO changes to orchestrator.md
+
+#### The Blind Developer Risk Explained
+
+**The Problem:**
+When Phase 2 (implementation) starts, developers don't automatically know about Phase 1 research artifacts.
+
+**Example Failure:**
+```
+Phase 1: RE produces → bazinga/artifacts/session_X/research_R1.md
+Phase 2: Developer spawns for "Implement OAuth"
+Developer: "Where should I start? I have no context about OAuth providers..."
+```
+
+**The Fix:**
+PM must explicitly include artifact paths in Phase 2 task descriptions:
+```markdown
+**Group A:** Implement OAuth Integration
+- **Research Reference:** bazinga/artifacts/{session}/research_R1.md
+- Read the research deliverable before starting implementation
+```
 
 ### Major Plan Revision: Minimal Viable Routing
 
@@ -1087,6 +1135,8 @@ if task_group.get("security_sensitive"):
 
 ### Incorporated Feedback
 
+**From GPT-5:**
+
 1. **No DB schema changes in Phase 1** ✅
    - Store task_type in PM.state only
    - Keep initial_tier values unchanged in DB
@@ -1114,6 +1164,23 @@ if task_group.get("security_sensitive"):
 7. **Offline fallback for research** ✅
    - Phase 1: codebase-only discovery (RE current capability)
    - Phase 2: Optional web research with explicit RE update
+
+**From Gemini:**
+
+8. **Status Masquerading to avoid QA Trap** ✅
+   - RE returns `READY_FOR_REVIEW` (not `RESEARCH_COMPLETE`)
+   - Bypasses QA Expert (can't test markdown)
+   - Routes directly to Tech Lead (can review text)
+   - Zero changes to orchestrator.md required
+
+9. **Artifact Path Handoff** ✅
+   - PM includes research artifact paths in Phase 2 task descriptions
+   - Developers know to read research before implementing
+   - Example: `**Research Reference:** bazinga/artifacts/{session}/research_R1.md`
+
+10. **Non-interactive Research Mode** ✅
+    - RE marks as BLOCKED if info missing (doesn't ask questions)
+    - Prevents workflow stalls from unanswered queries
 
 ### Revised Implementation Order
 
@@ -1146,12 +1213,14 @@ if task_group.get("security_sensitive"):
 
 ### Confidence Level
 
-**High** after revisions:
+**High** after revisions from both GPT-5 and Gemini:
 - ✅ No DB schema changes (major risk eliminated)
 - ✅ Reuses existing status codes (no parsing changes)
+- ✅ Status masquerading avoids QA Trap (Gemini)
 - ✅ Minimal orchestrator changes (~10 lines)
 - ✅ Single source of phase truth (PM.state)
 - ✅ TL/Investigator roles preserved
+- ✅ Artifact handoff ensures developer context (Gemini)
 - ✅ Offline-compatible (codebase-only discovery)
 
 ### Updated Summary
@@ -1165,4 +1234,49 @@ if task_group.get("security_sensitive"):
 | Investigation | Future | Keep for BLOCKED only | NO |
 | Implementation | Current | Unchanged | NO |
 
-**Key Insight from GPT-5 Review:** The original plan was over-scoped. Most of the value (fixing research task routing) can be achieved with minimal changes by storing task_type in PM state and overriding spawn logic, without touching the database schema or adding new status codes.
+**Key Insight from LLM Reviews:**
+- **GPT-5:** Original plan was over-scoped. Store task_type in PM state, not DB.
+- **Gemini:** Status masquerading (READY_FOR_REVIEW) avoids QA Trap with zero orchestrator changes.
+
+---
+
+## Final Implementation Checklist (Revised with All Feedback)
+
+### Phase 1: Research Routing
+
+**requirements_engineer.md:**
+- [ ] Add "Research Mode" section
+- [ ] **CRITICAL (Gemini):** Output status `READY_FOR_REVIEW` (not `RESEARCH_COMPLETE`)
+- [ ] **CRITICAL (Gemini):** Add instruction: "Non-interactive - mark BLOCKED if info missing"
+- [ ] Define research deliverable format (markdown with recommendations)
+
+**project_manager.md:**
+- [ ] Add `[R]` tag detection for research tasks
+- [ ] Add `type: research` field to task groups in PM state
+- [ ] Ensure research tasks assigned to Phase 1
+- [ ] **CRITICAL (Gemini):** Include artifact paths in Phase 2 task descriptions
+
+**model_selection.json:**
+- [ ] Add `requirements_engineer` entry with `sonnet` model
+
+**orchestrator.md:**
+- [ ] Add `requirements_engineer` to tier_selection table (1 line)
+- [ ] Add spawn override: if `type == "research"`, spawn RE instead of Dev
+- [ ] **NO new status handling** (uses existing READY_FOR_REVIEW → TL flow)
+
+### Phase 2: Security Override
+
+**project_manager.md:**
+- [ ] Add `security_sensitive: true` flag recognition
+- [ ] Force SSE tier for security tasks
+
+**orchestrator.md:**
+- [ ] Add TL approval enforcement for security-flagged groups
+
+### Verification Tests
+
+Before deploying, verify:
+1. [ ] RE returns READY_FOR_REVIEW → routes to TL (not QA)
+2. [ ] TL can review markdown research deliverable
+3. [ ] Phase 2 developers see research artifact paths in task descriptions
+4. [ ] Existing implementation tasks (no [R] tag) flow normally
