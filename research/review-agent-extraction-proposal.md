@@ -105,8 +105,8 @@ You are a PR review agent. Given a PR URL, you will:
 7. Return summary
 
 ## Execution Modes
-- **default**: Analyze + suggest changes only (no auto-push)
-- **fix**: Implement fixes with confirmation before each push
+- **fix** (default): Implement fixes, push, run review loop
+- **analyze**: Analyze + suggest changes only (no push)
 - **dry-run**: Generate summary without posting to GitHub
 
 ## Loop Guardrails
@@ -138,8 +138,8 @@ Replace ~820 lines with ~25 lines:
 /review-pr https://github.com/owner/repo/pull/123
 
 ### Modes
-- **default**: Analyze + suggest (no auto-push)
-- **fix**: Implement fixes (with confirmation)
+- **fix** (default): Implement fixes, push, review loop
+- **analyze**: Analyze + suggest only (no push)
 - **dry-run**: Summary only, no GitHub posts
 
 ### What it does
@@ -224,7 +224,7 @@ Parse the PR URL from arguments and spawn the review agent.
 |---|----------|--------|
 | 1 | Rename to `pr-review-agent.md` | ✅ Adopted |
 | 2 | Clarify GitHub endpoints | ✅ Adopted - specify exactly which APIs |
-| 3 | Default to analyze+suggest mode | ✅ Adopted - safer default |
+| 3 | Default mode | ✅ Using fix mode as default (user preference) |
 | 4 | Add confirmation gate for pushes | ✅ Adopted |
 | 5 | Bot comment markers for idempotency | ✅ Adopted |
 | 6 | Specify loop guardrails | ✅ Adopted - max 10 min, max 7 restarts |
