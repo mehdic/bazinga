@@ -400,7 +400,7 @@ The GPT-5 review identified several fundamental flaws in the original proposal:
    - Add optional WebFetch/WebSearch skills (feature-flagged)
    - Output format: executive summary, comparison matrix, recommendation, integration notes
    - Store artifacts to `bazinga/artifacts/`
-   - New statuses: `RESEARCH_COMPLETE`, `RESEARCH_BLOCKED`
+   - ~~New statuses: `RESEARCH_COMPLETE`, `RESEARCH_BLOCKED`~~ → **REVISED:** Uses existing `READY_FOR_REVIEW`/`BLOCKED` statuses
 
 3. **Research Workflow**
    ```
@@ -441,11 +441,11 @@ The GPT-5 review identified several fundamental flaws in the original proposal:
 
 ### Updated Implementation Checklist
 
-- [ ] Add `task_type` field to PM task group schema
-- [ ] Update `project_manager.md` with task type classification step
-- [ ] Extend `requirements_engineer.md` with Research Mode section
+- [x] Add `task_type` field to PM task group schema ✅ Done
+- [x] Update `project_manager.md` with task type classification step ✅ Done
+- [x] Extend `requirements_engineer.md` with Research Mode section ✅ Done
 - [ ] Add research-related skills to skills_config.json (feature-flagged)
-- [ ] Add new statuses (`RESEARCH_COMPLETE`, etc.) to orchestrator response parsing
+- [x] ~~Add new statuses~~ → Uses existing READY_FOR_REVIEW/BLOCKED ✅ Done
 - [ ] Update orchestrator message templates for research deliverables
 - [ ] Define research artifact path and DB logging schema
 - [ ] Add cost/iteration guardrails to PM research planning

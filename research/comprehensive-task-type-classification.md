@@ -500,10 +500,12 @@ PM → Phase 1: [RE, RE] parallel (max 2) → Findings
 
 ## Recommended Implementation Order
 
+> **⚠️ REVISED:** This original implementation order was superseded by the "Revised Implementation Order" section below (line ~1193). Phase 1 has NO database changes per GPT-5/Gemini review.
+
 ### Phase 1 (Immediate - Already Planned)
 
 1. **Research type** - Addresses the original problem
-2. **Database migration** - Enable new tier values
+2. ~~**Database migration** - Enable new tier values~~ → **DEFERRED** (No DB changes in Phase 1)
 3. **PM classification section** - Core routing logic
 
 ### Phase 2 (High Value - Security)
@@ -953,7 +955,7 @@ GPT-5 identified **6 critical issues** that require plan revision:
 | # | Issue | Severity | Resolution |
 |---|-------|----------|------------|
 | 1 | **Tech Lead/Investigator as initial tier breaks orchestrator** - Orchestrator expects TL to review code, not produce deliverables. Investigator only supported in investigation loop. | CRITICAL | **REVISED**: Remove TL/Investigator as initial tiers. Use architecture-as-research + TL validation instead |
-| 2 | **Requirements Engineer tool mismatch** - RE explicitly forbids Skills and web access, but research mode depends on WebSearch/WebFetch | CRITICAL | **REVISED**: Phase 1 uses codebase-only discovery. Web research optional in Phase 2 with explicit RE update |
+| 2 | **Requirements Engineer tool mismatch** - RE explicitly forbids Skills and web access, but research mode depends on WebSearch/WebFetch | CRITICAL | **REVISED**: Research Mode in RE now explicitly allows WebSearch/WebFetch for external research (see agents/requirements_engineer.md:624-628) |
 | 3 | **Risky DB schema changes** - Changing initial_tier casing ('Developer' → 'developer') breaks backward compatibility | HIGH | **REVISED**: NO DB schema changes in Phase 1. Store task_type in PM state only |
 | 4 | **Unaligned phase management** - Two sources of truth: task_groups.execution_phase vs PM.state.execution_phases | HIGH | **REVISED**: Use PM.state.execution_phases exclusively. No new DB column |
 | 5 | **New statuses not wired** - RESEARCH_COMPLETE not in orchestrator's routing tables | HIGH | **REVISED**: Reuse existing READY_FOR_REVIEW status with deliverable path |
@@ -1169,9 +1171,10 @@ if task_group.get("security_sensitive"):
    - PM.state.execution_phases only
    - No task_groups.execution_phase column
 
-7. **Offline fallback for research** ✅
-   - Phase 1: codebase-only discovery (RE current capability)
-   - Phase 2: Optional web research with explicit RE update
+7. **Web research enabled** ✅
+   - Research Mode allows WebSearch/WebFetch for external research
+   - Codebase tools (Grep/Glob/Read) also available
+   - See agents/requirements_engineer.md:624-628 for tool allowlist
 
 **From Gemini:**
 
@@ -1229,7 +1232,7 @@ if task_group.get("security_sensitive"):
 - ✅ Single source of phase truth (PM.state)
 - ✅ TL/Investigator roles preserved
 - ✅ Artifact handoff ensures developer context (Gemini)
-- ✅ Offline-compatible (codebase-only discovery)
+- ✅ Web research enabled (WebSearch/WebFetch in Research Mode)
 
 ### Updated Summary
 

@@ -759,10 +759,10 @@ PM saves research criteria:
 - [ ] Test tier-based spawning
 
 #### Phase 4: RE Updates (Day 2-3)
-- [ ] Add Research Mode section to RE (~40 lines)
-- [ ] Add artifact path for deliverables
-- [ ] Add research status codes (RESEARCH_COMPLETE, RESEARCH_BLOCKED)
-- [ ] Add offline fallback for web research
+- [x] Add Research Mode section to RE (~100 lines) ✅ Done
+- [x] Add artifact path for deliverables ✅ Done
+- [x] ~~Add research status codes~~ → Uses existing READY_FOR_REVIEW/BLOCKED
+- [ ] Add offline fallback for web research (optional)
 
 #### Phase 5: Template Updates (Day 3)
 - [ ] Update response_parsing.md with RE patterns
