@@ -889,7 +889,7 @@ curl -sSf -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 10) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 20) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 30) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
 
 # List reviews (author | commit | date)
 # Note: Use null-coalescing (//) to handle reviews with null commit
@@ -975,8 +975,8 @@ loop_state = {
     "openai_ready": False,
     "gemini_ready": False,
     "copilot_ready": False,
+    "gemini_skipped": False,  # True if Gemini returned 503/overloaded
     # Workflow rerun tracking (only attempt once per reviewer)
-    "gemini_rerun_triggered": False,
     "openai_rerun_triggered": False,
     # Grace period for Copilot when OpenAI+Gemini pass
     "grace_attempts": 0,
@@ -995,7 +995,8 @@ LOOP_START:
 
   attempts = 0
   openai_ready = gemini_ready = copilot_ready = False
-  gemini_rerun_triggered = openai_rerun_triggered = False
+  gemini_skipped = False  # Track if Gemini was skipped due to 503/overload
+  openai_rerun_triggered = False
   grace_attempts = 0
 
   WHILE attempts < max_attempts:
@@ -1021,15 +1022,15 @@ LOOP_START:
     openai_review = check_comment(author=test("github-actions"), contains="OpenAI Code Review", after=push_time)
     gemini_review = check_comment(author=test("github-actions"), contains="Gemini Code Review", after=push_time)
 
-    # === WORKFLOW FAILURE DETECTION AND RERUN ===
-    # Check for 503 errors in Gemini and trigger workflow rerun
-    IF gemini_review contains "503" or "API Error" or "Timeout":
-      IF NOT gemini_rerun_triggered:
-        output: "🔄 Gemini API failed (503). Triggering workflow rerun..."
-        rerun_workflow("Gemini PR Review", head_sha)  # See rerun function below
-        gemini_rerun_triggered = True
-        gemini_ready = False  # Wait for new review
-        CONTINUE
+    # === WORKFLOW FAILURE DETECTION ===
+    # Gemini workflow auto-retries with fallback model (gemini-2.5-flash) on 503
+    # If both models fail, we still get a review (with error message)
+
+    # Check if Gemini completely failed (both primary and fallback)
+    IF gemini_review contains "Fallback model" and contains "also failed":
+      output: "⏭️ Gemini API unavailable (both primary and fallback failed). Proceeding with OpenAI only."
+      gemini_ready = True  # Mark as "received" (workflow completed, even if with error)
+      gemini_skipped = True
 
     # Check for failures in OpenAI
     IF openai_review contains "API Error" or "Timeout":
@@ -1042,7 +1043,8 @@ LOOP_START:
 
     # Update ready status (only if review is valid, not error)
     openai_ready = openai_review exists AND NOT contains("API Error", "Timeout")
-    gemini_ready = gemini_review exists AND NOT contains("503", "API Error", "Timeout")
+    IF NOT gemini_skipped:
+      gemini_ready = gemini_review exists AND NOT contains("503", "overloaded", "Timeout")
     copilot_ready = copilot_review exists
 
     reviews_ready = count([openai_ready, gemini_ready, copilot_ready])
@@ -1182,7 +1184,7 @@ check_for_reviews() {
     -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "Content-Type: application/json" \
     "https://api.github.com/graphql" \
-    -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { headRefOid reviews(last: 20) { nodes { author { login } body commit { oid } createdAt } } comments(last: 30) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+    -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { headRefOid reviews(last: 30) { nodes { author { login } body commit { oid } createdAt } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
 
   # Get current head SHA
   HEAD_SHA=$(jq -r '.data.repository.pullRequest.headRefOid' /tmp/pr_data.json)

@@ -126,10 +126,9 @@ jobs:
           HAS_RESPONSES: ${{ steps.review_responses.outputs.has_responses }}
         run: |
           # Configuration
-          # Max diff size in characters - Gemini API has token limits
-          # 80k chars ≈ 20k tokens, Gemini 3 Pro has 1M context window
-          # Increased limits to avoid losing context
-          MAX_DIFF_SIZE=80000
+          # Max diff size in LINES - truncate by lines for clean breaks (not bytes which can corrupt)
+          # 3000 lines is generous for most PRs, Gemini 3 Pro has 1M context window
+          MAX_DIFF_LINES=3000
           MAX_PREVIOUS_GEMINI_SIZE=16000
           MAX_RESPONSES_SIZE=12000
 
@@ -277,13 +276,13 @@ jobs:
           ```diff
           EOF
 
-          # Truncate diff if too large (with safe command substitution)
-          DIFF_SIZE="$(wc -c < diff.patch 2>/dev/null || echo 0)"
-          if [ "$DIFF_SIZE" -gt "$MAX_DIFF_SIZE" ]; then
+          # Truncate diff by LINES for clean breaks (not bytes which can corrupt diff blocks)
+          DIFF_LINES="$(wc -l < diff.patch 2>/dev/null || echo 0)"
+          if [ "$DIFF_LINES" -gt "$MAX_DIFF_LINES" ]; then
             echo "" >> prompt_header.txt
-            echo "⚠️ Note: The diff has been truncated to ${MAX_DIFF_SIZE} characters due to size limits." >> prompt_header.txt
+            echo "⚠️ Note: The diff has been truncated to ${MAX_DIFF_LINES} lines due to size limits." >> prompt_header.txt
             echo "" >> prompt_header.txt
-            head -c "$MAX_DIFF_SIZE" diff.patch >> prompt_header.txt
+            head -n "$MAX_DIFF_LINES" diff.patch >> prompt_header.txt
           else
             cat diff.patch >> prompt_header.txt
           fi
@@ -443,22 +442,58 @@ jobs:
             echo "Error: Gemini API returned status $HTTP_CODE"
             cat gemini_response.json
 
-            # Build error message based on HTTP status
-            if [ "$HTTP_CODE" == "429" ]; then
+            # On 503 (model overloaded), retry with faster fallback model
+            if [ "$HTTP_CODE" == "503" ]; then
+              echo "Model overloaded. Retrying with gemini-2.5-flash..."
+              sleep 5  # Brief pause before retry
+
+              set +e
+              HTTP_CODE=$(curl -s \
+                --connect-timeout 30 \
+                --max-time 180 \
+                -w "%{http_code}" \
+                -o gemini_response.json \
+                -X POST \
+                -H "Content-Type: application/json" \
+                -H "x-goog-api-key: $GEMINI_API_KEY" \
+                -d @gemini_payload.json \
+                https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent)
+              CURL_EXIT=$?
+              set -e
+
+              echo "Fallback HTTP Status: $HTTP_CODE"
+
+              if [ "$HTTP_CODE" == "200" ]; then
+                echo "Fallback to gemini-2.5-flash succeeded!"
+                # Fall through to response parsing below
+              else
+                echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
+                echo "" >> review.txt
+                echo "_Reviewed commit: ${REVIEW_SHA_SHORT}_" >> review.txt
+                echo "" >> review.txt
+                echo "Primary model (gemini-3-pro-preview) overloaded (503). Fallback model (gemini-2.5-flash) also failed." >> review.txt
+                echo "" >> review.txt
+                echo "**Suggestions:**" >> review.txt
+                echo "- Wait a few minutes and retry the workflow" >> review.txt
+                echo "- Check Google AI status page" >> review.txt
+                exit 0
+              fi
+            elif [ "$HTTP_CODE" == "429" ]; then
               echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
               echo "" >> review.txt
               echo "Rate limit exceeded. Please check your API quota at https://aistudio.google.com/app/apikey" >> review.txt
+              exit 0
             elif [ "$HTTP_CODE" == "401" ] || [ "$HTTP_CODE" == "403" ]; then
               echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
               echo "" >> review.txt
               echo "Authentication failed. Please verify GEMINI_API_KEY secret is configured correctly." >> review.txt
+              exit 0
             else
               echo "## ⚠️ Gemini API Error (HTTP $HTTP_CODE)" > review.txt
               echo "" >> review.txt
               echo "API call failed. Check workflow logs for details." >> review.txt
+              exit 0
             fi
-
-            exit 0
           fi
 
           # Parse response with error handling
