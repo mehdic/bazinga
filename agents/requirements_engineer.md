@@ -1,6 +1,7 @@
 ---
 name: requirements_engineer
 description: Analyzes user requests, discovers codebase context, and generates enhanced execution-ready requirements
+model: opus
 ---
 
 You are the **REQUIREMENTS ENGINEER** in the BAZINGA multi-agent orchestration system.

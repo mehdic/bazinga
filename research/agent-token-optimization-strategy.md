@@ -2,8 +2,8 @@
 
 **Date:** 2025-12-02
 **Context:** Agent file sizes have grown beyond token limits, particularly project_manager.md and orchestrator.md
-**Decision:** Implement structured token reduction without losing critical functionality
-**Status:** Proposed
+**Decision:** Extract only Spec-Kit section to `bazinga/templates/pm_speckit.md` - PM reads on-demand
+**Status:** Reviewed & Approved
 
 ---
 
@@ -271,5 +271,61 @@ mkdir -p agents/references
 
 ## Multi-LLM Review Integration
 
-*(To be filled after running llm-reviews.sh)*
+**Reviewed by:** OpenAI GPT-5 (2025-12-02)
+
+### Consensus Points
+
+1. **Keep enforcement logic in core** - BAZINGA validation, self-adversarial checks, success criteria gates must never be extracted
+2. **Use allowed paths** - PM can only Read from `bazinga/...` paths, so references must go to `bazinga/templates/`
+3. **Token measurement** - bytes/4 is approximate; real tokenization may differ
+
+### Incorporated Feedback
+
+1. ✅ **Changed reference location** from `agents/references/` to `bazinga/templates/` (allowed Read path)
+2. ✅ **Kept BAZINGA validation in core** - only extracting Spec-Kit section (optional mode)
+3. ✅ **Minimal extraction** - only ~3,890 tokens extracted (Spec-Kit only), not the full 7,000 proposed
+
+### Rejected Suggestions
+
+1. ❌ **Build-time compilation** - Over-engineered for current needs; simple extraction sufficient
+2. ❌ **Conditional prompt assembly** - Would require orchestrator changes; on-demand Read is simpler
+3. ❌ **Token budget CI enforcement** - Good idea for future, not blocking current fix
+
+---
+
+## Final Decision
+
+### What We're Doing
+
+**Extract ONLY the Spec-Kit Integration section** (lines 1152-1660, ~3,890 tokens) from `project_manager.md`:
+
+| Before | After |
+|--------|-------|
+| project_manager.md: ~22,446 tokens | project_manager.md: ~18,556 tokens |
+| (no separate file) | bazinga/templates/pm_speckit.md: ~3,890 tokens |
+
+### Why This Approach
+
+1. **Minimal change** - Only extract one well-bounded section
+2. **Zero content loss** - All content preserved in template file
+3. **On-demand loading** - PM reads template only when Spec-Kit mode is active
+4. **Follows existing pattern** - Uses `bazinga/templates/` like other templates
+5. **Enforcement logic stays** - BAZINGA validation remains in core PM
+
+### Implementation
+
+1. Create `bazinga/templates/pm_speckit.md` with extracted content
+2. Replace section in `project_manager.md` with reference pointer:
+   ```markdown
+   ## 🆕 SPEC-KIT INTEGRATION MODE
+
+   **When orchestrator signals Spec-Kit mode, read:** `bazinga/templates/pm_speckit.md`
+
+   This template contains the full Spec-Kit integration workflow including:
+   - Reading spec-kit artifacts (spec.md, tasks.md, plan.md)
+   - Parsing tasks.md format with [P] and [US] markers
+   - Creating BAZINGA groups from spec-kit tasks
+   - Dual progress tracking (tasks.md + pm_state.json)
+   ```
+3. Validate token count is under 20,000
 
