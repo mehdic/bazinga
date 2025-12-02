@@ -970,7 +970,7 @@ loop_state = {
     "attempts": 0,
     "max_attempts": 10,  # 10 x 60s = 10 minutes (increased from 6)
     "restart_count": 0,
-    "max_restarts": 3,  # Global cap to prevent infinite loops
+    "max_restarts": 7,  # Global cap to prevent infinite loops (increased from 3)
     # Per-reviewer tracking
     "openai_ready": False,
     "gemini_ready": False,
@@ -989,7 +989,7 @@ loop_state = {
 ```
 LOOP_START:
   IF restart_count >= max_restarts:
-    output: "🛑 Max restarts (3) reached. Exiting to prevent infinite loop."
+    output: "🛑 Max restarts (7) reached. Exiting to prevent infinite loop."
     output: "Please review remaining items manually."
     EXIT LOOP → return control to user
 
@@ -1114,7 +1114,7 @@ LOOP_START:
 | **OpenAI+Gemini passed + grace expired** (Copilot slow/missing) | ✅ Exit loop with quorum (2/3 pass) |
 | **Review workflow failed** (API error, 503) | 🔄 Trigger workflow rerun (once per reviewer) |
 | **10 minute timeout** (reviews not appearing) | ⏱️ Exit loop, process available reviews |
-| **Max restarts reached** (3 cycles) | 🛑 Exit loop, prevent infinite loop |
+| **Max restarts reached** (7 cycles) | 🛑 Exit loop, prevent infinite loop |
 | **PR head changed** (force push) | 🔄 Reset loop for new head |
 | **OpenAI+Gemini have issues** | 🔧 Start fixing immediately (early-start), don't wait for Copilot |
 
@@ -1141,12 +1141,18 @@ rerun_workflow() {
     jq -r ".workflow_runs[] | select(.path == \"$WORKFLOW_PATH\") | .id" | head -1)
 
   if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
-    # Trigger rerun
-    curl -sSf -X POST \
+    # Trigger rerun and check HTTP status (expect 201 Created)
+    HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/rerun_response.json -X POST \
       -H "Authorization: Bearer $GITHUB_TOKEN" \
-      "https://api.github.com/repos/mehdic/bazinga/actions/runs/$RUN_ID/rerun"
-    echo "✅ Workflow rerun triggered: $WORKFLOW_NAME (Run ID: $RUN_ID)"
-    return 0
+      "https://api.github.com/repos/mehdic/bazinga/actions/runs/$RUN_ID/rerun")
+
+    if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
+      echo "✅ Workflow rerun triggered: $WORKFLOW_NAME (Run ID: $RUN_ID)"
+      return 0
+    else
+      echo "⚠️ Workflow rerun failed (HTTP $HTTP_CODE): $WORKFLOW_NAME"
+      return 1
+    fi
   else
     echo "⚠️ Could not find workflow run for: $WORKFLOW_NAME"
     return 1
@@ -1162,6 +1168,13 @@ check_for_reviews() {
   PR_NUMBER=$1
   PUSH_COMMIT=$2
   PUSH_TIME=$3
+
+  # Initialize GITHUB_TOKEN (critical - needed for API calls)
+  GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+  if [ -z "$GITHUB_TOKEN" ]; then
+    echo "ERROR: GITHUB_TOKEN not set" >&2
+    return 1
+  fi
 
   # Fetch fresh data (include headRefOid)
   curl -sSf -X POST \
@@ -1194,7 +1207,7 @@ check_for_reviews() {
 1. **DO NOT relinquish control** - Stay in the loop, don't ask user "should I check again?"
 2. **Sleep between checks** - `sleep 60` to avoid hammering the API
 3. **Track head SHA** - If PR head changes mid-loop, reset for new commit
-4. **Global restart cap** - Max 3 full workflow restarts to prevent infinite loops
+4. **Global restart cap** - Max 7 full workflow restarts to prevent infinite loops
 5. **Author matching** - Use `test("github-actions")` to match both variants
 6. **Deduplicate items** - Same file:line from multiple reviewers counts once
 7. **Report progress** - Output status each minute so user knows it's working
