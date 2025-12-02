@@ -148,15 +148,24 @@ When creating Phase 2+ implementation groups that depend on Phase 1 research:
 - Developers MUST read the research deliverable before starting implementation
 - This ensures research findings inform implementation decisions
 
+**ID Sanitization Helper:**
+```
+Sanitize IDs before use in paths:
+- SESSION_ID/GROUP_ID must match: [A-Za-z0-9_] only
+- Replace invalid chars with underscore: id.replace(/[^A-Za-z0-9_]/g, '_')
+- ❌ NEVER allow "../" (path traversal)
+```
+
 ### Step 0.5: Security Classification (AFTER Type, BEFORE Complexity)
 
 **🔴 CRITICAL: Flag security-sensitive tasks for mandatory SSE + Tech Lead review.**
 
 **Security Tasks** (`security_sensitive: true`):
-- Task name contains: "auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "token", "JWT", "OAuth", "SAML", "SSO"
+- Task name contains: "auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "jwt", "oauth", "saml", "sso", "bearer", "credential"
 - Task involves: user data, credentials, access control, session management
 - **Initial Tier:** senior_software_engineer (ALWAYS - overrides complexity scoring)
 - **Tech Lead Review:** MANDATORY (even after QA passes)
+- **Note:** "token" removed (too generic - matches CSRF token, string token). Use "bearer", "credential" instead.
 
 **Detection:**
 ```

@@ -593,10 +593,17 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 |------|----------|------------|
 | [Risk 1] | HIGH/MED/LOW | [How to address] |
 
-## Status: READY_FOR_REVIEW
+## Sources
+- [Source 1 Title](URL) - Brief annotation of what was learned
+- [Source 2 Title](URL) - Brief annotation
+
+## Research Status (for readers): READY_FOR_REVIEW
 ```
 
-**🔴 CRITICAL:** The deliverable should end with `## Status: READY_FOR_REVIEW` (standard format) - NOT agent-specific prefixes.
+**🔴 CRITICAL:**
+- The **deliverable file** uses "Research Status (for readers):" - NOT parsed by orchestrator
+- Your **agent response** must include `## Status: READY_FOR_REVIEW` - THIS is what orchestrator parses
+- This prevents duplicate status tokens from confusing the parser
 
 ### Research Mode Status Codes
 
@@ -628,25 +635,34 @@ Save deliverable to: `bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.m
 
 ### Tool Usage in Research Mode
 
-**✅ ALLOWED (Research Mode Only):**
-- WebSearch - External research (vendor docs, comparisons)
-- WebFetch - Specific page content
+**✅ ALWAYS ALLOWED:**
 - Grep/Glob/Read - Codebase context
 - Write - ONLY for deliverable output to `bazinga/artifacts/{SESSION_ID}/` folder
+
+**✅ CONDITIONALLY ALLOWED (check skills_config.web_research):**
+- WebSearch - External research (vendor docs, comparisons)
+- WebFetch - Specific page content
+
+**🔴 WEB RESEARCH GATING:**
+```
+IF skills_config.web_research == true:
+  → Use WebSearch/WebFetch for external research
+ELSE:
+  → Fallback to codebase-only research
+  → Document: "External research unavailable - analysis based on codebase only"
+```
 
 **❌ STILL FORBIDDEN:**
 - Edit - No code modifications
 - Task - No spawning other agents
 - Write to paths outside artifacts folder
 
-**🔴 PRIVACY GUARDRAILS:**
+**🔴 PRIVACY GUARDRAILS (when using web tools):**
 - ❌ DO NOT include secrets, API keys, or credentials in deliverables
 - ❌ DO NOT copy proprietary vendor content verbatim (cite sources instead)
 - ❌ DO NOT include PII (names, emails, internal usernames)
 - ✅ Redact any sensitive information discovered during research
 - ✅ Cite sources for external information
-
-**Note:** WebSearch/WebFetch are built-in Claude tools, not skills requiring skills_config.json.
 
 ### Output Format
 

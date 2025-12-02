@@ -2140,6 +2140,14 @@ Orchestrator output:
 
 **Parallelism Enforcement:** PM enforces MAX 2 research groups during planning. Orchestrator enforces MAX 4 implementation groups. Do NOT schedule >2 research groups concurrently.
 
+**🔴 Enforcement Rule (before spawning):**
+```
+research_groups = [g for g in groups if g.type == "research"]
+impl_groups = [g for g in groups if g.type != "research"]
+IF len(research_groups) > 2: ERROR("PM should not plan >2 research groups")
+IF len(impl_groups) > 4: defer_excess_groups()  # spawn in batches
+```
+
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
 **Spawn ALL in ONE message (MAX 4 groups):**

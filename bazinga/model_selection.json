@@ -70,7 +70,8 @@
     "security": {
       "agent": "senior_software_engineer",
       "model": "sonnet",
-      "markers": ["auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "token", "jwt", "oauth", "saml", "sso"],
+      "markers": ["auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "jwt", "oauth", "saml", "sso", "bearer", "credential"],
+      "note": "Removed generic 'token' - too broad (matches CSRF token, string token). Added 'bearer', 'credential' instead.",
       "matching": "case-insensitive",
       "flags": {"security_sensitive": true},
       "description": "Security-sensitive tasks - always SSE + mandatory TL review"
