@@ -163,7 +163,7 @@ Claude: Executing review workflow...
 
 | # | Suggestion | Status |
 |---|------------|--------|
-| 1 | GitHub Action approach | ❌ Rejected - want inline sub-agent, not CI workflow |
+| 1 | GitHub Actions approach | ❌ Rejected - want inline sub-agent, not CI workflow |
 | 2 | Retrieval-based dynamic prompts | ⏸️ Deferred - overkill for now |
 | 3 | Run lock per PR | ⏸️ Deferred - manual invocation prevents concurrent runs |
 | 4 | Suggested changes API | ⏸️ Deferred - current workflow uses comments, can enhance later |
