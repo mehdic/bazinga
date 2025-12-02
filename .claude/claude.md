@@ -892,7 +892,8 @@ curl -sSf -X POST \
   -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 10) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 20) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
 
 # List reviews (author | commit | date)
-jq -r '.data.repository.pullRequest.reviews.nodes[] | "\(.author.login) | \(.commit.oid[0:7]) | \(.createdAt)"' /tmp/pr_data.json
+# Note: Use null-coalescing (//) to handle reviews with null commit
+jq -r '.data.repository.pullRequest.reviews.nodes[] | "\(.author.login) | \((.commit.oid // "")[0:7]) | \(.createdAt)"' /tmp/pr_data.json
 
 # List comments (author | date)
 jq -r '.data.repository.pullRequest.comments.nodes[] | "\(.author.login) | \(.createdAt)"' /tmp/pr_data.json
@@ -1173,7 +1174,8 @@ check_for_reviews() {
   HEAD_SHA=$(jq -r '.data.repository.pullRequest.headRefOid' /tmp/pr_data.json)
 
   # Check Copilot (reviews on our commit)
-  COPILOT=$(jq -r ".data.repository.pullRequest.reviews.nodes[] | select(.author.login == \"copilot-pull-request-reviewer\") | select(.commit.oid | startswith(\"$PUSH_COMMIT\"))" /tmp/pr_data.json)
+  # Note: Use optional accessor (.oid?) and null-coalescing to handle reviews with null commit
+  COPILOT=$(jq -r ".data.repository.pullRequest.reviews.nodes[] | select(.author.login == \"copilot-pull-request-reviewer\") | select((.commit.oid? // \"\") | startswith(\"$PUSH_COMMIT\"))" /tmp/pr_data.json)
 
   # Check OpenAI/Gemini (use test() to match both "github-actions" and "github-actions[bot]")
   OPENAI=$(jq -r ".data.repository.pullRequest.comments.nodes[] | select(.author.login | test(\"github-actions\")) | select(.createdAt > \"$PUSH_TIME\") | select(.body | contains(\"OpenAI Code Review\"))" /tmp/pr_data.json)
