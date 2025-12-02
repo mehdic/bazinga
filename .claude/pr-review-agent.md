@@ -362,7 +362,7 @@ jq -r '.data.repository.pullRequest.comments.nodes[] | "\(.author.login) | \(.cr
 jq -r '.data.repository.pullRequest.reviews.nodes[-1].body' /tmp/pr_data.json
 
 # Get github-actions comments after timestamp (OpenAI/Gemini reviews)
-jq -r '.data.repository.pullRequest.comments.nodes[] | select(.author.login == "github-actions") | select(.createdAt > "2025-12-02T13:00:00Z") | .body' /tmp/pr_data.json
+jq -r '.data.repository.pullRequest.comments.nodes[] | select(.author.login | test("github-actions")) | select(.createdAt > "2025-12-02T13:00:00Z") | .body' /tmp/pr_data.json
 ```
 
 **Step 2: Fetch inline threads (separate query - larger payload)**

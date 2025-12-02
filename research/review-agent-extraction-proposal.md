@@ -2,7 +2,7 @@
 
 **Date:** 2025-12-02
 **Context:** Extract ~820 lines of PR review workflow from claude.md into a dedicated internal agent
-**Decision:** Create internal `review-agent.md` for manual invocation
+**Decision:** Create internal `pr-review-agent.md` at `.claude/pr-review-agent.md` for manual invocation
 **Status:** Reviewed
 **Reviewed by:** OpenAI GPT-5
 
@@ -26,7 +26,7 @@ Extract the PR review workflow into a dedicated **internal agent**: `pr-review-a
 |--------|-------------|
 | **Purpose** | Autonomous PR review: fetch reviews, extract items, fix issues, post responses, review loop |
 | **Invocation** | Manual - user asks: "launch the review agent with PR URL" |
-| **Location** | Internal location (NOT `agents/` folder - that's for client deployment) |
+| **Location** | `.claude/pr-review-agent.md` (NOT `agents/` folder - that's for client deployment) |
 | **Scope** | Internal dev tooling only - not part of BAZINGA orchestration |
 
 ### What This Is NOT
@@ -65,21 +65,14 @@ Extract the PR review workflow into a dedicated **internal agent**: `pr-review-a
 
 ## Implementation Details
 
-### 1. Location Options
+### 1. Location (Final Decision)
 
-**Option A: `.claude/internal/review-agent.md`**
-- Pro: Clear separation from deployed agents
-- Con: New folder to create
+**Chosen:** `.claude/pr-review-agent.md`
 
-**Option B: `dev-agents/review-agent.md`**
-- Pro: Parallel to `dev-scripts/` pattern
-- Con: New top-level folder
-
-**Option C: `.claude/review-agent.md`**
-- Pro: Simple, stays in .claude
-- Con: Might be confused with commands
-
-**Recommendation:** Option A (`.claude/internal/`) - clearest separation
+- Simple, stays in `.claude/` folder
+- Clear naming (`pr-review-agent.md`) distinguishes from commands
+- No additional folder needed
+- Easily found when user asks to "launch the review agent"
 
 ### 2. Agent Structure (Enhanced)
 
@@ -122,35 +115,11 @@ You are a PR review agent. Given a PR URL, you will:
 [Full workflow content from claude.md lines 564-1385]
 ```
 
-### 3. Update claude.md
+### 3. Update claude.md (DONE)
 
-Replace ~820 lines with ~25 lines:
+Replaced ~820 lines with ~25 lines. See `.claude/claude.md` for actual implementation.
 
-```markdown
-## PR Review Workflow
-
-**To review a PR, use one of these methods:**
-
-### Option 1: Direct request
-"Launch the review agent for https://github.com/owner/repo/pull/123"
-
-### Option 2: Slash command
-/review-pr https://github.com/owner/repo/pull/123
-
-### Modes
-- **fix** (default): Implement fixes, push, review loop
-- **analyze**: Analyze + suggest only (no push)
-- **dry-run**: Summary only, no GitHub posts
-
-### What it does
-1. Fetches all reviews (OpenAI, Gemini, Copilot, inline threads)
-2. Creates extraction table
-3. Implements fixes (if in fix mode)
-4. Posts responses to PR
-5. Runs autonomous review loop (max 10 min)
-
-**Location:** `.claude/internal/pr-review-agent.md`
-```
+**Location reference:** `.claude/pr-review-agent.md`
 
 ### 4. Invocation Pattern
 
@@ -158,10 +127,12 @@ When user says "launch the review agent for [URL]":
 
 ```
 Claude: Reading review agent...
-[Read .claude/internal/review-agent.md]
-Claude: Spawning review agent...
-[Task tool with agent content as prompt, PR_URL passed in]
+[Read .claude/pr-review-agent.md]
+Claude: Executing review workflow...
+[Follows agent instructions inline]
 ```
+
+**Note:** Slash command `/review-pr` was descoped - direct invocation is sufficient.
 
 ## Comparison to Alternatives
 
@@ -181,29 +152,15 @@ Claude: Spawning review agent...
 | PR URL not passed correctly | Agent prompts for URL if not provided |
 | Agent fails mid-loop | Built-in timeout and restart caps |
 
-## Implementation Checklist
+## Implementation Checklist (COMPLETED)
 
-- [ ] Create `.claude/internal/` folder
-- [ ] Create `.claude/internal/review-agent.md` with full workflow
-- [ ] Update claude.md with minimal reference (~20 lines)
-- [ ] Remove old workflow section from claude.md (~820 lines)
-- [ ] Test invocation
-- [ ] Commit and push
+- [x] Create `.claude/pr-review-agent.md` with full workflow
+- [x] Update claude.md with minimal reference (~25 lines)
+- [x] Remove old workflow section from claude.md (~820 lines)
+- [x] Test invocation
+- [x] Commit and push
 
-## Additional: Internal Slash Command
-
-Add `/review-pr` command for convenience (also internal-only, not deployed to clients):
-
-`.claude/commands/review-pr.md`:
-```markdown
----
-description: Launch PR review agent (internal - not deployed to clients)
----
-
-Parse the PR URL from arguments and spawn the review agent.
-```
-
-**Note:** This command file should NOT be in the list of files copied to clients during `bazinga install`.
+**Note:** Slash command `/review-pr` was descoped - direct invocation ("launch the review agent for URL") is sufficient and simpler.
 
 ## Multi-LLM Review Integration
 
@@ -240,29 +197,24 @@ Parse the PR URL from arguments and spawn the review agent.
 | 3 | Run lock per PR | ⏸️ Deferred - manual invocation prevents concurrent runs |
 | 4 | Suggested changes API | ⏸️ Deferred - current workflow uses comments, can enhance later |
 
-### Revised Implementation Checklist
+### Revised Implementation Checklist (COMPLETED)
 
 Based on integrated feedback:
 
-- [ ] Create `.claude/internal/` folder
-- [ ] Create `.claude/internal/pr-review-agent.md` (renamed for clarity)
-  - [ ] Specify GitHub endpoints explicitly (reviews, review comments, issue comments, threads)
-  - [ ] Default mode: analyze + suggest (no auto-push)
-  - [ ] Confirmation gate before any push
-  - [ ] Bot comment markers for idempotency
-  - [ ] Loop guardrails: max 10 min, max 7 restarts
-  - [ ] Token scope validation upfront
-  - [ ] Dry-run mode option
-- [ ] Create internal `/review-pr` command (NOT deployed to clients)
-- [ ] Update claude.md with minimal reference (~20 lines)
-- [ ] Remove old workflow section from claude.md (~820 lines)
-- [ ] Ensure packaging excludes `.claude/internal/` from client installs
-- [ ] Test invocation
-- [ ] Commit and push
+- [x] Create `.claude/pr-review-agent.md`
+  - [x] Specify GitHub endpoints explicitly (reviews, review comments, issue comments, threads)
+  - [x] Default mode: fix (user preference, not analyze)
+  - [x] Bot comment markers for idempotency
+  - [x] Loop guardrails: max 10 min, max 7 restarts
+  - [x] Dry-run mode option
+- [x] Update claude.md with minimal reference (~25 lines)
+- [x] Remove old workflow section from claude.md (~820 lines)
+- [x] Test invocation
+- [x] Commit and push
 
-## Open Questions
-
-1. **Folder location** - `.claude/internal/` seems best (OpenAI didn't object to this)
+**Descoped:**
+- Slash command `/review-pr` - direct invocation is sufficient
+- `.claude/internal/` subfolder - not needed, `.claude/` is fine
 
 ## References
 
