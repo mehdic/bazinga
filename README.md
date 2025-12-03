@@ -85,14 +85,15 @@ This adds 2-4 minutes upfront but provides better decisions, fewer revisions, an
 
 ### The Team
 
-BAZINGA coordinates 6 specialized AI agents:
+BAZINGA coordinates 7 specialized AI agents:
 
 1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
-2. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
-3. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
-4. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
-5. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
-6. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
+2. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
+3. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
+4. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
+5. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
+6. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
+7. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
 
 ### The Workflow
 
@@ -478,7 +479,7 @@ A: Check `bazinga/build_baseline.log`. BAZINGA tracks baseline vs. final build s
 ```
 your-project/
 ├── .claude/
-│   ├── agents/                # Agent definitions (6 agents)
+│   ├── agents/                # Agent definitions (7 agents)
 │   ├── commands/              # Slash commands
 │   ├── scripts/               # Utility scripts
 │   └── skills/                # Analysis tools (Skills)
