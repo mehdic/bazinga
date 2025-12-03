@@ -2180,6 +2180,8 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 Read(file_path: "bazinga/templates/batch_processing.md")
 ```
 
+**If Read fails:** Output `❌ Template load failed | batch_processing.md` and STOP.
+
 **After reading the template, you MUST:**
 1. Parse ALL responses FIRST (no spawning yet)
 2. Build spawn queue for ALL groups

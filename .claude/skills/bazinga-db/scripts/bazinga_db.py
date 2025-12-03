@@ -27,10 +27,12 @@ class BazingaDB:
     ]
 
     # Tables to salvage during recovery (ordered for FK dependencies)
+    # Includes all tables from schema.md - code handles missing tables gracefully
     SALVAGE_TABLE_ORDER = [
         'sessions', 'orchestration_logs', 'state_snapshots', 'task_groups',
         'token_usage', 'skill_outputs', 'development_plans', 'success_criteria',
-        'context_packages', 'context_package_consumers'
+        'context_packages', 'context_package_consumers',
+        'configuration', 'decisions', 'model_config'  # May not exist in all DBs
     ]
 
     # SQLite errors that indicate BAD QUERIES, NOT corruption
@@ -87,7 +89,10 @@ class BazingaDB:
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
     def _backup_corrupted_db(self) -> Optional[str]:
-        """Backup a corrupted database file before recovery."""
+        """Backup a corrupted database file before recovery.
+
+        Also backs up WAL and SHM sidecar files if present for complete recovery.
+        """
         db_path = Path(self.db_path)
         if not db_path.exists():
             return None
@@ -98,6 +103,18 @@ class BazingaDB:
             import shutil
             shutil.copy2(self.db_path, backup_path)
             self._print_error(f"Corrupted database backed up to: {backup_path}")
+
+            # Also backup WAL and SHM files if they exist (for complete recovery)
+            for ext in ['-wal', '-shm']:
+                sidecar = Path(str(db_path) + ext)
+                if sidecar.exists():
+                    sidecar_backup = Path(str(backup_path) + ext)
+                    try:
+                        shutil.copy2(sidecar, sidecar_backup)
+                        self._print_error(f"  Also backed up {sidecar.name}")
+                    except Exception:
+                        pass  # Non-fatal - main backup succeeded
+
             return str(backup_path)
         except Exception as e:
             self._print_error(f"Failed to backup corrupted database: {e}")
@@ -227,11 +244,16 @@ class BazingaDB:
         # Step 2: Backup corrupted file
         self._backup_corrupted_db()
 
-        # Step 3: Delete corrupted file
+        # Step 3: Delete corrupted file (and WAL/SHM sidecars)
         db_path = Path(self.db_path)
         try:
             if db_path.exists():
                 db_path.unlink()
+            # Also remove WAL and SHM sidecar files to ensure clean reinit
+            for ext in ['-wal', '-shm']:
+                sidecar = Path(str(db_path) + ext)
+                if sidecar.exists():
+                    sidecar.unlink()
         except Exception as e:
             self._print_error(f"Failed to remove corrupted database: {e}")
             return False
@@ -343,6 +365,15 @@ class BazingaDB:
             try:
                 db_path.unlink()
                 print(f"Removed corrupted database file", file=sys.stderr)
+                # Also remove WAL and SHM sidecar files to ensure clean reinit
+                for ext in ['-wal', '-shm']:
+                    sidecar = Path(str(db_path) + ext)
+                    if sidecar.exists():
+                        try:
+                            sidecar.unlink()
+                            print(f"  Also removed {sidecar.name}", file=sys.stderr)
+                        except Exception:
+                            pass  # Non-fatal
             except Exception as e:
                 print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
 
