@@ -19,10 +19,31 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
+# Add _shared directory to path for bazinga_paths import
+_script_dir = Path(__file__).parent.resolve()
+_shared_dir = _script_dir.parent.parent / '_shared'
+if _shared_dir.exists() and str(_shared_dir) not in sys.path:
+    sys.path.insert(0, str(_shared_dir))
+
+try:
+    from bazinga_paths import get_db_path, get_artifacts_dir
+    _HAS_BAZINGA_PATHS = True
+except ImportError:
+    _HAS_BAZINGA_PATHS = False
+
+def _get_db_path_safe() -> str:
+    """Get database path with fallback for backward compatibility."""
+    if _HAS_BAZINGA_PATHS:
+        try:
+            return str(get_db_path())
+        except RuntimeError:
+            pass
+    return "bazinga/bazinga.db"
+
 # Get current session ID from database
 def get_current_session_id():
     """Get the most recent session ID from the database."""
-    db_path = "bazinga/bazinga.db"
+    db_path = _get_db_path_safe()
     if not os.path.exists(db_path):
         return "bazinga_default"
 
@@ -38,7 +59,16 @@ def get_current_session_id():
         return "bazinga_default"
 
 SESSION_ID = get_current_session_id()
-OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
+
+# Use bazinga_paths for output directory if available
+if _HAS_BAZINGA_PATHS:
+    try:
+        OUTPUT_DIR = get_artifacts_dir(session_id=SESSION_ID) / "skills"
+    except RuntimeError:
+        OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
+else:
+    OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
+
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_FILE = OUTPUT_DIR / "db_migration_check.json"
 
