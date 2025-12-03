@@ -891,30 +891,39 @@ class BazingaDB:
         if len(summary) > 200:
             summary = summary[:197] + "..."
 
+        # Deduplicate consumers to prevent UNIQUE constraint violations
+        consumers = list(dict.fromkeys(consumers))  # Preserves order, removes duplicates
+
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Determine scope
-        scope = 'global' if group_id == 'global' or group_id is None else 'group'
-        actual_group_id = None if group_id == 'global' else group_id
+        try:
+            # Determine scope
+            scope = 'global' if group_id == 'global' or group_id is None else 'group'
+            actual_group_id = None if group_id == 'global' else group_id
 
-        # Insert the context package
-        cursor.execute("""
-            INSERT INTO context_packages
-            (session_id, group_id, package_type, file_path, producer_agent, priority, summary, size_bytes, scope)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (session_id, actual_group_id, package_type, file_path, producer_agent, priority, summary, size_bytes, scope))
-
-        package_id = cursor.lastrowid
-
-        # Create consumer entries
-        for consumer in consumers:
+            # Insert the context package
             cursor.execute("""
-                INSERT INTO context_package_consumers (package_id, agent_type)
-                VALUES (?, ?)
-            """, (package_id, consumer))
+                INSERT INTO context_packages
+                (session_id, group_id, package_type, file_path, producer_agent, priority, summary, size_bytes, scope)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (session_id, actual_group_id, package_type, normalized_path, producer_agent, priority, summary, size_bytes, scope))
 
-        conn.commit()
+            package_id = cursor.lastrowid
+
+            # Create consumer entries
+            for consumer in consumers:
+                cursor.execute("""
+                    INSERT INTO context_package_consumers (package_id, agent_type)
+                    VALUES (?, ?)
+                """, (package_id, consumer))
+
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            raise RuntimeError(f"Failed to save context package: {e}")
+
         conn.close()
 
         self._print_success(f"✓ Created context package {package_id} ({package_type}) with {len(consumers)} consumers")
@@ -964,20 +973,27 @@ class BazingaDB:
         return [dict(row) for row in rows]
 
     def mark_context_consumed(self, package_id: int, agent_type: str, iteration: int = 1) -> None:
-        """Mark a context package as consumed by an agent."""
+        """Mark a context package as consumed by an agent.
+
+        Consumes ANY pending (unconsumed) row for this package_id and agent_type,
+        regardless of iteration. This prevents stale packages from being re-routed
+        when iteration numbers don't match.
+        """
         conn = self._get_connection()
         cursor = conn.cursor()
 
+        # Try to update any pending (unconsumed) row for this package and agent
         cursor.execute("""
             UPDATE context_package_consumers
-            SET consumed_at = CURRENT_TIMESTAMP
-            WHERE package_id = ? AND agent_type = ? AND iteration = ?
-        """, (package_id, agent_type, iteration))
+            SET consumed_at = CURRENT_TIMESTAMP, iteration = ?
+            WHERE package_id = ? AND agent_type = ? AND consumed_at IS NULL
+            LIMIT 1
+        """, (iteration, package_id, agent_type))
 
         if cursor.rowcount == 0:
-            # Consumer entry doesn't exist for this iteration, create it
+            # No pending row exists - create a new consumed entry
             cursor.execute("""
-                INSERT OR REPLACE INTO context_package_consumers (package_id, agent_type, iteration, consumed_at)
+                INSERT OR IGNORE INTO context_package_consumers (package_id, agent_type, iteration, consumed_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             """, (package_id, agent_type, iteration))
 
@@ -1259,7 +1275,14 @@ def main():
         elif cmd == 'update-context-references':
             group_id = cmd_args[0]
             session_id = cmd_args[1]
-            package_ids = json.loads(cmd_args[2])
+            try:
+                package_ids = json.loads(cmd_args[2])
+                if not isinstance(package_ids, list) or not all(isinstance(x, int) for x in package_ids):
+                    raise ValueError("package_ids must be a JSON array of integers")
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"ERROR: Invalid package_ids argument: {e}", file=sys.stderr)
+                print("Expected: JSON array of integers, e.g., [1, 3, 5]", file=sys.stderr)
+                sys.exit(1)
             db.update_context_references(group_id, session_id, package_ids)
         elif cmd == 'query':
             if not cmd_args:

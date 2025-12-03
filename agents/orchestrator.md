@@ -1256,7 +1256,7 @@ Read these files BEFORE starting implementation:
 
 **Instructions:**
 1. Use Read tool on each file. Incorporate findings into your work.
-2. After reading, mark as consumed: `bazinga-db mark-context-consumed {id} {your_agent_type} {iteration}`
+2. After reading, mark as consumed: `bazinga-db mark-context-consumed {id} {your_agent_type} 1`
 ```
 
 Priority emojis: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low

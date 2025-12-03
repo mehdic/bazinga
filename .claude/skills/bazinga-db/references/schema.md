@@ -478,7 +478,7 @@ db.save_context_package(
     package_type='research',
     file_path='bazinga/artifacts/bazinga_123/context/research-group_a-hin.md',
     producer_agent='requirements_engineer',
-    consumers=['developer', 'senior_engineer'],
+    consumers=['developer', 'senior_software_engineer'],
     priority='high',
     summary='HIN OAuth2 endpoints, scopes, security requirements'
 )

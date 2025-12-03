@@ -268,7 +268,7 @@ Parameters:
 - `package_type`: One of: research, failures, decisions, handoff, investigation
 - `file_path`: Path to the markdown file (e.g., `bazinga/artifacts/{session_id}/context/research-group_a-hin.md`)
 - `producer_agent`: Agent type that created the package (e.g., `requirements_engineer`)
-- `consumers_json`: JSON array of agent types that should receive it (e.g., `'["developer", "senior_engineer"]'`)
+- `consumers_json`: JSON array of agent types that should receive it (e.g., `'["developer", "senior_software_engineer"]'`)
 - `priority`: One of: low, medium, high, critical
 - `summary`: Brief description (max 200 chars) for spawn prompts
 

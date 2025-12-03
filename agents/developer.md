@@ -601,16 +601,16 @@ IF your prompt contains `## Context Packages Available`:
    | handoff | Prior agent's work summary | Continue from where they left |
 4. **After reading each package, mark it as consumed:**
    - Extract the package ID from the context section
-   - Invoke: `bazinga-db mark-context-consumed {package_id} developer {iteration}`
+   - Invoke: `bazinga-db mark-context-consumed {package_id} developer 1`
    - This prevents the same context from being routed repeatedly
 
 **Example prompt section:**
 ```markdown
 ## Context Packages Available
 
-| Priority | Type | Summary | File |
-|----------|------|---------|------|
-| 🟠 HIGH | research | HIN OAuth2 endpoints and code samples | `bazinga/artifacts/.../context/research-A-hin.md` |
+| Priority | Type | Summary | File | Package ID |
+|----------|------|---------|------|------------|
+| 🟠 HIGH | research | HIN OAuth2 endpoints and code samples | `bazinga/artifacts/.../context/research-A-hin.md` | 42 |
 ```
 
 **Your action:** `Read("bazinga/artifacts/.../context/research-A-hin.md")` BEFORE starting work.

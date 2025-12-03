@@ -663,16 +663,16 @@ IF your prompt contains `## Context Packages Available`:
    | investigation | Root cause analysis, debug findings | Apply discovered fixes |
 4. **After reading each package, mark it as consumed:**
    - Extract the package ID from the context section
-   - Invoke: `bazinga-db mark-context-consumed {package_id} senior_software_engineer {iteration}`
+   - Invoke: `bazinga-db mark-context-consumed {package_id} senior_software_engineer 1`
    - This prevents the same context from being routed repeatedly
 
 **Example prompt section:**
 ```markdown
 ## Context Packages Available
 
-| Priority | Type | Summary | File |
-|----------|------|---------|------|
-| 🟠 HIGH | failures | 3 test failures with root cause analysis | `bazinga/artifacts/.../context/failures-A-iter1.md` |
+| Priority | Type | Summary | File | Package ID |
+|----------|------|---------|------|------------|
+| 🟠 HIGH | failures | 3 test failures with root cause analysis | `bazinga/artifacts/.../context/failures-A-iter1.md` | 42 |
 ```
 
 **Your action:** `Read("bazinga/artifacts/.../context/failures-A-iter1.md")` BEFORE starting work.
