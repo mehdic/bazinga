@@ -337,37 +337,55 @@ class BazingaDB:
             print(f"Database file is empty at {self.db_path}. Auto-initializing...", file=sys.stderr)
         else:
             # File exists and has content - check if it has tables and is not corrupted
-            try:
-                with sqlite3.connect(self.db_path) as conn:
-                    cursor = conn.cursor()
-                    # First check integrity
-                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
-                    if integrity != "ok":
+            # Retry loop for transient lock errors during startup
+            for attempt in range(4):  # 0, 1, 2, 3 = max 4 attempts
+                try:
+                    with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                        cursor = conn.cursor()
+                        # First check integrity
+                        integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                        if integrity != "ok":
+                            is_corrupted = True
+                            needs_init = True
+                            print(f"Database corrupted at {self.db_path}: {integrity}. Auto-recovering...", file=sys.stderr)
+                        else:
+                            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+                            if not cursor.fetchone():
+                                needs_init = True
+                                print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                    break  # Success - exit retry loop
+                except sqlite3.OperationalError as e:
+                    # Handle transient lock errors with retry/backoff
+                    error_msg = str(e).lower()
+                    if any(lock_err in error_msg for lock_err in ["database is locked", "database is busy", "schema is locked"]):
+                        if attempt < 3:
+                            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                            print(f"Database locked during init, retrying in {wait_time}s (attempt {attempt + 1}/4)...", file=sys.stderr)
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            print(f"Database locked after 4 attempts at {self.db_path}: {e}", file=sys.stderr)
+                            raise
+                    raise  # Non-lock operational error
+                except sqlite3.DatabaseError as e:
+                    # Check if this is a query error (wrong column/table names) vs real corruption
+                    if self._is_query_error(e):
+                        # Query errors should NOT trigger recovery - just propagate the error
+                        print(f"Query error at {self.db_path}: {e}. This is a SQL syntax/schema error (e.g., incorrect table/column name), NOT database corruption. Fix the query.", file=sys.stderr)
+                        raise  # Let caller handle it - don't destroy the database
+                    elif self._is_corruption_error(e):
                         is_corrupted = True
                         needs_init = True
-                        print(f"Database corrupted at {self.db_path}: {integrity}. Auto-recovering...", file=sys.stderr)
+                        print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
                     else:
-                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
-                        if not cursor.fetchone():
-                            needs_init = True
-                            print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
-            except sqlite3.DatabaseError as e:
-                # Check if this is a query error (wrong column/table names) vs real corruption
-                if self._is_query_error(e):
-                    # Query errors should NOT trigger recovery - just propagate the error
-                    print(f"Query error at {self.db_path}: {e}. This is a SQL syntax/schema error (e.g., incorrect table/column name), NOT database corruption. Fix the query.", file=sys.stderr)
-                    raise  # Let caller handle it - don't destroy the database
-                elif self._is_corruption_error(e):
-                    is_corrupted = True
+                        # Unknown database error - log but don't assume corruption
+                        print(f"Database error at {self.db_path}: {e}. May need investigation.", file=sys.stderr)
+                        raise  # Let caller handle it
+                    break  # Exit retry loop on corruption (will reinit)
+                except Exception as e:
                     needs_init = True
-                    print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
-                else:
-                    # Unknown database error - log but don't assume corruption
-                    print(f"Database error at {self.db_path}: {e}. May need investigation.", file=sys.stderr)
-                    raise  # Let caller handle it
-            except Exception as e:
-                needs_init = True
-                print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
+                    print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
+                    break  # Exit retry loop
 
         if not needs_init:
             return
