@@ -110,7 +110,8 @@ def main():
     print("=" * 60)
     print()
 
-    skill_dirs = sorted([d for d in skills_dir.iterdir() if d.is_dir()])
+    # Skip internal directories (starting with _)
+    skill_dirs = sorted([d for d in skills_dir.iterdir() if d.is_dir() and not d.name.startswith('_')])
 
     if not skill_dirs:
         print("❌ No skills found in .claude/skills/")

@@ -199,6 +199,13 @@ fi
 # Check each skill
 for skill_dir in .claude/skills/*/; do
     if [ -d "$skill_dir" ]; then
+        skill_name=$(basename "$skill_dir")
+        # Skip internal directories (starting with _)
+        if [[ "$skill_name" == _* ]]; then
+            echo "⏭️  Skipping internal directory: $skill_name"
+            echo ""
+            continue
+        fi
         check_skill "$skill_dir" || true  # Continue checking other skills
         total_skills=$((total_skills + 1))
     fi
