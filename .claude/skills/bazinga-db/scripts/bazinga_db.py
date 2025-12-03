@@ -62,18 +62,127 @@ class BazingaDB:
             self._print_error(f"Failed to backup corrupted database: {e}")
             return None
 
+    def _extract_salvageable_data(self) -> Dict[str, List[tuple]]:
+        """Try to extract data from a corrupted database before recovery.
+
+        Returns:
+            Dict mapping table names to list of row tuples. Empty dict if extraction fails.
+        """
+        salvaged = {}
+        tables_to_try = [
+            'sessions', 'orchestration_logs', 'state_snapshots', 'task_groups',
+            'token_usage', 'skill_outputs', 'development_plans', 'success_criteria',
+            'context_packages', 'context_package_consumers'
+        ]
+
+        try:
+            # Use a short timeout - if DB is badly corrupted, don't hang
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
+            cursor = conn.cursor()
+
+            for table in tables_to_try:
+                try:
+                    cursor.execute(f"SELECT * FROM {table}")
+                    rows = cursor.fetchall()
+                    if rows:
+                        # Get column names for this table
+                        cursor.execute(f"PRAGMA table_info({table})")
+                        columns = [col[1] for col in cursor.fetchall()]
+                        salvaged[table] = {'columns': columns, 'rows': rows}
+                        self._print_error(f"  Salvaged {len(rows)} rows from {table}")
+                except sqlite3.Error:
+                    # Table doesn't exist or is unreadable - skip
+                    pass
+
+            conn.close()
+        except Exception as e:
+            self._print_error(f"  Could not extract data: {e}")
+            return {}
+
+        return salvaged
+
+    def _restore_salvaged_data(self, salvaged: Dict[str, Dict]) -> int:
+        """Restore salvaged data to the new database.
+
+        Args:
+            salvaged: Dict from _extract_salvageable_data()
+
+        Returns:
+            Number of rows restored.
+        """
+        if not salvaged:
+            return 0
+
+        total_restored = 0
+
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.cursor()
+
+            # Restore in order to respect foreign keys
+            restore_order = [
+                'sessions', 'orchestration_logs', 'state_snapshots', 'task_groups',
+                'token_usage', 'skill_outputs', 'development_plans', 'success_criteria',
+                'context_packages', 'context_package_consumers'
+            ]
+
+            for table in restore_order:
+                if table not in salvaged:
+                    continue
+
+                data = salvaged[table]
+                columns = data['columns']
+                rows = data['rows']
+
+                if not rows:
+                    continue
+
+                # Build INSERT statement
+                placeholders = ', '.join(['?' for _ in columns])
+                cols_str = ', '.join(columns)
+
+                restored_count = 0
+                for row in rows:
+                    try:
+                        cursor.execute(
+                            f"INSERT OR IGNORE INTO {table} ({cols_str}) VALUES ({placeholders})",
+                            row
+                        )
+                        if cursor.rowcount > 0:
+                            restored_count += 1
+                    except sqlite3.Error:
+                        # Skip rows that fail (e.g., constraint violations)
+                        pass
+
+                if restored_count > 0:
+                    self._print_error(f"  Restored {restored_count}/{len(rows)} rows to {table}")
+                    total_restored += restored_count
+
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            self._print_error(f"  Error restoring data: {e}")
+
+        return total_restored
+
     def _recover_from_corruption(self) -> bool:
         """Attempt to recover from database corruption by reinitializing.
+
+        Tries to salvage data from the old database before replacing it.
 
         Returns:
             True if recovery succeeded, False otherwise.
         """
         self._print_error("Database corruption detected. Attempting recovery...")
 
-        # Backup corrupted file
+        # Step 1: Try to salvage data before doing anything destructive
+        self._print_error("Attempting to salvage data from corrupted database...")
+        salvaged_data = self._extract_salvageable_data()
+
+        # Step 2: Backup corrupted file
         self._backup_corrupted_db()
 
-        # Delete corrupted file
+        # Step 3: Delete corrupted file
         db_path = Path(self.db_path)
         try:
             if db_path.exists():
@@ -82,7 +191,7 @@ class BazingaDB:
             self._print_error(f"Failed to remove corrupted database: {e}")
             return False
 
-        # Reinitialize
+        # Step 4: Reinitialize with fresh schema
         try:
             script_dir = Path(__file__).parent
             init_script = script_dir / "init_db.py"
@@ -94,15 +203,26 @@ class BazingaDB:
                 text=True
             )
 
-            if result.returncode == 0:
-                self._print_error(f"✓ Database recovered and reinitialized at {self.db_path}")
-                return True
-            else:
+            if result.returncode != 0:
                 self._print_error(f"Failed to reinitialize database: {result.stderr}")
                 return False
+
         except Exception as e:
             self._print_error(f"Recovery failed: {e}")
             return False
+
+        # Step 5: Restore salvaged data
+        if salvaged_data:
+            self._print_error("Restoring salvaged data to new database...")
+            restored = self._restore_salvaged_data(salvaged_data)
+            if restored > 0:
+                self._print_error(f"✓ Database recovered with {restored} rows restored")
+            else:
+                self._print_error(f"✓ Database recovered (no data could be restored)")
+        else:
+            self._print_error(f"✓ Database recovered and reinitialized (fresh start)")
+
+        return True
 
     def check_integrity(self) -> Dict[str, Any]:
         """Run SQLite integrity check on the database.
