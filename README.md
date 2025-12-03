@@ -8,6 +8,16 @@ BAZINGA coordinates teams of AI agents to build software in parallel. While trad
 
 ---
 
+## What Makes This Different
+
+This isn't a collection of agents you invoke one by one. BAZINGA is a complete development framework where a Project Manager analyzes your request, decides the optimal approach, and coordinates the entire workflow autonomously.
+
+The framework adapts to each task: it determines parallelism based on task independence, escalates to more powerful models when problems persist, and enforces quality gates automatically. You describe what you need; the system handles the how.
+
+Whether it helps you ship better software is something you'll have to judge for yourself.
+
+---
+
 ## See It In Action
 
 ```bash
