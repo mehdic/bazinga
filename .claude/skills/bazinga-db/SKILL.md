@@ -45,10 +45,10 @@ When invoked:
 
 ## Environment Setup
 
-**Database paths:**
+**Database paths (use relative paths for portability):**
 ```bash
-DB_SCRIPT="/home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py"
-DB_PATH="/home/user/bazinga/bazinga/bazinga.db"
+DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_PATH="bazinga/bazinga.db"
 ```
 
 **Auto-initialization:**
