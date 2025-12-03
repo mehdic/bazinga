@@ -3,7 +3,7 @@
 **Date:** 2025-12-03
 **Context:** Extract spec-kit sections from agent files into reusable templates
 **Decision:** Flat layout at templates root (integrated from OpenAI review)
-**Status:** Proposed - Pending User Validation
+**Status:** Implemented
 **Reviewed by:** OpenAI GPT-5
 
 ---
@@ -259,10 +259,10 @@ Post-implementation verification:
 - Consistent with PM pattern
 - No infrastructure changes required
 
-**Questions for you:**
-1. Do you approve flat layout over subfolder?
-2. Should the inline fallback be more detailed or is 6-step summary sufficient?
-3. Ready to proceed with implementation?
+**Decisions Made:**
+1. ✅ Flat layout approved (over subfolder) - consistent with pm_speckit.md pattern
+2. ✅ 6-step inline fallback is sufficient - balances brevity with essential guidance
+3. ✅ Implementation completed - templates extracted, agents updated
 
 ---
 

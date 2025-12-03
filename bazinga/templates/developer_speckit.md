@@ -100,10 +100,10 @@ Look at OTHER tasks in tasks.md to understand:
 
 Example:
 If you see:
-- [x] [T001] Setup: Create auth module (auth/__init__.py)  <- Already done
-- [ ] [T002] [US1] JWT generation (auth/jwt.py)           <- Your task
-- [ ] [T003] [US1] Token validation (auth/jwt.py)         <- Your task
-- [ ] [T004] [US2] Login endpoint (api/login.py)          <- Depends on your work
+- [x] [T001] Setup: Create auth module (auth/__init__.py)  ← Already done
+- [ ] [T002] [US1] JWT generation (auth/jwt.py)            ← Your task
+- [ ] [T003] [US1] Token validation (auth/jwt.py)          ← Your task
+- [ ] [T004] [US2] Login endpoint (api/login.py)           ← Depends on your work
 
 You know:
 - auth module already exists (T001 is checked)
@@ -292,9 +292,9 @@ Read plan.md:
 # Read your tasks
 Read tasks.md:
 - [x] [T001] Setup: Create auth module (done by previous dev)
-- [ ] [T002] [P] [US1] JWT token generation (auth/jwt.py) <- You
-- [ ] [T003] [P] [US1] Token validation (auth/jwt.py) <- You
-- [ ] [T004] [US2] Login endpoint (api/login.py) <- Depends on you
+- [ ] [T002] [P] [US1] JWT token generation (auth/jwt.py) ← You
+- [ ] [T003] [P] [US1] Token validation (auth/jwt.py) ← You
+- [ ] [T004] [US2] Login endpoint (api/login.py) ← Depends on you
 ```
 
 **3. Implement T002 (JWT Generation)**:
@@ -307,6 +307,8 @@ from datetime import datetime, timedelta
 def generate_token(user_id: str, token_type: str = "access") -> str:
     """Generate JWT token following plan.md specifications."""
     secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise RuntimeError("JWT_SECRET environment variable is not set")
 
     # Expiration based on token type (from spec.md)
     expiry = timedelta(hours=1) if token_type == "access" else timedelta(days=7)
@@ -330,13 +332,25 @@ Edit tasks.md:
 
 **5. Implement T003 (Token Validation)**:
 ```python
+# Custom exceptions (define in auth/exceptions.py)
+class TokenExpiredError(Exception):
+    """Raised when JWT token has expired."""
+    pass
+
+class InvalidTokenError(Exception):
+    """Raised when JWT token is invalid (malformed or bad signature)."""
+    pass
+
 def validate_token(token: str) -> dict:
     """Validate JWT token following plan.md specifications."""
     secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise RuntimeError("JWT_SECRET environment variable is not set")
 
     try:
         # Validate signature and expiration (from spec.md edge cases)
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        # leeway=300 allows 5-minute clock skew tolerance between servers
+        payload = jwt.decode(token, secret, algorithms=["HS256"], leeway=300)
         return payload
     except jwt.ExpiredSignatureError:
         raise TokenExpiredError("Token has expired")
@@ -355,6 +369,17 @@ Edit tasks.md:
 **7. Write Tests (TDD)**:
 ```python
 # tests/test_jwt.py
+from freezegun import freeze_time  # Recommended for datetime mocking
+
+# Custom exceptions (define in auth/exceptions.py or use your framework's)
+class TokenExpiredError(Exception):
+    """Raised when JWT token has expired."""
+    pass
+
+class InvalidTokenError(Exception):
+    """Raised when JWT token is invalid (malformed or bad signature)."""
+    pass
+
 def test_generate_access_token():
     token = generate_token("user123", "access")
     payload = validate_token(token)
@@ -362,12 +387,24 @@ def test_generate_access_token():
     assert payload["type"] == "access"
 
 def test_token_expiration():
-    # Create expired token
-    with patch("datetime.utcnow") as mock_time:
-        mock_time.return_value = datetime.utcnow() - timedelta(hours=2)
+    # Use freezegun to mock time (patches datetime where it's used)
+    with freeze_time("2024-01-01 12:00:00"):
         token = generate_token("user123")
 
-    # Should raise expired error
+    # Move time forward past expiration
+    with freeze_time("2024-01-01 14:00:00"):  # 2 hours later
+        with pytest.raises(TokenExpiredError):
+            validate_token(token)
+
+# Alternative without freezegun: patch where datetime is imported
+def test_token_expiration_alt():
+    # Patch datetime in the module where it's USED, not datetime module itself
+    with patch("auth.jwt.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 12, 0, 0)
+        mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        token = generate_token("user123")
+
+    # Validate with real time (token will be expired)
     with pytest.raises(TokenExpiredError):
         validate_token(token)
 ```
