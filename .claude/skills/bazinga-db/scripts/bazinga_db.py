@@ -856,6 +856,12 @@ class BazingaDB:
 
     # ==================== CONTEXT PACKAGE OPERATIONS ====================
 
+    # Canonical agent types (lowercase) for normalization
+    VALID_AGENT_TYPES = frozenset({
+        'project_manager', 'developer', 'senior_software_engineer',
+        'qa_expert', 'tech_lead', 'investigator', 'requirements_engineer', 'orchestrator'
+    })
+
     def save_context_package(self, session_id: str, group_id: str, package_type: str,
                             file_path: str, producer_agent: str, consumers: List[str],
                             priority: str, summary: str, size_bytes: int = None) -> Dict:
@@ -871,6 +877,24 @@ class BazingaDB:
         valid_priorities = ('low', 'medium', 'high', 'critical')
         if priority not in valid_priorities:
             raise ValueError(f"Invalid priority: {priority}. Must be one of {valid_priorities}")
+
+        # Normalize and validate producer agent type
+        producer_agent = producer_agent.strip().lower()
+        if producer_agent not in self.VALID_AGENT_TYPES:
+            raise ValueError(f"Invalid producer_agent: {producer_agent}. Must be one of {sorted(self.VALID_AGENT_TYPES)}")
+
+        # Normalize and validate consumer agent types
+        normalized_consumers = []
+        for c in consumers:
+            if not c or not c.strip():
+                continue  # Skip empty strings
+            c_normalized = c.strip().lower()
+            if c_normalized not in self.VALID_AGENT_TYPES:
+                raise ValueError(f"Invalid consumer agent: {c}. Must be one of {sorted(self.VALID_AGENT_TYPES)}")
+            normalized_consumers.append(c_normalized)
+        if not normalized_consumers:
+            raise ValueError("At least one valid consumer agent is required")
+        consumers = normalized_consumers
 
         # Validate file path to prevent path traversal and symlink escapes
         from pathlib import Path
@@ -888,22 +912,24 @@ class BazingaDB:
 
         # Ensure candidate is within artifacts directory using relative_to
         try:
-            candidate_path.relative_to(artifacts_root_resolved)
+            rel_path = candidate_path.relative_to(artifacts_root_resolved)
         except ValueError:
             raise ValueError(f"Invalid file_path: must be within {artifacts_root}. Got: {file_path}")
 
-        # Use the resolved path for storage
-        normalized_path = str(candidate_path)
+        # Store as repo-relative path (not absolute) for portability
+        # Use forward slashes for cross-platform consistency
+        normalized_path = f"bazinga/artifacts/{session_id}/{str(rel_path).replace(os.sep, '/')}"
 
         # Auto-compute size_bytes if not provided and file exists
         if size_bytes is None:
             try:
-                size_bytes = os.stat(normalized_path).st_size
+                size_bytes = os.stat(str(candidate_path)).st_size
             except (OSError, FileNotFoundError):
                 # File doesn't exist yet or not accessible - leave as None
                 pass
 
-        # Enforce summary length constraint (max 200 chars)
+        # Enforce summary length constraint (max 200 chars) and sanitize
+        summary = summary.replace('\n', ' ').replace('\r', ' ')  # Single-line
         if len(summary) > 200:
             summary = summary[:197] + "..."
 
@@ -952,10 +978,13 @@ class BazingaDB:
         Args:
             session_id: Session ID to query
             group_id: Group ID to query
-            agent_type: Agent type to query packages for
+            agent_type: Agent type to query packages for (normalized to lowercase)
             limit: Maximum number of packages to return (default 3)
             include_consumed: If False (default), only return unconsumed packages
         """
+        # Normalize agent_type for consistent matching
+        agent_type = agent_type.strip().lower()
+
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -988,13 +1017,23 @@ class BazingaDB:
 
         return [dict(row) for row in rows]
 
-    def mark_context_consumed(self, package_id: int, agent_type: str, iteration: int = 1) -> None:
+    def mark_context_consumed(self, package_id: int, agent_type: str, iteration: int = 1) -> bool:
         """Mark a context package as consumed by an agent.
 
-        Consumes ANY pending (unconsumed) row for this package_id and agent_type,
-        regardless of iteration. This prevents stale packages from being re-routed
-        when iteration numbers don't match.
+        Only marks consumption if the agent_type was designated as a consumer
+        when the package was created. Does NOT create consumer rows implicitly.
+
+        Args:
+            package_id: ID of the package to mark consumed
+            agent_type: Agent type marking consumption (normalized to lowercase)
+            iteration: Iteration number (default 1)
+
+        Returns:
+            True if marked successfully, False if agent was not a designated consumer
         """
+        # Normalize agent_type
+        agent_type = agent_type.strip().lower()
+
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -1011,15 +1050,23 @@ class BazingaDB:
         """, (iteration, package_id, agent_type))
 
         if cursor.rowcount == 0:
-            # No pending row exists - create a new consumed entry
+            # Check if this agent was ever designated as a consumer (consumed or not)
             cursor.execute("""
-                INSERT OR IGNORE INTO context_package_consumers (package_id, agent_type, iteration, consumed_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """, (package_id, agent_type, iteration))
+                SELECT 1 FROM context_package_consumers
+                WHERE package_id = ? AND agent_type = ?
+                LIMIT 1
+            """, (package_id, agent_type))
+            if cursor.fetchone() is None:
+                # Agent was never designated as consumer - don't create implicit entry
+                conn.close()
+                print(f"! Agent '{agent_type}' was not designated as consumer for package {package_id}", file=sys.stderr)
+                return False
+            # Consumer exists but already consumed - that's fine
 
         conn.commit()
         conn.close()
         self._print_success(f"✓ Marked package {package_id} as consumed by {agent_type} (iteration {iteration})")
+        return True
 
     def update_context_references(self, group_id: str, session_id: str, package_ids: List[int]) -> None:
         """Update the context_references for a task group."""
