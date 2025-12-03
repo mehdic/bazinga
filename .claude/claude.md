@@ -299,6 +299,102 @@ This ensures:
 
 ---
 
+## 🔴 CRITICAL: BAZINGA Configuration Files
+
+The `bazinga/` folder contains three JSON configuration files that control agent behavior. **These are the authoritative sources** - agent frontmatter `model:` fields are documentation only.
+
+### Configuration Precedence
+
+```
+1. DB (model_config table) - Primary runtime source
+2. bazinga/*.json files - Fallback/seed for new sessions
+3. Agent frontmatter - Documentation only (NOT read by orchestrator)
+```
+
+### 1. `model_selection.json` - Agent Model Assignment
+
+**Purpose:** Controls which AI model (haiku/sonnet/opus) each agent uses
+
+**Current assignments:**
+| Agent | Model | Rationale |
+|-------|-------|-----------|
+| developer | haiku | Cost-efficient for straightforward implementation |
+| senior_software_engineer | sonnet | Escalation - handles complex failures |
+| qa_expert | sonnet | Balanced for test generation/validation |
+| tech_lead | opus | **Always Opus** - critical architectural decisions |
+| project_manager | opus | **Always Opus** - strategic planning, final quality gate |
+| investigator | opus | Complex debugging and root cause analysis |
+| requirements_engineer | opus | Complex requirements analysis, codebase discovery |
+| validator | sonnet | Independent BAZINGA verification |
+| orchestrator | sonnet | Coordination and routing |
+
+**Key sections:**
+- `agents` - Model assignment per agent
+- `escalation_rules` - When to escalate to stronger models (e.g., after 1 failure)
+- `task_type_routing` - Route certain task types to specific agents (research → RE, security → SSE)
+
+**To change an agent's model:**
+```bash
+# Edit bazinga/model_selection.json
+# Update the agents.<agent_name>.model field
+# New sessions will use the updated model
+```
+
+### 2. `skills_config.json` - Agent Skill Availability
+
+**Purpose:** Controls which skills each agent can/must use
+
+**Modes:**
+- `mandatory` - Skill always runs automatically
+- `optional` - Agent can invoke if framework-driven
+- `disabled` - Skill not available to agent
+
+**Example configuration:**
+```json
+{
+  "developer": {
+    "lint-check": "mandatory",
+    "codebase-analysis": "optional"
+  },
+  "tech_lead": {
+    "security-scan": "mandatory",
+    "test-coverage": "mandatory"
+  }
+}
+```
+
+**Configure via:** `/bazinga.configure-skills` slash command
+
+### 3. `challenge_levels.json` - QA Test Progression
+
+**Purpose:** QA Expert's 5-level test challenge system
+
+**Levels:**
+1. **Boundary Probing** - Edge cases, null values, max/min
+2. **Mutation Analysis** - Code mutation to verify test completeness
+3. **Behavioral Contracts** - Pre/post conditions, invariants
+4. **Security Adversary** - Injection attacks, auth bypass (escalates on fail)
+5. **Production Chaos** - Network failures, race conditions (escalates on fail)
+
+**Escalation rules:**
+- Levels 1-2 fail → Developer retry
+- Levels 3-5 fail → Escalate to Senior Software Engineer
+
+### Modifying Configuration
+
+**To change agent models or skills:**
+1. Edit the relevant JSON file in `bazinga/`
+2. Changes take effect on new orchestration sessions
+3. Running sessions use cached config from session start
+
+**DO NOT:**
+- Edit agent `.md` frontmatter to change models (has no effect)
+- Modify DB directly (use config files as source of truth)
+
+**Reference:** `research/agent-model-configuration-system.md` for detailed architecture
+
+---
+
 ## 🔴 CRITICAL: Config File Sync Requirement
 
 **When adding new bazinga config files (JSON), you MUST update TWO places:**
