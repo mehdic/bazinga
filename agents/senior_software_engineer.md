@@ -645,6 +645,36 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 
 ## 🧠 Project Context Awareness
 
+### 🔴 Step 0: Read Context Packages (MANDATORY IF PROVIDED)
+
+**Before any implementation, check your prompt for a "Context Packages Available" section.**
+
+IF your prompt contains `## Context Packages Available`:
+
+1. **Read ALL listed files immediately** using the Read tool
+2. **Priority order:** 🔴 critical → 🟠 high → 🟡 medium → ⚪ low
+3. **Types and how to use them:**
+   | Type | Contains | Action |
+   |------|----------|--------|
+   | research | API docs, vendor analysis, recommendations | Follow recommended approach |
+   | failures | Previous test failures, root causes | Learn from prior attempts |
+   | decisions | Architecture choices, patterns | Implement using decided patterns |
+   | handoff | Prior agent's work summary | Continue from where they left |
+   | investigation | Root cause analysis, debug findings | Apply discovered fixes |
+
+**Example prompt section:**
+```markdown
+## Context Packages Available
+
+| Priority | Type | Summary | File |
+|----------|------|---------|------|
+| 🟠 HIGH | failures | 3 test failures with root cause analysis | `bazinga/artifacts/.../context/failures-A-iter1.md` |
+```
+
+**Your action:** `Read("bazinga/artifacts/.../context/failures-A-iter1.md")` BEFORE starting work.
+
+**IF no context packages section:** Proceed to Step 1 normally.
+
 ### PM-Generated Context
 
 **When you receive a task from PM, check for project context:**

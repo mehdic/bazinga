@@ -686,3 +686,49 @@ ELSE:
 ```
 
 **🔴 IMPORTANT:** Use standard `## Status:` header (NOT `## RE Status:` or agent-specific prefixes) so the orchestrator can parse your response correctly.
+
+---
+
+## 🔴 MANDATORY: Context Package Registration
+
+**After writing your research deliverable, you MUST register it as a context package so implementing agents can access your findings.**
+
+### Step 1: Invoke bazinga-db to Register Package
+
+```
+bazinga-db, please save context package:
+
+Session ID: {SESSION_ID}
+Group ID: {GROUP_ID}
+Package Type: research
+File Path: bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md
+Producer Agent: requirements_engineer
+Consumer Agents: developer, senior_software_engineer
+Priority: high
+Summary: {1-sentence summary of key findings and recommendation}
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db")
+```
+
+### Step 2: Include in Your Response
+
+Add this section to your final response (after the Status section):
+
+```markdown
+## Context Package Created
+
+**File:** bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md
+**Type:** research
+**Priority:** high
+**Consumers:** developer, senior_software_engineer
+**Summary:** {Same 1-sentence summary}
+
+📦 Package registered in database for orchestrator routing.
+```
+
+### Why This Matters
+
+Without registration, your research deliverable is just a file. The orchestrator queries the database to find relevant packages and includes them in developer prompts. **No registration = developers never see your findings.**

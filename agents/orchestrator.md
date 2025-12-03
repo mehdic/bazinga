@@ -1219,7 +1219,42 @@ ELSE IF PM chose "parallel":
 
 **🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
 
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
+**🔴 Context Package Query (MANDATORY before spawn):**
+
+Query available context packages for this agent:
+```
+bazinga-db, please get context packages:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {developer|senior_software_engineer|requirements_engineer}
+Limit: 3
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Context Package Routing Rules:**
+| Query Result | Action |
+|--------------|--------|
+| Packages found (N > 0) | Include Context Packages table in prompt (see format below) |
+| No packages (N = 0) | Proceed without context section |
+| Query error | Log warning, proceed without context (non-blocking) |
+
+**Context Packages Prompt Section** (include when N > 0):
+```markdown
+## Context Packages Available
+
+Read these files BEFORE starting implementation:
+
+| Priority | Type | Summary | File |
+|----------|------|---------|------|
+| {priority_emoji} | {type} | {summary} | `{file_path}` |
+
+**Instructions:** Use Read tool on each file. Incorporate findings into your work.
+```
+
+Priority emojis: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
+
+**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -2164,7 +2199,20 @@ IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not e
 IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```
 
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+**🔴 Context Package Query (PER GROUP before spawn):**
+
+For each group, query context packages:
+```
+bazinga-db, please get context packages:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Limit: 3
+```
+Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that group's prompt (see Simple Mode §Context Package Routing Rules for format). Query errors are non-blocking.
+
+**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any for this group)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
 **Spawn ALL in ONE message (MAX 4 groups):**
 ```
