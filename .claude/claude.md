@@ -301,15 +301,16 @@ This ensures:
 
 ## 🔴 CRITICAL: BAZINGA Configuration Files
 
-The `bazinga/` folder contains three JSON configuration files that control agent behavior. **These are the authoritative sources** - agent frontmatter `model:` fields are documentation only.
+The `bazinga/` folder contains three JSON configuration files that control agent behavior. **These are the authoritative sources**.
 
-### Configuration Precedence
+### Source of Truth
 
 ```
-1. DB (model_config table) - Primary runtime source
-2. bazinga/*.json files - Fallback/seed for new sessions
-3. Agent frontmatter - Documentation only (NOT read by orchestrator)
+bazinga/*.json files = AUTHORITATIVE SOURCE
+Agent frontmatter model: field = Documentation only (NOT read by orchestrator)
 ```
+
+The orchestrator reads `bazinga/model_selection.json` at session start and caches the values. There is no DB layer for config - JSON files are the single source of truth.
 
 ### 1. `model_selection.json` - Agent Model Assignment
 
@@ -388,8 +389,7 @@ The `bazinga/` folder contains three JSON configuration files that control agent
 3. Running sessions use cached config from session start
 
 **DO NOT:**
-- Edit agent `.md` frontmatter to change models (has no effect)
-- Modify DB directly (use config files as source of truth)
+- Edit agent `.md` frontmatter to change models (has no effect on runtime)
 
 **Reference:** `research/agent-model-configuration-system.md` for detailed architecture
 

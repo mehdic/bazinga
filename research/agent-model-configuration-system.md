@@ -48,36 +48,27 @@ In the previous session, `model: opus` was added to the frontmatter of `agents/r
 
 ## Correct Architecture
 
-### Model Configuration Precedence
+### Model Configuration: Single Source of Truth
 
 ```
-1. DB (model_config table) - Primary runtime source
-2. bazinga/model_selection.json - Fallback/seed for new sessions
-3. Frontmatter - Documentation only (not read by orchestrator)
+bazinga/model_selection.json = AUTHORITATIVE SOURCE
+Agent frontmatter model: field = Documentation only (NOT read by orchestrator)
 ```
+
+**Decision:** No DB layer for model config. The JSON file is the single source of truth. This keeps the system simple and avoids sync complexity.
 
 ### How Orchestrator Uses Model Config
 
-From `agents/orchestrator.md`:
-
-```markdown
-**Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
-
-[Step 5] Query bazinga-db skill for model configuration
-Store model mappings in context: MODEL_CONFIG = {...}
-
-**IF model_config table doesn't exist or is empty:**
-- Use defaults from `bazinga/model_selection.json`
-
-**Use MODEL_CONFIG values in ALL Task invocations instead of hardcoded models.**
-```
+1. At session start, orchestrator reads `bazinga/model_selection.json`
+2. Caches model assignments in `MODEL_CONFIG` for the session
+3. Uses `MODEL_CONFIG` values in all Task invocations
 
 ### Task Invocation Pattern
 
 ```python
 Task(
   subagent_type="general-purpose",
-  model=MODEL_CONFIG["requirements_engineer"],  # From DB/JSON, NOT frontmatter
+  model=MODEL_CONFIG["requirements_engineer"],  # From JSON file
   description="Research: {task}",
   prompt=[agent_prompt]
 )
