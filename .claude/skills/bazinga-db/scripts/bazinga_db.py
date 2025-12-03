@@ -854,6 +854,240 @@ class BazingaDB:
 
         conn.close()
 
+    # ==================== CONTEXT PACKAGE OPERATIONS ====================
+
+    # Canonical agent types (lowercase) for normalization
+    VALID_AGENT_TYPES = frozenset({
+        'project_manager', 'developer', 'senior_software_engineer',
+        'qa_expert', 'tech_lead', 'investigator', 'requirements_engineer', 'orchestrator'
+    })
+
+    def save_context_package(self, session_id: str, group_id: str, package_type: str,
+                            file_path: str, producer_agent: str, consumers: List[str],
+                            priority: str, summary: str, size_bytes: int = None) -> Dict:
+        """Save a context package and create consumer entries.
+
+        NOTE: Versioning is not yet implemented. All packages have supersedes_id=NULL.
+        Future enhancement: add superseded_by_id column and link previous versions.
+        """
+        valid_types = ('research', 'failures', 'decisions', 'handoff', 'investigation')
+        if package_type not in valid_types:
+            raise ValueError(f"Invalid package_type: {package_type}. Must be one of {valid_types}")
+
+        valid_priorities = ('low', 'medium', 'high', 'critical')
+        if priority not in valid_priorities:
+            raise ValueError(f"Invalid priority: {priority}. Must be one of {valid_priorities}")
+
+        # Normalize and validate producer agent type
+        producer_agent = producer_agent.strip().lower()
+        if producer_agent not in self.VALID_AGENT_TYPES:
+            raise ValueError(f"Invalid producer_agent: {producer_agent}. Must be one of {sorted(self.VALID_AGENT_TYPES)}")
+
+        # Normalize and validate consumer agent types
+        normalized_consumers = []
+        for c in consumers:
+            if not c or not c.strip():
+                continue  # Skip empty strings
+            c_normalized = c.strip().lower()
+            if c_normalized not in self.VALID_AGENT_TYPES:
+                raise ValueError(f"Invalid consumer agent: {c}. Must be one of {sorted(self.VALID_AGENT_TYPES)}")
+            normalized_consumers.append(c_normalized)
+        if not normalized_consumers:
+            raise ValueError("At least one valid consumer agent is required")
+        consumers = normalized_consumers
+
+        # Validate file path to prevent path traversal and symlink escapes
+        from pathlib import Path
+        import os
+
+        # Convert to Path and resolve (follows symlinks)
+        try:
+            candidate_path = Path(file_path).resolve()
+        except (ValueError, RuntimeError) as e:
+            raise ValueError(f"Invalid file_path: {e}")
+
+        # Define artifacts root and resolve it
+        artifacts_root = Path("bazinga/artifacts") / session_id
+        artifacts_root_resolved = artifacts_root.resolve()
+
+        # Ensure candidate is within artifacts directory using relative_to
+        try:
+            rel_path = candidate_path.relative_to(artifacts_root_resolved)
+        except ValueError:
+            raise ValueError(f"Invalid file_path: must be within {artifacts_root}. Got: {file_path}")
+
+        # Store as repo-relative path (not absolute) for portability
+        # Use forward slashes for cross-platform consistency
+        normalized_path = f"bazinga/artifacts/{session_id}/{str(rel_path).replace(os.sep, '/')}"
+
+        # Auto-compute size_bytes if not provided and file exists
+        if size_bytes is None:
+            try:
+                size_bytes = os.stat(str(candidate_path)).st_size
+            except (OSError, FileNotFoundError):
+                # File doesn't exist yet or not accessible - leave as None
+                pass
+
+        # Enforce summary length constraint (max 200 chars) and sanitize
+        summary = summary.replace('\n', ' ').replace('\r', ' ')  # Single-line
+        if len(summary) > 200:
+            summary = summary[:197] + "..."
+
+        # Deduplicate consumers to prevent UNIQUE constraint violations
+        consumers = list(dict.fromkeys(consumers))  # Preserves order, removes duplicates
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Determine scope
+            scope = 'global' if group_id == 'global' or group_id is None else 'group'
+            actual_group_id = None if group_id == 'global' else group_id
+
+            # Insert the context package
+            cursor.execute("""
+                INSERT INTO context_packages
+                (session_id, group_id, package_type, file_path, producer_agent, priority, summary, size_bytes, scope)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (session_id, actual_group_id, package_type, normalized_path, producer_agent, priority, summary, size_bytes, scope))
+
+            package_id = cursor.lastrowid
+
+            # Create consumer entries
+            for consumer in consumers:
+                cursor.execute("""
+                    INSERT INTO context_package_consumers (package_id, agent_type)
+                    VALUES (?, ?)
+                """, (package_id, consumer))
+
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            raise RuntimeError(f"Failed to save context package: {e}")
+
+        conn.close()
+
+        self._print_success(f"✓ Created context package {package_id} ({package_type}) with {len(consumers)} consumers")
+        return {"package_id": package_id, "file_path": normalized_path, "consumers_created": len(consumers)}
+
+    def get_context_packages(self, session_id: str, group_id: str, agent_type: str,
+                            limit: int = 3, include_consumed: bool = False) -> List[Dict]:
+        """Get context packages for an agent spawn, ordered by priority.
+
+        Args:
+            session_id: Session ID to query
+            group_id: Group ID to query
+            agent_type: Agent type to query packages for (normalized to lowercase)
+            limit: Maximum number of packages to return (default 3)
+            include_consumed: If False (default), only return unconsumed packages
+        """
+        # Normalize agent_type for consistent matching
+        agent_type = agent_type.strip().lower()
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Build query with optional consumption filter
+        consumption_filter = "" if include_consumed else "AND cpc.consumed_at IS NULL"
+
+        # Query packages for this agent type, including global packages
+        cursor.execute(f"""
+            SELECT cp.id, cp.package_type, cp.priority, cp.summary, cp.file_path, cp.size_bytes, cp.group_id
+            FROM context_packages cp
+            JOIN context_package_consumers cpc ON cp.id = cpc.package_id
+            WHERE cp.session_id = ?
+              AND (cp.group_id = ? OR cp.scope = 'global')
+              AND cpc.agent_type = ?
+              AND cp.supersedes_id IS NULL
+              {consumption_filter}
+            ORDER BY
+              CASE cp.priority
+                WHEN 'critical' THEN 1
+                WHEN 'high' THEN 2
+                WHEN 'medium' THEN 3
+                WHEN 'low' THEN 4
+              END,
+              cp.created_at DESC
+            LIMIT ?
+        """, (session_id, group_id, agent_type, limit))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def mark_context_consumed(self, package_id: int, agent_type: str, iteration: int = 1) -> bool:
+        """Mark a context package as consumed by an agent.
+
+        Only marks consumption if the agent_type was designated as a consumer
+        when the package was created. Does NOT create consumer rows implicitly.
+
+        Args:
+            package_id: ID of the package to mark consumed
+            agent_type: Agent type marking consumption (normalized to lowercase)
+            iteration: Iteration number (default 1)
+
+        Returns:
+            True if marked successfully, False if agent was not a designated consumer
+        """
+        # Normalize agent_type
+        agent_type = agent_type.strip().lower()
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Try to update any pending (unconsumed) row for this package and agent
+        # SQLite doesn't support LIMIT in UPDATE, use subquery instead
+        cursor.execute("""
+            UPDATE context_package_consumers
+            SET consumed_at = CURRENT_TIMESTAMP, iteration = ?
+            WHERE id IN (
+                SELECT id FROM context_package_consumers
+                WHERE package_id = ? AND agent_type = ? AND consumed_at IS NULL
+                LIMIT 1
+            )
+        """, (iteration, package_id, agent_type))
+
+        if cursor.rowcount == 0:
+            # Check if this agent was ever designated as a consumer (consumed or not)
+            cursor.execute("""
+                SELECT 1 FROM context_package_consumers
+                WHERE package_id = ? AND agent_type = ?
+                LIMIT 1
+            """, (package_id, agent_type))
+            if cursor.fetchone() is None:
+                # Agent was never designated as consumer - don't create implicit entry
+                conn.close()
+                print(f"! Agent '{agent_type}' was not designated as consumer for package {package_id}", file=sys.stderr)
+                return False
+            # Consumer exists but already consumed - that's fine
+
+        conn.commit()
+        conn.close()
+        self._print_success(f"✓ Marked package {package_id} as consumed by {agent_type} (iteration {iteration})")
+        return True
+
+    def update_context_references(self, group_id: str, session_id: str, package_ids: List[int]) -> None:
+        """Update the context_references for a task group."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE task_groups
+            SET context_references = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND session_id = ?
+        """, (json.dumps(package_ids), group_id, session_id))
+
+        if cursor.rowcount == 0:
+            conn.close()
+            print(f"! Warning: No task group found with id='{group_id}' and session_id='{session_id}'", file=sys.stderr)
+            return
+
+        conn.commit()
+        conn.close()
+        self._print_success(f"✓ Updated context references for {group_id}: {package_ids}")
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -916,6 +1150,16 @@ SUCCESS CRITERIA OPERATIONS:
   get-success-criteria <session>              Get success criteria
   update-success-criterion <session> <criterion> [--status X] [--actual Y] [--evidence Z]
                                               Update criterion
+
+CONTEXT PACKAGE OPERATIONS:
+  save-context-package <session> <group_id> <type> <file_path> <producer> <consumers_json> <priority> <summary>
+                                              Save context package (type: research|failures|decisions|handoff|investigation)
+  get-context-packages <session> <group_id> <agent_type> [limit]
+                                              Get context packages for agent spawn (default: limit=3)
+  mark-context-consumed <package_id> <agent_type> [iteration]
+                                              Mark package as consumed (default: iteration=1)
+  update-context-references <group_id> <session> <package_ids_json>
+                                              Update task group context references
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -1070,6 +1314,54 @@ def main():
                 value = cmd_args[i + 1]
                 kwargs[key] = value
             db.update_success_criterion(session_id, criterion, **kwargs)
+        elif cmd == 'save-context-package':
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            package_type = cmd_args[2]
+            file_path = cmd_args[3]
+            producer = cmd_args[4]
+            try:
+                consumers = json.loads(cmd_args[5])
+                if not isinstance(consumers, list):
+                    raise ValueError("consumers_json must be a JSON array of strings")
+                if not all(x and isinstance(x, str) for x in consumers):
+                    raise ValueError("All consumer elements must be non-empty strings")
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"ERROR: Invalid consumers_json argument: {e}", file=sys.stderr)
+                print("Expected: JSON array of agent types, e.g., [\"developer\", \"qa_expert\"]", file=sys.stderr)
+                sys.exit(1)
+            priority = cmd_args[6]
+            summary = cmd_args[7]
+            result = db.save_context_package(session_id, group_id, package_type, file_path, producer, consumers, priority, summary)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-context-packages':
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            agent_type = cmd_args[2]
+            limit = int(cmd_args[3]) if len(cmd_args) > 3 else 3
+            # Validate limit is within acceptable range
+            if limit < 1 or limit > 50:
+                print(f"ERROR: limit must be between 1 and 50 (got {limit})", file=sys.stderr)
+                sys.exit(1)
+            result = db.get_context_packages(session_id, group_id, agent_type, limit)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'mark-context-consumed':
+            package_id = int(cmd_args[0])
+            agent_type = cmd_args[1]
+            iteration = int(cmd_args[2]) if len(cmd_args) > 2 else 1
+            db.mark_context_consumed(package_id, agent_type, iteration)
+        elif cmd == 'update-context-references':
+            group_id = cmd_args[0]
+            session_id = cmd_args[1]
+            try:
+                package_ids = json.loads(cmd_args[2])
+                if not isinstance(package_ids, list) or not all(isinstance(x, int) for x in package_ids):
+                    raise ValueError("package_ids must be a JSON array of integers")
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"ERROR: Invalid package_ids argument: {e}", file=sys.stderr)
+                print("Expected: JSON array of integers, e.g., [1, 3, 5]", file=sys.stderr)
+                sys.exit(1)
+            db.update_context_references(group_id, session_id, package_ids)
         elif cmd == 'query':
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)

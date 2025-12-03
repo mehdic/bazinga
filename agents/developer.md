@@ -584,6 +584,22 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 
 ## 🧠 Project Context Awareness
 
+### 🔴 Step 0: Read Context Packages (MANDATORY IF PROVIDED)
+
+**Check your prompt for "Context Packages Available" section.**
+
+IF present, read listed files BEFORE starting:
+| Type | Contains | Action |
+|------|----------|--------|
+| research | API docs, recommendations | Follow recommended approach |
+| failures | Prior test failures | Avoid repeating mistakes |
+| decisions | Architecture choices | Use decided patterns |
+| handoff | Prior agent's work | Continue from there |
+
+After reading, mark consumed: `bazinga-db mark-context-consumed {package_id} developer 1`
+
+**IF no context packages:** Proceed to Step 1.
+
 ### PM-Generated Context
 
 **When you receive a task from PM, check for project context:**

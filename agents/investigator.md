@@ -834,6 +834,38 @@ Write(
 **Artifact:** bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
 ```
 
+### 🔴 MANDATORY: Register Context Package
+
+**After writing your investigation artifact, register it so developers receive your findings:**
+
+```
+bazinga-db, please save context package:
+
+Session ID: {SESSION_ID}
+Group ID: {GROUP_ID}
+Package Type: investigation
+File Path: bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+Producer Agent: investigator
+Consumer Agents: ["developer", "senior_software_engineer"]
+Priority: high
+Summary: {1-sentence: Root cause + recommended fix}
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Include in your response:**
+```markdown
+## Context Package Created
+
+**File:** bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+**Type:** investigation
+**Priority:** high
+**Consumers:** ["developer", "senior_software_engineer"]
+**Summary:** {Same 1-sentence summary}
+
+📦 Package registered for developer routing.
+```
+
 ## Investigation Limits
 
 **Stop investigating and report if:**

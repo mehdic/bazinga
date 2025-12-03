@@ -216,6 +216,20 @@ tail -20 test_output.log
 
 ## Testing Workflow
 
+### 🔴 Step 0: Read Context Packages (IF PROVIDED)
+
+**Check your prompt for "Context Packages Available" section.**
+
+IF present, read listed files BEFORE testing:
+| Type | Contains | Action |
+|------|----------|--------|
+| investigation | Root cause analysis | Understand what was fixed |
+| failures | Prior iteration failures | Verify same issues don't recur |
+
+**After reading each package:** Mark as consumed via `bazinga-db mark-context-consumed {package_id} qa_expert 1` to prevent re-routing.
+
+**IF no context packages:** Proceed to Step 1.
+
 ### Step 1: Receive Handoff from Developer
 
 You'll be provided context:
@@ -1384,6 +1398,30 @@ After fixes, QA will retest.
 **Status:** FAIL
 **Next Step:** Orchestrator, please send back to Developer to fix test failures
 ```
+
+---
+
+## 🔴 MANDATORY: Create Failures Package (On FAIL Only)
+
+**When tests FAIL, register a context package so the next developer iteration has failure details:**
+
+```
+bazinga-db, please save context package:
+
+Session ID: {SESSION_ID}
+Group ID: {GROUP_ID}
+Package Type: failures
+File Path: bazinga/artifacts/{SESSION_ID}/failures_{GROUP_ID}_iter{N}.md
+Producer Agent: qa_expert
+Consumer Agents: ["developer", "senior_software_engineer"]
+Priority: high
+Summary: {N} test failures: {brief list of failing tests}
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Write the failures file first** with: test name, error message, expected vs actual, file locations. Then register.
+
+**Skip this step if Status = PASS** (no failures to communicate).
 
 ## Remember
 

@@ -178,6 +178,28 @@ Before implementing, verify:
 ## REMOVE: Ready?
 
 # =============================================================================
+# REPLACE: Context Packages (Add investigation type for Senior)
+# =============================================================================
+## REPLACE: 🔴 Step 0: Read Context Packages (MANDATORY IF PROVIDED)
+### 🔴 Step 0: Read Context Packages (MANDATORY IF PROVIDED)
+
+**Check your prompt for "Context Packages Available" section.**
+
+IF present, read listed files BEFORE starting:
+| Type | Contains | Action |
+|------|----------|--------|
+| research | API docs, recommendations | Follow recommended approach |
+| failures | Prior test failures | Avoid repeating mistakes |
+| decisions | Architecture choices | Use decided patterns |
+| handoff | Prior agent's work | Continue from there |
+| investigation | Root cause analysis | Apply discovered fixes |
+
+After reading, mark consumed: `bazinga-db mark-context-consumed {package_id} senior_software_engineer 1`
+
+**IF no context packages:** Proceed to Step 1.
+## END_REPLACE
+
+# =============================================================================
 # ADD: Challenge Level Response (Before Remember Section)
 # =============================================================================
 ## ADD_BEFORE: Remember
