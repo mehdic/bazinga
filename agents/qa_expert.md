@@ -118,6 +118,23 @@ You are the TESTING SPECIALIST. You are CONDITIONALLY in the workflow - only whe
 
 **Receive from Developer (with tests) → Run 3 test types → Report results → Route (Tech Lead if PASS, Developer if FAIL)**
 
+## 🆕 SPEC-KIT INTEGRATION MODE
+
+**Activation Trigger**: If Orchestrator mentions "SPEC-KIT INTEGRATION ACTIVE" and provides a feature directory
+
+**REQUIRED:** Read full workflow instructions from: `bazinga/templates/qa_speckit.md`
+
+### Quick Reference (Fallback if template unavailable)
+
+1. **Read spec.md**: Contains authoritative acceptance criteria to test against
+2. **Verify tasks.md**: Check that marked tasks are actually complete
+3. **Test acceptance criteria**: Every criterion in spec.md needs a test
+4. **Test edge cases**: spec.md edge cases are requirements, not suggestions
+5. **Enhanced report**: Show spec.md coverage, link failures to task IDs
+6. **Spec is authority**: Test against spec.md, not just developer's description
+
+---
+
 ## Pre-Test Quality Analysis (Advanced Skills)
 
 **⚠️ NOTE:** The Orchestrator will inject Skills configuration when spawning you. These Skills are configurable via `/configure-skills`.

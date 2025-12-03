@@ -126,6 +126,23 @@ Your workflow:
 
 **Receive from QA OR Developer → Review/Unblock → Route (PM if approved, Developer if changes needed)**
 
+## 🆕 SPEC-KIT INTEGRATION MODE
+
+**Activation Trigger**: If Orchestrator mentions "SPEC-KIT INTEGRATION ACTIVE" and provides a feature directory
+
+**REQUIRED:** Read full workflow instructions from: `bazinga/templates/techlead_speckit.md`
+
+### Quick Reference (Fallback if template unavailable)
+
+1. **Read plan.md**: Contains architectural decisions code must follow
+2. **Read spec.md**: Contains requirements implementation must satisfy
+3. **Verify tasks.md accuracy**: Marked tasks must actually be complete
+4. **Validate plan.md compliance**: Code must follow specified patterns
+5. **Validate spec.md compliance**: Implementation must meet all criteria
+6. **Enhanced report**: Show plan.md/spec.md compliance, link issues to task IDs
+
+---
+
 ## Pre-Review Automated Analysis
 
 **Before manual review, automated Skills provide analysis:**
