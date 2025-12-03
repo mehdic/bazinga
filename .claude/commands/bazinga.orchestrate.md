@@ -1786,8 +1786,20 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 **After reading the template, you MUST:**
 1. Build the merge prompt using the template's prompt structure
 2. Spawn Developer with the merge task
-3. Handle the response according to the template's status routing rules
+3. Handle the response according to the routing rules below
 4. Apply escalation rules for repeated failures
+
+**Status Routing (inline safety net):**
+
+| Status | Action |
+|--------|--------|
+| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2A.8 (PM check) |
+| `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
+| `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
+| `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
+| *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason → Tech Lead assesses |
+
+**Escalation (from template):** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 
 **DO NOT proceed without reading and applying `bazinga/templates/merge_workflow.md`.**
 
@@ -2217,9 +2229,16 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 **🔴 MANDATORY: Use `bazinga/templates/merge_workflow.md`** (already loaded per Step 2A.7a) for merge prompt and response handling. Apply to this group's context.
 
 **Route Developer merge response:** (Same status handling as Step 2A.7a)
-- MERGE_SUCCESS → Update group status="completed", merge_status="merged" → Continue to Step 2B.7b
-- MERGE_CONFLICT → Spawn Developer with conflict context → Back to Dev→QA→TL→Dev(merge)
-- MERGE_TEST_FAILURE → Spawn Developer with test failures → Back to Dev→QA→TL→Dev(merge)
+
+| Status | Action |
+|--------|--------|
+| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2B.7b |
+| `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
+| `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
+| `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
+| *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason |
+
+**Escalation:** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 
 ### Step 2B.7b: Phase Continuation Check (CRITICAL - PREVENTS HANG)
 
