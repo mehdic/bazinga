@@ -7,6 +7,7 @@ Provides high-level commands for agents without requiring SQL knowledge.
 import sqlite3
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -131,7 +132,9 @@ class BazingaDB:
 
         try:
             # Use a short timeout - if DB is badly corrupted, don't hang
-            with sqlite3.connect(self.db_path, timeout=5.0) as conn:
+            # Open in read-only mode to prevent accidental writes to corrupted DB
+            uri = f"file:{self.db_path}?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=5.0) as conn:
                 cursor = conn.cursor()
 
                 for table in self.SALVAGE_TABLE_ORDER:
@@ -170,6 +173,9 @@ class BazingaDB:
         try:
             with sqlite3.connect(self.db_path, timeout=10.0) as conn:
                 cursor = conn.cursor()
+                # Disable FK constraints during restore to avoid ordering issues
+                # Table ordering handles most cases, but this is a safety layer
+                cursor.execute("PRAGMA foreign_keys = OFF")
 
                 for table in self.SALVAGE_TABLE_ORDER:
                     if table not in salvaged:
@@ -222,7 +228,12 @@ class BazingaDB:
                     if restored_count > 0:
                         self._print_error(f"  Restored {restored_count}/{len(rows)} rows to {table}")
                         total_restored += restored_count
+                    elif len(rows) > 0:
+                        # Warn when salvaged data couldn't be restored (schema mismatch, constraints)
+                        self._print_error(f"  Warning: 0/{len(rows)} rows restored to {table}")
 
+                # Re-enable FK constraints after restore
+                cursor.execute("PRAGMA foreign_keys = ON")
                 conn.commit()
         except Exception as e:
             self._print_error(f"  Error restoring data: {e}")
@@ -396,11 +407,12 @@ class BazingaDB:
 
         print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
-    def _get_connection(self, retry_on_corruption: bool = True) -> sqlite3.Connection:
+    def _get_connection(self, retry_on_corruption: bool = True, _lock_retry: int = 0) -> sqlite3.Connection:
         """Get database connection with proper settings.
 
         Args:
             retry_on_corruption: If True, attempt recovery on corruption errors.
+            _lock_retry: Internal counter for lock retry attempts (max 3 retries with backoff).
 
         Returns:
             sqlite3.Connection with WAL mode and foreign keys enabled.
@@ -415,6 +427,14 @@ class BazingaDB:
             conn.execute("PRAGMA busy_timeout = 30000")
             conn.row_factory = sqlite3.Row
             return conn
+        except sqlite3.OperationalError as e:
+            # Handle transient "database is locked" errors with retry/backoff
+            if "database is locked" in str(e).lower() and _lock_retry < 3:
+                wait_time = 2 ** _lock_retry  # Exponential backoff: 1s, 2s, 4s
+                self._print_error(f"Database locked, retrying in {wait_time}s (attempt {_lock_retry + 1}/3)...")
+                time.sleep(wait_time)
+                return self._get_connection(retry_on_corruption, _lock_retry + 1)
+            raise
         except sqlite3.DatabaseError as e:
             if retry_on_corruption and self._is_corruption_error(e):
                 if self._recover_from_corruption():
