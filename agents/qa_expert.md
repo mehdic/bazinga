@@ -1411,9 +1411,9 @@ bazinga-db, please save context package:
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
 Package Type: failures
-File Path: bazinga/artifacts/{SESSION_ID}/failures_{GROUP_ID}_iter{N}.md
+File Path: bazinga/artifacts/{SESSION_ID}/context/failures_{GROUP_ID}_iter{N}.md
 Producer Agent: qa_expert
-Consumer Agents: developer, senior_software_engineer
+Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {N} test failures: {brief list of failing tests}
 ```

@@ -844,9 +844,9 @@ bazinga-db, please save context package:
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
 Package Type: investigation
-File Path: bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+File Path: bazinga/artifacts/{SESSION_ID}/context/investigation_{GROUP_ID}.md
 Producer Agent: investigator
-Consumer Agents: developer, senior_software_engineer
+Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {1-sentence: Root cause + recommended fix}
 ```
@@ -857,10 +857,10 @@ Then invoke: `Skill(command: "bazinga-db")`
 ```markdown
 ## Context Package Created
 
-**File:** bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+**File:** bazinga/artifacts/{SESSION_ID}/context/investigation_{GROUP_ID}.md
 **Type:** investigation
 **Priority:** high
-**Consumers:** developer, senior_software_engineer
+**Consumers:** ["developer", "senior_software_engineer"]
 **Summary:** {Same 1-sentence summary}
 
 📦 Package registered for developer routing.

@@ -1079,6 +1079,11 @@ class BazingaDB:
             WHERE id = ? AND session_id = ?
         """, (json.dumps(package_ids), group_id, session_id))
 
+        if cursor.rowcount == 0:
+            conn.close()
+            print(f"! Warning: No task group found with id='{group_id}' and session_id='{session_id}'", file=sys.stderr)
+            return
+
         conn.commit()
         conn.close()
         self._print_success(f"✓ Updated context references for {group_id}: {package_ids}")
@@ -1334,6 +1339,10 @@ def main():
             group_id = cmd_args[1]
             agent_type = cmd_args[2]
             limit = int(cmd_args[3]) if len(cmd_args) > 3 else 3
+            # Validate limit is within acceptable range
+            if limit < 1 or limit > 50:
+                print(f"ERROR: limit must be between 1 and 50 (got {limit})", file=sys.stderr)
+                sys.exit(1)
             result = db.get_context_packages(session_id, group_id, agent_type, limit)
             print(json.dumps(result, indent=2))
         elif cmd == 'mark-context-consumed':

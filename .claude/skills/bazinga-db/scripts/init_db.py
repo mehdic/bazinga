@@ -452,6 +452,7 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_type ON context_packages(package_type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_priority ON context_packages(priority)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_scope ON context_packages(scope)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_created ON context_packages(created_at)")
     print("✓ Created context_packages table with indexes")
 
     # Context package consumers join table (for per-agent consumption tracking)
