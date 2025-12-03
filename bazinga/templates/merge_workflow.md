@@ -46,6 +46,7 @@ Report one of:
 - `MERGE_SUCCESS` - Merged and tests pass (include files changed, test summary)
 - `MERGE_CONFLICT` - Conflicts found (list conflicting files)
 - `MERGE_TEST_FAILURE` - Tests failed after merge (list failures)
+- `MERGE_BLOCKED` - Cannot proceed (environment issue, missing deps, CI blocked)
 ```
 
 ---
@@ -71,6 +72,7 @@ Parse the Developer's merge response. Extract status:
 - **MERGE_SUCCESS** - Branch merged, tests pass
 - **MERGE_CONFLICT** - Git merge conflicts
 - **MERGE_TEST_FAILURE** - Tests fail after merge
+- **MERGE_BLOCKED** - Cannot proceed (environment/CI issue)
 
 ### Status Routing
 
@@ -112,6 +114,13 @@ Parse the Developer's merge response. Extract status:
     5. Commit and push: `git add . && git commit -m "Fix integration test failures" && git push origin {feature_branch}`
   * **CRITICAL:** This ensures feature_branch incorporates latest initial_branch changes before retry
   * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
+
+**IF status = MERGE_BLOCKED:**
+- Output capsule: `⚠️ Group {id} merge blocked | {blocker_reason} | Tech Lead assessing`
+- Update task_group in database:
+  - status: "in_progress"
+  - merge_status: "blocked"
+- **Spawn Tech Lead** to assess the blockage and determine next steps
 
 ---
 

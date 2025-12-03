@@ -215,6 +215,8 @@ class BazingaDB:
                                 if cursor.rowcount > 0:
                                     restored_count += 1
                             except sqlite3.Error:
+                                # Skip rows that fail (e.g., constraint violations, duplicates)
+                                # This is intentional - salvage as much data as possible
                                 pass
 
                     if restored_count > 0:
