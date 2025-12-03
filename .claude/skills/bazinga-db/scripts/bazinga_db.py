@@ -26,6 +26,22 @@ class BazingaDB:
         "attempt to write a readonly database",
     ]
 
+    # SQLite errors that indicate BAD QUERIES, NOT corruption
+    # These happen when agents write inline SQL with wrong column/table names
+    # They should NEVER trigger database recovery/deletion
+    QUERY_ERRORS = [
+        "no such column",
+        "no such table",
+        "syntax error",
+        "near \"",           # Syntax errors like 'near "SELECT"'
+        "unrecognized token",
+        "no such function",
+        "ambiguous column name",
+        "constraint failed",  # Constraint violations are not corruption
+        "unique constraint",
+        "foreign key constraint",
+    ]
+
     def __init__(self, db_path: str, quiet: bool = False):
         self.db_path = db_path
         self.quiet = quiet
@@ -40,9 +56,27 @@ class BazingaDB:
         """Print error message to stderr."""
         print(f"! {message}", file=sys.stderr)
 
-    def _is_corruption_error(self, error: Exception) -> bool:
-        """Check if an exception indicates database corruption."""
+    def _is_query_error(self, error: Exception) -> bool:
+        """Check if an exception indicates a bad query (NOT corruption).
+
+        These are errors caused by wrong column/table names, syntax errors, etc.
+        They should NEVER trigger database recovery/deletion.
+        """
         error_msg = str(error).lower()
+        return any(query_err in error_msg for query_err in self.QUERY_ERRORS)
+
+    def _is_corruption_error(self, error: Exception) -> bool:
+        """Check if an exception indicates database corruption.
+
+        IMPORTANT: Query errors (wrong column names, etc.) are NOT corruption.
+        This prevents data loss when agents write bad SQL.
+        """
+        error_msg = str(error).lower()
+
+        # First, check if this is a query error - these are NEVER corruption
+        if self._is_query_error(error):
+            return False
+
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
     def _backup_corrupted_db(self) -> Optional[str]:
@@ -272,9 +306,19 @@ class BazingaDB:
                             needs_init = True
                             print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
             except sqlite3.DatabaseError as e:
-                is_corrupted = True
-                needs_init = True
-                print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
+                # Check if this is a query error (wrong column/table names) vs real corruption
+                if self._is_query_error(e):
+                    # Query errors should NOT trigger recovery - just propagate the error
+                    print(f"Query error at {self.db_path}: {e}. Database is intact, bad SQL detected.", file=sys.stderr)
+                    raise  # Let caller handle it - don't destroy the database
+                elif self._is_corruption_error(e):
+                    is_corrupted = True
+                    needs_init = True
+                    print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
+                else:
+                    # Unknown database error - log but don't assume corruption
+                    print(f"Database error at {self.db_path}: {e}. May need investigation.", file=sys.stderr)
+                    raise  # Let caller handle it
             except Exception as e:
                 needs_init = True
                 print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
