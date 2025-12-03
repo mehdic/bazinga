@@ -854,6 +854,117 @@ class BazingaDB:
 
         conn.close()
 
+    # ==================== CONTEXT PACKAGE OPERATIONS ====================
+
+    def save_context_package(self, session_id: str, group_id: str, package_type: str,
+                            file_path: str, producer_agent: str, consumers: List[str],
+                            priority: str, summary: str, size_bytes: int = None) -> Dict:
+        """Save a context package and create consumer entries."""
+        valid_types = ('research', 'failures', 'decisions', 'handoff', 'investigation')
+        if package_type not in valid_types:
+            raise ValueError(f"Invalid package_type: {package_type}. Must be one of {valid_types}")
+
+        valid_priorities = ('low', 'medium', 'high', 'critical')
+        if priority not in valid_priorities:
+            raise ValueError(f"Invalid priority: {priority}. Must be one of {valid_priorities}")
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Determine scope
+        scope = 'global' if group_id == 'global' or group_id is None else 'group'
+        actual_group_id = None if group_id == 'global' else group_id
+
+        # Insert the context package
+        cursor.execute("""
+            INSERT INTO context_packages
+            (session_id, group_id, package_type, file_path, producer_agent, priority, summary, size_bytes, scope)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (session_id, actual_group_id, package_type, file_path, producer_agent, priority, summary, size_bytes, scope))
+
+        package_id = cursor.lastrowid
+
+        # Create consumer entries
+        for consumer in consumers:
+            cursor.execute("""
+                INSERT INTO context_package_consumers (package_id, agent_type)
+                VALUES (?, ?)
+            """, (package_id, consumer))
+
+        conn.commit()
+        conn.close()
+
+        self._print_success(f"✓ Created context package {package_id} ({package_type}) with {len(consumers)} consumers")
+        return {"package_id": package_id, "file_path": file_path, "consumers_created": len(consumers)}
+
+    def get_context_packages(self, session_id: str, group_id: str, agent_type: str,
+                            limit: int = 3) -> List[Dict]:
+        """Get context packages for an agent spawn, ordered by priority."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Query packages for this agent type, including global packages
+        cursor.execute("""
+            SELECT cp.id, cp.package_type, cp.priority, cp.summary, cp.file_path, cp.size_bytes, cp.group_id
+            FROM context_packages cp
+            JOIN context_package_consumers cpc ON cp.id = cpc.package_id
+            WHERE cp.session_id = ?
+              AND (cp.group_id = ? OR cp.scope = 'global')
+              AND cpc.agent_type = ?
+              AND cp.supersedes_id IS NULL
+            ORDER BY
+              CASE cp.priority
+                WHEN 'critical' THEN 1
+                WHEN 'high' THEN 2
+                WHEN 'medium' THEN 3
+                WHEN 'low' THEN 4
+              END,
+              cp.created_at DESC
+            LIMIT ?
+        """, (session_id, group_id, agent_type, limit))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def mark_context_consumed(self, package_id: int, agent_type: str, iteration: int = 1) -> None:
+        """Mark a context package as consumed by an agent."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE context_package_consumers
+            SET consumed_at = CURRENT_TIMESTAMP
+            WHERE package_id = ? AND agent_type = ? AND iteration = ?
+        """, (package_id, agent_type, iteration))
+
+        if cursor.rowcount == 0:
+            # Consumer entry doesn't exist for this iteration, create it
+            cursor.execute("""
+                INSERT OR REPLACE INTO context_package_consumers (package_id, agent_type, iteration, consumed_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """, (package_id, agent_type, iteration))
+
+        conn.commit()
+        conn.close()
+        self._print_success(f"✓ Marked package {package_id} as consumed by {agent_type} (iteration {iteration})")
+
+    def update_context_references(self, group_id: str, session_id: str, package_ids: List[int]) -> None:
+        """Update the context_references for a task group."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE task_groups
+            SET context_references = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND session_id = ?
+        """, (json.dumps(package_ids), group_id, session_id))
+
+        conn.commit()
+        conn.close()
+        self._print_success(f"✓ Updated context references for {group_id}: {package_ids}")
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -916,6 +1027,16 @@ SUCCESS CRITERIA OPERATIONS:
   get-success-criteria <session>              Get success criteria
   update-success-criterion <session> <criterion> [--status X] [--actual Y] [--evidence Z]
                                               Update criterion
+
+CONTEXT PACKAGE OPERATIONS:
+  save-context-package <session> <group_id> <type> <file_path> <producer> <consumers_json> <priority> <summary>
+                                              Save context package (type: research|failures|decisions|handoff|investigation)
+  get-context-packages <session> <group_id> <agent_type> [limit]
+                                              Get context packages for agent spawn (default: limit=3)
+  mark-context-consumed <package_id> <agent_type> [iteration]
+                                              Mark package as consumed (default: iteration=1)
+  update-context-references <group_id> <session> <package_ids_json>
+                                              Update task group context references
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -1070,6 +1191,34 @@ def main():
                 value = cmd_args[i + 1]
                 kwargs[key] = value
             db.update_success_criterion(session_id, criterion, **kwargs)
+        elif cmd == 'save-context-package':
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            package_type = cmd_args[2]
+            file_path = cmd_args[3]
+            producer = cmd_args[4]
+            consumers = json.loads(cmd_args[5])
+            priority = cmd_args[6]
+            summary = cmd_args[7]
+            result = db.save_context_package(session_id, group_id, package_type, file_path, producer, consumers, priority, summary)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-context-packages':
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            agent_type = cmd_args[2]
+            limit = int(cmd_args[3]) if len(cmd_args) > 3 else 3
+            result = db.get_context_packages(session_id, group_id, agent_type, limit)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'mark-context-consumed':
+            package_id = int(cmd_args[0])
+            agent_type = cmd_args[1]
+            iteration = int(cmd_args[2]) if len(cmd_args) > 2 else 1
+            db.mark_context_consumed(package_id, agent_type, iteration)
+        elif cmd == 'update-context-references':
+            group_id = cmd_args[0]
+            session_id = cmd_args[1]
+            package_ids = json.loads(cmd_args[2])
+            db.update_context_references(group_id, session_id, package_ids)
         elif cmd == 'query':
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)
