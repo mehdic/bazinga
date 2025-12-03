@@ -859,7 +859,11 @@ class BazingaDB:
     def save_context_package(self, session_id: str, group_id: str, package_type: str,
                             file_path: str, producer_agent: str, consumers: List[str],
                             priority: str, summary: str, size_bytes: int = None) -> Dict:
-        """Save a context package and create consumer entries."""
+        """Save a context package and create consumer entries.
+
+        NOTE: Versioning is not yet implemented. All packages have supersedes_id=NULL.
+        Future enhancement: add superseded_by_id column and link previous versions.
+        """
         valid_types = ('research', 'failures', 'decisions', 'handoff', 'investigation')
         if package_type not in valid_types:
             raise ValueError(f"Invalid package_type: {package_type}. Must be one of {valid_types}")
@@ -868,16 +872,28 @@ class BazingaDB:
         if priority not in valid_priorities:
             raise ValueError(f"Invalid priority: {priority}. Must be one of {valid_priorities}")
 
-        # Validate file path to prevent path traversal
+        # Validate file path to prevent path traversal and symlink escapes
+        from pathlib import Path
         import os
-        normalized_path = os.path.normpath(file_path)
-        # Reject absolute paths and paths with ".."
-        if os.path.isabs(normalized_path) or '..' in normalized_path.split(os.sep):
-            raise ValueError(f"Invalid file_path: must be relative and within artifacts directory. Got: {file_path}")
-        # Ensure path starts with bazinga/artifacts/{session_id}/
-        expected_prefix = f"bazinga/artifacts/{session_id}/"
-        if not normalized_path.startswith(expected_prefix):
-            raise ValueError(f"Invalid file_path: must start with '{expected_prefix}'. Got: {normalized_path}")
+
+        # Convert to Path and resolve (follows symlinks)
+        try:
+            candidate_path = Path(file_path).resolve()
+        except (ValueError, RuntimeError) as e:
+            raise ValueError(f"Invalid file_path: {e}")
+
+        # Define artifacts root and resolve it
+        artifacts_root = Path("bazinga/artifacts") / session_id
+        artifacts_root_resolved = artifacts_root.resolve()
+
+        # Ensure candidate is within artifacts directory using relative_to
+        try:
+            candidate_path.relative_to(artifacts_root_resolved)
+        except ValueError:
+            raise ValueError(f"Invalid file_path: must be within {artifacts_root}. Got: {file_path}")
+
+        # Use the resolved path for storage
+        normalized_path = str(candidate_path)
 
         # Auto-compute size_bytes if not provided and file exists
         if size_bytes is None:
@@ -927,7 +943,7 @@ class BazingaDB:
         conn.close()
 
         self._print_success(f"✓ Created context package {package_id} ({package_type}) with {len(consumers)} consumers")
-        return {"package_id": package_id, "file_path": file_path, "consumers_created": len(consumers)}
+        return {"package_id": package_id, "file_path": normalized_path, "consumers_created": len(consumers)}
 
     def get_context_packages(self, session_id: str, group_id: str, agent_type: str,
                             limit: int = 3, include_consumed: bool = False) -> List[Dict]:
@@ -983,11 +999,15 @@ class BazingaDB:
         cursor = conn.cursor()
 
         # Try to update any pending (unconsumed) row for this package and agent
+        # SQLite doesn't support LIMIT in UPDATE, use subquery instead
         cursor.execute("""
             UPDATE context_package_consumers
             SET consumed_at = CURRENT_TIMESTAMP, iteration = ?
-            WHERE package_id = ? AND agent_type = ? AND consumed_at IS NULL
-            LIMIT 1
+            WHERE id IN (
+                SELECT id FROM context_package_consumers
+                WHERE package_id = ? AND agent_type = ? AND consumed_at IS NULL
+                LIMIT 1
+            )
         """, (iteration, package_id, agent_type))
 
         if cursor.rowcount == 0:
@@ -1252,7 +1272,9 @@ def main():
                 consumers = json.loads(cmd_args[5])
                 if not isinstance(consumers, list):
                     raise ValueError("consumers_json must be a JSON array of strings")
-            except json.JSONDecodeError as e:
+                if not all(x and isinstance(x, str) for x in consumers):
+                    raise ValueError("All consumer elements must be non-empty strings")
+            except (json.JSONDecodeError, ValueError) as e:
                 print(f"ERROR: Invalid consumers_json argument: {e}", file=sys.stderr)
                 print("Expected: JSON array of agent types, e.g., [\"developer\", \"qa_expert\"]", file=sys.stderr)
                 sys.exit(1)

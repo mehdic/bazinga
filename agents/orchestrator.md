@@ -1245,6 +1245,9 @@ Then invoke: `Skill(command: "bazinga-db")`
 - This prevents path traversal attacks via DB-sourced paths
 
 **Context Packages Prompt Section** (include when N > 0 after validation):
+
+Replace `{your_agent_type}` with the actual agent type being spawned (e.g., "developer", "qa_expert").
+
 ```markdown
 ## Context Packages Available
 
@@ -1256,7 +1259,8 @@ Read these files BEFORE starting implementation:
 
 **Instructions:**
 1. Use Read tool on each file. Incorporate findings into your work.
-2. After reading, mark as consumed: `bazinga-db mark-context-consumed {id} {your_agent_type} 1`
+2. After reading, mark as consumed: `bazinga-db mark-context-consumed {id} {agent_type} 1`
+   (Replace {agent_type} with your role: developer, qa_expert, senior_software_engineer, etc.)
 ```
 
 Priority emojis: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
