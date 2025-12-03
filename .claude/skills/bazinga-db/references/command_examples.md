@@ -9,10 +9,10 @@ All commands follow this pattern:
 python3 /path/to/bazinga_db.py --db /path/to/bazinga.db <command> [arguments...]
 ```
 
-For brevity, examples below use:
+For brevity, examples below use (relative paths for portability):
 ```bash
-$DB_SCRIPT = /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py
-$DB_PATH = /home/user/bazinga/bazinga/bazinga.db
+$DB_SCRIPT = .claude/skills/bazinga-db/scripts/bazinga_db.py
+$DB_PATH = bazinga/bazinga.db
 ```
 
 ---
@@ -376,9 +376,9 @@ echo '{"test":"data"}' | jq . && \
 When using from Claude Code's Bash tool:
 
 ```bash
-# Set up variables
-DB_SCRIPT="/home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py"
-DB_PATH="/home/user/bazinga/bazinga/bazinga.db"
+# Set up variables (relative paths for portability)
+DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_PATH="bazinga/bazinga.db"
 SESSION_ID="bazinga_20250112_143022"
 
 # Example: Log interaction and update state in one command chain

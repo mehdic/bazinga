@@ -2,6 +2,14 @@
 """
 BAZINGA Database Client - Simple command interface for database operations.
 Provides high-level commands for agents without requiring SQL knowledge.
+
+Path Resolution:
+    The script auto-detects the project root and database path. You can override:
+    - --db PATH          Explicit database path
+    - --project-root DIR Explicit project root (db at DIR/bazinga/bazinga.db)
+    - BAZINGA_ROOT env   Environment variable override
+
+    If none provided, auto-detects by walking up from script location or CWD.
 """
 
 import sqlite3
@@ -12,6 +20,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import argparse
+
+# Add _shared directory to path for bazinga_paths import
+# Path: .claude/skills/bazinga-db/scripts/bazinga_db.py
+#   -> .claude/skills/bazinga-db/scripts/  (parent)
+#   -> .claude/skills/bazinga-db/          (parent.parent)
+#   -> .claude/skills/                      (parent.parent.parent)
+#   -> .claude/skills/_shared/              (where bazinga_paths.py lives)
+_script_dir = Path(__file__).parent.resolve()
+_shared_dir = _script_dir.parent.parent / '_shared'
+if _shared_dir.exists() and str(_shared_dir) not in sys.path:
+    sys.path.insert(0, str(_shared_dir))
+
+try:
+    from bazinga_paths import get_project_root, get_db_path, get_detection_info
+    _HAS_BAZINGA_PATHS = True
+except ImportError:
+    _HAS_BAZINGA_PATHS = False
 
 
 class BazingaDB:
@@ -1414,16 +1439,61 @@ QUERY OPERATIONS:
 DATABASE MAINTENANCE:
   integrity-check                             Check database integrity
   recover-db                                  Attempt to recover corrupted database
+  detect-paths                                Show auto-detected paths (debugging)
 
 HELP:
   help                                        Show this help message
 
+PATH RESOLUTION:
+  The script auto-detects the database path. Override with:
+  --db PATH           Explicit database path
+  --project-root DIR  Project root (db at DIR/bazinga/bazinga.db)
+  BAZINGA_ROOT env    Environment variable
+
 Examples:
-  bazinga_db.py --db bazinga.db list-sessions 5
-  bazinga_db.py --db bazinga.db query "SELECT * FROM sessions LIMIT 3"
-  bazinga_db.py --db bazinga.db get-task-groups session123
+  bazinga_db.py list-sessions 5                                    # Auto-detect path
+  bazinga_db.py --db bazinga.db list-sessions 5                    # Explicit path
+  bazinga_db.py --project-root /path/to/project list-sessions 5    # Project root
+  bazinga_db.py detect-paths                                       # Show detected paths
+  bazinga_db.py query "SELECT * FROM sessions LIMIT 3"
+  bazinga_db.py get-task-groups session123
 """
     print(help_text)
+
+
+def _resolve_db_path(args) -> str:
+    """Resolve the database path from arguments or auto-detection."""
+    # 1. Explicit --db takes highest priority
+    if args.db:
+        return args.db
+
+    # 2. Try auto-detection via bazinga_paths module
+    if _HAS_BAZINGA_PATHS:
+        try:
+            db_path = get_db_path(
+                override=args.db,
+                project_root=Path(args.project_root) if args.project_root else None
+            )
+            return str(db_path)
+        except RuntimeError as e:
+            print(f"Error: Could not auto-detect database path: {e}", file=sys.stderr)
+            print("Hint: Use --db to specify path explicitly, or ensure you're in a BAZINGA project.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Fallback: try to find db relative to script location
+        script_dir = Path(__file__).parent.resolve()
+        # Walk up to find project root
+        current = script_dir
+        for _ in range(10):  # Max 10 levels up
+            candidate = current / 'bazinga' / 'bazinga.db'
+            if (current / '.claude').exists() and (current / 'bazinga').exists():
+                return str(candidate)
+            if current.parent == current:
+                break
+            current = current.parent
+
+        print("Error: --db is required (auto-detection unavailable)", file=sys.stderr)
+        sys.exit(1)
 
 
 def main():
@@ -1431,13 +1501,26 @@ def main():
         description='BAZINGA Database Client',
         epilog='Run with "help" command to see all available commands'
     )
-    parser.add_argument('--db', required=True, help='Database path')
+    parser.add_argument('--db', required=False, help='Database path (auto-detected if not provided)')
+    parser.add_argument('--project-root', required=False, help='Project root directory (for auto-detection)')
     parser.add_argument('--quiet', action='store_true', help='Suppress success messages, only show errors')
     parser.add_argument('command', help='Command to execute')
     parser.add_argument('args', nargs=argparse.REMAINDER, help='Command arguments')
 
     args = parser.parse_args()
-    db = BazingaDB(args.db, quiet=args.quiet)
+
+    # Handle detect-paths command before resolving db
+    if args.command == 'detect-paths':
+        if _HAS_BAZINGA_PATHS:
+            info = get_detection_info()
+            print(json.dumps(info, indent=2))
+        else:
+            print(json.dumps({"error": "bazinga_paths module not available"}, indent=2))
+        sys.exit(0)
+
+    # Resolve database path
+    db_path = _resolve_db_path(args)
+    db = BazingaDB(db_path, quiet=args.quiet)
 
     # Parse command and execute
     cmd = args.command

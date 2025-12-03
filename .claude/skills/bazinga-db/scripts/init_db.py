@@ -2,6 +2,10 @@
 """
 Initialize BAZINGA database schema.
 Creates all necessary tables for managing orchestration state.
+
+Path Resolution:
+    If no database path is provided, auto-detects project root and uses:
+    PROJECT_ROOT/bazinga/bazinga.db
 """
 
 import sqlite3
@@ -9,6 +13,18 @@ import sys
 from pathlib import Path
 import tempfile
 import shutil
+
+# Add _shared directory to path for bazinga_paths import
+_script_dir = Path(__file__).parent.resolve()
+_shared_dir = _script_dir.parent.parent / '_shared'
+if _shared_dir.exists() and str(_shared_dir) not in sys.path:
+    sys.path.insert(0, str(_shared_dir))
+
+try:
+    from bazinga_paths import get_db_path
+    _HAS_BAZINGA_PATHS = True
+except ImportError:
+    _HAS_BAZINGA_PATHS = False
 
 # Current schema version
 SCHEMA_VERSION = 6
@@ -492,12 +508,24 @@ def init_database(db_path: str) -> None:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python init_db.py <database_path>")
-        print("Example: python init_db.py /home/user/bazinga/bazinga/bazinga.db")
+    # Determine database path
+    if len(sys.argv) >= 2:
+        # Explicit path provided
+        db_path = sys.argv[1]
+    elif _HAS_BAZINGA_PATHS:
+        # Auto-detect using bazinga_paths
+        try:
+            db_path = str(get_db_path())
+            print(f"Auto-detected database path: {db_path}")
+        except RuntimeError as e:
+            print(f"Error: Could not auto-detect database path: {e}", file=sys.stderr)
+            print("Usage: python init_db.py [database_path]", file=sys.stderr)
+            print("Example: python init_db.py bazinga/bazinga.db", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("Usage: python init_db.py <database_path>", file=sys.stderr)
+        print("Example: python init_db.py bazinga/bazinga.db", file=sys.stderr)
         sys.exit(1)
-
-    db_path = sys.argv[1]
 
     # Create parent directory if it doesn't exist
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
