@@ -183,6 +183,13 @@ Operation → Check result → If error: Output capsule with error
 - 🚫 **Glob/Grep** - (spawn agents to search)
 - 🚫 **Write** - (all state is in database, not files)
 
+**🔴 CRITICAL: NEVER USE INLINE SQL**
+- 🚫 **NEVER** write `python3 -c "import sqlite3..."` for database operations
+- 🚫 **NEVER** write raw SQL queries (UPDATE, INSERT, SELECT)
+- 🚫 **NEVER** directly access `bazinga/bazinga.db` with inline code
+- ✅ **ALWAYS** use `Skill(command: "bazinga-db")` for ALL database operations
+- **Why:** Inline SQL uses wrong column names (`group_id` vs `id`) and causes data loss
+
 ---
 
 ## 🚨 ROLE DRIFT PREVENTION: Internal Discipline Check

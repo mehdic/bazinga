@@ -124,10 +124,18 @@ class BazingaDB:
             return {"ok": False, "details": f"Integrity check failed: {e}"}
 
     def _ensure_db_exists(self):
-        """Ensure database exists and has schema, create if not."""
+        """Ensure database exists and has schema, create if not.
+
+        SAFETY: This function NEVER deletes existing databases automatically.
+        - Missing database: Create new
+        - Empty database: Initialize schema
+        - Missing schema: Initialize schema (safe - adds tables)
+        - Corrupted database: Backup and FAIL (require manual intervention)
+        """
         db_path = Path(self.db_path)
         needs_init = False
         is_corrupted = False
+        corruption_details = None
 
         if not db_path.exists():
             needs_init = True
@@ -144,8 +152,8 @@ class BazingaDB:
                     integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
                     if integrity != "ok":
                         is_corrupted = True
-                        needs_init = True
-                        print(f"Database corrupted at {self.db_path}: {integrity}. Auto-recovering...", file=sys.stderr)
+                        corruption_details = integrity
+                        print(f"! Database corrupted at {self.db_path}: {integrity}", file=sys.stderr)
                     else:
                         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
                         if not cursor.fetchone():
@@ -153,25 +161,33 @@ class BazingaDB:
                             print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
             except sqlite3.DatabaseError as e:
                 is_corrupted = True
-                needs_init = True
-                print(f"Database corrupted at {self.db_path}: {e}. Auto-recovering...", file=sys.stderr)
+                corruption_details = str(e)
+                print(f"! Database error at {self.db_path}: {e}", file=sys.stderr)
             except Exception as e:
-                needs_init = True
-                print(f"Database check failed at {self.db_path}: {e}. Auto-initializing...", file=sys.stderr)
+                # Non-database error (permissions, disk, etc.) - don't assume corruption
+                print(f"! Database check failed at {self.db_path}: {e}", file=sys.stderr)
+                print(f"! This may be a transient error. Retrying...", file=sys.stderr)
+                # Don't set is_corrupted - let it fail on actual operation instead
+                return
+
+        # SAFETY: If corrupted, backup but DO NOT delete - require manual intervention
+        if is_corrupted:
+            backup_path = self._backup_corrupted_db()
+            print(f"!", file=sys.stderr)
+            print(f"! ⚠️  DATABASE CORRUPTION DETECTED - MANUAL INTERVENTION REQUIRED", file=sys.stderr)
+            print(f"! Details: {corruption_details}", file=sys.stderr)
+            print(f"! Backup created: {backup_path}", file=sys.stderr)
+            print(f"!", file=sys.stderr)
+            print(f"! To recover, run one of:", file=sys.stderr)
+            print(f"!   python3 bazinga_db.py --db {self.db_path} recover-db", file=sys.stderr)
+            print(f"!   rm {self.db_path} && python3 init_db.py {self.db_path}", file=sys.stderr)
+            print(f"!", file=sys.stderr)
+            sys.exit(1)
 
         if not needs_init:
             return
 
-        # If corrupted, backup and delete before reinitializing
-        if is_corrupted and db_path.exists():
-            self._backup_corrupted_db()
-            try:
-                db_path.unlink()
-                print(f"Removed corrupted database file", file=sys.stderr)
-            except Exception as e:
-                print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
-
-        # Auto-initialize the database
+        # Auto-initialize the database (ONLY for missing/empty databases)
         script_dir = Path(__file__).parent
         init_script = script_dir / "init_db.py"
 
@@ -188,11 +204,10 @@ class BazingaDB:
 
         print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
-    def _get_connection(self, retry_on_corruption: bool = True) -> sqlite3.Connection:
+    def _get_connection(self) -> sqlite3.Connection:
         """Get database connection with proper settings.
 
-        Args:
-            retry_on_corruption: If True, attempt recovery on corruption errors.
+        SAFETY: Never auto-deletes database. On corruption, fails with clear error.
 
         Returns:
             sqlite3.Connection with WAL mode and foreign keys enabled.
@@ -208,10 +223,13 @@ class BazingaDB:
             conn.row_factory = sqlite3.Row
             return conn
         except sqlite3.DatabaseError as e:
-            if retry_on_corruption and self._is_corruption_error(e):
-                if self._recover_from_corruption():
-                    # Retry connection after recovery
-                    return self._get_connection(retry_on_corruption=False)
+            if self._is_corruption_error(e):
+                # Backup but DO NOT auto-delete - user must explicitly recover
+                backup_path = self._backup_corrupted_db()
+                self._print_error(f"⚠️  DATABASE CORRUPTION DETECTED")
+                self._print_error(f"Details: {e}")
+                self._print_error(f"Backup created: {backup_path}")
+                self._print_error(f"To recover: python3 bazinga_db.py --db {self.db_path} recover-db")
             raise
 
     # ==================== SESSION OPERATIONS ====================
@@ -373,13 +391,13 @@ class BazingaDB:
                     conn.rollback()
                 except:
                     pass
-            # Check if it's a corruption error
+            # Check if it's a corruption error - backup but DO NOT auto-delete
             if self._is_corruption_error(e):
-                if self._recover_from_corruption():
-                    # Retry once after recovery (with incremented counter to prevent infinite loop)
-                    self._print_error(f"Retrying log operation after recovery...")
-                    return self.log_interaction(session_id, agent_type, content, iteration, agent_id,
-                                               _retry_count=_retry_count + 1)
+                backup_path = self._backup_corrupted_db()
+                self._print_error(f"⚠️  DATABASE CORRUPTION DETECTED during log_interaction")
+                self._print_error(f"Details: {e}")
+                self._print_error(f"Backup created: {backup_path}")
+                self._print_error(f"To recover: python3 bazinga_db.py --db {self.db_path} recover-db")
             self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
             return {"success": False, "error": f"Database error: {str(e)}"}
         except Exception as e:
