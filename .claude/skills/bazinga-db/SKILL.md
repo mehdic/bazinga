@@ -281,7 +281,7 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-context-packages \
   [limit]
 ```
 
-Returns JSON array of packages ordered by priority DESC, created_at DESC. Default limit is 3.
+Returns JSON array of packages ordered by priority (critical→high→medium→low), then created_at DESC. Default limit is 3.
 
 **Mark context package as consumed:**
 ```bash

@@ -701,7 +701,7 @@ bazinga-db, please save context package:
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
 Package Type: research
-File Path: bazinga/artifacts/{SESSION_ID}/context/research_group_{GROUP_ID}.md
+File Path: bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md
 Producer Agent: requirements_engineer
 Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high

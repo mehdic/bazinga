@@ -586,36 +586,19 @@ Before marking "READY_FOR_QA" or "READY_FOR_REVIEW":
 
 ### 🔴 Step 0: Read Context Packages (MANDATORY IF PROVIDED)
 
-**Before any implementation, check your prompt for a "Context Packages Available" section.**
+**Check your prompt for "Context Packages Available" section.**
 
-IF your prompt contains `## Context Packages Available`:
+IF present, read listed files BEFORE starting:
+| Type | Contains | Action |
+|------|----------|--------|
+| research | API docs, recommendations | Follow recommended approach |
+| failures | Prior test failures | Avoid repeating mistakes |
+| decisions | Architecture choices | Use decided patterns |
+| handoff | Prior agent's work | Continue from there |
 
-1. **Read ALL listed files immediately** using the Read tool
-2. **Priority order:** 🔴 critical → 🟠 high → 🟡 medium → ⚪ low
-3. **Types and how to use them:**
-   | Type | Contains | Action |
-   |------|----------|--------|
-   | research | API docs, vendor analysis, recommendations | Follow recommended approach |
-   | failures | Previous test failures, root causes | Avoid repeating same mistakes |
-   | decisions | Architecture choices, patterns | Implement using decided patterns |
-   | handoff | Prior agent's work summary | Continue from where they left |
-4. **After reading each package, mark it as consumed:**
-   - Extract the package ID from the context section
-   - Invoke: `bazinga-db mark-context-consumed {package_id} developer 1`
-   - This prevents the same context from being routed repeatedly
+After reading, mark consumed: `bazinga-db mark-context-consumed {package_id} developer 1`
 
-**Example prompt section:**
-```markdown
-## Context Packages Available
-
-| Priority | Type | Summary | File | Package ID |
-|----------|------|---------|------|------------|
-| 🟠 HIGH | research | HIN OAuth2 endpoints and code samples | `bazinga/artifacts/.../context/research-A-hin.md` | 42 |
-```
-
-**Your action:** `Read("bazinga/artifacts/.../context/research-A-hin.md")` BEFORE starting work.
-
-**IF no context packages section:** Proceed to Step 1 normally.
+**IF no context packages:** Proceed to Step 1.
 
 ### PM-Generated Context
 

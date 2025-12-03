@@ -391,7 +391,7 @@ bazinga-db, please save context package:
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
 Package Type: decisions
-File Path: bazinga/artifacts/{SESSION_ID}/context/decisions_{GROUP_ID}_{topic}.md
+File Path: bazinga/artifacts/{SESSION_ID}/decisions_{GROUP_ID}_{topic}.md
 Producer Agent: tech_lead
 Consumer Agents: ["developer", "senior_software_engineer", "qa_expert"]
 Priority: medium
