@@ -1784,6 +1784,8 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 Read(file_path: "bazinga/templates/merge_workflow.md")
 ```
 
+**If Read fails:** Output `❌ Template load failed | merge_workflow.md` and STOP.
+
 **After reading the template, you MUST:**
 1. Build the merge prompt using the template's prompt structure
 2. Spawn Developer with the merge task
@@ -2227,7 +2229,15 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 🔀 Merging | Group {id} approved → Merging {feature_branch} to {initial_branch}
 ```
 
-**🔴 MANDATORY: Use `bazinga/templates/merge_workflow.md`** (already loaded per Step 2A.7a) for merge prompt and response handling. Apply to this group's context.
+**🔴 MANDATORY: Load and use merge workflow template:**
+
+```
+Read(file_path: "bazinga/templates/merge_workflow.md")
+```
+
+**If Read fails:** Output `❌ Template load failed | merge_workflow.md` and STOP.
+
+Use the template for merge prompt and response handling. Apply to this group's context.
 
 **Route Developer merge response:** (Same status handling as Step 2A.7a)
 

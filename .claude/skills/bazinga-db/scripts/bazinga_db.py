@@ -17,13 +17,20 @@ class BazingaDB:
     """Database client for BAZINGA orchestration."""
 
     # SQLite errors that indicate ACTUAL database corruption (file is unrecoverable)
-    # NOTE: Transient errors like "database is locked" or "disk I/O error" are NOT
-    # included here - they should be retried, not trigger database deletion!
+    # NOTE: Only true corruption errors that indicate the database file itself is damaged.
+    # Transient/operational errors (locked, full disk, readonly) should NOT trigger recovery!
     CORRUPTION_ERRORS = [
         "database disk image is malformed",
         "file is not a database",
-        "database or disk is full",
-        "attempt to write a readonly database",
+        # "database or disk is full" - operational, not corruption
+        # "attempt to write a readonly database" - permission issue, not corruption
+    ]
+
+    # Tables to salvage during recovery (ordered for FK dependencies)
+    SALVAGE_TABLE_ORDER = [
+        'sessions', 'orchestration_logs', 'state_snapshots', 'task_groups',
+        'token_usage', 'skill_outputs', 'development_plans', 'success_criteria',
+        'context_packages', 'context_package_consumers'
     ]
 
     # SQLite errors that indicate BAD QUERIES, NOT corruption
@@ -96,46 +103,40 @@ class BazingaDB:
             self._print_error(f"Failed to backup corrupted database: {e}")
             return None
 
-    def _extract_salvageable_data(self) -> Dict[str, List[tuple]]:
+    def _extract_salvageable_data(self) -> Dict[str, Dict[str, Any]]:
         """Try to extract data from a corrupted database before recovery.
 
         Returns:
-            Dict mapping table names to list of row tuples. Empty dict if extraction fails.
+            Dict mapping table names to {'columns': List[str], 'rows': List[tuple]}.
+            Empty dict if extraction fails.
         """
-        salvaged = {}
-        tables_to_try = [
-            'sessions', 'orchestration_logs', 'state_snapshots', 'task_groups',
-            'token_usage', 'skill_outputs', 'development_plans', 'success_criteria',
-            'context_packages', 'context_package_consumers'
-        ]
+        salvaged: Dict[str, Dict[str, Any]] = {}
 
         try:
             # Use a short timeout - if DB is badly corrupted, don't hang
-            conn = sqlite3.connect(self.db_path, timeout=5.0)
-            cursor = conn.cursor()
+            with sqlite3.connect(self.db_path, timeout=5.0) as conn:
+                cursor = conn.cursor()
 
-            for table in tables_to_try:
-                try:
-                    cursor.execute(f"SELECT * FROM {table}")
-                    rows = cursor.fetchall()
-                    if rows:
-                        # Get column names for this table
-                        cursor.execute(f"PRAGMA table_info({table})")
-                        columns = [col[1] for col in cursor.fetchall()]
-                        salvaged[table] = {'columns': columns, 'rows': rows}
-                        self._print_error(f"  Salvaged {len(rows)} rows from {table}")
-                except sqlite3.Error:
-                    # Table doesn't exist or is unreadable - skip
-                    pass
-
-            conn.close()
+                for table in self.SALVAGE_TABLE_ORDER:
+                    try:
+                        cursor.execute(f"SELECT * FROM \"{table}\"")
+                        rows = cursor.fetchall()
+                        if rows:
+                            # Get column names for this table
+                            cursor.execute(f"PRAGMA table_info(\"{table}\")")
+                            columns = [col[1] for col in cursor.fetchall()]
+                            salvaged[table] = {'columns': columns, 'rows': rows}
+                            self._print_error(f"  Salvaged {len(rows)} rows from {table}")
+                    except sqlite3.Error:
+                        # Table doesn't exist or is unreadable - skip
+                        pass
         except Exception as e:
             self._print_error(f"  Could not extract data: {e}")
             return {}
 
         return salvaged
 
-    def _restore_salvaged_data(self, salvaged: Dict[str, Dict]) -> int:
+    def _restore_salvaged_data(self, salvaged: Dict[str, Dict[str, Any]]) -> int:
         """Restore salvaged data to the new database.
 
         Args:
@@ -150,50 +151,60 @@ class BazingaDB:
         total_restored = 0
 
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
+            with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                cursor = conn.cursor()
 
-            # Restore in order to respect foreign keys
-            restore_order = [
-                'sessions', 'orchestration_logs', 'state_snapshots', 'task_groups',
-                'token_usage', 'skill_outputs', 'development_plans', 'success_criteria',
-                'context_packages', 'context_package_consumers'
-            ]
+                for table in self.SALVAGE_TABLE_ORDER:
+                    if table not in salvaged:
+                        continue
 
-            for table in restore_order:
-                if table not in salvaged:
-                    continue
+                    data = salvaged[table]
+                    old_columns = data['columns']
+                    rows = data['rows']
 
-                data = salvaged[table]
-                columns = data['columns']
-                rows = data['rows']
+                    if not rows:
+                        continue
 
-                if not rows:
-                    continue
+                    # Get current schema columns to handle schema changes
+                    cursor.execute(f"PRAGMA table_info(\"{table}\")")
+                    new_columns = [col[1] for col in cursor.fetchall()]
 
-                # Build INSERT statement
-                placeholders = ', '.join(['?' for _ in columns])
-                cols_str = ', '.join(columns)
+                    # Intersect: only restore columns that exist in both old and new schema
+                    valid_columns = [c for c in old_columns if c in new_columns]
+                    if not valid_columns:
+                        self._print_error(f"  Skipping {table}: no matching columns")
+                        continue
 
-                restored_count = 0
-                for row in rows:
+                    # Get indices of valid columns in original row data
+                    col_indices = [old_columns.index(c) for c in valid_columns]
+
+                    # Build INSERT statement once (with quoted identifiers)
+                    cols_str = ', '.join(f'"{c}"' for c in valid_columns)
+                    placeholders = ', '.join(['?' for _ in valid_columns])
+                    insert_sql = f"INSERT OR IGNORE INTO \"{table}\" ({cols_str}) VALUES ({placeholders})"
+
+                    # Filter row data to only valid columns and use executemany
+                    filtered_rows = [tuple(row[i] for i in col_indices) for row in rows]
+
                     try:
-                        cursor.execute(
-                            f"INSERT OR IGNORE INTO {table} ({cols_str}) VALUES ({placeholders})",
-                            row
-                        )
-                        if cursor.rowcount > 0:
-                            restored_count += 1
+                        cursor.executemany(insert_sql, filtered_rows)
+                        restored_count = cursor.rowcount if cursor.rowcount > 0 else 0
                     except sqlite3.Error:
-                        # Skip rows that fail (e.g., constraint violations)
-                        pass
+                        # Fall back to row-by-row on error
+                        restored_count = 0
+                        for row in filtered_rows:
+                            try:
+                                cursor.execute(insert_sql, row)
+                                if cursor.rowcount > 0:
+                                    restored_count += 1
+                            except sqlite3.Error:
+                                pass
 
-                if restored_count > 0:
-                    self._print_error(f"  Restored {restored_count}/{len(rows)} rows to {table}")
-                    total_restored += restored_count
+                    if restored_count > 0:
+                        self._print_error(f"  Restored {restored_count}/{len(rows)} rows to {table}")
+                        total_restored += restored_count
 
-            conn.commit()
-            conn.close()
+                conn.commit()
         except Exception as e:
             self._print_error(f"  Error restoring data: {e}")
 
@@ -309,7 +320,7 @@ class BazingaDB:
                 # Check if this is a query error (wrong column/table names) vs real corruption
                 if self._is_query_error(e):
                     # Query errors should NOT trigger recovery - just propagate the error
-                    print(f"Query error at {self.db_path}: {e}. Database is intact, bad SQL detected.", file=sys.stderr)
+                    print(f"Query error at {self.db_path}: {e}. This is a SQL syntax/schema error (e.g., incorrect table/column name), NOT database corruption. Fix the query.", file=sys.stderr)
                     raise  # Let caller handle it - don't destroy the database
                 elif self._is_corruption_error(e):
                     is_corrupted = True

@@ -1,6 +1,6 @@
 # Batch Processing Rules (Parallel Mode)
 
-**🔴 CRITICAL: This is the PRIMARY FIX for the orchestrator stopping bug.**
+**🔴 CRITICAL: This is the PRIMARY FIX for the orchestrator-stopping bug.**
 
 This template defines the MANDATORY batch processing workflow for parallel mode.
 
@@ -15,7 +15,7 @@ In parallel mode, the orchestrator receives multiple responses simultaneously. W
 - Serialize responses ("let me handle A first, then B")
 - Leave groups unrouted
 
-This causes the orchestrator stopping bug.
+This causes the orchestrator-stopping bug.
 
 ---
 
@@ -123,4 +123,4 @@ Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violat
 
 ---
 
-**This batch processing workflow is MANDATORY and prevents the root cause of orchestrator stopping bug.**
+**This batch processing workflow is MANDATORY and prevents the root cause of the orchestrator-stopping bug.**

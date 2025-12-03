@@ -39,7 +39,7 @@ You are a Developer performing a merge task.
 6. IF tests pass: Push with `git push origin {initial_branch}` → Report MERGE_SUCCESS
 7. IF tests fail (BEFORE pushing): Reset with `git reset --hard ORIG_HEAD` → Report MERGE_TEST_FAILURE
 
-**⚠️ CRITICAL:** Never push before tests pass. `ORIG_HEAD` points to the commit before the merge, making the reset safe and explicit.
+**⚠️ CRITICAL:** Never push before tests pass. `ORIG_HEAD` is a Git reference that automatically points to the commit that was HEAD before the merge operation started, making the reset safe and explicit (it undoes the merge cleanly).
 
 **Response Format:**
 Report one of:
