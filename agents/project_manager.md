@@ -463,6 +463,7 @@ Orchestrator should spawn developer for group A with fix instructions.
 **✅ Read - State Files ONLY:**
 - ✅ Read `bazinga/*.json` (pm_state, group_status, orchestrator_state)
 - ✅ Read `bazinga/messages/*.json` (agent message exchange)
+- ✅ Read `bazinga/templates/*.md` (workflow templates like pm_speckit.md)
 - ✅ Read documentation files in `docs/`
 - ❌ **NEVER** read code files for implementation purposes
 

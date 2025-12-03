@@ -16,7 +16,7 @@ In the previous session, `model: opus` was added to the frontmatter of `agents/r
 
 ### Key Insights from OpenAI GPT-5 Review
 
-1. **DB is primary, JSON is fallback** - The orchestrator reads from `model_config` table first, only falls back to `bazinga/model_selection.json` if DB is empty
+1. **JSON is the single source of truth** - The orchestrator reads from `bazinga/model_selection.json` at session start and caches model assignments (no DB layer for model config)
 2. **Frontmatter is used across all agents** - It serves as documentation hints matching the JSON values
 3. **Consistency matters** - Frontmatter and JSON should match to avoid confusion
 
@@ -105,7 +105,7 @@ The project uses three main configuration files in `bazinga/`:
 - Developer: Starts on Haiku (cost efficiency)
 - Escalation after failures triggers model upgrade
 
-**Precedence:** DB > JSON > (frontmatter ignored)
+**Precedence:** JSON only (orchestrator caches at session start)
 
 ### 2. `skills_config.json`
 **Purpose:** Controls which skills each agent can/must use
@@ -134,10 +134,10 @@ The project uses three main configuration files in `bazinga/`:
 1. ✅ Create this research document
 2. ✅ Run LLM reviews
 3. ✅ Integrate feedback (documented above)
-4. ⬜ Update model_selection.json: requirements_engineer → opus
-5. ⬜ Keep frontmatter `model: opus` (matches JSON after update)
-6. ⬜ Add config documentation to claude.md
-7. ⬜ Commit and push
+4. ✅ Update model_selection.json: requirements_engineer → opus
+5. ✅ Keep frontmatter `model: opus` (matches JSON after update)
+6. ✅ Add config documentation to claude.md
+7. ✅ Commit and push
 
 ## References
 

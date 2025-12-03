@@ -197,7 +197,9 @@ with open('bazinga/project_context.json') as f:
     existing_context = json.load(f)
 
 # Check conditions
-file_age = datetime.now() - datetime.fromisoformat(existing_context.get('generated_at', '1970-01-01'))
+# Note: Replace 'Z' with '+00:00' for Python 3.10 compatibility
+generated_at = existing_context.get('generated_at', '1970-01-01T00:00:00+00:00').replace('Z', '+00:00')
+file_age = datetime.now() - datetime.fromisoformat(generated_at)
 session_matches = existing_context.get('session_id') == current_session_id
 is_recent = file_age < timedelta(hours=1)
 
@@ -496,8 +498,10 @@ When spawning developers through orchestrator, include this context:
 **Verification before BAZINGA:**
 ```bash
 # Read tasks.md
-# Count: grep -c '\- \[x\]' tasks.md
-# Verify: count matches total task count
+# Count completed tasks (anchor to task ID pattern):
+completed=$(grep -E '^\- \[x\] \[T[0-9]+\]' tasks.md | wc -l)
+total=$(grep -E '^\- \[[x ]\] \[T[0-9]+\]' tasks.md | wc -l)
+# Verify: completed matches total
 # Only then: Send BAZINGA
 ```
 
