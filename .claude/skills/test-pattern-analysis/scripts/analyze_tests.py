@@ -22,6 +22,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Add _shared directory to path for bazinga_paths import
+# Assumes structure: .claude/skills/<skill_name>/scripts/<script>.py
+# _shared is at: .claude/skills/_shared/
 _script_dir = Path(__file__).parent.resolve()
 _shared_dir = _script_dir.parent.parent / '_shared'
 if _shared_dir.exists() and str(_shared_dir) not in sys.path:
@@ -110,8 +112,7 @@ except ImportError as e:
             "impact": "Test pattern analysis was skipped. Tests can still be written manually.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("bazinga").mkdir(exist_ok=True)
-        with open("OUTPUT_FILE", "w") as f:
+        with open(OUTPUT_FILE, "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
     else:
@@ -123,8 +124,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("bazinga").mkdir(exist_ok=True)
-        with open("OUTPUT_FILE", "w") as f:
+        with open(OUTPUT_FILE, "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
 
@@ -379,16 +379,11 @@ def main():
     # Run analysis
     result = analyze_test_suite(test_path, task_description)
 
-    # Write output
-    output_dir = Path("bazinga")
-    output_dir.mkdir(exist_ok=True)
-
-    output_file = output_dir / "test_patterns.json"
-
-    with open(output_file, 'w') as f:
+    # Write output to session artifacts directory
+    with open(OUTPUT_FILE, 'w') as f:
         json.dump(result, f, indent=2)
 
-    print(f"\n✅ Analysis complete! Results written to: {output_file}")
+    print(f"\n✅ Analysis complete! Results written to: {OUTPUT_FILE}")
     print(f"\n📊 Summary:")
     print(f"   - Framework: {result['framework']}")
     print(f"   - Fixtures: {len(result['common_fixtures'])}")

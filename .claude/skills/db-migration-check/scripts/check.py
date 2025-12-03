@@ -20,6 +20,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Add _shared directory to path for bazinga_paths import
+# Assumes structure: .claude/skills/<skill_name>/scripts/<script>.py
+# _shared is at: .claude/skills/_shared/
 _script_dir = Path(__file__).parent.resolve()
 _shared_dir = _script_dir.parent.parent / '_shared'
 if _shared_dir.exists() and str(_shared_dir) not in sys.path:
@@ -103,8 +105,7 @@ except ImportError as e:
             "impact": "Database migration safety check was skipped. Review migrations manually before deploying.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("bazinga").mkdir(exist_ok=True)
-        with open("OUTPUT_FILE", "w") as f:
+        with open(OUTPUT_FILE, "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
     else:
@@ -116,8 +117,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("bazinga").mkdir(exist_ok=True)
-        with open("OUTPUT_FILE", "w") as f:
+        with open(OUTPUT_FILE, "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
 
@@ -287,18 +287,13 @@ def main():
     # Run check
     result = check_migrations()
 
-    # Write output
-    output_dir = Path("bazinga")
-    output_dir.mkdir(exist_ok=True)
-
-    output_file = output_dir / "db_migration_check.json"
-
-    with open(output_file, 'w') as f:
+    # Write output to session artifacts directory
+    with open(OUTPUT_FILE, 'w') as f:
         json.dump(result, f, indent=2)
 
     print(f"\n{'='*50}")
     print(f"✅ Check complete!")
-    print(f"📄 Results: {output_file}")
+    print(f"📄 Results: {OUTPUT_FILE}")
 
     # Print summary
     status = result.get('status')

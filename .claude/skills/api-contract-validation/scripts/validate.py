@@ -20,13 +20,15 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Add _shared directory to path for bazinga_paths import
+# Assumes structure: .claude/skills/<skill_name>/scripts/<script>.py
+# _shared is at: .claude/skills/_shared/
 _script_dir = Path(__file__).parent.resolve()
 _shared_dir = _script_dir.parent.parent / '_shared'
 if _shared_dir.exists() and str(_shared_dir) not in sys.path:
     sys.path.insert(0, str(_shared_dir))
 
 try:
-    from bazinga_paths import get_db_path, get_artifacts_dir, get_project_root
+    from bazinga_paths import get_db_path, get_artifacts_dir
     _HAS_BAZINGA_PATHS = True
 except ImportError:
     _HAS_BAZINGA_PATHS = False
@@ -102,8 +104,7 @@ except ImportError as e:
             "impact": "API contract validation was skipped. You can manually review OpenAPI specs for breaking changes.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("bazinga").mkdir(exist_ok=True)
-        with open("OUTPUT_FILE", "w") as f:
+        with open(OUTPUT_FILE, "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(0)
     else:
@@ -115,8 +116,7 @@ except ImportError as e:
             "recommendation": "Check that all skill modules are present",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        Path("bazinga").mkdir(exist_ok=True)
-        with open("OUTPUT_FILE", "w") as f:
+        with open(OUTPUT_FILE, "w") as f:
             json.dump(output, f, indent=2)
         sys.exit(1)
 
@@ -330,18 +330,13 @@ def main():
     # Run validation
     result = validate_api_contract()
 
-    # Write output
-    output_dir = Path("bazinga")
-    output_dir.mkdir(exist_ok=True)
-
-    output_file = output_dir / "api_contract_validation.json"
-
-    with open(output_file, 'w') as f:
+    # Write output to session artifacts directory
+    with open(OUTPUT_FILE, 'w') as f:
         json.dump(result, f, indent=2)
 
     print(f"\n{'='*50}")
     print(f"✅ Validation complete!")
-    print(f"📄 Results: {output_file}")
+    print(f"📄 Results: {OUTPUT_FILE}")
 
     # Print summary
     status = result.get('status')
