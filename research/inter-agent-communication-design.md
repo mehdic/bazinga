@@ -121,7 +121,7 @@ group_id: P1_R1_HIN
 producer: requirements_engineer
 consumers:
   - developer
-  - senior_engineer
+  - senior_software_engineer
 priority: high
 version: 1
 ---
@@ -236,12 +236,12 @@ version: 1
 
 ```markdown
 ---
-type: decision
+type: decisions
 group_id: group_a
 producer: tech_lead
 consumers:
   - developer
-  - senior_engineer
+  - senior_software_engineer
   - qa_expert
 priority: medium
 version: 1
@@ -445,7 +445,7 @@ I have created a context package for the next agent:
 **File:** `bazinga/artifacts/{session_id}/context/research-{group_id}-hin-oauth2.md`
 **Type:** research
 **Priority:** high
-**Consumers:** developer, senior_engineer
+**Consumers:** developer, senior_software_engineer
 **Summary:** HIN OAuth2 integration research with endpoints, scopes, and code samples
 
 📦 **ORCHESTRATOR:** Please register this context package and ensure it reaches the implementing developer.

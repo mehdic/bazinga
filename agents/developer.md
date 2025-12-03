@@ -599,6 +599,10 @@ IF your prompt contains `## Context Packages Available`:
    | failures | Previous test failures, root causes | Avoid repeating same mistakes |
    | decisions | Architecture choices, patterns | Implement using decided patterns |
    | handoff | Prior agent's work summary | Continue from where they left |
+4. **After reading each package, mark it as consumed:**
+   - Extract the package ID from the context section
+   - Invoke: `bazinga-db mark-context-consumed {package_id} developer {iteration}`
+   - This prevents the same context from being routed repeatedly
 
 **Example prompt section:**
 ```markdown

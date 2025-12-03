@@ -568,7 +568,7 @@ Group ID: group_a
 Type: research
 File: bazinga/artifacts/bazinga_20250203_143530/context/research-group_a-hin.md
 Producer: requirements_engineer
-Consumers: ["developer", "senior_engineer"]
+Consumers: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: HIN OAuth2 endpoints, scopes, security requirements
 ```

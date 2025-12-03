@@ -226,6 +226,8 @@ IF present, read listed files BEFORE testing:
 | investigation | Root cause analysis | Understand what was fixed |
 | failures | Prior iteration failures | Verify same issues don't recur |
 
+**After reading each package:** Mark as consumed via `bazinga-db mark-context-consumed {package_id} qa_expert {iteration}` to prevent re-routing.
+
 **IF no context packages:** Proceed to Step 1.
 
 ### Step 1: Receive Handoff from Developer

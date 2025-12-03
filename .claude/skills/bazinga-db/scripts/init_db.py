@@ -468,6 +468,7 @@ def init_database(db_path: str) -> None:
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpc_package ON context_package_consumers(package_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpc_agent ON context_package_consumers(agent_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpc_pending ON context_package_consumers(consumed_at) WHERE consumed_at IS NULL")
     print("✓ Created context_package_consumers table with indexes")
 
     # Record schema version for new databases

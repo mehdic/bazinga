@@ -1234,21 +1234,28 @@ Then invoke: `Skill(command: "bazinga-db")`
 **Context Package Routing Rules:**
 | Query Result | Action |
 |--------------|--------|
-| Packages found (N > 0) | Include Context Packages table in prompt (see format below) |
+| Packages found (N > 0) | Validate file paths, then include Context Packages table in prompt |
 | No packages (N = 0) | Proceed without context section |
 | Query error | Log warning, proceed without context (non-blocking) |
 
-**Context Packages Prompt Section** (include when N > 0):
+**🔴 CRITICAL: Validate file paths before including in agent prompts**
+- Filter packages to only include paths starting with `bazinga/artifacts/{session_id}/`
+- Skip and log warning for any paths outside artifacts directory
+- This prevents path traversal attacks via DB-sourced paths
+
+**Context Packages Prompt Section** (include when N > 0 after validation):
 ```markdown
 ## Context Packages Available
 
 Read these files BEFORE starting implementation:
 
-| Priority | Type | Summary | File |
-|----------|------|---------|------|
-| {priority_emoji} | {type} | {summary} | `{file_path}` |
+| Priority | Type | Summary | File | Package ID |
+|----------|------|---------|------|------------|
+| {priority_emoji} | {type} | {summary} | `{file_path}` | {id} |
 
-**Instructions:** Use Read tool on each file. Incorporate findings into your work.
+**Instructions:**
+1. Use Read tool on each file. Incorporate findings into your work.
+2. After reading, mark as consumed: `bazinga-db mark-context-consumed {id} {your_agent_type} {iteration}`
 ```
 
 Priority emojis: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low

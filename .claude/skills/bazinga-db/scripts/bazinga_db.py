@@ -868,6 +868,29 @@ class BazingaDB:
         if priority not in valid_priorities:
             raise ValueError(f"Invalid priority: {priority}. Must be one of {valid_priorities}")
 
+        # Validate file path to prevent path traversal
+        import os
+        normalized_path = os.path.normpath(file_path)
+        # Reject absolute paths and paths with ".."
+        if os.path.isabs(normalized_path) or '..' in normalized_path.split(os.sep):
+            raise ValueError(f"Invalid file_path: must be relative and within artifacts directory. Got: {file_path}")
+        # Ensure path starts with bazinga/artifacts/{session_id}/
+        expected_prefix = f"bazinga/artifacts/{session_id}/"
+        if not normalized_path.startswith(expected_prefix):
+            raise ValueError(f"Invalid file_path: must start with '{expected_prefix}'. Got: {normalized_path}")
+
+        # Auto-compute size_bytes if not provided and file exists
+        if size_bytes is None:
+            try:
+                size_bytes = os.stat(normalized_path).st_size
+            except (OSError, FileNotFoundError):
+                # File doesn't exist yet or not accessible - leave as None
+                pass
+
+        # Enforce summary length constraint (max 200 chars)
+        if len(summary) > 200:
+            summary = summary[:197] + "..."
+
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -898,13 +921,24 @@ class BazingaDB:
         return {"package_id": package_id, "file_path": file_path, "consumers_created": len(consumers)}
 
     def get_context_packages(self, session_id: str, group_id: str, agent_type: str,
-                            limit: int = 3) -> List[Dict]:
-        """Get context packages for an agent spawn, ordered by priority."""
+                            limit: int = 3, include_consumed: bool = False) -> List[Dict]:
+        """Get context packages for an agent spawn, ordered by priority.
+
+        Args:
+            session_id: Session ID to query
+            group_id: Group ID to query
+            agent_type: Agent type to query packages for
+            limit: Maximum number of packages to return (default 3)
+            include_consumed: If False (default), only return unconsumed packages
+        """
         conn = self._get_connection()
         cursor = conn.cursor()
 
+        # Build query with optional consumption filter
+        consumption_filter = "" if include_consumed else "AND cpc.consumed_at IS NULL"
+
         # Query packages for this agent type, including global packages
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT cp.id, cp.package_type, cp.priority, cp.summary, cp.file_path, cp.size_bytes, cp.group_id
             FROM context_packages cp
             JOIN context_package_consumers cpc ON cp.id = cpc.package_id
@@ -912,6 +946,7 @@ class BazingaDB:
               AND (cp.group_id = ? OR cp.scope = 'global')
               AND cpc.agent_type = ?
               AND cp.supersedes_id IS NULL
+              {consumption_filter}
             ORDER BY
               CASE cp.priority
                 WHEN 'critical' THEN 1
@@ -1197,7 +1232,14 @@ def main():
             package_type = cmd_args[2]
             file_path = cmd_args[3]
             producer = cmd_args[4]
-            consumers = json.loads(cmd_args[5])
+            try:
+                consumers = json.loads(cmd_args[5])
+                if not isinstance(consumers, list):
+                    raise ValueError("consumers_json must be a JSON array of strings")
+            except json.JSONDecodeError as e:
+                print(f"ERROR: Invalid consumers_json argument: {e}", file=sys.stderr)
+                print("Expected: JSON array of agent types, e.g., [\"developer\", \"qa_expert\"]", file=sys.stderr)
+                sys.exit(1)
             priority = cmd_args[6]
             summary = cmd_args[7]
             result = db.save_context_package(session_id, group_id, package_type, file_path, producer, consumers, priority, summary)

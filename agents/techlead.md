@@ -695,6 +695,8 @@ IF present, read listed files BEFORE reviewing:
 | investigation | Root cause analysis | Verify fix addresses cause |
 | decisions | Prior arch decisions | Ensure consistency |
 
+**After reading each package:** Mark as consumed via `bazinga-db mark-context-consumed {package_id} tech_lead {iteration}` to prevent re-routing.
+
 **IF no context packages:** Proceed to Step 1.
 
 ### 1. Understand Context
