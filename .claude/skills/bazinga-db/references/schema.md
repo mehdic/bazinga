@@ -22,6 +22,8 @@ This document provides complete reference documentation for the BAZINGA database
 | `configuration` | System config | Replaces config JSON files |
 | `decisions` | Orchestrator decisions | Decision audit trail |
 | `model_config` | Agent model assignments | Dynamic model selection |
+| `context_packages` | Inter-agent context | Research, failures, decisions, handoffs |
+| `context_package_consumers` | Consumer tracking | Join table for per-agent consumption |
 
 ---
 
@@ -177,6 +179,7 @@ CREATE TABLE task_groups (
     merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),
     complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
     initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
+    context_references TEXT,  -- JSON array of context package IDs relevant to this group
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, session_id),
@@ -199,6 +202,7 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 - `merge_status`: Tracks merge state (`pending`, `in_progress`, `merged`, `conflict`, `test_failure`, NULL)
 - `complexity`: Task complexity score (1-10), set by PM
 - `initial_tier`: Initial implementation tier (`Developer` or `Senior Software Engineer`), set by PM
+- `context_references`: JSON array of context package IDs relevant to this group (e.g., `[1, 3, 5]`)
 - `created_at`: When task group was created
 - `updated_at`: Last modification timestamp
 
@@ -416,6 +420,130 @@ model = db.get_agent_model('developer')
 - Future-proof for new model releases (Claude 4, etc.)
 - Single source of truth for model assignments
 - Orchestrator queries this at initialization
+
+---
+
+### context_packages
+
+Stores context packages for inter-agent communication (research, failures, decisions, handoffs).
+
+```sql
+CREATE TABLE context_packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    group_id TEXT,  -- NULL for global/session-wide packages
+    package_type TEXT NOT NULL CHECK(package_type IN ('research', 'failures', 'decisions', 'handoff', 'investigation')),
+    file_path TEXT NOT NULL,
+    producer_agent TEXT NOT NULL,
+    priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
+    summary TEXT NOT NULL,  -- Brief description for routing (max 200 chars)
+    size_bytes INTEGER,  -- File size for budget decisions
+    version INTEGER DEFAULT 1,
+    supersedes_id INTEGER,  -- Previous version if updated
+    scope TEXT DEFAULT 'group' CHECK(scope IN ('group', 'global')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY (supersedes_id) REFERENCES context_packages(id)
+)
+
+-- Indexes
+CREATE INDEX idx_cp_session ON context_packages(session_id);
+CREATE INDEX idx_cp_group ON context_packages(group_id);
+CREATE INDEX idx_cp_type ON context_packages(package_type);
+CREATE INDEX idx_cp_priority ON context_packages(priority);
+CREATE INDEX idx_cp_scope ON context_packages(scope);
+```
+
+**Columns:**
+- `id`: Auto-increment primary key
+- `session_id`: Foreign key to sessions table
+- `group_id`: Task group ID (NULL for global packages)
+- `package_type`: Type of context (`research`, `failures`, `decisions`, `handoff`, `investigation`)
+- `file_path`: Path to the context package markdown file
+- `producer_agent`: Agent that created the package
+- `priority`: Routing priority (`low`, `medium`, `high`, `critical`)
+- `summary`: Brief description for spawn prompts (max 200 chars)
+- `size_bytes`: File size for token budget decisions
+- `version`: Package version (incremented on updates)
+- `supersedes_id`: Reference to previous version if updated
+- `scope`: Whether package is group-specific or session-wide
+- `created_at`: When package was created
+
+**Usage Example:**
+```python
+# Create context package
+db.save_context_package(
+    session_id='bazinga_123',
+    group_id='group_a',
+    package_type='research',
+    file_path='bazinga/artifacts/bazinga_123/context/research-group_a-hin.md',
+    producer_agent='requirements_engineer',
+    consumers=['developer', 'senior_engineer'],
+    priority='high',
+    summary='HIN OAuth2 endpoints, scopes, security requirements'
+)
+
+# Get packages for agent spawn
+packages = db.get_context_packages(
+    session_id='bazinga_123',
+    group_id='group_a',
+    agent_type='developer',
+    limit=3
+)
+```
+
+---
+
+### context_package_consumers
+
+Join table for tracking per-agent consumption of context packages.
+
+```sql
+CREATE TABLE context_package_consumers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL,
+    agent_type TEXT NOT NULL,
+    consumed_at TIMESTAMP,  -- NULL = not yet consumed
+    iteration INTEGER DEFAULT 1,  -- Which iteration of the agent consumed it
+    FOREIGN KEY (package_id) REFERENCES context_packages(id) ON DELETE CASCADE,
+    UNIQUE(package_id, agent_type, iteration)
+)
+
+-- Indexes
+CREATE INDEX idx_cpc_package ON context_package_consumers(package_id);
+CREATE INDEX idx_cpc_agent ON context_package_consumers(agent_type);
+CREATE INDEX idx_cpc_pending ON context_package_consumers(consumed_at) WHERE consumed_at IS NULL;
+```
+
+**Columns:**
+- `id`: Auto-increment primary key
+- `package_id`: Foreign key to context_packages table
+- `agent_type`: Type of agent that can consume (`developer`, `qa_expert`, etc.)
+- `consumed_at`: When the package was consumed (NULL if pending)
+- `iteration`: Which iteration of the agent consumed it (allows re-consumption)
+
+**Usage Example:**
+```python
+# Mark package as consumed
+db.mark_context_consumed(
+    package_id=1,
+    agent_type='developer',
+    iteration=2
+)
+
+# Get pending packages for agent
+pending = db.get_pending_context(
+    session_id='bazinga_123',
+    agent_type='developer',
+    group_id='group_a'
+)
+```
+
+**Why Join Table (Not JSON Array):**
+- Proper indexing for efficient lookups
+- Per-consumer tracking (multiple agents can consume same package)
+- Supports iteration-based re-consumption
+- Clean queries without string pattern matching
 
 ---
 

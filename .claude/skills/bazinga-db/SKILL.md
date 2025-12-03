@@ -23,6 +23,9 @@ You are the bazinga-db skill. When invoked, you handle database operations for t
 - PM needs to update success criteria status before BAZINGA
 - Orchestrator needs to query success criteria for BAZINGA validation
 - Replacing file writes to `bazinga/*.json` or `docs/orchestration-log.md`
+- Any agent needs to save or query context packages (research, failures, decisions, handoffs)
+- Orchestrator needs to get context packages for agent spawning
+- Any agent needs to mark context packages as consumed
 
 **Do NOT invoke when:**
 - Requesting read-only file operations (use Read tool directly)
@@ -79,6 +82,10 @@ Extract from the calling agent's request:
 - "save success criteria" / "store criteria" → save-success-criteria
 - "get success criteria" / "query criteria" → get-success-criteria
 - "update success criterion" / "update criterion status" → update-success-criterion
+- "save context package" / "create context package" → save-context-package
+- "get context packages" / "query context" → get-context-packages
+- "mark context consumed" / "context consumed" → mark-context-consumed
+- "update context references" / "link context to group" → update-context-references
 
 **Required parameters:**
 - session_id (almost always required)
@@ -239,6 +246,60 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-success-criterion \
   --actual "711/711 passing" \
   --evidence "pytest run at 2025-11-24T10:30:00"
 ```
+
+### Context Package Operations (Inter-Agent Communication)
+
+**Save context package:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-context-package \
+  "<session_id>" \
+  "<group_id>" \
+  "<package_type>" \
+  "<file_path>" \
+  "<producer_agent>" \
+  "<consumers_json>" \
+  "<priority>" \
+  "<summary>"
+```
+
+Parameters:
+- `session_id`: Session identifier
+- `group_id`: Task group ID (use "global" for session-wide packages)
+- `package_type`: One of: research, failures, decisions, handoff, investigation
+- `file_path`: Path to the markdown file (e.g., `bazinga/artifacts/{session_id}/context/research-group_a-hin.md`)
+- `producer_agent`: Agent type that created the package (e.g., `requirements_engineer`)
+- `consumers_json`: JSON array of agent types that should receive it (e.g., `'["developer", "senior_engineer"]'`)
+- `priority`: One of: low, medium, high, critical
+- `summary`: Brief description (max 200 chars) for spawn prompts
+
+**Get context packages for agent spawn:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-context-packages \
+  "<session_id>" \
+  "<group_id>" \
+  "<agent_type>" \
+  [limit]
+```
+
+Returns JSON array of packages ordered by priority DESC, created_at DESC. Default limit is 3.
+
+**Mark context package as consumed:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet mark-context-consumed \
+  "<package_id>" \
+  "<agent_type>" \
+  [iteration]
+```
+
+**Update task group context references:**
+```bash
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-context-references \
+  "<group_id>" \
+  "<session_id>" \
+  "<package_ids_json>"
+```
+
+Links context packages to a task group. `package_ids_json` is a JSON array of package IDs (e.g., `'[1, 3, 5]'`).
 
 **Full command reference:** See `scripts/bazinga_db.py --help` for all available operations.
 
@@ -494,6 +555,65 @@ Proceeding with original request...
 
 ---
 
+**Scenario 6: Requirements Engineer Saving Research Context**
+
+Input: Requirements Engineer completed research, needs to create context package for developers
+
+Request from orchestrator:
+```
+bazinga-db, please save context package:
+
+Session ID: bazinga_20250203_143530
+Group ID: group_a
+Type: research
+File: bazinga/artifacts/bazinga_20250203_143530/context/research-group_a-hin.md
+Producer: requirements_engineer
+Consumers: ["developer", "senior_engineer"]
+Priority: high
+Summary: HIN OAuth2 endpoints, scopes, security requirements
+```
+
+Expected output (minimal):
+```json
+{
+  "package_id": 1,
+  "file_path": "bazinga/artifacts/bazinga_20250203_143530/context/research-group_a-hin.md",
+  "consumers_created": 2
+}
+```
+
+---
+
+**Scenario 7: Orchestrator Getting Context for Developer Spawn**
+
+Input: Orchestrator spawning developer, needs relevant context packages
+
+Request from orchestrator:
+```
+bazinga-db, get context packages for developer spawn:
+
+Session ID: bazinga_20250203_143530
+Group ID: group_a
+Agent Type: developer
+Limit: 3
+```
+
+Expected output (minimal):
+```json
+[
+  {
+    "id": 1,
+    "package_type": "research",
+    "priority": "high",
+    "summary": "HIN OAuth2 endpoints, scopes, security requirements",
+    "file_path": "bazinga/artifacts/bazinga_20250203_143530/context/research-group_a-hin.md",
+    "size_bytes": 21504
+  }
+]
+```
+
+---
+
 ## Error Handling
 
 **Database not found:**
@@ -546,6 +666,15 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet update-task-group "group_a" "$SID" 
 
 # Dashboard snapshot
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet dashboard-snapshot "$SID"
+
+# Save context package
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-context-package "$SID" "group_a" "research" "$FILE_PATH" "requirements_engineer" '["developer"]' "high" "Summary text"
+
+# Get context packages for agent
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet get-context-packages "$SID" "group_a" "developer" 3
+
+# Mark context consumed
+python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet mark-context-consumed 1 "developer" 1
 ```
 
 **Success criteria:**
