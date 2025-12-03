@@ -1775,123 +1775,21 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 🔀 Merging | Group {id} approved → Merging {feature_branch} to {initial_branch}
 ```
 
-### 🔴 MANDATORY MERGE TASK PROMPT (Inline - No Separate Agent File)
+### 🔴 MANDATORY: Load Merge Workflow Template
 
-**Variable sources:**
-- `{session_id}` - Current session ID (from orchestrator state)
-- `{initial_branch}` - From `sessions.initial_branch` in database (set at session creation, defaults to 'main')
-- `{feature_branch}` - From `task_groups.feature_branch` in database (set by Developer when creating branch)
-- `{group_id}` - Current group being merged (e.g., "A", "B", "main")
+**⚠️ YOU MUST READ AND FOLLOW the merge workflow template. This is NOT optional.**
 
-**Build prompt with this inline template:**
-```markdown
-## Your Task: Merge Feature Branch
-
-You are a Developer performing a merge task.
-
-**Context:**
-- Session ID: {session_id}
-- Initial Branch: {initial_branch}
-- Feature Branch: {feature_branch}
-- Group ID: {group_id}
-
-**Instructions:**
-1. Checkout initial branch: `git checkout {initial_branch}`
-2. Pull latest: `git pull origin {initial_branch}`
-3. Merge feature branch: `git merge {feature_branch} --no-edit`
-4. IF merge conflicts: Abort with `git merge --abort` → Report MERGE_CONFLICT
-5. IF merge succeeds: Run tests
-6. IF tests pass: Push with `git push origin {initial_branch}` → Report MERGE_SUCCESS
-7. IF tests fail (BEFORE pushing): Reset with `git reset --hard ORIG_HEAD` → Report MERGE_TEST_FAILURE
-
-**⚠️ CRITICAL:** Never push before tests pass. `ORIG_HEAD` points to the commit before the merge, making the reset safe and explicit.
-
-**Response Format:**
-Report one of:
-- `MERGE_SUCCESS` - Merged and tests pass (include files changed, test summary)
-- `MERGE_CONFLICT` - Conflicts found (list conflicting files)
-- `MERGE_TEST_FAILURE` - Tests failed after merge (list failures)
+```
+Read(file_path: "bazinga/templates/merge_workflow.md")
 ```
 
-**Spawn:**
-```
-Task(
-  subagent_type: "general-purpose",
-  model: MODEL_CONFIG["developer"],  # Uses Haiku (simple merge task)
-  description: "Dev {group_id}: merge to {initial_branch}",
-  prompt: [Inline merge prompt above with context filled in]
-)
-```
+**After reading the template, you MUST:**
+1. Build the merge prompt using the template's prompt structure
+2. Spawn Developer with the merge task
+3. Handle the response according to the template's status routing rules
+4. Apply escalation rules for repeated failures
 
-**AFTER receiving the Developer's merge response:**
-
-**Step 1: Parse response and output capsule to user**
-
-Extract status from response:
-- **MERGE_SUCCESS** - Branch merged, tests pass
-- **MERGE_CONFLICT** - Git merge conflicts
-- **MERGE_TEST_FAILURE** - Tests fail after merge
-
-**Step 2: Select and construct capsule based on status**
-
-IF status = MERGE_SUCCESS:
-  → Use "Merge Success" template:
-  ```
-  ✅ Group {id} merged | {feature_branch} → {initial_branch} | Tests passing → PM check
-  ```
-  → Update task_group in database:
-    - status: "completed"
-    - merge_status: "merged"
-  → **Proceed to Step 2A.8** (Spawn PM for final check)
-
-IF status = MERGE_CONFLICT:
-  → Use "Merge Conflict" template:
-  ```
-  ⚠️ Group {id} merge conflict | {conflict_files} | Developer fixing → Retry merge
-  ```
-  → Update task_group in database:
-    - status: "in_progress"
-    - merge_status: "conflict"
-  → **Spawn Developer** with conflict resolution context:
-    * Include conflicting files list
-    * Instructions:
-      1. Checkout feature_branch: `git checkout {feature_branch}`
-      2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
-      3. Resolve all conflicts
-      4. Commit the resolution: `git commit -m "Resolve merge conflicts with {initial_branch}"`
-      5. Push feature_branch: `git push origin {feature_branch}`
-    * **CRITICAL:** This ensures feature_branch is up-to-date with initial_branch before retry merge
-    * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
-
-IF status = MERGE_TEST_FAILURE:
-  → Use "Merge Test Failure" template:
-  ```
-  ⚠️ Group {id} merge failed tests | {test_failures} | Developer fixing → Retry merge
-  ```
-  → Update task_group in database:
-    - status: "in_progress"
-    - merge_status: "test_failure"  # NOT "conflict" - these are distinct issues
-  → **Spawn Developer** with test failure context:
-    * Include test output and failures
-    * Instructions:
-      1. Checkout feature_branch: `git checkout {feature_branch}`
-      2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
-      3. Fix the integration test failures
-      4. Run tests locally to verify fixes
-      5. Commit and push: `git add . && git commit -m "Fix integration test failures" && git push origin {feature_branch}`
-    * **CRITICAL:** This ensures feature_branch incorporates latest initial_branch changes before retry
-    * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
-
-**Step 3: Log Developer merge interaction** — Use §Logging Reference pattern. Agent ID: `dev_merge_group_{X}`.
-
-**Step 4: Escalation for Repeated Merge Failures**
-
-Track merge retry count in task_group metadata. If a group fails merge 2+ times:
-- On 2nd failure: Escalate to **Senior Software Engineer** for conflict/test analysis
-- On 3rd failure: Escalate to **Tech Lead** for architectural guidance
-- On 4th+ failure: Escalate to **PM** to evaluate if task should be simplified or deprioritized
-
-This prevents infinite merge retry loops and brings in higher-tier expertise when merges are persistently problematic.
+**DO NOT proceed without reading and applying `bazinga/templates/merge_workflow.md`.**
 
 ### Step 2A.8: Spawn PM for Final Check
 
@@ -2261,105 +2159,24 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 
 ### Step 2B.2a: Mandatory Batch Processing (LAYER 1 - ROOT CAUSE FIX)
 
-**🔴 CRITICAL: ENFORCE BATCH PROCESSING TO PREVENT SERIALIZATION**
-
-**This is the PRIMARY FIX for the orchestrator stopping bug.**
-
-**MANDATORY WORKFLOW:**
-
-When you receive multiple developer/QA/Tech Lead responses in parallel mode, you MUST follow this three-step batch process:
-
-**STEP 1: PARSE ALL RESPONSES FIRST**
-
-Before spawning ANY Task, parse ALL responses received in this orchestrator iteration:
+**🔴 CRITICAL: YOU MUST READ AND FOLLOW the batch processing template. This is NOT optional.**
 
 ```
-Parse iteration:
-- Developer A response → status = READY_FOR_QA
-- Developer B response → status = PARTIAL (69 test failures)
-- QA C response → status = READY_FOR_REVIEW
-- Tech Lead D response → status = APPROVED
+Read(file_path: "bazinga/templates/batch_processing.md")
 ```
 
-**DO NOT spawn Tasks yet.** Complete parsing first.
+**After reading the template, you MUST:**
+1. Parse ALL responses FIRST (no spawning yet)
+2. Build spawn queue for ALL groups
+3. Spawn ALL Tasks in ONE message block
+4. Verify enforcement checklist
 
-**STEP 2: BUILD SPAWN QUEUE FOR ALL GROUPS**
+**This prevents the orchestrator stopping bug. DO NOT proceed without reading and applying `bazinga/templates/batch_processing.md`.**
 
-After parsing ALL responses, build a complete spawn queue:
-
-```
-Spawn queue:
-1. Group A: status=READY_FOR_QA → Spawn QA Expert A
-2. Group B: status=PARTIAL → Spawn Developer B (continuation)
-3. Group C: status=READY_FOR_REVIEW → Spawn Tech Lead C
-4. Group D: status=APPROVED → Spawn Developer (merge) (Step 2B.7a), then Phase Continuation Check (Step 2B.7b)
-```
-
-**Identify routing for each group:**
-- READY_FOR_QA → QA Expert
-- READY_FOR_REVIEW → Tech Lead
-- APPROVED → Phase Continuation Check
-- INCOMPLETE → Developer continuation
-- PARTIAL → Developer continuation
-- FAILED → Investigator
-- BLOCKED → Investigator
-
-**STEP 3: SPAWN ALL TASKS IN ONE MESSAGE BLOCK**
-
-**🔴 CRITICAL REQUIREMENT:** Spawn ALL Task calls in a SINGLE message response.
-
-**DO NOT serialize** with "first... then..." language.
-
-**CORRECT PATTERN:**
-
-```
-Received responses from Groups A, B, C.
-Building spawn queue: QA A + Developer B + Tech Lead C
-Spawning all agents in parallel:
-
-[Task call for QA Expert A]
-[Task call for Developer B continuation]
-[Task call for Tech Lead C]
-```
-
-**All three Task calls MUST appear in ONE orchestrator message.**
-
-**FORBIDDEN PATTERNS:**
-
-❌ **Serialization:** "Let me route Group C first, then I'll respawn Developer B"
-- This creates stopping points and causes the bug
-- You MUST route ALL groups in ONE message
-
-❌ **Partial spawning:** Spawning only the first group and stopping
-- Parse ALL → Build queue for ALL → Spawn ALL
-- No exceptions
-
-❌ **Deferred spawning:** "I'll handle the other groups next"
-- There is no "next" - handle ALL groups NOW
-- Build and spawn complete queue in this message
-
-**REQUIRED PATTERN:**
-
-✅ **Batch processing:** Parse all → Build queue → Spawn all in ONE message
-✅ **Parallel Task calls:** All Task invocations in same orchestrator response
-✅ **Complete handling:** Every group gets routed, no groups left pending
-
-**ENFORCEMENT:**
-
-For each response received, verify the required action was taken:
-- INCOMPLETE → Developer Task spawned
-- PARTIAL → Developer Task spawned
-- READY_FOR_QA → QA Expert Task spawned
-- READY_FOR_REVIEW → Tech Lead Task spawned
-- APPROVED → Developer (merge) spawned (Step 2B.7a), then Phase Continuation Check (Step 2B.7b) OR PM spawned
-- BLOCKED → Investigator Task spawned
-- FAILED → Investigator Task spawned
-
-IF any response lacks its required action → VIOLATION (group not properly routed)
-
-Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violations.
-
-**This batch processing workflow is MANDATORY and prevents the root cause of orchestrator stopping bug.**
+**Quick Reference (full rules in template):**
+- ✅ Parse all → Build queue → Spawn all in ONE message
+- ❌ NEVER serialize: "first A, then B"
+- ❌ NEVER partial spawn: handle ALL groups NOW
 
 ### Step 2B.3-2B.7: Route Each Group Independently
 
@@ -2392,22 +2209,12 @@ Step 2B.7b (Pre-Stop Verification) provides final safety net to catch any violat
 
 **🔴 CRITICAL: In Parallel Mode, after Tech Lead approval, spawn Developer (merge) BEFORE phase continuation check**
 
-**This is the same process as Step 2A.7a but for each parallel group.**
-
 **User output (capsule format):**
 ```
 🔀 Merging | Group {id} approved → Merging {feature_branch} to {initial_branch}
 ```
 
-**Spawn Developer with merge task:** (Same inline prompt as Step 2A.7a)
-```
-Task(
-  subagent_type: "general-purpose",
-  model: MODEL_CONFIG["developer"],
-  description: "Dev {group_id}: merge to {initial_branch}",
-  prompt: [Inline merge prompt from Step 2A.7a with group-specific context]
-)
-```
+**🔴 MANDATORY: Use `bazinga/templates/merge_workflow.md`** (already loaded per Step 2A.7a) for merge prompt and response handling. Apply to this group's context.
 
 **Route Developer merge response:** (Same status handling as Step 2A.7a)
 - MERGE_SUCCESS → Update group status="completed", merge_status="merged" → Continue to Step 2B.7b
