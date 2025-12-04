@@ -264,6 +264,24 @@ Write to `bazinga/project_context.json`:
 
 ---
 
+## Before Writing Output: Validate Specialization Paths
+
+**CRITICAL:** Before adding any path to `suggested_specializations`, verify it exists:
+
+```bash
+# Use Glob to verify each specialization path exists
+Glob("bazinga/templates/specializations/01-languages/typescript.md")
+```
+
+**Rules:**
+- ✅ Path exists → Include in `suggested_specializations`
+- ❌ Path missing → **DO NOT include** (prevents DB validation errors downstream)
+- ⚠️ If unsure about exact filename, use Glob pattern: `bazinga/templates/specializations/**/*typescript*.md`
+
+This prevents invalid paths from being saved to project_context.json and later rejected by the database path validator.
+
+---
+
 ## After Writing Output
 
 After writing `bazinga/project_context.json`, output a summary:

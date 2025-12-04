@@ -680,7 +680,7 @@ test -f bazinga/project_context.json && echo "exists" || echo "missing"
 ```
 Task(
   subagent_type: "general-purpose",
-  model: "sonnet",
+  model: MODEL_CONFIG["tech_stack_scout"],  // From bazinga/model_selection.json
   description: "Tech Stack Scout: detect project stack",
   prompt: [Full Scout prompt from agents/tech_stack_scout.md with session_id]
 )
