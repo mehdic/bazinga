@@ -312,6 +312,86 @@ PM reads `project_context.json` and uses it for:
 
 ---
 
+## Multi-LLM Review Integration
+
+**Reviewed by:** OpenAI GPT-5 (2025-12-04)
+**Gemini:** Skipped (disabled in environment)
+
+### User Decisions on Suggested Changes
+
+| Suggestion | User Decision | Notes |
+|------------|---------------|-------|
+| Scout sole writer of project_context.json | ✅ APPROVED | PM reads only, doesn't overwrite |
+| Register in DB as context package | ✅ APPROVED | For discoverability and resume support |
+| Backward-compatible schema | ❌ REJECTED | Create migration script for old data instead |
+| Max-2 specialization limit | ❌ REJECTED | As many specializations as needed |
+| Performance safeguards (ignore globs) | ✅ APPROVED | Ignore node_modules, .git, venv, etc. |
+| Tool whitelist for Scout | ✅ APPROVED | Read, Glob, Grep only |
+| Timeout/fallback | ✅ APPROVED | 2 min timeout, proceed with minimal on failure |
+| Evidence trail | ✅ APPROVED | Include file paths as proof |
+
+### Incorporated Changes
+
+1. **Scout is sole writer** - PM will NOT generate project_context.json if Scout already created it
+2. **DB registration** - Detection output registered as context package in bazinga-db
+3. **New schema only** - Rich schema with components[], no backward compatibility needed (migration script handles old data)
+4. **No specialization limit** - PM can assign as many specializations as task requires
+5. **Performance safeguards** - Scout ignores: node_modules, .git, venv, dist, build, coverage, *.lock
+6. **Tool constraints** - Scout allowed: Read, Glob, Grep. Forbidden: Edit, Write, Bash
+7. **Timeout handling** - 2 minute timeout, fallback to minimal context on failure
+8. **Evidence** - Each detection includes file path + dependency key as proof
+
+### Rejected Suggestions
+
+1. **Backward-compatible schema** - User prefers clean new schema + migration script over dual-format
+2. **Max-2 limit** - User wants flexibility for complex projects that need more specializations
+
+---
+
+## Final Architecture (Post-Approval)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 0.5: Tech Stack Scout (Sonnet, Plan Mode)                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  Tools: Read, Glob, Grep only                                   │
+│  Ignores: node_modules, .git, venv, dist, build, *.lock         │
+│  Timeout: 2 minutes (fallback to minimal on failure)            │
+│  Output: bazinga/project_context.json (rich schema)             │
+│  DB: Register as context package for discoverability            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 1: PM Planning (Opus)                                     │
+│  ─────────────────────────────────────────────────────────────  │
+│  Reads: project_context.json (does NOT overwrite)               │
+│  Decides: Per-group specializations (no limit on count)         │
+│  Stores: task_groups.specializations in DB                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 2+: Orchestrator (at agent spawn)                         │
+│  ─────────────────────────────────────────────────────────────  │
+│  Queries: DB for group's specializations                        │
+│  Validates: Paths exist under bazinga/templates/specializations/│
+│  Injects: Into agent prompt                                     │
+│  Logs: To orchestration_logs for audit trail                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Document Status
+
+**Status:** Ready for Implementation
+**Reviewed by:** OpenAI GPT-5 (2025-12-04)
+**User Approved:** 2025-12-04
+**Next:** Create Tech Stack Scout agent, update orchestrator Step 0.5
+
+---
+
 ## References
 
 - `bazinga/templates/specializations/` - 72 specialization templates
