@@ -801,7 +801,15 @@ Check if PM response contains investigation section. Look for these headers (fuz
   📊 Investigation results | {findings_summary} | Details: {details}
   ```
 - Example: `📊 Investigation results | Found 83 E2E tests in 5 files | 30 passing, 53 skipped`
-- **Log:** §Logging Reference (type: investigation, ID: `pre_orchestration_qa`)
+- **Log investigation to database:**
+  ```
+  bazinga-db, please log this investigation:
+  Session ID: [session_id]
+  Investigation Type: pre_orchestration_qa
+  Questions: [extracted questions]
+  Answers: [extracted answers]
+  ```
+  Then invoke: `Skill(command: "bazinga-db")`
 - Then continue to parse planning sections
 
 **Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
@@ -1184,35 +1192,13 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 - **Coverage** percentage
 - **Summary** of work
 
-**Step 2: Select and construct capsule based on status**
+**Step 2: Construct capsule** per `response_parsing.md` §Developer Response templates:
+- **READY_FOR_QA/REVIEW:** `🔨 Group {id} [{tier}] complete | {summary}, {files}, {tests} ({coverage}%) | → {next}`
+- **PARTIAL:** `🔨 Group {id} [{tier}] implementing | {done} | {status}`
+- **BLOCKED:** `⚠️ Group {id} [{tier}] blocked | {blocker} | Investigating`
+- **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] escalating | {reason} | → SSE`
 
-IF status = READY_FOR_QA OR READY_FOR_REVIEW:
-  → Use "Developer Work Complete" template:
-  ```
-  🔨 Group {id} [{tier}/{model}] complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
-  ```
-
-IF status = PARTIAL:
-  → Use "Work in Progress" template:
-  ```
-  🔨 Group {id} [{tier}/{model}] implementing | {what's done} | {current_status}
-  ```
-
-IF status = BLOCKED:
-  → Use "Blocker" template:
-  ```
-  ⚠️ Group {id} [{tier}/{model}] blocked | {blocker_description} | Investigating
-  ```
-
-IF status = ESCALATE_SENIOR:
-  → Use "Escalation" template:
-  ```
-  🔺 Group {id} [{tier}/{model}] escalating | {reason} | → Senior Software Engineer (Sonnet)
-  ```
-
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
+**Tier notation:** `[SSE/Sonnet]`, `[Dev/Haiku]`
 
 **Step 3: Output capsule to user**
 
@@ -1341,33 +1327,11 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 - **Failed tests** (if any)
 - **Quality signals** (security, performance)
 
-**Step 2: Select and construct capsule based on status**
-
-IF status = PASS:
-  → Use "QA Tests Passing" template:
-  ```
-  ✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
-  ```
-
-IF status = FAIL:
-  → Use "QA Tests Failing" template:
-  ```
-  ⚠️ Group {id} QA failed | {failed_count}/{total} tests failing ({failure_summary}) | Developer fixing → See artifacts/{SESSION_ID}/qa_failures_group_{id}.md
-  ```
-
-IF status = BLOCKED:
-  → Use "Blocker" template:
-  ```
-  ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
-  ```
-
-IF status = ESCALATE_SENIOR:
-  → Use "Challenge Escalation" template:
-  ```
-  🔺 Group {id} [{tier}/{model}] challenge failed | Level {level} failure: {reason} | → Senior Software Engineer (Sonnet)
-  ```
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
+**Step 2: Construct capsule** per `response_parsing.md` §QA Response templates:
+- **PASS:** `✅ Group {id} tests passing | {tests}, {coverage}% | → Tech Lead`
+- **FAIL:** `⚠️ Group {id} QA failed | {failures} | Developer fixing`
+- **BLOCKED:** `⚠️ Group {id} blocked | {blocker} | Investigating`
+- **ESCALATE_SENIOR:** `🔺 Group {id} challenge failed | Level {N}: {reason} | → SSE`
 
 **Step 3: Output capsule to user**
 
@@ -1437,50 +1401,11 @@ Use the Tech Lead Response Parsing section from `bazinga/templates/response_pars
 - **Architecture concerns**
 - **Quality assessment**
 
-**Step 2: Select and construct capsule based on decision**
-
-IF decision = APPROVED:
-  → Use "Tech Lead Approved" template:
-  ```markdown
-  👔 **Technical Review: Group {id}** ✅ APPROVED
-
-  **Quality Summary:**
-  • Security: {security_summary} (e.g., "0 issues" or "2 medium issues")
-  • Lint: {lint_summary} (e.g., "clean" or "3 warnings")
-  • Coverage: {coverage}%
-  • Architecture: {architecture_verdict}
-
-  **Verdict:** Approved | {N}/{total} groups complete
-  ```
-
-  **Data sources:** Extract from Tech Lead response - security issues count, lint issues count, coverage %, architecture assessment.
-  **Fallback:** `✅ Group {id} approved | Quality checks passed | Complete ({N}/{total})`
-
-IF decision = CHANGES_REQUESTED:
-  → Use "Tech Lead Changes" template:
-  ```markdown
-  👔 **Technical Review: Group {id}** ⚠️ CHANGES REQUESTED
-
-  **Issues:** {issue_summary}
-  **Action:** Developer fixing
-  ```
-
-  **Data sources:** Extract issue summary from Tech Lead's "Reason" or issues list.
-  **Fallback:** `⚠️ Group {id} needs changes | Issues found | Developer fixing`
-
-IF decision = SPAWN_INVESTIGATOR:
-  → Use "Investigation Needed" template:
-  ```
-  🔬 Group {id} needs investigation | {problem_summary} | Spawning investigator
-  ```
-
-IF decision = ESCALATE_TO_OPUS:
-  → Use "Escalation" template:
-  ```
-  ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
-  ```
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
+**Step 2: Construct capsule** per `response_parsing.md` §Tech Lead Response templates:
+- **APPROVED:** `👔 Group {id} ✅ | Security: {N}, Lint: {N}, Coverage: {N}% | Complete ({N}/{total})`
+- **CHANGES_REQUESTED:** `⚠️ Group {id} needs changes | {issues} | Developer fixing`
+- **SPAWN_INVESTIGATOR:** `🔬 Group {id} investigation | {problem} | Spawning investigator`
+- **ESCALATE_TO_OPUS:** `⚠️ Group {id} escalated | {reason} | → Opus`
 
 **Step 3: Output capsule to user**
 
