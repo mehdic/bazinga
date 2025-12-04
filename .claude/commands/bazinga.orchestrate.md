@@ -42,54 +42,25 @@ The user's message to you contains their requirements for this orchestration tas
 
 **Your validation responsibilities:**
 - ❌ DO NOT trust PM's status updates in database blindly
-- ✅ INDEPENDENTLY verify test failures (run tests yourself)
-- ✅ INDEPENDENTLY verify coverage (check reports yourself)
-- ✅ Challenge PM if evidence doesn't match claims
-- ✅ Reject BAZINGA if ANY criterion is unmet (zero tolerance)
+- ✅ Invoke `bazinga-validator` skill when PM sends BAZINGA
+- ✅ Validator runs tests and verifies evidence independently
+- ✅ Challenge PM if validator evidence doesn't match claims
+- ✅ Reject BAZINGA if validator returns REJECT (zero tolerance)
 
-**The PM's job is coordination. Your job is QUALITY CONTROL.**
+**BAZINGA Verification Process:**
+When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
+- IF ACCEPT → Proceed to completion
+- IF REJECT → Spawn PM with validator's failure details
 
-**If PM sends BAZINGA prematurely, reject it firmly and spawn PM with corrective instructions. The user expects 100% completion when you accept BAZINGA - don't disappoint them.**
+**The PM's job is coordination. Your job is QUALITY CONTROL via the validator.**
 
 **UI Status Messages:**
 
-**MANDATORY: Use Compact Progress Capsule Format**
+**Output:** Use `bazinga/templates/message_templates.md` for capsule format, rules, and examples.
+**Format:** `[Emoji] [Action] | [Observation] | [Outcome] → [Next]` • Tier notation: `[SSE/Sonnet]`, `[Dev/Haiku]`
 
-**⚠️ NOTE:** You loaded message templates (`bazinga/templates/message_templates.md`) during initialization. Use those exact formats for all user-facing output.
-
-All user-visible updates MUST use the capsule format:
-
-```
-[Emoji] [Action/Phase] | [Key Observation] | [Decision/Outcome] → [Next Step]
-```
-
-**Rules:**
-- ✅ One capsule per major state transition
-- ✅ Surface problems and solutions (not just status)
-- ✅ Link to artifacts for detail > 3 lines
-- ❌ NEVER output database operations (except errors - see below)
-- ❌ NEVER output role checks to user
-- ❌ NEVER output routing mechanics ("forwarding to...", "received from...")
-
-**Exceptions - Use Rich Context Blocks for:**
-- 🚀 **Initialization** (Step 0) - Show workflow overview
-- 📋 **Planning Complete** (Step 1.3) - Show execution plan, phases, criteria
-- 🔨 **Developer Spawn Summary** (Step 2B.0) - Show tier assignments when spawning ≥3 developers
-- 👔 **Tech Lead Summary** (Step 2A.6/2B.6) - Show quality metrics
-- ✅ **BAZINGA** - Show completion summary
-- ⚠️ **System Warnings** - Report DB failures, fallbacks, critical errors
-
-**Examples:** See `bazinga/templates/message_templates.md` for complete catalog. Quick sample:
-```
-🚀 Starting orchestration | Session: {session_id}
-📋 Planning complete | {mode}: {groups} | Starting development
-🔨 Group {id} [{tier}/{model}] complete | {files}, {tests} ({coverage}%) | {status} → {next}
-✅ Group {id} approved | {quality_summary} | Complete ({N}/{total})
-```
-
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
-
-**Artifact separation:** Main transcript = capsules only. Link to `artifacts/{session_id}/` for details > 3 lines.
+**Rich Context Blocks (exceptions to capsule-only):**
+🚀 Init • 📋 Planning Complete • 🔨 Dev Spawn (≥3) • 👔 Tech Lead Summary • ✅ BAZINGA • ⚠️ System Warnings
 
 ---
 
@@ -174,6 +145,7 @@ Operation → Check result → If error: Output capsule with error
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
+  - `bazinga/project_context.json` (project tech stack - for specialization loading)
 - ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
 **FORBIDDEN tools for implementation:**
@@ -278,36 +250,9 @@ fi
 
 **Note:** Process dashboard startup silently - no user output needed. Just ensure it's running before continuing.
 
-**THEN display start message (use enhanced format for complex tasks):**
-
-For simple requests:
-```
-🚀 Starting orchestration | Initializing session
-```
-
-For complex requests (spec files, multi-phase, many tasks):
-```markdown
-🚀 **BAZINGA Orchestration Starting**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Session:** {session_id}
-**Input:** {source_file_or_description}
-
-**Workflow Overview:**
-1. 📋 PM analyzes requirements → execution plan
-2. 🔨 Developers implement in parallel
-3. ✅ QA validates tests + coverage
-4. 👔 Tech Lead reviews security + architecture
-5. 📋 PM validates criteria → BAZINGA
-
-Spawning Project Manager for analysis...
-```
-
-**Note:** Task count is determined by PM during analysis, not shown at init.
-
-**Heuristics for complex vs simple format:**
-- **Use enhanced format** if ANY of: spec file input (.md, .txt), multi-file request, 3+ distinct requirements, explicit phases mentioned
-- **Use simple format** for: single feature request, bug fix, small refactor
+**THEN display start message:** Use `bazinga/templates/message_templates.md` §Initialization Messages.
+- **Simple:** `🚀 Starting orchestration | Session: {id}`
+- **Enhanced:** Full workflow overview (for spec files, multi-phase, 3+ requirements)
 
 **MANDATORY: Check previous session status FIRST (before checking user intent)**
 
@@ -694,7 +639,112 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 
 **CRITICAL:** Verify initialization complete (session ID, database, configs loaded, templates loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
 
-**Then IMMEDIATELY proceed to Phase 1 - spawn PM without stopping or waiting.
+**Then IMMEDIATELY proceed to Step 0.5 - Tech Stack Detection.
+
+---
+
+## Step 0.5: Tech Stack Detection (NEW SESSION ONLY)
+
+**Purpose:** Detect project tech stack BEFORE PM spawn to enable specialization loading.
+
+### Step 0.5-PRE: Check for Existing Project Context
+
+**BEFORE spawning Scout, check if project_context.json already exists:**
+
+```bash
+test -f bazinga/project_context.json && echo "exists" || echo "missing"
+```
+
+**IF project_context.json EXISTS:**
+1. **Skip Scout spawn entirely** - use existing detection
+2. **Output to user (capsule format):**
+   ```
+   🔍 Tech stack cached | Using existing project_context.json | Skipping re-detection
+   ```
+3. **Proceed directly to Phase 1 (PM spawn)**
+
+**IF project_context.json MISSING → Continue to spawn Scout below:**
+
+**User output (capsule format):**
+```
+🔍 Detecting tech stack | Analyzing project structure for specializations
+```
+
+### 🔴 MANDATORY: Spawn Tech Stack Scout (if no cached context)
+
+**Build Scout prompt:**
+1. Read `agents/tech_stack_scout.md` for full agent definition
+2. Include session context
+
+**Spawn Tech Stack Scout:**
+```
+Task(
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "Tech Stack Scout: detect project stack",
+  prompt: [Full Scout prompt from agents/tech_stack_scout.md with session_id]
+)
+```
+
+**Note:** Scout uses general-purpose mode with restricted tools (read-only + output file writing).
+
+### Step 0.5a: Process Scout Response
+
+**After Scout completes:**
+
+1. **Verify output file exists:**
+   ```bash
+   test -f bazinga/project_context.json && echo "exists" || echo "missing"
+   ```
+
+2. **Register detection as context package (optional but recommended):**
+   ```
+   bazinga-db, save context package:
+   Session ID: [session_id]
+   Group ID: null (global/session-wide)
+   Type: research
+   File: bazinga/project_context.json
+   Producer: tech_stack_scout
+   Consumers: ["project_manager"]
+   Priority: high
+   Summary: Project tech stack detection - languages, frameworks, infrastructure
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+3. **Output summary to user (capsule format):**
+   ```
+   🔍 Tech stack detected | {primary_language}, {framework or "no framework"} | {N} specializations suggested
+   ```
+
+### Step 0.5b: Timeout/Failure Handling
+
+**IF Scout times out (>2 minutes) OR fails:**
+
+1. **Output warning:**
+   ```
+   ⚠️ Tech stack detection skipped | Scout timeout/failure | Proceeding without specializations
+   ```
+
+2. **Create minimal fallback context (graceful degradation):**
+   ```bash
+   cat > bazinga/project_context.json <<'EOF'
+   {
+     "schema_version": "2.0",
+     "detected_at": "[ISO timestamp]",
+     "confidence": "low",
+     "primary_language": "unknown",
+     "secondary_languages": [],
+     "structure": "unknown",
+     "components": [],
+     "infrastructure": {},
+     "detection_notes": ["Scout timeout/failure - minimal context created"]
+   }
+   EOF
+   ```
+
+3. **Continue to Phase 1** (PM can still function without specializations)
+
+**AFTER Step 0.5 completes: IMMEDIATELY proceed to Phase 1 (Spawn PM). Do NOT stop.**
 
 ---
 
@@ -862,17 +912,12 @@ Check if PM response contains investigation section. Look for these headers (fuz
 - **Log investigation to database:**
   ```
   bazinga-db, please log this investigation:
-
   Session ID: [session_id]
   Investigation Type: pre_orchestration_qa
   Questions: [extracted questions]
   Answers: [extracted answers]
   ```
-
-  **Then invoke:**
-  ```
-  Skill(command: "bazinga-db")
-  ```
+  Then invoke: `Skill(command: "bazinga-db")`
 - Then continue to parse planning sections
 
 **Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
@@ -979,40 +1024,8 @@ Before continuing to Step 1.3a, verify:
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
-**Step 1: Log Clarification Request**
-
-```
-bazinga-db, please log clarification request:
-
-Session ID: [current session_id]
-Request Type: pm_clarification
-Status: pending
-Content: [PM's clarification request section]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**Step 2: Update Orchestrator State**
-
-```
-bazinga-db, please update orchestrator state:
-
-Session ID: [current session_id]
-State Data: {
-  "clarification_pending": true,
-  "clarification_requested_at": "[ISO timestamp]",
-  "phase": "awaiting_clarification"
-}
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
+**Step 1: Log** via §Logging Reference (type: `pm_clarification`, status: `pending`)
+**Step 2: Update orchestrator state** via bazinga-db (`clarification_pending: true`, `phase: awaiting_clarification`)
 **Step 3: Surface Clarification to User**
 
 **User output (capsule format):**
@@ -1204,6 +1217,110 @@ ELSE IF PM chose "parallel":
 ```
 
 ---
+
+## §Specialization Loading
+
+**Purpose:** Inject technology-specific patterns into agent prompts via specialization-loader skill.
+
+**Location:** `bazinga/templates/specializations/{category}/{technology}.md`
+
+### Two-Phase Specialization Workflow
+
+**Phase 1: PM Assignment (during planning)** - UNCHANGED
+- PM reads `bazinga/project_context.json` (created by Tech Stack Scout at Step 0.5)
+- PM assigns specializations PER TASK GROUP based on:
+  - Which component(s) the group's task targets (frontend/, backend/, etc.)
+  - Scout's suggested_specializations for that component
+- PM stores specializations via `bazinga-db create-task-group --specializations '[...]'`
+
+**Phase 2: Orchestrator Loading (at agent spawn)** - NEW SKILL-BASED
+- Check if specializations enabled in skills_config.json
+- Check if agent type is in enabled_agents list
+- Invoke specialization-loader skill to compose block
+- Prepend composed block to agent prompt
+
+### Process (at agent spawn)
+
+**Step 1: Check if enabled**
+```
+Read bazinga/skills_config.json
+IF specializations.enabled == false:
+    Skip specialization loading, continue to spawn
+IF agent_type NOT IN specializations.enabled_agents:
+    Skip specialization loading, continue to spawn
+```
+
+**Step 2: Query DB for group's specializations**
+```
+bazinga-db, get task groups for session [session_id]
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Step 3: Extract and validate specializations**
+```
+specializations = task_group["specializations"]  # JSON array or null
+IF specializations is null OR empty:
+    Skip specialization loading, continue to spawn
+```
+
+**Step 4: Invoke specialization-loader skill**
+
+Provide context before invoking:
+```
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
+Model: {model from model_selection.json}
+Specialization Paths: {JSON array from step 3}
+```
+
+Then invoke: `Skill(command: "specialization-loader")`
+
+**Step 5: Extract composed block**
+
+The skill returns a composed block between markers:
+```
+[SPECIALIZATION_BLOCK_START]
+{composed markdown block}
+[SPECIALIZATION_BLOCK_END]
+```
+
+Extract the block content.
+
+**Step 6: Prepend to agent prompt**
+
+The composed block goes at the TOP of the agent prompt, before the task description:
+```markdown
+{composed_specialization_block}
+
+---
+
+## Your Task
+{task_description from PM}
+```
+
+### Fallback Scenarios
+
+| Scenario | Action |
+|----------|--------|
+| specializations.enabled = false | Skip entirely |
+| Agent type not in enabled_agents | Skip entirely |
+| No specializations in DB (null/empty) | Skip entirely (graceful degradation) |
+| Skill invocation fails | Log warning, spawn without specialization |
+| project_context.json missing | Skill handles (conservative defaults) |
+
+### Token Budget (per-model)
+
+| Model | Soft Limit | Hard Limit |
+|-------|------------|------------|
+| haiku | 600 | 900 |
+| sonnet | 1200 | 1800 |
+| opus | 1600 | 2400 |
+
+The skill enforces these limits. Orchestrator does not need to track tokens.
+
+---
+
 ## Phase 2A: Simple Mode Execution
 
 ### Step 2A.1: Spawn Single Developer
@@ -1269,7 +1386,7 @@ Read these files BEFORE starting implementation:
 
 Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
+**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -1287,35 +1404,13 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 - **Coverage** percentage
 - **Summary** of work
 
-**Step 2: Select and construct capsule based on status**
+**Step 2: Construct capsule** per `response_parsing.md` §Developer Response templates:
+- **READY_FOR_QA/REVIEW:** `🔨 Group {id} [{tier}] complete | {summary}, {files}, {tests} ({coverage}%) | → {next}`
+- **PARTIAL:** `🔨 Group {id} [{tier}] implementing | {done} | {status}`
+- **BLOCKED:** `⚠️ Group {id} [{tier}] blocked | {blocker} | Investigating`
+- **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] escalating | {reason} | → SSE`
 
-IF status = READY_FOR_QA OR READY_FOR_REVIEW:
-  → Use "Developer Work Complete" template:
-  ```
-  🔨 Group {id} [{tier}/{model}] complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
-  ```
-
-IF status = PARTIAL:
-  → Use "Work in Progress" template:
-  ```
-  🔨 Group {id} [{tier}/{model}] implementing | {what's done} | {current_status}
-  ```
-
-IF status = BLOCKED:
-  → Use "Blocker" template:
-  ```
-  ⚠️ Group {id} [{tier}/{model}] blocked | {blocker_description} | Investigating
-  ```
-
-IF status = ESCALATE_SENIOR:
-  → Use "Escalation" template:
-  ```
-  🔺 Group {id} [{tier}/{model}] escalating | {reason} | → Senior Software Engineer (Sonnet)
-  ```
-
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
+**Tier notation:** `[SSE/Sonnet]`, `[Dev/Haiku]`
 
 **Step 3: Output capsule to user**
 
@@ -1430,7 +1525,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -1444,33 +1539,11 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 - **Failed tests** (if any)
 - **Quality signals** (security, performance)
 
-**Step 2: Select and construct capsule based on status**
-
-IF status = PASS:
-  → Use "QA Tests Passing" template:
-  ```
-  ✅ Group {id} tests passing | {passed}/{total} tests passed, {coverage}% coverage, {quality_signals} | Approved → Tech Lead review
-  ```
-
-IF status = FAIL:
-  → Use "QA Tests Failing" template:
-  ```
-  ⚠️ Group {id} QA failed | {failed_count}/{total} tests failing ({failure_summary}) | Developer fixing → See artifacts/{SESSION_ID}/qa_failures_group_{id}.md
-  ```
-
-IF status = BLOCKED:
-  → Use "Blocker" template:
-  ```
-  ⚠️ Group {id} QA blocked | {blocker_description} | Investigating
-  ```
-
-IF status = ESCALATE_SENIOR:
-  → Use "Challenge Escalation" template:
-  ```
-  🔺 Group {id} [{tier}/{model}] challenge failed | Level {level} failure: {reason} | → Senior Software Engineer (Sonnet)
-  ```
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
+**Step 2: Construct capsule** per `response_parsing.md` §QA Response templates:
+- **PASS:** `✅ Group {id} tests passing | {tests}, {coverage}% | → Tech Lead`
+- **FAIL:** `⚠️ Group {id} QA failed | {failures} | Developer fixing`
+- **BLOCKED:** `⚠️ Group {id} blocked | {blocker} | Investigating`
+- **ESCALATE_SENIOR:** `🔺 Group {id} challenge failed | Level {N}: {reason} | → SSE`
 
 **Step 3: Output capsule to user**
 
@@ -1526,7 +1599,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary), **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1540,50 +1613,11 @@ Use the Tech Lead Response Parsing section from `bazinga/templates/response_pars
 - **Architecture concerns**
 - **Quality assessment**
 
-**Step 2: Select and construct capsule based on decision**
-
-IF decision = APPROVED:
-  → Use "Tech Lead Approved" template:
-  ```markdown
-  👔 **Technical Review: Group {id}** ✅ APPROVED
-
-  **Quality Summary:**
-  • Security: {security_summary} (e.g., "0 issues" or "2 medium issues")
-  • Lint: {lint_summary} (e.g., "clean" or "3 warnings")
-  • Coverage: {coverage}%
-  • Architecture: {architecture_verdict}
-
-  **Verdict:** Approved | {N}/{total} groups complete
-  ```
-
-  **Data sources:** Extract from Tech Lead response - security issues count, lint issues count, coverage %, architecture assessment.
-  **Fallback:** `✅ Group {id} approved | Quality checks passed | Complete ({N}/{total})`
-
-IF decision = CHANGES_REQUESTED:
-  → Use "Tech Lead Changes" template:
-  ```markdown
-  👔 **Technical Review: Group {id}** ⚠️ CHANGES REQUESTED
-
-  **Issues:** {issue_summary}
-  **Action:** Developer fixing
-  ```
-
-  **Data sources:** Extract issue summary from Tech Lead's "Reason" or issues list.
-  **Fallback:** `⚠️ Group {id} needs changes | Issues found | Developer fixing`
-
-IF decision = SPAWN_INVESTIGATOR:
-  → Use "Investigation Needed" template:
-  ```
-  🔬 Group {id} needs investigation | {problem_summary} | Spawning investigator
-  ```
-
-IF decision = ESCALATE_TO_OPUS:
-  → Use "Escalation" template:
-  ```
-  ⚠️ Group {id} escalated | {complexity_reason} | Switching to Opus model
-  ```
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
+**Step 2: Construct capsule** per `response_parsing.md` §Tech Lead Response templates:
+- **APPROVED:** `👔 Group {id} ✅ | Security: {N}, Lint: {N}, Coverage: {N}% | Complete ({N}/{total})`
+- **CHANGES_REQUESTED:** `⚠️ Group {id} needs changes | {issues} | Developer fixing`
+- **SPAWN_INVESTIGATOR:** `🔬 Group {id} investigation | {problem} | Spawning investigator`
+- **ESCALATE_TO_OPUS:** `⚠️ Group {id} escalated | {reason} | → Opus`
 
 **Step 3: Output capsule to user**
 
@@ -1807,96 +1841,21 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 ### Step 2A.8: Spawn PM for Final Check
 
-**FIRST: Output Technical Review Summary to user (consolidates all group reviews):**
+**FIRST:** Output §Technical Review Summary from `message_templates.md` (aggregate all Tech Lead responses).
+**Skip if:** Only one group (already shown in individual review).
 
-```markdown
-👔 **Technical Review Summary**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**THEN:** Build PM prompt with implementation summary + quality metrics → Spawn:
+`Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])`
 
-**Group {id} ({description}):** {status_emoji} {status}
-  • Security: {security_summary}
-  • Lint: {lint_summary}
-  • Coverage: {coverage}%
-  • Architecture: {architecture_notes}
+**AFTER PM response:** Parse using `response_parsing.md` §PM Response Parsing. Construct output capsule:
+- **BAZINGA:** §Completion template (groups, tests, criteria)
+- **CONTINUE:** §PM Assessment template (status, issues, next)
+- **NEEDS_CLARIFICATION:** `⚠️ PM needs clarification | {question} | Awaiting response`
+- **INVESTIGATION_NEEDED:** `🔬 Investigation needed | {problem} | Spawning Investigator` → §Step 2A.6b
 
-**Group {id} ({description}):** {status_emoji} {status}
-  • Security: {security_summary}
-  • Issues: {issues_if_any}
+**Apply fallbacks:** If data missing, use generic descriptions per `response_parsing.md`.
 
-**Overall:** {approved}/{total} groups approved{, N pending fixes if any}
-```
-
-**Data sources:** Aggregate from all Tech Lead responses stored in session.
-**Fallback:** If only one group, skip summary (already shown in individual review).
-
-**THEN: Spawn PM for final assessment (no verbose spawn message needed).**
-
-Build PM prompt with complete implementation summary and quality metrics.
-
-**Spawn:**
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])
-```
-
-
-**AFTER receiving the PM's response:**
-
-**Step 1: Parse response and output capsule to user**
-
-Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED)
-- **Assessment** of current state
-- **Feedback** (if requesting changes)
-- **Next actions** (if continuing)
-
-**Step 2: Select and construct capsule based on decision**
-
-IF decision = BAZINGA:
-  → Use "Completion" template:
-  ```markdown
-  ✅ **BAZINGA - Orchestration Complete!**
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  **Summary:**
-  • Groups: {groups_complete}/{total} approved
-  • Tests: {test_status} ({coverage}% coverage)
-  • Quality: All gates passed
-
-  **Success Criteria:** {criteria_met}/{criteria_total} met ✅
-  ```
-
-  **Data sources:** Extract from PM's BAZINGA response - group counts, test status, criteria validation.
-  **Fallback:** `✅ BAZINGA! All work complete | Success criteria met`
-
-IF decision = CONTINUE:
-  → Use "PM Assessment" template:
-  ```markdown
-  📋 **PM Assessment**
-
-  **Status:** {groups_complete}/{total_groups} groups approved
-  **Issues:** {issue_summary}
-  **Next:** {next_action}
-  ```
-
-  **Data sources:** Extract from PM response - group status, issues mentioned, next steps.
-  **Fallback:** `📋 PM check | Work continues | {next_action}`
-
-IF decision = NEEDS_CLARIFICATION:
-  → Use "Clarification" template:
-  ```
-  ⚠️ PM needs clarification | {question_summary} | Awaiting response
-  ```
-
-IF decision = INVESTIGATION_NEEDED:
-  → Use "Investigation Needed" template:
-  ```
-  🔬 Investigation needed | {problem_summary} | Spawning Investigator
-  ```
-  → Immediately spawn Investigator (see §Step 2A.6b for investigation loop)
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
-
-**IF PM response lacks explicit status code OR presents options/questions:**
+**IF PM response lacks explicit status code:**
 
 **🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
 
@@ -2139,7 +2098,7 @@ Limit: 3
 ```
 Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that group's prompt (see Simple Mode §Context Package Routing Rules for format). Query errors are non-blocking.
 
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any for this group)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
 
 **Spawn ALL in ONE message (MAX 4 groups):**
 ```
@@ -2302,86 +2261,16 @@ Build PM prompt with:
 Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt=[PM prompt])`
 
 
-**AFTER receiving the PM's response:**
-
-**Step 1: Parse response and output capsule** (same as Step 2A.8)
-
-Use §PM Response Parsing to extract decision, assessment, feedback.
-
-**Construct and output capsule (use enhanced templates from Step 2A.8):**
-- BAZINGA: Use "Completion" template with technical summary (tests, security, lint, deliverables)
-- CONTINUE: Use "PM Assessment" template with skill results (quality metrics, issues, next action)
-- NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
-
-**See Step 2A.8 for full template formats with technical details.**
-
-**IF PM response lacks explicit status code OR presents options/questions:**
-
-**🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
-
-**PRECEDENCE:** If PM includes explicit status code (CONTINUE, BAZINGA, NEEDS_CLARIFICATION), use that status. Only apply inference when status is missing.
-
-**Detect PERMISSION-SEEKING patterns (auto-route these):**
-- "Would you like me to continue/proceed/start/resume..."
-- "Should I spawn/assign/begin..."
-- "Do you want me to keep going..."
-
-**DO NOT auto-route PRODUCT/TECHNICAL questions:**
-- "Would you like Postgres or MySQL?" → NEEDS_CLARIFICATION (legitimate)
-- "Should the API use REST or GraphQL?" → NEEDS_CLARIFICATION (legitimate)
-
-**Inference rules (only when no explicit status):**
-- Mentions failures, errors, blockers → INVESTIGATION_NEEDED
-- Requests changes, fixes, updates → CONTINUE
-- Indicates completion or approval → BAZINGA
-- Asks about requirements/scope/technical choices → NEEDS_CLARIFICATION
-- **Permission-seeking pattern detected** → CONTINUE (PM shouldn't ask permission)
-
-**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent.
-
-**Step 2: Log PM response** — Use §Logging Reference pattern. Agent ID: `pm_parallel_final`.
-
-**Step 3: Track velocity metrics:**
-```
-velocity-tracker, please analyze parallel mode completion:
-
-Session ID: [session_id]
-Groups Completed: [N]
-Total Time: [duration]
-```
-
-Then invoke:
-```
-Skill(command: "velocity-tracker")
-```
+**AFTER PM response:** Follow §Step 2A.8 process (parse, construct capsule, apply auto-route rules).
+**Log:** §Logging Reference with ID: `pm_parallel_final`
+**Track:** Invoke `Skill(command: "velocity-tracker")` with session + groups + duration
 
 ### Step 2B.9: Route PM Response
 
-**IF PM sends BAZINGA:**
-- **Immediately proceed to Completion phase** (no user input needed)
-
-**IF PM sends CONTINUE:**
-- Query task groups (§Step 1.4) → Parse PM feedback → Identify groups needing fixes
-- Build revision prompts per §Step 2B.1 → Spawn in parallel (all groups in ONE message) → Log responses
-- Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
-
-**❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
-
-**IF PM sends INVESTIGATION_NEEDED:**
-- **Immediately spawn Investigator** (no user permission required)
-- Extract problem description from PM response
-- Build Investigator prompt with context:
-  * Session ID, Group ID(s) affected, Branch(es)
-  * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
-  * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
-- After Investigator response: Route to Tech Lead for validation (same pattern as Step 2A.6c)
-- Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
-
-**❌ DO NOT ask "Should I spawn Investigator?" - spawn immediately**
-
-**IF PM sends NEEDS_CLARIFICATION:**
-- Follow clarification workflow from Step 1.3a (only case where you stop for user input)
+Follow §Step 2A.9 routing rules with parallel-mode adaptations:
+- **CONTINUE:** Spawn ALL groups in ONE message (not sequential)
+- **INVESTIGATION_NEEDED:** Include all affected group IDs and branches; Investigator→TL→Dev(s)→QA→TL→PM
+- **NEEDS_CLARIFICATION:** §Step 1.3a (only stop point)
 
 ---
 
