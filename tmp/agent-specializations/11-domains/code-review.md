@@ -7,7 +7,7 @@ compatible_with: [tech_lead, senior_software_engineer]
 requires: []
 ---
 
-> **PRECEDENCE**: Base agent workflow rules take precedence over this guidance.
+> **MANDATORY**: Apply these patterns to ALL code you write. This is NOT optional guidance—these are required practices. Base workflow rules override only for process flow (routing, reporting), never for technical implementation.
 
 # Code Review Expertise
 

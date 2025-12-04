@@ -6,7 +6,7 @@ token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 ---
 
-> **PRECEDENCE**: Base agent workflow rules take precedence over this guidance.
+> **MANDATORY**: Apply these patterns to ALL code you write. This is NOT optional guidance—these are required practices. Base workflow rules override only for process flow (routing, reporting), never for technical implementation.
 
 # Bash/Shell Engineering Expertise
 
