@@ -2,7 +2,7 @@
 name: research-analysis
 type: domain
 priority: 3
-token_estimate: 450
+token_estimate: 500
 compatible_with: [requirements_engineer, tech_lead, project_manager]
 requires: []
 ---
@@ -12,202 +12,176 @@ requires: []
 # Research & Requirements Analysis Expertise
 
 ## Specialist Profile
-Requirements analysis specialist conducting systematic research. Expert in stakeholder analysis, requirement elicitation, and technical feasibility assessment.
+Requirements analysis specialist conducting systematic research. Expert in codebase discovery, stakeholder analysis, feasibility assessment, and requirement elicitation.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Codebase Discovery
+- **Project structure mapping**: Understand folder organization
+- **Technology stack identification**: Frameworks, languages, versions
+- **Architectural pattern recognition**: Layered, DDD, microservices
+- **Convention identification**: Naming, file organization, patterns
+- **Integration points mapping**: APIs, databases, queues
+- **Test strategy understanding**: Unit, integration, E2E patterns
 
-```markdown
-## Codebase Analysis Report
-
-### 1. Project Structure
-```
-src/
-├── api/           # HTTP handlers (Express/Fastify)
-├── services/      # Business logic layer
-├── repositories/  # Data access layer
-├── models/        # Domain entities
-├── utils/         # Shared utilities
-└── types/         # TypeScript definitions
-```
-
-### 2. Technology Stack
-| Layer | Technology | Version | Notes |
-|-------|------------|---------|-------|
-| Runtime | Node.js | 20.x | LTS |
-| Framework | Express | 4.18 | REST API |
-| Database | PostgreSQL | 16 | Primary store |
-| ORM | Prisma | 5.x | Type-safe queries |
-| Cache | Redis | 7.x | Sessions, caching |
-| Testing | Jest | 29.x | Unit + integration |
-
-### 3. Architectural Patterns
-- **Layered Architecture**: Controllers → Services → Repositories
-- **Dependency Injection**: Constructor injection pattern
-- **Repository Pattern**: Abstract data access
-- **DTO Pattern**: Request/Response objects
-
-### 4. Existing Conventions
-- File naming: kebab-case (user-service.ts)
-- Class naming: PascalCase (UserService)
-- Function naming: camelCase (createUser)
-- Test files: *.test.ts co-located with source
-
-### 5. Integration Points
-- Authentication: JWT with refresh tokens
-- External APIs: Payment gateway (Stripe)
-- Message Queue: Not currently used
-- Monitoring: Prometheus metrics endpoint
-```
-
-### Requirements Template
-
-```markdown
-## Requirement: REQ-USER-001
-**Title:** User Registration with Email Verification
-
-### Description
-As a new user, I want to register with my email and verify my account
-so that I can securely access the system.
-
-### Acceptance Criteria
-1. User can submit registration form with:
-   - Email (required, valid format, unique)
-   - Password (min 12 chars, complexity requirements)
-   - Display name (2-100 characters)
-
-2. System sends verification email within 30 seconds
-3. Verification link expires after 24 hours
-4. User cannot login until email is verified
-5. User can request new verification email (rate limited)
-
-### Technical Constraints
-- Must integrate with existing auth service
-- Email provider: SendGrid (already configured)
-- Token storage: Redis with 24h TTL
-
-### Dependencies
-- REQ-AUTH-001: Authentication system (complete)
-- REQ-EMAIL-001: Email service integration (complete)
-
-### Non-Functional Requirements
-- Response time: < 200ms for registration
-- Email delivery: 99% within 30 seconds
-- Rate limit: 3 registration attempts per IP per hour
-
-### Priority
-P1 - Required for MVP
-
-### Estimation
-Story points: 8
-```
-
-### Technical Feasibility Assessment
-
-```markdown
-## Feasibility Analysis: Real-time Notifications
-
-### 1. Requirement Summary
-Implement real-time notifications for user events (messages, orders, alerts).
-
-### 2. Technical Options
-
-#### Option A: WebSockets (Socket.io)
-**Pros:**
-- Bi-directional communication
-- Wide browser support
-- Existing team expertise
-
-**Cons:**
-- Connection management complexity
-- Scaling requires sticky sessions or Redis adapter
-
-**Effort:** Medium (2-3 sprints)
-
-#### Option B: Server-Sent Events (SSE)
-**Pros:**
-- Simpler implementation
-- Native browser support
-- Easier to scale (stateless)
-
-**Cons:**
-- Uni-directional only
-- Limited concurrent connections in some browsers
-
-**Effort:** Low (1-2 sprints)
-
-#### Option C: Polling
-**Pros:**
-- Simplest implementation
-- No infrastructure changes
-
-**Cons:**
-- Higher latency
-- Increased server load
-- Not truly real-time
-
-**Effort:** Low (1 sprint)
-
-### 3. Recommendation
-**Option A: WebSockets with Socket.io**
-
-Rationale:
-- Bi-directional needed for read receipts
-- Team has prior experience
-- Redis adapter handles scaling
-
-### 4. Implementation Approach
-1. Add Socket.io server alongside Express
-2. Implement Redis adapter for multi-node
-3. Create event emitter service
-4. Add client SDK wrapper
-5. Implement reconnection handling
-
-### 5. Risks & Mitigations
-| Risk | Probability | Mitigation |
-|------|-------------|------------|
-| Connection drops | Medium | Auto-reconnect + offline queue |
-| Memory leaks | Low | Connection timeout + monitoring |
-| Scale issues | Low | Load test before launch |
-```
+### Requirement Elicitation
+- **User story format**: As a [role], I want [capability], so that [benefit]
+- **Acceptance criteria**: Given-When-Then (Gherkin) format
+- **INVEST criteria**: Independent, Negotiable, Valuable, Estimable, Small, Testable
+- **Non-functional requirements**: Performance, security, scalability
+- **Constraints documentation**: Technical, business, regulatory
+- **Dependency mapping**: What blocks what, external dependencies
 
 ### Stakeholder Analysis
+- **Identify all stakeholders**: Users, operators, internal teams
+- **Interest vs. influence matrix**: High/low quadrants
+- **Communication plan**: Who gets what, how often
+- **Requirement sources**: Interviews, tickets, analytics
+- **Consensus building**: Align conflicting requirements
 
-```markdown
-## Stakeholder Map: User Management Feature
+### Technical Feasibility Assessment
+- **Options enumeration**: At least 3 approaches
+- **Pros/cons analysis**: For each option
+- **Effort estimation**: Rough sizing (T-shirt or sprints)
+- **Risk identification**: Technical, schedule, resource
+- **Recommendation with rationale**: Why this over others
+- **Proof of concept scope**: What to validate early
 
-### Primary Stakeholders
-| Stakeholder | Role | Interest | Influence | Needs |
-|-------------|------|----------|-----------|-------|
-| End Users | Consumer | High | Low | Easy registration, privacy |
-| Admin Users | Operator | High | Medium | User management tools |
-| Support Team | Internal | High | Medium | User lookup, audit logs |
-| Security Team | Internal | Medium | High | Compliance, audit trail |
+### Impact Analysis
+- **Affected systems**: Which services, databases, APIs
+- **Breaking changes**: Backward compatibility concerns
+- **Migration requirements**: Data, schema, API versions
+- **Rollback strategy**: How to undo if needed
+- **Dependency updates**: Downstream consumers affected
 
-### Communication Plan
-| Stakeholder | Frequency | Method | Content |
-|-------------|-----------|--------|---------|
-| End Users | Release | Changelog | New features |
-| Admin Users | Weekly | Slack | Progress updates |
-| Security Team | Milestone | Review meeting | Security assessment |
+### Documentation Standards
+- **Requirements template**: Consistent format
+- **Traceability matrix**: Requirements → implementation → tests
+- **Versioning**: Track requirement changes
+- **Approval workflow**: Who signs off
+- **Living documentation**: Update as understanding evolves
 
-### Requirement Sources
-- User interviews: 10 conducted
-- Support tickets: Top 5 pain points analyzed
-- Analytics: User drop-off points identified
-- Competitor analysis: Feature comparison done
-```
+---
 
 ## Patterns to Avoid
-- ❌ Assumptions without validation
-- ❌ Missing non-functional requirements
-- ❌ No stakeholder alignment
-- ❌ Skipping feasibility analysis
+
+### Research Anti-Patterns
+- ❌ **Assumptions without validation**: Ask, don't assume
+- ❌ **Single source of truth**: Triangulate with multiple sources
+- ❌ **Surface-level analysis**: Dig into code, not just docs
+- ❌ **Ignoring legacy constraints**: Existing code limits options
+
+### Requirements Anti-Patterns
+- ❌ **Missing acceptance criteria**: How do we know it's done?
+- ❌ **Vague user stories**: "Improve performance"
+- ❌ **No non-functional requirements**: Only happy path
+- ❌ **Gold plating**: Adding unrequested features
+- ❌ **Solution in requirement**: Describe need, not implementation
+
+### Stakeholder Anti-Patterns
+- ❌ **Missing stakeholders**: Discover late, rework later
+- ❌ **No prioritization**: Everything is P0
+- ❌ **Ignoring dissent**: Minority concerns matter
+- ❌ **Scope creep**: Requirements grow without control
+
+### Feasibility Anti-Patterns
+- ❌ **Single option considered**: No alternatives
+- ❌ **Premature commitment**: Decide before research
+- ❌ **Ignoring constraints**: Technical debt, team skills
+- ❌ **No risk assessment**: Optimism bias
+
+---
 
 ## Verification Checklist
-- [ ] Codebase analyzed
-- [ ] Stakeholders identified
-- [ ] Requirements documented
-- [ ] Feasibility assessed
-- [ ] Dependencies mapped
+
+### Codebase Analysis
+- [ ] Project structure documented
+- [ ] Technology stack identified
+- [ ] Conventions catalogued
+- [ ] Integration points mapped
+- [ ] Existing patterns noted
+
+### Requirements
+- [ ] User stories complete (who, what, why)
+- [ ] Acceptance criteria defined (Given-When-Then)
+- [ ] Non-functional requirements captured
+- [ ] Dependencies identified
+- [ ] Constraints documented
+
+### Stakeholders
+- [ ] All stakeholders identified
+- [ ] Interest/influence assessed
+- [ ] Communication plan created
+- [ ] Conflicts surfaced and resolved
+
+### Feasibility
+- [ ] Multiple options analyzed
+- [ ] Pros/cons documented
+- [ ] Effort estimated
+- [ ] Risks identified with mitigations
+- [ ] Recommendation justified
+
+---
+
+## Code Patterns (Reference)
+
+### Codebase Report Structure
+```
+## Project Structure
+src/
+├── api/        # HTTP handlers
+├── services/   # Business logic
+├── repositories/ # Data access
+└── types/      # Type definitions
+
+## Technology Stack
+| Layer | Tech | Version |
+|-------|------|---------|
+| Runtime | Node.js | 20.x |
+| Framework | Express | 4.18 |
+
+## Conventions
+- File naming: kebab-case
+- Test files: *.test.ts co-located
+```
+
+### Requirement Template
+```
+## REQ-001: [Title]
+**User Story**: As a [role], I want [capability], so that [benefit]
+
+**Acceptance Criteria**:
+- Given [context], When [action], Then [result]
+
+**Non-Functional**:
+- Performance: < 200ms response
+- Security: Authenticated users only
+
+**Dependencies**: REQ-002, external-api
+**Priority**: P1
+**Estimation**: 5 story points
+```
+
+### Feasibility Template
+```
+## Option A: [Name]
+**Pros**: Faster, team expertise
+**Cons**: More expensive, vendor lock-in
+**Effort**: 3 sprints
+**Risks**: API deprecation
+
+## Recommendation
+Option A because [rationale]
+```
+
+### Stakeholder Matrix
+```
+| Stakeholder | Interest | Influence | Communication |
+|-------------|----------|-----------|---------------|
+| End Users | High | Low | Release notes |
+| Dev Team | High | High | Daily standups |
+| Security | Medium | High | Review meetings |
+```
+

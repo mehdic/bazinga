@@ -2,7 +2,7 @@
 name: devops-sre
 type: domain
 priority: 3
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,171 +12,146 @@ requires: []
 # DevOps/SRE Engineering Expertise
 
 ## Specialist Profile
-DevOps/SRE specialist building reliable systems. Expert in CI/CD, infrastructure automation, and incident response.
+DevOps/SRE specialist building reliable systems. Expert in SLOs, error budgets, incident management, and continuous delivery.
 
-## Implementation Guidelines
+---
 
-### SLO Definition
+## Patterns to Follow
 
-```yaml
-# slo.yaml
-service: user-api
-slos:
-  - name: availability
-    description: "Service responds to requests"
-    target: 99.9%
-    window: 30d
-    sli:
-      type: availability
-      good_events: "http_requests_total{status!~'5..'}"
-      total_events: "http_requests_total"
+### SLO Definition (2025)
+- **Availability SLO**: `99.9%` = 43 minutes/month downtime budget
+- **Latency SLO**: P99 under target (e.g., 200ms)
+- **30-day rolling window**: Standard measurement period
+- **SLI = measurement**: What you actually measure
+- **SLO = target**: What you promise
+- **SLA = contract**: Business commitment with consequences
 
-  - name: latency_p99
-    description: "99th percentile latency under 200ms"
-    target: 99%
-    window: 30d
-    sli:
-      type: latency
-      threshold_ms: 200
-      good_events: "http_request_duration_seconds_bucket{le='0.2'}"
-      total_events: "http_request_duration_seconds_count"
+### Error Budget Management
+- **Budget = 100% - SLO**: 99.9% SLO = 0.1% error budget
+- **Green zone (0-50%)**: Normal development velocity
+- **Yellow zone (50-80%)**: Increased reliability focus
+- **Red zone (>80%)**: Feature freeze, reliability only
+- **Budget exhausted**: Code freeze, mandatory postmortems
+- **Budget gates in CI/CD**: Block deploys when budget low
 
-# Error budget calculation
-# Monthly budget: 100% - 99.9% = 0.1%
-# 30 days * 24 hours * 60 min = 43,200 minutes
-# Error budget = 43,200 * 0.1% = 43.2 minutes of downtime
-```
-
-### Alerting Rules
-
-```yaml
-# prometheus/alerts.yml
-groups:
-  - name: user-api
-    rules:
-      - alert: HighErrorRate
-        expr: |
-          sum(rate(http_requests_total{service="user-api",status=~"5.."}[5m]))
-          / sum(rate(http_requests_total{service="user-api"}[5m]))
-          > 0.01
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High error rate on {{ $labels.service }}"
-          description: "Error rate is {{ $value | humanizePercentage }}"
-
-      - alert: LatencyHigh
-        expr: |
-          histogram_quantile(0.99,
-            sum(rate(http_request_duration_seconds_bucket{service="user-api"}[5m])) by (le)
-          ) > 0.5
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High latency on {{ $labels.service }}"
-
-      - alert: ErrorBudgetBurn
-        expr: |
-          1 - (
-            sum(rate(http_requests_total{service="user-api",status!~"5.."}[1h]))
-            / sum(rate(http_requests_total{service="user-api"}[1h]))
-          ) > 14.4 * (1 - 0.999)
-        for: 1h
-        labels:
-          severity: critical
-        annotations:
-          summary: "Error budget burning too fast"
-```
-
-### Runbooks
-
-```markdown
-# Runbook: High Error Rate
-
-## Alert: HighErrorRate
-
-### Symptoms
-- Error rate > 1% for 5+ minutes
-- Users reporting failures
-
-### Investigation Steps
-1. Check recent deployments: `kubectl rollout history deployment/user-api`
-2. View error logs: `kubectl logs -l app=user-api --since=10m | grep ERROR`
-3. Check downstream dependencies:
-   - Database: `kubectl exec -it postgres-0 -- pg_isready`
-   - Redis: `kubectl exec -it redis-0 -- redis-cli ping`
-
-### Remediation
-1. **If recent deployment**: Rollback
-   ```bash
-   kubectl rollout undo deployment/user-api
-   ```
-2. **If dependency issue**: Check dependency health
-3. **If resource exhaustion**: Scale up
-   ```bash
-   kubectl scale deployment/user-api --replicas=5
-   ```
-
-### Escalation
-- After 15 min: Page on-call engineer
-- After 30 min: Page engineering manager
-```
+### Multi-Window Alerting
+- **Fast burn**: 5% budget in 1 hour → page immediately
+- **Slow burn**: 10% budget in 6 hours → page
+- **Long window**: Error budget trending → ticket
+- **Avoid symptom-based**: Alert on SLO violations, not symptoms
+- **Reduce noise**: Fewer, actionable alerts
 
 ### Incident Management
+- **Severity levels**: SEV1 (critical) to SEV4 (minor)
+- **Incident commander**: Single owner during incident
+- **War room**: Immediate communication channel
+- **Status page**: Customer communication
+- **Timeline tracking**: Log all actions with timestamps
+- **Blameless postmortems**: Focus on systems, not people
 
-```typescript
-// incident/manager.ts
-interface Incident {
-  id: string;
-  severity: 'sev1' | 'sev2' | 'sev3';
-  title: string;
-  status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
-  commander: string;
-  timeline: TimelineEntry[];
-}
+### Runbooks
+- **Symptom description**: What the alert looks like
+- **Investigation steps**: Ordered troubleshooting
+- **Remediation actions**: Copy-paste commands
+- **Escalation path**: Who to contact
+- **Rollback procedures**: Quick recovery steps
+- **Keep updated**: Review after each incident
 
-class IncidentManager {
-  async declare(incident: Omit<Incident, 'id' | 'status' | 'timeline'>): Promise<Incident> {
-    const created = await db.incidents.create({
-      ...incident,
-      status: 'investigating',
-      timeline: [{ time: new Date(), event: 'Incident declared' }],
-    });
+### Deployment Safety
+- **Canary deployments**: 1-5% traffic first
+- **Progressive rollout**: Increase traffic gradually
+- **Automated rollback**: On SLO violation
+- **Feature flags**: Decouple deploy from release
+- **Blue-green**: Instant rollback capability
 
-    // Notify appropriate channels
-    await slack.postMessage(getIncidentChannel(incident.severity), {
-      text: `🚨 ${incident.severity.toUpperCase()}: ${incident.title}`,
-      blocks: formatIncidentBlocks(created),
-    });
+### Chaos Engineering (2025)
+- **Gremlin/LitmusChaos**: Managed chaos tools
+- **Game days**: Scheduled failure injection
+- **Steady state hypothesis**: Define normal behavior
+- **Minimize blast radius**: Start small, expand
+- **Auto-remediation tests**: Verify recovery works
 
-    // Create war room
-    if (incident.severity === 'sev1') {
-      await zoom.createMeeting(`Incident: ${incident.title}`);
-    }
-
-    return created;
-  }
-
-  async updateStatus(id: string, status: Incident['status'], note: string): Promise<void> {
-    await db.incidents.update(id, {
-      status,
-      $push: { timeline: { time: new Date(), event: note } },
-    });
-  }
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Alerting on symptoms, not causes
-- ❌ Missing runbooks
-- ❌ No error budgets
-- ❌ Manual deployments
+
+### SLO Anti-Patterns
+- ❌ **100% availability target**: Impossible, blocks development
+- ❌ **Too many SLOs**: 3-5 per service maximum
+- ❌ **SLO without budget policy**: No action on violations
+- ❌ **Ignoring error budget**: Velocity over reliability
+
+### Alerting Anti-Patterns
+- ❌ **Alert on everything**: Alert fatigue
+- ❌ **No actionable alerts**: "Something is wrong"
+- ❌ **Missing runbooks**: Alerts without remediation
+- ❌ **Single threshold**: No multi-window burning
+
+### Incident Anti-Patterns
+- ❌ **Blame culture**: People hide problems
+- ❌ **No postmortems**: Same incidents repeat
+- ❌ **Missing timeline**: Can't reconstruct events
+- ❌ **Hero culture**: Single person always fixes
+
+### Deployment Anti-Patterns
+- ❌ **Big bang deployments**: All-or-nothing risk
+- ❌ **Friday deploys**: No support during issues
+- ❌ **No rollback plan**: Stuck with bad code
+- ❌ **Manual deployments**: Inconsistent, error-prone
+
+---
 
 ## Verification Checklist
-- [ ] SLOs defined with error budgets
-- [ ] Multi-window alerting
+
+### SLO & Budgets
+- [ ] SLOs defined (availability, latency)
+- [ ] Error budget calculated and tracked
+- [ ] Budget policy documented (green/yellow/red zones)
+- [ ] CI/CD gates on budget status
+
+### Alerting
+- [ ] Multi-window burn rate alerts
 - [ ] Runbooks for all alerts
-- [ ] Incident management process
-- [ ] Automated rollbacks
+- [ ] On-call rotation defined
+- [ ] Escalation paths documented
+
+### Incident Response
+- [ ] Incident severity levels defined
+- [ ] Commander role assigned
+- [ ] Communication channels ready
+- [ ] Postmortem template available
+
+### Deployment
+- [ ] Canary/progressive rollouts enabled
+- [ ] Automated rollback on SLO breach
+- [ ] Feature flags infrastructure
+- [ ] Deployment frequency tracked
+
+### Observability
+- [ ] SLIs measured and dashboarded
+- [ ] Error budget burn visible
+- [ ] Distributed tracing enabled
+- [ ] Log aggregation working
+
+---
+
+## Code Patterns (Reference)
+
+### SLO Definition (YAML)
+- **Availability**: `sli: { good: 'status!~"5.."', total: 'requests_total' }, target: 99.9%, window: 30d`
+- **Latency**: `sli: { good: 'duration_bucket{le="0.2"}', total: 'duration_count' }, target: 99%`
+
+### Prometheus Alert (Burn Rate)
+- **Fast burn**: `expr: error_rate > 14.4 * (1 - 0.999)`, `for: 5m`
+- **Labels**: `severity: critical`
+- **Annotations**: `summary`, `runbook_url`
+
+### Error Budget Calculation
+- **Monthly budget**: `43200 minutes × (1 - SLO)` = minutes of allowed downtime
+- **Remaining**: `budget - consumed_error_minutes`
+
+### Incident Declaration
+- **Create**: Incident ID, severity, title, commander, status
+- **Timeline**: Append `{ time, event }` for each action
+- **Notify**: Appropriate channels based on severity
+

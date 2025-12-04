@@ -2,7 +2,7 @@
 name: microservices
 type: domain
 priority: 3
-token_estimate: 450
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer, tech_lead]
 requires: []
 ---
@@ -12,186 +12,138 @@ requires: []
 # Microservices Architecture Expertise
 
 ## Specialist Profile
-Microservices specialist designing distributed systems. Expert in service decomposition, communication patterns, and resilience.
+Microservices specialist designing distributed systems. Expert in service decomposition, communication patterns, resilience, and eventual consistency.
 
-## Implementation Guidelines
+---
 
-### Service Communication
+## Patterns to Follow
 
-```typescript
-// Circuit Breaker Pattern
-import CircuitBreaker from 'opossum';
-
-const breaker = new CircuitBreaker(
-  async (userId: string) => {
-    const response = await fetch(`${USER_SERVICE_URL}/users/${userId}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
-  },
-  {
-    timeout: 3000,
-    errorThresholdPercentage: 50,
-    resetTimeout: 30000,
-    volumeThreshold: 10,
-  }
-);
-
-breaker.on('open', () => logger.warn('Circuit opened'));
-breaker.on('halfOpen', () => logger.info('Circuit half-open'));
-breaker.on('close', () => logger.info('Circuit closed'));
-
-export async function getUser(userId: string): Promise<User | null> {
-  try {
-    return await breaker.fire(userId);
-  } catch (error) {
-    if (breaker.opened) {
-      // Return cached/default value during outage
-      return cache.get(`user:${userId}`) ?? null;
-    }
-    throw error;
-  }
-}
-```
-
-### Event-Driven Communication
-
-```typescript
-// events/userEvents.ts
-interface DomainEvent<T> {
-  id: string;
-  type: string;
-  aggregateId: string;
-  timestamp: Date;
-  version: number;
-  payload: T;
-}
-
-// Outbox pattern for reliable publishing
-async function createUserWithEvent(data: CreateUserInput): Promise<User> {
-  return db.transaction(async (tx) => {
-    // Create user
-    const user = await tx.users.create(data);
-
-    // Store event in outbox (same transaction)
-    await tx.outbox.create({
-      aggregateId: user.id,
-      eventType: 'user.created',
-      payload: JSON.stringify({
-        userId: user.id,
-        email: user.email,
-      }),
-    });
-
-    return user;
-  });
-}
-
-// Outbox processor (separate process)
-async function processOutbox() {
-  const events = await db.outbox.findUnprocessed({ limit: 100 });
-
-  for (const event of events) {
-    try {
-      await messageBroker.publish(event.eventType, event.payload);
-      await db.outbox.markProcessed(event.id);
-    } catch (error) {
-      logger.error({ error, eventId: event.id }, 'Failed to publish event');
-    }
-  }
-}
-```
-
-### Service Discovery
-
-```typescript
-// discovery/serviceRegistry.ts
-interface ServiceInstance {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  healthCheck: string;
-  metadata: Record<string, string>;
-}
-
-class ServiceRegistry {
-  private instances = new Map<string, ServiceInstance[]>();
-
-  async discover(serviceName: string): Promise<ServiceInstance[]> {
-    // From Consul/etcd/K8s DNS
-    const instances = await consul.health.service(serviceName);
-    this.instances.set(serviceName, instances);
-    return instances;
-  }
-
-  selectInstance(serviceName: string): ServiceInstance {
-    const instances = this.instances.get(serviceName) ?? [];
-    if (!instances.length) throw new Error(`No instances for ${serviceName}`);
-
-    // Round-robin or weighted selection
-    return instances[Math.floor(Math.random() * instances.length)];
-  }
-}
-
-// Client-side load balancing
-async function callService(serviceName: string, path: string) {
-  const instance = registry.selectInstance(serviceName);
-  return fetch(`http://${instance.host}:${instance.port}${path}`);
-}
-```
+### Circuit Breaker (2025)
+- **Resilience4j for Java/Kotlin**: Modern, lightweight library
+- **opossum for Node.js**: Promise-based circuit breaker
+- **Thresholds**: 50% error rate, 10 volume minimum
+- **Timeouts**: 3-5 seconds for service calls
+- **Fallback strategy**: Cache, default value, or graceful degradation
+- **Half-open state**: Gradually test recovery
 
 ### Saga Pattern
+- **Choreography**: Services publish events, others react
+- **Orchestration**: Central coordinator directs transactions
+- **Compensating transactions**: Rollback actions for each step
+- **Idempotent operations**: Safe retry on failure
+- **Saga state tracking**: Persist saga execution state
 
-```typescript
-// sagas/orderSaga.ts
-class OrderSaga {
-  private steps: SagaStep[] = [];
+### Event Sourcing
+- **Events as source of truth**: Immutable event log
+- **Event stores**: Kafka, EventStoreDB, or database
+- **Snapshots for performance**: Periodic state materialization
+- **Versioned events**: Schema evolution support
+- **Replay capability**: Rebuild state from events
 
-  async execute(): Promise<void> {
-    const executedSteps: SagaStep[] = [];
+### CQRS (Command Query Responsibility Segregation)
+- **Separate read/write models**: Optimize each independently
+- **Eventual consistency**: Read models updated asynchronously
+- **Materialized views**: Denormalized for query performance
+- **Use with event sourcing**: Natural combination
+- **Independent scaling**: Scale reads vs writes differently
 
-    for (const step of this.steps) {
-      try {
-        await step.execute();
-        executedSteps.push(step);
-      } catch (error) {
-        // Compensate in reverse order
-        for (const completed of executedSteps.reverse()) {
-          await completed.compensate();
-        }
-        throw error;
-      }
-    }
-  }
-}
+### Outbox Pattern
+- **Transactional outbox**: Store events with business data
+- **Relay process**: Publish events from outbox
+- **At-least-once delivery**: Handle duplicates downstream
+- **Polling or CDC**: Debezium for change data capture
+- **Guaranteed delivery**: No lost events
 
-// Usage
-const saga = new OrderSaga()
-  .addStep({
-    execute: () => orderService.create(order),
-    compensate: () => orderService.cancel(order.id),
-  })
-  .addStep({
-    execute: () => paymentService.charge(payment),
-    compensate: () => paymentService.refund(payment.id),
-  })
-  .addStep({
-    execute: () => inventoryService.reserve(items),
-    compensate: () => inventoryService.release(items),
-  });
+### Service Mesh (2025)
+- **Istio/Linkerd**: Sidecar-based networking
+- **mTLS automatic**: Zero-trust networking
+- **Observability built-in**: Traces, metrics, logs
+- **Traffic management**: Canary, A/B, circuit breaking
+- **Service-to-service auth**: SPIFFE/SPIRE identities
 
-await saga.execute();
-```
+### Bulkhead Pattern
+- **Isolated thread pools**: Per downstream service
+- **Connection limits**: Prevent cascade failures
+- **Resource isolation**: CPU, memory per service
+- **Fail fast**: Don't wait for slow services
+- **Graceful degradation**: Partial functionality over full failure
+
+---
 
 ## Patterns to Avoid
-- ❌ Synchronous chains across services
-- ❌ Shared databases
-- ❌ Missing circuit breakers
-- ❌ Tight coupling between services
+
+### Communication Anti-Patterns
+- ❌ **Synchronous chains**: Service A → B → C → D synchronously
+- ❌ **Missing circuit breakers**: Single failure cascades
+- ❌ **No timeouts**: Hanging connections exhaust resources
+- ❌ **Distributed transactions (2PC)**: Use Saga instead
+
+### Data Anti-Patterns
+- ❌ **Shared databases**: Tight coupling, schema conflicts
+- ❌ **Join across services**: Query N services for one request
+- ❌ **Synchronous data replication**: Use events
+- ❌ **No data ownership**: Unclear who owns what
+
+### Design Anti-Patterns
+- ❌ **Distributed monolith**: Microservices with tight coupling
+- ❌ **Too fine-grained**: Nano-services with high coordination
+- ❌ **No domain boundaries**: Services split arbitrarily
+- ❌ **Shared libraries for business logic**: Hidden coupling
+
+### Event Anti-Patterns
+- ❌ **Events without idempotency**: Duplicate processing
+- ❌ **Ordering assumptions**: Events may arrive out of order
+- ❌ **Fat events**: Include IDs, not full entities
+- ❌ **No event versioning**: Schema breaks consumers
+
+---
 
 ## Verification Checklist
-- [ ] Circuit breakers for external calls
-- [ ] Outbox pattern for events
-- [ ] Saga for distributed transactions
-- [ ] Service discovery
-- [ ] Idempotent operations
+
+### Resilience
+- [ ] Circuit breakers on all external calls
+- [ ] Timeouts configured (3-5 seconds)
+- [ ] Fallback strategies defined
+- [ ] Bulkhead isolation for critical paths
+
+### Data Consistency
+- [ ] Saga pattern for distributed transactions
+- [ ] Outbox pattern for reliable events
+- [ ] Idempotent event handlers
+- [ ] Eventual consistency understood
+
+### Service Design
+- [ ] Clear domain boundaries
+- [ ] Single database per service
+- [ ] Async communication preferred
+- [ ] API contracts versioned
+
+### Observability
+- [ ] Distributed tracing (correlation IDs)
+- [ ] Health check endpoints
+- [ ] Metrics exported (RED method)
+- [ ] Centralized logging
+
+---
+
+## Code Patterns (Reference)
+
+### Circuit Breaker (Resilience4j)
+- **Config**: `CircuitBreakerConfig.custom().failureRateThreshold(50).waitDurationInOpenState(Duration.ofSeconds(30)).build()`
+- **Use**: `circuitBreaker.executeSupplier(() -> callRemoteService())`
+
+### Circuit Breaker (opossum)
+- **Config**: `new CircuitBreaker(fn, { timeout: 3000, errorThresholdPercentage: 50, resetTimeout: 30000 })`
+- **Events**: `breaker.on('open', () => ...); breaker.on('fallback', () => ...)`
+
+### Saga Orchestration
+- **Step**: `{ execute: () => service.create(), compensate: () => service.rollback() }`
+- **Execute**: Loop steps, on failure compensate in reverse
+
+### Outbox Pattern
+- **Insert**: `tx.outbox.create({ aggregateId, eventType, payload })` in same transaction
+- **Relay**: Poll outbox, publish to broker, mark processed
+
+### Event Structure
+- **Format**: `{ id, type, aggregateId, timestamp, version, payload }`
+

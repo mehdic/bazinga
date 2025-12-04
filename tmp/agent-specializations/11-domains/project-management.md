@@ -2,7 +2,7 @@
 name: project-management
 type: domain
 priority: 3
-token_estimate: 450
+token_estimate: 500
 compatible_with: [project_manager]
 requires: []
 ---
@@ -12,185 +12,169 @@ requires: []
 # Project Management Expertise
 
 ## Specialist Profile
-Project management specialist coordinating software delivery. Expert in task breakdown, estimation, risk assessment, and delivery planning.
+Project management specialist coordinating software delivery. Expert in task breakdown, estimation, risk assessment, and stakeholder communication.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Task Decomposition
+- **Epic → Story → Task**: Three-level breakdown
+- **5-point maximum**: Stories larger than 5 should split
+- **INVEST criteria**: Independent, Negotiable, Valuable, Estimable, Small, Testable
+- **Clear acceptance criteria**: Define "done" before starting
+- **Identify dependencies**: What blocks what
+- **Critical path analysis**: Sequence-dependent work
 
-```markdown
-## Feature: User Authentication System
+### Story Point Estimation (2025)
+- **Fibonacci scale**: 1, 2, 3, 5, 8, 13 (higher = more uncertainty)
+- **Relative sizing**: Compare to reference story
+- **Team-specific**: Points mean different things to different teams
+- **Planning poker**: Consensus-based estimation
+- **T-shirt sizing for epics**: XS, S, M, L, XL → points later
+- **Re-estimate when learned**: Update as understanding grows
 
-### Epic Breakdown
-1. **User Registration** (13 pts)
-   - Email validation endpoint (2 pts)
-   - Registration form + API (3 pts)
-   - Email verification flow (5 pts)
-   - Welcome email integration (3 pts)
-
-2. **Login/Logout** (8 pts)
-   - Login endpoint with JWT (3 pts)
-   - Session management (3 pts)
-   - Logout + token invalidation (2 pts)
-
-3. **Password Management** (8 pts)
-   - Forgot password flow (3 pts)
-   - Password reset with token (3 pts)
-   - Password strength validation (2 pts)
-
-### Dependency Graph
-```
-Registration ──► Email Verification ──► Login
-                                         │
-Password Reset ◄─────────────────────────┘
-```
-
-### Critical Path
-Registration → Email Verification → Login (must complete in sequence)
-Password Management can be parallelized after Login.
-```
-
-### Estimation Framework
-
-```markdown
-## Estimation Guidelines
-
-### Story Point Reference
-| Points | Complexity | Example |
-|--------|------------|---------|
-| 1 | Trivial | Config change, copy update |
-| 2 | Simple | Basic CRUD endpoint |
-| 3 | Medium | Endpoint with validation + tests |
-| 5 | Complex | Feature with external integration |
-| 8 | Very Complex | Multi-service coordination |
-| 13 | Epic-sized | Should be broken down |
-
-### T-Shirt Sizing → Points Mapping
-| Size | Points | Time (1 dev) |
-|------|--------|--------------|
-| XS | 1-2 | < 1 day |
-| S | 3 | 1-2 days |
-| M | 5 | 3-4 days |
-| L | 8 | ~1 week |
-| XL | 13+ | Break down further |
-
-### Confidence Levels
-- High (±10%): Well-understood, similar past work
-- Medium (±25%): Some unknowns, new patterns
-- Low (±50%): Significant unknowns, new tech
-```
-
-### Risk Assessment
-
-```markdown
-## Risk Register: Authentication Feature
-
-| ID | Risk | Probability | Impact | Score | Mitigation | Owner |
-|----|------|-------------|--------|-------|------------|-------|
-| R1 | OAuth provider downtime | Low | High | 6 | Fallback to email auth | Dev Lead |
-| R2 | Security vulnerabilities | Medium | Critical | 12 | Security review before launch | Security |
-| R3 | Performance under load | Medium | High | 9 | Load test with 10x expected | QA |
-| R4 | Scope creep | High | Medium | 9 | Strict change control | PM |
-
-### Risk Scoring
-- Probability: Low (1), Medium (2), High (3)
-- Impact: Low (1), Medium (2), High (3), Critical (4)
-- Score = Probability × Impact
-- Action threshold: Score ≥ 6
-
-### Contingency Plans
-**R2 - Security vulnerabilities:**
-- Trigger: Any P1 security finding
-- Action: Delay release, hotfix + re-review
-- Budget: 2 days contingency allocated
-```
+### Estimation Reference
+- **1 point**: Config change, copy update (< half day)
+- **2 points**: Simple CRUD endpoint (half day)
+- **3 points**: Endpoint with validation + tests (1-2 days)
+- **5 points**: Feature with external integration (3-4 days)
+- **8 points**: Multi-service coordination (~1 week)
+- **13+ points**: Break down further
 
 ### Sprint Planning
+- **Velocity-based capacity**: Average of last 3-5 sprints
+- **15-20% buffer**: For unknowns and bugs
+- **Don't plan at 100%**: Teams need slack
+- **Stretch goals**: Optional if ahead of schedule
+- **No mid-sprint scope changes**: Protect the sprint
+- **Clear sprint goal**: One sentence summary
 
-```markdown
-## Sprint 23 Plan
-
-### Capacity
-| Developer | Availability | Capacity (pts) |
-|-----------|--------------|----------------|
-| Dev A | 100% | 10 |
-| Dev B | 80% (PTO Fri) | 8 |
-| Dev C | 100% | 10 |
-| **Total** | | **28 pts** |
-
-### Committed Work
-| Story | Points | Assignee | Dependencies |
-|-------|--------|----------|--------------|
-| AUTH-101: Registration API | 3 | Dev A | None |
-| AUTH-102: Email verification | 5 | Dev A | AUTH-101 |
-| AUTH-103: Login endpoint | 3 | Dev B | None |
-| AUTH-104: Session management | 3 | Dev B | AUTH-103 |
-| AUTH-105: Password reset | 5 | Dev C | AUTH-103 |
-| BUG-42: Fix timeout issue | 2 | Dev C | None |
-| TECH-15: Update deps | 2 | Dev A | None |
-| **Total** | **23 pts** | | |
-
-### Buffer
-- Committed: 23 pts (82% of capacity)
-- Buffer: 5 pts for unknowns/bugs
-- Stretch goal: AUTH-106 (3 pts) if ahead
-
-### Sprint Goals
-1. ✅ Complete registration + verification flow
-2. ✅ Basic login functionality working
-3. ✅ Password reset initiated
-```
+### Risk Management
+- **Probability × Impact scoring**: Prioritize high-score risks
+- **Mitigation plans**: Actions to reduce probability
+- **Contingency plans**: Actions if risk materializes
+- **Risk register**: Track and review weekly
+- **Early warning signs**: Define triggers for escalation
 
 ### Status Reporting
+- **Traffic light status**: 🟢 On track, 🟡 At risk, 🔴 Blocked
+- **Metrics tracked**: Velocity, burndown, blockers, scope changes
+- **Blockers prominently displayed**: Action items attached
+- **Weekly cadence**: Consistent reporting rhythm
+- **Stakeholder-appropriate detail**: Executive vs. team view
 
-```markdown
-## Weekly Status Report - Week 12
+### Dependency Management
+- **Dependency graph**: Visual representation
+- **External dependencies flagged**: Higher risk
+- **Buffer time for dependencies**: Account for delays
+- **Regular sync with dependent teams**: Weekly minimum
+- **Escalation path defined**: When delays occur
 
-### Summary
+---
+
+## Patterns to Avoid
+
+### Estimation Anti-Patterns
+- ❌ **Estimating without team**: PM/lead estimates alone
+- ❌ **Hours not points**: Points are about complexity
+- ❌ **Comparing team velocities**: Points aren't standardized
+- ❌ **Padding estimates secretly**: Be transparent about risk
+- ❌ **No estimation at all**: Need some planning basis
+
+### Planning Anti-Patterns
+- ❌ **100% capacity planning**: No room for surprises
+- ❌ **Ignoring historical velocity**: Optimism bias
+- ❌ **No buffer time**: Everything perfectly timed
+- ❌ **Mid-sprint scope additions**: Protect the commitment
+- ❌ **No sprint goal**: Just a list of tasks
+
+### Tracking Anti-Patterns
+- ❌ **Only tracking velocity**: Ignore quality, bugs, tech debt
+- ❌ **Velocity as performance metric**: Creates gaming
+- ❌ **No burndown visibility**: Can't see progress
+- ❌ **Status reports as punishment**: Hide problems
+
+### Communication Anti-Patterns
+- ❌ **Infrequent updates**: Stakeholders surprised
+- ❌ **Hiding blockers**: Problems fester
+- ❌ **Only good news**: Reality distortion
+- ❌ **Technical jargon to non-technical**: Audience matters
+
+---
+
+## Verification Checklist
+
+### Planning
+- [ ] Stories broken down to ≤5 points
+- [ ] Acceptance criteria defined
+- [ ] Dependencies mapped
+- [ ] Critical path identified
+- [ ] Sprint capacity calculated
+
+### Estimation
+- [ ] Team involved in estimation
+- [ ] Reference stories used
+- [ ] Fibonacci scale applied
+- [ ] High uncertainty = higher points
+- [ ] Buffer included (15-20%)
+
+### Risk Management
+- [ ] Risk register maintained
+- [ ] Probability × Impact scored
+- [ ] Mitigation plans defined
+- [ ] Regular review cadence
+- [ ] Escalation paths clear
+
+### Tracking & Communication
+- [ ] Daily standups happening
+- [ ] Burndown updated
+- [ ] Blockers tracked and actioned
+- [ ] Weekly status reports sent
+- [ ] Stakeholders aligned
+
+---
+
+## Code Patterns (Reference)
+
+### Sprint Capacity Calculation
+```
+Team capacity:
+- Dev A: 100% → 10 pts
+- Dev B: 80% (PTO) → 8 pts
+- Dev C: 100% → 10 pts
+Total: 28 pts
+
+Buffer (20%): 5.6 pts
+Committable: 22 pts
+```
+
+### Risk Register Entry
+```
+| ID | Risk | Prob | Impact | Score | Mitigation | Owner |
+|----|------|------|--------|-------|------------|-------|
+| R1 | Vendor delay | Med | High | 6 | Early integration | Dev Lead |
+```
+
+### Status Report Structure
+```
+## Weekly Status - Week 12
 🟢 On Track | Sprint 23 | Day 7/10
 
 ### Progress
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Velocity | 25 pts | 18 pts | 🟡 |
-| Stories Done | 5 | 3 | 🟡 |
-| Bugs Open | <5 | 3 | 🟢 |
-| Blockers | 0 | 1 | 🔴 |
-
-### Completed This Week
-- ✅ AUTH-101: Registration API (3 pts)
-- ✅ AUTH-103: Login endpoint (3 pts)
-- ✅ BUG-42: Timeout fix (2 pts)
-
-### In Progress
-- 🔄 AUTH-102: Email verification (60%)
-- 🔄 AUTH-104: Session management (40%)
+| Metric | Target | Actual |
+|--------|--------|--------|
+| Velocity | 25 | 18 |
+| Blockers | 0 | 1 |
 
 ### Blockers
-1. **SendGrid API access** - Waiting on vendor approval
-   - Impact: Blocks email verification
-   - ETA: Expecting credentials by Wed
-   - Mitigation: Mock email service for testing
-
-### Risks
-- 🟡 May not complete AUTH-105 this sprint
-- Action: Deprioritize if blocked, carry to Sprint 24
+1. [Description] - ETA: Wed - Mitigation: [action]
 
 ### Next Week
-- Complete email verification
-- Start password reset flow
-- Begin QA testing
+- [Priority items]
 ```
 
-## Patterns to Avoid
-- ❌ Estimating without team input
-- ❌ 100% capacity planning
-- ❌ Ignoring dependencies
-- ❌ Scope changes without impact analysis
+### Sprint Goal Template
+- **Format**: "By end of sprint, [stakeholder] can [capability] enabling [benefit]"
+- **Example**: "By end of sprint, users can reset passwords via email enabling self-service account recovery"
 
-## Verification Checklist
-- [ ] Tasks broken to ≤5 points
-- [ ] Dependencies identified
-- [ ] Risks assessed with mitigations
-- [ ] 15-20% buffer in sprint
-- [ ] Clear acceptance criteria

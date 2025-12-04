@@ -2,7 +2,7 @@
 name: agile-scrum
 type: domain
 priority: 3
-token_estimate: 400
+token_estimate: 500
 compatible_with: [project_manager, tech_lead]
 requires: []
 ---
@@ -12,192 +12,172 @@ requires: []
 # Agile/Scrum Methodology Expertise
 
 ## Specialist Profile
-Agile specialist facilitating iterative delivery. Expert in Scrum ceremonies, backlog management, and continuous improvement.
+Agile specialist facilitating iterative delivery. Expert in Scrum ceremonies, backlog management, velocity tracking, and continuous improvement.
 
-## Implementation Guidelines
+---
 
-### User Story Format
+## Patterns to Follow
 
-```markdown
-## Story: USER-123
+### User Story Best Practices
+- **Standard format**: As a [role], I want [capability], so that [benefit]
+- **INVEST criteria**: Independent, Negotiable, Valuable, Estimable, Small, Testable
+- **Acceptance criteria in Gherkin**: Given-When-Then format
+- **Definition of Done**: Checklist that applies to all stories
+- **Story ≤ 5 points**: Larger stories need splitting
+- **Vertical slicing**: End-to-end functionality, not horizontal layers
 
-### Title
-As a [user], I want [capability] so that [benefit]
+### Story Splitting Patterns
+- **By workflow step**: Registration → Verification → Login
+- **By data variation**: Personal info, Preferences, Privacy settings
+- **By CRUD operation**: Create, Read, Update, Delete
+- **By business rule**: Basic case, Edge case, Error handling
+- **By platform**: Web, Mobile, API
+- **Spike first**: Research before implementation
 
-### Example
-As a **registered user**, I want to **reset my password via email**
-so that I can **regain access to my account if I forget my credentials**.
+### Backlog Refinement
+- **Regular cadence**: Weekly, 1-2 hours
+- **2 sprints ahead**: Keep backlog ready
+- **Team estimates together**: Planning poker
+- **Clarify acceptance criteria**: Remove ambiguity
+- **Split large stories**: Before sprint planning
+- **Prioritize ruthlessly**: Top items are detailed, bottom items rough
 
-### Acceptance Criteria (Given-When-Then)
-```gherkin
-Scenario: Request password reset
-  Given I am on the login page
-  When I click "Forgot Password"
-  And I enter my registered email
-  Then I should see "Reset link sent"
-  And I should receive an email within 5 minutes
+### Sprint Ceremonies
+- **Planning (2-4 hours)**: What (select stories) + How (break into tasks)
+- **Daily standup (15 min)**: Yesterday, Today, Blockers (peer-to-peer, not status report)
+- **Review (1-2 hours)**: Demo to stakeholders, get feedback
+- **Retrospective (1-1.5 hours)**: What worked, what didn't, actions
 
-Scenario: Reset with valid token
-  Given I have a valid reset token
-  When I click the reset link
-  And I enter a new password meeting requirements
-  Then my password should be updated
-  And I should be redirected to login
+### Velocity Management (2025)
+- **3-5 sprints to baseline**: New teams need time
+- **Only count done work**: 90% complete = 0 points
+- **Don't compare across teams**: Points aren't standardized
+- **Track trends, not absolutes**: Consistency matters more
+- **Use for planning, not performance**: Velocity ≠ productivity
+- **WIP limits**: Finish before starting new work
 
-Scenario: Reset with expired token
-  Given I have an expired reset token (>24h old)
-  When I click the reset link
-  Then I should see "Link expired"
-  And I should be prompted to request a new link
-```
+### Retrospective Formats
+- **Start-Stop-Continue**: Three columns for actions
+- **4Ls**: Liked, Learned, Lacked, Longed for
+- **Sailboat**: Wind (helps), Anchor (hinders), Rocks (risks)
+- **Mad-Sad-Glad**: Emotional temperature check
+- **Action items**: Max 2-3 per retro, assign owners
 
 ### Definition of Done
-- [ ] Code complete with unit tests (>80% coverage)
-- [ ] Code reviewed and approved
-- [ ] Integration tests passing
+- **Code complete with tests**: Coverage threshold met
+- **Code reviewed and approved**: At least one reviewer
+- **CI/CD passed**: Build, lint, tests green
+- **Documentation updated**: API docs, README if needed
+- **Deployed to staging**: Verified in environment
+- **No P1/P2 bugs**: Quality gate
+
+---
+
+## Patterns to Avoid
+
+### Story Anti-Patterns
+- ❌ **Technical tasks as stories**: Stories deliver user value
+- ❌ **Horizontal slicing**: "Build database layer" as a story
+- ❌ **Missing "so that"**: Benefit explains why it matters
+- ❌ **Implementation in story**: Describe need, not solution
+- ❌ **Stories without criteria**: Can't verify done
+
+### Ceremony Anti-Patterns
+- ❌ **Skipping retrospectives**: No improvement
+- ❌ **Status reports at standup**: Should be peer coordination
+- ❌ **Demo with bugs**: Review working software only
+- ❌ **Planning without team**: Estimates need doers
+
+### Sprint Anti-Patterns
+- ❌ **Mid-sprint scope changes**: Protect commitment
+- ❌ **Carrying over constantly**: Stories too big
+- ❌ **No sprint goal**: Just a task list
+- ❌ **Velocity as KPI**: Creates gaming behavior
+
+### Estimation Anti-Patterns
+- ❌ **Treating estimates as deadlines**: They're approximations
+- ❌ **PM assigns points**: Team estimates together
+- ❌ **Normalizing points across teams**: Meaningless comparison
+- ❌ **No re-estimation**: Update when you learn more
+
+---
+
+## Verification Checklist
+
+### Stories
+- [ ] User story format followed
+- [ ] INVEST criteria met
+- [ ] Acceptance criteria in Gherkin format
+- [ ] Story ≤ 5 points
+- [ ] Definition of Done defined
+
+### Backlog
+- [ ] Regular refinement sessions
+- [ ] 2 sprints worth of ready stories
+- [ ] Stories prioritized
+- [ ] Large stories split
+
+### Ceremonies
+- [ ] Sprint planning sets goal and commitment
+- [ ] Daily standups < 15 minutes
+- [ ] Sprint review demos working software
+- [ ] Retrospectives produce action items
+
+### Velocity
+- [ ] Velocity tracked per sprint
+- [ ] Only done work counted
+- [ ] Used for planning, not performance
+- [ ] WIP limits enforced
+
+---
+
+## Code Patterns (Reference)
+
+### User Story Template
+```
+## Story: USER-123
+**As a** registered user
+**I want to** reset my password via email
+**So that** I can regain access if I forget credentials
+
+### Acceptance Criteria
+Given I am on the login page
+When I click "Forgot Password"
+And I enter my registered email
+Then I should see "Reset link sent"
+And I should receive an email within 5 minutes
+
+### Definition of Done
+- [ ] Tests pass (>80% coverage)
+- [ ] Code reviewed
 - [ ] Documentation updated
-- [ ] QA sign-off
 - [ ] No P1/P2 bugs
 ```
 
-### Backlog Refinement
-
-```markdown
-## Refinement Session Agenda
-
-### 1. Review Upcoming Stories (30 min)
-| Story | Status | Action |
-|-------|--------|--------|
-| USER-124 | Ready | Estimate |
-| USER-125 | Needs AC | Add criteria |
-| USER-126 | Too large | Split |
-
-### 2. Story Splitting Patterns
-
-**Original (too large):**
-> As a user, I want to manage my profile
-
-**Split by workflow:**
-1. View profile information
-2. Edit basic info (name, avatar)
-3. Change email (with verification)
-4. Delete account
-
-**Split by data:**
-1. Manage personal info
-2. Manage notification preferences
-3. Manage privacy settings
-
-**Split by operation (CRUD):**
-1. Create profile (during registration)
-2. Read profile (view page)
-3. Update profile (edit page)
-4. Delete profile (account deletion)
-
-### 3. Estimation (Planning Poker)
-| Story | Dev A | Dev B | Dev C | Final |
-|-------|-------|-------|-------|-------|
-| USER-124 | 3 | 5 | 3 | 3 |
-| USER-125 | 5 | 5 | 8 | 5 |
-| USER-126a | 2 | 3 | 2 | 2 |
+### Velocity Tracking
+```
+| Sprint | Committed | Completed | Carry-over |
+|--------|-----------|-----------|------------|
+| S21 | 24 | 24 | 0 |
+| S22 | 26 | 20 | 6 |
+| S23 | 23 | 21 | 2 |
+| Avg | 24.3 | 21.7 | - |
 ```
 
-### Sprint Ceremonies
-
-```markdown
-## Ceremony Guide
-
-### Daily Standup (15 min)
-**Format:** Each person answers:
-1. What did I complete yesterday?
-2. What will I work on today?
-3. Any blockers?
-
-**Anti-patterns to avoid:**
-- Status report to PM (should be peer-to-peer)
-- Problem-solving (take offline)
-- Going over 15 minutes
-
-### Sprint Planning (2-4 hours)
-**Part 1: What (1-2h)**
-- Review sprint goal
-- Select stories from backlog
-- Clarify acceptance criteria
-
-**Part 2: How (1-2h)**
-- Break stories into tasks
-- Identify dependencies
-- Assign initial owners
-
-**Output:** Sprint backlog with committed stories
-
-### Sprint Review (1-2 hours)
-**Agenda:**
-1. Demo completed features (team)
-2. Stakeholder feedback
-3. Backlog updates based on feedback
-4. Release discussion
-
-### Sprint Retrospective (1-1.5 hours)
-**Format Options:**
-
-**Start-Stop-Continue:**
-| Start | Stop | Continue |
-|-------|------|----------|
-| Pair programming | Long meetings | Daily standups |
-| Earlier testing | Scope creep | Code reviews |
-
-**4Ls (Liked, Learned, Lacked, Longed for):**
-- Liked: Team collaboration
-- Learned: New testing approach
-- Lacked: Clear requirements
-- Longed for: More automation
-
-**Action Items:**
+### Retro Action Items
+```
 | Action | Owner | Due |
 |--------|-------|-----|
 | Set up pair programming rotation | Dev Lead | Next sprint |
 | Timebox meetings to 1h | PM | Immediately |
 ```
 
-### Velocity Tracking
+### Sprint Planning Output
+```
+Sprint Goal: Users can reset passwords enabling self-service recovery
 
-```markdown
-## Velocity Chart
-
-| Sprint | Committed | Completed | Carry-over |
-|--------|-----------|-----------|------------|
-| S20 | 25 | 22 | 3 |
-| S21 | 24 | 24 | 0 |
-| S22 | 26 | 20 | 6 |
-| S23 | 23 | 21 | 2 |
-| **Avg** | **24.5** | **21.75** | |
-
-### Observations
-- Velocity trending: Stable (~22 pts)
-- S22 drop: 2 devs sick, 1 blocker
-- Recommendation: Plan for 20-22 pts
-
-### Burndown Analysis
-Sprint 23:
-- Day 1: 23 pts remaining
-- Day 5: 15 pts (on track)
-- Day 8: 8 pts (slightly behind)
-- Day 10: 2 pts (carry-over)
-
-Issue: Late-sprint scope addition (+3 pts)
-Action: Enforce change control
+Committed: 22 pts (78% capacity)
+Buffer: 6 pts for unknowns
+Stretch: USER-125 (3 pts) if ahead
 ```
 
-## Patterns to Avoid
-- ❌ Skipping retrospectives
-- ❌ Changing scope mid-sprint
-- ❌ Treating estimates as commitments
-- ❌ PM assigning tasks (team self-organizes)
-
-## Verification Checklist
-- [ ] Stories have clear acceptance criteria
-- [ ] Sprint goal defined
-- [ ] Velocity-based planning
-- [ ] Regular retrospectives
-- [ ] Definition of Done enforced

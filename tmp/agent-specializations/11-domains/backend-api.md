@@ -2,191 +2,155 @@
 name: backend-api
 type: domain
 priority: 3
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
+requires: []
 ---
 
-> **PRECEDENCE**: Base agent workflow, routing, and reporting rules take precedence over this guidance.
+> **PRECEDENCE**: Base agent workflow rules take precedence over this guidance.
 
 # Backend API Engineering Expertise
 
 ## Specialist Profile
+Backend API specialist designing RESTful and GraphQL APIs. Expert in HTTP semantics, resource design, pagination, and API versioning.
 
-Backend API specialist designing RESTful and GraphQL APIs. Expert in HTTP semantics, authentication patterns, and API versioning.
+---
 
-## Implementation Guidelines
+## Patterns to Follow
 
-### RESTful Resource Design
+### Resource Design
+- **Nouns, not verbs**: `/users`, `/orders`, not `/getUsers`
+- **Plural naming**: `/users/{id}` for consistency
+- **Nested resources**: `/users/{id}/orders` for relationships
+- **Flat when possible**: Deep nesting > 2 levels is hard to maintain
+- **Consistent naming**: snake_case or camelCase, not mixed
 
-```
-# Resource naming (nouns, not verbs)
-GET    /api/v1/users           # List users
-POST   /api/v1/users           # Create user
-GET    /api/v1/users/{id}      # Get user
-PUT    /api/v1/users/{id}      # Replace user
-PATCH  /api/v1/users/{id}      # Update user
-DELETE /api/v1/users/{id}      # Delete user
+### HTTP Methods & Status Codes
+- **GET 200**: Success with body
+- **POST 201**: Created, include Location header
+- **PUT 200/204**: Full replace, idempotent
+- **PATCH 200**: Partial update
+- **DELETE 204**: No content on success
+- **400**: Malformed request, validation failure
+- **401**: Missing or invalid authentication
+- **403**: Authenticated but not authorized
+- **404**: Resource doesn't exist
+- **409**: Conflict (duplicate, version mismatch)
+- **422**: Valid syntax but semantic errors
+- **429**: Rate limit exceeded, include Retry-After
 
-# Nested resources
-GET    /api/v1/users/{id}/orders    # User's orders
-POST   /api/v1/users/{id}/orders    # Create order for user
+### Pagination (2025)
+- **Cursor-based preferred**: More efficient for large datasets
+- **Offset/limit for small sets**: Simpler, `?limit=20&offset=40`
+- **Include metadata**: `has_more`, `next_cursor`, `total` (if cheap)
+- **Consistent structure**: Same pagination object across endpoints
+- **Field selection**: Allow `?fields=id,name` to reduce payload
 
-# Filtering, sorting, pagination
-GET /api/v1/users?status=active&sort=-created_at&page=2&limit=20
-```
+### Versioning
+- **URI versioning**: `/api/v1/` (60% developer preference, 2025)
+- **Support N+2 versions**: At least two previous versions
+- **Deprecation notices**: Sunset header, docs warning
+- **Major versions only**: No `/v1.2/`, use response evolution
 
-### HTTP Status Codes
-
-```
-# Success
-200 OK           - GET, PUT, PATCH success with body
-201 Created      - POST success, include Location header
-204 No Content   - DELETE success, PUT/PATCH without body
-
-# Client Errors
-400 Bad Request  - Malformed request, validation failure
-401 Unauthorized - Missing or invalid authentication
-403 Forbidden    - Authenticated but not authorized
-404 Not Found    - Resource doesn't exist
-409 Conflict     - State conflict (duplicate, version mismatch)
-422 Unprocessable - Valid syntax but semantic errors
-
-# Server Errors
-500 Internal     - Unexpected server error
-503 Unavailable  - Temporary overload or maintenance
-```
-
-### Error Response Format
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Request validation failed",
-    "details": [
-      {
-        "field": "email",
-        "code": "INVALID_FORMAT",
-        "message": "Must be a valid email address"
-      }
-    ],
-    "request_id": "req_abc123",
-    "documentation_url": "https://api.example.com/docs/errors#VALIDATION_ERROR"
-  }
-}
-```
-
-### Pagination
-
-```json
-// Cursor-based (preferred for large datasets)
-{
-  "data": [...],
-  "pagination": {
-    "next_cursor": "eyJpZCI6MTIzfQ==",
-    "has_more": true
-  }
-}
-
-// Offset-based (simpler but less efficient)
-{
-  "data": [...],
-  "pagination": {
-    "page": 2,
-    "per_page": 20,
-    "total": 150,
-    "total_pages": 8
-  }
-}
-```
-
-### Authentication Patterns
-
-```
-# Bearer token (JWT)
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-
-# API key (for service-to-service)
-X-API-Key: sk_live_abc123
-
-# Token response
-{
-  "access_token": "eyJ...",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "refresh_token": "dGhpcyBpcyBh..."
-}
-```
-
-### Rate Limiting Headers
-
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 45
-X-RateLimit-Reset: 1640995200
-Retry-After: 60
-```
-
-### API Versioning
-
-```
-# URL path versioning (most common)
-GET /api/v1/users
-GET /api/v2/users
-
-# Header versioning
-Accept: application/vnd.example.v2+json
-
-# Query parameter (least preferred)
-GET /api/users?version=2
-```
-
-### Request/Response Headers
-
-```
-# Request
-Content-Type: application/json
-Accept: application/json
-Authorization: Bearer ...
-X-Request-ID: req_abc123
-X-Idempotency-Key: idem_xyz789
-
-# Response
-Content-Type: application/json; charset=utf-8
-X-Request-ID: req_abc123
-Cache-Control: private, max-age=0
-ETag: "abc123"
-```
+### Error Responses
+- **Structured format**: `error.code`, `error.message`, `error.details`
+- **Request ID**: Include for debugging/support
+- **Field-level errors**: For validation failures
+- **Documentation link**: Reference error code docs
+- **No stack traces**: Never expose internals to clients
 
 ### Idempotency
+- **Idempotency-Key header**: For non-idempotent POST operations
+- **Store results**: Return cached response on retry
+- **24-hour TTL**: Reasonable key retention
+- **Client-generated**: UUIDv4 recommended
 
-```
-# Client sends idempotency key
-POST /api/v1/payments
-X-Idempotency-Key: payment_attempt_12345
+### Rate Limiting
+- **X-RateLimit-Limit**: Requests allowed per window
+- **X-RateLimit-Remaining**: Requests remaining
+- **X-RateLimit-Reset**: Unix timestamp for reset
+- **Retry-After**: Seconds to wait on 429
 
-# Server stores result, returns cached response on retry
-# Safe methods (GET, HEAD, OPTIONS) are inherently idempotent
-# PUT, DELETE should be idempotent by design
-# POST needs explicit idempotency key for safety
-```
+---
 
 ## Patterns to Avoid
 
-- Verbs in URLs (`/api/getUsers`)
-- Inconsistent naming (mixing snake_case and camelCase)
-- Missing pagination on list endpoints
-- Exposing internal IDs or stack traces
-- 200 OK for errors (use proper status codes)
-- Missing Content-Type headers
-- Breaking changes without versioning
+### Resource Anti-Patterns
+- ❌ **Verbs in URLs**: `/api/getUsers`, `/api/createOrder`
+- ❌ **Mixed naming**: `user_id` in one endpoint, `userId` in another
+- ❌ **Deep nesting**: `/users/{id}/orders/{id}/items/{id}/reviews`
+- ❌ **CRUD in URL**: `/users/delete/{id}`
+
+### Response Anti-Patterns
+- ❌ **200 for errors**: Use proper status codes
+- ❌ **Stack traces in errors**: Security risk
+- ❌ **Inconsistent error format**: Different structures per endpoint
+- ❌ **Missing pagination**: Unbounded list responses
+
+### Versioning Anti-Patterns
+- ❌ **No versioning**: Breaking changes without warning
+- ❌ **Minor versions in URI**: `/api/v1.2.3/`
+- ❌ **Breaking without deprecation**: Instant removal
+
+### Security Anti-Patterns
+- ❌ **Secrets in URLs**: Logged everywhere
+- ❌ **No rate limiting**: DoS vulnerability
+- ❌ **Missing authentication**: Open endpoints
+- ❌ **Over-fetching by default**: Return minimal data
+
+---
 
 ## Verification Checklist
 
-- [ ] Consistent resource naming (nouns, plural)
-- [ ] Proper HTTP methods and status codes
-- [ ] Structured error responses with codes
-- [ ] Pagination on all list endpoints
-- [ ] Rate limiting headers
-- [ ] Request/response validation
-- [ ] API versioning strategy documented
+### Design
+- [ ] Resource naming follows nouns/plural convention
+- [ ] HTTP methods used correctly (GET idempotent, POST creates)
+- [ ] Status codes are accurate (201 for creation, 404 for missing)
+- [ ] Nested resources max 2 levels deep
+
+### Pagination & Filtering
+- [ ] All list endpoints paginated
+- [ ] Cursor or offset pagination implemented
+- [ ] Field selection available (`?fields=`)
+- [ ] Sorting/filtering parameters documented
+
+### Versioning & Evolution
+- [ ] API version in URI
+- [ ] Deprecation policy documented
+- [ ] Changelog maintained
+- [ ] Breaking changes announced
+
+### Error Handling
+- [ ] Structured error responses
+- [ ] Request ID in all responses
+- [ ] No internal details exposed
+- [ ] Documentation links provided
+
+### Security & Headers
+- [ ] Rate limiting headers present
+- [ ] Idempotency-Key for POST mutations
+- [ ] CORS configured appropriately
+- [ ] Content-Type validation
+
+---
+
+## Code Patterns (Reference)
+
+### Resource Endpoints
+- **List**: `GET /api/v1/users?limit=20&cursor=abc`
+- **Create**: `POST /api/v1/users` → 201 + Location header
+- **Read**: `GET /api/v1/users/{id}` → 200
+- **Update**: `PATCH /api/v1/users/{id}` → 200
+- **Delete**: `DELETE /api/v1/users/{id}` → 204
+
+### Error Response
+- **Format**: `{ "error": { "code": "VALIDATION_ERROR", "message": "...", "details": [...], "request_id": "req_abc" } }`
+
+### Pagination Response
+- **Cursor**: `{ "data": [...], "pagination": { "next_cursor": "eyJ...", "has_more": true } }`
+- **Offset**: `{ "data": [...], "meta": { "page": 2, "per_page": 20, "total": 150 } }`
+
+### Headers
+- **Request**: `Authorization: Bearer ...`, `X-Request-ID`, `X-Idempotency-Key`
+- **Response**: `X-RateLimit-*`, `ETag`, `Cache-Control`
+
