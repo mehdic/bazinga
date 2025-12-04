@@ -134,10 +134,11 @@ if ! grep -q "ORCHESTRATOR" "$TEMP_FILE"; then
     exit 1
 fi
 
-# Check 4: File is reasonably sized (orchestrator should be ~2600+ lines)
+# Check 4: File is reasonably sized (orchestrator core should be ~1400+ lines)
+# Note: Phase 2A/2B extracted to templates, reducing core from ~2600 to ~1500
 LINE_COUNT=$(wc -l < "$TEMP_FILE")
-if [ "$LINE_COUNT" -lt 2000 ]; then
-    echo "  ❌ ERROR: Generated file too small ($LINE_COUNT lines, expected 2600+)"
+if [ "$LINE_COUNT" -lt 1400 ]; then
+    echo "  ❌ ERROR: Generated file too small ($LINE_COUNT lines, expected 1400+)"
     echo "  This suggests content was not properly extracted"
     exit 1
 fi

@@ -3,8 +3,38 @@
 **Date:** 2025-12-04
 **Context:** Orchestrator file is 2390 lines / 90KB - largest agent file by far
 **Problem:** Orchestrator bypasses token limits during long sessions
-**Status:** Proposed
-**Reviewed by:** Pending OpenAI + Gemini review
+**Status:** Approved for Implementation
+**Reviewed by:** OpenAI GPT-5 (2025-12-04)
+
+## User Decision (2025-12-04)
+
+| Question | Decision |
+|----------|----------|
+| Use `bazinga/templates/orchestrator/` | ✅ YES |
+| Add CI gates | ❌ NO |
+| Compress prose | ❌ NO - Extract only |
+
+**Implementation approach:** Extract Phase 2A/2B to templates without compression. Adjust core orchestrator to read templates at runtime.
+
+## Implementation Complete (2025-12-04)
+
+**Files created:**
+- `bazinga/templates/orchestrator/phase_simple.md` (604 lines) - Phase 2A workflow
+- `bazinga/templates/orchestrator/phase_parallel.md` (349 lines) - Phase 2B workflow
+
+**Files modified:**
+- `agents/orchestrator.md` - Reduced from 2390 → 1496 lines (37% reduction)
+- `scripts/build-slash-commands.sh` - Updated line count validation (2000 → 1400)
+- `.claude/commands/bazinga.orchestrate.md` - Regenerated (1495 lines)
+
+**Results:**
+| Metric | Before | After | Savings |
+|--------|--------|-------|---------|
+| Core orchestrator | 2390 lines | 1496 lines | 894 lines (37%) |
+| Active context (simple) | 2390 lines | 1496 + 604 = 2100 lines | 12% |
+| Active context (parallel) | 2390 lines | 1496 + 349 = 1845 lines | 23% |
+
+**Note:** Core is always loaded. Templates are loaded on-demand when entering each phase.
 
 ---
 
