@@ -25,10 +25,16 @@ TypeScript specialist building type-safe applications. Expert in advanced types,
 ### Type Design
 - **Discriminated unions**: Use literal type discriminators for type narrowing
 - **Branded types**: Create nominal types for IDs, currencies, etc. (`type UserId = string & { readonly brand: unique symbol }`)
+<!-- version: typescript >= 4.1 -->
 - **Template literal types**: For string patterns (`type Route = \`/api/${string}\``)
+<!-- version: typescript >= 3.4 -->
 - **Const assertions**: `as const` for literal inference
+<!-- version: typescript >= 4.9 -->
 - **Satisfies operator**: `config satisfies Config` for type checking without widening
-- **Infer with constraints**: `T extends { id: infer U } ? U : never`
+<!-- version: typescript >= 4.7 -->
+- **Infer with constraints**: `T extends { id: infer U extends string } ? U : never`
+<!-- version: typescript < 4.7 -->
+- **Infer without constraints**: `T extends { id: infer U } ? U : never`
 
 ### Type Narrowing
 - **Type guards**: Custom `isX(value): value is X` functions
@@ -120,13 +126,21 @@ TypeScript specialist building type-safe applications. Expert in advanced types,
 ### Recommended Constructs
 - **Discriminated union**: `type Event = { type: 'a'; data: A } | { type: 'b'; data: B }`
 - **Branded types**: `type UserId = string & { readonly __brand: 'UserId' }`
+<!-- version: typescript >= 3.7 -->
 - **Type guard**: `function isUser(x: unknown): x is User { return ... }`
+- **Assertion function**: `function assertUser(x: unknown): asserts x is User { ... }`
+<!-- version: typescript >= 4.9 -->
 - **Satisfies**: `const config = { ... } satisfies Config`
+<!-- version: typescript >= 3.4 -->
 - **Const assertion**: `const ROUTES = ['/', '/users'] as const`
+<!-- version: typescript >= 4.1 -->
 - **Template literals**: `type ApiPath = \`/api/v${number}/${string}\``
 
 ### Utility Types to Know
 - `Partial<T>`, `Required<T>`, `Readonly<T>`, `Pick<T, K>`, `Omit<T, K>`
 - `Record<K, V>`, `Extract<T, U>`, `Exclude<T, U>`
 - `ReturnType<F>`, `Parameters<F>`, `Awaited<T>`
-- `NonNullable<T>`, `NoInfer<T>` (5.4+)
+<!-- version: typescript >= 5.4 -->
+- `NonNullable<T>`, `NoInfer<T>` (prevents unwanted inference)
+<!-- version: typescript < 5.4 -->
+- `NonNullable<T>` (NoInfer requires TS 5.4+)

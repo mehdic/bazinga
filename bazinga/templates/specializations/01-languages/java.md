@@ -24,8 +24,15 @@ Java specialist building enterprise applications. Expert in modern Java features
 - **YAGNI**: Don't add functionality until needed
 
 ### Immutability
-- **Records** (16+): `record User(String id, String email) {}` for immutable data
+<!-- version: java >= 16 -->
+- **Records**: `record User(String id, String email) {}` for immutable data
+<!-- version: java < 16 -->
+- **Final classes**: Use Lombok `@Value` or write immutable classes with final fields
+<!-- version: java >= 9 -->
 - **Immutable collections**: `List.of()`, `Set.of()`, `Map.of()` for unmodifiable collections
+<!-- version: java < 9 -->
+- **Immutable collections**: `Collections.unmodifiableList()` or Guava `ImmutableList`
+<!-- version: java >= 8 -->
 - **Final fields**: Mark fields `final` when they shouldn't change
 - **Defensive copying**: Copy mutable parameters/returns to preserve immutability
 
@@ -129,10 +136,18 @@ Java specialist building enterprise applications. Expert in modern Java features
 ## Code Patterns (Reference)
 
 ### Recommended Constructs
+<!-- version: java >= 16 -->
 - **Record**: `record UserDto(String id, String email) {}`
+<!-- version: java >= 17 -->
 - **Sealed class**: `sealed interface Shape permits Circle, Square {}`
+<!-- version: java >= 14 -->
 - **Pattern matching**: `if (shape instanceof Circle c) { use(c.radius()); }`
 - **Switch expression**: `var x = switch(status) { case A -> 1; default -> 0; };`
-- **Try-with-resources**: `try (var conn = getConnection()) { ... }`
+<!-- version: java >= 10 -->
+- **var keyword**: `var conn = getConnection()` for obvious types
+<!-- version: java >= 8 -->
+- **Try-with-resources**: `try (Connection conn = getConnection()) { ... }`
 - **Optional**: `findUser(id).map(User::email).orElse("unknown")`
-- **Stream**: `users.stream().filter(u -> u.active()).map(User::id).toList()`
+- **Stream**: `users.stream().filter(User::isActive).map(User::getId).collect(Collectors.toList())`
+<!-- version: java >= 16 -->
+- **Stream toList()**: `users.stream().filter(User::isActive).toList()` (Java 16+)

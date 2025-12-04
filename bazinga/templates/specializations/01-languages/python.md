@@ -26,10 +26,17 @@ Python specialist building clean, maintainable code. Expert in type hints, async
 
 ### Type System
 - **Type hints on all public APIs**: Functions, methods, class attributes
-- **Use `|` union syntax** (3.10+) or `Optional`/`Union` for nullable types
+<!-- version: python >= 3.10 -->
+- **Use `|` union syntax**: `def foo(x: str | None) -> int | str`
+<!-- version: python < 3.10 -->
+- **Use `Optional`/`Union`**: `def foo(x: Optional[str]) -> Union[int, str]`
+<!-- version: python >= 3.8 -->
 - **Protocols over ABCs**: For structural subtyping (duck typing with type safety)
 - **TypedDict**: For dictionary schemas, especially API responses
+<!-- version: python >= 3.10 -->
 - **Frozen dataclasses**: `@dataclass(frozen=True, slots=True)` for immutable data
+<!-- version: python >= 3.7, python < 3.10 -->
+- **Frozen dataclasses**: `@dataclass(frozen=True)` for immutable data (no slots)
 
 ### Error Handling
 - **Specific exceptions**: Catch the most specific exception possible
@@ -40,7 +47,11 @@ Python specialist building clean, maintainable code. Expert in type hints, async
 ### Async Programming
 - **Async all the way**: Don't mix sync/async - propagate async up the call stack
 - **`asyncio.gather`**: For concurrent I/O operations
-- **`asyncio.TaskGroup`** (3.11+): For structured concurrency with proper cancellation
+<!-- version: python >= 3.11 -->
+- **`asyncio.TaskGroup`**: For structured concurrency with proper cancellation
+<!-- version: python < 3.11 -->
+- **`asyncio.gather` with cancellation**: Manual task management for concurrent operations
+<!-- version: python >= 3.8 -->
 - **Async context managers**: `@asynccontextmanager` for async resource management
 
 ### Dependencies & Structure
