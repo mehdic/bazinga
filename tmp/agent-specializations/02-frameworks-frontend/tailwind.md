@@ -2,7 +2,7 @@
 name: tailwind
 type: framework
 priority: 2
-token_estimate: 350
+token_estimate: 500
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -11,133 +11,109 @@ compatible_with: [developer, senior_software_engineer]
 # Tailwind CSS Engineering Expertise
 
 ## Specialist Profile
-Tailwind specialist building consistent, responsive UIs. Expert in utility-first CSS, component patterns, and design systems.
+Tailwind specialist building consistent, responsive UIs. Expert in utility-first CSS, design systems, and component patterns.
 
-## Implementation Guidelines
+---
 
-### Component Patterns
+## Patterns to Follow
 
-```tsx
-// Button with variants
-interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-  children: React.ReactNode;
-}
+### Utility-First Approach
+- **Utilities over custom CSS**: Build UIs entirely with utilities
+- **Design constraints**: Use the spacing/color scale, not arbitrary values
+- **Semantic colors**: Define brand/semantic colors in config
+- **Component abstractions**: Combine utilities in reusable components
 
-const variants = {
-  primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-  secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
-  danger: 'bg-red-600 hover:bg-red-700 text-white',
-};
-
-const sizes = {
-  sm: 'px-2 py-1 text-sm',
-  md: 'px-4 py-2',
-  lg: 'px-6 py-3 text-lg',
-};
-
-export function Button({ variant = 'primary', size = 'md', children }: ButtonProps) {
-  return (
-    <button className={`
-      ${variants[variant]}
-      ${sizes[size]}
-      rounded-md font-medium transition-colors
-      focus:outline-none focus:ring-2 focus:ring-offset-2
-      disabled:opacity-50 disabled:cursor-not-allowed
-    `}>
-      {children}
-    </button>
-  );
-}
-```
-
-### Responsive Design
-
-```tsx
-<div className="
-  grid gap-4
-  grid-cols-1
-  sm:grid-cols-2
-  lg:grid-cols-3
-  xl:grid-cols-4
-">
-  {items.map(item => (
-    <Card key={item.id} item={item} />
-  ))}
-</div>
-
-// Mobile-first responsive text
-<h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl">
-  Responsive Heading
-</h1>
-```
-
-### Dark Mode
-
-```tsx
-<div className="
-  bg-white dark:bg-gray-900
-  text-gray-900 dark:text-gray-100
-  border border-gray-200 dark:border-gray-700
-">
-  <h2 className="text-gray-800 dark:text-gray-200">Title</h2>
-  <p className="text-gray-600 dark:text-gray-400">Description</p>
-</div>
-```
-
-### Custom Configuration
-
-```javascript
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        brand: {
-          50: '#f0f9ff',
-          500: '#0ea5e9',
-          900: '#0c4a6e',
-        },
-      },
-      spacing: {
-        '18': '4.5rem',
-      },
-      animation: {
-        'fade-in': 'fadeIn 0.3s ease-in-out',
-      },
-    },
-  },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/typography'),
-  ],
-};
-```
+### Tailwind v4 Patterns
+<!-- version: tailwind >= 4 -->
+- **CSS-first configuration**: `@theme` for design tokens
+- **CSS layers**: `@layer theme, base, components, utilities`
+- **Native CSS variables**: `--color-brand-500`
+- **No preprocessors needed**: Drop Sass/Less/Stylus
 
 ### Class Organization
+- **Consistent order**: Layout → sizing → spacing → typography → colors → effects
+- **Prettier plugin**: Auto-sort classes with official plugin
+- **Logical grouping**: Keep related utilities together
+- **Line breaks for long lists**: Readable multi-line classes
 
-```tsx
-// Order: layout → sizing → spacing → typography → colors → effects
-<div className="
-  flex flex-col          /* layout */
-  w-full max-w-md        /* sizing */
-  p-4 space-y-2          /* spacing */
-  text-sm font-medium    /* typography */
-  bg-white text-gray-900 /* colors */
-  rounded-lg shadow-md   /* effects */
-">
-```
+### Responsive Design
+- **Mobile-first**: Default styles for mobile, breakpoint for larger
+- **Breakpoint prefixes**: `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
+- **Container queries**: `@container` for component-relative sizing
+- **Consistent breakpoints**: Use the default scale
+
+### Dark Mode
+- **`dark:` variant**: Toggle with class or media preference
+- **Semantic tokens**: Define light/dark in config
+- **Consistent contrast**: Test both modes for accessibility
+- **System preference**: `prefers-color-scheme` support
+
+---
 
 ## Patterns to Avoid
-- ❌ Arbitrary values when tokens exist
-- ❌ Overriding with !important
-- ❌ Mixing Tailwind with custom CSS
-- ❌ Inconsistent spacing values
+
+### Configuration Anti-Patterns
+- ❌ **Arbitrary values everywhere**: Use design tokens from config
+- ❌ **Default color palette in production**: Define semantic colors
+- ❌ **Magic numbers**: `w-[437px]` loses design system benefits
+- ❌ **Sass/Less/Stylus with v4**: Use native CSS features
+
+### Styling Anti-Patterns
+- ❌ **Overusing @apply**: Reduces single-source-of-truth benefit
+- ❌ **Custom classes in @layer components (v4)**: Variants won't work
+- ❌ **!important overrides**: Rethink the cascade
+- ❌ **Mixing Tailwind with vanilla CSS**: Pick one approach
+
+### Architecture Anti-Patterns
+- ❌ **Utility classes in plain HTML at scale**: Use component framework
+- ❌ **Duplicating class strings**: Extract to components
+- ❌ **Inconsistent spacing**: Stick to the scale
+- ❌ **No design system**: Define colors, spacing, typography first
+
+### Accessibility Anti-Patterns
+- ❌ **Low contrast colors**: Test with contrast checkers
+- ❌ **Focus states removed**: Keep or enhance `focus:` styles
+- ❌ **Motion without reduced-motion**: Use `motion-safe:`, `motion-reduce:`
+
+---
 
 ## Verification Checklist
-- [ ] Mobile-first responsive
-- [ ] Dark mode support
-- [ ] Consistent spacing scale
-- [ ] Accessible color contrast
-- [ ] Reusable component patterns
+
+### Design System
+- [ ] Semantic colors defined in config
+- [ ] Consistent spacing scale used
+- [ ] Typography scale configured
+- [ ] No arbitrary magic numbers
+
+### Responsiveness
+- [ ] Mobile-first approach
+- [ ] All breakpoints tested
+- [ ] Container queries where appropriate
+- [ ] Touch targets sized correctly
+
+### Accessibility
+- [ ] Color contrast passes WCAG
+- [ ] Focus states visible
+- [ ] reduced-motion respected
+- [ ] Dark mode tested
+
+### Code Quality
+- [ ] Prettier plugin for class sorting
+- [ ] Component abstractions for reuse
+- [ ] No @apply overuse
+- [ ] Consistent class organization
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Responsive**: `<div class="p-4 md:p-6 lg:p-8">...</div>`
+- **Dark mode**: `<div class="bg-white dark:bg-gray-900">...</div>`
+- **Interactive**: `<button class="bg-blue-600 hover:bg-blue-700 focus:ring-2">...</button>`
+- **Layout**: `<div class="flex flex-col gap-4 sm:flex-row">...</div>`
+- **Typography**: `<p class="text-sm text-gray-600 dark:text-gray-400">...</p>`
+<!-- version: tailwind >= 4 -->
+- **Theme token**: `@theme { --color-brand: #0ea5e9; }`
+- **Container query**: `<div class="@container"><div class="@md:flex">...</div></div>`
+

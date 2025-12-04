@@ -2,273 +2,124 @@
 name: react
 type: framework
 priority: 2
-token_estimate: 500
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript, javascript]
 ---
 
-> **PRECEDENCE**: Base agent workflow, routing, and reporting rules take precedence over this guidance.
+> **PRECEDENCE**: Base agent workflow rules take precedence over this guidance.
 
 # React Engineering Expertise
 
 ## Specialist Profile
+React specialist building performant, accessible UIs. Expert in hooks, Server Components, and modern React patterns.
 
-React specialist building performant, accessible UIs. Expert in hooks, state management, and component architecture.
+---
 
-## Implementation Guidelines
+## Patterns to Follow
 
-### Functional Components
+### Component Architecture
+- **Server Components by default**: Only use `'use client'` when needed
+- **Functional components**: No class components for new code
+- **Single responsibility**: One purpose per component
+- **Composition over props**: Use children and render props
+- **Colocation**: Keep related code together
 
-<!-- version: react >= 18 -->
-```tsx
-interface UserCardProps {
-  user: User;
-  onSelect?: (user: User) => void;
-}
+### React 19 Patterns
+<!-- version: react >= 19 -->
+- **useActionState for forms**: Replaces useFormState with clearer semantics
+- **useOptimistic for UI**: Optimistic updates built-in
+- **use() for promises**: Cleaner async data handling
+- **React Compiler**: Auto-memoization reduces useMemo/useCallback need
 
-export function UserCard({ user, onSelect }: UserCardProps) {
-  const handleClick = useCallback(() => {
-    onSelect?.(user);
-  }, [user, onSelect]);
-
-  return (
-    <article className="user-card" onClick={handleClick} role="button" tabIndex={0}>
-      <h2>{user.displayName}</h2>
-      <p>{user.email}</p>
-    </article>
-  );
-}
-```
-
-<!-- version: react >= 16.8, react < 18 -->
-```tsx
-interface UserCardProps {
-  user: User;
-  onSelect?: (user: User) => void;
-}
-
-export const UserCard: React.FC<UserCardProps> = ({ user, onSelect }) => {
-  const handleClick = useCallback(() => {
-    onSelect?.(user);
-  }, [user, onSelect]);
-
-  return (
-    <article className="user-card" onClick={handleClick}>
-      <h2>{user.displayName}</h2>
-      <p>{user.email}</p>
-    </article>
-  );
-};
-```
-
-### Custom Hooks
-
-```tsx
-function useAsync<T>(asyncFn: () => Promise<T>, deps: unknown[] = []) {
-  const [state, setState] = useState<{
-    data: T | null;
-    loading: boolean;
-    error: Error | null;
-  }>({ data: null, loading: true, error: null });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setState(prev => ({ ...prev, loading: true, error: null }));
-
-    asyncFn()
-      .then(data => {
-        if (!cancelled) {
-          setState({ data, loading: false, error: null });
-        }
-      })
-      .catch(error => {
-        if (!cancelled) {
-          setState({ data: null, loading: false, error });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, deps);
-
-  return state;
-}
-
-// Usage
-function UserProfile({ userId }: { userId: string }) {
-  const { data: user, loading, error } = useAsync(
-    () => fetchUser(userId),
-    [userId]
-  );
-
-  if (loading) return <Spinner />;
-  if (error) return <ErrorMessage error={error} />;
-  return <UserCard user={user!} />;
-}
-```
+### Hooks Best Practices
+- **Custom hooks for reuse**: Extract logic into `use*` functions
+- **Dependency arrays**: Include all reactive values
+- **Cleanup functions**: Return cleanup from useEffect
+- **useReducer for complex state**: When state has multiple sub-values
+- **useMemo/useCallback sparingly**: Only for measured performance issues
 
 ### State Management
+- **Lift state minimally**: Only as high as needed
+- **Context for global state**: Theme, auth, locale
+- **Server state libraries**: TanStack Query, SWR for async
+- **URL state**: searchParams for shareable state
 
-<!-- version: react >= 18 -->
-```tsx
-// Using useReducer for complex state
-interface State {
-  users: User[];
-  selectedId: string | null;
-  filter: string;
-}
+### Performance
+- **Code splitting**: Dynamic imports for large components
+- **Suspense boundaries**: Wrap async components
+- **Error boundaries**: Catch rendering errors gracefully
+- **Key props**: Stable, unique keys for lists
 
-type Action =
-  | { type: 'SET_USERS'; payload: User[] }
-  | { type: 'SELECT_USER'; payload: string }
-  | { type: 'SET_FILTER'; payload: string };
-
-function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case 'SET_USERS':
-      return { ...state, users: action.payload };
-    case 'SELECT_USER':
-      return { ...state, selectedId: action.payload };
-    case 'SET_FILTER':
-      return { ...state, filter: action.payload };
-    default:
-      return state;
-  }
-}
-
-function UserList() {
-  const [state, dispatch] = useReducer(reducer, {
-    users: [],
-    selectedId: null,
-    filter: '',
-  });
-
-  const filteredUsers = useMemo(
-    () => state.users.filter(u =>
-      u.displayName.toLowerCase().includes(state.filter.toLowerCase())
-    ),
-    [state.users, state.filter]
-  );
-
-  return (
-    <>
-      <SearchInput
-        value={state.filter}
-        onChange={value => dispatch({ type: 'SET_FILTER', payload: value })}
-      />
-      {filteredUsers.map(user => (
-        <UserCard
-          key={user.id}
-          user={user}
-          onSelect={() => dispatch({ type: 'SELECT_USER', payload: user.id })}
-        />
-      ))}
-    </>
-  );
-}
-```
-
-### Performance Optimization
-
-```tsx
-// Memoize expensive components
-const MemoizedUserCard = memo(UserCard, (prev, next) =>
-  prev.user.id === next.user.id
-);
-
-// Memoize callbacks
-const handleSubmit = useCallback((data: FormData) => {
-  onSubmit(data);
-}, [onSubmit]);
-
-// Memoize computed values
-const sortedUsers = useMemo(
-  () => [...users].sort((a, b) => a.displayName.localeCompare(b.displayName)),
-  [users]
-);
-```
-
-### Error Boundaries
-
-```tsx
-interface ErrorBoundaryProps {
-  fallback: React.ReactNode;
-  children: React.ReactNode;
-}
-
-class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('Error caught:', error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
-}
-```
-
-### Accessibility
-
-```tsx
-function Dialog({ isOpen, onClose, title, children }: DialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      dialogRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dialog-title"
-      tabIndex={-1}
-      onKeyDown={e => e.key === 'Escape' && onClose()}
-    >
-      <h2 id="dialog-title">{title}</h2>
-      {children}
-      <button onClick={onClose}>Close</button>
-    </div>
-  );
-}
-```
+---
 
 ## Patterns to Avoid
 
-- Class components for new code (use hooks)
-- Inline object/array creation in JSX (causes re-renders)
-- Missing `key` props in lists
-- State updates in useEffect without cleanup
-- Direct DOM manipulation
-- Prop drilling > 3 levels (use context)
-<!-- version: react < 16.8 -->
-- N/A: Hooks (React 16.8+ only)
+### Component Anti-Patterns
+- ❌ **`'use client'` everywhere**: Ship unnecessary JS; default to server
+- ❌ **Props drilling >3 levels**: Use context or composition
+- ❌ **Inline object/array literals in JSX**: Creates new reference each render
+- ❌ **Missing key props**: Causes reconciliation bugs
+- ❌ **Index as key**: Breaks state on reorder; use stable IDs
+
+### Hook Anti-Patterns
+- ❌ **useEffect for derived state**: Use useMemo or compute in render
+- ❌ **useEffect for data fetching** (React 19+): Use Server Components or use()
+- ❌ **Missing dependencies**: Stale closures cause bugs
+- ❌ **State for props transformation**: Just compute it
+- ❌ **useEffect as "Swiss Army knife"**: Use proper patterns instead
+
+### State Anti-Patterns
+- ❌ **Storing derived values**: Compute from source of truth
+- ❌ **Redundant state**: One source per piece of data
+- ❌ **State updates in render**: Causes infinite loops
+- ❌ **Global state for local needs**: Keep state close to usage
+
+### Performance Anti-Patterns
+- ❌ **Premature optimization**: Measure before memoizing
+- ❌ **Over-memoizing**: React Compiler handles most cases
+- ❌ **Large component trees**: Split and lazy load
+- ❌ **Direct DOM manipulation**: Use refs and React patterns
+
+---
 
 ## Verification Checklist
 
-- [ ] Proper TypeScript types for props
-- [ ] Memoization for expensive computations
-- [ ] useCallback for event handlers passed as props
-- [ ] Cleanup functions in useEffect
-- [ ] Keyboard accessibility
-- [ ] ARIA attributes for interactive elements
-- [ ] Error boundaries around fallible components
+### Architecture
+- [ ] Server Components for non-interactive UI
+- [ ] Client Components only for hooks/events
+- [ ] Proper component composition
+- [ ] Code splitting for large bundles
+
+### Hooks
+- [ ] Custom hooks for reusable logic
+- [ ] Complete dependency arrays
+- [ ] Cleanup functions where needed
+- [ ] No useEffect abuse
+
+### Performance
+- [ ] Suspense boundaries for async
+- [ ] Error boundaries for fault tolerance
+- [ ] Stable key props on lists
+- [ ] Bundle size monitored
+
+### Accessibility
+- [ ] Semantic HTML elements
+- [ ] ARIA attributes for custom widgets
+- [ ] Keyboard navigation
+- [ ] Focus management
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Functional component**: `function UserCard({ user }: Props) { return <div>{user.name}</div>; }`
+- **Custom hook**: `function useUser(id: string) { /* fetch logic */ return { user, loading }; }`
+- **Error boundary**: Wrap fallible subtrees with error UI fallback
+- **Suspense**: `<Suspense fallback={<Spinner />}><AsyncComponent /></Suspense>`
+<!-- version: react >= 19 -->
+- **useActionState**: `const [state, action, pending] = useActionState(serverAction, initial)`
+- **useOptimistic**: `const [optimistic, setOptimistic] = useOptimistic(state)`
+- **use()**: `const data = use(promise)` inside component
+

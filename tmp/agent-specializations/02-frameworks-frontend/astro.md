@@ -2,7 +2,7 @@
 name: astro
 type: framework
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -11,134 +11,112 @@ compatible_with: [developer, senior_software_engineer]
 # Astro Engineering Expertise
 
 ## Specialist Profile
-Astro specialist building fast, content-focused sites. Expert in islands architecture, content collections, and SSG/SSR.
+Astro specialist building fast, content-focused sites. Expert in islands architecture, Content Collections, and zero-JS-by-default.
 
-## Implementation Guidelines
-
-### Astro Components
-
-```astro
----
-// src/components/UserCard.astro
-interface Props {
-  user: User;
-  showEmail?: boolean;
-}
-
-const { user, showEmail = false } = Astro.props;
 ---
 
-<article class="user-card">
-  <h2>{user.displayName}</h2>
-  {showEmail && <p>{user.email}</p>}
-  <slot />
-</article>
+## Patterns to Follow
 
-<style>
-  .user-card {
-    padding: 1rem;
-    border-radius: 0.5rem;
-    background: var(--card-bg);
-  }
-</style>
-```
+### Islands Architecture
+- **Zero JS by default**: Static HTML unless hydration needed
+- **Client directives**: Choose hydration strategy per component
+- **`client:load`**: Interactive immediately (use sparingly)
+- **`client:visible`**: Hydrate when scrolled into view
+- **`client:idle`**: Hydrate when browser is idle
+- **`client:media`**: Hydrate on media query match
 
-### Islands (Client Hydration)
-
-```astro
----
-import Counter from '../components/Counter.tsx';
-import Newsletter from '../components/Newsletter.vue';
----
-
-<!-- No JS shipped -->
-<UserCard user={user} />
-
-<!-- Hydrate on load -->
-<Counter client:load initialCount={5} />
-
-<!-- Hydrate when visible -->
-<Newsletter client:visible />
-
-<!-- Hydrate on idle -->
-<Comments client:idle />
-
-<!-- Hydrate on media query -->
-<MobileMenu client:media="(max-width: 768px)" />
-```
+### Server Islands (Astro 5+)
+<!-- version: astro >= 5 -->
+- **`server:defer`**: Dynamic content rendered separately
+- **Personalization**: User-specific without blocking static
+- **Real-time data**: Prices, inventory, recommendations
+- **Performance**: Static shell with dynamic islands
 
 ### Content Collections
+- **Typed schemas**: Zod validation for frontmatter
+- **Content Layer API**: Multiple data sources (local, CMS, API)
+- **Type-safe queries**: `getCollection()`, `getEntry()`
+- **Build-time validation**: Catch errors early
 
-```typescript
-// src/content/config.ts
-import { z, defineCollection } from 'astro:content';
+### Performance
+- **Default SSG**: Pre-render when possible
+- **Image optimization**: `<Image>` component
+- **View transitions**: Smooth page navigation
+- **Prefetching**: `data-astro-prefetch` for instant loads
 
-const blog = defineCollection({
-  type: 'content',
-  schema: z.object({
-    title: z.string(),
-    publishDate: z.date(),
-    author: z.string(),
-    tags: z.array(z.string()),
-    draft: z.boolean().default(false),
-  }),
-});
+### Multi-Framework
+- **Mix frameworks**: React, Vue, Svelte, Solid in same project
+- **Share state**: Nano Stores for cross-framework state
+- **Pick per-component**: Best tool for each job
+- **Consistent styling**: Tailwind or CSS across all
 
-export const collections = { blog };
-```
-
-```astro
 ---
-// src/pages/blog/[...slug].astro
-import { getCollection } from 'astro:content';
-
-export async function getStaticPaths() {
-  const posts = await getCollection('blog', ({ data }) => !data.draft);
-  return posts.map(post => ({
-    params: { slug: post.slug },
-    props: { post },
-  }));
-}
-
-const { post } = Astro.props;
-const { Content } = await post.render();
----
-
-<article>
-  <h1>{post.data.title}</h1>
-  <Content />
-</article>
-```
-
-### API Endpoints
-
-```typescript
-// src/pages/api/users.ts
-import type { APIRoute } from 'astro';
-
-export const GET: APIRoute = async ({ request }) => {
-  const users = await db.users.findMany();
-  return new Response(JSON.stringify(users), {
-    headers: { 'Content-Type': 'application/json' },
-  });
-};
-
-export const POST: APIRoute = async ({ request }) => {
-  const body = await request.json();
-  const user = await db.users.create({ data: body });
-  return new Response(JSON.stringify(user), { status: 201 });
-};
-```
 
 ## Patterns to Avoid
-- ❌ `client:load` on everything
-- ❌ Heavy JS in static pages
-- ❌ Ignoring content collections for content sites
-- ❌ SSR when SSG works
+
+### Hydration Anti-Patterns
+- ❌ **`client:load` everywhere**: Ships unnecessary JS
+- ❌ **Interactive framework for static content**: Use Astro components
+- ❌ **Heavy JS on content pages**: Islands should be small
+- ❌ **Hydrating above-fold unnecessarily**: Start with static
+
+### Architecture Anti-Patterns
+- ❌ **SSR when SSG works**: Pre-render for performance
+- ❌ **Ignoring Content Collections**: Type-safe content is better
+- ❌ **Client-side routing for content sites**: MPA is fine
+- ❌ **Complex state management**: Backend for complexity
+
+### Content Anti-Patterns
+- ❌ **Untyped frontmatter**: Define schemas with Zod
+- ❌ **Fetching at runtime when build-time works**: SSG advantage
+- ❌ **Large markdown files**: Split into collections
+- ❌ **Missing image optimization**: Use `<Image>` component
+
+### Performance Anti-Patterns
+- ❌ **Blocking third-party scripts**: Defer or async
+- ❌ **Skipping prefetch**: Use for predictable navigation
+- ❌ **No View Transitions**: Smooth UX for multi-page
+- ❌ **Unoptimized images**: Astro handles this; use it
+
+---
 
 ## Verification Checklist
-- [ ] Zero JS by default
-- [ ] Appropriate hydration directives
-- [ ] Content collections for content
-- [ ] Proper image optimization
-- [ ] View transitions where appropriate
+
+### Performance
+- [ ] Zero JS default verified
+- [ ] Appropriate client directives
+- [ ] Images optimized
+- [ ] Lighthouse score checked
+
+### Content
+- [ ] Content Collections with schemas
+- [ ] Frontmatter validated
+- [ ] Type-safe queries used
+- [ ] Draft/published handling
+
+### Architecture
+- [ ] SSG where possible
+- [ ] Islands for interactivity only
+- [ ] Minimal framework code shipped
+- [ ] View transitions configured
+
+### SEO
+- [ ] Metadata on all pages
+- [ ] Sitemap generated
+- [ ] robots.txt configured
+- [ ] OpenGraph/Twitter cards
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Astro component**: `---\nconst { title } = Astro.props;\n---\n<h1>{title}</h1>`
+- **Client directive**: `<Counter client:visible />`
+- **Content Collection**: `const posts = await getCollection('blog', ({ data }) => !data.draft)`
+<!-- version: astro >= 5 -->
+- **Server island**: `<UserAvatar server:defer />`
+- **Content schema**: `const blog = defineCollection({ schema: z.object({ title: z.string() }) })`
+- **Image**: `<Image src={import('./hero.jpg')} alt="..." width={800} />`
+- **View transition**: `<ViewTransitions />` in layout head
+

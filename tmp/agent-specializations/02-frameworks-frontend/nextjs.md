@@ -2,7 +2,7 @@
 name: nextjs
 type: framework
 priority: 2
-token_estimate: 550
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript, react]
 ---
@@ -12,143 +12,109 @@ requires: [typescript, react]
 # Next.js Engineering Expertise
 
 ## Specialist Profile
-Next.js specialist building full-stack React applications. Expert in App Router, Server Components, and data fetching.
+Next.js specialist building full-stack React applications. Expert in App Router, Server Components, and Server Actions.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Server Components
-
 <!-- version: nextjs >= 14 -->
-```tsx
-// app/users/page.tsx (Server Component by default)
-import { getUsers } from '@/lib/users';
-
-export default async function UsersPage() {
-  const users = await getUsers();
-
-  return (
-    <main>
-      <h1>Users</h1>
-      <UserList users={users} />
-    </main>
-  );
-}
-
-// Metadata
-export const metadata = {
-  title: 'Users',
-  description: 'View all users',
-};
-```
-
-### Client Components
-
-```tsx
-'use client';
-
-import { useState, useTransition } from 'react';
-import { createUser } from '@/app/actions';
-
-export function CreateUserForm() {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(formData: FormData) {
-    startTransition(async () => {
-      const result = await createUser(formData);
-      if (result.error) setError(result.error);
-    });
-  }
-
-  return (
-    <form action={handleSubmit}>
-      <input name="email" type="email" required />
-      <input name="displayName" required />
-      <button disabled={isPending}>
-        {isPending ? 'Creating...' : 'Create User'}
-      </button>
-      {error && <p className="error">{error}</p>}
-    </form>
-  );
-}
-```
+- **Default to server**: Components are Server Components unless marked
+- **Data fetching in components**: Fetch where data is needed
+- **Async components**: `async function Page()` for server data
+- **Small client islands**: Isolate interactivity in imports
 
 ### Server Actions
+- **Mutations via Server Actions**: Not API routes for internal ops
+- **Separate actions file**: `'use server'` at module level
+- **revalidatePath/revalidateTag**: Update cached data after mutations
+- **Error handling**: Return error objects, don't throw to client
+- **Input validation**: Never trust form data; validate first
 
-```typescript
-// app/actions.ts
-'use server';
+### Caching Strategy
+- **Understand defaults**: fetch() is cached by default
+- **Explicit cache options**: `cache: 'no-store'` or `revalidate: N`
+- **Route segment config**: `export const dynamic = 'force-dynamic'`
+- **Tags for granular revalidation**: `next: { tags: ['users'] }`
 
-import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
+### File Organization
+- **Colocation**: Components near their routes
+- **actions/ directory**: Server actions organized separately
+- **lib/ for utilities**: Shared code, not route-specific
+- **Clear naming**: `updateUserAction`, `submitFormAction`
 
-export async function createUser(formData: FormData) {
-  const email = formData.get('email') as string;
-  const displayName = formData.get('displayName') as string;
+### Client/Server Boundary
+- **Props serialization**: Only send serializable data to client
+- **Keep secrets server-side**: Environment variables in server code
+- **Minimal client state**: URL state, server state where possible
 
-  try {
-    await db.users.create({ email, displayName });
-    revalidatePath('/users');
-    redirect('/users');
-  } catch (error) {
-    return { error: 'Failed to create user' };
-  }
-}
-```
-
-### Data Fetching
-
-```typescript
-// With caching
-async function getUser(id: string) {
-  const res = await fetch(`${API_URL}/users/${id}`, {
-    next: { revalidate: 60 }, // Revalidate every 60s
-  });
-  return res.json();
-}
-
-// No caching
-async function getCurrentUser() {
-  const res = await fetch(`${API_URL}/me`, {
-    cache: 'no-store',
-  });
-  return res.json();
-}
-```
-
-### Route Handlers
-
-```typescript
-// app/api/users/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const status = searchParams.get('status');
-
-  const users = await db.users.findMany({
-    where: status ? { status } : undefined,
-  });
-
-  return NextResponse.json(users);
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const user = await db.users.create({ data: body });
-  return NextResponse.json(user, { status: 201 });
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ `'use client'` on everything
-- ❌ Client-side data fetching when server works
-- ❌ getServerSideProps (use App Router)
-- ❌ API routes for internal data (use Server Actions)
+
+### Component Anti-Patterns
+- ❌ **`'use client'` everywhere**: Defeats Server Components benefits
+- ❌ **Client-side fetch when server works**: Fetch in Server Components
+- ❌ **Defining Server Actions in client files**: Must be separate file
+- ❌ **Large client components**: Split and isolate interactivity
+
+### Server Action Anti-Patterns
+- ❌ **Server Actions for data fetching**: They're for mutations
+- ❌ **Calling window/document in actions**: Server-only code
+- ❌ **Leaking secrets in errors**: Log server-side, generic to client
+- ❌ **No rate limiting**: Add protection for public actions
+
+### Caching Anti-Patterns
+- ❌ **Ignoring cache behavior**: Understand when data revalidates
+- ❌ **Over-caching dynamic data**: User-specific needs no-store
+- ❌ **Forgetting revalidation**: Call after Server Action mutations
+- ❌ **redirect() in try/catch**: It throws internally; handle outside
+
+### Architecture Anti-Patterns
+- ❌ **API routes for internal data**: Server Actions or Server Components
+- ❌ **getServerSideProps/getStaticProps**: App Router patterns instead
+- ❌ **Suspense inside async component**: Place higher in tree
+- ❌ **pages/ and app/ mixed**: Migrate fully to App Router
+
+---
 
 ## Verification Checklist
-- [ ] Server Components by default
-- [ ] Client Components only when needed
-- [ ] Server Actions for mutations
-- [ ] Proper caching strategy
-- [ ] Metadata for SEO
+
+### Server Components
+- [ ] Default server, client only when needed
+- [ ] Data fetching at component level
+- [ ] Small client islands imported
+- [ ] Metadata exported for SEO
+
+### Server Actions
+- [ ] Separate file with 'use server'
+- [ ] Input validation on all actions
+- [ ] revalidatePath/revalidateTag called
+- [ ] Errors handled gracefully
+
+### Caching
+- [ ] Cache strategy explicit
+- [ ] Dynamic routes marked correctly
+- [ ] Tags for granular invalidation
+- [ ] Sensitive data not cached
+
+### Security
+- [ ] Secrets server-side only
+- [ ] Rate limiting on actions
+- [ ] CSRF protection (built-in for actions)
+- [ ] Authorization checks in actions
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Server Component**: `async function Page() { const data = await fetch(...); return <div>{data}</div>; }`
+- **Server Action**: `'use server'; export async function createUser(formData: FormData) { ... revalidatePath('/'); }`
+- **Client Component**: `'use client'; export function Counter() { const [count, setCount] = useState(0); ... }`
+- **Caching**: `fetch(url, { next: { revalidate: 60, tags: ['users'] } })`
+- **Revalidation**: `revalidateTag('users')` or `revalidatePath('/users')`
+- **Metadata**: `export const metadata = { title: 'Page', description: '...' }`
+- **Dynamic route**: `export const dynamic = 'force-dynamic'` for no-cache routes
+
