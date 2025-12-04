@@ -99,11 +99,13 @@ For each path in specialization_paths (filtered by compatibility, sorted by prio
 3. Domain templates (priority 3)
 4. Quality templates (priority 4)
 
-**Trimming strategy when over budget:**
-1. Trim "Code Patterns (Reference)" sections first
-2. Trim "Verification Checklist" next
-3. Reduce to bullet summaries if still over
+**Trimming strategy when over budget (in order - least important first):**
+1. Trim "Code Patterns (Reference)" sections FIRST (code examples are least valuable)
+2. Trim detailed explanations, keep bullet points
+3. Trim "Verification Checklist" LAST (checklists ensure quality - high value)
 4. Stop adding templates if hard limit reached
+
+**Rationale:** Verification checklists drive quality gates and are more actionable than code examples. Code examples can be generated from patterns, but checklists prevent errors.
 
 ### Step 5: Compose Identity String
 
