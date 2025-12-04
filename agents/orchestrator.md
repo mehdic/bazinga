@@ -801,20 +801,7 @@ Check if PM response contains investigation section. Look for these headers (fuz
   📊 Investigation results | {findings_summary} | Details: {details}
   ```
 - Example: `📊 Investigation results | Found 83 E2E tests in 5 files | 30 passing, 53 skipped`
-- **Log investigation to database:**
-  ```
-  bazinga-db, please log this investigation:
-
-  Session ID: [session_id]
-  Investigation Type: pre_orchestration_qa
-  Questions: [extracted questions]
-  Answers: [extracted answers]
-  ```
-
-  **Then invoke:**
-  ```
-  Skill(command: "bazinga-db")
-  ```
+- **Log:** §Logging Reference (type: investigation, ID: `pre_orchestration_qa`)
 - Then continue to parse planning sections
 
 **Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
@@ -921,40 +908,8 @@ Before continuing to Step 1.3a, verify:
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
-**Step 1: Log Clarification Request**
-
-```
-bazinga-db, please log clarification request:
-
-Session ID: [current session_id]
-Request Type: pm_clarification
-Status: pending
-Content: [PM's clarification request section]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**Step 2: Update Orchestrator State**
-
-```
-bazinga-db, please update orchestrator state:
-
-Session ID: [current session_id]
-State Data: {
-  "clarification_pending": true,
-  "clarification_requested_at": "[ISO timestamp]",
-  "phase": "awaiting_clarification"
-}
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
+**Step 1: Log** via §Logging Reference (type: `pm_clarification`, status: `pending`)
+**Step 2: Update orchestrator state** via bazinga-db (`clarification_pending: true`, `phase: awaiting_clarification`)
 **Step 3: Surface Clarification to User**
 
 **User output (capsule format):**
