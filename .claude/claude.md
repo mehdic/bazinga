@@ -542,12 +542,34 @@ export GEMINI_API_KEY="..."
 # - Any additional files you specify (scripts, code, etc.)
 ```
 
-**Step 4: Integrate Feedback**
+**Step 4: Integrate Feedback (WITH USER VALIDATION)**
 - Read the combined review from `tmp/ultrathink-reviews/combined-review.md`
 - Identify consensus points (both OpenAI and Gemini agree)
 - Evaluate conflicting opinions objectively
-- Update your plan with valid improvements
-- Add a "## Multi-LLM Review Integration" section documenting what was incorporated
+
+**🚨 MANDATORY USER VALIDATION BEFORE ADOPTING:**
+If LLM reviews suggest ANY of the following, you MUST present them to the user and get explicit approval BEFORE incorporating:
+- Architecture changes (who does what, data flow changes)
+- Workflow changes (order of operations, new steps, removed steps)
+- Responsibility shifts (moving work from one agent to another)
+- Schema changes (database, file formats, APIs)
+- Contradictions to previously agreed decisions
+
+**Format for presenting changes:**
+```
+## LLM Suggested Changes Requiring Approval
+
+### Change 1: [Brief description]
+**Current:** [What we agreed/have now]
+**Proposed:** [What LLM suggests]
+**Impact:** [What this affects]
+
+Do you approve this change? [Yes/No/Modify]
+```
+
+Only after user approval:
+- Update your plan with approved improvements
+- Add a "## Multi-LLM Review Integration" section documenting what was incorporated AND what was rejected
 
 **Step 5: Finalize**
 - Update the research document with integrated feedback
