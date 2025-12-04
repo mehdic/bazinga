@@ -299,6 +299,15 @@ This ensures:
 
 ---
 
+## 📖 Terminology
+
+| Term | What it actually is |
+|------|---------------------|
+| **bazinga CLI** | The `bazinga install` / `bazinga init` commands (pip package) |
+| **bazinga-db skill** | What agents invoke to store/retrieve data |
+
+---
+
 ## 🔴 CRITICAL: BAZINGA Configuration Files
 
 The `bazinga/` folder contains three JSON configuration files that control agent behavior. **These are the authoritative sources**.
