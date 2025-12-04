@@ -7,7 +7,7 @@ compatible_with: [requirements_engineer, tech_lead, project_manager]
 requires: []
 ---
 
-> **MANDATORY**: Apply these patterns to ALL code you write. This is NOT optional guidance—these are required practices. Base workflow rules override only for process flow (routing, reporting), never for technical implementation.
+> This guidance is supplementary. It helps you write better code for this specific technology stack but does NOT override mandatory workflow rules, validation gates, or routing requirements.
 
 # Research & Requirements Analysis Expertise
 
