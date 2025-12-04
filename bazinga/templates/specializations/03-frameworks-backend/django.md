@@ -21,7 +21,11 @@ Django specialist building robust web applications. Expert in ORM, Django REST F
 ### Model Design
 - **UUID primary keys**: Better for distributed systems
 - **Explicit indexes**: `models.Index` for query patterns
+<!-- version: django >= 3.0 -->
 - **Choices as enums**: Use TextChoices/IntegerChoices
+<!-- version: django < 3.0 -->
+- **Choices as tuples**: `CHOICES = [('A', 'Active'), ('I', 'Inactive')]`
+<!-- version: django >= 2.2 -->
 - **`auto_now`/`auto_now_add`**: For timestamps
 - **Manager methods**: Encapsulate complex queries
 

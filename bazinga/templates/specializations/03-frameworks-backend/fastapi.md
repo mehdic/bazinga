@@ -27,10 +27,16 @@ FastAPI specialist building high-performance APIs. Expert in async Python, Pydan
 
 ### Pydantic Models
 - **Request/Response separation**: Different models for input/output
-- **`from_attributes = True`**: For ORM model conversion
+<!-- version: pydantic >= 2 -->
+- **`model_config = {'from_attributes': True}`**: For ORM model conversion
+- **`@field_validator`**: For field-level validation
+- **`model_validator(mode='after')`**: For cross-field validation
+<!-- version: pydantic < 2 -->
+- **`class Config: orm_mode = True`**: For ORM model conversion
+- **`@validator`**: For field-level validation
+- **`@root_validator`**: For cross-field validation
+<!-- version: pydantic >= 1.8 -->
 - **Field validation**: Use `Field()` with constraints
-- **Custom validators**: `@field_validator` for complex rules
-- **Config classes**: Centralize model behavior
 
 ### Async Best Practices
 - **Async all the way**: Don't mix sync I/O in async routes
