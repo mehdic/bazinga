@@ -26,6 +26,11 @@ Next.js specialist building full-stack React applications. Expert in App Router,
 - **Small client islands**: Isolate interactivity in imports
 
 ### Server Actions
+<!-- version: nextjs >= 14 -->
+- **Server Actions stable**: Use for mutations without experimental flag
+<!-- version: nextjs >= 13, nextjs < 14 -->
+- **Server Actions experimental**: Enable `experimental.serverActions` in config
+<!-- version: nextjs >= 13.4 -->
 - **Mutations via Server Actions**: Not API routes for internal ops
 - **Separate actions file**: `'use server'` at module level
 - **revalidatePath/revalidateTag**: Update cached data after mutations
@@ -110,11 +115,19 @@ Next.js specialist building full-stack React applications. Expert in App Router,
 ## Code Patterns (Reference)
 
 ### Recommended Constructs
+<!-- version: nextjs >= 13 -->
 - **Server Component**: `async function Page() { const data = await fetch(...); return <div>{data}</div>; }`
-- **Server Action**: `'use server'; export async function createUser(formData: FormData) { ... revalidatePath('/'); }`
 - **Client Component**: `'use client'; export function Counter() { const [count, setCount] = useState(0); ... }`
+- **Metadata**: `export const metadata = { title: 'Page', description: '...' }`
+<!-- version: nextjs >= 13.4 -->
+- **Server Action**: `'use server'; export async function createUser(formData: FormData) { ... revalidatePath('/'); }`
 - **Caching**: `fetch(url, { next: { revalidate: 60, tags: ['users'] } })`
 - **Revalidation**: `revalidateTag('users')` or `revalidatePath('/users')`
-- **Metadata**: `export const metadata = { title: 'Page', description: '...' }`
 - **Dynamic route**: `export const dynamic = 'force-dynamic'` for no-cache routes
+<!-- version: nextjs >= 15 -->
+- **Async request APIs**: `const params = await props.params` (params/headers now async)
+- **fetch no cache default**: `fetch()` is `cache: 'no-store'` by default
+<!-- version: nextjs < 13 -->
+- **Pages Router**: Use `getServerSideProps`/`getStaticProps` for data fetching
+- **API Routes**: Use `pages/api/` for backend endpoints
 

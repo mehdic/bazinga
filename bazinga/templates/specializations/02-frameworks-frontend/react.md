@@ -19,7 +19,11 @@ React specialist building performant, accessible UIs. Expert in hooks, Server Co
 ## Patterns to Follow
 
 ### Component Architecture
-- **Server Components by default**: Only use `'use client'` when needed
+<!-- version: react >= 18 -->
+- **Server Components by default**: Only use `'use client'` when needed (Next.js App Router)
+<!-- version: react < 18 -->
+- **Client-side rendering**: No Server Components; use data fetching libraries
+<!-- version: react >= 16.8 -->
 - **Functional components**: No class components for new code
 - **Single responsibility**: One purpose per component
 - **Composition over props**: Use children and render props
@@ -33,10 +37,14 @@ React specialist building performant, accessible UIs. Expert in hooks, Server Co
 - **React Compiler**: Auto-memoization reduces useMemo/useCallback need
 
 ### Hooks Best Practices
+<!-- version: react >= 16.8 -->
 - **Custom hooks for reuse**: Extract logic into `use*` functions
 - **Dependency arrays**: Include all reactive values
 - **Cleanup functions**: Return cleanup from useEffect
 - **useReducer for complex state**: When state has multiple sub-values
+<!-- version: react >= 19 -->
+- **useMemo/useCallback rarely**: React Compiler auto-memoizes; use for ref stability only
+<!-- version: react >= 16.8, react < 19 -->
 - **useMemo/useCallback sparingly**: Only for measured performance issues
 
 ### State Management
@@ -114,10 +122,17 @@ React specialist building performant, accessible UIs. Expert in hooks, Server Co
 ## Code Patterns (Reference)
 
 ### Recommended Constructs
+<!-- version: react >= 16.8 -->
 - **Functional component**: `function UserCard({ user }: Props) { return <div>{user.name}</div>; }`
 - **Custom hook**: `function useUser(id: string) { /* fetch logic */ return { user, loading }; }`
+<!-- version: react >= 16 -->
 - **Error boundary**: Wrap fallible subtrees with error UI fallback
-- **Suspense**: `<Suspense fallback={<Spinner />}><AsyncComponent /></Suspense>`
+<!-- version: react >= 18 -->
+- **Suspense for data**: `<Suspense fallback={<Spinner />}><AsyncComponent /></Suspense>`
+- **useTransition**: `const [isPending, startTransition] = useTransition()` for non-urgent updates
+- **useDeferredValue**: `const deferred = useDeferredValue(value)` for expensive computations
+<!-- version: react >= 16.6, react < 18 -->
+- **Suspense for lazy**: `<Suspense fallback={<Spinner />}><LazyComponent /></Suspense>` (code-splitting only)
 <!-- version: react >= 19 -->
 - **useActionState**: `const [state, action, pending] = useActionState(serverAction, initial)`
 - **useOptimistic**: `const [optimistic, setOptimistic] = useOptimistic(state)`

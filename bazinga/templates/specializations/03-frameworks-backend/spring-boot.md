@@ -28,9 +28,14 @@ Spring Boot specialist building production-grade applications. Expert in depende
 ### Dependency Injection
 - **Constructor injection**: Immutable dependencies
 - **`@RequiredArgsConstructor`**: Lombok for brevity
+<!-- version: spring-boot >= 3.0 -->
+- **`@Autowired` optional**: Single constructor auto-wired by default
+<!-- version: spring-boot < 3.0 -->
+- **`@Autowired` explicit**: Add on constructor for clarity
+<!-- version: spring-boot >= 2.2 -->
+- **`@ConfigurationProperties`**: Type-safe config with records (3.0+) or POJOs
 - **Interface-based design**: For testability
 - **`@Qualifier` for ambiguity**: Multiple implementations
-- **`@ConfigurationProperties`**: Type-safe config
 
 ### Transaction Management
 - **`@Transactional` on services**: Not controllers
@@ -115,9 +120,14 @@ Spring Boot specialist building production-grade applications. Expert in depende
 - **Controller**: `@RestController @RequestMapping("/api/users") class UserController {}`
 - **Service**: `@Service @Transactional(readOnly = true) class UserService {}`
 - **Repository**: `interface UserRepository extends JpaRepository<User, UUID> {}`
-- **DTO**: `record CreateUserRequest(@NotBlank @Email String email, @Size(min=2) String name) {}`
-- **Exception**: `@ExceptionHandler(NotFoundException.class) ResponseEntity<?> handle(e) {...}`
+<!-- version: spring-boot >= 3.0 -->
+- **DTO**: `record CreateUserRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Email String email) {}`
 - **Config**: `@ConfigurationProperties(prefix = "app") record AppConfig(String apiKey, Duration timeout) {}`
+<!-- version: spring-boot < 3.0 -->
+- **DTO**: Class with `@javax.validation.constraints.NotBlank` annotations
+- **Config**: POJO class with `@ConfigurationProperties` (records require 3.0+)
+<!-- version: spring-boot >= 2.0 -->
+- **Exception**: `@ExceptionHandler(NotFoundException.class) ResponseEntity<?> handle(e) {...}`
 <!-- version: spring-boot >= 3.2 -->
 - **Virtual threads**: `spring.threads.virtual.enabled=true` (properties)
 
