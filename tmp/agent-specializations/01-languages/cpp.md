@@ -2,7 +2,7 @@
 name: cpp
 type: language
 priority: 1
-token_estimate: 500
+token_estimate: 650
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -11,107 +11,132 @@ compatible_with: [developer, senior_software_engineer]
 # C++ Engineering Expertise
 
 ## Specialist Profile
-C++ specialist building performant systems. Expert in modern C++, RAII, and memory safety.
+C++ specialist building performant systems. Expert in modern C++, RAII, memory safety, and the C++ Core Guidelines.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
+
+### Resource Management (RAII)
+- **Acquire in constructor, release in destructor**: Automatic cleanup
+- **Smart pointers for ownership**: `unique_ptr`, `shared_ptr`, `weak_ptr`
+- **Rule of Zero**: Prefer to not write special member functions
+- **Rule of Five**: If you write one, write all (destructor, copy/move ctor/assign)
+- **`std::exchange` for move**: Clean move semantics
 
 ### Modern C++ Types
-
 <!-- version: cpp >= 17 -->
-```cpp
-#include <optional>
-#include <string_view>
-#include <variant>
-
-class UserService {
-public:
-    std::optional<User> findById(std::string_view id) const {
-        if (auto it = users_.find(std::string{id}); it != users_.end()) {
-            return it->second;
-        }
-        return std::nullopt;
-    }
-};
-```
-
-### Smart Pointers
-
-```cpp
-// Unique ownership
-auto user = std::make_unique<User>("id", "email@example.com");
-
-// Shared ownership (when needed)
-auto sharedUser = std::make_shared<User>("id", "email@example.com");
-
-// Weak reference
-std::weak_ptr<User> weakRef = sharedUser;
-
-// Never use raw new/delete for ownership
-```
-
-### RAII Pattern
-
-```cpp
-class DatabaseConnection {
-public:
-    DatabaseConnection(std::string_view connStr)
-        : conn_(db_connect(connStr.data())) {}
-
-    ~DatabaseConnection() {
-        if (conn_) db_close(conn_);
-    }
-
-    // Non-copyable
-    DatabaseConnection(const DatabaseConnection&) = delete;
-    DatabaseConnection& operator=(const DatabaseConnection&) = delete;
-
-    // Movable
-    DatabaseConnection(DatabaseConnection&& other) noexcept
-        : conn_(std::exchange(other.conn_, nullptr)) {}
-
-private:
-    db_handle* conn_;
-};
-```
-
-### Structured Bindings
-
-<!-- version: cpp >= 17 -->
-```cpp
-std::map<std::string, User> users;
-
-for (const auto& [id, user] : users) {
-    std::cout << id << ": " << user.name << '\n';
-}
-
-auto [iter, inserted] = users.try_emplace("id", User{});
-```
-
-### Concepts
+- **`std::optional`**: Nullable values without pointers
+- **`std::variant`**: Type-safe union
+- **`std::string_view`**: Non-owning string reference
+- **Structured bindings**: `auto [key, value] = pair;`
+- **`if` with initializer**: `if (auto it = map.find(k); it != map.end())`
 
 <!-- version: cpp >= 20 -->
-```cpp
-template<typename T>
-concept Printable = requires(T t) {
-    { std::cout << t } -> std::same_as<std::ostream&>;
-};
+- **Concepts**: Constrain templates with readable requirements
+- **Ranges**: Composable, lazy sequence operations
+- **`std::span`**: Non-owning view over contiguous sequences
+- **Modules**: Replace header includes for faster compilation
+- **Coroutines**: Async/generators with `co_await`, `co_yield`
 
-template<Printable T>
-void print(const T& value) {
-    std::cout << value << '\n';
-}
-```
+<!-- version: cpp >= 23 -->
+- **`std::expected`**: Error handling without exceptions
+- **`std::flat_map`**: Cache-friendly associative container
+- **`std::print`/`std::println`**: Modern formatted output
+- **Deducing `this`**: Simplifies CRTP and recursive lambdas
+
+### Memory Safety
+- **Const correctness**: `const` everywhere applicable
+- **References over pointers**: When null isn't valid
+- **`constexpr` for compile-time**: Move computation to compile time
+- **Bounds checking**: Use `.at()` or sanitizers in debug
+
+### API Design
+- **Pass by const ref**: Large objects as `const T&`
+- **Return by value**: RVO/NRVO optimizes copies away
+- **`[[nodiscard]]`**: Force callers to use return values
+- **Strong types**: Wrap primitives for type safety
+
+### Concurrency
+- **`std::jthread`** (C++20): Auto-joining thread with stop token
+- **`std::atomic`**: Lock-free primitives
+- **`std::mutex` with `std::lock_guard`**: RAII locking
+- **`std::shared_mutex`**: Reader-writer locks
+
+---
 
 ## Patterns to Avoid
-- ❌ Raw new/delete
-- ❌ C-style casts (use static_cast, etc.)
-- ❌ NULL (use nullptr)
-- ❌ Manual memory management
-- ❌ Using namespace std globally
+
+### Memory Errors
+- ❌ **Raw `new`/`delete`**: Use smart pointers or containers
+- ❌ **C-style arrays**: Use `std::array` or `std::vector`
+- ❌ **Manual memory management**: RAII handles it
+- ❌ **Dangling references**: Lifetime issues; use ownership semantics
+- ❌ **Uninitialized variables**: Always initialize
+
+### Unsafe Practices
+- ❌ **C-style casts**: Use `static_cast`, `dynamic_cast`, `reinterpret_cast`
+- ❌ **`NULL`**: Use `nullptr`
+- ❌ **`using namespace std`** globally: Pollutes namespace
+- ❌ **Macro abuse**: Use `constexpr`, `inline`, templates instead
+- ❌ **`void*` for polymorphism**: Use templates or type erasure
+
+### Design Anti-Patterns
+- ❌ **Copy-paste programming (Lava Flow)**: Factor into abstractions
+- ❌ **God classes**: Split responsibilities
+- ❌ **Deep inheritance**: Prefer composition
+- ❌ **Premature optimization**: Profile first
+- ❌ **Ignoring compiler warnings**: Treat as errors (`-Werror`)
+
+### Exception Safety Issues
+- ❌ **Throwing from destructors**: Terminates; use `noexcept`
+- ❌ **Catching by value**: Catch by const reference
+- ❌ **Empty catch blocks**: At least log the exception
+- ❌ **`throw;` in catch without exception**: Undefined behavior
+
+---
 
 ## Verification Checklist
-- [ ] RAII for resources
+
+### Memory Safety
+- [ ] No raw `new`/`delete`
 - [ ] Smart pointers for ownership
-- [ ] const correctness
-- [ ] No memory leaks (use sanitizers)
-- [ ] Move semantics where appropriate
+- [ ] RAII for all resources
+- [ ] AddressSanitizer clean in tests
+- [ ] Valgrind shows no leaks
+
+### Modern C++
+- [ ] `nullptr` over `NULL`
+- [ ] `auto` with clear types
+- [ ] Range-based for loops
+- [ ] Structured bindings where appropriate
+- [ ] `std::optional`/`std::variant` for sum types
+
+### Const Correctness
+- [ ] Member functions `const` where possible
+- [ ] Parameters `const&` for read-only
+- [ ] `constexpr` for compile-time evaluation
+- [ ] `[[nodiscard]]` on pure functions
+
+### Build Quality
+- [ ] Compiles with `-Wall -Wextra -Werror`
+- [ ] No warnings from static analyzers
+- [ ] clang-tidy checks pass
+- [ ] Move semantics implemented correctly
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Smart pointer**: `auto user = std::make_unique<User>("id", "email");`
+- **Optional**: `std::optional<User> findById(std::string_view id);`
+- **RAII**: `std::lock_guard<std::mutex> lock(mutex_);`
+- **Structured binding**: `for (const auto& [key, value] : map) { ... }`
+<!-- version: cpp >= 20 -->
+- **Concept**: `template<typename T> concept Printable = requires(T t) { std::cout << t; };`
+- **Span**: `void process(std::span<const int> data);`
+<!-- version: cpp >= 23 -->
+- **Expected**: `std::expected<User, Error> createUser(const Request& req);`
+- **Print**: `std::println("User: {} ({})", user.name, user.id);`
+

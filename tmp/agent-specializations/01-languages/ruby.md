@@ -2,7 +2,7 @@
 name: ruby
 type: language
 priority: 1
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -11,98 +11,123 @@ compatible_with: [developer, senior_software_engineer]
 # Ruby Engineering Expertise
 
 ## Specialist Profile
-Ruby specialist writing elegant, expressive code. Expert in Ruby idioms, metaprogramming (when appropriate), and the Ruby ecosystem.
+Ruby specialist writing elegant, expressive code. Expert in Ruby idioms, OOP design, and the Ruby ecosystem.
 
-## Implementation Guidelines
+---
 
-### Class Design
+## Patterns to Follow
 
-```ruby
-class User
-  attr_reader :id, :email, :display_name, :created_at
-
-  def initialize(id:, email:, display_name:, created_at: Time.current)
-    @id = id
-    @email = email
-    @display_name = display_name
-    @created_at = created_at
-    freeze
-  end
-
-  def active?
-    status == :active
-  end
-end
-```
+### Object Design
+- **Immutable by default**: `freeze` objects after initialization
+- **Keyword arguments**: `def create(email:, name:)` for clarity
+- **attr_reader over attr_accessor**: Minimize mutation surface
+- **Small classes**: Single responsibility, <100 lines ideal
+- **Composition over inheritance**: Inject collaborators
 
 ### Service Objects
-
-```ruby
-class CreateUser
-  def initialize(repository:, notifier:)
-    @repository = repository
-    @notifier = notifier
-  end
-
-  def call(email:, display_name:)
-    user = User.new(
-      id: SecureRandom.uuid,
-      email: email,
-      display_name: display_name
-    )
-
-    @repository.save(user)
-    @notifier.user_created(user)
-
-    Success(user)
-  rescue ValidationError => e
-    Failure(e.message)
-  end
-end
-```
+- **Single public method**: `call` or descriptive verb
+- **Dependency injection**: Pass collaborators via constructor
+- **Return value objects**: `Success(data)` / `Failure(error)`
+- **Explicit dependencies**: No reliance on global state
 
 ### Enumerable Patterns
-
-```ruby
-def active_users
-  users
-    .select(&:active?)
-    .sort_by(&:created_at)
-    .reverse
-    .map { |user| UserPresenter.new(user) }
-end
-
-def users_by_role
-  users.group_by(&:role)
-end
-```
+- **Chain methods**: `select`, `map`, `reduce` for transformations
+- **Lazy enumerables**: `.lazy` for large/infinite sequences
+- **Symbol-to-proc**: `&:method_name` for simple transformations
+- **`each_with_object`**: When building up a result
 
 ### Error Handling
+- **Custom exception hierarchy**: Domain-specific errors
+- **Specific rescue**: `rescue SpecificError` not `rescue Exception`
+- **Bang methods for danger**: `save!` raises, `save` returns boolean
+- **Guard clauses**: Early return for invalid cases
 
-```ruby
-class UserService
-  def find!(id)
-    repository.find(id) or raise UserNotFoundError, "User #{id} not found"
-  end
+### Ruby Idioms
+- **Duck typing**: Respond to messages, don't check types
+- **Blocks for callbacks**: Yield for customization points
+- **Double splat for options**: `**options` for hash arguments
+- **`||=` for memoization**: Cache expensive computations
+- **Ternary for simple conditions**: `x ? y : z` not if/else
 
-  def find(id)
-    repository.find(id)
-  rescue ActiveRecord::RecordNotFound
-    nil
-  end
-end
-```
+### Code Organization
+- **Module for namespacing**: Group related classes
+- **Concerns for shared behavior**: `include`/`extend` carefully
+- **Private for implementation**: Default to private methods
+- **Semantic versioning**: Follow SemVer for libraries
+
+---
 
 ## Patterns to Avoid
-- ❌ `rescue Exception` (too broad)
-- ❌ Excessive metaprogramming
-- ❌ Global variables
-- ❌ Long methods (>10 lines)
-- ❌ Deep nesting (>2 levels)
+
+### Exception Handling
+- ❌ **`rescue Exception`**: Catches system signals; use `StandardError`
+- ❌ **Empty rescue blocks**: At minimum log the error
+- ❌ **`rescue => e; raise e`**: Just let it propagate
+- ❌ **Exceptions for control flow**: Use conditionals instead
+
+### Object-Oriented Issues
+- ❌ **God objects**: Classes doing too much; split by responsibility
+- ❌ **Deep inheritance**: Max 2-3 levels; prefer composition
+- ❌ **Excessive metaprogramming**: Makes code hard to understand
+- ❌ **`method_missing` abuse**: Only when truly dynamic
+
+### Code Smells
+- ❌ **Long methods**: >10 lines usually needs splitting
+- ❌ **Deep nesting**: >2 levels; use early returns
+- ❌ **Global variables**: Use dependency injection
+- ❌ **`unless` with `else`**: Confusing; use `if` instead
+- ❌ **Double negatives**: `!user.inactive?` → `user.active?`
+
+### Performance Issues
+- ❌ **N+1 queries**: Use `includes` or `preload` in ActiveRecord
+- ❌ **String `+` in loops**: Use `<<` or `join`
+- ❌ **Creating objects in loops**: Cache or preallocate
+- ❌ **`each` when `map` fits**: Choose the right iterator
+
+### Rails-Specific (if applicable)
+- ❌ **Callbacks for business logic**: Use service objects
+- ❌ **Fat models**: Extract to services, form objects, query objects
+- ❌ **Fat controllers**: Keep thin; delegate to services
+- ❌ **Skipping validations**: `save(validate: false)` is dangerous
+
+---
 
 ## Verification Checklist
+
+### Code Quality
+- [ ] `rubocop` passes with no violations
+- [ ] No `rescue Exception` (use `StandardError`)
+- [ ] Methods under 10 lines
+- [ ] Classes under 100 lines
+
+### Design
 - [ ] Objects frozen when immutable
-- [ ] Dependency injection used
+- [ ] Dependency injection used (no global state)
 - [ ] Service objects for business logic
-- [ ] Proper exception handling
-- [ ] RSpec tests with contexts
+- [ ] Single responsibility per class
+
+### Testing (RSpec)
+- [ ] Descriptive context blocks
+- [ ] One expectation per example (generally)
+- [ ] Factories over fixtures (FactoryBot)
+- [ ] No database access in unit tests
+
+### Style
+- [ ] Keyword arguments for clarity
+- [ ] `attr_reader` preferred over `attr_accessor`
+- [ ] Early returns (guard clauses)
+- [ ] Consistent naming conventions
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Service object**: `class CreateUser; def call(email:) ... end; end`
+- **Value object**: `User = Struct.new(:id, :email, keyword_init: true)`
+- **Result pattern**: `Success(user)` / `Failure(errors)`
+- **Memoization**: `@users ||= repository.all`
+- **Guard clause**: `return if params.blank?`
+- **Enumerable chain**: `users.select(&:active?).map(&:email)`
+- **Frozen object**: `def initialize(...); ...; freeze; end`
+- **Keyword args**: `def create(email:, name:, role: :user)`

@@ -2,7 +2,7 @@
 name: swift
 type: language
 priority: 1
-token_estimate: 450
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -13,110 +13,112 @@ compatible_with: [developer, senior_software_engineer]
 ## Specialist Profile
 Swift specialist building safe, performant applications. Expert in protocols, value types, and Swift concurrency.
 
-## Implementation Guidelines
+---
 
-### Structs and Value Types
+## Patterns to Follow
 
-```swift
-struct User: Identifiable, Codable {
-    let id: UUID
-    let email: String
-    let displayName: String
-    let createdAt: Date
+### Value Types & Mutability
+- **Structs over classes**: Default to structs; classes only for reference semantics
+- **Immutable by default**: `let` over `var`
+- **Copy-on-write**: Leverage for efficient value semantics
+- **Protocol extensions**: Share behavior without inheritance
 
-    init(id: UUID = UUID(), email: String, displayName: String) {
-        self.id = id
-        self.email = email
-        self.displayName = displayName
-        self.createdAt = Date()
-    }
-}
-```
+### Optional Handling
+- **Guard for early exit**: `guard let user = user else { return }`
+- **Optional chaining**: `user?.profile?.name`
+- **Nil coalescing**: `name ?? "Unknown"`
+- **Optional map/flatMap**: Transform without unwrapping
+- **if let for conditional binding**: When you need the value in scope
 
-### Optionals
-
-```swift
-func findUser(id: UUID) -> User? {
-    repository.find(id)
-}
-
-func getDisplayName(user: User?) -> String {
-    user?.displayName ?? "Unknown"
-}
-
-// Guard for early exit
-func processUser(_ user: User?) throws {
-    guard let user = user else {
-        throw UserError.notFound
-    }
-    // user is now non-optional
-}
-```
-
-### Swift Concurrency
-
-```swift
-actor UserService {
-    private let repository: UserRepository
-
-    func findById(_ id: UUID) async throws -> User {
-        try await repository.find(id)
-    }
-
-    func fetchAll(ids: [UUID]) async throws -> [User] {
-        try await withThrowingTaskGroup(of: User?.self) { group in
-            for id in ids {
-                group.addTask { try? await self.findById(id) }
-            }
-            return try await group.compactMap { $0 }.reduce(into: []) { $0.append($1) }
-        }
-    }
-}
-```
+### Swift Concurrency (5.5+)
+- **async/await**: Replace completion handlers
+- **Actors for isolation**: Protect mutable state from data races
+- **@MainActor for UI**: Ensure UI updates on main thread
+- **TaskGroup for parallel work**: Structured concurrent operations
+- **Sendable for thread safety**: Mark types safe to pass across isolation
+- **@concurrent for explicit parallelism** (6.2+): Opt into concurrent execution
 
 ### Protocol-Oriented Design
+- **Protocol with associated types**: Generic abstractions
+- **Protocol extensions**: Default implementations
+- **Composition over inheritance**: Combine small protocols
+- **Existential types**: `any Protocol` for runtime polymorphism
 
-```swift
-protocol Repository {
-    associatedtype Entity
-    func find(_ id: UUID) async throws -> Entity?
-    func save(_ entity: Entity) async throws
-}
+### Error Handling
+- **Typed throws** (Swift 6): `throws(MyError)` for specific error types
+- **Result type**: For async operations without throwing
+- **Custom error enums**: Domain-specific error cases
+- **Error context**: Add context when re-throwing
 
-struct UserRepository: Repository {
-    typealias Entity = User
-
-    func find(_ id: UUID) async throws -> User? { ... }
-    func save(_ entity: User) async throws { ... }
-}
-```
-
-### Result Type
-
-```swift
-enum UserError: Error {
-    case notFound
-    case invalidEmail
-}
-
-func createUser(email: String) -> Result<User, UserError> {
-    guard email.contains("@") else {
-        return .failure(.invalidEmail)
-    }
-    let user = User(email: email, displayName: "")
-    return .success(user)
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Force unwrapping `!` without certainty
-- ❌ Classes when structs work
-- ❌ Inheritance when protocols work
-- ❌ Callbacks when async/await available
+
+### Optional Abuse
+- ❌ **Force unwrapping `!`**: Crashes at runtime; use safe alternatives
+- ❌ **Implicit unwrapped optionals**: Only for IBOutlets; avoid elsewhere
+- ❌ **Nested optional unwrapping**: Flatten with `flatMap`
+- ❌ **Force try `try!`**: Handle errors properly
+
+### Concurrency Anti-Patterns
+- ❌ **Split isolation types**: Don't mix `@MainActor` and non-isolated in one type
+- ❌ **Actor protocol conformance with sync methods**: Actors are async by nature
+- ❌ **Async on non-Sendable types**: Data races waiting to happen
+- ❌ **Actors as queues**: They're not; use proper queue abstractions
+- ❌ **DispatchQueue when async/await available**: Modernize to structured concurrency
+
+### Design Issues
+- ❌ **Classes when structs work**: Avoid reference semantics overhead
+- ❌ **Deep inheritance hierarchies**: Max 2 levels; prefer protocols
+- ❌ **Massive view controllers**: Extract to coordinators, view models
+- ❌ **Callbacks when async available**: Convert to async/await
+
+### Swift 6 Migration Pitfalls
+- ❌ **Swift 5 mode without warnings**: Builds incorrect mental model
+- ❌ **Ignoring concurrency warnings**: They're errors in Swift 6
+- ❌ **Overusing @preconcurrency**: Temporary fix only; migrate properly
+
+---
 
 ## Verification Checklist
-- [ ] Prefer structs over classes
-- [ ] No force unwrapping
-- [ ] Protocols for abstraction
-- [ ] async/await for concurrency
-- [ ] Codable for serialization
+
+### Type Safety
+- [ ] No force unwrapping (`!`) without certainty
+- [ ] Optionals handled with `guard`/`if let`
+- [ ] Error enums for failure cases
+- [ ] Structs preferred over classes
+
+### Swift 6 Concurrency
+- [ ] No data race warnings
+- [ ] Actors for shared mutable state
+- [ ] @MainActor for UI code
+- [ ] Sendable types for cross-isolation
+- [ ] async/await over completion handlers
+
+### Protocol Design
+- [ ] Small, focused protocols
+- [ ] Extensions for default implementations
+- [ ] Associated types for generic abstractions
+- [ ] Composition over inheritance
+
+### Performance
+- [ ] Value types for data
+- [ ] Lazy properties where appropriate
+- [ ] Copy-on-write for large collections
+- [ ] Profile with Instruments
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Struct**: `struct User: Identifiable, Codable, Sendable { let id: UUID; let email: String }`
+- **Actor**: `actor UserService { func findById(_ id: UUID) async throws -> User }`
+- **Guard**: `guard let user = user else { throw UserError.notFound }`
+- **Result**: `func fetch() -> Result<User, UserError>`
+- **TaskGroup**: `try await withThrowingTaskGroup(of: User.self) { group in ... }`
+- **Protocol**: `protocol Repository { associatedtype Entity; func find(_ id: UUID) async throws -> Entity? }`
+<!-- version: swift >= 6 -->
+- **Typed throws**: `func load() throws(LoadError) -> Data`
+- **@concurrent**: `@concurrent func process() async -> Result`
+

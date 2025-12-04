@@ -11,112 +11,128 @@ compatible_with: [developer, senior_software_engineer]
 # Java Engineering Expertise
 
 ## Specialist Profile
-Enterprise Java engineer with deep JVM expertise. Writes idiomatic, performant code leveraging modern Java features appropriate to the project version.
+Java specialist building enterprise applications. Expert in modern Java features, design patterns, and JVM performance.
 
-## Implementation Guidelines
+---
 
-### Immutable Data Types
+## Patterns to Follow
 
-<!-- version: java >= 16 -->
-```java
-public record CreateUserRequest(
-    @NotBlank String email,
-    @NotBlank String displayName
-) {}
-```
+### Core Principles
+- **SOLID principles**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
+- **DRY (Don't Repeat Yourself)**: Extract common code into reusable methods/classes
+- **KISS (Keep It Simple)**: Simplest solution that works; avoid over-engineering
+- **YAGNI**: Don't add functionality until needed
 
-<!-- version: java < 14 -->
-```java
-public final class CreateUserRequest {
-    private final String email;
-    private final String displayName;
+### Immutability
+- **Records** (16+): `record User(String id, String email) {}` for immutable data
+- **Immutable collections**: `List.of()`, `Set.of()`, `Map.of()` for unmodifiable collections
+- **Final fields**: Mark fields `final` when they shouldn't change
+- **Defensive copying**: Copy mutable parameters/returns to preserve immutability
 
-    public CreateUserRequest(String email, String displayName) {
-        this.email = Objects.requireNonNull(email);
-        this.displayName = Objects.requireNonNull(displayName);
-    }
+### Modern Java Features
+<!-- version: java >= 14 -->
+- **Pattern matching**: `if (obj instanceof String s)` - no explicit cast needed
+- **Switch expressions**: `var result = switch(x) { case A -> 1; default -> 0; };`
+- **Text blocks**: `"""multiline string"""` for SQL, JSON, etc.
 
-    public String email() { return email; }
-    public String displayName() { return displayName; }
-}
-```
+<!-- version: java >= 17 -->
+- **Sealed classes**: `sealed class Shape permits Circle, Square` for closed hierarchies
 
-### Null-Safe Operations
+<!-- version: java >= 21 -->
+- **Virtual threads**: `Thread.startVirtualThread()` for high-concurrency I/O
+- **Record patterns**: Destructuring in pattern matching
+- **Sequenced collections**: `getFirst()`, `getLast()`, `reversed()`
 
-```java
-public Optional<User> findById(Long id) {
-    return repository.findById(id);
-}
+### Error Handling
+- **Specific exceptions**: Catch the most specific exception type
+- **Custom exceptions**: Create domain-specific exception hierarchy
+- **Try-with-resources**: For all `AutoCloseable` resources
+- **No swallowing**: Never `catch (Exception e) {}` - at minimum log
 
-public String getDisplayName(User user) {
-    return Optional.ofNullable(user)
-        .map(User::getDisplayName)
-        .orElse("Unknown");
-}
-```
+### Dependency Management
+- **Constructor injection**: Prefer over field injection (testable, explicit dependencies)
+- **Program to interfaces**: Depend on abstractions, not implementations
+- **Composition over inheritance**: Use delegation, not deep hierarchies
 
-### Service Layer Pattern
+### Null Safety
+- **Optional for return types**: `Optional<User>` instead of nullable User
+- **Never Optional parameters**: Use overloading instead
+- **@Nullable/@NonNull annotations**: Document nullability explicitly
+- **Objects.requireNonNull()**: Fail fast on null parameters
 
-<!-- style: uses_lombok -->
-```java
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class UserService {
-    private final UserRepository userRepository;
-
-    public Optional<UserDto> findById(UUID id) {
-        return userRepository.findById(id).map(this::toDto);
-    }
-
-    @Transactional
-    public UserDto create(CreateUserRequest request) {
-        User user = User.builder()
-            .email(request.email())
-            .build();
-        return toDto(userRepository.save(user));
-    }
-}
-```
-
-<!-- style: !uses_lombok -->
-```java
-@Service
-@Transactional(readOnly = true)
-public class UserService {
-    private final UserRepository userRepository;
-
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-}
-```
-
-### Stream Operations
-
-```java
-public List<UserDto> findActiveUsers() {
-    return userRepository.findAll().stream()
-        .filter(User::isActive)
-        .map(this::toDto)
-        .sorted(Comparator.comparing(UserDto::createdAt).reversed())
-        .collect(Collectors.toList());
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Returning null (use `Optional<T>`)
-- ❌ Field injection with `@Autowired` (use constructor)
-- ❌ Raw generic types (`List` instead of `List<User>`)
-- ❌ Mutable DTOs in APIs
-<!-- version: java < 10 -->
-- ❌ `var` keyword (Java 10+ only)
-<!-- version: java < 14 -->
-- ❌ Records (Java 14+ only)
+
+### Design Anti-Patterns
+- ❌ **God Object**: Class with too many responsibilities; split by domain
+- ❌ **Spaghetti Code**: Tangled logic; extract methods, use patterns
+- ❌ **Magic Numbers/Strings**: Hardcoded values; use constants or enums
+- ❌ **Copy-Paste Programming**: Duplicated code; extract common logic
+
+### Code Smells
+- ❌ **Long methods**: >20 lines usually means split needed
+- ❌ **Deep nesting**: >3 levels; use early returns, extract methods
+- ❌ **Feature envy**: Method uses another class's data more than its own
+- ❌ **Primitive obsession**: Use domain types instead of raw primitives
+
+### Null Handling Issues
+- ❌ **Returning null from collections**: Return empty collection instead
+- ❌ **Optional.get() without check**: Use `orElse()`, `orElseThrow()`, `ifPresent()`
+- ❌ **Optional for fields**: Optional is for return types only
+- ❌ **Null checks everywhere**: Fix the root cause, use @NonNull
+
+### Resource Management
+- ❌ **Manual resource closing**: Use try-with-resources
+- ❌ **Catching and ignoring exceptions**: At minimum log the error
+- ❌ **`catch (Exception e)`**: Catch specific exceptions
+
+### Performance Anti-Patterns
+- ❌ **String concatenation in loops**: Use StringBuilder
+- ❌ **Creating objects in loops**: Pool or create outside
+- ❌ **Unnecessary boxing**: Use primitives when possible
+- ❌ **N+1 queries**: Batch database calls
+
+### Concurrency Issues
+- ❌ **Synchronized on mutable field**: Lock on final object
+- ❌ **Double-checked locking (incorrect)**: Use volatile or initialization-on-demand
+- ❌ **Thread.stop()**: Use interruption instead
+
+---
 
 ## Verification Checklist
-- [ ] Uses `Optional` for nullable returns
-- [ ] Constructor injection for dependencies
-- [ ] Immutable DTOs/value objects
-- [ ] Proper resource management (try-with-resources)
-- [ ] Stream API where appropriate
+
+### Code Quality
+- [ ] No `@SuppressWarnings` without justification comment
+- [ ] All public APIs have Javadoc
+- [ ] No raw types (use generics)
+- [ ] No empty catch blocks
+
+### Modern Practices
+- [ ] Records used for DTOs and value objects
+- [ ] var used for local variables where type is obvious
+- [ ] Stream API for collection transformations
+- [ ] Optional for nullable returns
+
+### Resource Safety
+- [ ] Try-with-resources for all AutoCloseable
+- [ ] No resource leaks (connections, streams, etc.)
+- [ ] Proper thread pool shutdown
+
+### Testing
+- [ ] Constructor injection enables unit testing
+- [ ] No static dependencies that prevent mocking
+- [ ] Business logic separate from I/O
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Record**: `record UserDto(String id, String email) {}`
+- **Sealed class**: `sealed interface Shape permits Circle, Square {}`
+- **Pattern matching**: `if (shape instanceof Circle c) { use(c.radius()); }`
+- **Switch expression**: `var x = switch(status) { case A -> 1; default -> 0; };`
+- **Try-with-resources**: `try (var conn = getConnection()) { ... }`
+- **Optional**: `findUser(id).map(User::email).orElse("unknown")`
+- **Stream**: `users.stream().filter(u -> u.active()).map(User::id).toList()`

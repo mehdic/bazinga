@@ -2,7 +2,7 @@
 name: sql
 type: language
 priority: 1
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -11,115 +11,118 @@ compatible_with: [developer, senior_software_engineer]
 # SQL Engineering Expertise
 
 ## Specialist Profile
-SQL specialist writing performant, maintainable queries. Expert in query optimization, indexing, and database design.
+SQL specialist writing performant, maintainable queries. Expert in query optimization, indexing strategy, and database design.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Query Structure
+- **Explicit column list**: Never `SELECT *` in production
+- **Table aliases**: Short, meaningful (`u` for users, `o` for orders)
+- **CTEs for readability**: `WITH` clauses for complex logic
+- **Consistent formatting**: Keywords uppercase, indent joins/conditions
+- **COALESCE for nulls**: Handle null values explicitly
 
-```sql
--- Clear, formatted queries
-SELECT
-    u.id,
-    u.email,
-    u.display_name,
-    COUNT(o.id) AS order_count,
-    SUM(o.total) AS total_spent
-FROM users u
-LEFT JOIN orders o ON o.user_id = u.id
-WHERE u.status = 'active'
-    AND u.created_at >= '2024-01-01'
-GROUP BY u.id, u.email, u.display_name
-HAVING COUNT(o.id) > 0
-ORDER BY total_spent DESC
-LIMIT 100;
-```
+### Index-Aware Queries
+- **Leftmost prefix rule**: Match index column order
+- **Sargable conditions**: No functions on indexed columns
+- **Range at end**: Equality conditions before range in composite indexes
+- **Covering indexes**: Include all needed columns to avoid table lookup
+- **EXPLAIN first**: Check execution plan before optimizing
 
-### CTEs for Readability
+### Joins & Subqueries
+- **JOINs over subqueries**: Generally more efficient
+- **EXISTS over IN**: For large subquery results
+- **Correlated subqueries sparingly**: Can be slow; consider CTEs
+- **Appropriate join type**: INNER, LEFT, RIGHT based on requirements
 
-```sql
-WITH active_users AS (
-    SELECT id, email, display_name
-    FROM users
-    WHERE status = 'active'
-),
-user_orders AS (
-    SELECT
-        user_id,
-        COUNT(*) AS order_count,
-        SUM(total) AS total_spent
-    FROM orders
-    WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-    GROUP BY user_id
-)
-SELECT
-    au.email,
-    au.display_name,
-    COALESCE(uo.order_count, 0) AS order_count,
-    COALESCE(uo.total_spent, 0) AS total_spent
-FROM active_users au
-LEFT JOIN user_orders uo ON uo.user_id = au.id;
-```
+### Aggregation
+- **GROUP BY all non-aggregated columns**: SQL standard compliance
+- **HAVING for aggregate filters**: Not WHERE
+- **Window functions for running totals**: `SUM() OVER (ORDER BY ...)`
+- **DISTINCT sparingly**: Often indicates design issue
 
-### Index-Friendly Queries
+### Write Operations
+- **Transactions for related writes**: BEGIN/COMMIT/ROLLBACK
+- **Always have WHERE on UPDATE/DELETE**: Prevent full table modification
+- **Batch large operations**: Avoid locking issues
+- **RETURNING for inserted data**: Get generated values (PostgreSQL)
 
-```sql
--- Good: uses index on (user_id, created_at)
-SELECT * FROM orders
-WHERE user_id = 123
-    AND created_at >= '2024-01-01';
+### Performance Patterns
+- **Keyset pagination**: `WHERE id > last_id LIMIT n` over `OFFSET`
+- **Materialized views**: Pre-compute expensive aggregations
+- **Partial indexes**: Index only relevant rows
+- **Connection pooling**: Reuse connections
 
--- Bad: function on indexed column
-SELECT * FROM orders
-WHERE YEAR(created_at) = 2024;  -- Can't use index
-
--- Better:
-SELECT * FROM orders
-WHERE created_at >= '2024-01-01'
-    AND created_at < '2025-01-01';
-```
-
-### Window Functions
-
-```sql
-SELECT
-    id,
-    email,
-    created_at,
-    ROW_NUMBER() OVER (ORDER BY created_at) AS row_num,
-    RANK() OVER (PARTITION BY status ORDER BY created_at) AS status_rank,
-    LAG(created_at) OVER (ORDER BY created_at) AS prev_created,
-    SUM(amount) OVER (ORDER BY created_at ROWS UNBOUNDED PRECEDING) AS running_total
-FROM users;
-```
-
-### Safe Updates
-
-```sql
--- Always use transactions for updates
-BEGIN;
-
-UPDATE users
-SET status = 'inactive'
-WHERE last_login < CURRENT_DATE - INTERVAL '1 year'
-    AND status = 'active';
-
--- Verify before commit
-SELECT COUNT(*) FROM users WHERE status = 'inactive';
-
-COMMIT;  -- or ROLLBACK;
-```
+---
 
 ## Patterns to Avoid
-- ❌ SELECT * in production
-- ❌ Functions on indexed columns in WHERE
-- ❌ N+1 queries (use JOINs)
-- ❌ Updates without WHERE
-- ❌ Implicit type conversions
+
+### Query Anti-Patterns
+- ❌ **`SELECT *`**: Fetches unnecessary data; breaks on schema changes
+- ❌ **Functions on indexed columns**: `WHERE YEAR(date) = 2024` can't use index
+- ❌ **Implicit type conversion**: `WHERE id = '123'` when id is integer
+- ❌ **N+1 queries**: Use JOINs or batch fetching
+- ❌ **Overusing DISTINCT**: Usually hides join/data issues
+
+### Index Anti-Patterns
+- ❌ **Too many indexes**: Slows writes; index what you query
+- ❌ **Blunderbus indexing**: Random indexes without EXPLAIN analysis
+- ❌ **Missing covering columns**: Forces table lookups
+- ❌ **Wrong column order**: Index (a, b) doesn't help `WHERE b = ?`
+
+### Write Anti-Patterns
+- ❌ **UPDATE/DELETE without WHERE**: Modifies all rows
+- ❌ **Long-running transactions**: Lock contention
+- ❌ **No transaction for related writes**: Partial failures corrupt data
+- ❌ **Dynamic SQL with concatenation**: SQL injection risk; use parameters
+
+### Design Anti-Patterns
+- ❌ **EAV (Entity-Attribute-Value)**: Hard to query; use proper columns
+- ❌ **Storing comma-separated values**: Violates 1NF; use junction tables
+- ❌ **No foreign keys**: Data integrity issues
+- ❌ **Premature denormalization**: Normalize first, denormalize with data
+
+---
 
 ## Verification Checklist
+
+### Query Quality
+- [ ] No `SELECT *` in production code
 - [ ] EXPLAIN plan reviewed
-- [ ] Appropriate indexes exist
-- [ ] CTEs for complex queries
-- [ ] Transactions for writes
-- [ ] No N+1 patterns
+- [ ] Indexes exist for WHERE/JOIN columns
+- [ ] No functions on indexed columns in WHERE
+
+### Performance
+- [ ] N+1 patterns eliminated
+- [ ] Large result sets paginated (keyset preferred)
+- [ ] Long-running queries optimized
+- [ ] Appropriate indexes without over-indexing
+
+### Safety
+- [ ] All writes in transactions
+- [ ] UPDATE/DELETE always have WHERE
+- [ ] Parameterized queries (no string concatenation)
+- [ ] Backups before destructive operations
+
+### Design
+- [ ] Foreign keys for relationships
+- [ ] Appropriate normalization level
+- [ ] Consistent naming conventions
+- [ ] NULL handling explicit (NOT NULL where appropriate)
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **CTE**: `WITH active AS (SELECT * FROM users WHERE status = 'active') SELECT * FROM active`
+- **Sargable**: `WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'`
+- **Window function**: `SUM(amount) OVER (PARTITION BY user_id ORDER BY date)`
+- **EXISTS**: `WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)`
+- **Keyset pagination**: `WHERE id > :last_id ORDER BY id LIMIT 20`
+- **Safe update**: `BEGIN; UPDATE users SET status = 'inactive' WHERE last_login < '2023-01-01'; COMMIT;`
+- **COALESCE**: `COALESCE(display_name, email, 'Unknown') AS name`
+- **Covering index**: `CREATE INDEX idx_users_status_email ON users(status) INCLUDE (email)`
+

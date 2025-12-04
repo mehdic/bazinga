@@ -2,7 +2,7 @@
 name: elixir
 type: language
 priority: 1
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -13,106 +13,109 @@ compatible_with: [developer, senior_software_engineer]
 ## Specialist Profile
 Elixir specialist building fault-tolerant systems. Expert in OTP, pattern matching, and the BEAM ecosystem.
 
-## Implementation Guidelines
+---
 
-### Modules and Structs
-
-```elixir
-defmodule User do
-  @enforce_keys [:id, :email]
-  defstruct [:id, :email, :display_name, :created_at]
-
-  @type t :: %__MODULE__{
-    id: String.t(),
-    email: String.t(),
-    display_name: String.t() | nil,
-    created_at: DateTime.t() | nil
-  }
-
-  def new(attrs) do
-    %__MODULE__{
-      id: attrs.id,
-      email: attrs.email,
-      display_name: attrs[:display_name],
-      created_at: DateTime.utc_now()
-    }
-  end
-end
-```
+## Patterns to Follow
 
 ### Pattern Matching
+- **Function clauses over conditionals**: Multiple function heads for dispatch
+- **Destructuring in parameters**: `def process(%User{email: email})`
+- **Guard clauses**: `when is_binary(name)` for type constraints
+- **Pin operator**: `^expected` to match against existing value
+- **Tagged tuples**: `{:ok, result}` / `{:error, reason}` convention
 
-```elixir
-def handle_result({:ok, user}), do: process_user(user)
-def handle_result({:error, reason}), do: log_error(reason)
+### Data Modeling
+- **Structs with `@enforce_keys`**: Required fields validated at compile time
+- **Typespecs for all public functions**: `@spec create(map()) :: {:ok, User.t()} | {:error, term()}`
+- **Behaviours for contracts**: Define callback interfaces
+- **Protocols for polymorphism**: Extend types without modifying them
 
-def greet(%User{display_name: name}) when not is_nil(name) do
-  "Hello, #{name}!"
-end
-def greet(%User{email: email}), do: "Hello, #{email}!"
-```
+### OTP Patterns
+- **GenServer for state**: Wrap mutable state properly
+- **Supervision trees**: "Let it crash" with proper recovery
+- **Named processes with Registry**: Dynamic process lookup
+- **Task for async work**: `Task.async/await` for concurrent operations
+- **Agent for simple state**: When full GenServer isn't needed
 
-### Pipe Operator
+### Control Flow
+- **`with` for happy path**: Chain operations, handle errors in `else`
+- **Pipe operator**: Transform data through function chain
+- **`Enum` over recursion**: Built-in functions are optimized
+- **Stream for lazy evaluation**: Large/infinite sequences
 
-```elixir
-def get_active_users do
-  User
-  |> Repo.all()
-  |> Enum.filter(&(&1.status == :active))
-  |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
-  |> Enum.map(&to_dto/1)
-end
-```
+### Phoenix (if applicable)
+- **Contexts for business logic**: Bounded contexts, not fat models
+- **Changesets for validation**: Single source of validation truth
+- **Live View for real-time**: Server-rendered reactive UIs
+- **PubSub for events**: Decouple components
 
-### With Statement
-
-```elixir
-def create_user(params) do
-  with {:ok, validated} <- validate(params),
-       {:ok, user} <- Repo.insert(User.new(validated)),
-       :ok <- send_welcome_email(user) do
-    {:ok, user}
-  else
-    {:error, %Ecto.Changeset{} = changeset} ->
-      {:error, format_errors(changeset)}
-    {:error, reason} ->
-      {:error, reason}
-  end
-end
-```
-
-### GenServer
-
-```elixir
-defmodule UserCache do
-  use GenServer
-
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, %{}, opts)
-  end
-
-  def get(pid, key), do: GenServer.call(pid, {:get, key})
-  def put(pid, key, value), do: GenServer.cast(pid, {:put, key, value})
-
-  @impl true
-  def init(state), do: {:ok, state}
-
-  @impl true
-  def handle_call({:get, key}, _from, state) do
-    {:reply, Map.get(state, key), state}
-  end
-end
-```
+---
 
 ## Patterns to Avoid
-- ❌ Nested case statements (use with)
-- ❌ Long function bodies
-- ❌ Ignoring OTP patterns
-- ❌ Not using supervision trees
+
+### GenServer Anti-Patterns
+- ❌ **GenServer for pure computation**: Just use functions; no state needed
+- ❌ **Named GenServer with `__MODULE__`**: Blocks scaling; use Registry
+- ❌ **Blocking in GenServer**: Timeouts cascade; use async patterns
+- ❌ **State for code organization**: Processes are for runtime properties only
+- ❌ **Missing supervision**: Always supervise GenServers
+
+### Control Flow Issues
+- ❌ **Nested case statements**: Use `with` or pattern matching
+- ❌ **Deep nesting**: Extract to helper functions
+- ❌ **Ignoring error tuples**: Always handle `{:error, _}`
+- ❌ **Catching all exceptions**: Catch specific; let others crash
+
+### Data Anti-Patterns
+- ❌ **Primitive obsession**: Use structs for domain entities
+- ❌ **Missing typespecs**: Document all public APIs
+- ❌ **Mutable-style thinking**: Elixir data is immutable
+- ❌ **String keys in maps**: Prefer atoms for internal data
+
+### Phoenix Anti-Patterns
+- ❌ **Fat controllers**: Move logic to contexts
+- ❌ **Fat schemas**: Extract to embedded schemas, services
+- ❌ **Callbacks for business logic**: Explicit function calls
+- ❌ **N+1 queries**: Use `Repo.preload` or joins
+
+---
 
 ## Verification Checklist
-- [ ] Pattern matching used
-- [ ] Pipe operator for transforms
-- [ ] GenServer for stateful processes
-- [ ] Proper supervision
-- [ ] Dialyzer types
+
+### Code Quality
+- [ ] Pattern matching for dispatch
+- [ ] `with` for multi-step operations
+- [ ] Typespecs on public functions
+- [ ] `@moduledoc` and `@doc` present
+
+### OTP
+- [ ] GenServers supervised
+- [ ] Processes only for state/concurrency
+- [ ] Registry for dynamic processes
+- [ ] Proper `handle_info` for messages
+
+### Error Handling
+- [ ] Tagged tuples consistently used
+- [ ] `{:error, _}` cases handled
+- [ ] Supervision strategy appropriate
+- [ ] `with` else clause covers failures
+
+### Testing
+- [ ] Dialyzer passes (typespecs verified)
+- [ ] Credo checks pass
+- [ ] ExUnit tests cover edge cases
+- [ ] Property-based tests for core logic
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Struct**: `defstruct [:id, :email]; @type t :: %__MODULE__{id: String.t(), email: String.t()}`
+- **Pattern match**: `def handle({:ok, user}), do: ...; def handle({:error, reason}), do: ...`
+- **With**: `with {:ok, a} <- step1(), {:ok, b} <- step2(a), do: {:ok, result}`
+- **Pipe**: `data |> transform() |> filter() |> format()`
+- **GenServer**: `use GenServer; def init(state), do: {:ok, state}`
+- **Supervisor**: `children = [{Worker, arg}]; Supervisor.start_link(children, strategy: :one_for_one)`
+- **Typespec**: `@spec find(id :: String.t()) :: {:ok, User.t()} | {:error, :not_found}`
+

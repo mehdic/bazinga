@@ -2,7 +2,7 @@
 name: scala
 type: language
 priority: 1
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 ---
 
@@ -11,88 +11,115 @@ compatible_with: [developer, senior_software_engineer]
 # Scala Engineering Expertise
 
 ## Specialist Profile
-Scala specialist blending functional and object-oriented paradigms. Expert in type safety, immutability, and Cats/ZIO.
+Scala specialist blending functional and object-oriented paradigms. Expert in type safety, immutability, and effect systems (Cats Effect/ZIO).
 
-## Implementation Guidelines
+---
 
-### Case Classes
+## Patterns to Follow
 
-```scala
-case class User(
-  id: UUID,
-  email: String,
-  displayName: String,
-  createdAt: Instant = Instant.now()
-)
+### Functional Foundations
+- **Immutability by default**: Case classes, `val`, immutable collections
+- **Pure functions**: No side effects; referential transparency
+- **Option over null**: Never use `null`; always `Option[T]`
+- **Either for errors**: `Either[Error, Result]` for recoverable failures
+- **For comprehensions**: Compose monadic operations cleanly
 
-case class CreateUserRequest(email: String, displayName: String)
-```
+### Type System Usage
+- **Strong types over primitives**: `case class UserId(value: String)` for type safety
+- **Sealed traits for ADTs**: Exhaustive pattern matching
+- **Type aliases for clarity**: `type Result[A] = Either[AppError, A]`
+- **Variance annotations**: `+A` covariant, `-A` contravariant when needed
 
-### Option Handling
+### Effect Systems
+- **ZIO environment pattern**: `ZIO[R, E, A]` for dependencies, errors, results
+- **Cats Effect IO**: Lazy, referentially transparent effects
+- **Resource management**: `Resource` or `ZIO.acquireRelease` for cleanup
+- **Error channels**: Use typed errors (`E`) not `Throwable`
 
-```scala
-def findUser(id: UUID): Option[User] =
-  repository.find(id)
-
-def getDisplayName(user: Option[User]): String =
-  user.map(_.displayName).getOrElse("Unknown")
-
-// Pattern matching
-user match {
-  case Some(u) => processUser(u)
-  case None => handleMissing()
-}
-
-// For comprehension
-for {
-  user <- findUser(id)
-  profile <- user.profile
-} yield profile.displayName
-```
-
-### Either for Errors
-
-```scala
-sealed trait UserError
-case class NotFound(id: UUID) extends UserError
-case class InvalidEmail(email: String) extends UserError
-
-def createUser(request: CreateUserRequest): Either[UserError, User] =
-  for {
-    _ <- validateEmail(request.email)
-    user <- Right(User(UUID.randomUUID(), request.email, request.displayName))
-  } yield user
-```
-
-### Pattern Matching
-
-```scala
-def processEvent(event: Event): String = event match {
-  case UserCreated(id, email) => s"User $id created with $email"
-  case UserDeleted(id) => s"User $id deleted"
-  case _ => "Unknown event"
-}
-```
-
-### Implicits/Givens
-
+### Scala 3 Features
 <!-- version: scala >= 3 -->
-```scala
-given Ordering[User] = Ordering.by(_.createdAt)
+- **Given/using over implicit**: Clearer context parameters
+- **Extension methods**: `extension (s: String) def toSlug: String`
+- **Opaque types**: Zero-cost type wrappers
+- **Enums**: Native algebraic data types
+- **Union/intersection types**: `String | Int`, `A & B`
 
-extension (s: String)
-  def toSlug: String = s.toLowerCase.replaceAll("[^a-z0-9]+", "-")
-```
+### Code Organization
+- **Small, focused modules**: Single responsibility
+- **Tagless final for abstraction**: `F[_]: Monad` for polymorphic effects
+- **Companion objects**: Factory methods, type class instances
+- **Package objects sparingly**: Prefer explicit imports
+
+---
 
 ## Patterns to Avoid
-- ❌ null (use Option)
-- ❌ Mutable collections
-- ❌ Exceptions for control flow
-- ❌ Overusing implicits
+
+### Type System Abuse
+- ❌ **Weakly-typed values**: `String` for IDs; use newtypes
+- ❌ **Omitting return types**: Always annotate public methods
+- ❌ **`Any` or `AnyRef`**: Lose type safety; use proper generics
+- ❌ **Overusing implicits**: Makes code hard to follow; be explicit
+
+### Effect System Anti-Patterns
+- ❌ **`unsafeRunSync` in production**: Only at application edge
+- ❌ **Wrapping pure code in IO**: No benefit; adds overhead
+- ❌ **Monad transformers in public APIs**: Use ZIO environment or tagless final
+- ❌ **Ignoring `traverse`**: Use `traverse` not `map` + `sequence`
+- ❌ **Blocking in async context**: Use proper async primitives
+
+### Functional Anti-Patterns
+- ❌ **`null` anywhere**: Use `Option` always
+- ❌ **Mutable state**: Use `Ref`, `State` monad, or actors
+- ❌ **Exceptions for control flow**: Use `Either` or typed errors
+- ❌ **Side effects in pure functions**: Wrap in effect type
+- ❌ **Passing dependencies as functions**: Use proper DI or Reader
+
+### Code Smells
+- ❌ **God objects**: Split by domain
+- ❌ **Deep inheritance**: Prefer composition and type classes
+- ❌ **Non-exhaustive pattern matching**: Compiler warnings are errors
+- ❌ **Ignoring compiler warnings**: Enable `-Xfatal-warnings`
+
+---
 
 ## Verification Checklist
+
+### Type Safety
+- [ ] No `null` usage
+- [ ] All public methods have return types
+- [ ] Strong types for domain values (newtypes)
+- [ ] Pattern matches exhaustive
+
+### Functional Style
 - [ ] Immutable data structures
-- [ ] Option instead of null
-- [ ] Either for error handling
-- [ ] Pattern matching exhaustive
-- [ ] Pure functions where possible
+- [ ] Pure functions (side effects wrapped)
+- [ ] `Either`/ZIO error handling (not exceptions)
+- [ ] For comprehensions for monadic composition
+
+### Effect System
+- [ ] Effects suspended properly (IO, ZIO)
+- [ ] Resources cleaned up (`Resource`, `ZIO.acquireRelease`)
+- [ ] No `unsafeRunSync` except at edge
+- [ ] Typed error channels used
+
+### Tooling
+- [ ] Scalafix rules pass
+- [ ] Scapegoat/WartRemover checks
+- [ ] `-Xlint` warnings addressed
+- [ ] Scalafmt formatting applied
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Case class**: `case class User(id: UserId, email: Email)`
+- **Sealed trait**: `sealed trait UserError; case class NotFound(id: UserId) extends UserError`
+- **Option handling**: `user.map(_.name).getOrElse("Unknown")`
+- **Either**: `def create(req: Request): Either[ValidationError, User]`
+- **For comprehension**: `for { user <- findUser(id); profile <- user.profile } yield profile`
+<!-- version: scala >= 3 -->
+- **Extension**: `extension (s: String) def toSlug = s.toLowerCase.replaceAll("[^a-z0-9]+", "-")`
+- **Given**: `given Ordering[User] = Ordering.by(_.createdAt)`
+- **Opaque type**: `opaque type UserId = String`
+
