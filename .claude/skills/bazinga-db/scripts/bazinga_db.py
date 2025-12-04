@@ -1680,18 +1680,14 @@ def main():
             status = cmd_args[1]
             db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
-            group_id = cmd_args[0]
-            session_id = cmd_args[1]
-            name = cmd_args[2]
-            status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
-            assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
-            # Parse optional --specializations flag
+            # Parse --specializations flag first, then extract positional args
             specializations = None
-            for i, arg in enumerate(cmd_args):
-                if arg == '--specializations' and i + 1 < len(cmd_args):
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--specializations' and i + 1 < len(cmd_args):
                     try:
                         specializations = json.loads(cmd_args[i + 1])
-                        # Validate it's a list of strings
                         if not isinstance(specializations, list):
                             print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2))
                             sys.exit(1)
@@ -1701,7 +1697,16 @@ def main():
                     except json.JSONDecodeError as e:
                         print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2))
                         sys.exit(1)
-                    break
+                    i += 2  # Skip flag and value
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            # Now assign positional args correctly
+            group_id = positional_args[0]
+            session_id = positional_args[1]
+            name = positional_args[2]
+            status = positional_args[3] if len(positional_args) > 3 else 'pending'
+            assigned_to = positional_args[4] if len(positional_args) > 4 else None
             result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
