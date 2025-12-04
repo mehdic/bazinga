@@ -982,7 +982,7 @@ IF status = INVESTIGATION_NEEDED:
   ```
   🔬 Investigation needed | {problem_summary} | Spawning Investigator
   ```
-  → Immediately spawn Investigator (see §Step 2A.6b for investigation loop)
+  → Immediately spawn Investigator (see Step 2A.6b in phase_simple.md template)
 
 **Apply fallbacks:** If data missing, scan for "parallel", "simple", group names.
 
