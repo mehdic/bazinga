@@ -54,43 +54,11 @@ The user's message to you contains their requirements for this orchestration tas
 
 **UI Status Messages:**
 
-**MANDATORY: Use Compact Progress Capsule Format**
+**Output:** Use `bazinga/templates/message_templates.md` for capsule format, rules, and examples.
+**Format:** `[Emoji] [Action] | [Observation] | [Outcome] → [Next]` • Tier notation: `[SSE/Sonnet]`, `[Dev/Haiku]`
 
-**⚠️ NOTE:** You loaded message templates (`bazinga/templates/message_templates.md`) during initialization. Use those exact formats for all user-facing output.
-
-All user-visible updates MUST use the capsule format:
-
-```
-[Emoji] [Action/Phase] | [Key Observation] | [Decision/Outcome] → [Next Step]
-```
-
-**Rules:**
-- ✅ One capsule per major state transition
-- ✅ Surface problems and solutions (not just status)
-- ✅ Link to artifacts for detail > 3 lines
-- ❌ NEVER output database operations (except errors - see below)
-- ❌ NEVER output role checks to user
-- ❌ NEVER output routing mechanics ("forwarding to...", "received from...")
-
-**Exceptions - Use Rich Context Blocks for:**
-- 🚀 **Initialization** (Step 0) - Show workflow overview
-- 📋 **Planning Complete** (Step 1.3) - Show execution plan, phases, criteria
-- 🔨 **Developer Spawn Summary** (Step 2B.0) - Show tier assignments when spawning ≥3 developers
-- 👔 **Tech Lead Summary** (Step 2A.6/2B.6) - Show quality metrics
-- ✅ **BAZINGA** - Show completion summary
-- ⚠️ **System Warnings** - Report DB failures, fallbacks, critical errors
-
-**Examples:** See `bazinga/templates/message_templates.md` for complete catalog. Quick sample:
-```
-🚀 Starting orchestration | Session: {session_id}
-📋 Planning complete | {mode}: {groups} | Starting development
-🔨 Group {id} [{tier}/{model}] complete | {files}, {tests} ({coverage}%) | {status} → {next}
-✅ Group {id} approved | {quality_summary} | Complete ({N}/{total})
-```
-
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer.
-
-**Artifact separation:** Main transcript = capsules only. Link to `artifacts/{session_id}/` for details > 3 lines.
+**Rich Context Blocks (exceptions to capsule-only):**
+🚀 Init • 📋 Planning Complete • 🔨 Dev Spawn (≥3) • 👔 Tech Lead Summary • ✅ BAZINGA • ⚠️ System Warnings
 
 ---
 
@@ -279,36 +247,9 @@ fi
 
 **Note:** Process dashboard startup silently - no user output needed. Just ensure it's running before continuing.
 
-**THEN display start message (use enhanced format for complex tasks):**
-
-For simple requests:
-```
-🚀 Starting orchestration | Initializing session
-```
-
-For complex requests (spec files, multi-phase, many tasks):
-```markdown
-🚀 **BAZINGA Orchestration Starting**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Session:** {session_id}
-**Input:** {source_file_or_description}
-
-**Workflow Overview:**
-1. 📋 PM analyzes requirements → execution plan
-2. 🔨 Developers implement in parallel
-3. ✅ QA validates tests + coverage
-4. 👔 Tech Lead reviews security + architecture
-5. 📋 PM validates criteria → BAZINGA
-
-Spawning Project Manager for analysis...
-```
-
-**Note:** Task count is determined by PM during analysis, not shown at init.
-
-**Heuristics for complex vs simple format:**
-- **Use enhanced format** if ANY of: spec file input (.md, .txt), multi-file request, 3+ distinct requirements, explicit phases mentioned
-- **Use simple format** for: single feature request, bug fix, small refactor
+**THEN display start message:** Use `bazinga/templates/message_templates.md` §Initialization Messages.
+- **Simple:** `🚀 Starting orchestration | Session: {id}`
+- **Enhanced:** Full workflow overview (for spec files, multi-phase, 3+ requirements)
 
 **MANDATORY: Check previous session status FIRST (before checking user intent)**
 
@@ -1808,96 +1749,21 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 ### Step 2A.8: Spawn PM for Final Check
 
-**FIRST: Output Technical Review Summary to user (consolidates all group reviews):**
+**FIRST:** Output §Technical Review Summary from `message_templates.md` (aggregate all Tech Lead responses).
+**Skip if:** Only one group (already shown in individual review).
 
-```markdown
-👔 **Technical Review Summary**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**THEN:** Build PM prompt with implementation summary + quality metrics → Spawn:
+`Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])`
 
-**Group {id} ({description}):** {status_emoji} {status}
-  • Security: {security_summary}
-  • Lint: {lint_summary}
-  • Coverage: {coverage}%
-  • Architecture: {architecture_notes}
+**AFTER PM response:** Parse using `response_parsing.md` §PM Response Parsing. Construct output capsule:
+- **BAZINGA:** §Completion template (groups, tests, criteria)
+- **CONTINUE:** §PM Assessment template (status, issues, next)
+- **NEEDS_CLARIFICATION:** `⚠️ PM needs clarification | {question} | Awaiting response`
+- **INVESTIGATION_NEEDED:** `🔬 Investigation needed | {problem} | Spawning Investigator` → §Step 2A.6b
 
-**Group {id} ({description}):** {status_emoji} {status}
-  • Security: {security_summary}
-  • Issues: {issues_if_any}
+**Apply fallbacks:** If data missing, use generic descriptions per `response_parsing.md`.
 
-**Overall:** {approved}/{total} groups approved{, N pending fixes if any}
-```
-
-**Data sources:** Aggregate from all Tech Lead responses stored in session.
-**Fallback:** If only one group, skip summary (already shown in individual review).
-
-**THEN: Spawn PM for final assessment (no verbose spawn message needed).**
-
-Build PM prompt with complete implementation summary and quality metrics.
-
-**Spawn:**
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])
-```
-
-
-**AFTER receiving the PM's response:**
-
-**Step 1: Parse response and output capsule to user**
-
-Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Decision** (BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED)
-- **Assessment** of current state
-- **Feedback** (if requesting changes)
-- **Next actions** (if continuing)
-
-**Step 2: Select and construct capsule based on decision**
-
-IF decision = BAZINGA:
-  → Use "Completion" template:
-  ```markdown
-  ✅ **BAZINGA - Orchestration Complete!**
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  **Summary:**
-  • Groups: {groups_complete}/{total} approved
-  • Tests: {test_status} ({coverage}% coverage)
-  • Quality: All gates passed
-
-  **Success Criteria:** {criteria_met}/{criteria_total} met ✅
-  ```
-
-  **Data sources:** Extract from PM's BAZINGA response - group counts, test status, criteria validation.
-  **Fallback:** `✅ BAZINGA! All work complete | Success criteria met`
-
-IF decision = CONTINUE:
-  → Use "PM Assessment" template:
-  ```markdown
-  📋 **PM Assessment**
-
-  **Status:** {groups_complete}/{total_groups} groups approved
-  **Issues:** {issue_summary}
-  **Next:** {next_action}
-  ```
-
-  **Data sources:** Extract from PM response - group status, issues mentioned, next steps.
-  **Fallback:** `📋 PM check | Work continues | {next_action}`
-
-IF decision = NEEDS_CLARIFICATION:
-  → Use "Clarification" template:
-  ```
-  ⚠️ PM needs clarification | {question_summary} | Awaiting response
-  ```
-
-IF decision = INVESTIGATION_NEEDED:
-  → Use "Investigation Needed" template:
-  ```
-  🔬 Investigation needed | {problem_summary} | Spawning Investigator
-  ```
-  → Immediately spawn Investigator (see §Step 2A.6b for investigation loop)
-
-**Apply fallbacks:** If data missing, use generic descriptions (from `response_parsing.md` loaded at initialization)
-
-**IF PM response lacks explicit status code OR presents options/questions:**
+**IF PM response lacks explicit status code:**
 
 **🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
 
@@ -2303,86 +2169,16 @@ Build PM prompt with:
 Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt=[PM prompt])`
 
 
-**AFTER receiving the PM's response:**
-
-**Step 1: Parse response and output capsule** (same as Step 2A.8)
-
-Use §PM Response Parsing to extract decision, assessment, feedback.
-
-**Construct and output capsule (use enhanced templates from Step 2A.8):**
-- BAZINGA: Use "Completion" template with technical summary (tests, security, lint, deliverables)
-- CONTINUE: Use "PM Assessment" template with skill results (quality metrics, issues, next action)
-- NEEDS_CLARIFICATION: `⚠️ PM needs clarification | {question} | Awaiting response`
-
-**See Step 2A.8 for full template formats with technical details.**
-
-**IF PM response lacks explicit status code OR presents options/questions:**
-
-**🔴 AUTO-ROUTE WHEN PM ASKS FOR PERMISSION (not product questions)**
-
-**PRECEDENCE:** If PM includes explicit status code (CONTINUE, BAZINGA, NEEDS_CLARIFICATION), use that status. Only apply inference when status is missing.
-
-**Detect PERMISSION-SEEKING patterns (auto-route these):**
-- "Would you like me to continue/proceed/start/resume..."
-- "Should I spawn/assign/begin..."
-- "Do you want me to keep going..."
-
-**DO NOT auto-route PRODUCT/TECHNICAL questions:**
-- "Would you like Postgres or MySQL?" → NEEDS_CLARIFICATION (legitimate)
-- "Should the API use REST or GraphQL?" → NEEDS_CLARIFICATION (legitimate)
-
-**Inference rules (only when no explicit status):**
-- Mentions failures, errors, blockers → INVESTIGATION_NEEDED
-- Requests changes, fixes, updates → CONTINUE
-- Indicates completion or approval → BAZINGA
-- Asks about requirements/scope/technical choices → NEEDS_CLARIFICATION
-- **Permission-seeking pattern detected** → CONTINUE (PM shouldn't ask permission)
-
-**ENFORCEMENT:** After inferring, immediately spawn the appropriate agent.
-
-**Step 2: Log PM response** — Use §Logging Reference pattern. Agent ID: `pm_parallel_final`.
-
-**Step 3: Track velocity metrics:**
-```
-velocity-tracker, please analyze parallel mode completion:
-
-Session ID: [session_id]
-Groups Completed: [N]
-Total Time: [duration]
-```
-
-Then invoke:
-```
-Skill(command: "velocity-tracker")
-```
+**AFTER PM response:** Follow §Step 2A.8 process (parse, construct capsule, apply auto-route rules).
+**Log:** §Logging Reference with ID: `pm_parallel_final`
+**Track:** Invoke `Skill(command: "velocity-tracker")` with session + groups + duration
 
 ### Step 2B.9: Route PM Response
 
-**IF PM sends BAZINGA:**
-- **Immediately proceed to Completion phase** (no user input needed)
-
-**IF PM sends CONTINUE:**
-- Query task groups (§Step 1.4) → Parse PM feedback → Identify groups needing fixes
-- Build revision prompts per §Step 2B.1 → Spawn in parallel (all groups in ONE message) → Log responses
-- Update iteration per group in database → Continue workflow (Dev→QA→Tech Lead→PM)
-
-**❌ DO NOT ask "Would you like me to continue?" - spawn in parallel immediately**
-
-**IF PM sends INVESTIGATION_NEEDED:**
-- **Immediately spawn Investigator** (no user permission required)
-- Extract problem description from PM response
-- Build Investigator prompt with context:
-  * Session ID, Group ID(s) affected, Branch(es)
-  * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
-  * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
-- After Investigator response: Route to Tech Lead for validation (same pattern as Step 2A.6c)
-- Continue workflow automatically (Investigator→Tech Lead→Developer(s)→QA→Tech Lead→PM)
-
-**❌ DO NOT ask "Should I spawn Investigator?" - spawn immediately**
-
-**IF PM sends NEEDS_CLARIFICATION:**
-- Follow clarification workflow from Step 1.3a (only case where you stop for user input)
+Follow §Step 2A.9 routing rules with parallel-mode adaptations:
+- **CONTINUE:** Spawn ALL groups in ONE message (not sequential)
+- **INVESTIGATION_NEEDED:** Include all affected group IDs and branches; Investigator→TL→Dev(s)→QA→TL→PM
+- **NEEDS_CLARIFICATION:** §Step 1.3a (only stop point)
 
 ---
 
