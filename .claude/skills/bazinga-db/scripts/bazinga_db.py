@@ -18,7 +18,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import argparse
 
 # Add _shared directory to path for bazinga_paths import
@@ -37,6 +37,15 @@ try:
     _HAS_BAZINGA_PATHS = True
 except ImportError:
     _HAS_BAZINGA_PATHS = False
+
+# Import SCHEMA_VERSION from init_db.py to avoid duplication
+try:
+    from init_db import SCHEMA_VERSION as EXPECTED_SCHEMA_VERSION
+except ImportError:
+    # Fallback if init_db.py is not accessible
+    print("Warning: Could not import SCHEMA_VERSION from init_db.py, using fallback value 7. "
+          "Check if init_db.py exists in the same directory.", file=sys.stderr)
+    EXPECTED_SCHEMA_VERSION = 7
 
 
 class BazingaDB:
@@ -113,6 +122,47 @@ class BazingaDB:
             return False
 
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
+
+    def _validate_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> Tuple[bool, Optional[str]]:
+        """Validate specialization path for security (prevent path traversal).
+
+        Args:
+            spec_path: Relative path to specialization file
+            project_root: Project root directory (auto-detected if not provided)
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            # Auto-detect project root if not provided
+            if project_root is None:
+                if _HAS_BAZINGA_PATHS:
+                    project_root = get_project_root()
+                else:
+                    # Fallback: assume db_path is at PROJECT_ROOT/bazinga/bazinga.db
+                    project_root = Path(self.db_path).parent.parent
+
+            # Define allowed base directory
+            allowed_base = (project_root / "bazinga" / "templates" / "specializations").resolve()
+
+            # Resolve the provided path (handles .., symlinks, etc.)
+            full_path = (project_root / spec_path).resolve()
+
+            # Check if resolved path is within allowed base
+            try:
+                full_path.relative_to(allowed_base)
+            except ValueError:
+                return False, f"Path escapes allowed directory: {spec_path}"
+
+            # Validate path contains only safe characters (alphanumeric, -, _, /, .)
+            import re
+            if not re.match(r'^[a-zA-Z0-9/_.-]+$', spec_path):
+                return False, f"Path contains unsafe characters: {spec_path}"
+
+            return True, None
+
+        except Exception as e:
+            return False, f"Path validation error: {e}"
 
     def _backup_corrupted_db(self) -> Optional[str]:
         """Backup a corrupted database file before recovery.
@@ -378,6 +428,21 @@ class BazingaDB:
                             if not cursor.fetchone():
                                 needs_init = True
                                 print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                            else:
+                                # Check schema version - run migrations if outdated
+                                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+                                if cursor.fetchone():
+                                    cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+                                    version_row = cursor.fetchone()
+                                    current_version = version_row[0] if version_row else 0
+                                    # Check against expected version from init_db.py
+                                    if current_version < EXPECTED_SCHEMA_VERSION:
+                                        needs_init = True
+                                        print(f"Database schema outdated (v{current_version} < v{EXPECTED_SCHEMA_VERSION}). Running migrations...", file=sys.stderr)
+                                else:
+                                    # schema_version table missing - treat as outdated and run migrations
+                                    needs_init = True
+                                    print(f"Database missing schema_version table at {self.db_path}. Running migrations...", file=sys.stderr)
                     break  # Success - exit retry loop
                 except sqlite3.OperationalError as e:
                     # Handle transient lock errors with retry/backoff
@@ -738,29 +803,58 @@ class BazingaDB:
     # ==================== TASK GROUP OPERATIONS ====================
 
     def create_task_group(self, group_id: str, session_id: str, name: str,
-                         status: str = 'pending', assigned_to: Optional[str] = None) -> Dict[str, Any]:
+                         status: str = 'pending', assigned_to: Optional[str] = None,
+                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to are updated - preserving
-        revision_count, last_review_status, and created_at.
+        already exists, only name/status/assigned_to/specializations are updated -
+        preserving revision_count, last_review_status, and created_at.
+
+        Args:
+            specializations: List of specialization file paths for this group
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
         conn = None
         try:
+            # Defensive type validation for specializations
+            if specializations is not None:
+                if not isinstance(specializations, list):
+                    return {
+                        "success": False,
+                        "error": f"specializations must be a list, got {type(specializations).__name__}"
+                    }
+                if not all(isinstance(s, str) for s in specializations):
+                    return {
+                        "success": False,
+                        "error": "specializations must contain only strings"
+                    }
+                # Validate paths for security (prevent path traversal)
+                for spec_path in specializations:
+                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    if not is_valid:
+                        return {
+                            "success": False,
+                            "error": f"Invalid specialization path: {error_msg}"
+                        }
+
             conn = self._get_connection()
+            # Serialize specializations to JSON (preserve [] vs None distinction)
+            specs_json = json.dumps(specializations) if specializations is not None else None
             # Use ON CONFLICT for true upsert - preserves existing metadata
+            # COALESCE for status: INSERT uses 'pending' default, UPDATE preserves existing if None passed
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations)
+                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?)
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
-                    status = excluded.status,
-                    assigned_to = COALESCE(excluded.assigned_to, assigned_to),
+                    status = COALESCE(excluded.status, task_groups.status),
+                    assigned_to = COALESCE(excluded.assigned_to, task_groups.assigned_to),
+                    specializations = COALESCE(excluded.specializations, task_groups.specializations),
                     updated_at = CURRENT_TIMESTAMP
-            """, (group_id, session_id, name, status, assigned_to))
+            """, (group_id, session_id, name, status, assigned_to, specs_json))
             conn.commit()
 
             # Fetch and return the saved record
@@ -782,7 +876,8 @@ class BazingaDB:
     def update_task_group(self, group_id: str, session_id: str, status: Optional[str] = None,
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
                          last_review_status: Optional[str] = None,
-                         auto_create: bool = True, name: Optional[str] = None) -> Dict[str, Any]:
+                         auto_create: bool = True, name: Optional[str] = None,
+                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -794,12 +889,34 @@ class BazingaDB:
             last_review_status: APPROVED or CHANGES_REQUESTED
             auto_create: If True and group doesn't exist, create it (default: True)
             name: Name for auto-creation (defaults to group_id if not provided)
+            specializations: List of specialization file paths for this group
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
         conn = None
         try:
+            # Defensive type validation for specializations
+            if specializations is not None:
+                if not isinstance(specializations, list):
+                    return {
+                        "success": False,
+                        "error": f"specializations must be a list, got {type(specializations).__name__}"
+                    }
+                if not all(isinstance(s, str) for s in specializations):
+                    return {
+                        "success": False,
+                        "error": "specializations must contain only strings"
+                    }
+                # Validate paths for security (prevent path traversal)
+                for spec_path in specializations:
+                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    if not is_valid:
+                        return {
+                            "success": False,
+                            "error": f"Invalid specialization path: {error_msg}"
+                        }
+
             conn = self._get_connection()
             updates = []
             params = []
@@ -816,6 +933,12 @@ class BazingaDB:
             if last_review_status:
                 updates.append("last_review_status = ?")
                 params.append(last_review_status)
+            if name:
+                updates.append("name = ?")
+                params.append(name)
+            if specializations is not None:
+                updates.append("specializations = ?")
+                params.append(json.dumps(specializations))
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
@@ -1393,11 +1516,11 @@ STATE OPERATIONS:
   get-state <session> <type>                  Get latest state snapshot
 
 TASK GROUP OPERATIONS:
-  create-task-group <group_id> <session> <name> [status] [assigned_to]
-                                              Create task group (default: status=pending)
-  update-task-group <group_id> <session> [--status X] [--assigned_to Y]
-                                              Update task group
-  get-task-groups <session> [status]          Get task groups
+  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON]
+                                              Create task group with optional specializations
+  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON]
+                                              Update task group (specializations as JSON array)
+  get-task-groups <session> [status]          Get task groups (includes specializations)
 
 TOKEN OPERATIONS:
   log-tokens <session> <agent> <tokens> [agent_id]
@@ -1585,19 +1708,62 @@ def main():
             status = cmd_args[1]
             db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
-            group_id = cmd_args[0]
-            session_id = cmd_args[1]
-            name = cmd_args[2]
-            status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
-            assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
-            result = db.create_task_group(group_id, session_id, name, status, assigned_to)
+            # Parse --specializations flag first, then extract positional args
+            specializations = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--specializations' and i + 1 < len(cmd_args):
+                    try:
+                        specializations = json.loads(cmd_args[i + 1])
+                        if not isinstance(specializations, list):
+                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        if not all(isinstance(s, str) for s in specializations):
+                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                    except json.JSONDecodeError as e:
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                    i += 2  # Skip flag and value
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            # Validate positional args count (required: group_id, session_id, name)
+            if len(positional_args) < 3:
+                print(json.dumps({"success": False, "error": "create-task-group requires at least 3 args: <group_id> <session_id> <name>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            if len(positional_args) > 5:
+                print(json.dumps({"success": False, "error": "create-task-group accepts at most 5 positional args: <group_id> <session_id> <name> [status] [assigned_to]"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            # Now assign positional args correctly
+            group_id = positional_args[0]
+            session_id = positional_args[1]
+            name = positional_args[2]
+            # Default to None so upsert preserves existing status; INSERT defaults to 'pending'
+            status = positional_args[3] if len(positional_args) > 3 else None
+            assigned_to = positional_args[4] if len(positional_args) > 4 else None
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
+            # Validate minimum args
+            if len(cmd_args) < 2:
+                print(json.dumps({"success": False, "error": "update-task-group requires at least 2 args: <group_id> <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
             group_id = cmd_args[0]
             session_id = cmd_args[1]
             kwargs = {}
+            # Allowlist of valid flags
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
+                # Validate flag is in allowlist
+                if key not in valid_flags:
+                    print(json.dumps({"success": False, "error": f"Unknown flag --{key}. Valid flags: {', '.join(sorted(valid_flags))}"}, indent=2), file=sys.stderr)
+                    sys.exit(1)
+                if i + 1 >= len(cmd_args):
+                    print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2), file=sys.stderr)
+                    sys.exit(1)
                 value = cmd_args[i + 1]
                 # Convert revision_count to int if present
                 if key == 'revision_count':
@@ -1605,6 +1771,20 @@ def main():
                 # Convert auto_create to bool
                 elif key == 'auto_create':
                     value = value.lower() in ('true', '1', 'yes')
+                # Parse and validate specializations JSON
+                elif key == 'specializations':
+                    try:
+                        value = json.loads(value)
+                        # Validate it's a list of strings
+                        if not isinstance(value, list):
+                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        if not all(isinstance(s, str) for s in value):
+                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                    except json.JSONDecodeError as e:
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
                 kwargs[key] = value
             result = db.update_task_group(group_id, session_id, **kwargs)
             print(json.dumps(result, indent=2))

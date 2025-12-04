@@ -35,6 +35,10 @@
     "orchestrator": {
       "model": "sonnet",
       "rationale": "Coordination and routing - inline execution via slash command"
+    },
+    "tech_stack_scout": {
+      "model": "sonnet",
+      "rationale": "Deep project analysis for tech stack detection - runs once at Step 0.5"
     }
   },
   "escalation_rules": {
@@ -79,16 +83,17 @@
     }
   },
   "_metadata": {
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Model selection, escalation rules, and task type routing for BAZINGA agents",
-    "last_updated": "2025-12-02",
+    "last_updated": "2025-12-04",
     "notes": [
       "Tech Lead and PM are ALWAYS on Opus - non-negotiable",
       "Developer starts on Haiku for cost efficiency",
       "Senior Software Engineer on Sonnet handles escalated complexity",
       "Escalation triggers after 1 failure (not 2)",
       "Security tasks always use SSE + mandatory TL review",
-      "Research/architecture tasks route to Requirements Engineer"
+      "Research/architecture tasks route to Requirements Engineer",
+      "Tech Stack Scout runs at Step 0.5 to detect project stack before PM"
     ]
   }
 }

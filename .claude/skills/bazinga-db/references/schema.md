@@ -180,6 +180,7 @@ CREATE TABLE task_groups (
     complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
     initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
     context_references TEXT,  -- JSON array of context package IDs relevant to this group
+    specializations TEXT,  -- JSON array of specialization file paths (e.g., ["bazinga/templates/specializations/01-languages/typescript.md"])
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, session_id),
@@ -203,6 +204,7 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 - `complexity`: Task complexity score (1-10), set by PM
 - `initial_tier`: Initial implementation tier (`Developer` or `Senior Software Engineer`), set by PM
 - `context_references`: JSON array of context package IDs relevant to this group (e.g., `[1, 3, 5]`)
+- `specializations`: JSON array of specialization file paths assigned by PM (e.g., `["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]`)
 - `created_at`: When task group was created
 - `updated_at`: Last modification timestamp
 
@@ -227,14 +229,24 @@ OR test_failure (tests failed after merge → dev fixes tests)
 
 **Usage Example:**
 ```python
-# Create task group
-db.create_task_group('group_a', 'bazinga_123', 'Authentication', status='pending')
+# Create task group with specializations
+db.create_task_group(
+    'group_a', 'bazinga_123', 'Authentication',
+    status='pending',
+    specializations=['bazinga/templates/specializations/01-languages/typescript.md']
+)
 
-# Update task group (requires session_id for composite key)
-db.update_task_group('group_a', 'bazinga_123', status='completed', last_review_status='APPROVED')
+# Update task group with specializations (requires session_id for composite key)
+db.update_task_group(
+    'group_a', 'bazinga_123',
+    status='completed',
+    last_review_status='APPROVED',
+    specializations=['bazinga/templates/specializations/03-frameworks-backend/express.md']
+)
 
-# Get incomplete task groups
-incomplete = db.get_task_groups('bazinga_123', status='in_progress')
+# Get task groups (includes specializations)
+groups = db.get_task_groups('bazinga_123', status='in_progress')
+# Returns: [{'id': 'group_a', 'specializations': '[...]', ...}]
 ```
 
 ---

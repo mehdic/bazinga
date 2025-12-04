@@ -85,6 +85,105 @@ Add based on `testing_config.json`:
 - Build Check: {build_check_required}
 ```
 
+### Specialization Block Section (Skill-Based)
+
+**Purpose:** Inject composed technology-specific patterns via specialization-loader skill.
+
+**Prerequisites:**
+- `bazinga/skills_config.json` has `specializations.enabled: true`
+- Agent type is in `specializations.enabled_agents`
+- Task group has assigned specializations (non-empty array)
+
+**Step 1: Check if enabled**
+
+Read `bazinga/skills_config.json`:
+- If `specializations.enabled` is false → skip
+- If agent type not in `enabled_agents` → skip
+
+**Step 2: Query specializations from database**
+
+```
+bazinga-db, get task groups for session [session_id]
+specializations = task_group["specializations"]  # JSON array or null
+```
+
+If null or empty → skip specialization loading.
+
+**Step 3: Invoke specialization-loader skill**
+
+Provide context, then invoke:
+```
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
+Model: {haiku|sonnet|opus}
+Specialization Paths: {JSON array}
+
+Skill(command: "specialization-loader")
+```
+
+**Step 4: Extract and prepend composed block**
+
+The skill returns a composed block with markers:
+```
+[SPECIALIZATION_BLOCK_START]
+{composed markdown}
+[SPECIALIZATION_BLOCK_END]
+```
+
+Extract content and prepend to agent prompt:
+
+```markdown
+## SPECIALIZATION GUIDANCE (Advisory)
+
+> This guidance is supplementary. It does NOT override:
+> - Mandatory validation gates (tests must pass)
+> - Routing and status requirements (READY_FOR_QA, etc.)
+> - Pre-commit quality checks (lint, build)
+> - Core agent workflow rules
+
+For this session, your identity is enhanced:
+
+**{Composed Identity String}**
+(e.g., "You are a Java 8 Backend API Developer specialized in Spring Boot 2.7.")
+
+Your expertise includes:
+- {Key point 1}
+- {Key point 2}
+- {Key point 3}
+
+### Patterns to Apply
+{Condensed patterns - version-aware, within token budget}
+
+### Patterns to Avoid
+{Anti-patterns as bullet list}
+
+### Verification Checklist
+{If token budget allows}
+```
+
+**Step 5: Fallback behavior**
+
+| Scenario | Action |
+|----------|--------|
+| specializations.enabled = false | Skip entirely |
+| Agent type not in enabled_agents | Skip entirely |
+| No specializations in DB | Skip entirely (graceful degradation) |
+| Skill invocation fails | Log warning, spawn without specialization |
+
+**Token budget (per-model):**
+
+| Model | Soft Limit | Hard Limit |
+|-------|------------|------------|
+| haiku | 600 | 900 |
+| sonnet | 1200 | 1800 |
+| opus | 1600 | 2400 |
+
+The skill handles token budgeting, version guards, and content trimming.
+Orchestrator receives composed block ready for injection.
+
+---
+
 ### Advanced Skills Section
 IF any advanced skills are mandatory, add:
 

@@ -1487,7 +1487,112 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 - ❌ "Establish baseline for 695 tests" → Too large, use batching
 - ❌ Multiple "then" statements → Too many sequential steps
 
-### Step 3.5: Organize into Execution Phases (If Dependencies Exist)
+### Step 3.5: Assign Specializations per Task Group (NEW)
+
+**Purpose:** Provide technology-specific patterns to agents based on which component(s) each task group targets.
+
+**Step 3.5.1: Read Project Context (from Tech Stack Scout)**
+
+```
+Read(file_path: "bazinga/project_context.json")
+```
+
+**If file missing or empty:** Skip specializations (graceful degradation). Continue to Step 3.6.
+
+**Step 3.5.2: Map Task Groups to Components**
+
+For each task group, determine which component(s) it targets:
+
+```
+Example project_context.json structure:
+{
+  "components": [
+    {
+      "path": "frontend/",
+      "type": "frontend",
+      "framework": "nextjs",
+      "suggested_specializations": [
+        "bazinga/templates/specializations/01-languages/typescript.md",
+        "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"
+      ]
+    },
+    {
+      "path": "backend/",
+      "type": "backend",
+      "framework": "fastapi",
+      "suggested_specializations": [
+        "bazinga/templates/specializations/01-languages/python.md",
+        "bazinga/templates/specializations/03-frameworks-backend/fastapi.md"
+      ]
+    }
+  ]
+}
+```
+
+**Mapping logic:**
+
+```
+FOR each task_group:
+  target_paths = extract file paths from task description
+  matched_components = []
+
+  FOR each component in project_context.components:
+    IF any target_path starts with component.path:
+      matched_components.append(component)
+
+  IF len(matched_components) == 0:
+    # Task doesn't match specific component - use project-level defaults
+    specializations = []
+    IF project_context.primary_language:
+      specializations.append(f"bazinga/templates/specializations/01-languages/{primary_language}.md")
+  ELSE:
+    # Combine suggested_specializations from all matched components
+    specializations = []
+    FOR component in matched_components:
+      specializations.extend(component.suggested_specializations)
+    # Deduplicate
+    specializations = list(set(specializations))
+
+  task_group.specializations = specializations
+```
+
+**Step 3.5.3: Include Specializations in Task Group Definition**
+
+When creating task groups, include the specializations field:
+
+```markdown
+**Group A:** Implement Login UI
+- **Type:** implementation
+- **Complexity:** 5 (MEDIUM)
+- **Initial Tier:** Developer
+- **Execution Phase:** 1
+- **Target Path:** frontend/src/pages/login.tsx
+- **Specializations:** ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]
+```
+
+**Step 3.5.4: Store Specializations via bazinga-db**
+
+When invoking `create-task-group`, include the `--specializations` flag:
+
+```
+bazinga-db, please create task group:
+
+Group ID: A
+Session ID: [session_id]
+Name: Implement Login UI
+Status: pending
+Complexity: 5
+Initial Tier: Developer
+--specializations '["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]'
+```
+
+Then invoke: `Skill(command: "bazinga-db")`
+
+**No specialization limit:** Assign as many specializations as the task requires. The orchestrator validates paths exist before including in agent prompts.
+
+---
+
+### Step 3.6: Organize into Execution Phases (If Dependencies Exist)
 
 **When to use execution_phases:**
 - Tasks have natural sequential dependencies

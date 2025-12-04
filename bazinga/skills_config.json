@@ -1,4 +1,23 @@
 {
+  "specializations": {
+    "enabled": true,
+    "mode": "advisory",
+    "token_budgets": {
+      "haiku": { "soft": 600, "hard": 900 },
+      "sonnet": { "soft": 1200, "hard": 1800 },
+      "opus": { "soft": 1600, "hard": 2400 }
+    },
+    "include_code_examples": true,
+    "include_checklist": true,
+    "enabled_agents": [
+      "developer",
+      "senior_software_engineer",
+      "qa_expert",
+      "tech_lead",
+      "requirements_engineer",
+      "investigator"
+    ]
+  },
   "developer": {
     "lint-check": "mandatory",
     "codebase-analysis": "optional",
