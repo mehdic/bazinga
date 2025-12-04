@@ -20,7 +20,9 @@ You are the specialization-loader skill. You compose technology-specific identit
 **Do NOT invoke when:**
 - specializations array is empty or null
 - skills_config.json has specializations.enabled = false
-- No project_context.json exists
+
+**Handle gracefully (with defaults):**
+- No project_context.json exists → skip version guards, use generic patterns
 
 ---
 
@@ -63,16 +65,26 @@ If project_context.json missing, use conservative defaults (no version-specific 
 
 Default to `sonnet` limits if model not specified.
 
+### Step 3.5: Filter by Agent Compatibility
+
+For each template path, check frontmatter `compatible_with` array:
+- If agent_type is in `compatible_with`: include template
+- If agent_type NOT in `compatible_with`: skip template
+- If `compatible_with` is empty/missing: include by default
+
+This ensures QA agents get testing patterns, not implementation patterns.
+Tech Leads get review patterns, Investigators get debugging patterns, etc.
+
 ### Step 4: Read Templates with Token Tracking
 
-For each path in specialization_paths (sorted by priority):
+For each path in specialization_paths (filtered by compatibility, sorted by priority):
 
 1. **Read the template:**
    ```bash
    cat {template_path}
    ```
 
-2. **Parse frontmatter:** Extract `priority`, `token_estimate`, `type`
+2. **Parse frontmatter:** Extract `priority`, `token_estimate`, `type`, `compatible_with`
 
 3. **Apply version guards:**
    - Find `<!-- version: LANG OPERATOR VERSION -->` markers

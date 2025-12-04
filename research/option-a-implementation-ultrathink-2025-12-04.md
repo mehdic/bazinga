@@ -3,8 +3,8 @@
 **Date:** 2025-12-04
 **Context:** Implementing complete specialization system with token budgeting, composed identity, and advisory wrapper
 **Decision:** Pending user validation
-**Status:** Proposed
-**Reviewed by:** Pending LLM review
+**Status:** Implemented with fixes pending
+**Reviewed by:** Codex (2025-12-04)
 
 ---
 
@@ -726,6 +726,113 @@ Trimming strategy:
 
 ---
 
+## Multi-LLM Review Integration
+
+### Codex Review (2025-12-04)
+
+**Reviewer:** Codex (automated code review)
+
+#### Summary
+
+Codex found the implementation generally matches or exceeds the plan, with token budgets scaling by model instead of fixed values, and orchestrator/prompt-building docs consistently reflecting the new skill-driven flow.
+
+#### Issues Raised
+
+| Issue | Severity | Status | Resolution |
+|-------|----------|--------|------------|
+| Missing `compatible_with` filtering | Medium | **VALID** | Skill needs to filter templates by agent type |
+| project_context.json handling contradiction | Medium | **VALID** | Remove conflicting "do not invoke" guidance |
+| Missing references/usage.md | Low | **REJECTED** | SKILL.md is comprehensive (356 lines) |
+
+#### Issue 1: Missing Compatibility Filtering (VALID)
+
+**Codex said:**
+> Templates still declare compatibility only for developer/SSE (e.g., Java's frontmatter). The skill does not describe filtering by `compatible_with`, so QA/TL agents could receive developer-focused guidance.
+
+**Analysis:** This is **VALID**. Templates have `compatible_with` frontmatter:
+- `java.md`: `compatible_with: [developer, senior_software_engineer]`
+- `qa-strategies.md`: `compatible_with: [qa_expert, tech_lead]`
+- `code-review.md`: `compatible_with: [tech_lead, senior_software_engineer]`
+
+But the skill doesn't filter templates by this field when loading.
+
+**Fix required:** Add Step 3.5 to SKILL.md:
+```markdown
+### Step 3.5: Filter by Agent Compatibility
+
+For each template, check frontmatter `compatible_with` array:
+- If agent_type is in compatible_with: include template
+- If agent_type NOT in compatible_with: skip template
+- If compatible_with is empty/missing: include by default
+
+This ensures QA agents get testing patterns, not implementation patterns.
+```
+
+#### Issue 2: project_context.json Contradiction (VALID)
+
+**Codex said:**
+> The skill's guard list says not to invoke it when project_context.json is missing, whereas the orchestrator fallback table assumes the skill will handle missing context conservatively.
+
+**Analysis:** This is **VALID**. Two conflicting statements:
+1. Line 23: "Do NOT invoke when: No project_context.json exists"
+2. Line 52 + error table: "If project_context.json missing, use conservative defaults"
+
+**Resolution:** The skill should be defensive. Remove the "do not invoke" guidance and rely on graceful handling. The orchestrator might not know if project_context.json exists until the skill checks.
+
+**Fix required:** Update SKILL.md "Do NOT invoke when" section:
+```markdown
+**Do NOT invoke when:**
+- specializations array is empty or null
+- skills_config.json has specializations.enabled = false
+
+**Handle gracefully (with defaults):**
+- No project_context.json exists → skip version guards, use generic patterns
+```
+
+#### Issue 3: Missing references/usage.md (REJECTED)
+
+**Codex said:**
+> The Option A document called for an additional references/usage.md under the skill directory; that file is absent.
+
+**Resolution:** **REJECTED**. The SKILL.md is 356 lines with comprehensive documentation including:
+- Step-by-step process
+- Token budgets by model
+- Agent-specific customization
+- Complete example output
+- Error handling table
+
+Creating a separate usage.md would only duplicate content and increase maintenance burden.
+
+### User Responses to LLM Suggestions
+
+| Suggestion | User Decision | Rationale |
+|------------|---------------|-----------|
+| Add `compatible_with` filtering | **APPROVED** | Prevents developer patterns going to QA |
+| Fix project_context.json handling | **APPROVED** | Skill should be defensive |
+| Create references/usage.md | **REJECTED** | SKILL.md is already comprehensive |
+
+---
+
+## Implementation Status
+
+### Completed ✅
+
+1. specialization-loader skill (SKILL.md - 356 lines)
+2. Token budgets per model (haiku/sonnet/opus)
+3. Composed identity per agent type
+4. Advisory wrapper on all 71 templates
+5. Version guards on 70 templates (303 total guards)
+6. Config flags in skills_config.json
+7. Orchestrator section updated
+8. prompt_building.md updated
+
+### Pending Fixes (from LLM Review)
+
+1. **Add `compatible_with` filtering to skill** - Step 3.5
+2. **Remove project_context.json contradiction** - Update "Do NOT invoke" section
+
+---
+
 ## Next Step
 
-Run LLM reviews on this document, then implement based on validated plan.
+Apply the two fixes identified in LLM review, then mark implementation as complete.
