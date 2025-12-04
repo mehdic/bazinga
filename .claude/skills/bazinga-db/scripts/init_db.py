@@ -27,7 +27,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -254,12 +254,29 @@ def init_database(db_path: str) -> None:
             # 3. Create context_package_consumers table (will be created below with IF NOT EXISTS)
 
             print("✓ Migration to v6 complete (context packages for inter-agent communication)")
+            current_version = 6
+
+        # Migration from v6 to v7: Add specializations to task_groups
+        if current_version == 6:
+            print("🔄 Migrating schema from v6 to v7...")
+
+            # Add specializations column to task_groups
+            try:
+                cursor.execute("ALTER TABLE task_groups ADD COLUMN specializations TEXT")
+                print("   ✓ Added task_groups.specializations")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" in str(e).lower():
+                    print("   ⊘ task_groups.specializations already exists")
+                else:
+                    raise
+
+            print("✓ Migration to v7 complete (specializations for tech stack loading)")
 
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Context packages for inter-agent communication"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Specializations for tech stack loading"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -341,6 +358,7 @@ def init_database(db_path: str) -> None:
             complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
             initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
             context_references TEXT,
+            specializations TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),

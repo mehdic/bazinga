@@ -640,7 +640,94 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 
 **CRITICAL:** Verify initialization complete (session ID, database, configs loaded, templates loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
 
-**Then IMMEDIATELY proceed to Phase 1 - spawn PM without stopping or waiting.
+**Then IMMEDIATELY proceed to Step 0.5 - Tech Stack Detection.
+
+---
+
+## Step 0.5: Tech Stack Detection (NEW SESSION ONLY)
+
+**Purpose:** Detect project tech stack BEFORE PM spawn to enable specialization loading.
+
+**User output (capsule format):**
+```
+🔍 Detecting tech stack | Analyzing project structure for specializations
+```
+
+### 🔴 MANDATORY: Spawn Tech Stack Scout
+
+**Build Scout prompt:**
+1. Read `agents/tech_stack_scout.md` for full agent definition
+2. Include session context
+
+**Spawn Tech Stack Scout:**
+```
+Task(
+  subagent_type: "Plan",
+  model: "sonnet",
+  description: "Tech Stack Scout: detect project stack",
+  prompt: [Full Scout prompt from agents/tech_stack_scout.md with session_id]
+)
+```
+
+**Note:** Scout uses Plan mode (read-only analysis) - cannot modify files.
+
+### Step 0.5a: Process Scout Response
+
+**After Scout completes:**
+
+1. **Verify output file exists:**
+   ```bash
+   test -f bazinga/project_context.json && echo "exists" || echo "missing"
+   ```
+
+2. **Register detection as context package (optional but recommended):**
+   ```
+   bazinga-db, save context package:
+   Session ID: [session_id]
+   Group ID: null (global/session-wide)
+   Type: research
+   File: bazinga/project_context.json
+   Producer: tech_stack_scout
+   Consumers: ["project_manager"]
+   Priority: high
+   Summary: Project tech stack detection - languages, frameworks, infrastructure
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+3. **Output summary to user (capsule format):**
+   ```
+   🔍 Tech stack detected | {primary_language}, {framework or "no framework"} | {N} specializations suggested
+   ```
+
+### Step 0.5b: Timeout/Failure Handling
+
+**IF Scout times out (>2 minutes) OR fails:**
+
+1. **Output warning:**
+   ```
+   ⚠️ Tech stack detection skipped | Scout timeout/failure | Proceeding without specializations
+   ```
+
+2. **Create minimal fallback context (graceful degradation):**
+   ```bash
+   cat > bazinga/project_context.json <<'EOF'
+   {
+     "schema_version": "2.0",
+     "detected_at": "[ISO timestamp]",
+     "confidence": "low",
+     "primary_language": "unknown",
+     "secondary_languages": [],
+     "structure": "unknown",
+     "components": [],
+     "infrastructure": {},
+     "detection_notes": ["Scout timeout/failure - minimal context created"]
+   }
+   EOF
+   ```
+
+3. **Continue to Phase 1** (PM can still function without specializations)
+
+**AFTER Step 0.5 completes: IMMEDIATELY proceed to Phase 1 (Spawn PM). Do NOT stop.**
 
 ---
 
@@ -1120,25 +1207,69 @@ ELSE IF PM chose "parallel":
 
 **Location:** `bazinga/templates/specializations/{category}/{technology}.md`
 
-**Process (add to agent prompts in prompt_building.md):**
-1. Check if `bazinga/project_context.json` exists
-2. If exists, extract `primary_language` and `framework` fields
-3. Match to specialization files:
-   - `primary_language` → `01-languages/{lang}.md` (e.g., typescript.md)
-   - `framework` → `02-frameworks-frontend/` or `03-frameworks-backend/{fw}.md` (e.g., nextjs.md)
-4. Add to prompt (max 2 paths):
-   ```markdown
-   ## Specialization References
-   Read and apply these patterns before implementation:
-   - `bazinga/templates/specializations/01-languages/typescript.md`
-   - `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md`
+### Two-Phase Specialization Workflow
 
-   ⚠️ MANDATORY: Apply ALL patterns from these files. These are required practices.
-   ```
+**Phase 1: PM Assignment (during planning)**
+- PM reads `bazinga/project_context.json` (created by Tech Stack Scout at Step 0.5)
+- PM assigns specializations PER TASK GROUP based on:
+  - Which component(s) the group's task targets (frontend/, backend/, etc.)
+  - Scout's suggested_specializations for that component
+- PM stores specializations via `bazinga-db create-task-group --specializations '[...]'`
 
-**Fallback:** If project_context.json missing or fields empty, skip specializations (graceful degradation).
+**Phase 2: Orchestrator Loading (at agent spawn)**
+- Query DB for group's specializations
+- Validate paths exist under `bazinga/templates/specializations/`
+- Include validated paths in agent prompt
+
+### Process (at agent spawn)
+
+**Step 1: Query DB for group's specializations**
+```
+bazinga-db, get task groups for session [session_id]
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Step 2: Extract specializations for this group**
+```
+specializations = task_group["specializations"]  # JSON array or null
+```
+
+**Step 3: Validate paths (skip invalid)**
+```
+valid_paths = []
+for path in specializations:
+    if path.startswith("bazinga/templates/specializations/") and file_exists(path):
+        valid_paths.append(path)
+```
+
+**Step 4: Add to prompt (if specializations exist)**
+```markdown
+## Specialization References
+
+Read and apply these patterns BEFORE implementation:
+{for each valid_path}
+- `{path}`
+{end for}
+
+⚠️ MANDATORY: Apply ALL patterns from these files. These are required practices.
+```
+
+### Fallback Scenarios
+
+| Scenario | Action |
+|----------|--------|
+| No specializations in DB (null/empty) | Check project_context.json directly (legacy support) |
+| project_context.json also missing | Skip specializations (graceful degradation) |
+| Path doesn't exist | Skip that path, log warning, continue with valid paths |
+| All paths invalid | Skip specializations section entirely |
+
+**Legacy support:** If task_group.specializations is null, fall back to reading project_context.json:
+1. Extract `primary_language` → `01-languages/{lang}.md`
+2. Extract `framework` → `02-frameworks-frontend/` or `03-frameworks-backend/{fw}.md`
+3. Use max 2 paths
+
 **Token budget:** ~40 tokens (paths only - agent reads content).
-**Max specializations:** 2 per agent to manage context size.
+**No hard limit:** PM can assign as many specializations as the task requires.
 
 ---
 

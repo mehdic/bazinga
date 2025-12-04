@@ -156,13 +156,16 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state \
 **Create task group:**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-task-group \
-  "<group_id>" "<session_id>" "<name>" [status] [assigned_to]
+  "<group_id>" "<session_id>" "<name>" [status] [assigned_to] [--specializations '<json_array>']
 ```
+
+Parameters:
+- `specializations`: JSON array of specialization file paths (e.g., `'["bazinga/templates/specializations/01-languages/typescript.md"]'`)
 
 **Update task group:**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
-  "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"]
+  "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"] [--specializations '<json_array>']
 ```
 
 **Get task groups:**

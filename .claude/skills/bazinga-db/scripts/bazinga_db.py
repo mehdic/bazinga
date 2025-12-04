@@ -738,12 +738,16 @@ class BazingaDB:
     # ==================== TASK GROUP OPERATIONS ====================
 
     def create_task_group(self, group_id: str, session_id: str, name: str,
-                         status: str = 'pending', assigned_to: Optional[str] = None) -> Dict[str, Any]:
+                         status: str = 'pending', assigned_to: Optional[str] = None,
+                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to are updated - preserving
-        revision_count, last_review_status, and created_at.
+        already exists, only name/status/assigned_to/specializations are updated -
+        preserving revision_count, last_review_status, and created_at.
+
+        Args:
+            specializations: List of specialization file paths for this group
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -751,16 +755,19 @@ class BazingaDB:
         conn = None
         try:
             conn = self._get_connection()
+            # Serialize specializations to JSON
+            specs_json = json.dumps(specializations) if specializations else None
             # Use ON CONFLICT for true upsert - preserves existing metadata
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
                     status = excluded.status,
                     assigned_to = COALESCE(excluded.assigned_to, assigned_to),
+                    specializations = COALESCE(excluded.specializations, specializations),
                     updated_at = CURRENT_TIMESTAMP
-            """, (group_id, session_id, name, status, assigned_to))
+            """, (group_id, session_id, name, status, assigned_to, specs_json))
             conn.commit()
 
             # Fetch and return the saved record
@@ -782,7 +789,8 @@ class BazingaDB:
     def update_task_group(self, group_id: str, session_id: str, status: Optional[str] = None,
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
                          last_review_status: Optional[str] = None,
-                         auto_create: bool = True, name: Optional[str] = None) -> Dict[str, Any]:
+                         auto_create: bool = True, name: Optional[str] = None,
+                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -794,6 +802,7 @@ class BazingaDB:
             last_review_status: APPROVED or CHANGES_REQUESTED
             auto_create: If True and group doesn't exist, create it (default: True)
             name: Name for auto-creation (defaults to group_id if not provided)
+            specializations: List of specialization file paths for this group
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -816,6 +825,9 @@ class BazingaDB:
             if last_review_status:
                 updates.append("last_review_status = ?")
                 params.append(last_review_status)
+            if specializations is not None:
+                updates.append("specializations = ?")
+                params.append(json.dumps(specializations))
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
@@ -1393,11 +1405,11 @@ STATE OPERATIONS:
   get-state <session> <type>                  Get latest state snapshot
 
 TASK GROUP OPERATIONS:
-  create-task-group <group_id> <session> <name> [status] [assigned_to]
-                                              Create task group (default: status=pending)
-  update-task-group <group_id> <session> [--status X] [--assigned_to Y]
-                                              Update task group
-  get-task-groups <session> [status]          Get task groups
+  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON]
+                                              Create task group with optional specializations
+  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON]
+                                              Update task group (specializations as JSON array)
+  get-task-groups <session> [status]          Get task groups (includes specializations)
 
 TOKEN OPERATIONS:
   log-tokens <session> <agent> <tokens> [agent_id]
@@ -1590,7 +1602,13 @@ def main():
             name = cmd_args[2]
             status = cmd_args[3] if len(cmd_args) > 3 else 'pending'
             assigned_to = cmd_args[4] if len(cmd_args) > 4 else None
-            result = db.create_task_group(group_id, session_id, name, status, assigned_to)
+            # Parse optional --specializations flag
+            specializations = None
+            for i, arg in enumerate(cmd_args):
+                if arg == '--specializations' and i + 1 < len(cmd_args):
+                    specializations = json.loads(cmd_args[i + 1])
+                    break
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             group_id = cmd_args[0]

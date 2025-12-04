@@ -85,6 +85,74 @@ Add based on `testing_config.json`:
 - Build Check: {build_check_required}
 ```
 
+### Specialization References Section (NEW)
+
+**Purpose:** Inject technology-specific patterns based on the task group's assigned specializations.
+
+**Step 1: Query specializations from database**
+
+The orchestrator queries the task group's specializations from the database:
+```
+bazinga-db, get task groups for session [session_id]
+```
+
+Extract the `specializations` field for the current group (JSON array or null).
+
+**Step 2: Validate paths**
+
+For each specialization path, verify it exists under `bazinga/templates/specializations/`.
+Skip invalid paths with a warning.
+
+**Step 3: Add to agent prompt (if specializations exist)**
+
+```markdown
+═══════════════════════════════════════════
+📚 SPECIALIZATION REFERENCES
+═══════════════════════════════════════════
+
+Read and apply these technology-specific patterns BEFORE implementation:
+
+{FOR each valid_specialization_path}
+- `{path}`
+{END FOR}
+
+⚠️ MANDATORY: Apply ALL patterns from these files. These are required practices
+for this project's technology stack.
+
+Instructions:
+1. Read each specialization file listed above
+2. Apply the patterns, conventions, and best practices described
+3. Follow the testing approaches specific to this technology
+4. Use the recommended libraries and utilities
+═══════════════════════════════════════════
+```
+
+**Step 4: Fallback behavior**
+
+| Scenario | Action |
+|----------|--------|
+| task_group.specializations is null | Check project_context.json directly (legacy support) |
+| project_context.json missing | Skip specialization section (graceful degradation) |
+| All paths invalid | Skip section, log warning |
+
+**Legacy fallback (if DB specializations null):**
+```
+Read(file_path: "bazinga/project_context.json")
+
+IF exists:
+  specializations = []
+  IF primary_language:
+    specializations.append(f"bazinga/templates/specializations/01-languages/{primary_language}.md")
+  IF framework:
+    specializations.append(f"bazinga/templates/specializations/02-frameworks-frontend/{framework}.md")
+    OR
+    specializations.append(f"bazinga/templates/specializations/03-frameworks-backend/{framework}.md")
+```
+
+**Token budget:** ~40 tokens for paths. Agent reads full content when needed.
+
+---
+
 ### Advanced Skills Section
 IF any advanced skills are mandatory, add:
 
