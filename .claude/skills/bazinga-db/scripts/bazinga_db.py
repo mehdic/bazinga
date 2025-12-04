@@ -18,7 +18,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import argparse
 
 # Add _shared directory to path for bazinga_paths import
@@ -37,6 +37,13 @@ try:
     _HAS_BAZINGA_PATHS = True
 except ImportError:
     _HAS_BAZINGA_PATHS = False
+
+# Import SCHEMA_VERSION from init_db.py to avoid duplication
+try:
+    from init_db import SCHEMA_VERSION as EXPECTED_SCHEMA_VERSION
+except ImportError:
+    # Fallback if init_db.py is not accessible
+    EXPECTED_SCHEMA_VERSION = 7
 
 
 class BazingaDB:
@@ -114,7 +121,7 @@ class BazingaDB:
 
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
-    def _validate_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> tuple[bool, Optional[str]]:
+    def _validate_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> Tuple[bool, Optional[str]]:
         """Validate specialization path for security (prevent path traversal).
 
         Args:
@@ -426,11 +433,10 @@ class BazingaDB:
                                     cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
                                     version_row = cursor.fetchone()
                                     current_version = version_row[0] if version_row else 0
-                                    # Current expected version is 7 (from init_db.py)
-                                    EXPECTED_VERSION = 7
-                                    if current_version < EXPECTED_VERSION:
+                                    # Check against expected version from init_db.py
+                                    if current_version < EXPECTED_SCHEMA_VERSION:
                                         needs_init = True
-                                        print(f"Database schema outdated (v{current_version} < v{EXPECTED_VERSION}). Running migrations...", file=sys.stderr)
+                                        print(f"Database schema outdated (v{current_version} < v{EXPECTED_SCHEMA_VERSION}). Running migrations...", file=sys.stderr)
                                 else:
                                     # schema_version table missing - treat as outdated and run migrations
                                     needs_init = True
