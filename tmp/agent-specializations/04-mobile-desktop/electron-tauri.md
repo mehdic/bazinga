@@ -2,7 +2,7 @@
 name: electron-tauri
 type: framework
 priority: 2
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript]
 ---
@@ -12,126 +12,123 @@ requires: [typescript]
 # Electron/Tauri Desktop Expertise
 
 ## Specialist Profile
-Desktop app specialist building cross-platform apps. Expert in IPC, native APIs, and web-to-desktop patterns.
+Desktop app specialist building cross-platform apps. Expert in IPC security, native APIs, and performance optimization.
 
-## Implementation Guidelines
+---
 
-### Tauri Commands
+## Patterns to Follow
 
-```rust
-// src-tauri/src/commands/user.rs
-use tauri::State;
-use crate::db::Database;
+### Tauri 2.0 (2025 Recommended)
+- **Rust backend**: Memory-safe, high performance
+- **OS native webview**: WebView2 (Windows), WebKit (macOS/Linux)
+- **Deny by default security**: Explicit permission grants
+- **3MB binary size**: vs 200MB+ Electron
+- **30MB RAM usage**: vs 250MB+ Electron idle
+- **Mobile support**: iOS and Android in v2.0
 
-#[tauri::command]
-pub async fn get_users(db: State<'_, Database>) -> Result<Vec<User>, String> {
-    db.get_all_users()
-        .await
-        .map_err(|e| e.to_string())
-}
+### Tauri Patterns
+- **Commands for IPC**: `#[tauri::command]` decorated functions
+- **State management**: `State<'_, T>` injection
+- **Error handling**: Return `Result<T, String>` from commands
+- **Event system**: Frontend ↔ Backend communication
+- **Plugin system**: Extend functionality modularly
 
-#[tauri::command]
-pub async fn create_user(
-    request: CreateUserRequest,
-    db: State<'_, Database>,
-) -> Result<User, String> {
-    db.create_user(request)
-        .await
-        .map_err(|e| e.to_string())
-}
-```
+### Electron Security
+- **contextIsolation: true**: Always enable
+- **nodeIntegration: false**: Never enable in renderer
+- **Preload scripts**: Expose limited API via contextBridge
+- **sandbox: true**: Sandbox renderer processes
+- **CSP headers**: Prevent XSS attacks
 
-### Frontend Invocation (Tauri)
+### Electron Patterns
+- **IPC handlers**: `ipcMain.handle` for async, `ipcMain.on` for events
+- **Preload bridge**: `contextBridge.exposeInMainWorld`
+- **Window management**: BrowserWindow with proper options
+- **Auto-updates**: electron-updater integration
 
-```typescript
-// src/services/userService.ts
-import { invoke } from '@tauri-apps/api/tauri';
+### Cross-Platform
+- **App icons**: Platform-specific formats
+- **Menu bar**: Native menus where applicable
+- **File associations**: Register file types
+- **Native dialogs**: Open, save, message boxes
 
-export interface User {
-  id: string;
-  email: string;
-  displayName: string;
-}
-
-export async function getUsers(): Promise<User[]> {
-  return invoke('get_users');
-}
-
-export async function createUser(request: CreateUserRequest): Promise<User> {
-  return invoke('create_user', { request });
-}
-```
-
-### Electron Main Process
-
-```typescript
-// electron/main.ts
-import { app, BrowserWindow, ipcMain } from 'electron';
-
-function createWindow() {
-  const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  mainWindow.loadFile('index.html');
-}
-
-// IPC Handlers
-ipcMain.handle('get-users', async () => {
-  return db.getUsers();
-});
-
-ipcMain.handle('create-user', async (_event, request: CreateUserRequest) => {
-  return db.createUser(request);
-});
-```
-
-### Electron Preload
-
-```typescript
-// electron/preload.ts
-import { contextBridge, ipcRenderer } from 'electron';
-
-contextBridge.exposeInMainWorld('electronAPI', {
-  getUsers: () => ipcRenderer.invoke('get-users'),
-  createUser: (request: CreateUserRequest) =>
-    ipcRenderer.invoke('create-user', request),
-});
-```
-
-### Frontend (Electron)
-
-```typescript
-// src/services/userService.ts
-declare global {
-  interface Window {
-    electronAPI: {
-      getUsers: () => Promise<User[]>;
-      createUser: (request: CreateUserRequest) => Promise<User>;
-    };
-  }
-}
-
-export const getUsers = () => window.electronAPI.getUsers();
-export const createUser = (req: CreateUserRequest) =>
-  window.electronAPI.createUser(req);
-```
+---
 
 ## Patterns to Avoid
-- ❌ nodeIntegration: true (security risk)
-- ❌ Disabled contextIsolation
-- ❌ Synchronous IPC calls
-- ❌ Exposing entire Node APIs
+
+### Security Anti-Patterns (Critical)
+- ❌ **nodeIntegration: true**: Full Node.js in renderer = RCE
+- ❌ **contextIsolation: false**: Prototype pollution attacks
+- ❌ **Exposing require() to renderer**: Code injection
+- ❌ **Disabling webSecurity**: CORS protection lost
+- ❌ **Remote module usage**: Deprecated, insecure
+
+### Tauri Anti-Patterns
+- ❌ **Overly permissive allowlist**: Minimal permissions
+- ❌ **Sync commands blocking UI**: Use async
+- ❌ **Missing error handling in Rust**: Return Result types
+- ❌ **Direct filesystem access without scope**: Use path scope
+
+### Electron Anti-Patterns
+- ❌ **Synchronous IPC (sendSync)**: Blocks renderer
+- ❌ **Multiple BrowserWindow instances needlessly**: RAM bloat
+- ❌ **Loading remote URLs without verification**: Security risk
+- ❌ **Missing ASAR packaging**: File tampering
+
+### Performance Anti-Patterns
+- ❌ **Heavy computation in main process**: Blocks all windows
+- ❌ **Large IPC payloads**: Serialize efficiently
+- ❌ **Memory leaks from event listeners**: Remove on cleanup
+- ❌ **Bundling entire node_modules**: Tree-shake dependencies
+
+---
 
 ## Verification Checklist
-- [ ] Context isolation enabled
-- [ ] Typed IPC communication
-- [ ] Async command handlers
-- [ ] Proper error handling across boundary
-- [ ] Security best practices
+
+### Security (Critical)
+- [ ] contextIsolation enabled
+- [ ] nodeIntegration disabled
+- [ ] Preload script with minimal API
+- [ ] CSP headers configured
+- [ ] Input validation on IPC
+
+### Tauri-Specific
+- [ ] Minimal capability permissions
+- [ ] Path scoping configured
+- [ ] Async commands for blocking ops
+- [ ] Error types properly returned
+
+### Electron-Specific
+- [ ] sandbox enabled
+- [ ] Remote module not used
+- [ ] Auto-updater configured
+- [ ] ASAR packaging enabled
+
+### Cross-Platform
+- [ ] Tested on all target platforms
+- [ ] Native menus configured
+- [ ] App icons for each platform
+- [ ] Installer/DMG/AppImage created
+
+---
+
+## Code Patterns (Reference)
+
+### Tauri Commands
+- **Async command**: `#[tauri::command] async fn get_users(db: State<'_, Database>) -> Result<Vec<User>, String> { ... }`
+- **Invoke**: `await invoke<User[]>('get_users')`
+- **With args**: `invoke('create_user', { request })`
+- **Error handling**: `.map_err(|e| e.to_string())`
+
+### Electron Main
+- **Window**: `new BrowserWindow({ webPreferences: { contextIsolation: true, nodeIntegration: false, preload: '...' } })`
+- **Handler**: `ipcMain.handle('get-users', async () => db.getUsers())`
+
+### Electron Preload
+- **Bridge**: `contextBridge.exposeInMainWorld('api', { getUsers: () => ipcRenderer.invoke('get-users') })`
+- **Typed**: `declare global { interface Window { api: { getUsers: () => Promise<User[]> } } }`
+
+### Tauri Config (tauri.conf.json)
+- **Capabilities**: `"permissions": ["path:default", "fs:read-files"]`
+- **Window**: `"windows": [{ "title": "App", "width": 1200, "height": 800 }]`
+

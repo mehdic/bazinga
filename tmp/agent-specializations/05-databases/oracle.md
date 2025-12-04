@@ -2,7 +2,7 @@
 name: oracle
 type: database
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: [sql]
 ---
@@ -14,149 +14,123 @@ requires: [sql]
 ## Specialist Profile
 Oracle DB specialist building enterprise database solutions. Expert in PL/SQL, performance tuning, and Oracle-specific features.
 
-## Implementation Guidelines
+---
 
-### PL/SQL Procedures
+## Patterns to Follow
 
-```sql
--- Stored procedure with error handling
-CREATE OR REPLACE PROCEDURE create_user(
-    p_email       IN  VARCHAR2,
-    p_display_name IN VARCHAR2,
-    p_user_id     OUT VARCHAR2,
-    p_status      OUT VARCHAR2
-) AS
-    v_count NUMBER;
-BEGIN
-    -- Check for duplicate
-    SELECT COUNT(*) INTO v_count
-    FROM users WHERE email = LOWER(p_email);
+### PL/SQL Best Practices
+- **BULK COLLECT for reads**: Process sets, not rows
+- **FORALL for writes**: Batch DML operations
+- **Exception handling**: WHEN OTHERS with RAISE
+- **AUTONOMOUS_TRANSACTION**: Independent commits
+- **Packages for organization**: Logical grouping of procedures
 
-    IF v_count > 0 THEN
-        p_status := 'ERROR: Email already exists';
-        RETURN;
-    END IF;
+### Performance Optimization
+- **Bind variables always**: Avoid hard parsing
+- **EXPLAIN PLAN before execution**: Check access paths
+- **Hints sparingly**: `/*+ INDEX */`, `/*+ PARALLEL */`
+- **Partitioning for large tables**: Range, list, hash
+- **Materialized views**: Pre-computed aggregations
 
-    -- Generate UUID
-    p_user_id := SYS_GUID();
+### Modern Features (23c+)
+<!-- version: oracle >= 23 -->
+- **JSON Relational Duality**: JSON views over relational data
+- **JavaScript stored procedures**: JS in the database
+- **Annotations**: Metadata on database objects
+- **SQL domains**: Semantic data types
+- **Boolean data type**: Native boolean (finally)
 
-    INSERT INTO users (id, email, display_name, status, created_at)
-    VALUES (p_user_id, LOWER(p_email), p_display_name, 'pending', SYSTIMESTAMP);
-
-    COMMIT;
-    p_status := 'SUCCESS';
-
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        p_status := 'ERROR: ' || SQLERRM;
-END create_user;
-/
-```
-
-### Pagination with ROWNUM/FETCH
-
-```sql
--- Oracle 12c+ (FETCH FIRST)
-SELECT id, email, display_name, created_at
-FROM users
-WHERE status = 'active'
-ORDER BY created_at DESC
-OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY;
-
--- Pre-12c (ROWNUM)
-SELECT * FROM (
-    SELECT u.*, ROWNUM rn FROM (
-        SELECT id, email, display_name, created_at
-        FROM users
-        WHERE status = 'active'
-        ORDER BY created_at DESC
-    ) u
-    WHERE ROWNUM <= :offset + :limit
-)
-WHERE rn > :offset;
-```
+### Concurrency & Transactions
+- **MERGE for upsert**: Atomic insert/update
+- **SELECT FOR UPDATE SKIP LOCKED**: Queue processing
+- **Autonomous transactions for logging**: Independent commit
+- **Read consistency**: Understand SCN
+- **Deadlock prevention**: Consistent ordering
 
 ### Analytic Functions
+- **RANK, DENSE_RANK, ROW_NUMBER**: Ordering within groups
+- **LAG, LEAD**: Previous/next row values
+- **RATIO_TO_REPORT**: Percentage of total
+- **LISTAGG**: String aggregation
+- **OVER (PARTITION BY)**: Window calculations
 
-```sql
--- Running totals and rankings
-SELECT
-    id,
-    email,
-    order_count,
-    RANK() OVER (ORDER BY order_count DESC) as rank,
-    SUM(order_count) OVER (ORDER BY created_at ROWS UNBOUNDED PRECEDING) as cumulative_orders,
-    LAG(order_count) OVER (ORDER BY created_at) as prev_order_count
-FROM user_stats;
-
--- Partitioned analytics
-SELECT
-    region,
-    user_id,
-    total_spent,
-    RATIO_TO_REPORT(total_spent) OVER (PARTITION BY region) as region_share
-FROM user_spending;
-```
-
-### Bulk Operations
-
-```sql
--- BULK COLLECT for efficient reads
-DECLARE
-    TYPE user_table IS TABLE OF users%ROWTYPE;
-    v_users user_table;
-BEGIN
-    SELECT * BULK COLLECT INTO v_users
-    FROM users
-    WHERE status = 'pending'
-    AND created_at < SYSTIMESTAMP - INTERVAL '7' DAY;
-
-    FORALL i IN 1..v_users.COUNT
-        UPDATE users SET status = 'inactive'
-        WHERE id = v_users(i).id;
-
-    COMMIT;
-END;
-/
-
--- MERGE for upsert
-MERGE INTO users target
-USING (SELECT :email AS email, :name AS display_name FROM dual) source
-ON (target.email = source.email)
-WHEN MATCHED THEN
-    UPDATE SET display_name = source.display_name, updated_at = SYSTIMESTAMP
-WHEN NOT MATCHED THEN
-    INSERT (id, email, display_name, status, created_at)
-    VALUES (SYS_GUID(), source.email, source.display_name, 'pending', SYSTIMESTAMP);
-```
-
-### Hints and Performance
-
-```sql
--- Index hints
-SELECT /*+ INDEX(u idx_users_status_created) */
-    id, email, display_name
-FROM users u
-WHERE status = 'active'
-ORDER BY created_at DESC;
-
--- Parallel execution
-SELECT /*+ PARALLEL(u, 4) */
-    region, COUNT(*) as user_count
-FROM users u
-GROUP BY region;
-```
+---
 
 ## Patterns to Avoid
-- ❌ SELECT * in production
-- ❌ Not using bind variables
-- ❌ Missing exception handling in PL/SQL
-- ❌ Cartesian joins without WHERE
+
+### PL/SQL Anti-Patterns
+- ❌ **Row-by-row processing**: Use BULK COLLECT/FORALL
+- ❌ **WHEN OTHERS without RAISE**: Swallows errors
+- ❌ **Commit inside loops**: Transaction fragmentation
+- ❌ **Implicit cursors in loops**: Use bulk operations
+- ❌ **Dynamic SQL without binds**: Injection risk, hard parse
+
+### Performance Anti-Patterns
+- ❌ **SELECT * in production**: Specify columns
+- ❌ **Not using bind variables**: Library cache bloat
+- ❌ **Missing indexes on FK columns**: Slow joins
+- ❌ **Full table scans unintentionally**: Check explain plan
+- ❌ **Cartesian joins**: Missing WHERE conditions
+
+### Design Anti-Patterns
+- ❌ **VARCHAR2 for numbers**: Use NUMBER
+- ❌ **Storing dates as strings**: Use DATE/TIMESTAMP
+- ❌ **No constraints**: Rely on app validation only
+- ❌ **Triggers for business logic**: Hard to debug/maintain
+
+### Concurrency Anti-Patterns
+- ❌ **Long transactions**: Hold locks, block others
+- ❌ **SELECT FOR UPDATE without NOWAIT/TIMEOUT**: Hangs
+- ❌ **Ignoring ORA-00060 deadlocks**: Need investigation
+- ❌ **Uncommitted changes in sessions**: Resource lock
+
+---
 
 ## Verification Checklist
-- [ ] Bind variables for all parameters
-- [ ] BULK COLLECT for large datasets
+
+### PL/SQL
+- [ ] BULK COLLECT for multi-row reads
+- [ ] FORALL for batch DML
 - [ ] Proper exception handling
+- [ ] Bind variables used
+
+### Performance
 - [ ] Execution plan reviewed
-- [ ] Indexes match query patterns
+- [ ] Indexes on query predicates
+- [ ] Statistics current (DBMS_STATS)
+- [ ] AWR/ASH for analysis
+
+### Schema
+- [ ] Primary keys on all tables
+- [ ] Foreign keys indexed
+- [ ] Constraints for integrity
+- [ ] Partitioning for large tables
+
+### Operational
+- [ ] Regular statistics gathering
+- [ ] Index maintenance
+- [ ] Backup/recovery tested
+- [ ] Alerting configured
+
+---
+
+## Code Patterns (Reference)
+
+### PL/SQL
+- **Bulk read**: `SELECT * BULK COLLECT INTO v_users FROM users WHERE status = 'pending';`
+- **Bulk write**: `FORALL i IN 1..v_users.COUNT UPDATE users SET status = 'active' WHERE id = v_users(i).id;`
+- **Exception**: `EXCEPTION WHEN OTHERS THEN ROLLBACK; RAISE;`
+
+### Queries
+- **Pagination (12c+)**: `SELECT * FROM users ORDER BY created_at DESC OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY;`
+- **MERGE**: `MERGE INTO t USING (...) ON (...) WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ...;`
+- **Analytics**: `SELECT id, RANK() OVER (ORDER BY score DESC) FROM users;`
+
+### Hints
+- **Index**: `SELECT /*+ INDEX(u idx_users_status) */ * FROM users u WHERE status = 'active';`
+- **Parallel**: `SELECT /*+ PARALLEL(u, 4) */ region, COUNT(*) FROM users u GROUP BY region;`
+
+### JSON (21c+)
+- **JSON column**: `CREATE TABLE t (id NUMBER, data JSON);`
+- **Query**: `SELECT JSON_VALUE(data, '$.name') FROM t;`
+

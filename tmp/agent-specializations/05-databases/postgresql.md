@@ -2,7 +2,7 @@
 name: postgresql
 type: database
 priority: 2
-token_estimate: 450
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [sql]
 ---
@@ -14,129 +14,128 @@ requires: [sql]
 ## Specialist Profile
 PostgreSQL specialist optimizing relational databases. Expert in query optimization, indexing strategies, and advanced features.
 
-## Implementation Guidelines
+---
 
-### Migrations
+## Patterns to Follow
 
-```sql
--- migrations/001_create_users.sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+### Index Strategy
+- **B-tree (default)**: Equality, range, ORDER BY, GROUP BY
+- **Hash**: Equality-only comparisons (fast)
+- **GIN**: Arrays, JSONB, full-text search
+- **GiST**: Geometric, ranges, full-text
+- **BRIN**: Large sequential tables (time-series)
+- **Partial indexes**: `WHERE status = 'active'` for subset
 
-    CONSTRAINT users_email_unique UNIQUE (email),
-    CONSTRAINT users_status_check CHECK (status IN ('active', 'inactive', 'pending'))
-);
+### Query Optimization
+- **EXPLAIN ANALYZE**: Always check query plans
+- **pg_stat_statements**: Find slowest queries
+- **CTEs for readability**: But know they can be optimization barriers
+- **JOINs over subqueries**: Usually more efficient
+- **LIMIT with ORDER BY**: Always together for pagination
+- **Cursor-based pagination**: For large datasets
 
-CREATE INDEX idx_users_email ON users (email);
-CREATE INDEX idx_users_status ON users (status) WHERE status = 'active';
-CREATE INDEX idx_users_created_at ON users (created_at DESC);
+### Memory Configuration
+- **shared_buffers**: 25% of RAM (starting point)
+- **work_mem**: 64-256MB for OLAP, lower for OLTP
+- **effective_cache_size**: 50-75% of RAM
+- **maintenance_work_mem**: Higher for VACUUM, CREATE INDEX
+- **random_page_cost**: 1.1 for SSD, 2.0 for spinning
 
--- Trigger for updated_at
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+### Connection Management
+- **Connection pooling**: PgBouncer or Pgpool-II
+- **Don't increase max_connections**: Use pooler instead
+- **Appropriate pool size**: `(cores * 2) + disk_spindles`
+- **Statement timeout**: Prevent runaway queries
 
-CREATE TRIGGER users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-```
+### Maintenance
+- **Autovacuum tuning**: Adjust for write-heavy tables
+- **ANALYZE regularly**: Update statistics
+- **Monitor bloat**: pg_stat_user_tables for dead tuples
+- **Reindex periodically**: Especially after bulk updates
 
-### Advanced Queries
+### Advanced Features
+- **JSONB with GIN**: Flexible schema + fast queries
+- **Full-text search**: tsvector, GIN index, plainto_tsquery
+- **Window functions**: RANK, ROW_NUMBER, LAG, LEAD
+- **UPSERT**: `ON CONFLICT DO UPDATE`
+- **Generated columns**: Computed at write time
 
-```sql
--- Pagination with cursor
-SELECT id, email, display_name, created_at
-FROM users
-WHERE created_at < $1  -- cursor
-  AND status = 'active'
-ORDER BY created_at DESC
-LIMIT 20;
-
--- Full-text search
-ALTER TABLE users ADD COLUMN search_vector tsvector
-    GENERATED ALWAYS AS (
-        setweight(to_tsvector('english', coalesce(display_name, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(email, '')), 'B')
-    ) STORED;
-
-CREATE INDEX idx_users_search ON users USING GIN (search_vector);
-
-SELECT * FROM users
-WHERE search_vector @@ plainto_tsquery('english', $1);
-
--- UPSERT
-INSERT INTO users (email, display_name, status)
-VALUES ($1, $2, $3)
-ON CONFLICT (email)
-DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    updated_at = NOW()
-RETURNING *;
-```
-
-### Window Functions
-
-```sql
--- Rank users by activity
-SELECT
-    id,
-    email,
-    order_count,
-    RANK() OVER (ORDER BY order_count DESC) as rank,
-    PERCENT_RANK() OVER (ORDER BY order_count DESC) as percentile
-FROM (
-    SELECT u.id, u.email, COUNT(o.id) as order_count
-    FROM users u
-    LEFT JOIN orders o ON o.user_id = u.id
-    GROUP BY u.id
-) sub;
-
--- Running totals
-SELECT
-    date_trunc('day', created_at) as day,
-    COUNT(*) as daily_signups,
-    SUM(COUNT(*)) OVER (ORDER BY date_trunc('day', created_at)) as cumulative
-FROM users
-GROUP BY 1
-ORDER BY 1;
-```
-
-### JSON Operations
-
-```sql
--- Store and query JSONB
-ALTER TABLE users ADD COLUMN preferences JSONB DEFAULT '{}';
-
-CREATE INDEX idx_users_preferences ON users USING GIN (preferences);
-
--- Query nested JSON
-SELECT * FROM users
-WHERE preferences @> '{"notifications": {"email": true}}';
-
--- Update nested value
-UPDATE users
-SET preferences = jsonb_set(preferences, '{theme}', '"dark"')
-WHERE id = $1;
-```
+---
 
 ## Patterns to Avoid
-- ❌ SELECT * in production
-- ❌ Missing indexes on foreign keys
-- ❌ Unbounded queries without LIMIT
-- ❌ N+1 in application code
+
+### Query Anti-Patterns
+- ❌ **SELECT * in production**: Select only needed columns
+- ❌ **Unbounded queries**: Always use LIMIT
+- ❌ **OFFSET for deep pagination**: Use cursor/keyset pagination
+- ❌ **Correlated subqueries**: Rewrite as JOINs
+- ❌ **Functions on indexed columns**: `WHERE LOWER(email) = ...`
+
+### Index Anti-Patterns
+- ❌ **Missing FK indexes**: Always index foreign keys
+- ❌ **Over-indexing**: Slows writes, wastes space
+- ❌ **Low-selectivity indexes**: Status with 3 values
+- ❌ **Unused indexes**: Check pg_stat_user_indexes
+
+### Configuration Anti-Patterns
+- ❌ **Default shared_buffers (128MB)**: Way too low
+- ❌ **High max_connections without pooling**: Memory exhaustion
+- ❌ **Disabled autovacuum**: Table bloat, transaction wraparound
+- ❌ **Missing statement_timeout**: Runaway queries
+
+### Schema Anti-Patterns
+- ❌ **VARCHAR without limit** on user input: Use TEXT or set limit
+- ❌ **Serial for new tables**: Use IDENTITY or UUID
+- ❌ **Storing money as float**: Use NUMERIC or bigint cents
+- ❌ **Timezone-naive timestamps**: Use TIMESTAMPTZ
+
+---
 
 ## Verification Checklist
-- [ ] Proper indexes for queries
-- [ ] Parameterized queries
-- [ ] Appropriate data types
-- [ ] Constraints for data integrity
-- [ ] EXPLAIN ANALYZE for complex queries
+
+### Indexes
+- [ ] Indexes on all foreign keys
+- [ ] Indexes match WHERE clauses
+- [ ] Partial indexes for common filters
+- [ ] GIN for JSONB/array columns
+- [ ] No unused indexes (check pg_stat_user_indexes)
+
+### Queries
+- [ ] EXPLAIN ANALYZE on slow queries
+- [ ] Parameterized queries (prevent injection)
+- [ ] Cursor pagination for large sets
+- [ ] Appropriate LIMIT on all queries
+
+### Configuration
+- [ ] shared_buffers tuned
+- [ ] Connection pooling configured
+- [ ] Autovacuum parameters reviewed
+- [ ] statement_timeout set
+
+### Maintenance
+- [ ] Regular ANALYZE runs
+- [ ] Bloat monitoring in place
+- [ ] Backup strategy tested
+- [ ] pg_stat_statements enabled
+
+---
+
+## Code Patterns (Reference)
+
+### Index Types
+- **B-tree**: `CREATE INDEX idx_users_email ON users (email);`
+- **Partial**: `CREATE INDEX idx_active_users ON users (created_at) WHERE status = 'active';`
+- **GIN (JSONB)**: `CREATE INDEX idx_prefs ON users USING GIN (preferences);`
+- **Full-text**: `CREATE INDEX idx_search ON users USING GIN (search_vector);`
+
+### Query Patterns
+- **Cursor pagination**: `SELECT * FROM users WHERE id > $cursor ORDER BY id LIMIT 20;`
+- **UPSERT**: `INSERT INTO t (k, v) VALUES (...) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v;`
+- **Window**: `SELECT *, RANK() OVER (ORDER BY score DESC) FROM users;`
+- **JSONB query**: `SELECT * FROM users WHERE prefs @> '{"theme": "dark"}';`
+
+### Maintenance
+- **Statistics**: `ANALYZE users;`
+- **Vacuum**: `VACUUM (VERBOSE, ANALYZE) users;`
+- **Reindex**: `REINDEX INDEX CONCURRENTLY idx_users_email;`
+

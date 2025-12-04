@@ -2,7 +2,7 @@
 name: prisma-orm
 type: database
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript]
 ---
@@ -12,157 +12,123 @@ requires: [typescript]
 # Prisma ORM Engineering Expertise
 
 ## Specialist Profile
-Prisma specialist building type-safe database access. Expert in schema design, relations, and query optimization.
+Prisma specialist building type-safe database access. Expert in schema design, query optimization, and Prisma ecosystem.
 
-## Implementation Guidelines
+---
 
-### Schema Definition
+## Patterns to Follow
 
-```prisma
-// prisma/schema.prisma
-generator client {
-  provider = "prisma-client-js"
-}
+### Schema Design
+- **Explicit @map for naming**: `@map("snake_case")` for DB columns
+- **@@map for table names**: Keep Prisma model names PascalCase
+- **Compound indexes**: `@@index([field1, field2])` for common queries
+- **onDelete/onUpdate**: Explicit referential actions
+- **Enums for status fields**: Type-safe, self-documenting
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+### Query Optimization
+- **Select specific fields**: Reduce data transfer
+- **Include for related data**: Avoid N+1
+- **Batch with createMany/updateMany**: More efficient
+- **Cursor pagination**: For large datasets
+- **Raw queries for complex**: `$queryRaw` when needed
 
-model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  displayName String   @map("display_name")
-  status      Status   @default(PENDING)
-  profile     Profile?
-  orders      Order[]
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+### Query Compiler (2025)
+<!-- version: prisma >= 6 -->
+- **Rust-free mode**: TypeScript-only, faster large queries
+- **Reduced CPU footprint**: No engine binary
+- **Faster complex queries**: Especially joins/aggregations
+- **Same API**: No code changes needed
 
-  @@index([status, createdAt(sort: Desc)])
-  @@map("users")
-}
+### Prisma Ecosystem
+- **Prisma Accelerate**: Connection pooling, caching
+- **Prisma Pulse**: Real-time database events
+- **Prisma Optimize**: Query analysis and recommendations
+- **OpenTelemetry integration**: Tracing and metrics
 
-model Profile {
-  id     String  @id @default(uuid())
-  avatar String?
-  bio    String?
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String  @unique @map("user_id")
+### Migration Best Practices
+- **prisma migrate for production**: Version-controlled migrations
+- **prisma db push for prototyping**: Fast iteration
+- **Never edit deployed migrations**: Create follow-up migrations
+- **Seed scripts**: Consistent test data
 
-  @@map("profiles")
-}
-
-enum Status {
-  ACTIVE
-  INACTIVE
-  PENDING
-}
-```
-
-### Repository Pattern
-
-```typescript
-// repositories/userRepository.ts
-import { PrismaClient, Prisma, User, Status } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-export const userRepository = {
-  async findAll(params: {
-    status?: Status;
-    cursor?: string;
-    take?: number;
-  }): Promise<User[]> {
-    return prisma.user.findMany({
-      where: { status: params.status },
-      take: params.take || 20,
-      skip: params.cursor ? 1 : 0,
-      cursor: params.cursor ? { id: params.cursor } : undefined,
-      orderBy: { createdAt: 'desc' },
-      include: { profile: true },
-    });
-  },
-
-  async findById(id: string) {
-    return prisma.user.findUnique({
-      where: { id },
-      include: { profile: true, orders: { take: 10 } },
-    });
-  },
-
-  async create(data: Prisma.UserCreateInput) {
-    return prisma.user.create({
-      data: {
-        ...data,
-        profile: { create: {} },
-      },
-      include: { profile: true },
-    });
-  },
-
-  async updateStatus(id: string, status: Status) {
-    return prisma.user.update({
-      where: { id },
-      data: { status },
-    });
-  },
-};
-```
-
-### Transactions
-
-```typescript
-// Complex transaction
-async function createUserWithOrder(
-  userData: Prisma.UserCreateInput,
-  orderData: Omit<Prisma.OrderCreateInput, 'user'>
-) {
-  return prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        ...userData,
-        profile: { create: {} },
-      },
-    });
-
-    const order = await tx.order.create({
-      data: {
-        ...orderData,
-        user: { connect: { id: user.id } },
-      },
-    });
-
-    return { user, order };
-  });
-}
-```
-
-### Raw Queries (When Needed)
-
-```typescript
-// Complex analytics
-const stats = await prisma.$queryRaw<UserStats[]>`
-  SELECT
-    status,
-    COUNT(*)::int as count,
-    DATE_TRUNC('day', created_at) as day
-  FROM users
-  WHERE created_at > ${startDate}
-  GROUP BY status, DATE_TRUNC('day', created_at)
-  ORDER BY day DESC
-`;
-```
+---
 
 ## Patterns to Avoid
-- ❌ N+1 queries (use include/select)
-- ❌ Fetching entire relations
-- ❌ Raw queries for simple operations
-- ❌ Missing indexes on filtered fields
+
+### Query Anti-Patterns
+- ❌ **N+1 queries**: Use include/select
+- ❌ **Fetching entire relations**: Use take/skip on relations
+- ❌ **Raw queries for simple ops**: Use type-safe client
+- ❌ **Missing select on large models**: Fetch only needed fields
+- ❌ **Not using transactions**: For related operations
+
+### Client Anti-Patterns
+- ❌ **Multiple PrismaClient instances**: Connection pool exhaustion
+- ❌ **No singleton pattern**: Create once, reuse
+- ❌ **Missing error handling**: Catch PrismaClientKnownRequestError
+- ❌ **Ignoring connection limits**: Especially in serverless
+
+### Schema Anti-Patterns
+- ❌ **Missing indexes on filtered fields**: Slow queries
+- ❌ **No referential actions**: Orphaned data
+- ❌ **Implicit many-to-many without control**: Use explicit join table
+- ❌ **No @map/@@@map**: Inconsistent naming
+
+### Migration Anti-Patterns
+- ❌ **db push in production**: Use migrate
+- ❌ **Editing deployed migrations**: Schema drift
+- ❌ **Missing rollback strategy**: Plan for failures
+- ❌ **Large migrations without testing**: Stage first
+
+---
 
 ## Verification Checklist
-- [ ] Proper relations defined
+
+### Schema
 - [ ] Indexes on query fields
-- [ ] Select only needed fields
-- [ ] Transactions for multi-operation
-- [ ] Migration history maintained
+- [ ] Explicit referential actions
+- [ ] @map/@@map for naming
+- [ ] Enums for status fields
+
+### Queries
+- [ ] include for related data
+- [ ] select for partial fields
+- [ ] Transactions for multi-ops
+- [ ] Cursor pagination for lists
+
+### Client
+- [ ] Singleton PrismaClient
+- [ ] Error handling for Prisma errors
+- [ ] Connection limits appropriate
+- [ ] Middleware for logging/metrics
+
+### Migrations
+- [ ] prisma migrate in CI/CD
+- [ ] Seed scripts maintained
+- [ ] Migration history in git
+- [ ] Tested in staging first
+
+---
+
+## Code Patterns (Reference)
+
+### Schema
+- **Model**: `model User { id String @id @default(uuid()) email String @unique @@map("users") }`
+- **Relation**: `posts Post[] // 1:many` or `profile Profile? // 1:1`
+- **Index**: `@@index([status, createdAt(sort: Desc)])`
+- **Enum**: `enum Status { ACTIVE INACTIVE PENDING }`
+
+### Queries
+- **Select fields**: `prisma.user.findMany({ select: { id: true, email: true } })`
+- **Include relation**: `prisma.user.findUnique({ where: { id }, include: { posts: { take: 10 } } })`
+- **Cursor pagination**: `prisma.user.findMany({ take: 20, skip: 1, cursor: { id: lastId } })`
+- **Batch create**: `prisma.user.createMany({ data: users, skipDuplicates: true })`
+
+### Transactions
+- **Interactive**: `prisma.$transaction(async (tx) => { await tx.user.create(...); await tx.profile.create(...); })`
+- **Batch**: `prisma.$transaction([prisma.user.create(...), prisma.profile.create(...)])`
+
+### Raw Query
+- **SQL**: `prisma.$queryRaw<Stats[]>\`SELECT status, COUNT(*)::int FROM users GROUP BY status\``
+- **Execute**: `prisma.$executeRaw\`UPDATE users SET status = 'inactive' WHERE ...\``
+

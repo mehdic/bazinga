@@ -2,7 +2,7 @@
 name: mongodb
 type: database
 priority: 2
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,138 +12,126 @@ requires: []
 # MongoDB Engineering Expertise
 
 ## Specialist Profile
-MongoDB specialist designing document databases. Expert in aggregation pipelines, schema design, and performance tuning.
+MongoDB specialist designing document databases. Expert in schema design patterns, aggregation pipelines, and performance tuning.
 
-## Implementation Guidelines
+---
 
-### Schema Design
+## Patterns to Follow
 
-```typescript
-// models/User.ts
-import { Schema, model, Types } from 'mongoose';
+### Schema Design Principles
+- **Data accessed together, stored together**: Embed related data
+- **Favor embedding over referencing**: For 1:1 and 1:few
+- **Reference for 1:many unbounded**: Avoid 16MB limit
+- **Subset Pattern**: Frequently accessed subset embedded
+- **Extended Reference**: Denormalize frequently joined fields
+- **Schema versioning**: Add `schemaVersion` field
 
-interface IUser {
-  _id: Types.ObjectId;
-  email: string;
-  displayName: string;
-  status: 'active' | 'inactive' | 'pending';
-  profile: {
-    avatar?: string;
-    bio?: string;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
+### Design Patterns
+- **Computed Pattern**: Pre-compute expensive aggregations
+- **Bucket Pattern**: Time-series, IoT data in buckets
+- **Outlier Pattern**: Separate treatment for edge cases
+- **Attribute Pattern**: Polymorphic attributes as array
+- **Polymorphic Pattern**: Different schemas in same collection
 
-const userSchema = new Schema<IUser>(
-  {
-    email: { type: String, required: true, unique: true, lowercase: true },
-    displayName: { type: String, required: true, minLength: 2 },
-    status: { type: String, enum: ['active', 'inactive', 'pending'], default: 'pending' },
-    profile: {
-      avatar: String,
-      bio: { type: String, maxLength: 500 },
-    },
-  },
-  { timestamps: true }
-);
+### Index Strategy
+- **Compound indexes**: Match query patterns
+- **Covered queries**: Index contains all fields
+- **Index order matters**: Match query filter/sort order
+- **Sparse indexes**: For optional fields
+- **TTL indexes**: Auto-expire documents
+- **Text indexes**: Full-text search
 
-userSchema.index({ status: 1, createdAt: -1 });
-userSchema.index({ email: 'text', displayName: 'text' });
+### Aggregation Best Practices
+- **$match early**: Filter before heavy operations
+- **$project to reduce size**: Before $lookup
+- **$lookup with indexes**: Ensure foreign key indexed
+- **Aggregation explain**: Check execution plan
+- **allowDiskUse for large**: When exceeding memory
 
-export const User = model<IUser>('User', userSchema);
-```
+### Performance
+- **Cursor-based pagination**: `_id: { $gt: lastId }` + limit
+- **lean() for read-only**: Skip Mongoose hydration
+- **bulkWrite for batch**: More efficient than loops
+- **Projection**: Select only needed fields
+- **Connection pooling**: Appropriate pool size
 
-### Aggregation Pipelines
-
-```typescript
-// Get user stats with orders
-const stats = await User.aggregate([
-  { $match: { status: 'active' } },
-  {
-    $lookup: {
-      from: 'orders',
-      localField: '_id',
-      foreignField: 'userId',
-      as: 'orders',
-    },
-  },
-  {
-    $addFields: {
-      orderCount: { $size: '$orders' },
-      totalSpent: { $sum: '$orders.amount' },
-    },
-  },
-  { $project: { orders: 0, password: 0 } },
-  { $sort: { totalSpent: -1 } },
-  { $limit: 100 },
-]);
-
-// Group by date
-const dailySignups = await User.aggregate([
-  {
-    $group: {
-      _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-      count: { $sum: 1 },
-    },
-  },
-  { $sort: { _id: 1 } },
-]);
-```
-
-### Transactions
-
-```typescript
-const session = await mongoose.startSession();
-try {
-  session.startTransaction();
-
-  const user = await User.create([{ email, displayName }], { session });
-  await Profile.create([{ userId: user[0]._id }], { session });
-  await sendWelcomeEmail(user[0].email);
-
-  await session.commitTransaction();
-  return user[0];
-} catch (error) {
-  await session.abortTransaction();
-  throw error;
-} finally {
-  session.endSession();
-}
-```
-
-### Query Optimization
-
-```typescript
-// Efficient pagination with cursor
-const users = await User.find({
-  status: 'active',
-  _id: { $gt: lastId }, // cursor-based
-})
-  .select('email displayName createdAt')
-  .sort({ _id: 1 })
-  .limit(20)
-  .lean(); // Returns plain objects
-
-// Bulk operations
-const bulkOps = users.map((user) => ({
-  updateOne: {
-    filter: { _id: user._id },
-    update: { $set: { status: 'inactive' } },
-  },
-}));
-await User.bulkWrite(bulkOps);
-```
+---
 
 ## Patterns to Avoid
-- ❌ Unbounded arrays in documents
-- ❌ Missing indexes on query fields
-- ❌ Skip-based pagination at scale
-- ❌ Storing related data separately without reason
+
+### Schema Anti-Patterns
+- ❌ **Unbounded arrays**: Will hit 16MB limit
+- ❌ **Bloated documents**: Split infrequently accessed data
+- ❌ **Massive arrays of references**: Hard to query
+- ❌ **Storing data separately without reason**: Loses document benefits
+- ❌ **Over-normalizing like SQL**: Embrace embedding
+
+### Query Anti-Patterns
+- ❌ **Missing indexes on query fields**: COLLSCAN in explain
+- ❌ **Skip-based pagination at scale**: Degrades with offset
+- ❌ **Fetching entire documents**: Use projection
+- ❌ **N+1 queries**: Use $lookup or embed
+- ❌ **Regex without anchor**: `^pattern` uses index, `pattern$` doesn't
+
+### Index Anti-Patterns
+- ❌ **Too many indexes**: Slows writes
+- ❌ **Wrong compound order**: Doesn't match queries
+- ❌ **Indexing low-cardinality**: Boolean fields alone
+- ❌ **Missing index on $lookup**: Slow joins
+
+### Performance Anti-Patterns
+- ❌ **Large documents over wire**: Project needed fields
+- ❌ **Not using lean()**: Unnecessary hydration
+- ❌ **Single-document loops**: Use bulkWrite
+- ❌ **No connection pooling**: Connection overhead
+
+---
 
 ## Verification Checklist
-- [ ] Appropriate schema design
+
+### Schema
+- [ ] Embedding vs referencing justified
+- [ ] No unbounded arrays
+- [ ] Schema version field present
+- [ ] Appropriate use of patterns
+
+### Indexes
 - [ ] Indexes match query patterns
-- [ ] Aggregation for complex queries
-- [ ] Lean queries where applicable
-- [ ] Transactions for multi-document ops
+- [ ] Compound index order correct
+- [ ] Explain shows IXSCAN not COLLSCAN
+- [ ] Covered queries where possible
+
+### Aggregation
+- [ ] $match early in pipeline
+- [ ] $project before expensive stages
+- [ ] allowDiskUse for large aggregations
+- [ ] Explain reviewed
+
+### Performance
+- [ ] Cursor-based pagination
+- [ ] lean() for read operations
+- [ ] bulkWrite for batch operations
+- [ ] Connection pool configured
+
+---
+
+## Code Patterns (Reference)
+
+### Schema (Mongoose)
+- **Model**: `const userSchema = new Schema({ email: { type: String, unique: true, lowercase: true } }, { timestamps: true });`
+- **Compound index**: `userSchema.index({ status: 1, createdAt: -1 });`
+- **Text index**: `userSchema.index({ email: 'text', displayName: 'text' });`
+
+### Queries
+- **Cursor pagination**: `User.find({ _id: { $gt: lastId } }).sort({ _id: 1 }).limit(20).lean()`
+- **Projection**: `User.find({}).select('email displayName -_id')`
+- **Bulk write**: `User.bulkWrite([{ updateOne: { filter: {...}, update: {...} } }])`
+
+### Aggregation
+- **Pipeline**: `User.aggregate([{ $match: { status: 'active' } }, { $lookup: {...} }, { $project: {...} }])`
+- **Group**: `{ $group: { _id: '$status', count: { $sum: 1 } } }`
+- **Date histogram**: `{ $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } } }`
+
+### Transactions
+- **Session**: `const session = await mongoose.startSession(); session.startTransaction(); ... session.commitTransaction();`
+

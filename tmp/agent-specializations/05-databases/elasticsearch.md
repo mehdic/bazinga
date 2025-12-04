@@ -2,7 +2,7 @@
 name: elasticsearch
 type: database
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,158 +12,123 @@ requires: []
 # Elasticsearch Engineering Expertise
 
 ## Specialist Profile
-Elasticsearch specialist building search and analytics solutions. Expert in mappings, queries, and aggregations.
+Elasticsearch specialist building search and analytics solutions. Expert in mappings, queries, aggregations, and cluster management.
 
-## Implementation Guidelines
+---
 
-### Index Mappings
+## Patterns to Follow
 
-```json
-{
-  "mappings": {
-    "properties": {
-      "id": { "type": "keyword" },
-      "email": { "type": "keyword" },
-      "displayName": {
-        "type": "text",
-        "analyzer": "standard",
-        "fields": {
-          "keyword": { "type": "keyword" },
-          "autocomplete": {
-            "type": "text",
-            "analyzer": "autocomplete"
-          }
-        }
-      },
-      "status": { "type": "keyword" },
-      "tags": { "type": "keyword" },
-      "createdAt": { "type": "date" }
-    }
-  },
-  "settings": {
-    "analysis": {
-      "analyzer": {
-        "autocomplete": {
-          "type": "custom",
-          "tokenizer": "standard",
-          "filter": ["lowercase", "autocomplete_filter"]
-        }
-      },
-      "filter": {
-        "autocomplete_filter": {
-          "type": "edge_ngram",
-          "min_gram": 2,
-          "max_gram": 20
-        }
-      }
-    }
-  }
-}
-```
+### Mapping Design
+- **Explicit mappings**: Define before indexing, never dynamic in production
+- **Keyword for exact match**: IDs, status, tags (not analyzed)
+- **Text for full-text**: With appropriate analyzer
+- **Multi-fields**: `displayName` as text + keyword + autocomplete
+- **doc_values: false**: On text fields not used for sorting/aggregation
 
-### Search Queries
+### Search Optimization
+- **bool query structure**: must/filter/should/must_not
+- **filter for non-scoring**: Cached, faster than must
+- **$match early in aggregations**: Reduce document set
+- **Scroll or search_after**: For deep pagination
+- **Index aliases**: Zero-downtime reindexing
 
-```typescript
-// Full-text search with filters
-const searchUsers = async (query: string, filters: SearchFilters) => {
-  const response = await client.search({
-    index: 'users',
-    body: {
-      query: {
-        bool: {
-          must: query
-            ? {
-                multi_match: {
-                  query,
-                  fields: ['displayName^2', 'email'],
-                  type: 'best_fields',
-                  fuzziness: 'AUTO',
-                },
-              }
-            : { match_all: {} },
-          filter: [
-            filters.status && { term: { status: filters.status } },
-            filters.tags?.length && { terms: { tags: filters.tags } },
-            filters.dateRange && {
-              range: {
-                createdAt: {
-                  gte: filters.dateRange.start,
-                  lte: filters.dateRange.end,
-                },
-              },
-            },
-          ].filter(Boolean),
-        },
-      },
-      sort: [{ _score: 'desc' }, { createdAt: 'desc' }],
-      from: filters.offset || 0,
-      size: filters.limit || 20,
-    },
-  });
-
-  return {
-    hits: response.hits.hits.map((hit) => hit._source),
-    total: response.hits.total,
-  };
-};
-```
+### Analyzers
+- **standard**: Good default for most text
+- **keyword**: No analysis, exact match
+- **edge_ngram**: Autocomplete/typeahead
+- **Custom analyzers**: Language-specific, synonyms
+- **Normalizers**: For keyword case-insensitivity
 
 ### Aggregations
+- **Terms for facets**: Category counts
+- **Date histogram**: Time-series bucketing
+- **Composite for pagination**: Large bucket sets
+- **Cardinality for unique**: Approximate distinct counts
+- **Sub-aggregations**: Nested analytics
 
-```typescript
-// Analytics query
-const getUserStats = async () => {
-  const response = await client.search({
-    index: 'users',
-    body: {
-      size: 0,
-      aggs: {
-        by_status: { terms: { field: 'status' } },
-        signups_over_time: {
-          date_histogram: {
-            field: 'createdAt',
-            calendar_interval: 'day',
-          },
-        },
-        top_tags: {
-          terms: { field: 'tags', size: 10 },
-        },
-      },
-    },
-  });
+### Cluster Best Practices
+- **Sharding strategy**: 20-50GB per shard
+- **Replica count**: At least 1 for HA
+- **Index lifecycle management (ILM)**: Auto-rollover, delete
+- **Hot-warm-cold**: Tiered storage for time-series
+- **Shard allocation**: Aware of zones
 
-  return response.aggregations;
-};
-```
-
-### Bulk Operations
-
-```typescript
-// Bulk indexing
-const bulkIndex = async (users: User[]) => {
-  const body = users.flatMap((user) => [
-    { index: { _index: 'users', _id: user.id } },
-    user,
-  ]);
-
-  const response = await client.bulk({ body, refresh: true });
-
-  if (response.errors) {
-    const errors = response.items.filter((item) => item.index?.error);
-    console.error('Bulk indexing errors:', errors);
-  }
-};
-```
+---
 
 ## Patterns to Avoid
-- ❌ Dynamic mappings in production
-- ❌ Deep pagination with from/size
-- ❌ Querying without filters
-- ❌ Missing index aliases
+
+### Mapping Anti-Patterns
+- ❌ **Dynamic mappings in production**: Mapping explosion
+- ❌ **Too many fields**: Mapping explosion, memory issues
+- ❌ **Missing index aliases**: Risky reindexing
+- ❌ **Changing existing field types**: Requires reindex
+
+### Query Anti-Patterns
+- ❌ **from/size deep pagination**: Memory explosion, slow
+- ❌ **Script scoring without cache**: CPU intensive
+- ❌ **Wildcard at start**: `*pattern` scans all terms
+- ❌ **must instead of filter**: Unnecessary scoring overhead
+- ❌ **Querying without index**: Full index scan
+
+### Index Anti-Patterns
+- ❌ **Too many shards**: Cluster overhead
+- ❌ **Too few shards**: Can't scale horizontally
+- ❌ **No replicas**: Single point of failure
+- ❌ **Missing ILM**: Manual cleanup, disk exhaustion
+
+### Operational Anti-Patterns
+- ❌ **Indexing without bulk**: One doc at a time
+- ❌ **refresh: true on every write**: Performance killer
+- ❌ **No monitoring**: Blind to issues
+- ❌ **Ignoring slow logs**: Hidden performance problems
+
+---
 
 ## Verification Checklist
+
+### Mappings
 - [ ] Explicit mappings defined
-- [ ] Appropriate analyzers
-- [ ] Scroll or search_after for deep pagination
-- [ ] Index aliases for zero-downtime reindexing
-- [ ] Bulk operations for batch processing
+- [ ] Appropriate field types (keyword vs text)
+- [ ] Custom analyzers for search requirements
+- [ ] Multi-fields where needed
+
+### Queries
+- [ ] filter for non-scoring clauses
+- [ ] search_after for deep pagination
+- [ ] Explain API for debugging relevance
+- [ ] Profile API for performance
+
+### Indexing
+- [ ] Bulk API for batch indexing
+- [ ] Index aliases in use
+- [ ] ILM policies configured
+- [ ] Appropriate refresh interval
+
+### Cluster
+- [ ] Shard size 20-50GB
+- [ ] Replicas for HA
+- [ ] Monitoring configured
+- [ ] Slow logs enabled
+
+---
+
+## Code Patterns (Reference)
+
+### Mappings
+- **Text + keyword**: `"title": { "type": "text", "fields": { "keyword": { "type": "keyword" } } }`
+- **Autocomplete**: `"analyzer": "autocomplete"` with edge_ngram filter
+- **Date**: `"createdAt": { "type": "date" }`
+
+### Search
+- **Bool query**: `{ "bool": { "must": [...], "filter": [...], "should": [...] } }`
+- **Multi-match**: `{ "multi_match": { "query": q, "fields": ["title^2", "body"], "fuzziness": "AUTO" } }`
+- **Filter (cached)**: `{ "filter": [{ "term": { "status": "active" } }, { "range": { "date": { "gte": "now-7d" } } }] }`
+
+### Aggregations
+- **Terms**: `{ "aggs": { "by_status": { "terms": { "field": "status" } } } }`
+- **Date histogram**: `{ "date_histogram": { "field": "createdAt", "calendar_interval": "day" } }`
+- **Composite (paginated)**: `{ "composite": { "size": 100, "sources": [...], "after": {...} } }`
+
+### Bulk
+- **Indexing**: `client.bulk({ body: docs.flatMap(d => [{ index: { _index: 'idx', _id: d.id } }, d]) })`
+

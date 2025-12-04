@@ -2,7 +2,7 @@
 name: sqlserver
 type: database
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: [sql]
 ---
@@ -14,157 +14,123 @@ requires: [sql]
 ## Specialist Profile
 SQL Server specialist building enterprise database solutions. Expert in T-SQL, query optimization, and SQL Server features.
 
-## Implementation Guidelines
+---
 
-### Stored Procedures
+## Patterns to Follow
 
-```sql
--- Stored procedure with error handling
-CREATE OR ALTER PROCEDURE dbo.CreateUser
-    @Email NVARCHAR(255),
-    @DisplayName NVARCHAR(100),
-    @UserId UNIQUEIDENTIFIER OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+### T-SQL Best Practices
+- **SET NOCOUNT ON**: In all procedures
+- **SET XACT_ABORT ON**: Auto-rollback on error
+- **TRY/CATCH for errors**: Structured error handling
+- **Table-valued parameters**: For batch operations
+- **OUTPUT clause**: Return affected rows
 
-    BEGIN TRY
-        BEGIN TRANSACTION;
+### Performance Optimization
+- **Parameterized queries**: Avoid plan cache bloat
+- **Execution plan analysis**: SET STATISTICS IO/TIME ON
+- **Index tuning advisor**: DMV-based recommendations
+- **Query Store**: Performance regression detection
+- **Columnstore for analytics**: Massive compression, fast aggregations
 
-        -- Check for duplicate
-        IF EXISTS (SELECT 1 FROM dbo.Users WHERE Email = LOWER(@Email))
-        BEGIN
-            RAISERROR('Email already exists', 16, 1);
-            RETURN;
-        END
-
-        SET @UserId = NEWID();
-
-        INSERT INTO dbo.Users (Id, Email, DisplayName, Status, CreatedAt)
-        VALUES (@UserId, LOWER(@Email), @DisplayName, 'pending', SYSUTCDATETIME());
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH
-END;
-GO
-```
-
-### Pagination
-
-```sql
--- SQL Server 2012+ (OFFSET/FETCH)
-SELECT Id, Email, DisplayName, CreatedAt
-FROM dbo.Users
-WHERE Status = 'active'
-ORDER BY CreatedAt DESC
-OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY;
-
--- With total count (efficient)
-WITH FilteredUsers AS (
-    SELECT Id, Email, DisplayName, CreatedAt,
-           COUNT(*) OVER() AS TotalCount
-    FROM dbo.Users
-    WHERE Status = 'active'
-)
-SELECT Id, Email, DisplayName, CreatedAt, TotalCount
-FROM FilteredUsers
-ORDER BY CreatedAt DESC
-OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY;
-```
+### Modern Features (2019+)
+<!-- version: sqlserver >= 2019 -->
+- **Intelligent Query Processing**: Auto-tuning
+- **Accelerated Database Recovery**: Fast recovery
+- **Memory-optimized TempDB**: Reduced contention
+- **APPROX_COUNT_DISTINCT**: Fast approximate counts
+- **Scalar UDF inlining**: Better performance
 
 ### Window Functions
-
-```sql
--- Rankings and running totals
-SELECT
-    Id,
-    Email,
-    OrderCount,
-    RANK() OVER (ORDER BY OrderCount DESC) AS Rank,
-    DENSE_RANK() OVER (ORDER BY OrderCount DESC) AS DenseRank,
-    SUM(OrderCount) OVER (ORDER BY CreatedAt ROWS UNBOUNDED PRECEDING) AS RunningTotal,
-    LAG(OrderCount) OVER (ORDER BY CreatedAt) AS PrevOrderCount,
-    LEAD(OrderCount) OVER (ORDER BY CreatedAt) AS NextOrderCount
-FROM dbo.UserStats;
-
--- Partitioned calculations
-SELECT
-    Region,
-    UserId,
-    TotalSpent,
-    TotalSpent * 100.0 / SUM(TotalSpent) OVER (PARTITION BY Region) AS RegionPercent
-FROM dbo.UserSpending;
-```
-
-### MERGE for Upsert
-
-```sql
-MERGE dbo.Users AS target
-USING (SELECT @Email AS Email, @DisplayName AS DisplayName) AS source
-ON target.Email = source.Email
-WHEN MATCHED THEN
-    UPDATE SET
-        DisplayName = source.DisplayName,
-        UpdatedAt = SYSUTCDATETIME()
-WHEN NOT MATCHED THEN
-    INSERT (Id, Email, DisplayName, Status, CreatedAt)
-    VALUES (NEWID(), source.Email, source.DisplayName, 'pending', SYSUTCDATETIME());
-```
+- **RANK, DENSE_RANK, ROW_NUMBER**: Ordering
+- **LAG, LEAD**: Access previous/next rows
+- **FIRST_VALUE, LAST_VALUE**: Boundary values
+- **SUM/COUNT OVER**: Running totals
+- **PERCENT_RANK, CUME_DIST**: Statistical
 
 ### JSON Support
+- **JSON_VALUE**: Extract scalar value
+- **JSON_QUERY**: Extract object/array
+- **JSON_MODIFY**: Update JSON
+- **OPENJSON**: Parse to rowset
+- **FOR JSON**: Generate JSON output
 
-```sql
--- SQL Server 2016+
--- Store and query JSON
-ALTER TABLE dbo.Users ADD Preferences NVARCHAR(MAX);
-
--- Query JSON
-SELECT Id, Email,
-    JSON_VALUE(Preferences, '$.theme') AS Theme,
-    JSON_VALUE(Preferences, '$.notifications.email') AS EmailNotifications
-FROM dbo.Users
-WHERE ISJSON(Preferences) = 1
-  AND JSON_VALUE(Preferences, '$.theme') = 'dark';
-
--- Update JSON
-UPDATE dbo.Users
-SET Preferences = JSON_MODIFY(Preferences, '$.theme', 'light')
-WHERE Id = @UserId;
-```
-
-### Table-Valued Parameters
-
-```sql
--- Create type
-CREATE TYPE dbo.UserIdList AS TABLE (Id UNIQUEIDENTIFIER);
-GO
-
--- Use in procedure
-CREATE PROCEDURE dbo.GetUsersByIds
-    @UserIds dbo.UserIdList READONLY
-AS
-BEGIN
-    SELECT u.*
-    FROM dbo.Users u
-    INNER JOIN @UserIds ids ON u.Id = ids.Id;
-END;
-GO
-```
+---
 
 ## Patterns to Avoid
-- ❌ NOLOCK hints without understanding
-- ❌ Cursors for set-based operations
-- ❌ SELECT * in production
-- ❌ Missing SET NOCOUNT ON
+
+### T-SQL Anti-Patterns
+- ❌ **Missing SET NOCOUNT ON**: Extra network chatter
+- ❌ **NOLOCK hints everywhere**: Dirty reads, not faster
+- ❌ **Cursors for set operations**: Use set-based SQL
+- ❌ **SELECT ***: Specify needed columns
+- ❌ **Scalar UDFs in WHERE**: Performance killer (pre-2019)
+
+### Performance Anti-Patterns
+- ❌ **Non-parameterized queries**: Plan bloat
+- ❌ **Functions on indexed columns**: Kills index usage
+- ❌ **Missing clustered index**: Heap tables
+- ❌ **Too many indexes**: Write overhead
+- ❌ **Ignoring statistics**: Stale = bad plans
+
+### Design Anti-Patterns
+- ❌ **Identity gaps as bug**: By design, not guaranteed
+- ❌ **Storing dates as strings**: Use DATE/DATETIME2
+- ❌ **VARCHAR for Unicode**: Use NVARCHAR
+- ❌ **FLOAT for money**: Use DECIMAL/MONEY
+
+### Error Handling Anti-Patterns
+- ❌ **No TRY/CATCH**: Unhandled errors
+- ❌ **RAISERROR without proper severity**: Use THROW
+- ❌ **Missing XACT_ABORT**: Partial transactions
+- ❌ **Ignoring @@TRANCOUNT**: Transaction leaks
+
+---
 
 ## Verification Checklist
-- [ ] SET NOCOUNT ON in procedures
-- [ ] Proper error handling (TRY/CATCH)
+
+### Procedures
+- [ ] SET NOCOUNT ON
+- [ ] SET XACT_ABORT ON
+- [ ] TRY/CATCH blocks
 - [ ] Parameterized queries
-- [ ] Execution plan reviewed
-- [ ] Appropriate indexes
+
+### Performance
+- [ ] Execution plans reviewed
+- [ ] Indexes on query predicates
+- [ ] Statistics up to date
+- [ ] Query Store enabled
+
+### Schema
+- [ ] Clustered index on all tables
+- [ ] Non-clustered for common queries
+- [ ] Appropriate data types
+- [ ] Constraints for integrity
+
+### Operational
+- [ ] Maintenance plans configured
+- [ ] Backup/restore tested
+- [ ] Monitoring alerts set
+- [ ] Index fragmentation managed
+
+---
+
+## Code Patterns (Reference)
+
+### Stored Procedure
+- **Template**: `CREATE OR ALTER PROCEDURE dbo.CreateUser ... AS BEGIN SET NOCOUNT ON; SET XACT_ABORT ON; BEGIN TRY BEGIN TRAN; ... COMMIT; END TRY BEGIN CATCH IF @@TRANCOUNT > 0 ROLLBACK; THROW; END CATCH END;`
+- **OUTPUT**: `INSERT INTO users (...) OUTPUT INSERTED.Id VALUES (...);`
+
+### Queries
+- **Pagination**: `SELECT * FROM users ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY;`
+- **Count with results**: `SELECT *, COUNT(*) OVER() AS TotalCount FROM users ORDER BY ... OFFSET ... FETCH ...;`
+- **MERGE**: `MERGE INTO t AS target USING (...) AS source ON ... WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ...;`
+
+### Window Functions
+- **Ranking**: `SELECT *, RANK() OVER (ORDER BY Score DESC) FROM users;`
+- **Running total**: `SELECT *, SUM(Amount) OVER (ORDER BY Date ROWS UNBOUNDED PRECEDING) FROM orders;`
+- **Partition**: `SELECT *, SUM(Amount) OVER (PARTITION BY UserId) AS UserTotal FROM orders;`
+
+### JSON
+- **Query**: `SELECT Id, JSON_VALUE(Preferences, '$.theme') AS Theme FROM users WHERE ISJSON(Preferences) = 1;`
+- **Modify**: `UPDATE users SET Preferences = JSON_MODIFY(Preferences, '$.theme', 'dark') WHERE Id = @Id;`
+

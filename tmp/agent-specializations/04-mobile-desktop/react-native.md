@@ -2,7 +2,7 @@
 name: react-native
 type: framework
 priority: 2
-token_estimate: 450
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript]
 ---
@@ -12,126 +12,126 @@ requires: [typescript]
 # React Native Engineering Expertise
 
 ## Specialist Profile
-React Native specialist building cross-platform mobile apps. Expert in native modules, navigation, and performance optimization.
+React Native specialist building cross-platform mobile apps. Expert in New Architecture, Expo, and performance optimization.
 
-## Implementation Guidelines
+---
 
-### Screens
+## Patterns to Follow
 
-```tsx
-// screens/UserListScreen.tsx
-import { FlatList, StyleSheet, View } from 'react-native';
-import { useUsers } from '../hooks/useUsers';
-import { UserCard } from '../components/UserCard';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+### New Architecture (RN 0.82+)
+<!-- version: react-native >= 0.82 -->
+- **Fabric Renderer**: Smoother animations, better native interop
+- **TurboModules**: Faster startup, efficient JS-native communication
+- **Hermes Engine**: Reduced memory, faster startup times
+- **Bridgeless mode**: Direct native calls without bridge overhead
 
-export function UserListScreen() {
-  const { data: users, isLoading, refetch } = useUsers();
+### Component Patterns
+- **Functional components with hooks**: Prefer over class components
+- **React.memo for expensive components**: Prevent unnecessary re-renders
+- **Custom hooks for reusable logic**: `useUsers`, `useAuth`, `useForm`
+- **Feature-based folder structure**: Group by feature not file type
+- **Atomic design**: Atoms → Molecules → Organisms → Templates
 
-  if (isLoading) return <LoadingSpinner />;
+### State Management
+- **React Query/TanStack Query**: Server state management
+- **Zustand or Jotai**: Simple client state
+- **Context for low-frequency updates**: Theme, locale
+- **Local state for UI-only**: Form inputs, toggles
 
-  return (
-    <View style={styles.container}>
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <UserCard user={item} />}
-        onRefresh={refetch}
-        refreshing={isLoading}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  separator: { height: 8 },
-});
-```
+### List Optimization
+- **FlatList with keyExtractor**: Never use index as key
+- **removeClippedSubviews**: Unmount off-screen items
+- **maxToRenderPerBatch**: Control batch size (default 10)
+- **windowSize**: Render window (default 21)
+- **getItemLayout for fixed heights**: Skip measurement
 
 ### Navigation
+- **React Navigation v6+**: Type-safe with TypeScript
+- **Native Stack Navigator**: Native performance
+- **Deep linking configuration**: Universal links support
+- **Expo Router**: File-based routing for Expo projects
 
-```tsx
-// navigation/RootNavigator.tsx
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+### Expo Best Practices
+- **Expo SDK 53+**: New Architecture support
+- **EAS Build**: Cloud builds with native modules
+- **Expo Router**: Next.js-like file routing
+- **Config plugins**: Extend native configuration
 
-export type RootStackParamList = {
-  Home: undefined;
-  UserDetails: { userId: string };
-  Settings: undefined;
-};
-
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
-export function RootNavigator() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="UserDetails" component={UserDetailsScreen} />
-    </Stack.Navigator>
-  );
-}
-```
-
-### Custom Hooks
-
-```tsx
-// hooks/useUsers.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api';
-
-export function useUsers() {
-  return useQuery({
-    queryKey: ['users'],
-    queryFn: api.getUsers,
-  });
-}
-
-export function useCreateUser() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: api.createUser,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-  });
-}
-```
-
-### Platform-Specific Code
-
-```tsx
-// components/Button.tsx
-import { Platform, Pressable, StyleSheet, Text } from 'react-native';
-
-export function Button({ title, onPress }: ButtonProps) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.button,
-        Platform.select({
-          ios: pressed && styles.pressedIos,
-          android: {},  // Uses built-in ripple
-        }),
-      ]}
-      android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
-      onPress={onPress}
-    >
-      <Text style={styles.text}>{title}</Text>
-    </Pressable>
-  );
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Inline styles everywhere (use StyleSheet)
-- ❌ Anonymous functions in renderItem
-- ❌ Missing keyExtractor in lists
-- ❌ Synchronous storage operations
+
+### Performance Anti-Patterns
+- ❌ **Anonymous functions in renderItem**: Creates new function each render
+- ❌ **Inline styles everywhere**: Use StyleSheet for optimization
+- ❌ **Missing keyExtractor**: Causes list re-render issues
+- ❌ **Large images without resizing**: Memory bloat
+- ❌ **Synchronous storage operations**: Block JS thread
+
+### Component Anti-Patterns
+- ❌ **Business logic in components**: Use hooks/services
+- ❌ **Prop drilling deeply**: Use context or state library
+- ❌ **Missing memo for expensive renders**: Profile with Flipper
+- ❌ **Using index as key in lists**: Breaks reconciliation
+
+### Navigation Anti-Patterns
+- ❌ **Untyped navigation params**: Type with RootStackParamList
+- ❌ **Heavy computation during navigation**: Defer with InteractionManager
+- ❌ **Missing back handler on Android**: Handle hardware back button
+- ❌ **Nested navigators without care**: Complex state management
+
+### State Anti-Patterns
+- ❌ **Storing derived state**: Compute from source
+- ❌ **Global state for local concerns**: Keep UI state local
+- ❌ **Missing error boundaries**: App crashes on error
+- ❌ **Not handling loading states**: Poor UX
+
+---
 
 ## Verification Checklist
-- [ ] TypeScript navigation types
-- [ ] React Query for data fetching
-- [ ] FlatList for long lists
-- [ ] Platform-specific handling
-- [ ] Proper list optimization
+
+### Architecture
+- [ ] New Architecture enabled (SDK 53+)
+- [ ] Feature-based folder structure
+- [ ] TypeScript throughout
+- [ ] Custom hooks for shared logic
+
+### Performance
+- [ ] FlatList optimized (keyExtractor, getItemLayout)
+- [ ] React.memo on expensive components
+- [ ] Images optimized and cached
+- [ ] Hermes engine enabled
+
+### Navigation
+- [ ] Type-safe navigation params
+- [ ] Deep linking configured
+- [ ] Android back handler
+- [ ] Screen options optimized
+
+### Testing
+- [ ] Jest for unit tests
+- [ ] React Native Testing Library for components
+- [ ] Detox for E2E (native) or Maestro
+- [ ] Test on both platforms
+
+---
+
+## Code Patterns (Reference)
+
+### Components
+- **Screen**: `export function UserListScreen() { const { data, isLoading } = useUsers(); ... }`
+- **FlatList**: `<FlatList data={users} keyExtractor={u => u.id} renderItem={UserCard} getItemLayout={...} />`
+- **Memoized**: `export const UserCard = React.memo(({ user }: Props) => ...)`
+
+### Hooks
+- **Query hook**: `export function useUsers() { return useQuery({ queryKey: ['users'], queryFn: api.getUsers }); }`
+- **Mutation hook**: `export function useCreateUser() { return useMutation({ mutationFn: api.createUser, onSuccess: ... }); }`
+
+### Navigation
+- **Type-safe params**: `export type RootStackParamList = { Home: undefined; User: { id: string } };`
+- **Navigator**: `const Stack = createNativeStackNavigator<RootStackParamList>();`
+
+### Platform-Specific
+- **Platform.select**: `Platform.select({ ios: styles.iosShadow, android: styles.elevation })`
+- **File extension**: `Button.ios.tsx`, `Button.android.tsx`
+

@@ -2,7 +2,7 @@
 name: redis
 type: database
 priority: 2
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,145 +12,123 @@ requires: []
 # Redis Engineering Expertise
 
 ## Specialist Profile
-Redis specialist building high-performance caches and data stores. Expert in data structures, caching patterns, and pub/sub.
+Redis specialist building high-performance caches and data stores. Expert in data structures, caching patterns, and distributed systems.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Caching Patterns
+- **Cache-aside (lazy loading)**: Check cache, fetch on miss, populate
+- **Write-through**: Write to cache and DB synchronously
+- **Write-behind (write-back)**: Write to cache, async to DB
+- **Cache prefetching**: Pre-populate before needed
+- **Multi-tier caching**: L1 (memory) → L2 (Redis) → DB
 
-```typescript
-// services/cache.ts
-import Redis from 'ioredis';
-
-const redis = new Redis(process.env.REDIS_URL);
-
-export async function getOrSet<T>(
-  key: string,
-  fetcher: () => Promise<T>,
-  ttlSeconds = 3600
-): Promise<T> {
-  const cached = await redis.get(key);
-  if (cached) return JSON.parse(cached);
-
-  const fresh = await fetcher();
-  await redis.setex(key, ttlSeconds, JSON.stringify(fresh));
-  return fresh;
-}
-
-// Cache-aside pattern
-export async function getUser(id: string): Promise<User | null> {
-  return getOrSet(`user:${id}`, () => db.users.findById(id), 300);
-}
-
-// Invalidation
-export async function invalidateUser(id: string): Promise<void> {
-  await redis.del(`user:${id}`);
-}
-```
+### TTL Strategies
+- **Fixed TTL**: All keys expire after set time
+- **Sliding TTL**: Reset on access
+- **Randomized TTL**: Add jitter to prevent stampede
+- **Never forget TTL**: Set on ALL cache keys
+- **allkeys-lru policy**: For general caching
 
 ### Data Structures
+- **Strings**: Simple key-value, counters
+- **Hashes**: Object storage (20% less memory than strings)
+- **Lists**: Queues, recent items, feeds
+- **Sets**: Unique values, relationships
+- **Sorted Sets**: Leaderboards, time-series, rate limiting
+- **Streams**: Event streaming, message queues
 
-```typescript
-// Rate limiting with sliding window
-export async function checkRateLimit(
-  userId: string,
-  limit: number,
-  windowSeconds: number
-): Promise<boolean> {
-  const key = `ratelimit:${userId}`;
-  const now = Date.now();
-  const windowStart = now - windowSeconds * 1000;
+### Performance Optimization
+- **Pipelining**: Batch multiple commands
+- **Connection pooling**: Reuse connections
+- **Lua scripts**: Atomic complex operations
+- **SCAN over KEYS**: Non-blocking iteration
+- **Appropriate data structures**: Hashes for objects, not JSON strings
 
-  const pipeline = redis.pipeline();
-  pipeline.zremrangebyscore(key, 0, windowStart);
-  pipeline.zadd(key, now, `${now}`);
-  pipeline.zcard(key);
-  pipeline.expire(key, windowSeconds);
+### Distributed Patterns
+- **Redis Cluster**: Horizontal scaling, 70% throughput boost
+- **Redlock**: Distributed locking across nodes
+- **Pub/Sub**: Real-time event broadcast
+- **Streams**: Reliable message queue with consumer groups
 
-  const results = await pipeline.exec();
-  const count = results?.[2]?.[1] as number;
-  return count <= limit;
-}
-
-// Leaderboard
-export async function updateScore(userId: string, score: number): Promise<void> {
-  await redis.zadd('leaderboard', score, userId);
-}
-
-export async function getTopUsers(count: number): Promise<string[]> {
-  return redis.zrevrange('leaderboard', 0, count - 1, 'WITHSCORES');
-}
-
-// Session storage
-export async function setSession(
-  sessionId: string,
-  data: SessionData,
-  ttl = 86400
-): Promise<void> {
-  await redis.hset(`session:${sessionId}`, data);
-  await redis.expire(`session:${sessionId}`, ttl);
-}
-```
-
-### Pub/Sub
-
-```typescript
-// Publisher
-export async function publishEvent(channel: string, event: unknown): Promise<void> {
-  await redis.publish(channel, JSON.stringify(event));
-}
-
-// Subscriber
-const subscriber = redis.duplicate();
-subscriber.subscribe('user-events', (err) => {
-  if (err) console.error('Subscribe error:', err);
-});
-
-subscriber.on('message', (channel, message) => {
-  const event = JSON.parse(message);
-  handleEvent(channel, event);
-});
-```
-
-### Distributed Locking
-
-```typescript
-// Redlock pattern
-export async function withLock<T>(
-  key: string,
-  fn: () => Promise<T>,
-  ttlMs = 10000
-): Promise<T> {
-  const lockKey = `lock:${key}`;
-  const lockValue = crypto.randomUUID();
-
-  const acquired = await redis.set(lockKey, lockValue, 'PX', ttlMs, 'NX');
-  if (!acquired) throw new Error('Could not acquire lock');
-
-  try {
-    return await fn();
-  } finally {
-    // Release only if we own the lock
-    const script = `
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-      end
-      return 0
-    `;
-    await redis.eval(script, 1, lockKey, lockValue);
-  }
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Storing large objects (>100KB)
-- ❌ Using KEYS in production
-- ❌ Missing TTL on cache entries
-- ❌ Single point of failure
+
+### Cache Anti-Patterns
+- ❌ **Missing TTL on cache entries**: Memory leak
+- ❌ **Cache as primary data store**: Volatile, not durable
+- ❌ **Overloading with full datasets**: Cache hot data only
+- ❌ **Same TTL for everything**: Cache stampede risk
+- ❌ **Ignoring cache misses in metrics**: Hidden latency
+
+### Command Anti-Patterns
+- ❌ **KEYS in production**: Blocks all operations
+- ❌ **Large objects (>100KB)**: Latency spikes
+- ❌ **Storing JSON when hash works**: Memory waste
+- ❌ **Sync operations without timeout**: Hangs on network issues
+- ❌ **DEL on large collections**: Use UNLINK (async)
+
+### Architecture Anti-Patterns
+- ❌ **Single point of failure**: Use Sentinel or Cluster
+- ❌ **No connection pooling**: Connection overhead
+- ❌ **Missing persistence config**: Data loss on restart
+- ❌ **Blocking operations on main thread**: Use async clients
+
+### Key Anti-Patterns
+- ❌ **No key naming convention**: Chaos
+- ❌ **Extremely long keys**: Memory waste
+- ❌ **No namespace prefixes**: Key collisions
+- ❌ **PII in keys**: Security/compliance risk
+
+---
 
 ## Verification Checklist
-- [ ] Appropriate data structures
+
+### Caching
 - [ ] TTL on all cache entries
-- [ ] Connection pooling
-- [ ] Error handling for cache misses
+- [ ] Appropriate eviction policy
+- [ ] Cache invalidation strategy
+- [ ] Stampede prevention (jittered TTL)
+
+### Performance
+- [ ] Pipelining for batch operations
+- [ ] Connection pooling configured
 - [ ] Lua scripts for atomic operations
+- [ ] SCAN used, not KEYS
+
+### Data Structures
+- [ ] Hashes for object storage
+- [ ] Sorted sets for leaderboards/rate limits
+- [ ] Appropriate structure per use case
+- [ ] Key naming convention
+
+### Reliability
+- [ ] Sentinel or Cluster for HA
+- [ ] Persistence configured (RDB/AOF)
+- [ ] Memory limits set
+- [ ] Monitoring in place (redis-cli INFO)
+
+---
+
+## Code Patterns (Reference)
+
+### Caching
+- **Cache-aside**: `const cached = await redis.get(key); if (cached) return JSON.parse(cached); const fresh = await fetch(); await redis.setex(key, ttl, JSON.stringify(fresh));`
+- **Invalidation**: `await redis.del(cacheKey);` or `await redis.unlink(cacheKey);`
+
+### Data Structures
+- **Hash**: `redis.hset('user:123', { name: 'John', email: '...' }); redis.hgetall('user:123');`
+- **Sorted set**: `redis.zadd('leaderboard', score, odId); redis.zrevrange('leaderboard', 0, 9);`
+- **Rate limit**: `redis.pipeline().zremrangebyscore(key, 0, windowStart).zadd(key, now, now).zcard(key).expire(key, windowSec).exec();`
+
+### Locking
+- **Acquire**: `redis.set(lockKey, lockValue, 'PX', ttlMs, 'NX')`
+- **Release (Lua)**: `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) end`
+
+### Pub/Sub
+- **Publish**: `redis.publish(channel, JSON.stringify(event))`
+- **Subscribe**: `subscriber.subscribe(channel); subscriber.on('message', handler)`
+
