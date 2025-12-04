@@ -2,7 +2,7 @@
 name: gin-fiber
 type: framework
 priority: 2
-token_estimate: 400
+token_estimate: 500
 compatible_with: [developer, senior_software_engineer]
 requires: [go]
 ---
@@ -14,166 +14,115 @@ requires: [go]
 ## Specialist Profile
 Go web framework specialist building high-performance APIs. Expert in Gin, Fiber, and idiomatic Go patterns.
 
-## Implementation Guidelines
+---
 
-### Gin Handlers
+## Patterns to Follow
 
-```go
-// handlers/user.go
-type UserHandler struct {
-    service *UserService
-}
+### Application Structure
+- **Handler structs**: Inject dependencies via constructor
+- **Service layer**: Business logic separate from handlers
+- **Repository pattern**: Data access abstraction
+- **Config struct**: Environment-based configuration
+- **Wire/manual DI**: Explicit dependency wiring
 
-func NewUserHandler(s *UserService) *UserHandler {
-    return &UserHandler{service: s}
-}
-
-func (h *UserHandler) GetAll(c *gin.Context) {
-    users, err := h.service.FindAll(c.Request.Context())
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, users)
-}
-
-func (h *UserHandler) Create(c *gin.Context) {
-    var req CreateUserRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
-
-    user, err := h.service.Create(c.Request.Context(), req)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusCreated, user)
-}
-```
-
-### Fiber Handlers
-
-```go
-// handlers/user.go
-type UserHandler struct {
-    service *UserService
-}
-
-func (h *UserHandler) GetAll(c *fiber.Ctx) error {
-    users, err := h.service.FindAll(c.Context())
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": err.Error(),
-        })
-    }
-    return c.JSON(users)
-}
-
-func (h *UserHandler) Create(c *fiber.Ctx) error {
-    var req CreateUserRequest
-    if err := c.BodyParser(&req); err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "error": err.Error(),
-        })
-    }
-
-    user, err := h.service.Create(c.Context(), req)
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": err.Error(),
-        })
-    }
-    return c.Status(fiber.StatusCreated).JSON(user)
-}
-```
+### Handler Patterns
+- **Context propagation**: Pass `ctx context.Context`
+- **Structured responses**: Consistent JSON format
+- **Proper status codes**: 201, 204, 400, 404, 500
+- **Error return convention**: Return error, let middleware handle
+- **Binding with validation**: `ShouldBindJSON` + validator tags
 
 ### Middleware
+- **Recovery**: Panic recovery for resilience
+- **Logging**: Request/response logging
+- **Auth middleware**: JWT validation
+- **Rate limiting**: Protect endpoints
+- **CORS**: Configure for API access
 
-```go
-// Gin middleware
-func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        token := c.GetHeader("Authorization")
-        if token == "" {
-            c.AbortWithStatusJSON(401, gin.H{"error": "unauthorized"})
-            return
-        }
+### Error Handling
+- **Custom error types**: Domain-specific errors
+- **Error middleware**: Central error handler
+- **Error wrapping**: Add context with `fmt.Errorf("...: %w", err)`
+- **Structured error responses**: Code + message format
 
-        user, err := validateToken(token)
-        if err != nil {
-            c.AbortWithStatusJSON(401, gin.H{"error": "invalid token"})
-            return
-        }
+### Graceful Shutdown
+- **Signal handling**: SIGTERM, SIGINT
+- **Timeout for shutdown**: Give requests time to complete
+- **Close connections**: Database, cache, etc.
+- **Health endpoints**: `/health`, `/ready`
 
-        c.Set("user", user)
-        c.Next()
-    }
-}
-
-// Fiber middleware
-func AuthMiddleware() fiber.Handler {
-    return func(c *fiber.Ctx) error {
-        token := c.Get("Authorization")
-        if token == "" {
-            return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
-        }
-
-        user, err := validateToken(token)
-        if err != nil {
-            return c.Status(401).JSON(fiber.Map{"error": "invalid token"})
-        }
-
-        c.Locals("user", user)
-        return c.Next()
-    }
-}
-```
-
-### Router Setup
-
-```go
-// Gin
-func SetupRouter(userHandler *UserHandler) *gin.Engine {
-    r := gin.Default()
-    r.Use(gin.Recovery())
-
-    api := r.Group("/api/v1")
-    {
-        users := api.Group("/users")
-        users.GET("", userHandler.GetAll)
-        users.POST("", userHandler.Create)
-        users.GET("/:id", userHandler.GetByID)
-    }
-
-    return r
-}
-
-// Fiber
-func SetupRouter(userHandler *UserHandler) *fiber.App {
-    app := fiber.New(fiber.Config{
-        ErrorHandler: customErrorHandler,
-    })
-
-    api := app.Group("/api/v1")
-    users := api.Group("/users")
-    users.Get("/", userHandler.GetAll)
-    users.Post("/", userHandler.Create)
-
-    return app
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Panic in handlers (return errors)
-- ❌ Global state
-- ❌ Blocking operations without context
-- ❌ Missing graceful shutdown
+
+### Handler Anti-Patterns
+- ❌ **Panic in handlers**: Return errors instead
+- ❌ **Global state**: Inject dependencies
+- ❌ **Ignoring context**: Propagate for cancellation
+- ❌ **Business logic in handlers**: Use services
+
+### Error Anti-Patterns
+- ❌ **Swallowing errors**: Always handle or return
+- ❌ **Generic error messages**: Provide context
+- ❌ **Panic for errors**: Reserve for unrecoverable
+- ❌ **No error middleware**: Handle consistently
+
+### Concurrency Anti-Patterns
+- ❌ **Goroutine leaks**: Always ensure exit path
+- ❌ **Missing sync**: Protect shared state
+- ❌ **Ignoring context cancellation**: Check in loops
+- ❌ **Blocking without timeout**: Use context deadline
+
+### API Anti-Patterns
+- ❌ **Missing validation**: Validate all input
+- ❌ **Inconsistent response format**: Standardize structure
+- ❌ **No graceful shutdown**: Requests get dropped
+- ❌ **Missing health checks**: Hard to monitor
+
+---
 
 ## Verification Checklist
-- [ ] Proper error handling
-- [ ] Context propagation
-- [ ] Middleware for cross-cutting
-- [ ] Graceful shutdown
-- [ ] Request validation
+
+### Application
+- [ ] Dependency injection configured
+- [ ] Service layer for logic
+- [ ] Configuration from environment
+- [ ] Graceful shutdown implemented
+
+### Error Handling
+- [ ] Custom error types
+- [ ] Error middleware
+- [ ] Consistent response format
+- [ ] Error logging
+
+### Security
+- [ ] Authentication middleware
+- [ ] Input validation
+- [ ] Rate limiting
+- [ ] CORS configured
+
+### Operational
+- [ ] Health check endpoints
+- [ ] Request logging
+- [ ] Panic recovery
+- [ ] Metrics endpoint
+
+---
+
+## Code Patterns (Reference)
+
+### Gin Constructs
+- **Handler**: `func (h *UserHandler) Create(c *gin.Context) { var req Request; c.ShouldBindJSON(&req); ... }`
+- **Router**: `r.Group("/api").Use(AuthMiddleware()).GET("/users", h.GetAll)`
+- **Middleware**: `func Auth() gin.HandlerFunc { return func(c *gin.Context) { ... c.Next() } }`
+- **Recovery**: `r.Use(gin.Recovery())`
+
+### Fiber Constructs
+- **Handler**: `func (h *UserHandler) Create(c *fiber.Ctx) error { var req Request; c.BodyParser(&req); ... }`
+- **Router**: `api := app.Group("/api", AuthMiddleware); api.Get("/users", h.GetAll)`
+- **Error handler**: `app := fiber.New(fiber.Config{ErrorHandler: customHandler})`
+
+### Shared Patterns
+- **Graceful shutdown**: `srv.Shutdown(ctx)` with signal handling
+- **Health**: `GET /health -> {"status": "ok"}`
+

@@ -2,235 +2,122 @@
 name: spring-boot
 type: framework
 priority: 2
-token_estimate: 600
+token_estimate: 650
 compatible_with: [developer, senior_software_engineer]
 requires: [java]
 ---
 
-> **PRECEDENCE**: Base agent workflow, routing, and reporting rules take precedence over this guidance.
+> **PRECEDENCE**: Base agent workflow rules take precedence over this guidance.
 
 # Spring Boot Engineering Expertise
 
 ## Specialist Profile
+Spring Boot specialist building production-grade applications. Expert in dependency injection, JPA, and reactive patterns.
 
-Spring Boot specialist building production-grade applications. Deep understanding of Spring ecosystem, dependency injection, and reactive patterns.
+---
 
-## Implementation Guidelines
+## Patterns to Follow
 
-### Controller Layer
+### Layered Architecture
+- **Controller → Service → Repository**: Clear separation
+- **DTOs for APIs**: Don't expose entities
+- **Mappers**: MapStruct or manual for entity ↔ DTO
+- **Thin controllers**: Validation and routing only
+- **Fat services**: Business logic here
 
-<!-- version: spring-boot >= 3.0 -->
-```java
-@RestController
-@RequestMapping("/api/v1/users")
-@RequiredArgsConstructor
-@Tag(name = "Users", description = "User management endpoints")
-public class UserController {
+### Dependency Injection
+- **Constructor injection**: Immutable dependencies
+- **`@RequiredArgsConstructor`**: Lombok for brevity
+- **Interface-based design**: For testability
+- **`@Qualifier` for ambiguity**: Multiple implementations
+- **`@ConfigurationProperties`**: Type-safe config
 
-    private final UserService userService;
+### Transaction Management
+- **`@Transactional` on services**: Not controllers
+- **`readOnly = true` for reads**: Optimization hint
+- **Propagation understanding**: REQUIRED vs REQUIRES_NEW
+- **Rollback for checked**: Configure explicitly
 
-    @GetMapping("/{id}")
-    @Operation(summary = "Get user by ID")
-    public ResponseEntity<UserDto> getUser(@PathVariable UUID id) {
-        return userService.findById(id)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
-    }
+### Virtual Threads (Spring Boot 3.2+)
+<!-- version: spring-boot >= 3.2 -->
+- **Enable via property**: `spring.threads.virtual.enabled=true`
+- **2x throughput improvement**: For blocking I/O
+- **No code changes needed**: Automatic executor
+- **Not for CPU-bound**: Only benefits I/O
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public UserDto createUser(@Valid @RequestBody CreateUserRequest request) {
-        return userService.create(request);
-    }
-}
-```
+### Data Access
+- **JPA repositories**: Spring Data magic
+- **`@EntityGraph`**: Solve N+1 selectively
+- **Native queries sparingly**: When JPA isn't enough
+- **Pagination**: `Pageable` parameter
 
-<!-- version: spring-boot >= 2.0, spring-boot < 3.0 -->
-```java
-@RestController
-@RequestMapping("/api/v1/users")
-@RequiredArgsConstructor
-@Api(tags = "Users")
-public class UserController {
-
-    private final UserService userService;
-
-    @GetMapping("/{id}")
-    @ApiOperation("Get user by ID")
-    public ResponseEntity<UserDto> getUser(@PathVariable UUID id) {
-        return userService.findById(id)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public UserDto createUser(@Valid @RequestBody CreateUserRequest request) {
-        return userService.create(request);
-    }
-}
-```
-
-### Service Layer
-
-```java
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class UserService {
-
-    private final UserRepository userRepository;
-    private final UserMapper userMapper;
-
-    public Optional<UserDto> findById(UUID id) {
-        return userRepository.findById(id)
-            .map(userMapper::toDto);
-    }
-
-    @Transactional
-    public UserDto create(CreateUserRequest request) {
-        User user = userMapper.toEntity(request);
-        User saved = userRepository.save(user);
-        return userMapper.toDto(saved);
-    }
-
-    public Page<UserDto> findAll(Pageable pageable) {
-        return userRepository.findAll(pageable)
-            .map(userMapper::toDto);
-    }
-}
-```
-
-### Repository Layer
-
-```java
-public interface UserRepository extends JpaRepository<User, UUID> {
-
-    Optional<User> findByEmail(String email);
-
-    @Query("SELECT u FROM User u WHERE u.status = :status")
-    Page<User> findByStatus(@Param("status") UserStatus status, Pageable pageable);
-
-    boolean existsByEmail(String email);
-}
-```
-
-### Exception Handling
-
-```java
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(EntityNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(new ErrorResponse("NOT_FOUND", ex.getMessage()));
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
-        List<FieldError> errors = ex.getBindingResult().getFieldErrors().stream()
-            .map(e -> new FieldError(e.getField(), e.getDefaultMessage()))
-            .toList();
-        return ResponseEntity.badRequest()
-            .body(new ErrorResponse("VALIDATION_ERROR", "Validation failed", errors));
-    }
-}
-```
-
-### Configuration
-
-<!-- style: uses_lombok -->
-```java
-@Configuration
-@ConfigurationProperties(prefix = "app")
-@Data
-public class AppProperties {
-    private String apiKey;
-    private Duration timeout = Duration.ofSeconds(30);
-    private int maxRetries = 3;
-}
-```
-
-<!-- style: !uses_lombok -->
-```java
-@Configuration
-@ConfigurationProperties(prefix = "app")
-public class AppProperties {
-    private String apiKey;
-    private Duration timeout = Duration.ofSeconds(30);
-    private int maxRetries = 3;
-
-    // Getters and setters...
-}
-```
-
-### Testing
-
-```java
-@WebMvcTest(UserController.class)
-class UserControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
-    private UserService userService;
-
-    @Test
-    void getUser_whenExists_returnsUser() throws Exception {
-        UUID id = UUID.randomUUID();
-        UserDto user = new UserDto(id, "test@example.com", "Test User");
-        when(userService.findById(id)).thenReturn(Optional.of(user));
-
-        mockMvc.perform(get("/api/v1/users/{id}", id))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.email").value("test@example.com"));
-    }
-
-    @Test
-    void getUser_whenNotExists_returns404() throws Exception {
-        UUID id = UUID.randomUUID();
-        when(userService.findById(id)).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/api/v1/users/{id}", id))
-            .andExpect(status().isNotFound());
-    }
-}
-
-@SpringBootTest
-@Transactional
-class UserServiceIntegrationTest {
-
-    @Autowired
-    private UserService userService;
-
-    @Test
-    void create_savesUser() {
-        CreateUserRequest request = new CreateUserRequest("test@example.com", "Test");
-        UserDto result = userService.create(request);
-
-        assertThat(result.email()).isEqualTo("test@example.com");
-        assertThat(userService.findById(result.id())).isPresent();
-    }
-}
-```
+---
 
 ## Patterns to Avoid
 
-- Field injection (`@Autowired` on fields) → Use constructor injection
-- Business logic in controllers → Move to service layer
-- Missing `@Transactional` on write operations
-- N+1 queries → Use `@EntityGraph` or join fetch
-- Exposing entities directly → Use DTOs
-- Hardcoded configuration → Use `@ConfigurationProperties`
+### DI Anti-Patterns
+- ❌ **Field injection**: Use constructor
+- ❌ **Circular dependencies**: Restructure
+- ❌ **`new` for services**: Let Spring manage
+- ❌ **Static methods on services**: Inject instances
+
+### Transaction Anti-Patterns
+- ❌ **`@Transactional` on controllers**: Service layer only
+- ❌ **Missing `readOnly`**: Performance impact
+- ❌ **Long transactions**: Hold locks briefly
+- ❌ **Catching exceptions inside**: Breaks rollback
+
+### JPA Anti-Patterns
+- ❌ **N+1 queries**: Use `@EntityGraph` or fetch join
+- ❌ **Exposing entities**: Use DTOs
+- ❌ **Lazy loading in controllers**: Initialize in service
+- ❌ **`findAll()` without pagination**: Memory issues
+
+### Performance Anti-Patterns
+- ❌ **Fixed thread pool with virtual threads**: Use virtual executor
+- ❌ **Blocking in reactive**: Choose one paradigm
+- ❌ **No caching**: Use `@Cacheable` where appropriate
+- ❌ **Missing indexes**: Check query plans
+
+---
 
 ## Verification Checklist
 
-- [ ] Constructor injection for all dependencies
-- [ ] `@Transactional` on service methods (readOnly=true for reads)
-- [ ] Proper HTTP status codes (201 for create, 204 for delete)
-- [ ] Request validation with `@Valid`
+### Architecture
+- [ ] Constructor injection everywhere
+- [ ] DTOs for API boundaries
+- [ ] Services for business logic
 - [ ] Global exception handling
-- [ ] Unit tests for controllers with MockMvc
-- [ ] Integration tests with @SpringBootTest
+
+### Transactions
+- [ ] `@Transactional` on service methods
+- [ ] `readOnly = true` for queries
+- [ ] Proper rollback configuration
+- [ ] No long-running transactions
+
+### Performance
+- [ ] N+1 queries addressed
+- [ ] Pagination on lists
+- [ ] Caching strategy defined
+- [ ] Indexes verified
+
+### Testing
+- [ ] `@WebMvcTest` for controllers
+- [ ] `@SpringBootTest` for integration
+- [ ] `@MockBean` for dependencies
+- [ ] `@Transactional` for test rollback
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Controller**: `@RestController @RequestMapping("/api/users") class UserController {}`
+- **Service**: `@Service @Transactional(readOnly = true) class UserService {}`
+- **Repository**: `interface UserRepository extends JpaRepository<User, UUID> {}`
+- **DTO**: `record CreateUserRequest(@NotBlank @Email String email, @Size(min=2) String name) {}`
+- **Exception**: `@ExceptionHandler(NotFoundException.class) ResponseEntity<?> handle(e) {...}`
+- **Config**: `@ConfigurationProperties(prefix = "app") record AppConfig(String apiKey, Duration timeout) {}`
+<!-- version: spring-boot >= 3.2 -->
+- **Virtual threads**: `spring.threads.virtual.enabled=true` (properties)
+

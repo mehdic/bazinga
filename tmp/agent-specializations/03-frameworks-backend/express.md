@@ -2,7 +2,7 @@
 name: express
 type: framework
 priority: 2
-token_estimate: 450
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript, javascript]
 ---
@@ -14,149 +14,108 @@ requires: [typescript, javascript]
 ## Specialist Profile
 Express specialist building Node.js APIs. Expert in middleware patterns, error handling, and TypeScript integration.
 
-## Implementation Guidelines
+---
 
-### App Structure
+## Patterns to Follow
 
-```typescript
-// app.ts
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { errorHandler } from './middleware/errorHandler';
-import { userRouter } from './routes/users';
-
-const app = express();
-
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-
-app.use('/api/users', userRouter);
-
-app.use(errorHandler);
-
-export { app };
-```
-
-### Controllers
-
-```typescript
-// controllers/userController.ts
-import { Request, Response, NextFunction } from 'express';
-import { userService } from '../services/userService';
-import { CreateUserDto } from '../dto/user.dto';
-
-export const userController = {
-  async getAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const users = await userService.findAll();
-      res.json(users);
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async create(req: Request<{}, {}, CreateUserDto>, res: Response, next: NextFunction) {
-    try {
-      const user = await userService.create(req.body);
-      res.status(201).json(user);
-    } catch (error) {
-      next(error);
-    }
-  },
-};
-```
+### Application Structure
+- **Layered architecture**: Routes → Controllers → Services → Repositories
+- **Middleware pipeline**: Ordered execution for cross-cutting concerns
+- **Router organization**: Feature-based routing
+- **Config management**: Environment-based configuration
+- **Dependency injection**: Manual or via container
 
 ### Error Handling
+- **Central error handler**: Single middleware at end of chain
+- **Async wrapper**: Catch promise rejections automatically
+- **Custom error classes**: Domain-specific with status codes
+- **Error logging**: Log before responding
+- **Never expose internals**: Sanitize error messages
 
-```typescript
-// middleware/errorHandler.ts
-import { Request, Response, NextFunction } from 'express';
+### Middleware Patterns
+- **Validation middleware**: Zod/Joi schemas
+- **Authentication middleware**: JWT/session validation
+- **Rate limiting**: Protect against abuse
+- **Request logging**: Morgan or custom
+- **CORS/Helmet**: Security headers
 
-export class AppError extends Error {
-  constructor(
-    public statusCode: number,
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+### TypeScript Best Practices
+- **Typed request handlers**: Generic Request types
+- **Typed responses**: Response<ResponseBody>
+- **Strict mode**: Enable all strict checks
+- **DTO interfaces**: For request/response shapes
 
-export function errorHandler(
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      error: { code: err.code, message: err.message },
-    });
-  }
+### Async Patterns
+- **async/await over callbacks**: Modern syntax
+- **Async wrapper utility**: No try/catch in every route
+- **Promise rejection handling**: Global handler
+- **Graceful shutdown**: Handle SIGTERM/SIGINT
 
-  console.error(err);
-  res.status(500).json({
-    error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' },
-  });
-}
-```
-
-### Validation Middleware
-
-```typescript
-// middleware/validate.ts
-import { z, ZodSchema } from 'zod';
-import { Request, Response, NextFunction } from 'express';
-import { AppError } from './errorHandler';
-
-export const validate = (schema: ZodSchema) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
-    if (!result.success) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid request body');
-    }
-    req.body = result.data;
-    next();
-  };
-
-// Usage
-const createUserSchema = z.object({
-  email: z.string().email(),
-  displayName: z.string().min(2),
-});
-
-router.post('/', validate(createUserSchema), userController.create);
-```
-
-### Async Wrapper
-
-```typescript
-// utils/asyncHandler.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express';
-
-export const asyncHandler = (fn: RequestHandler): RequestHandler =>
-  (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-
-// Usage - no try/catch needed
-router.get('/', asyncHandler(async (req, res) => {
-  const users = await userService.findAll();
-  res.json(users);
-}));
-```
+---
 
 ## Patterns to Avoid
-- ❌ Callback-based async (use async/await)
-- ❌ Try/catch in every route (use asyncHandler)
-- ❌ Business logic in routes
-- ❌ Unhandled promise rejections
+
+### Error Handling Anti-Patterns
+- ❌ **Try/catch in every route**: Use async wrapper
+- ❌ **Swallowing errors**: Always log and respond
+- ❌ **Leaking stack traces**: Hide in production
+- ❌ **No global handler**: Unhandled rejections crash
+
+### Architecture Anti-Patterns
+- ❌ **Business logic in routes**: Use services
+- ❌ **God router**: Split by feature
+- ❌ **Callback-based async**: Use async/await
+- ❌ **Hardcoded config**: Use environment variables
+
+### Middleware Anti-Patterns
+- ❌ **Order-dependent bugs**: Document middleware order
+- ❌ **Missing next() calls**: Hang requests
+- ❌ **Sync blocking operations**: Use async
+- ❌ **No request validation**: Validate all inputs
+
+### Security Anti-Patterns
+- ❌ **No Helmet**: Missing security headers
+- ❌ **No rate limiting**: DoS vulnerability
+- ❌ **SQL/NoSQL injection**: Use parameterized queries
+- ❌ **Missing CORS config**: Overly permissive default
+
+---
 
 ## Verification Checklist
-- [ ] Central error handling
-- [ ] Request validation
-- [ ] TypeScript throughout
-- [ ] Async error wrapper
+
+### Error Handling
+- [ ] Central error handler middleware
+- [ ] Async wrapper for routes
+- [ ] Custom error classes
 - [ ] Proper status codes
+
+### Security
+- [ ] Helmet middleware
+- [ ] CORS configured
+- [ ] Rate limiting enabled
+- [ ] Input validation
+
+### Architecture
+- [ ] Layered structure (controller/service)
+- [ ] Router organization by feature
+- [ ] TypeScript strict mode
+- [ ] Environment configuration
+
+### Testing
+- [ ] Supertest for HTTP tests
+- [ ] Jest/Vitest setup
+- [ ] Mocked services
+- [ ] Integration test coverage
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Async wrapper**: `const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)`
+- **Error class**: `class AppError extends Error { constructor(statusCode, code, message) {...} }`
+- **Error handler**: `app.use((err, req, res, next) => { res.status(err.statusCode || 500).json({error: ...}) })`
+- **Validation**: `const validate = (schema) => (req, res, next) => { schema.parse(req.body); next(); }`
+- **Router**: `router.post('/', validate(schema), asyncHandler(controller.create))`
+- **Graceful shutdown**: `process.on('SIGTERM', () => server.close(() => process.exit(0)))`
+

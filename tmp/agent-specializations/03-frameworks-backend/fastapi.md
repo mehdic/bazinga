@@ -2,7 +2,7 @@
 name: fastapi
 type: framework
 priority: 2
-token_estimate: 500
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [python]
 ---
@@ -12,136 +12,112 @@ requires: [python]
 # FastAPI Engineering Expertise
 
 ## Specialist Profile
-FastAPI specialist building high-performance APIs. Expert in async Python, Pydantic, and OpenAPI.
+FastAPI specialist building high-performance APIs. Expert in async Python, Pydantic, and dependency injection.
 
-## Implementation Guidelines
+---
 
-### Route Structure
-
-```python
-from fastapi import FastAPI, HTTPException, Depends, status
-from pydantic import BaseModel, EmailStr
-
-app = FastAPI(title="User API", version="1.0.0")
-
-class CreateUserRequest(BaseModel):
-    email: EmailStr
-    display_name: str
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    display_name: str
-
-    class Config:
-        from_attributes = True
-
-@app.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    request: CreateUserRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    user = User(email=request.email, display_name=request.display_name)
-    db.add(user)
-    await db.commit()
-    return user
-```
+## Patterns to Follow
 
 ### Dependency Injection
+- **Use Annotated**: `Annotated[Service, Depends(get_service)]`
+- **Caching**: Dependencies cached within request by default
+- **Nested dependencies**: Compose for complex requirements
+- **Override for testing**: `app.dependency_overrides[dep] = mock`
+- **DB sessions as dependencies**: Proper lifecycle management
 
-```python
-from functools import lru_cache
-from typing import Annotated
+### Pydantic Models
+- **Request/Response separation**: Different models for input/output
+- **`from_attributes = True`**: For ORM model conversion
+- **Field validation**: Use `Field()` with constraints
+- **Custom validators**: `@field_validator` for complex rules
+- **Config classes**: Centralize model behavior
 
-@lru_cache
-def get_settings():
-    return Settings()
+### Async Best Practices
+- **Async all the way**: Don't mix sync I/O in async routes
+- **Proper DB drivers**: Use async drivers (asyncpg, aiomysql)
+- **Background tasks**: For fire-and-forget operations
+- **Streaming responses**: For large data transfers
+- **Lifespan context**: For startup/shutdown logic
 
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+### Project Structure
+- **Router organization**: `/routers/{domain}.py`
+- **Service layer**: Business logic separate from routes
+- **Repository pattern**: Data access abstraction
+- **Schema module**: Pydantic models organized
+- **Thin routes**: Orchestration only, not business logic
 
-async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> User:
-    user = await verify_token(token, db)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return user
+### Error Handling
+- **Custom exception classes**: Domain-specific errors
+- **Exception handlers**: Consistent error responses
+- **HTTPException for HTTP errors**: Standard HTTP semantics
+- **Validation error formatting**: User-friendly messages
 
-CurrentUser = Annotated[User, Depends(get_current_user)]
-```
-
-### Exception Handling
-
-```python
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
-class AppError(Exception):
-    def __init__(self, code: str, message: str, status_code: int = 400):
-        self.code = code
-        self.message = message
-        self.status_code = status_code
-
-@app.exception_handler(AppError)
-async def app_error_handler(request: Request, exc: AppError):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": {"code": exc.code, "message": exc.message}},
-    )
-```
-
-### Background Tasks
-
-```python
-from fastapi import BackgroundTasks
-
-async def send_email(email: str, subject: str, body: str):
-    await email_service.send(email, subject, body)
-
-@app.post("/users")
-async def create_user(
-    request: CreateUserRequest,
-    background_tasks: BackgroundTasks,
-):
-    user = await user_service.create(request)
-    background_tasks.add_task(send_email, user.email, "Welcome!", "...")
-    return user
-```
-
-### Router Organization
-
-```python
-# routers/users.py
-from fastapi import APIRouter
-
-router = APIRouter(prefix="/users", tags=["users"])
-
-@router.get("/{user_id}")
-async def get_user(user_id: str): ...
-
-# main.py
-from routers import users, orders
-app.include_router(users.router)
-app.include_router(orders.router)
-```
+---
 
 ## Patterns to Avoid
-- ❌ Sync database calls (use async)
-- ❌ Business logic in routes (use services)
-- ❌ No response models (always define them)
-- ❌ Catching generic Exception
+
+### Async Anti-Patterns
+- ❌ **Sync I/O in async routes**: Blocks event loop
+- ❌ **Sync DB drivers**: Use async (asyncpg, not psycopg2)
+- ❌ **Sync dependencies in async routes**: Makes them sync
+- ❌ **CPU-bound in event loop**: Offload to thread pool
+
+### DI Anti-Patterns
+- ❌ **Global state**: Use dependencies instead
+- ❌ **Hardcoded dependencies**: Inject for testability
+- ❌ **Creating sessions in routes**: Use dependency injection
+- ❌ **Missing cleanup**: Ensure resources are released
+
+### Route Anti-Patterns
+- ❌ **Business logic in routes**: Use services
+- ❌ **No response model**: Always define return types
+- ❌ **Catching generic Exception**: Catch specific exceptions
+- ❌ **No request validation**: Pydantic handles it; use it
+
+### Performance Anti-Patterns
+- ❌ **Unbounded queries**: Always paginate
+- ❌ **N+1 in async loops**: Use batch fetching
+- ❌ **No connection pooling**: Configure pool size
+- ❌ **Sync file I/O**: Use aiofiles
+
+---
 
 ## Verification Checklist
-- [ ] Pydantic models for request/response
-- [ ] Dependency injection for DB/services
-- [ ] Proper HTTP status codes
-- [ ] Exception handlers defined
-- [ ] OpenAPI docs accurate
+
+### Type Safety
+- [ ] Pydantic models for all request/response
+- [ ] `Annotated` for dependencies
+- [ ] Return types on all endpoints
+- [ ] Strict mode in Pydantic
+
+### Async
+- [ ] Async DB driver used
+- [ ] No sync I/O in async routes
+- [ ] Background tasks for slow ops
+- [ ] Proper lifespan handling
+
+### Architecture
+- [ ] Router organization by domain
+- [ ] Service layer for logic
+- [ ] Dependency injection throughout
+- [ ] Custom exception handlers
+
+### Testing
+- [ ] AsyncClient for async tests
+- [ ] dependency_overrides for mocking
+- [ ] TestClient for sync tests
+- [ ] pytest-asyncio configured
+
+---
+
+## Code Patterns (Reference)
+
+### Recommended Constructs
+- **Route**: `@router.post("/users", response_model=UserResponse, status_code=201)`
+- **Dependency**: `async def get_db(): async with session() as s: yield s`
+- **Annotated DI**: `db: Annotated[AsyncSession, Depends(get_db)]`
+- **Pydantic**: `class UserCreate(BaseModel): email: EmailStr; name: str = Field(min_length=2)`
+- **Exception handler**: `@app.exception_handler(AppError) async def handle(req, exc): ...`
+- **Background task**: `background_tasks.add_task(send_email, user.email)`
+- **Lifespan**: `@asynccontextmanager async def lifespan(app): yield`
+
