@@ -31,6 +31,9 @@ Testing specialist implementing comprehensive test strategies. Expert in unit, i
 - **Transaction rollback**: Clean state per test
 - **Minimal mocking**: Only external services
 - **Realistic scenarios**: Happy path + error paths
+<!-- version: testcontainers >= 3.0 -->
+- **Reusable containers**: Singleton pattern for fast tests
+- **Module system**: Compose-based multi-container setups
 
 ### Test-Driven Development (TDD)
 - **Red-Green-Refactor**: Write failing test first
@@ -112,9 +115,21 @@ Testing specialist implementing comprehensive test strategies. Expert in unit, i
 ## Code Patterns (Reference)
 
 ### Unit Test (Jest)
+<!-- version: jest >= 27 -->
 - **Structure**: `describe('UserService', () => { describe('create', () => { it('should...', () => {}); }); });`
 - **Mock**: `const mockRepo = { create: jest.fn().mockResolvedValue(user) };`
 - **Assert**: `expect(result).toMatchObject({ email: 'test@example.com' });`
+<!-- version: jest >= 28 -->
+- **Sharding**: `--shard=1/3` for parallel CI
+- **Fake timers**: `jest.useFakeTimers({ advanceTimers: true })`
+<!-- version: jest >= 29 -->
+- **ESM support**: Native ES modules without transform
+<!-- version: vitest >= 0.30 -->
+- **Browser mode**: Real browser testing
+- **Type checking**: `--typecheck` flag
+<!-- version: vitest >= 1.0 -->
+- **Benchmark API**: `bench()` for performance tests
+- **Workspace support**: Monorepo configurations
 
 ### Integration Test
 - **Setup**: `beforeAll(async () => { db = await createTestDatabase(); });`

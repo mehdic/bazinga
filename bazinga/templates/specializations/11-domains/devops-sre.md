@@ -65,11 +65,16 @@ DevOps/SRE specialist building reliable systems. Expert in SLOs, error budgets, 
 - **Blue-green**: Instant rollback capability
 
 ### Chaos Engineering (2025)
-- **Gremlin/LitmusChaos**: Managed chaos tools
 - **Game days**: Scheduled failure injection
 - **Steady state hypothesis**: Define normal behavior
 - **Minimize blast radius**: Start small, expand
 - **Auto-remediation tests**: Verify recovery works
+<!-- version: litmuschaos >= 3.0 -->
+- **LitmusChaos**: Kubernetes-native chaos engineering
+- **ChaosHub**: Community experiment library
+<!-- version: gremlin >= 2.0 -->
+- **Gremlin**: Managed chaos as a service
+- **Scenarios**: Pre-built failure scenarios
 
 ---
 
@@ -142,9 +147,14 @@ DevOps/SRE specialist building reliable systems. Expert in SLOs, error budgets, 
 - **Latency**: `sli: { good: 'duration_bucket{le="0.2"}', total: 'duration_count' }, target: 99%`
 
 ### Prometheus Alert (Burn Rate)
+<!-- version: prometheus >= 2.40 -->
 - **Fast burn**: `expr: error_rate > 14.4 * (1 - 0.999)`, `for: 5m`
 - **Labels**: `severity: critical`
 - **Annotations**: `summary`, `runbook_url`
+<!-- version: prometheus >= 2.47 -->
+- **Native histograms**: Improved memory efficiency
+<!-- version: opentelemetry >= 1.0 -->
+- **OTLP export**: OpenTelemetry protocol support
 
 ### Error Budget Calculation
 - **Monthly budget**: `43200 minutes × (1 - SLO)` = minutes of allowed downtime

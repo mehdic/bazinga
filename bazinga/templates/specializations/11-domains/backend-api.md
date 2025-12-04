@@ -45,6 +45,9 @@ Backend API specialist designing RESTful and GraphQL APIs. Expert in HTTP semant
 - **Include metadata**: `has_more`, `next_cursor`, `total` (if cheap)
 - **Consistent structure**: Same pagination object across endpoints
 - **Field selection**: Allow `?fields=id,name` to reduce payload
+<!-- version: openapi >= 3.1 -->
+- **JSON Schema 2020-12**: Full schema compatibility in OpenAPI
+- **Webhooks definition**: Callback endpoints in spec
 
 ### Versioning
 - **URI versioning**: `/api/v1/` (60% developer preference, 2025)

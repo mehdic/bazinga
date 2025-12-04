@@ -52,6 +52,19 @@ Selenium specialist building browser automation. Expert in WebDriver, waits, and
 - **Cloud providers**: BrowserStack, SauceLabs
 - **Configuration via fixtures**: Browser selection
 
+### Selenium Version Features
+<!-- version: selenium >= 4.0 -->
+- **BiDi protocol**: Bidirectional WebDriver
+- **Relative locators**: `above()`, `below()`, `near()`
+- **New actions API**: Improved keyboard/mouse actions
+- **Grid 4**: New architecture, Docker support
+<!-- version: selenium >= 4.6 -->
+- **Selenium Manager**: Built-in driver management
+<!-- version: selenium >= 4.11 -->
+- **Chrome DevTools Protocol**: CDP over BiDi
+<!-- version: selenium < 4.0 -->
+- **Selenium 3.x**: Requires explicit driver management
+
 ---
 
 ## Patterns to Avoid

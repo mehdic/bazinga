@@ -19,18 +19,31 @@ Security specialist auditing application security. Expert in OWASP vulnerabiliti
 ## Patterns to Follow
 
 ### Input Validation
-- **Schema validation (Zod/Joi)**: Type-safe, whitelist approach
 - **Sanitize for context**: HTML, SQL, shell differently
 - **Parameterized queries always**: Never concatenate
 - **Content-Type validation**: Reject unexpected types
 - **Size limits**: Prevent DoS via large inputs
+<!-- version: zod >= 3.0 -->
+- **Schema validation (Zod)**: Type-safe, inferred TypeScript types
+- **Transform and refine**: Data transformation in schema
+<!-- version: zod >= 3.22 -->
+- **z.pipe()**: Composable validation pipelines
+<!-- version: joi >= 17.0 -->
+- **Schema validation (Joi)**: Powerful object validation
+- **Extended types**: Custom validation extensions
 
 ### Password Security
-- **Argon2id**: Current best algorithm
 - **Memory-hard hashing**: 64MB+, 3+ iterations
 - **Password strength rules**: Min 12 chars, complexity
 - **Breach database check**: HaveIBeenPwned API
 - **Rate limiting login attempts**: Prevent brute force
+<!-- version: argon2 >= 1.3 -->
+- **Argon2id**: Current best algorithm (OWASP recommended)
+- **Parameters**: m=65536, t=3, p=4 (minimum)
+<!-- version: node >= 20 -->
+- **Native crypto.scrypt**: Built-in for Node.js apps
+<!-- version: bcrypt < argon2 -->
+- **bcrypt fallback**: Cost factor 12+ if Argon2 unavailable
 
 ### Authorization
 - **RBAC or ABAC**: Role or attribute-based

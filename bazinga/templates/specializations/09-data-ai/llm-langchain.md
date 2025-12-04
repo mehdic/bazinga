@@ -19,11 +19,18 @@ LLM application specialist building AI-powered features. Expert in prompt engine
 ## Patterns to Follow
 
 ### LCEL (LangChain Expression Language)
+<!-- version: langchain >= 0.1 -->
 - **Pipe syntax**: `prompt | llm | parser` (composable, readable)
 - **Native streaming**: Built-in support
 - **Fallback chains**: `chain.with_fallbacks([backup_chain])`
 - **Batching**: Process multiple inputs efficiently
 - **Async support**: `await chain.ainvoke(input)`
+<!-- version: langchain >= 0.2 -->
+- **Improved observability**: Better LangSmith integration
+- **Tool calling**: Standardized across providers
+<!-- version: langchain >= 0.3 -->
+- **Pydantic v2**: Full v2 compatibility
+- **LangGraph integration**: Built-in state management
 
 ### RAG Best Practices
 - **Chunk size matters**: 500-1000 tokens typically

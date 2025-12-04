@@ -68,6 +68,12 @@ Code review specialist ensuring quality and maintainability. Expert in providing
 - **AI for consistency**: Style, formatting, patterns
 - **Don't fully automate**: Human judgment still needed
 - **Review AI suggestions**: AI can be wrong
+<!-- version: github >= 2023 -->
+- **GitHub Copilot Code Review**: AI-powered PR analysis
+- **Suggested changes**: Inline code suggestions
+<!-- version: gitlab >= 16.0 -->
+- **GitLab Duo Code Review**: AI-assisted review features
+- **Vulnerability detection**: Security scanning in MRs
 
 ---
 

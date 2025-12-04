@@ -38,6 +38,17 @@ ML engineering specialist building production models. Expert in feature engineer
 - **Hyperparameter tuning**: Optuna, Ray Tune
 - **Stratified splits**: Balanced classes
 - **Early stopping**: Prevent overfitting
+<!-- version: sklearn >= 1.0 -->
+- **Pandas output**: `set_output(transform="pandas")`
+- **Feature names in**: `get_feature_names_out()` standard
+<!-- version: sklearn >= 1.2 -->
+- **HDBSCAN**: Native hierarchical clustering
+- **TargetEncoder**: Improved category encoding
+<!-- version: sklearn >= 1.4 -->
+- **Metadata routing**: Consistent sample_weight handling
+<!-- version: mlflow >= 2.0 -->
+- **LLM tracking**: Native LLM experiment support
+- **Recipes/Pipelines**: Declarative ML workflows
 
 ### Model Serving
 - **Model registry**: Production-ready models

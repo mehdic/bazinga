@@ -26,18 +26,34 @@ E2E testing specialist building browser automation. Expert in page objects, visu
 - **Single responsibility**: One behavior per test
 
 ### Playwright Patterns (2025)
+<!-- version: playwright >= 1.20 -->
 - **Auto-waiting built-in**: No manual waits needed
 - **Parallel execution**: Native, fast
 - **Multiple browsers**: Chrome, Firefox, WebKit
 - **Trace Viewer**: Deep debugging on failure
 - **API mocking**: `page.route()` for isolation
+<!-- version: playwright >= 1.35 -->
+- **UI mode**: Interactive test runner with watch mode
+- **Component testing**: Native React/Vue/Svelte support
+<!-- version: playwright >= 1.40 -->
+- **Annotations API**: `test.step()`, `test.slow()`, `test.fixme()`
+<!-- version: playwright >= 1.44 -->
+- **Clock API**: Mock Date, setTimeout, setInterval
 
 ### Cypress Patterns
+<!-- version: cypress >= 10.0 -->
 - **cy.intercept()**: Network stubbing
 - **Auto-retry assertions**: Handles async naturally
 - **Time-travel debugging**: Inspect each step
 - **Component testing**: Native support
 - **Real-time reloading**: Fast feedback
+<!-- version: cypress >= 12.0 -->
+- **Test isolation default**: Each test starts fresh
+- **Improved component testing**: Better framework support
+<!-- version: cypress >= 13.0 -->
+- **Session API improvements**: Persistent auth across tests
+<!-- version: cypress < 10.0 -->
+- **Legacy cy.route()**: Use cy.intercept() instead (deprecated)
 
 ### Reliability Patterns
 - **API shortcuts for setup**: Seed data via API, not UI

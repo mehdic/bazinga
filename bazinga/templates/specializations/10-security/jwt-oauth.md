@@ -24,6 +24,13 @@ Authentication specialist implementing token-based auth. Expert in JWT, OAuth 2.
 - **Minimal claims**: Only essential data in payload
 - **No PII in tokens**: Easily decoded
 - **iss/aud/exp validation**: Always verify these claims
+<!-- version: jwt >= rfc9068 -->
+- **JWT Access Tokens (RFC 9068)**: Standardized access token format
+- **Required claims**: `iss`, `exp`, `aud`, `sub`, `client_id`, `iat`, `jti`
+<!-- version: oauth >= 2.1 -->
+- **OAuth 2.1**: Consolidates security best practices
+- **PKCE required**: For all clients, not just public
+- **No implicit flow**: Removed from spec
 
 ### Refresh Token Security
 - **Rotation on use**: New refresh token each time
@@ -51,6 +58,12 @@ Authentication specialist implementing token-based auth. Expert in JWT, OAuth 2.
 - **Rotation every 30-90 days**: Limit exposure
 - **JWKS endpoint**: Public key distribution
 - **Overlapping validity**: Zero-downtime rotation
+<!-- version: jose >= es256 -->
+- **ES256 preferred**: Smaller signatures than RS256
+- **EdDSA support**: Ed25519 for best performance
+<!-- version: dpop >= 1.0 -->
+- **DPoP (Proof of Possession)**: Sender-constrained tokens
+- **Prevents token replay**: Even if intercepted
 
 ---
 

@@ -19,12 +19,16 @@ Microservices specialist designing distributed systems. Expert in service decomp
 ## Patterns to Follow
 
 ### Circuit Breaker (2025)
-- **Resilience4j for Java/Kotlin**: Modern, lightweight library
-- **opossum for Node.js**: Promise-based circuit breaker
 - **Thresholds**: 50% error rate, 10 volume minimum
 - **Timeouts**: 3-5 seconds for service calls
 - **Fallback strategy**: Cache, default value, or graceful degradation
 - **Half-open state**: Gradually test recovery
+<!-- version: resilience4j >= 2.0 -->
+- **Resilience4j for Java/Kotlin**: Modern, lightweight library
+- **Modular design**: Separate modules for each pattern
+<!-- version: opossum >= 8.0 -->
+- **opossum for Node.js**: Promise-based circuit breaker
+- **Metrics export**: Prometheus integration
 
 ### Saga Pattern
 - **Choreography**: Services publish events, others react
@@ -55,11 +59,16 @@ Microservices specialist designing distributed systems. Expert in service decomp
 - **Guaranteed delivery**: No lost events
 
 ### Service Mesh (2025)
-- **Istio/Linkerd**: Sidecar-based networking
 - **mTLS automatic**: Zero-trust networking
 - **Observability built-in**: Traces, metrics, logs
 - **Traffic management**: Canary, A/B, circuit breaking
 - **Service-to-service auth**: SPIFFE/SPIRE identities
+<!-- version: istio >= 1.18 -->
+- **Istio**: Sidecar-based service mesh
+- **Ambient mode**: Sidecarless option for reduced overhead
+<!-- version: linkerd >= 2.14 -->
+- **Linkerd**: Lightweight, Rust-based mesh
+- **Multi-cluster**: Cross-cluster service discovery
 
 ### Bulkhead Pattern
 - **Isolated thread pools**: Per downstream service

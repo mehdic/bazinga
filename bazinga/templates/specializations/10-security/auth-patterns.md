@@ -34,10 +34,15 @@ Authentication specialist implementing secure auth flows. Expert in OIDC, API ke
 
 ### Multi-Factor Authentication
 - **TOTP (RFC 6238)**: Time-based codes
-- **WebAuthn/Passkeys**: Phishing-resistant
 - **Recovery codes**: Secure backup
 - **Remember device**: Risk-based MFA
 - **Fallback methods**: Not just one factor
+<!-- version: webauthn >= level2 -->
+- **WebAuthn/Passkeys**: Phishing-resistant biometrics
+- **Resident credentials**: Discoverable credentials
+<!-- version: webauthn >= level3 -->
+- **Conditional UI**: Passkey autofill integration
+- **Hybrid authenticators**: Cross-device authentication
 
 ### Session Management
 - **Secure session IDs**: Cryptographic random
@@ -48,10 +53,15 @@ Authentication specialist implementing secure auth flows. Expert in OIDC, API ke
 
 ### Enterprise SSO
 - **SAML 2.0**: Enterprise standard
-- **SCIM**: User provisioning
 - **JIT provisioning**: Create user on first login
 - **Attribute mapping**: IdP claims to app roles
 - **Single logout**: Cross-application signout
+<!-- version: scim >= 2.0 -->
+- **SCIM 2.0**: Standard user/group provisioning API
+- **Bulk operations**: Efficient batch provisioning
+<!-- version: openid-connect >= 1.0 -->
+- **OIDC for SSO**: Modern alternative to SAML
+- **Dynamic registration**: Automated client setup
 
 ---
 

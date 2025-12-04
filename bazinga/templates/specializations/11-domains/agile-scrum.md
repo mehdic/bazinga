@@ -70,6 +70,12 @@ Agile specialist facilitating iterative delivery. Expert in Scrum ceremonies, ba
 - **Documentation updated**: API docs, README if needed
 - **Deployed to staging**: Verified in environment
 - **No P1/P2 bugs**: Quality gate
+<!-- version: jira >= 9.0 -->
+- **Jira Automation**: Auto-transition on PR merge
+- **DevOps insights**: Deployment frequency tracking
+<!-- version: linear >= 2023 -->
+- **Linear Cycles**: Built-in sprint-like iterations
+- **Triage queue**: Automated issue prioritization
 
 ---
 

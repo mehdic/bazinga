@@ -26,11 +26,18 @@ Data engineering specialist building ETL pipelines. Expert in data transformatio
 - **Lineage tracking**: Know data origins
 
 ### PySpark Patterns
+<!-- version: pyspark >= 3.0 -->
 - **Adaptive Query Execution**: Auto-optimization
 - **Broadcast joins**: Small table to all nodes
 - **Partition by key columns**: Query performance
 - **Caching strategically**: Reused DataFrames
 - **Avoid collect()**: Keeps data distributed
+<!-- version: pyspark >= 3.1 -->
+- **Pandas UDFs**: `mapInPandas()`, `applyInPandas()`
+<!-- version: pyspark >= 3.3 -->
+- **Pandas API**: `pyspark.pandas` for pandas compatibility
+<!-- version: pyspark >= 3.5 -->
+- **Connect**: Decoupled client with Spark Connect
 
 ### Orchestration (Airflow)
 - **DAG as code**: Version controlled
@@ -38,6 +45,15 @@ Data engineering specialist building ETL pipelines. Expert in data transformatio
 - **XCom for small data**: Not large datasets
 - **Sensors with timeouts**: Don't block forever
 - **Task groups**: Logical organization
+<!-- version: airflow >= 2.0 -->
+- **TaskFlow API**: `@task` decorator for Python functions
+- **Full REST API**: Programmatic DAG control
+<!-- version: airflow >= 2.3 -->
+- **Dynamic task mapping**: `expand()` for parallel tasks
+<!-- version: airflow >= 2.7 -->
+- **Setup/teardown tasks**: Resource lifecycle management
+<!-- version: airflow >= 2.9 -->
+- **Object storage**: Native cloud storage support
 
 ### dbt Best Practices
 - **Incremental models**: Performance at scale
@@ -45,6 +61,13 @@ Data engineering specialist building ETL pipelines. Expert in data transformatio
 - **Tests on sources**: Catch bad data early
 - **Documentation**: Every model documented
 - **Seeds for lookup tables**: Version controlled
+<!-- version: dbt >= 1.5 -->
+- **Python models**: Native Python support
+- **Groups and access**: Model governance
+<!-- version: dbt >= 1.6 -->
+- **Programmatic invocations**: Python API
+<!-- version: dbt >= 1.8 -->
+- **Unit testing**: Native model unit tests
 
 ### Data Quality
 - **Schema validation**: Expected columns/types

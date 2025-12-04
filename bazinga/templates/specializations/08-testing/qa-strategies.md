@@ -118,7 +118,12 @@ QA specialist designing comprehensive test strategies. Expert in test planning, 
 - **Risks**: Probability, impact, mitigation
 
 ### Boundary Testing
+<!-- version: pytest >= 7.0 -->
 - **Pattern**: `@pytest.mark.parametrize("length,valid", [(1, False), (2, True), (100, True), (101, False)])`
+- **Parallel**: `pytest-xdist` with `--dist worksteal` for optimal load balancing
+<!-- version: pytest >= 8.0 -->
+- **Improved markers**: Better marker inheritance and collection
+- **Type hints**: Full type annotation support
 
 ### Equivalence Partitioning
 - **Classes**: Valid standard, valid edge, invalid format, invalid empty

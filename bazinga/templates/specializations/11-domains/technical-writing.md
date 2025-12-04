@@ -29,7 +29,6 @@ Technical writing specialist creating clear documentation. Expert in API docs, a
 - **Keep updated per release**: Part of definition of done
 
 ### API Documentation
-- **OpenAPI 3.2 standard**: Industry standard 2025
 - **Request/response examples**: For every endpoint
 - **Error scenarios documented**: All 4xx, 5xx responses
 - **Authentication explained**: How to get and use tokens
@@ -37,6 +36,12 @@ Technical writing specialist creating clear documentation. Expert in API docs, a
 - **Versioning visible**: Which version docs apply to
 - **Try-it-now capability**: Interactive examples
 - **README-style workflows**: Show how operations chain together
+<!-- version: openapi >= 3.0 -->
+- **OpenAPI 3.0**: Callbacks, links, improved security
+<!-- version: openapi >= 3.1 -->
+- **OpenAPI 3.1**: Full JSON Schema compatibility, webhooks
+<!-- version: openapi >= 3.2 -->
+- **OpenAPI 3.2**: Overlay specs, enhanced examples
 
 ### Architecture Decision Records (ADR)
 - **One decision per ADR**: Keep focused
@@ -52,9 +57,14 @@ Technical writing specialist creating clear documentation. Expert in API docs, a
 - **Markdown in repo**: Same versioning as code
 - **CI/CD for docs**: Auto-build, auto-deploy
 - **Treat docs as first-class**: Part of PR requirements
-- **Auto-generate from code**: JSDoc, TypeDoc, Swagger
 - **Review docs in PRs**: Not separate from code review
 - **30-45% faster onboarding**: When docs are maintained
+<!-- version: typedoc >= 0.25 -->
+- **TypeDoc**: Auto-generate from TypeScript
+- **Plugin ecosystem**: Extended rendering options
+<!-- version: swagger-ui >= 5.0 -->
+- **Swagger UI**: Interactive API documentation
+- **Deep linking**: Direct links to operations
 
 ### Code Comments
 - **Explain why, not what**: Code shows what, comments show why
