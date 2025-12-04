@@ -680,14 +680,14 @@ test -f bazinga/project_context.json && echo "exists" || echo "missing"
 **Spawn Tech Stack Scout:**
 ```
 Task(
-  subagent_type: "Plan",
+  subagent_type: "general-purpose",
   model: "sonnet",
   description: "Tech Stack Scout: detect project stack",
   prompt: [Full Scout prompt from agents/tech_stack_scout.md with session_id]
 )
 ```
 
-**Note:** Scout uses Plan mode (read-only analysis) - cannot modify files.
+**Note:** Scout uses general-purpose mode with restricted tools (read-only + output file writing).
 
 ### Step 0.5a: Process Scout Response
 

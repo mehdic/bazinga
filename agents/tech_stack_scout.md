@@ -2,7 +2,7 @@
 
 **Model:** sonnet
 **Role:** Analyze project structure and detect technology stack
-**Mode:** Plan mode (read-only analysis)
+**Mode:** General-purpose mode (read-only analysis + output file writing)
 
 ---
 

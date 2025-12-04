@@ -378,6 +378,18 @@ class BazingaDB:
                             if not cursor.fetchone():
                                 needs_init = True
                                 print(f"Database missing schema at {self.db_path}. Auto-initializing...", file=sys.stderr)
+                            else:
+                                # Check schema version - run migrations if outdated
+                                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+                                if cursor.fetchone():
+                                    cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+                                    version_row = cursor.fetchone()
+                                    current_version = version_row[0] if version_row else 0
+                                    # Current expected version is 7 (from init_db.py)
+                                    EXPECTED_VERSION = 7
+                                    if current_version < EXPECTED_VERSION:
+                                        needs_init = True
+                                        print(f"Database schema outdated (v{current_version} < v{EXPECTED_VERSION}). Running migrations...", file=sys.stderr)
                     break  # Success - exit retry loop
                 except sqlite3.OperationalError as e:
                     # Handle transient lock errors with retry/backoff
@@ -754,6 +766,15 @@ class BazingaDB:
         """
         conn = None
         try:
+            # Validate specialization paths for security
+            if specializations:
+                for spec_path in specializations:
+                    if not spec_path.startswith("bazinga/templates/specializations/"):
+                        return {
+                            "success": False,
+                            "error": f"Invalid specialization path: {spec_path}. Must start with 'bazinga/templates/specializations/'"
+                        }
+
             conn = self._get_connection()
             # Serialize specializations to JSON
             specs_json = json.dumps(specializations) if specializations else None
@@ -809,6 +830,15 @@ class BazingaDB:
         """
         conn = None
         try:
+            # Validate specialization paths for security
+            if specializations:
+                for spec_path in specializations:
+                    if not spec_path.startswith("bazinga/templates/specializations/"):
+                        return {
+                            "success": False,
+                            "error": f"Invalid specialization path: {spec_path}. Must start with 'bazinga/templates/specializations/'"
+                        }
+
             conn = self._get_connection()
             updates = []
             params = []
@@ -1606,7 +1636,18 @@ def main():
             specializations = None
             for i, arg in enumerate(cmd_args):
                 if arg == '--specializations' and i + 1 < len(cmd_args):
-                    specializations = json.loads(cmd_args[i + 1])
+                    try:
+                        specializations = json.loads(cmd_args[i + 1])
+                        # Validate it's a list of strings
+                        if not isinstance(specializations, list):
+                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2))
+                            sys.exit(1)
+                        if not all(isinstance(s, str) for s in specializations):
+                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2))
+                            sys.exit(1)
+                    except json.JSONDecodeError as e:
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2))
+                        sys.exit(1)
                     break
             result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
             print(json.dumps(result, indent=2))
@@ -1623,6 +1664,20 @@ def main():
                 # Convert auto_create to bool
                 elif key == 'auto_create':
                     value = value.lower() in ('true', '1', 'yes')
+                # Parse and validate specializations JSON
+                elif key == 'specializations':
+                    try:
+                        value = json.loads(value)
+                        # Validate it's a list of strings
+                        if not isinstance(value, list):
+                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2))
+                            sys.exit(1)
+                        if not all(isinstance(s, str) for s in value):
+                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2))
+                            sys.exit(1)
+                    except json.JSONDecodeError as e:
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2))
+                        sys.exit(1)
                 kwargs[key] = value
             result = db.update_task_group(group_id, session_id, **kwargs)
             print(json.dumps(result, indent=2))
