@@ -67,6 +67,7 @@ uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
 ```
 
 That's it. No configuration needed. BAZINGA automatically:
+- ✅ **Detects your tech stack** (languages, frameworks, databases) and loads specialized knowledge
 - ✅ Analyzes task complexity and independence
 - ✅ Spawns 1-4 developers based on parallelization opportunities
 - ✅ Runs security scans, lint checks, and test coverage
@@ -95,15 +96,16 @@ This adds 2-4 minutes upfront but provides better decisions, fewer revisions, an
 
 ### The Team
 
-BAZINGA coordinates 7 specialized AI agents:
+BAZINGA coordinates 8 specialized AI agents:
 
-1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
-2. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
-3. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
-4. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
-5. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
-6. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
-7. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
+1. **Tech Stack Scout** - Detects languages, frameworks, databases; loads specialized knowledge for all agents
+2. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
+3. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
+4. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
+5. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
+6. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
+7. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
+8. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
 
 ### The Workflow
 
@@ -160,6 +162,31 @@ The PM automatically decides how many developers to spawn (1-4) based on:
 | "Add auth, user mgmt, admin dashboard" | 3 developers | Independent features, low file overlap |
 | "Add login and password reset" | 1 developer | Password reset depends on auth |
 | "Refactor database layer" | 1 developer | High file overlap, risky in parallel |
+
+### Smart Tech Stack Detection
+
+At the start of every orchestration, the **Tech Stack Scout** analyzes your project and loads specialized knowledge:
+
+```
+🔍 Scout: Detecting tech stack...
+   → Found: TypeScript, React, Next.js, Prisma, PostgreSQL
+   → Loading 5 specialization templates
+   → Agents now have framework-specific patterns and best practices
+```
+
+**72 specialization templates** covering:
+
+| Category | Examples |
+|----------|----------|
+| Languages (15) | Python, TypeScript, Go, Rust, Java, Ruby, PHP... |
+| Frontend (8) | React, Vue, Angular, Next.js, Svelte, Astro... |
+| Backend (10) | FastAPI, Django, Express, NestJS, Spring Boot, Rails... |
+| Databases (7) | PostgreSQL, MongoDB, Redis, Prisma, Elasticsearch... |
+| Infrastructure (5) | Docker, Kubernetes, Terraform, GitHub Actions... |
+| Testing (4) | Playwright, Cypress, Jest patterns... |
+| Security (3) | JWT/OAuth, Auth patterns, Security auditing... |
+
+**Why this matters:** Developers write idiomatic code. A React component follows React patterns. A FastAPI endpoint uses Pydantic models correctly. No more generic advice—every agent knows your stack.
 
 ---
 
@@ -366,14 +393,15 @@ bazinga update
 
 ## Key Features
 
+- **Smart Tech Detection** - Auto-detects your stack and loads 72 specialization templates (languages, frameworks, databases)
 - **Parallel Developers** - 1-4 developers working simultaneously, automatically coordinated
 - **Adaptive Workflow** - PM decides parallelism based on task independence
+- **Framework-Specific Knowledge** - Agents write idiomatic code for React, FastAPI, Django, Next.js, and 60+ more
 - **3-Tier Problem Solving** - Standard review (80%), structured frameworks (15%), deep investigation (5%)
-- **Advanced Investigation** - Systematic root cause analysis for complex multi-hypothesis problems
 - **Automatic Quality Gates** - Security scanning, linting, and test coverage built-in
 - **Model Escalation** - Automatically escalates from Sonnet to Opus at revision 3
 - **Graceful Degradation** - Works even with missing tools, warns but continues
-- **Multi-language Support** - Python, JavaScript/TypeScript, Go, Java, Ruby
+- **Multi-language Support** - Python, JavaScript/TypeScript, Go, Java, Ruby, Rust, PHP, and more
 
 ---
 
@@ -543,6 +571,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 **Stable:**
 - ✅ Core orchestration workflow
 - ✅ Adaptive parallelism (1-4 developers)
+- ✅ **Tech Stack Scout** - Auto-detects languages, frameworks, databases
+- ✅ **72 specialization templates** - Framework-specific patterns and best practices
 - ✅ 3-tier problem-solving (standard/frameworks/investigation)
 - ✅ Investigator agent with systematic root cause analysis
 - ✅ 6 problem-solving frameworks (Root Cause, Architecture, Performance, Flaky Tests, Security, Investigation)
@@ -550,7 +580,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ Role drift prevention
 - ✅ Core Skills (security, lint, coverage, codebase-analysis, pattern-miner)
 - ✅ Model escalation
-- ✅ Multi-language support (Python, JS, Go, Java, Ruby)
+- ✅ Multi-language support (Python, JS, Go, Java, Ruby, Rust, PHP, and more)
 
 **Advanced (opt-in):**
 - ⚡ Velocity tracking and PM metrics
@@ -600,8 +630,8 @@ Special thanks to:
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2025-01-10
+**Version:** 2.1.0
+**Last Updated:** 2025-12-04
 **Created by:** [@mehdic](https://github.com/mehdic)
 
 ---
