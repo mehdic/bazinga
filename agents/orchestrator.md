@@ -146,6 +146,7 @@ Operation → Check result → If error: Output capsule with error
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
+  - `bazinga/project_context.json` (project tech stack - for specialization loading)
 - ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
 **FORBIDDEN tools for implementation:**
