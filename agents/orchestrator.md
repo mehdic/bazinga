@@ -532,7 +532,8 @@ Display:
      "tech_lead": "[model from DB, default: opus]",
      "project_manager": "[model from DB, default: opus]",
      "investigator": "[model from DB, default: opus]",
-     "validator": "[model from DB, default: sonnet]"
+     "validator": "[model from DB, default: sonnet]",
+     "tech_stack_scout": "[model from DB, default: sonnet]"
    }
    ```
 
