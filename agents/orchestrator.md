@@ -648,12 +648,30 @@ All state stored in SQLite database at `bazinga/bazinga.db`:
 
 **Purpose:** Detect project tech stack BEFORE PM spawn to enable specialization loading.
 
+### Step 0.5-PRE: Check for Existing Project Context
+
+**BEFORE spawning Scout, check if project_context.json already exists:**
+
+```bash
+test -f bazinga/project_context.json && echo "exists" || echo "missing"
+```
+
+**IF project_context.json EXISTS:**
+1. **Skip Scout spawn entirely** - use existing detection
+2. **Output to user (capsule format):**
+   ```
+   🔍 Tech stack cached | Using existing project_context.json | Skipping re-detection
+   ```
+3. **Proceed directly to Phase 1 (PM spawn)**
+
+**IF project_context.json MISSING → Continue to spawn Scout below:**
+
 **User output (capsule format):**
 ```
 🔍 Detecting tech stack | Analyzing project structure for specializations
 ```
 
-### 🔴 MANDATORY: Spawn Tech Stack Scout
+### 🔴 MANDATORY: Spawn Tech Stack Scout (if no cached context)
 
 **Build Scout prompt:**
 1. Read `agents/tech_stack_scout.md` for full agent definition
