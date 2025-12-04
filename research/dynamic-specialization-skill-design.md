@@ -37,23 +37,43 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 1. PM ANALYZES PROJECT (at session start)                       │
+│ 0. ORCHESTRATOR RUNS CODEBASE ANALYSIS (ONCE at session start)  │
 ├─────────────────────────────────────────────────────────────────┤
-│ PM detects technologies via codebase-analysis or file patterns: │
+│ Skill(command: "codebase-analysis")                             │
+│                                                                  │
+│ Detects technologies via file patterns:                         │
 │   - pom.xml + spring-boot-starter → Java + Spring Boot          │
 │   - package.json + react → TypeScript + React                   │
 │   - pyproject.toml + fastapi → Python + FastAPI                 │
 │                                                                  │
-│ PM stores detection in project_context.json:                    │
+│ Results CACHED to bazinga-db (project_stack table):             │
 │ {                                                                │
+│   "session_id": "bazinga_20251204_100000",                       │
 │   "detected_technologies": {                                     │
 │     "language": "java",                                          │
 │     "language_version": "8",                                     │
 │     "framework": "spring-boot",                                  │
 │     "framework_version": "2.7",                                  │
 │     "domain": "backend-api"                                      │
-│   }                                                              │
+│   },                                                             │
+│   "style_signals": { ... },                                      │
+│   "cached_at": "2025-12-04T10:00:00Z"                            │
 │ }                                                                │
+│                                                                  │
+│ ⚡ KEY OPTIMIZATION: Analysis runs ONCE, not per PM spawn        │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. PM READS CACHED STACK DATA (no re-analysis needed)           │
+├─────────────────────────────────────────────────────────────────┤
+│ PM queries bazinga-db for cached technologies:                  │
+│   SELECT * FROM project_stack WHERE session_id = ?              │
+│                                                                  │
+│ PM uses cached data for:                                         │
+│   - Task planning (knows project stack)                          │
+│   - Group assignment (per-group stack for monorepos)             │
+│   - Developer specialization hints                               │
 └───────────────────────────┬─────────────────────────────────────┘
                             │
                             ▼
@@ -62,9 +82,9 @@
 ├─────────────────────────────────────────────────────────────────┤
 │ Skill(command: "specialization-loader")                         │
 │                                                                  │
-│ Skill reads:                                                     │
-│   - bazinga/project_context.json (detected technologies)        │
-│   - bazinga/templates/specializations/*.md (template library)   │
+│ Skill reads from bazinga-db (NOT re-analyzing):                 │
+│   - Cached technologies from project_stack table                │
+│   - Templates from resources/templates/*.md                     │
 │                                                                  │
 │ Skill returns:                                                   │
 │   - Enhanced identity string                                     │
@@ -87,6 +107,58 @@
 │ )                                                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Codebase Analysis Caching Strategy
+
+**Problem:** PM may be spawned multiple times during an orchestration session (initial planning, after dev cycles, rework). Running codebase-analysis each time is wasteful.
+
+**Solution:** Run analysis ONCE at orchestration start, cache in bazinga-db.
+
+```
+Session Timeline:
+─────────────────────────────────────────────────────────────────────
+│ Session Start                                                      │
+│   └── Orchestrator runs codebase-analysis skill (ONCE)            │
+│         └── Results cached to bazinga-db.project_stack            │
+│                                                                    │
+│ PM Spawn #1 (initial planning)                                    │
+│   └── Reads cached data from DB (no analysis)                     │
+│                                                                    │
+│ Developer work...                                                  │
+│                                                                    │
+│ PM Spawn #2 (after QA feedback)                                   │
+│   └── Reads cached data from DB (no analysis)                     │
+│                                                                    │
+│ PM Spawn #3 (rework assignment)                                   │
+│   └── Reads cached data from DB (no analysis)                     │
+│                                                                    │
+│ Session End                                                        │
+─────────────────────────────────────────────────────────────────────
+```
+
+**Database Schema Addition:**
+
+```sql
+CREATE TABLE project_stack (
+    id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    language TEXT,
+    language_version TEXT,
+    framework TEXT,
+    framework_version TEXT,
+    domain TEXT,
+    style_signals TEXT,  -- JSON blob
+    detected_files TEXT, -- JSON array of key files found
+    cached_at TEXT NOT NULL,
+    UNIQUE(session_id)
+);
+```
+
+**Benefits:**
+- Analysis cost: O(1) per session instead of O(n) per PM spawn
+- Consistency: All agents see the same stack data
+- Auditability: Stack detection logged with timestamp
+- Speed: PM starts faster (no filesystem scanning)
 
 ### Specialization Block Structure
 
@@ -1294,3 +1366,68 @@ GROUP G2 (Frontend):
 ```
 
 Each developer receives the appropriate specialization for their group's stack.
+
+---
+
+## Documentation Requirements (Create at Implementation Time)
+
+**NOTE:** When implementing this feature, create user-facing documentation and reference it from the README.
+
+### Required Documentation
+
+Create `docs/dynamic-specialization.md` with:
+
+1. **Overview**
+   - What is Dynamic Agent Specialization
+   - How it enhances developer agents with technology-specific expertise
+   - Automatic stack detection and version adaptation
+
+2. **How It Works**
+   - Codebase analysis runs once at session start
+   - Stack data cached in bazinga-db
+   - Specialization templates applied based on detected technologies
+   - Version-appropriate patterns (Java 8 vs 21, React 16 vs 18)
+   - Style signal detection (Lombok, injection style, test framework)
+
+3. **Advantages**
+   - **Context-Aware Code**: Developers generate code matching your actual stack versions
+   - **Fewer Errors**: Won't suggest Java 14+ records in a Java 8 project
+   - **Consistent Style**: Mirrors your existing codebase conventions
+   - **Faster Onboarding**: Agents immediately understand project idioms
+   - **Reduced Rework**: Follows patterns already in use, not prescribing new ones
+   - **Monorepo Support**: Per-group specialization for different stacks
+
+4. **Configuration**
+   - `skills_config.json` settings for specialization-loader
+   - Template customization
+   - Enabling/disabling specific templates
+
+5. **Template Reference**
+   - Available templates (languages, frameworks, domains)
+   - Template format and version guards
+   - How to add custom templates
+
+### README Update
+
+Add to `README.md` features section:
+
+```markdown
+### Dynamic Agent Specialization
+
+BAZINGA automatically detects your project's technology stack and adapts agent behavior:
+
+- **Stack Detection**: Identifies languages, frameworks, and versions from project files
+- **Version-Aware Patterns**: Suggests Java 8 patterns for Java 8 projects, Java 21 for Java 21
+- **Style Matching**: Detects and follows your existing conventions (Lombok, injection style)
+- **Monorepo Support**: Different specializations for different parts of your codebase
+
+See [Dynamic Specialization Guide](docs/dynamic-specialization.md) for details.
+```
+
+### Implementation Checklist
+
+- [ ] Create `docs/dynamic-specialization.md`
+- [ ] Add feature section to `README.md`
+- [ ] Include architecture diagram
+- [ ] Add configuration examples
+- [ ] Document template customization
