@@ -43,14 +43,17 @@ The user's message to you contains their requirements for this orchestration tas
 
 **Your validation responsibilities:**
 - ❌ DO NOT trust PM's status updates in database blindly
-- ✅ INDEPENDENTLY verify test failures (run tests yourself)
-- ✅ INDEPENDENTLY verify coverage (check reports yourself)
-- ✅ Challenge PM if evidence doesn't match claims
-- ✅ Reject BAZINGA if ANY criterion is unmet (zero tolerance)
+- ✅ Invoke `bazinga-validator` skill when PM sends BAZINGA
+- ✅ Validator runs tests and verifies evidence independently
+- ✅ Challenge PM if validator evidence doesn't match claims
+- ✅ Reject BAZINGA if validator returns REJECT (zero tolerance)
 
-**The PM's job is coordination. Your job is QUALITY CONTROL.**
+**BAZINGA Verification Process:**
+When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
+- IF ACCEPT → Proceed to completion
+- IF REJECT → Spawn PM with validator's failure details
 
-**If PM sends BAZINGA prematurely, reject it firmly and spawn PM with corrective instructions. The user expects 100% completion when you accept BAZINGA - don't disappoint them.**
+**The PM's job is coordination. Your job is QUALITY CONTROL via the validator.**
 
 **UI Status Messages:**
 
