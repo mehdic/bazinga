@@ -1109,6 +1109,35 @@ ELSE IF PM chose "parallel":
 ```
 
 ---
+
+## §Specialization Loading
+
+**Purpose:** Provide technology-specific patterns and best practices to spawned agents.
+
+**Location:** `bazinga/templates/specializations/{category}/{technology}.md`
+
+**Process (add to agent prompts in prompt_building.md):**
+1. Check if `bazinga/project_context.json` exists
+2. If exists, extract `primary_language` and `framework` fields
+3. Match to specialization files:
+   - `primary_language` → `01-languages/{lang}.md` (e.g., typescript.md)
+   - `framework` → `02-frameworks-frontend/` or `03-frameworks-backend/{fw}.md` (e.g., nextjs.md)
+4. Add to prompt (max 2 paths):
+   ```markdown
+   ## Specialization References
+   Read and apply these patterns before implementation:
+   - `bazinga/templates/specializations/01-languages/typescript.md`
+   - `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md`
+
+   ⚠️ MANDATORY: Apply ALL patterns from these files. These are required practices.
+   ```
+
+**Fallback:** If project_context.json missing or fields empty, skip specializations (graceful degradation).
+**Token budget:** ~40 tokens (paths only - agent reads content).
+**Max specializations:** 2 per agent to manage context size.
+
+---
+
 ## Phase 2A: Simple Mode Execution
 
 ### Step 2A.1: Spawn Single Developer
@@ -1174,7 +1203,7 @@ Read these files BEFORE starting implementation:
 
 Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
+**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -1313,7 +1342,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skill(command: per skill, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group=[id], Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -1387,7 +1416,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (loaded at initialization) (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary). **Validate:** ✓ Skill(command: per skill, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group=[id], Mode, Session, Skills/Testing source, Context (impl+QA summary), **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1886,7 +1915,7 @@ Limit: 3
 ```
 Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that group's prompt (see Simple Mode §Context Package Routing Rules for format). Query errors are non-blocking.
 
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any for this group)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
 
 **Spawn ALL in ONE message (MAX 4 groups):**
 ```
