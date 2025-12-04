@@ -2,7 +2,7 @@
 name: playwright-cypress
 type: testing
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer, qa_expert]
 requires: [typescript]
 ---
@@ -14,151 +14,111 @@ requires: [typescript]
 ## Specialist Profile
 E2E testing specialist building browser automation. Expert in page objects, visual testing, and test reliability.
 
-## Implementation Guidelines
+---
 
-### Playwright Tests
+## Patterns to Follow
 
-```typescript
-// tests/e2e/users.spec.ts
-import { test, expect } from '@playwright/test';
-import { UsersPage } from './pages/UsersPage';
+### Test Structure
+- **Page Object Model**: Encapsulate page interactions
+- **data-testid selectors**: Stable, decoupled from styling
+- **Descriptive test names**: `should create user with valid data`
+- **Arrange-Act-Assert**: Clear test phases
+- **Single responsibility**: One behavior per test
 
-test.describe('Users Management', () => {
-  let usersPage: UsersPage;
+### Playwright Patterns (2025)
+- **Auto-waiting built-in**: No manual waits needed
+- **Parallel execution**: Native, fast
+- **Multiple browsers**: Chrome, Firefox, WebKit
+- **Trace Viewer**: Deep debugging on failure
+- **API mocking**: `page.route()` for isolation
 
-  test.beforeEach(async ({ page }) => {
-    usersPage = new UsersPage(page);
-    await usersPage.goto();
-  });
+### Cypress Patterns
+- **cy.intercept()**: Network stubbing
+- **Auto-retry assertions**: Handles async naturally
+- **Time-travel debugging**: Inspect each step
+- **Component testing**: Native support
+- **Real-time reloading**: Fast feedback
 
-  test('should display users list', async () => {
-    await expect(usersPage.usersList).toBeVisible();
-    await expect(usersPage.userCards).toHaveCount(await usersPage.getUserCount());
-  });
+### Reliability Patterns
+- **API shortcuts for setup**: Seed data via API, not UI
+- **Isolated test data**: Each test creates its own
+- **Retry flaky tests**: `retries: 2` in config
+- **Visual regression**: Percy, Applitools, or built-in
+- **Cross-browser testing**: CI matrix
 
-  test('should create new user', async () => {
-    await usersPage.clickCreateUser();
-    await usersPage.fillUserForm({
-      email: 'new@test.com',
-      displayName: 'New User',
-    });
-    await usersPage.submitForm();
+### CI/CD Integration
+- **Headless by default**: Faster in CI
+- **Artifacts on failure**: Screenshots, videos, traces
+- **Parallel sharding**: Split across workers
+- **Flaky test detection**: Track over time
 
-    await expect(usersPage.successToast).toBeVisible();
-    await expect(usersPage.userCards.last()).toContainText('New User');
-  });
-
-  test('should filter users by status', async () => {
-    await usersPage.filterByStatus('active');
-
-    const users = await usersPage.getVisibleUsers();
-    for (const user of users) {
-      expect(user.status).toBe('active');
-    }
-  });
-});
-```
-
-### Page Objects
-
-```typescript
-// tests/e2e/pages/UsersPage.ts
-import { Page, Locator } from '@playwright/test';
-
-export class UsersPage {
-  readonly page: Page;
-  readonly usersList: Locator;
-  readonly userCards: Locator;
-  readonly createButton: Locator;
-  readonly successToast: Locator;
-
-  constructor(page: Page) {
-    this.page = page;
-    this.usersList = page.getByTestId('users-list');
-    this.userCards = page.getByTestId('user-card');
-    this.createButton = page.getByRole('button', { name: 'Create User' });
-    this.successToast = page.getByRole('alert').filter({ hasText: 'Success' });
-  }
-
-  async goto() {
-    await this.page.goto('/users');
-    await this.usersList.waitFor();
-  }
-
-  async clickCreateUser() {
-    await this.createButton.click();
-    await this.page.getByRole('dialog').waitFor();
-  }
-
-  async fillUserForm(data: { email: string; displayName: string }) {
-    await this.page.getByLabel('Email').fill(data.email);
-    await this.page.getByLabel('Display Name').fill(data.displayName);
-  }
-
-  async submitForm() {
-    await this.page.getByRole('button', { name: 'Submit' }).click();
-  }
-
-  async filterByStatus(status: string) {
-    await this.page.getByRole('combobox', { name: 'Status' }).selectOption(status);
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async getUserCount(): Promise<number> {
-    return this.userCards.count();
-  }
-
-  async getVisibleUsers() {
-    const cards = await this.userCards.all();
-    return Promise.all(
-      cards.map(async (card) => ({
-        name: await card.getByTestId('user-name').textContent(),
-        status: await card.getByTestId('user-status').textContent(),
-      }))
-    );
-  }
-}
-```
-
-### Cypress Tests
-
-```typescript
-// cypress/e2e/users.cy.ts
-describe('Users Management', () => {
-  beforeEach(() => {
-    cy.intercept('GET', '/api/users*').as('getUsers');
-    cy.visit('/users');
-    cy.wait('@getUsers');
-  });
-
-  it('should display users list', () => {
-    cy.getByTestId('users-list').should('be.visible');
-    cy.getByTestId('user-card').should('have.length.greaterThan', 0);
-  });
-
-  it('should create new user', () => {
-    cy.intercept('POST', '/api/users').as('createUser');
-
-    cy.contains('button', 'Create User').click();
-    cy.getByLabel('Email').type('new@test.com');
-    cy.getByLabel('Display Name').type('New User');
-    cy.contains('button', 'Submit').click();
-
-    cy.wait('@createUser').its('response.statusCode').should('eq', 201);
-    cy.contains('[role="alert"]', 'Success').should('be.visible');
-  });
-});
-```
+---
 
 ## Patterns to Avoid
-- ❌ Hard-coded waits (use proper assertions)
-- ❌ Flaky selectors (use data-testid)
-- ❌ Testing through UI what can be API tested
-- ❌ Coupled tests
+
+### Selector Anti-Patterns
+- ❌ **CSS classes for selectors**: Fragile, change often
+- ❌ **XPath for simple elements**: Use semantic selectors
+- ❌ **Auto-generated IDs**: Unstable between builds
+- ❌ **Text-based only**: May change with i18n
+
+### Test Anti-Patterns
+- ❌ **Hard-coded waits (sleep)**: Flaky, slow
+- ❌ **Testing via UI what's faster via API**: Slow, brittle
+- ❌ **Shared mutable state**: Tests affect each other
+- ❌ **Sequential dependencies**: Tests should be independent
+- ❌ **Giant test files**: Hard to maintain
+
+### Maintenance Anti-Patterns
+- ❌ **Duplicated selectors**: Use page objects
+- ❌ **No retry strategy**: Flaky test fatigue
+- ❌ **Missing CI artifacts**: Can't debug failures
+- ❌ **Ignoring flaky tests**: Tech debt builds up
+
+---
 
 ## Verification Checklist
-- [ ] Page Object Pattern
-- [ ] Data-testid selectors
-- [ ] Network interception
-- [ ] Proper waiting strategies
-- [ ] Visual regression tests
+
+### Structure
+- [ ] Page Object Pattern used
+- [ ] data-testid for key elements
+- [ ] Tests are independent
+- [ ] Single assertion focus
+
+### Reliability
+- [ ] No hard-coded waits
+- [ ] Network mocking where needed
+- [ ] Retry configuration
+- [ ] Test isolation (data, state)
+
+### CI/CD
+- [ ] Headless mode configured
+- [ ] Artifacts on failure
+- [ ] Parallel execution
+- [ ] Cross-browser matrix
+
+### Reporting
+- [ ] HTML report generation
+- [ ] Video/screenshot on failure
+- [ ] Trace files (Playwright)
+- [ ] Coverage integration
+
+---
+
+## Code Patterns (Reference)
+
+### Playwright
+- **Page Object**: `class UsersPage { constructor(page: Page) { this.usersList = page.getByTestId('users-list'); } }`
+- **Test**: `test('should display users', async ({ page }) => { await expect(page.getByTestId('user-card')).toHaveCount(3); });`
+- **API mock**: `await page.route('/api/users', route => route.fulfill({ json: users }));`
+- **Wait for network**: `await page.waitForResponse('/api/users');`
+
+### Cypress
+- **Intercept**: `cy.intercept('GET', '/api/users').as('getUsers'); cy.wait('@getUsers');`
+- **Custom command**: `Cypress.Commands.add('login', (email) => { cy.request('POST', '/api/login', { email }); });`
+- **Assertion**: `cy.getByTestId('user-card').should('have.length.greaterThan', 0);`
+
+### Both
+- **data-testid**: `<button data-testid="submit-btn">Submit</button>`
+- **Page Object method**: `async fillForm(data) { await this.emailInput.fill(data.email); }`
+

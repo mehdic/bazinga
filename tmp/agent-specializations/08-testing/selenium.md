@@ -2,7 +2,7 @@
 name: selenium
 type: testing
 priority: 2
-token_estimate: 400
+token_estimate: 500
 compatible_with: [developer, senior_software_engineer, qa_expert]
 requires: []
 ---
@@ -14,170 +14,118 @@ requires: []
 ## Specialist Profile
 Selenium specialist building browser automation. Expert in WebDriver, waits, and cross-browser testing patterns.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Page Object Model
-
-```python
-# pages/base_page.py
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-class BasePage:
-    def __init__(self, driver):
-        self.driver = driver
-        self.wait = WebDriverWait(driver, 10)
-
-    def find_element(self, locator):
-        return self.wait.until(EC.presence_of_element_located(locator))
-
-    def find_clickable(self, locator):
-        return self.wait.until(EC.element_to_be_clickable(locator))
-
-    def find_elements(self, locator):
-        return self.wait.until(EC.presence_of_all_elements_located(locator))
-
-# pages/users_page.py
-from selenium.webdriver.common.by import By
-
-class UsersPage(BasePage):
-    # Locators
-    USERS_LIST = (By.CSS_SELECTOR, "[data-testid='users-list']")
-    USER_CARDS = (By.CSS_SELECTOR, "[data-testid='user-card']")
-    CREATE_BUTTON = (By.XPATH, "//button[contains(text(), 'Create User')]")
-    EMAIL_INPUT = (By.ID, "email")
-    NAME_INPUT = (By.ID, "displayName")
-    SUBMIT_BUTTON = (By.CSS_SELECTOR, "button[type='submit']")
-    SUCCESS_TOAST = (By.CSS_SELECTOR, "[role='alert']")
-
-    def __init__(self, driver):
-        super().__init__(driver)
-        self.url = "/users"
-
-    def navigate(self):
-        self.driver.get(f"{self.base_url}{self.url}")
-        self.find_element(self.USERS_LIST)
-        return self
-
-    def get_user_count(self):
-        return len(self.find_elements(self.USER_CARDS))
-
-    def click_create_user(self):
-        self.find_clickable(self.CREATE_BUTTON).click()
-        return self
-
-    def fill_user_form(self, email, display_name):
-        self.find_element(self.EMAIL_INPUT).send_keys(email)
-        self.find_element(self.NAME_INPUT).send_keys(display_name)
-        return self
-
-    def submit_form(self):
-        self.find_clickable(self.SUBMIT_BUTTON).click()
-        return self
-
-    def get_success_message(self):
-        return self.find_element(self.SUCCESS_TOAST).text
-```
-
-### Test Cases
-
-```python
-# tests/test_users.py
-import pytest
-from pages.users_page import UsersPage
-
-class TestUsers:
-    @pytest.fixture(autouse=True)
-    def setup(self, driver):
-        self.page = UsersPage(driver)
-        self.page.navigate()
-
-    def test_display_users_list(self):
-        assert self.page.get_user_count() > 0
-
-    def test_create_user(self):
-        initial_count = self.page.get_user_count()
-
-        self.page.click_create_user()
-        self.page.fill_user_form("test@example.com", "Test User")
-        self.page.submit_form()
-
-        assert "Success" in self.page.get_success_message()
-        assert self.page.get_user_count() == initial_count + 1
-
-    def test_create_user_validation(self):
-        self.page.click_create_user()
-        self.page.fill_user_form("invalid-email", "")
-        self.page.submit_form()
-
-        # Should show validation errors
-        error = self.page.find_element((By.CSS_SELECTOR, ".error-message"))
-        assert "valid email" in error.text.lower()
-```
-
-### WebDriver Setup
-
-```python
-# conftest.py
-import pytest
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-
-@pytest.fixture(scope="session")
-def driver():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-
-    driver = webdriver.Chrome(options=options)
-    driver.implicitly_wait(5)
-
-    yield driver
-
-    driver.quit()
-
-@pytest.fixture(autouse=True)
-def clean_state(driver):
-    yield
-    driver.delete_all_cookies()
-```
+- **One class per page**: Encapsulate all locators/actions
+- **Return self for chaining**: Fluent interface
+- **Locators as class constants**: Easy to update
+- **Methods for user actions**: Not low-level operations
+- **Base page class**: Shared wait and navigation logic
 
 ### Wait Strategies
+- **Explicit waits preferred**: `WebDriverWait` with conditions
+- **Expected conditions**: `element_to_be_clickable`, `visibility_of`
+- **Custom conditions**: For complex scenarios
+- **Fluent waits**: Polling with ignored exceptions
+- **Never use time.sleep()**: Always explicit
 
-```python
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+### Locator Strategy (Priority)
+1. **data-testid**: Most stable
+2. **ID**: If unique and stable
+3. **name attribute**: Forms
+4. **CSS selector**: Efficient, readable
+5. **XPath**: Last resort for complex traversal
 
-# Explicit wait (preferred)
-element = WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.ID, "submit"))
-)
+### Test Organization
+- **pytest/JUnit fixtures**: Setup/teardown
+- **Parameterized tests**: Multiple data sets
+- **Parallel execution**: pytest-xdist, TestNG parallel
+- **Screenshots on failure**: Debugging artifacts
+- **Headless for CI**: Faster, no display needed
 
-# Custom wait condition
-def element_has_text(locator, text):
-    def check(driver):
-        element = driver.find_element(*locator)
-        return text in element.text
-    return check
+### Cross-Browser Testing
+- **WebDriver Manager**: Auto-download drivers
+- **Selenium Grid**: Parallel cross-browser
+- **Cloud providers**: BrowserStack, SauceLabs
+- **Configuration via fixtures**: Browser selection
 
-WebDriverWait(driver, 10).until(element_has_text((By.ID, "status"), "Complete"))
-
-# Fluent wait
-wait = WebDriverWait(driver, 30, poll_frequency=0.5,
-                     ignored_exceptions=[StaleElementReferenceException])
-```
+---
 
 ## Patterns to Avoid
-- ❌ time.sleep() for waits
-- ❌ Hard-coded XPath selectors
-- ❌ Not using Page Object Model
-- ❌ Missing explicit waits
+
+### Wait Anti-Patterns
+- ❌ **time.sleep()**: Unreliable, slow
+- ❌ **Implicit waits globally**: Unpredictable
+- ❌ **Mixing implicit/explicit**: Conflicts
+- ❌ **Too short timeouts**: Flaky tests
+
+### Locator Anti-Patterns
+- ❌ **Absolute XPath**: `/html/body/div[3]/...` breaks easily
+- ❌ **Auto-generated IDs**: Change between builds
+- ❌ **CSS class names**: Styling changes break tests
+- ❌ **Index-based locators**: Fragile to reordering
+
+### Structure Anti-Patterns
+- ❌ **No Page Object Model**: Duplicate locators everywhere
+- ❌ **Test logic in page objects**: Keep pure
+- ❌ **Giant test methods**: Split into focused tests
+- ❌ **Shared browser state**: Tests affect each other
+
+### Execution Anti-Patterns
+- ❌ **No retry mechanism**: Flaky test failures
+- ❌ **Missing artifacts**: Can't debug CI failures
+- ❌ **Sequential only**: Slow feedback
+- ❌ **No headless option**: CI environment issues
+
+---
 
 ## Verification Checklist
-- [ ] Page Object Model
-- [ ] Explicit waits
-- [ ] Data-testid selectors
-- [ ] Cross-browser testing
-- [ ] Headless mode support
+
+### Structure
+- [ ] Page Object Model implemented
+- [ ] Base page with common methods
+- [ ] Stable locator strategy
+- [ ] Fixtures for setup/teardown
+
+### Waits
+- [ ] Explicit waits used
+- [ ] No time.sleep()
+- [ ] Custom conditions where needed
+- [ ] Reasonable timeouts
+
+### Execution
+- [ ] Headless mode available
+- [ ] Parallel test support
+- [ ] Screenshots on failure
+- [ ] Cross-browser configuration
+
+### CI/CD
+- [ ] WebDriver auto-management
+- [ ] Artifacts uploaded
+- [ ] Retry for flaky tests
+- [ ] Grid or cloud integration
+
+---
+
+## Code Patterns (Reference)
+
+### Page Object
+- **Class**: `class UsersPage(BasePage): USERS_LIST = (By.CSS_SELECTOR, "[data-testid='users-list']")`
+- **Method**: `def click_create(self): self.find_clickable(self.CREATE_BUTTON).click(); return self`
+- **Wait**: `self.wait.until(EC.element_to_be_clickable(locator))`
+
+### Explicit Wait
+- **Standard**: `WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "result")))`
+- **Custom**: `WebDriverWait(driver, 10).until(lambda d: "complete" in d.find_element(By.ID, "status").text)`
+- **Fluent**: `WebDriverWait(driver, 30, poll_frequency=0.5, ignored_exceptions=[StaleElementReferenceException])`
+
+### Fixtures (pytest)
+- **Driver**: `@pytest.fixture(scope="session") def driver(): return webdriver.Chrome(options=Options().add_argument("--headless"))`
+- **Cleanup**: `yield driver; driver.quit()`
+
+### Test
+- **Structure**: `def test_create_user(self, driver): page = UsersPage(driver).navigate(); page.click_create().fill_form(...).submit(); assert "Success" in page.get_message()`
+

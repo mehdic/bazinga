@@ -2,7 +2,7 @@
 name: testing-patterns
 type: testing
 priority: 2
-token_estimate: 450
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer, qa_expert]
 requires: []
 ---
@@ -14,169 +14,116 @@ requires: []
 ## Specialist Profile
 Testing specialist implementing comprehensive test strategies. Expert in unit, integration, and E2E testing patterns.
 
-## Implementation Guidelines
+---
 
-### Unit Tests
+## Patterns to Follow
 
-```typescript
-// services/__tests__/userService.test.ts
-import { UserService } from '../userService';
-import { createMockRepository, createMockNotifier } from '../../test/mocks';
+### Unit Testing
+- **Arrange-Act-Assert (AAA)**: Clear test structure
+- **Test behavior, not implementation**: Public API focus
+- **One assertion per test (ideally)**: Clear failure reason
+- **Fast execution**: Mock external dependencies
+- **Descriptive names**: `should_return_error_when_email_invalid`
 
-describe('UserService', () => {
-  let service: UserService;
-  let mockRepo: ReturnType<typeof createMockRepository>;
-  let mockNotifier: ReturnType<typeof createMockNotifier>;
+### Integration Testing
+- **Real database (containerized)**: Docker, Testcontainers
+- **API contract testing**: HTTP layer
+- **Transaction rollback**: Clean state per test
+- **Minimal mocking**: Only external services
+- **Realistic scenarios**: Happy path + error paths
 
-  beforeEach(() => {
-    mockRepo = createMockRepository();
-    mockNotifier = createMockNotifier();
-    service = new UserService(mockRepo, mockNotifier);
-  });
+### Test-Driven Development (TDD)
+- **Red-Green-Refactor**: Write failing test first
+- **Outer/Inner loop**: Acceptance test → unit tests
+- **Small increments**: One test at a time
+- **Refactor with confidence**: Tests are safety net
 
-  describe('create', () => {
-    it('should create user and send welcome notification', async () => {
-      const input = { email: 'test@example.com', displayName: 'Test' };
-      mockRepo.create.mockResolvedValue({ id: '1', ...input, status: 'pending' });
+### Test Data
+- **Factory pattern**: `buildUser({ email: 'test@example.com' })`
+- **Faker for realistic data**: Random but valid
+- **Fixtures for complex scenarios**: Reusable setups
+- **Database seeding**: Consistent baseline
 
-      const result = await service.create(input);
+### Mocking Strategy
+- **Mock at boundaries**: External services, time, randomness
+- **Don't mock what you own**: Test real interactions
+- **Verify mock calls**: Ensure correct usage
+- **Reset between tests**: Clean state
 
-      expect(result).toMatchObject({ id: '1', email: input.email });
-      expect(mockRepo.create).toHaveBeenCalledWith(input);
-      expect(mockNotifier.sendWelcome).toHaveBeenCalledWith(
-        expect.objectContaining({ email: input.email })
-      );
-    });
-
-    it('should throw on duplicate email', async () => {
-      mockRepo.create.mockRejectedValue(new DuplicateError('email'));
-
-      await expect(service.create({ email: 'exists@test.com', displayName: 'Test' }))
-        .rejects.toThrow(DuplicateError);
-    });
-  });
-});
-```
-
-### Integration Tests
-
-```typescript
-// __tests__/integration/users.test.ts
-import { createTestApp, createTestDatabase } from '../setup';
-import request from 'supertest';
-
-describe('Users API', () => {
-  let app: Express;
-  let db: TestDatabase;
-
-  beforeAll(async () => {
-    db = await createTestDatabase();
-    app = createTestApp(db);
-  });
-
-  afterAll(async () => {
-    await db.cleanup();
-  });
-
-  beforeEach(async () => {
-    await db.truncate(['users']);
-  });
-
-  describe('POST /users', () => {
-    it('should create user and return 201', async () => {
-      const response = await request(app)
-        .post('/users')
-        .send({ email: 'new@test.com', displayName: 'New User' })
-        .expect(201);
-
-      expect(response.body).toMatchObject({
-        email: 'new@test.com',
-        displayName: 'New User',
-        status: 'pending',
-      });
-      expect(response.headers.location).toMatch(/\/users\/[\w-]+/);
-
-      // Verify in database
-      const dbUser = await db.users.findByEmail('new@test.com');
-      expect(dbUser).toBeTruthy();
-    });
-
-    it('should return 409 on duplicate email', async () => {
-      await db.users.create({ email: 'exists@test.com', displayName: 'Existing' });
-
-      await request(app)
-        .post('/users')
-        .send({ email: 'exists@test.com', displayName: 'Duplicate' })
-        .expect(409);
-    });
-  });
-});
-```
-
-### Test Factories
-
-```typescript
-// test/factories/userFactory.ts
-import { faker } from '@faker-js/faker';
-import { User, CreateUserInput } from '../../types';
-
-export function buildUser(overrides: Partial<User> = {}): User {
-  return {
-    id: faker.string.uuid(),
-    email: faker.internet.email(),
-    displayName: faker.person.fullName(),
-    status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  };
-}
-
-export function buildCreateUserInput(overrides: Partial<CreateUserInput> = {}): CreateUserInput {
-  return {
-    email: faker.internet.email(),
-    displayName: faker.person.fullName(),
-    ...overrides,
-  };
-}
-```
-
-### Test Helpers
-
-```typescript
-// test/helpers/database.ts
-export async function withTransaction<T>(
-  db: Database,
-  fn: (tx: Transaction) => Promise<T>
-): Promise<T> {
-  const tx = await db.beginTransaction();
-  try {
-    const result = await fn(tx);
-    await tx.rollback(); // Always rollback in tests
-    return result;
-  } catch (error) {
-    await tx.rollback();
-    throw error;
-  }
-}
-
-// test/helpers/assertions.ts
-export function expectValidationError(response: Response, field: string) {
-  expect(response.status).toBe(400);
-  expect(response.body.code).toBe('VALIDATION_ERROR');
-  expect(response.body.details).toHaveProperty(field);
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Testing implementation details
-- ❌ Shared mutable state between tests
-- ❌ Flaky async tests
-- ❌ Over-mocking
+
+### Unit Test Anti-Patterns
+- ❌ **Testing private methods**: Test public behavior
+- ❌ **Shared mutable state**: Isolation required
+- ❌ **Over-mocking**: Loses confidence
+- ❌ **Brittle assertions**: Test essence, not details
+- ❌ **Slow tests**: Should run in milliseconds
+
+### Integration Anti-Patterns
+- ❌ **Mocking everything**: Defeats purpose
+- ❌ **Shared database state**: Tests affect each other
+- ❌ **No cleanup**: Data accumulates
+- ❌ **Flaky async handling**: Use proper waiting
+
+### General Anti-Patterns
+- ❌ **Chasing 100% coverage**: Coverage ≠ quality
+- ❌ **No mutation testing**: Tests may be weak
+- ❌ **Ignoring flaky tests**: Technical debt
+- ❌ **Comments in tests**: Test names should be clear
+
+### Structure Anti-Patterns
+- ❌ **Logic in tests**: Keep tests simple
+- ❌ **Multiple assertions (unrelated)**: Split tests
+- ❌ **Copy-paste test code**: Use factories/helpers
+- ❌ **Tests without assertions**: False confidence
+
+---
 
 ## Verification Checklist
-- [ ] Isolated test cases
-- [ ] Descriptive test names
-- [ ] Factory patterns for test data
-- [ ] Database cleanup between tests
-- [ ] Meaningful assertions
+
+### Unit Tests
+- [ ] AAA pattern followed
+- [ ] Tests are isolated
+- [ ] Fast execution (<100ms each)
+- [ ] Meaningful names
+
+### Integration Tests
+- [ ] Real database used
+- [ ] Proper cleanup/rollback
+- [ ] Contract verification
+- [ ] Timeout handling
+
+### Coverage
+- [ ] Critical paths covered
+- [ ] Edge cases included
+- [ ] Error handling tested
+- [ ] Mutation testing considered
+
+### Maintenance
+- [ ] Factory patterns for data
+- [ ] Helper functions for common assertions
+- [ ] Clear folder structure
+- [ ] CI integration
+
+---
+
+## Code Patterns (Reference)
+
+### Unit Test (Jest)
+- **Structure**: `describe('UserService', () => { describe('create', () => { it('should...', () => {}); }); });`
+- **Mock**: `const mockRepo = { create: jest.fn().mockResolvedValue(user) };`
+- **Assert**: `expect(result).toMatchObject({ email: 'test@example.com' });`
+
+### Integration Test
+- **Setup**: `beforeAll(async () => { db = await createTestDatabase(); });`
+- **Request**: `const response = await request(app).post('/users').send(userData).expect(201);`
+- **Cleanup**: `afterEach(async () => { await db.truncate(['users']); });`
+
+### Factory Pattern
+- **Builder**: `function buildUser(overrides = {}) { return { id: faker.string.uuid(), email: faker.internet.email(), ...overrides }; }`
+
+### Helper
+- **Custom assertion**: `function expectValidationError(response, field) { expect(response.status).toBe(400); expect(response.body.details).toHaveProperty(field); }`
+

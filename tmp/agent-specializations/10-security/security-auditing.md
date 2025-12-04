@@ -2,7 +2,7 @@
 name: security-auditing
 type: security
 priority: 2
-token_estimate: 450
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer, tech_lead]
 requires: []
 ---
@@ -14,152 +14,122 @@ requires: []
 ## Specialist Profile
 Security specialist auditing application security. Expert in OWASP vulnerabilities, secure coding, and threat modeling.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Input Validation
+- **Schema validation (Zod/Joi)**: Type-safe, whitelist approach
+- **Sanitize for context**: HTML, SQL, shell differently
+- **Parameterized queries always**: Never concatenate
+- **Content-Type validation**: Reject unexpected types
+- **Size limits**: Prevent DoS via large inputs
 
-```typescript
-// middleware/validation.ts
-import { z } from 'zod';
-import DOMPurify from 'isomorphic-dompurify';
-
-// Schema with strict validation
-const createUserSchema = z.object({
-  email: z.string().email().max(255),
-  displayName: z.string().min(2).max(100).regex(/^[\w\s-]+$/),
-  password: z.string()
-    .min(12)
-    .regex(/[A-Z]/, 'Must contain uppercase')
-    .regex(/[a-z]/, 'Must contain lowercase')
-    .regex(/[0-9]/, 'Must contain number')
-    .regex(/[^A-Za-z0-9]/, 'Must contain special character'),
-});
-
-// Sanitization for user content
-export function sanitizeHtml(dirty: string): string {
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p'],
-    ALLOWED_ATTR: ['href'],
-  });
-}
-
-// SQL parameterization (never concatenate)
-const user = await db.query(
-  'SELECT * FROM users WHERE email = $1 AND status = $2',
-  [email, status]
-);
-```
-
-### Authentication
-
-```typescript
-// auth/password.ts
-import argon2 from 'argon2';
-
-export async function hashPassword(password: string): Promise<string> {
-  return argon2.hash(password, {
-    type: argon2.argon2id,
-    memoryCost: 65536,
-    timeCost: 3,
-    parallelism: 4,
-  });
-}
-
-export async function verifyPassword(hash: string, password: string): Promise<boolean> {
-  return argon2.verify(hash, password);
-}
-
-// Rate limiting
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: 'Too many login attempts',
-  keyGenerator: (req) => req.ip + req.body.email,
-});
-
-// Constant-time comparison
-import { timingSafeEqual } from 'crypto';
-function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
-}
-```
+### Password Security
+- **Argon2id**: Current best algorithm
+- **Memory-hard hashing**: 64MB+, 3+ iterations
+- **Password strength rules**: Min 12 chars, complexity
+- **Breach database check**: HaveIBeenPwned API
+- **Rate limiting login attempts**: Prevent brute force
 
 ### Authorization
-
-```typescript
-// auth/rbac.ts
-type Permission = 'users:read' | 'users:write' | 'orders:read' | 'admin:*';
-
-const rolePermissions: Record<string, Permission[]> = {
-  user: ['users:read'],
-  admin: ['users:read', 'users:write', 'orders:read'],
-  superadmin: ['admin:*'],
-};
-
-export function hasPermission(user: User, permission: Permission): boolean {
-  const permissions = rolePermissions[user.role] ?? [];
-  return permissions.includes(permission) ||
-         permissions.includes('admin:*');
-}
-
-// Middleware
-export function requirePermission(permission: Permission) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!hasPermission(req.user, permission)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    next();
-  };
-}
-
-// Resource-level authorization
-export async function canAccessOrder(user: User, orderId: string): Promise<boolean> {
-  const order = await db.orders.findById(orderId);
-  return order?.userId === user.id || user.role === 'admin';
-}
-```
+- **RBAC or ABAC**: Role or attribute-based
+- **Principle of least privilege**: Minimal access
+- **Resource-level checks**: Not just role checks
+- **Deny by default**: Explicit grants only
+- **Audit logging**: Who did what, when
 
 ### Security Headers
+- **Content-Security-Policy**: Script sources
+- **Strict-Transport-Security**: HTTPS only
+- **X-Content-Type-Options**: nosniff
+- **X-Frame-Options**: Clickjacking prevention
+- **Referrer-Policy**: Control leakage
 
-```typescript
-// middleware/security.ts
-import helmet from 'helmet';
+### Secrets Management
+- **Environment variables**: Not in code
+- **Secret managers**: Vault, AWS Secrets Manager
+- **Rotation capability**: Regular key changes
+- **Access audit**: Who accessed what
+- **No secrets in logs**: Redact sensitive data
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", process.env.API_URL],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-    },
-  },
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-}));
-
-// CORS
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(','),
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-}));
-```
+---
 
 ## Patterns to Avoid
-- ❌ String concatenation in SQL
-- ❌ MD5/SHA1 for passwords
-- ❌ Storing secrets in code
-- ❌ Missing rate limiting
+
+### Injection Anti-Patterns
+- ❌ **String concatenation for SQL**: Use params
+- ❌ **User input in shell commands**: Command injection
+- ❌ **Unsanitized HTML output**: XSS
+- ❌ **eval() on user input**: Code injection
+
+### Authentication Anti-Patterns
+- ❌ **MD5/SHA1 for passwords**: Use Argon2id
+- ❌ **Password in URL params**: Logged everywhere
+- ❌ **No rate limiting**: Brute force attacks
+- ❌ **Timing attacks**: Non-constant comparison
+
+### Authorization Anti-Patterns
+- ❌ **Client-side only checks**: Easily bypassed
+- ❌ **Role check without resource check**: IDOR
+- ❌ **Trusting client IDs**: Verify ownership
+- ❌ **No audit trail**: Can't detect breaches
+
+### Data Anti-Patterns
+- ❌ **Secrets in code/logs**: Exposure risk
+- ❌ **Sensitive data unencrypted**: At rest or transit
+- ❌ **PII in error messages**: Information leakage
+- ❌ **No data retention policy**: Excessive storage
+
+---
 
 ## Verification Checklist
-- [ ] Input validation (Zod/Joi)
+
+### Input
+- [ ] Schema validation on all endpoints
 - [ ] Parameterized queries
-- [ ] Argon2id for passwords
-- [ ] RBAC with least privilege
-- [ ] Security headers (Helmet)
+- [ ] Output encoding for context
+- [ ] Size limits configured
+
+### Authentication
+- [ ] Argon2id password hashing
+- [ ] Rate limiting on auth
+- [ ] Constant-time comparisons
+- [ ] Breach password check
+
+### Authorization
+- [ ] RBAC/ABAC implemented
+- [ ] Resource-level checks
+- [ ] Deny by default
+- [ ] Audit logging enabled
+
+### Infrastructure
+- [ ] Security headers configured
+- [ ] Secrets in secret manager
+- [ ] TLS 1.3 only
+- [ ] Dependency scanning
+
+---
+
+## Code Patterns (Reference)
+
+### Input Validation (Zod)
+- **Schema**: `z.object({ email: z.string().email().max(255), name: z.string().min(2).max(100) })`
+- **Parse**: `const data = schema.parse(req.body)` (throws on invalid)
+- **Sanitize HTML**: `DOMPurify.sanitize(dirty, { ALLOWED_TAGS: ['b', 'i', 'a'] })`
+
+### Password (Argon2)
+- **Hash**: `argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 })`
+- **Verify**: `argon2.verify(hash, password)`
+- **Constant-time**: `crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))`
+
+### Authorization
+- **RBAC**: `const permissions = rolePermissions[user.role]; if (!permissions.includes(required)) throw new ForbiddenError()`
+- **Resource check**: `if (order.userId !== user.id && user.role !== 'admin') throw new ForbiddenError()`
+
+### Headers (Helmet)
+- **Setup**: `app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"] } }, hsts: { maxAge: 31536000 } }))`
+
+### SQL (Parameterized)
+- **Query**: `db.query('SELECT * FROM users WHERE email = $1', [email])`
+

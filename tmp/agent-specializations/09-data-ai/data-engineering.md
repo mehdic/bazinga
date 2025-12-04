@@ -2,7 +2,7 @@
 name: data-engineering
 type: data
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: [python]
 ---
@@ -14,156 +14,118 @@ requires: [python]
 ## Specialist Profile
 Data engineering specialist building ETL pipelines. Expert in data transformation, orchestration, and warehouse patterns.
 
-## Implementation Guidelines
+---
 
-### ETL with PySpark
+## Patterns to Follow
 
-```python
-# jobs/user_aggregation.py
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+### ETL Best Practices
+- **Idempotent jobs**: Re-runnable without side effects
+- **Incremental processing**: Only new/changed data
+- **Partition pruning**: Read only relevant partitions
+- **Data quality checks**: Validate before and after
+- **Lineage tracking**: Know data origins
 
-def create_spark_session() -> SparkSession:
-    return SparkSession.builder \
-        .appName("user_aggregation") \
-        .config("spark.sql.adaptive.enabled", "true") \
-        .getOrCreate()
+### PySpark Patterns
+- **Adaptive Query Execution**: Auto-optimization
+- **Broadcast joins**: Small table to all nodes
+- **Partition by key columns**: Query performance
+- **Caching strategically**: Reused DataFrames
+- **Avoid collect()**: Keeps data distributed
 
-def run_aggregation(spark: SparkSession, date: str):
-    users = spark.read.parquet(f"s3://data-lake/users/date={date}")
-    orders = spark.read.parquet(f"s3://data-lake/orders/date={date}")
+### Orchestration (Airflow)
+- **DAG as code**: Version controlled
+- **Idempotent tasks**: Safe retries
+- **XCom for small data**: Not large datasets
+- **Sensors with timeouts**: Don't block forever
+- **Task groups**: Logical organization
 
-    # Aggregate user metrics
-    user_metrics = orders.groupBy("user_id").agg(
-        F.count("*").alias("order_count"),
-        F.sum("amount").alias("total_spent"),
-        F.avg("amount").alias("avg_order_value"),
-        F.max("created_at").alias("last_order_at"),
-    )
+### dbt Best Practices
+- **Incremental models**: Performance at scale
+- **Ephemeral for CTEs**: No materialization
+- **Tests on sources**: Catch bad data early
+- **Documentation**: Every model documented
+- **Seeds for lookup tables**: Version controlled
 
-    # Window for ranking
-    window = Window.orderBy(F.desc("total_spent"))
+### Data Quality
+- **Schema validation**: Expected columns/types
+- **Row counts**: Expected ranges
+- **Null checks**: Critical fields
+- **Freshness SLAs**: Data timeliness
+- **Great Expectations or dbt tests**: Automated validation
 
-    result = users.join(user_metrics, users.id == user_metrics.user_id, "left") \
-        .select(
-            users.id,
-            users.email,
-            F.coalesce(user_metrics.order_count, F.lit(0)).alias("order_count"),
-            F.coalesce(user_metrics.total_spent, F.lit(0)).alias("total_spent"),
-            F.rank().over(window).alias("spending_rank"),
-        )
-
-    result.write \
-        .mode("overwrite") \
-        .partitionBy("date") \
-        .parquet(f"s3://data-warehouse/user_metrics/")
-
-if __name__ == "__main__":
-    spark = create_spark_session()
-    run_aggregation(spark, "2024-01-15")
-```
-
-### Airflow DAG
-
-```python
-# dags/user_pipeline.py
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
-from datetime import datetime, timedelta
-
-default_args = {
-    "owner": "data-team",
-    "depends_on_past": False,
-    "retries": 2,
-    "retry_delay": timedelta(minutes=5),
-}
-
-with DAG(
-    "user_metrics_pipeline",
-    default_args=default_args,
-    schedule_interval="@daily",
-    start_date=datetime(2024, 1, 1),
-    catchup=False,
-    tags=["users", "metrics"],
-) as dag:
-
-    extract_users = PythonOperator(
-        task_id="extract_users",
-        python_callable=extract_from_postgres,
-        op_kwargs={"table": "users", "date": "{{ ds }}"},
-    )
-
-    transform = EmrAddStepsOperator(
-        task_id="transform_users",
-        job_flow_id="{{ var.value.emr_cluster_id }}",
-        steps=[{
-            "Name": "User Aggregation",
-            "ActionOnFailure": "CONTINUE",
-            "HadoopJarStep": {
-                "Jar": "command-runner.jar",
-                "Args": ["spark-submit", "s3://scripts/user_aggregation.py", "{{ ds }}"],
-            },
-        }],
-    )
-
-    load_warehouse = PythonOperator(
-        task_id="load_to_warehouse",
-        python_callable=load_to_redshift,
-        op_kwargs={"table": "user_metrics", "date": "{{ ds }}"},
-    )
-
-    extract_users >> transform >> load_warehouse
-```
-
-### dbt Models
-
-```sql
--- models/marts/user_metrics.sql
-{{ config(
-    materialized='incremental',
-    unique_key='user_id',
-    partition_by={'field': 'date', 'data_type': 'date'}
-) }}
-
-WITH orders AS (
-    SELECT * FROM {{ ref('stg_orders') }}
-    {% if is_incremental() %}
-    WHERE created_at > (SELECT MAX(created_at) FROM {{ this }})
-    {% endif %}
-),
-
-user_orders AS (
-    SELECT
-        user_id,
-        COUNT(*) AS order_count,
-        SUM(amount) AS total_spent,
-        MAX(created_at) AS last_order_at
-    FROM orders
-    GROUP BY user_id
-)
-
-SELECT
-    u.id AS user_id,
-    u.email,
-    COALESCE(uo.order_count, 0) AS order_count,
-    COALESCE(uo.total_spent, 0) AS total_spent,
-    uo.last_order_at,
-    CURRENT_DATE AS date
-FROM {{ ref('stg_users') }} u
-LEFT JOIN user_orders uo ON u.id = uo.user_id
-```
+---
 
 ## Patterns to Avoid
-- ❌ Processing without partitioning
-- ❌ Missing idempotency
-- ❌ Unbounded data scans
-- ❌ No data quality checks
+
+### ETL Anti-Patterns
+- ❌ **Non-idempotent jobs**: Duplicates on retry
+- ❌ **Full table scans**: Read only what's needed
+- ❌ **No partitioning**: Slow queries, high costs
+- ❌ **Missing data validation**: Garbage propagates
+
+### Spark Anti-Patterns
+- ❌ **collect() on large data**: OOM errors
+- ❌ **UDFs when built-ins exist**: Slower
+- ❌ **Skewed joins**: One partition takes forever
+- ❌ **Not caching reused DFs**: Recomputes
+
+### Orchestration Anti-Patterns
+- ❌ **Logic in DAG files**: Hard to test
+- ❌ **Long-running tasks**: No checkpointing
+- ❌ **No task retries**: Fragile pipelines
+- ❌ **Hardcoded connections**: Use Airflow connections
+
+### Architecture Anti-Patterns
+- ❌ **No lineage tracking**: Unknown data provenance
+- ❌ **Monolithic pipelines**: Hard to debug
+- ❌ **No alerting**: Silent failures
+- ❌ **Ignoring backpressure**: Downstream overwhelm
+
+---
 
 ## Verification Checklist
-- [ ] Idempotent jobs
-- [ ] Partition pruning
-- [ ] Data quality assertions
-- [ ] Incremental processing
-- [ ] Proper error handling
+
+### Jobs
+- [ ] Idempotent design
+- [ ] Incremental where applicable
+- [ ] Partitioning strategy
+- [ ] Error handling with retries
+
+### Data Quality
+- [ ] Schema validation
+- [ ] Row count checks
+- [ ] Null/freshness validation
+- [ ] Test coverage in dbt
+
+### Orchestration
+- [ ] DAG version controlled
+- [ ] Task dependencies clear
+- [ ] Retry/SLA configured
+- [ ] Alerting on failure
+
+### Performance
+- [ ] Partition pruning enabled
+- [ ] Joins optimized (broadcast/shuffle)
+- [ ] Caching where beneficial
+- [ ] No full table scans
+
+---
+
+## Code Patterns (Reference)
+
+### PySpark
+- **Session**: `spark = SparkSession.builder.config("spark.sql.adaptive.enabled", "true").getOrCreate()`
+- **Read partitioned**: `spark.read.parquet(f"s3://data/date={date}")`
+- **Write partitioned**: `df.write.mode("overwrite").partitionBy("date").parquet("s3://output/")`
+- **Window**: `Window.partitionBy("user_id").orderBy(F.desc("created_at"))`
+
+### Airflow
+- **DAG**: `with DAG("pipeline", schedule_interval="@daily", catchup=False) as dag:`
+- **Task**: `PythonOperator(task_id="extract", python_callable=extract_fn, op_kwargs={"date": "{{ ds }}"})`
+- **Dependencies**: `extract >> transform >> load`
+
+### dbt
+- **Incremental**: `{{ config(materialized='incremental', unique_key='id') }} {% if is_incremental() %} WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }}) {% endif %}`
+- **Ref**: `SELECT * FROM {{ ref('stg_orders') }}`
+- **Test**: `- unique: user_id`, `- not_null: email`
+

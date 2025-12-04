@@ -2,7 +2,7 @@
 name: auth-patterns
 type: security
 priority: 2
-token_estimate: 500
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,243 +12,122 @@ requires: []
 # Authentication Patterns Expertise
 
 ## Specialist Profile
-Authentication specialist implementing secure auth flows. Expert in OIDC, OAuth 2.0, API keys, and enterprise SSO patterns.
+Authentication specialist implementing secure auth flows. Expert in OIDC, API keys, and enterprise SSO patterns.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### OpenID Connect (OIDC)
+- **Authorization code + PKCE**: Modern secure flow
+- **ID token validation**: iss, aud, exp, nonce
+- **Userinfo endpoint**: Additional claims
+- **Discovery document**: Auto-configuration
+- **Session management**: RP-initiated logout
 
-```typescript
-// OIDC with Authorization Code + PKCE
-import { generators, Issuer } from 'openid-client';
+### API Key Security
+- **Prefix for identification**: First 8 chars visible
+- **Hash before storage**: Argon2, bcrypt
+- **Scoped permissions**: Principle of least privilege
+- **Expiration support**: Time-limited keys
+- **Rotation capability**: Generate new, revoke old
 
-async function setupOIDC() {
-  const issuer = await Issuer.discover(process.env.OIDC_ISSUER_URL!);
+### Multi-Factor Authentication
+- **TOTP (RFC 6238)**: Time-based codes
+- **WebAuthn/Passkeys**: Phishing-resistant
+- **Recovery codes**: Secure backup
+- **Remember device**: Risk-based MFA
+- **Fallback methods**: Not just one factor
 
-  const client = new issuer.Client({
-    client_id: process.env.OIDC_CLIENT_ID!,
-    client_secret: process.env.OIDC_CLIENT_SECRET,
-    redirect_uris: [process.env.OIDC_REDIRECT_URI!],
-    response_types: ['code'],
-    token_endpoint_auth_method: 'client_secret_basic',
-  });
+### Session Management
+- **Secure session IDs**: Cryptographic random
+- **Server-side storage**: Redis, database
+- **Absolute timeout**: Max session duration
+- **Idle timeout**: Inactivity expiration
+- **Session regeneration**: After auth level change
 
-  return client;
-}
+### Enterprise SSO
+- **SAML 2.0**: Enterprise standard
+- **SCIM**: User provisioning
+- **JIT provisioning**: Create user on first login
+- **Attribute mapping**: IdP claims to app roles
+- **Single logout**: Cross-application signout
 
-// Authorization endpoint
-app.get('/auth/login', async (req, res) => {
-  const codeVerifier = generators.codeVerifier();
-  const codeChallenge = generators.codeChallenge(codeVerifier);
-  const state = generators.state();
-  const nonce = generators.nonce();
-
-  // Store in session
-  req.session.oidc = { codeVerifier, state, nonce };
-
-  const authUrl = client.authorizationUrl({
-    scope: 'openid profile email',
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-    state,
-    nonce,
-  });
-
-  res.redirect(authUrl);
-});
-
-// Callback handler
-app.get('/auth/callback', async (req, res) => {
-  const { codeVerifier, state, nonce } = req.session.oidc;
-
-  const params = client.callbackParams(req);
-  const tokenSet = await client.callback(
-    process.env.OIDC_REDIRECT_URI!,
-    params,
-    { code_verifier: codeVerifier, state, nonce }
-  );
-
-  // Validate ID token claims
-  const claims = tokenSet.claims();
-  if (claims.aud !== process.env.OIDC_CLIENT_ID) {
-    throw new Error('Invalid audience');
-  }
-
-  // Create session
-  const user = await findOrCreateUser(claims);
-  req.session.userId = user.id;
-
-  res.redirect('/dashboard');
-});
-```
-
-### OAuth 2.0 Flows
-
-```typescript
-// Client Credentials (machine-to-machine)
-async function getM2MToken(): Promise<string> {
-  const response = await fetch(`${OAUTH_SERVER}/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: process.env.CLIENT_ID!,
-      client_secret: process.env.CLIENT_SECRET!,
-      scope: 'api:read api:write',
-    }),
-  });
-
-  const data = await response.json();
-  return data.access_token;
-}
-
-// Resource Owner Password (legacy - avoid if possible)
-async function passwordGrant(username: string, password: string) {
-  const response = await fetch(`${OAUTH_SERVER}/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'password',
-      client_id: process.env.CLIENT_ID!,
-      username,
-      password,
-      scope: 'openid profile',
-    }),
-  });
-
-  return response.json();
-}
-```
-
-### API Key Authentication
-
-```typescript
-// API Key management
-interface ApiKey {
-  id: string;
-  hashedKey: string;
-  prefix: string;  // First 8 chars for identification
-  name: string;
-  scopes: string[];
-  userId: string;
-  expiresAt: Date | null;
-  lastUsedAt: Date | null;
-}
-
-async function generateApiKey(userId: string, name: string, scopes: string[]): Promise<string> {
-  // Generate cryptographically secure key
-  const rawKey = crypto.randomBytes(32).toString('base64url');
-  const prefix = rawKey.slice(0, 8);
-  const hashedKey = await argon2.hash(rawKey);
-
-  await db.apiKeys.create({
-    id: crypto.randomUUID(),
-    hashedKey,
-    prefix,
-    name,
-    scopes,
-    userId,
-    expiresAt: null,
-    lastUsedAt: null,
-  });
-
-  // Return full key only once - user must store it
-  return `${prefix}_${rawKey}`;
-}
-
-// API Key middleware
-async function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers['x-api-key'];
-  if (!authHeader) return res.status(401).json({ error: 'API key required' });
-
-  const [prefix] = authHeader.split('_');
-  const apiKey = await db.apiKeys.findOne({ prefix });
-
-  if (!apiKey) return res.status(401).json({ error: 'Invalid API key' });
-  if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
-    return res.status(401).json({ error: 'API key expired' });
-  }
-
-  const valid = await argon2.verify(apiKey.hashedKey, authHeader);
-  if (!valid) return res.status(401).json({ error: 'Invalid API key' });
-
-  // Update last used
-  await db.apiKeys.update(apiKey.id, { lastUsedAt: new Date() });
-
-  req.apiKey = apiKey;
-  req.scopes = apiKey.scopes;
-  next();
-}
-```
-
-### Basic Authentication
-
-```typescript
-// Basic Auth (use only over HTTPS, for simple APIs)
-function basicAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Basic ')) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="API"');
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  const base64 = authHeader.slice(6);
-  const decoded = Buffer.from(base64, 'base64').toString('utf-8');
-  const [username, password] = decoded.split(':');
-
-  // Validate credentials (use constant-time comparison)
-  const user = await validateCredentials(username, password);
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  req.user = user;
-  next();
-}
-```
-
-### SAML SSO
-
-```typescript
-// SAML 2.0 with passport-saml
-import { Strategy as SamlStrategy } from 'passport-saml';
-
-passport.use(new SamlStrategy({
-    entryPoint: process.env.SAML_ENTRY_POINT,
-    issuer: process.env.SAML_ISSUER,
-    cert: process.env.SAML_CERT,
-    callbackUrl: process.env.SAML_CALLBACK_URL,
-    identifierFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
-  },
-  async (profile, done) => {
-    const user = await findOrCreateSamlUser({
-      email: profile.email,
-      nameId: profile.nameID,
-      displayName: profile.displayName,
-    });
-    done(null, user);
-  }
-));
-
-// Initiate SAML login
-app.get('/auth/saml/login', passport.authenticate('saml'));
-
-// Handle SAML response
-app.post('/auth/saml/callback',
-  passport.authenticate('saml', { failureRedirect: '/login' }),
-  (req, res) => res.redirect('/dashboard')
-);
-```
+---
 
 ## Patterns to Avoid
-- ❌ Storing plain-text API keys
-- ❌ OIDC without PKCE
-- ❌ Basic Auth over HTTP
-- ❌ Missing token validation
+
+### OIDC Anti-Patterns
+- ❌ **Implicit flow**: Use authorization code
+- ❌ **No PKCE**: Vulnerable to interception
+- ❌ **Skipping claim validation**: Trust but verify
+- ❌ **Ignoring nonce**: Replay attacks
+
+### API Key Anti-Patterns
+- ❌ **Plain-text storage**: Easy to steal
+- ❌ **No expiration**: Eternal access
+- ❌ **Overly broad scopes**: Excessive permissions
+- ❌ **Keys in URLs**: Logged, cached, visible
+
+### Session Anti-Patterns
+- ❌ **Predictable session IDs**: Sequential numbers
+- ❌ **Client-side only**: No server validation
+- ❌ **No timeout**: Sessions last forever
+- ❌ **Fixed session ID**: No regeneration after login
+
+### General Anti-Patterns
+- ❌ **Basic auth over HTTP**: Credentials in clear
+- ❌ **Shared secrets across services**: Blast radius
+- ❌ **No rate limiting**: Brute force possible
+- ❌ **Missing audit logs**: Can't trace access
+
+---
 
 ## Verification Checklist
-- [ ] PKCE for authorization code flow
-- [ ] API keys hashed and prefixed
-- [ ] Token validation (iss, aud, exp)
-- [ ] Secure token storage
+
+### OIDC
+- [ ] Authorization code + PKCE flow
+- [ ] ID token claims validated
+- [ ] State parameter verified
+- [ ] Logout implemented
+
+### API Keys
+- [ ] Hashed in database
+- [ ] Prefix for identification
+- [ ] Scoped permissions
+- [ ] Rotation/revocation supported
+
+### Sessions
+- [ ] Cryptographic random IDs
+- [ ] Server-side storage
+- [ ] Idle and absolute timeouts
+- [ ] Regeneration after login
+
+### Security
 - [ ] Rate limiting on auth endpoints
+- [ ] Audit logging
+- [ ] MFA available
+- [ ] Secure transport (HTTPS)
+
+---
+
+## Code Patterns (Reference)
+
+### OIDC (openid-client)
+- **Discovery**: `const issuer = await Issuer.discover(process.env.OIDC_ISSUER_URL)`
+- **PKCE**: `const verifier = generators.codeVerifier(); const challenge = generators.codeChallenge(verifier)`
+- **Auth URL**: `client.authorizationUrl({ scope: 'openid profile', code_challenge: challenge, code_challenge_method: 'S256', state, nonce })`
+- **Callback**: `const tokenSet = await client.callback(redirectUri, params, { code_verifier: verifier, state, nonce })`
+
+### API Key
+- **Generate**: `const rawKey = crypto.randomBytes(32).toString('base64url'); const prefix = rawKey.slice(0, 8)`
+- **Store**: `await db.apiKeys.create({ prefix, hashedKey: await argon2.hash(rawKey), scopes, userId })`
+- **Validate**: `const key = await db.apiKeys.findOne({ prefix }); if (await argon2.verify(key.hashedKey, rawKey)) { ... }`
+
+### Session
+- **Create**: `req.session.userId = user.id; req.session.regenerate(callback)`
+- **Config**: `{ secret, resave: false, saveUninitialized: false, cookie: { secure: true, httpOnly: true, maxAge: 3600000 } }`
+
+### SAML
+- **Strategy**: `new SamlStrategy({ entryPoint, issuer, cert, callbackUrl }, (profile, done) => { ... })`
+

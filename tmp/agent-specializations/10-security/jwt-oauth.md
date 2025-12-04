@@ -2,7 +2,7 @@
 name: jwt-oauth
 type: security
 priority: 2
-token_estimate: 400
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,173 +12,122 @@ requires: []
 # JWT/OAuth Engineering Expertise
 
 ## Specialist Profile
-Authentication specialist implementing token-based auth. Expert in JWT, OAuth 2.0, and session management.
+Authentication specialist implementing token-based auth. Expert in JWT, OAuth 2.0, and secure session management.
 
-## Implementation Guidelines
+---
 
-### JWT Token Service
+## Patterns to Follow
 
-```typescript
-// services/tokenService.ts
-import jwt from 'jsonwebtoken';
-import { createHash, randomBytes } from 'crypto';
+### JWT Best Practices (IETF 2025)
+- **Short-lived access tokens**: 15 minutes max
+- **RS256 (asymmetric)**: Public key verification
+- **Minimal claims**: Only essential data in payload
+- **No PII in tokens**: Easily decoded
+- **iss/aud/exp validation**: Always verify these claims
 
-interface TokenPayload {
-  sub: string;
-  email: string;
-  role: string;
-}
+### Refresh Token Security
+- **Rotation on use**: New refresh token each time
+- **Hash before storage**: Never store plain tokens
+- **Bound to client**: IP, user-agent fingerprinting
+- **Revocation support**: Immediate logout capability
+- **Longer expiry**: 7-30 days typical
 
-export class TokenService {
-  private readonly accessSecret = process.env.JWT_ACCESS_SECRET!;
-  private readonly refreshSecret = process.env.JWT_REFRESH_SECRET!;
+### OAuth 2.0 Security (2025)
+- **PKCE always**: Even for confidential clients
+- **Authorization code flow**: Never implicit
+- **State parameter**: CSRF protection
+- **mTLS or private key JWT**: Client authentication
+- **Exact redirect URI matching**: No wildcards
 
-  generateAccessToken(payload: TokenPayload): string {
-    return jwt.sign(payload, this.accessSecret, {
-      expiresIn: '15m',
-      algorithm: 'HS256',
-      issuer: 'api.example.com',
-      audience: 'example.com',
-    });
-  }
+### Token Storage
+- **httpOnly cookies for web**: XSS protection
+- **Secure + SameSite=Strict**: CSRF protection
+- **Web Workers for SPAs**: If cookies not possible
+- **Never localStorage**: XSS vulnerable
+- **Secure storage for mobile**: Keychain/Keystore
 
-  generateRefreshToken(): string {
-    return randomBytes(40).toString('hex');
-  }
+### Key Management
+- **256-bit minimum entropy**: Cryptographically strong
+- **Rotation every 30-90 days**: Limit exposure
+- **JWKS endpoint**: Public key distribution
+- **Overlapping validity**: Zero-downtime rotation
 
-  verifyAccessToken(token: string): TokenPayload {
-    return jwt.verify(token, this.accessSecret, {
-      algorithms: ['HS256'],
-      issuer: 'api.example.com',
-      audience: 'example.com',
-    }) as TokenPayload;
-  }
-
-  async storeRefreshToken(userId: string, token: string): Promise<void> {
-    const hash = createHash('sha256').update(token).digest('hex');
-    await db.refreshTokens.create({
-      userId,
-      tokenHash: hash,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-  }
-
-  async validateRefreshToken(userId: string, token: string): Promise<boolean> {
-    const hash = createHash('sha256').update(token).digest('hex');
-    const stored = await db.refreshTokens.findOne({
-      userId,
-      tokenHash: hash,
-      expiresAt: { $gt: new Date() },
-    });
-    return !!stored;
-  }
-
-  async revokeRefreshToken(userId: string, token: string): Promise<void> {
-    const hash = createHash('sha256').update(token).digest('hex');
-    await db.refreshTokens.delete({ userId, tokenHash: hash });
-  }
-}
-```
-
-### OAuth 2.0 Flow
-
-```typescript
-// auth/oauth.ts
-import { OAuth2Client } from 'google-auth-library';
-
-const googleClient = new OAuth2Client({
-  clientId: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: process.env.GOOGLE_REDIRECT_URI,
-});
-
-export async function handleGoogleCallback(code: string) {
-  const { tokens } = await googleClient.getToken(code);
-  const ticket = await googleClient.verifyIdToken({
-    idToken: tokens.id_token!,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-
-  const payload = ticket.getPayload()!;
-
-  // Find or create user
-  let user = await db.users.findByEmail(payload.email!);
-  if (!user) {
-    user = await db.users.create({
-      email: payload.email!,
-      displayName: payload.name!,
-      provider: 'google',
-      providerId: payload.sub,
-      emailVerified: payload.email_verified,
-    });
-  }
-
-  // Generate tokens
-  const tokenService = new TokenService();
-  const accessToken = tokenService.generateAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-  });
-  const refreshToken = tokenService.generateRefreshToken();
-  await tokenService.storeRefreshToken(user.id, refreshToken);
-
-  return { accessToken, refreshToken, user };
-}
-```
-
-### Auth Middleware
-
-```typescript
-// middleware/auth.ts
-export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing token' });
-  }
-
-  const token = authHeader.slice(7);
-  try {
-    const payload = tokenService.verifyAccessToken(token);
-    req.user = payload;
-    next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ error: 'Token expired' });
-    }
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
-
-// Token refresh endpoint
-router.post('/refresh', async (req, res) => {
-  const { refreshToken } = req.body;
-
-  const decoded = jwt.decode(req.headers.authorization?.slice(7) || '');
-  if (!decoded?.sub) return res.status(401).json({ error: 'Invalid token' });
-
-  const valid = await tokenService.validateRefreshToken(decoded.sub, refreshToken);
-  if (!valid) return res.status(401).json({ error: 'Invalid refresh token' });
-
-  // Rotate refresh token
-  await tokenService.revokeRefreshToken(decoded.sub, refreshToken);
-  const newRefreshToken = tokenService.generateRefreshToken();
-  await tokenService.storeRefreshToken(decoded.sub, newRefreshToken);
-
-  const accessToken = tokenService.generateAccessToken({ sub: decoded.sub, ... });
-  return res.json({ accessToken, refreshToken: newRefreshToken });
-});
-```
+---
 
 ## Patterns to Avoid
-- ❌ Storing JWT in localStorage (use httpOnly cookies)
-- ❌ Long-lived access tokens
-- ❌ No refresh token rotation
-- ❌ Missing token revocation
+
+### JWT Anti-Patterns
+- ❌ **Long-lived access tokens**: Hours or days
+- ❌ **HS256 with weak secret**: Easy to crack
+- ❌ **Sensitive data in payload**: PII, secrets
+- ❌ **No expiration validation**: Replay attacks
+- ❌ **alg=none accepted**: Critical vulnerability
+
+### Storage Anti-Patterns
+- ❌ **JWT in localStorage**: XSS vulnerable
+- ❌ **Plain refresh tokens in DB**: No hashing
+- ❌ **Shared secrets across services**: Blast radius
+- ❌ **Hardcoded secrets**: In code or config
+
+### OAuth Anti-Patterns
+- ❌ **Implicit flow**: Deprecated, insecure
+- ❌ **No PKCE**: Vulnerable to interception
+- ❌ **Wildcard redirects**: Open redirect attacks
+- ❌ **Password grant without need**: Use auth code
+
+### Refresh Anti-Patterns
+- ❌ **No token rotation**: Stolen tokens persist
+- ❌ **No revocation**: Can't invalidate on logout
+- ❌ **Same expiry as access**: Defeats purpose
+- ❌ **Not bound to session**: Transferable
+
+---
 
 ## Verification Checklist
-- [ ] Short access token expiry (15m)
-- [ ] Secure refresh token storage
-- [ ] Token rotation on refresh
-- [ ] Proper revocation
-- [ ] PKCE for OAuth
+
+### JWT
+- [ ] Access token expiry ≤15 min
+- [ ] RS256 or ES256 algorithm
+- [ ] iss/aud/exp validated
+- [ ] No sensitive data in claims
+
+### Refresh Tokens
+- [ ] Hashed before storage
+- [ ] Rotation on each use
+- [ ] Revocation implemented
+- [ ] Reasonable expiry (7-30 days)
+
+### OAuth
+- [ ] PKCE implemented
+- [ ] Authorization code flow
+- [ ] State parameter validated
+- [ ] Exact redirect URI match
+
+### Storage & Transport
+- [ ] httpOnly cookies (web)
+- [ ] HTTPS only
+- [ ] SameSite=Strict
+- [ ] Secure key management
+
+---
+
+## Code Patterns (Reference)
+
+### JWT Generation
+- **Sign**: `jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '15m', issuer: 'api', audience: 'app' })`
+- **Verify**: `jwt.verify(token, publicKey, { algorithms: ['RS256'], issuer: 'api', audience: 'app' })`
+
+### Refresh Token
+- **Generate**: `const refreshToken = crypto.randomBytes(40).toString('hex')`
+- **Store**: `const hash = await argon2.hash(refreshToken); await db.refreshTokens.create({ userId, tokenHash: hash })`
+- **Validate**: `await argon2.verify(storedHash, providedToken)`
+- **Rotate**: `await db.refreshTokens.delete({ tokenHash: oldHash }); await db.refreshTokens.create({ tokenHash: newHash })`
+
+### OAuth PKCE
+- **Verifier**: `const verifier = crypto.randomBytes(32).toString('base64url')`
+- **Challenge**: `const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')`
+- **Request**: `code_challenge=${challenge}&code_challenge_method=S256`
+
+### httpOnly Cookie
+- **Set**: `res.cookie('accessToken', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 900000 })`
+
