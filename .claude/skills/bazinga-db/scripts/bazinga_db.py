@@ -1657,6 +1657,9 @@ def main():
             kwargs = {}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
+                if i + 1 >= len(cmd_args):
+                    print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2))
+                    sys.exit(1)
                 value = cmd_args[i + 1]
                 # Convert revision_count to int if present
                 if key == 'revision_count':

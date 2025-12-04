@@ -271,7 +271,6 @@ def init_database(db_path: str) -> None:
                     raise
 
             print("✓ Migration to v7 complete (specializations for tech stack loading)")
-            current_version = 7
 
         # Record version upgrade
         cursor.execute("""
