@@ -43,6 +43,8 @@ try:
     from init_db import SCHEMA_VERSION as EXPECTED_SCHEMA_VERSION
 except ImportError:
     # Fallback if init_db.py is not accessible
+    print("Warning: Could not import SCHEMA_VERSION from init_db.py, using fallback value 7. "
+          "Check if init_db.py exists in the same directory.", file=sys.stderr)
     EXPECTED_SCHEMA_VERSION = 7
 
 
@@ -817,8 +819,19 @@ class BazingaDB:
         """
         conn = None
         try:
-            # Validate specialization paths for security (prevent path traversal)
-            if specializations:
+            # Defensive type validation for specializations
+            if specializations is not None:
+                if not isinstance(specializations, list):
+                    return {
+                        "success": False,
+                        "error": f"specializations must be a list, got {type(specializations).__name__}"
+                    }
+                if not all(isinstance(s, str) for s in specializations):
+                    return {
+                        "success": False,
+                        "error": "specializations must contain only strings"
+                    }
+                # Validate paths for security (prevent path traversal)
                 for spec_path in specializations:
                     is_valid, error_msg = self._validate_specialization_path(spec_path)
                     if not is_valid:
@@ -882,8 +895,19 @@ class BazingaDB:
         """
         conn = None
         try:
-            # Validate specialization paths for security (prevent path traversal)
-            if specializations:
+            # Defensive type validation for specializations
+            if specializations is not None:
+                if not isinstance(specializations, list):
+                    return {
+                        "success": False,
+                        "error": f"specializations must be a list, got {type(specializations).__name__}"
+                    }
+                if not all(isinstance(s, str) for s in specializations):
+                    return {
+                        "success": False,
+                        "error": "specializations must contain only strings"
+                    }
+                # Validate paths for security (prevent path traversal)
                 for spec_path in specializations:
                     is_valid, error_msg = self._validate_specialization_path(spec_path)
                     if not is_valid:
@@ -1689,18 +1713,25 @@ def main():
                     try:
                         specializations = json.loads(cmd_args[i + 1])
                         if not isinstance(specializations, list):
-                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2))
+                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2), file=sys.stderr)
                             sys.exit(1)
                         if not all(isinstance(s, str) for s in specializations):
-                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2))
+                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2), file=sys.stderr)
                             sys.exit(1)
                     except json.JSONDecodeError as e:
-                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2))
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                     i += 2  # Skip flag and value
                 else:
                     positional_args.append(cmd_args[i])
                     i += 1
+            # Validate positional args count (required: group_id, session_id, name)
+            if len(positional_args) < 3:
+                print(json.dumps({"success": False, "error": "create-task-group requires at least 3 args: <group_id> <session_id> <name>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            if len(positional_args) > 5:
+                print(json.dumps({"success": False, "error": "create-task-group accepts at most 5 positional args: <group_id> <session_id> <name> [status] [assigned_to]"}, indent=2), file=sys.stderr)
+                sys.exit(1)
             # Now assign positional args correctly
             group_id = positional_args[0]
             session_id = positional_args[1]
@@ -1710,13 +1741,23 @@ def main():
             result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
+            # Validate minimum args
+            if len(cmd_args) < 2:
+                print(json.dumps({"success": False, "error": "update-task-group requires at least 2 args: <group_id> <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
             group_id = cmd_args[0]
             session_id = cmd_args[1]
             kwargs = {}
+            # Allowlist of valid flags
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
+                # Validate flag is in allowlist
+                if key not in valid_flags:
+                    print(json.dumps({"success": False, "error": f"Unknown flag --{key}. Valid flags: {', '.join(sorted(valid_flags))}"}, indent=2), file=sys.stderr)
+                    sys.exit(1)
                 if i + 1 >= len(cmd_args):
-                    print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2))
+                    print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2), file=sys.stderr)
                     sys.exit(1)
                 value = cmd_args[i + 1]
                 # Convert revision_count to int if present
@@ -1731,13 +1772,13 @@ def main():
                         value = json.loads(value)
                         # Validate it's a list of strings
                         if not isinstance(value, list):
-                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2))
+                            print(json.dumps({"success": False, "error": "--specializations must be a JSON array"}, indent=2), file=sys.stderr)
                             sys.exit(1)
                         if not all(isinstance(s, str) for s in value):
-                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2))
+                            print(json.dumps({"success": False, "error": "--specializations array must contain only strings"}, indent=2), file=sys.stderr)
                             sys.exit(1)
                     except json.JSONDecodeError as e:
-                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2))
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                 kwargs[key] = value
             result = db.update_task_group(group_id, session_id, **kwargs)
