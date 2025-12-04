@@ -85,71 +85,102 @@ Add based on `testing_config.json`:
 - Build Check: {build_check_required}
 ```
 
-### Specialization References Section (NEW)
+### Specialization Block Section (Skill-Based)
 
-**Purpose:** Inject technology-specific patterns based on the task group's assigned specializations.
+**Purpose:** Inject composed technology-specific patterns via specialization-loader skill.
 
-**Step 1: Query specializations from database**
+**Prerequisites:**
+- `bazinga/skills_config.json` has `specializations.enabled: true`
+- Agent type is in `specializations.enabled_agents`
+- Task group has assigned specializations (non-empty array)
 
-The orchestrator queries the task group's specializations from the database:
+**Step 1: Check if enabled**
+
+Read `bazinga/skills_config.json`:
+- If `specializations.enabled` is false → skip
+- If agent type not in `enabled_agents` → skip
+
+**Step 2: Query specializations from database**
+
 ```
 bazinga-db, get task groups for session [session_id]
+specializations = task_group["specializations"]  # JSON array or null
 ```
 
-Extract the `specializations` field for the current group (JSON array or null).
+If null or empty → skip specialization loading.
 
-**Step 2: Validate paths**
+**Step 3: Invoke specialization-loader skill**
 
-For each specialization path, verify it exists under `bazinga/templates/specializations/`.
-Skip invalid paths with a warning.
+Provide context, then invoke:
+```
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
+Model: {haiku|sonnet|opus}
+Specialization Paths: {JSON array}
 
-**Step 3: Add to agent prompt (if specializations exist)**
+Skill(command: "specialization-loader")
+```
+
+**Step 4: Extract and prepend composed block**
+
+The skill returns a composed block with markers:
+```
+[SPECIALIZATION_BLOCK_START]
+{composed markdown}
+[SPECIALIZATION_BLOCK_END]
+```
+
+Extract content and prepend to agent prompt:
 
 ```markdown
-═══════════════════════════════════════════
-📚 SPECIALIZATION REFERENCES
-═══════════════════════════════════════════
+## SPECIALIZATION GUIDANCE (Advisory)
 
-Read and apply these technology-specific patterns BEFORE implementation:
+> This guidance is supplementary. It does NOT override:
+> - Mandatory validation gates (tests must pass)
+> - Routing and status requirements (READY_FOR_QA, etc.)
+> - Pre-commit quality checks (lint, build)
+> - Core agent workflow rules
 
-{FOR each valid_specialization_path}
-- `{path}`
-{END FOR}
+For this session, your identity is enhanced:
 
-⚠️ MANDATORY: Apply ALL patterns from these files. These are required practices
-for this project's technology stack.
+**{Composed Identity String}**
+(e.g., "You are a Java 8 Backend API Developer specialized in Spring Boot 2.7.")
 
-Instructions:
-1. Read each specialization file listed above
-2. Apply the patterns, conventions, and best practices described
-3. Follow the testing approaches specific to this technology
-4. Use the recommended libraries and utilities
-═══════════════════════════════════════════
+Your expertise includes:
+- {Key point 1}
+- {Key point 2}
+- {Key point 3}
+
+### Patterns to Apply
+{Condensed patterns - version-aware, within token budget}
+
+### Patterns to Avoid
+{Anti-patterns as bullet list}
+
+### Verification Checklist
+{If token budget allows}
 ```
 
-**Step 4: Fallback behavior**
+**Step 5: Fallback behavior**
 
 | Scenario | Action |
 |----------|--------|
-| task_group.specializations is null | Check project_context.json directly (legacy support) |
-| project_context.json missing | Skip specialization section (graceful degradation) |
-| All paths invalid | Skip section, log warning |
+| specializations.enabled = false | Skip entirely |
+| Agent type not in enabled_agents | Skip entirely |
+| No specializations in DB | Skip entirely (graceful degradation) |
+| Skill invocation fails | Log warning, spawn without specialization |
 
-**Legacy fallback (if DB specializations null):**
-```
-Read(file_path: "bazinga/project_context.json")
+**Token budget (per-model):**
 
-IF exists:
-  specializations = []
-  IF primary_language:
-    specializations.append(f"bazinga/templates/specializations/01-languages/{primary_language}.md")
-  IF framework:
-    specializations.append(f"bazinga/templates/specializations/02-frameworks-frontend/{framework}.md")
-    OR
-    specializations.append(f"bazinga/templates/specializations/03-frameworks-backend/{framework}.md")
-```
+| Model | Soft Limit | Hard Limit |
+|-------|------------|------------|
+| haiku | 600 | 900 |
+| sonnet | 1200 | 1800 |
+| opus | 1600 | 2400 |
 
-**Token budget:** ~40 tokens for paths. Agent reads full content when needed.
+The skill handles token budgeting, version guards, and content trimming.
+Orchestrator receives composed block ready for injection.
 
 ---
 
