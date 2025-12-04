@@ -114,6 +114,47 @@ class BazingaDB:
 
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
+    def _validate_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> tuple[bool, Optional[str]]:
+        """Validate specialization path for security (prevent path traversal).
+
+        Args:
+            spec_path: Relative path to specialization file
+            project_root: Project root directory (auto-detected if not provided)
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            # Auto-detect project root if not provided
+            if project_root is None:
+                if _HAS_BAZINGA_PATHS:
+                    project_root = get_project_root()
+                else:
+                    # Fallback: assume db_path is at PROJECT_ROOT/bazinga/bazinga.db
+                    project_root = Path(self.db_path).parent.parent
+
+            # Define allowed base directory
+            allowed_base = (project_root / "bazinga" / "templates" / "specializations").resolve()
+
+            # Resolve the provided path (handles .., symlinks, etc.)
+            full_path = (project_root / spec_path).resolve()
+
+            # Check if resolved path is within allowed base
+            try:
+                full_path.relative_to(allowed_base)
+            except ValueError:
+                return False, f"Path escapes allowed directory: {spec_path}"
+
+            # Validate path contains only safe characters (alphanumeric, -, _, /, .)
+            import re
+            if not re.match(r'^[a-zA-Z0-9/_.-]+$', spec_path):
+                return False, f"Path contains unsafe characters: {spec_path}"
+
+            return True, None
+
+        except Exception as e:
+            return False, f"Path validation error: {e}"
+
     def _backup_corrupted_db(self) -> Optional[str]:
         """Backup a corrupted database file before recovery.
 
@@ -390,6 +431,10 @@ class BazingaDB:
                                     if current_version < EXPECTED_VERSION:
                                         needs_init = True
                                         print(f"Database schema outdated (v{current_version} < v{EXPECTED_VERSION}). Running migrations...", file=sys.stderr)
+                                else:
+                                    # schema_version table missing - treat as outdated and run migrations
+                                    needs_init = True
+                                    print(f"Database missing schema_version table at {self.db_path}. Running migrations...", file=sys.stderr)
                     break  # Success - exit retry loop
                 except sqlite3.OperationalError as e:
                     # Handle transient lock errors with retry/backoff
@@ -766,18 +811,19 @@ class BazingaDB:
         """
         conn = None
         try:
-            # Validate specialization paths for security
+            # Validate specialization paths for security (prevent path traversal)
             if specializations:
                 for spec_path in specializations:
-                    if not spec_path.startswith("bazinga/templates/specializations/"):
+                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    if not is_valid:
                         return {
                             "success": False,
-                            "error": f"Invalid specialization path: {spec_path}. Must start with 'bazinga/templates/specializations/'"
+                            "error": f"Invalid specialization path: {error_msg}"
                         }
 
             conn = self._get_connection()
-            # Serialize specializations to JSON
-            specs_json = json.dumps(specializations) if specializations else None
+            # Serialize specializations to JSON (preserve [] vs None distinction)
+            specs_json = json.dumps(specializations) if specializations is not None else None
             # Use ON CONFLICT for true upsert - preserves existing metadata
             conn.execute("""
                 INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations)
@@ -830,13 +876,14 @@ class BazingaDB:
         """
         conn = None
         try:
-            # Validate specialization paths for security
+            # Validate specialization paths for security (prevent path traversal)
             if specializations:
                 for spec_path in specializations:
-                    if not spec_path.startswith("bazinga/templates/specializations/"):
+                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    if not is_valid:
                         return {
                             "success": False,
-                            "error": f"Invalid specialization path: {spec_path}. Must start with 'bazinga/templates/specializations/'"
+                            "error": f"Invalid specialization path: {error_msg}"
                         }
 
             conn = self._get_connection()
