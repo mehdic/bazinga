@@ -2,7 +2,7 @@
 name: github-actions
 type: infrastructure
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,164 +12,128 @@ requires: []
 # GitHub Actions Engineering Expertise
 
 ## Specialist Profile
-GitHub Actions specialist building CI/CD pipelines. Expert in workflows, reusable actions, and deployment strategies.
+GitHub Actions specialist building CI/CD pipelines. Expert in workflows, security, and deployment strategies.
 
-## Implementation Guidelines
+---
 
-### CI Workflow
+## Patterns to Follow
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
+### Workflow Structure
+- **Concurrency control**: Cancel in-progress on new push
+- **Matrix builds**: Test multiple versions in parallel
+- **Job dependencies**: Use `needs` for ordering
+- **Reusable workflows**: `workflow_call` for DRY
+- **Composite actions**: Shared steps as actions
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+### Caching (Critical for Speed)
+- **actions/cache**: NPM, pip, Go modules
+- **setup-* actions with cache**: `cache: 'npm'` built-in
+- **Docker layer caching**: `cache-from: type=gha`
+- **Restore keys**: Fallback to partial cache
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+### Security Patterns
+- **OIDC for cloud auth**: No long-lived credentials
+- **Minimal permissions**: `permissions: { }` at workflow level
+- **Environment protection**: Required reviewers, wait timers
+- **Pin action versions**: `@v4` or SHA for third-party
+- **Secret scanning**: Never log secrets
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+### Deployment Strategies
+- **Environment per stage**: dev, staging, production
+- **Manual approval**: `environment: production` requires review
+- **Rollback capability**: Keep previous artifact/tag
+- **Blue/Green or Canary**: Gradual rollout patterns
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+### Artifact Management
+- **Upload for sharing**: Between jobs
+- **Retention policy**: Clean up old artifacts
+- **Container registry**: Push with git SHA tags
+- **Release assets**: Attach binaries to releases
 
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test -- --coverage
+### Performance Optimization
+- **Parallel jobs**: Independent steps concurrently
+- **Larger runners**: For faster builds (paid)
+- **Self-hosted for secrets**: When cloud won't work
+- **Early failure**: Fail fast, `fail-fast: true`
 
-      - uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - run: npm ci
-      - run: npm run build
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: dist/
-          retention-days: 7
-```
-
-### Deployment Workflow
-
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.ECR_REGISTRY }}
-
-      - uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.ECR_REGISTRY }}/api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy to ECS
-        run: |
-          aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER }} \
-            --service api \
-            --force-new-deployment
-```
-
-### Reusable Workflow
-
-```yaml
-# .github/workflows/reusable-test.yml
-name: Reusable Test
-
-on:
-  workflow_call:
-    inputs:
-      node-version:
-        type: string
-        default: '20'
-    secrets:
-      npm-token:
-        required: false
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-          registry-url: https://npm.pkg.github.com
-      - run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm-token }}
-      - run: npm test
-```
+---
 
 ## Patterns to Avoid
-- ❌ Secrets in workflow files
-- ❌ Missing concurrency limits
-- ❌ No caching
-- ❌ Overly broad permissions
+
+### Security Anti-Patterns
+- ❌ **Secrets in workflow files**: Use secrets/vars
+- ❌ **Overly broad permissions**: Default is too permissive
+- ❌ **Long-lived cloud credentials**: Use OIDC
+- ❌ **Unpinned third-party actions**: Supply chain risk
+- ❌ **Echoing secrets**: Even masked, avoid
+
+### Workflow Anti-Patterns
+- ❌ **No concurrency limits**: Wasted runners
+- ❌ **No caching**: Slow builds
+- ❌ **Duplicate steps across workflows**: Use reusable workflows
+- ❌ **Hardcoded values**: Use variables
+- ❌ **Missing timeout-minutes**: Runaway jobs
+
+### Deployment Anti-Patterns
+- ❌ **No environment protection**: Anyone can deploy
+- ❌ **Same workflow for all envs**: Use inputs/environments
+- ❌ **No rollback plan**: Keep previous versions
+- ❌ **Force push main on deploy**: Use tags/releases
+
+### Testing Anti-Patterns
+- ❌ **Skipping tests on main**: Always test
+- ❌ **No coverage reporting**: Track trends
+- ❌ **Tests without artifacts**: Save on failure
+- ❌ **Sequential when parallel possible**: Slow feedback
+
+---
 
 ## Verification Checklist
-- [ ] Concurrency control
-- [ ] Proper caching
-- [ ] OIDC for cloud auth
-- [ ] Environment protection
-- [ ] Artifact management
+
+### Workflow
+- [ ] Concurrency control configured
+- [ ] Caching enabled
+- [ ] Timeout set
+- [ ] Reusable workflows where applicable
+
+### Security
+- [ ] OIDC for cloud authentication
+- [ ] Minimal permissions declared
+- [ ] Actions pinned to versions/SHA
+- [ ] Environment protection rules
+
+### Deployment
+- [ ] Environment per stage
+- [ ] Manual approval for production
+- [ ] Rollback strategy documented
+- [ ] Artifact retention configured
+
+### Testing
+- [ ] Tests run on PR
+- [ ] Coverage uploaded
+- [ ] Matrix for multiple versions
+- [ ] Parallel jobs where possible
+
+---
+
+## Code Patterns (Reference)
+
+### Workflow Structure
+- **Concurrency**: `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`
+- **Permissions**: `permissions: { contents: read, id-token: write }`
+- **Environment**: `environment: production`
+
+### Caching
+- **Node**: `uses: actions/setup-node@v4; with: { node-version: 20, cache: 'npm' }`
+- **Docker**: `cache-from: type=gha; cache-to: type=gha,mode=max`
+
+### OIDC (AWS)
+- **Configure**: `uses: aws-actions/configure-aws-credentials@v4; with: { role-to-assume: ${{ secrets.AWS_ROLE_ARN }}, aws-region: us-east-1 }`
+
+### Reusable Workflow
+- **Call**: `uses: ./.github/workflows/test.yml; with: { node-version: '20' }; secrets: inherit`
+- **Define**: `on: workflow_call; inputs: { node-version: { type: string, default: '20' } }`
+
+### Matrix
+- **Multiple versions**: `strategy: { matrix: { node: [18, 20, 22] } }; steps: [...setup-node with: node-version: ${{ matrix.node }}]`
+

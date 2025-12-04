@@ -2,7 +2,7 @@
 name: grpc
 type: api
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -14,150 +14,124 @@ requires: []
 ## Specialist Profile
 gRPC specialist building high-performance services. Expert in Protocol Buffers, streaming, and service mesh patterns.
 
-## Implementation Guidelines
+---
 
-### Protocol Buffers
+## Patterns to Follow
 
-```protobuf
-// proto/user/v1/user.proto
-syntax = "proto3";
+### Proto Design
+- **Package versioning**: `package user.v1;`
+- **Service per domain**: UserService, OrderService
+- **Request/Response pattern**: Separate messages
+- **Enums with UNSPECIFIED = 0**: Default/unknown state
+- **google.protobuf types**: Timestamp, Duration, Struct
 
-package user.v1;
+### Error Handling
+- **Standard status codes**: NotFound, InvalidArgument, Internal
+- **Rich error details**: google.rpc.Status with details
+- **Error messages for humans**: Clear, actionable
+- **Don't leak internals**: Abstract error messages
 
-option go_package = "github.com/mycompany/api/gen/user/v1;userv1";
+### Streaming Patterns
+- **Server streaming**: Large result sets
+- **Client streaming**: Uploads, aggregation
+- **Bidirectional**: Real-time, chat
+- **Backpressure handling**: Flow control
 
-import "google/protobuf/timestamp.proto";
+### Context & Deadlines
+- **Always set deadlines**: Prevent resource exhaustion
+- **Propagate context**: Across service calls
+- **Cancel on timeout**: Client and server
+- **Metadata for context**: Auth, tracing, request ID
 
-service UserService {
-  rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
-  rpc StreamUsers(StreamUsersRequest) returns (stream User);
-}
+### Interceptors
+- **Unary interceptors**: Logging, auth, metrics
+- **Stream interceptors**: Same for streaming
+- **Order matters**: Auth before logging
+- **Recovery interceptor**: Catch panics (Go)
 
-message User {
-  string id = 1;
-  string email = 2;
-  string display_name = 3;
-  UserStatus status = 4;
-  google.protobuf.Timestamp created_at = 5;
-}
+### Health Checks
+- **gRPC Health Checking Protocol**: Standard service
+- **Serving status**: SERVING, NOT_SERVING
+- **Per-service status**: Fine-grained health
+- **Kubernetes integration**: liveness/readiness probes
 
-enum UserStatus {
-  USER_STATUS_UNSPECIFIED = 0;
-  USER_STATUS_ACTIVE = 1;
-  USER_STATUS_INACTIVE = 2;
-  USER_STATUS_PENDING = 3;
-}
-
-message GetUserRequest {
-  string id = 1;
-}
-
-message GetUserResponse {
-  User user = 1;
-}
-
-message ListUsersRequest {
-  int32 page_size = 1;
-  string page_token = 2;
-  UserStatus status_filter = 3;
-}
-
-message ListUsersResponse {
-  repeated User users = 1;
-  string next_page_token = 2;
-  int32 total_count = 3;
-}
-
-message CreateUserRequest {
-  string email = 1;
-  string display_name = 2;
-}
-
-message CreateUserResponse {
-  User user = 1;
-}
-```
-
-### Go Server Implementation
-
-```go
-// internal/service/user.go
-type UserServer struct {
-    userv1.UnimplementedUserServiceServer
-    repo UserRepository
-}
-
-func (s *UserServer) GetUser(ctx context.Context, req *userv1.GetUserRequest) (*userv1.GetUserResponse, error) {
-    user, err := s.repo.FindByID(ctx, req.Id)
-    if err != nil {
-        if errors.Is(err, ErrNotFound) {
-            return nil, status.Error(codes.NotFound, "user not found")
-        }
-        return nil, status.Error(codes.Internal, "failed to fetch user")
-    }
-    return &userv1.GetUserResponse{User: toProto(user)}, nil
-}
-
-func (s *UserServer) StreamUsers(req *userv1.StreamUsersRequest, stream userv1.UserService_StreamUsersServer) error {
-    users, err := s.repo.FindAll(stream.Context())
-    if err != nil {
-        return status.Error(codes.Internal, "failed to fetch users")
-    }
-
-    for _, user := range users {
-        if err := stream.Send(toProto(user)); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-```
-
-### Client Usage
-
-```go
-// cmd/client/main.go
-func main() {
-    conn, err := grpc.Dial(
-        "localhost:50051",
-        grpc.WithTransportCredentials(insecure.NewCredentials()),
-        grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer conn.Close()
-
-    client := userv1.NewUserServiceClient(conn)
-
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-
-    resp, err := client.GetUser(ctx, &userv1.GetUserRequest{Id: "123"})
-    if err != nil {
-        st, ok := status.FromError(err)
-        if ok && st.Code() == codes.NotFound {
-            log.Println("User not found")
-            return
-        }
-        log.Fatal(err)
-    }
-
-    fmt.Printf("User: %v\n", resp.User)
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Ignoring error codes
-- ❌ Missing deadlines/timeouts
-- ❌ Large messages (>4MB default)
-- ❌ Blocking in stream handlers
+
+### Proto Anti-Patterns
+- ❌ **No package versioning**: Breaking changes affect all
+- ❌ **Reusing field numbers**: Wire format corruption
+- ❌ **required fields (proto2)**: Use proto3
+- ❌ **Giant messages**: Keep under 4MB
+
+### Error Anti-Patterns
+- ❌ **Ignoring error codes**: Treat all as generic error
+- ❌ **Internal details in messages**: Security leak
+- ❌ **Wrong status code**: NotFound for validation error
+- ❌ **Empty error messages**: Unhelpful
+
+### Performance Anti-Patterns
+- ❌ **Missing deadlines**: Runaway requests
+- ❌ **Blocking in stream handlers**: Reduces throughput
+- ❌ **Large message without streaming**: Memory pressure
+- ❌ **No connection pooling**: Connection overhead
+
+### Design Anti-Patterns
+- ❌ **REST semantics in gRPC**: Use native patterns
+- ❌ **No interceptors**: Cross-cutting concerns scattered
+- ❌ **Synchronous when async fits**: Blocking unnecessarily
+- ❌ **Ignoring context cancellation**: Resource waste
+
+---
 
 ## Verification Checklist
-- [ ] Proper error codes
+
+### Proto
+- [ ] Package versioning (v1, v2)
+- [ ] Enums start with UNSPECIFIED
+- [ ] Standard types used
+- [ ] Documentation comments
+
+### Implementation
+- [ ] Proper status codes
+- [ ] Deadlines set on all calls
 - [ ] Context propagation
-- [ ] Streaming for large datasets
-- [ ] Proto versioning (v1, v2)
 - [ ] Interceptors for cross-cutting
+
+### Streaming
+- [ ] Used for large data sets
+- [ ] Backpressure handled
+- [ ] Errors sent properly
+- [ ] Graceful completion
+
+### Operations
+- [ ] Health service implemented
+- [ ] Metrics exposed
+- [ ] Tracing integrated
+- [ ] Load balancing configured
+
+---
+
+## Code Patterns (Reference)
+
+### Proto
+- **Service**: `service UserService { rpc GetUser(GetUserRequest) returns (GetUserResponse); }`
+- **Streaming**: `rpc StreamUsers(StreamRequest) returns (stream User);`
+- **Message**: `message User { string id = 1; string email = 2; UserStatus status = 3; }`
+- **Enum**: `enum UserStatus { USER_STATUS_UNSPECIFIED = 0; USER_STATUS_ACTIVE = 1; }`
+
+### Server (Go)
+- **Error**: `return nil, status.Error(codes.NotFound, "user not found")`
+- **Rich error**: `status.Errorf(codes.InvalidArgument, "validation failed").WithDetails(...)`
+- **Stream send**: `for _, user := range users { stream.Send(toProto(user)) }`
+
+### Client (Go)
+- **With deadline**: `ctx, cancel := context.WithTimeout(ctx, 5*time.Second); defer cancel()`
+- **Error handling**: `if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound { ... }`
+- **Interceptor**: `grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor())`
+
+### Health Check
+- **Service**: `grpc_health_v1.RegisterHealthServer(s, health.NewServer())`
+- **Set status**: `healthServer.SetServingStatus("user.v1.UserService", healthpb.HealthCheckResponse_SERVING)`
+

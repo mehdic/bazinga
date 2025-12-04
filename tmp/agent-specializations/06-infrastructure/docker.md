@@ -2,7 +2,7 @@
 name: docker
 type: infrastructure
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,148 +12,128 @@ requires: []
 # Docker Engineering Expertise
 
 ## Specialist Profile
-Docker specialist building containerized applications. Expert in multi-stage builds, optimization, and compose configurations.
+Docker specialist building containerized applications. Expert in multi-stage builds, security, and optimization.
 
-## Implementation Guidelines
+---
 
-### Multi-Stage Dockerfile
+## Patterns to Follow
 
-```dockerfile
-# Build stage
-FROM node:20-alpine AS builder
+### Multi-Stage Builds (50-85% size reduction)
+- **Separate build and runtime stages**: Only copy artifacts
+- **Name stages for clarity**: `FROM node:20-alpine AS builder`
+- **Parallel stages for speed**: Independent builds run concurrently
+- **Use --from for specific copies**: `COPY --from=builder /app/dist ./`
+- **Minimal runtime images**: Alpine, distroless, scratch
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+### Layer Optimization
+- **Order by change frequency**: Less-changing first (cache hits)
+- **Combine RUN commands**: Single layer with `&&`
+- **Clean up in same layer**: `apt-get clean && rm -rf /var/lib/apt/lists/*`
+- **Use COPY instead of ADD**: More predictable
+- **Leverage .dockerignore**: Exclude build artifacts, secrets
 
-COPY . .
-RUN npm run build
+### Security (Critical)
+- **Run as non-root**: Create user with adduser, use USER directive
+- **Distroless for production**: No shell, minimal attack surface
+- **Pin base image versions**: Never use :latest in production
+- **Scan images**: Trivy, Snyk, Grype in CI
+- **No secrets in images**: Use runtime injection
 
-# Production stage
-FROM node:20-alpine AS runner
+### Base Image Selection
+- **Alpine for size**: ~5MB base
+- **Distroless for security**: No shell/package manager
+- **Debian slim for compatibility**: When Alpine has musl issues
+- **Language-specific**: `python:3.12-slim`, `node:20-alpine`
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+### Health Checks
+- **HEALTHCHECK in Dockerfile**: Built-in monitoring
+- **Appropriate intervals**: 30s default, adjust per app
+- **Start period for slow init**: Avoid false positives
+- **CMD or curl/wget**: HTTP or TCP checks
 
-WORKDIR /app
+### Compose Best Practices
+- **depends_on with condition**: `condition: service_healthy`
+- **Named volumes for persistence**: Not bind mounts in prod
+- **Networks for isolation**: Separate frontend/backend
+- **Environment files**: `.env` for secrets (not committed)
 
-COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
-
-USER nextjs
-
-EXPOSE 3000
-ENV NODE_ENV=production
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
-
-CMD ["node", "dist/main.js"]
-```
-
-### Docker Compose
-
-```yaml
-# docker-compose.yml
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
-    ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=postgresql://user:pass@db:5432/app
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - backend
-
-  db:
-    image: postgres:16-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: app
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d app"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    networks:
-      - backend
-
-volumes:
-  postgres_data:
-  redis_data:
-
-networks:
-  backend:
-    driver: bridge
-```
-
-### .dockerignore
-
-```
-node_modules
-npm-debug.log
-.git
-.gitignore
-.env*
-!.env.example
-Dockerfile*
-docker-compose*
-.dockerignore
-README.md
-.vscode
-coverage
-.nyc_output
-dist
-```
-
-### Development Compose
-
-```yaml
-# docker-compose.dev.yml
-services:
-  app:
-    build:
-      context: .
-      target: builder
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run dev
-    environment:
-      - NODE_ENV=development
-```
+---
 
 ## Patterns to Avoid
-- ❌ Running as root
-- ❌ Storing secrets in images
-- ❌ Using latest tag in production
-- ❌ Missing health checks
+
+### Security Anti-Patterns
+- ❌ **Running as root (58% of containers do!)**: Use USER directive
+- ❌ **Secrets in images/layers**: Visible in history
+- ❌ **Using :latest in production**: Unpredictable
+- ❌ **ADD for URLs**: Use curl/wget in RUN for control
+- ❌ **Disabling security features**: Keep defaults
+
+### Build Anti-Patterns
+- ❌ **Not using multi-stage**: Bloated images
+- ❌ **One command per RUN**: Too many layers
+- ❌ **Caching package manager last**: Slow rebuilds
+- ❌ **Missing .dockerignore**: Large context, secrets leaked
+- ❌ **COPY . . before npm install**: Busts cache
+
+### Runtime Anti-Patterns
+- ❌ **No health checks**: Unhealthy containers stay running
+- ❌ **Logging to files**: Use stdout/stderr
+- ❌ **Storing state in container**: Use volumes
+- ❌ **Hard-coded environment**: Use env vars
+
+### Compose Anti-Patterns
+- ❌ **depends_on without health checks**: Race conditions
+- ❌ **Anonymous volumes**: Hard to manage
+- ❌ **Secrets in compose file**: Commit risk
+- ❌ **Not using networks**: All containers can talk
+
+---
 
 ## Verification Checklist
-- [ ] Multi-stage builds
-- [ ] Non-root user
-- [ ] Health checks defined
-- [ ] Proper .dockerignore
-- [ ] Volume mounts for persistence
+
+### Build
+- [ ] Multi-stage build used
+- [ ] Minimal base image selected
+- [ ] Layers ordered for caching
+- [ ] .dockerignore present
+
+### Security
+- [ ] Non-root user (USER directive)
+- [ ] Base image version pinned
+- [ ] Image scanned in CI
+- [ ] No secrets in image
+
+### Runtime
+- [ ] HEALTHCHECK defined
+- [ ] Logs to stdout/stderr
+- [ ] Environment via env vars
+- [ ] Volumes for persistence
+
+### Compose
+- [ ] Health checks with depends_on
+- [ ] Named networks/volumes
+- [ ] Secrets not committed
+- [ ] restart policy set
+
+---
+
+## Code Patterns (Reference)
+
+### Multi-Stage
+- **Builder stage**: `FROM node:20-alpine AS builder; WORKDIR /app; COPY package*.json ./; RUN npm ci; COPY . .; RUN npm run build`
+- **Runtime stage**: `FROM node:20-alpine AS runner; COPY --from=builder /app/dist ./dist`
+
+### Non-Root User
+- **Create user**: `RUN addgroup --system --gid 1001 app && adduser --system --uid 1001 app`
+- **Switch user**: `USER app`
+
+### Health Check
+- **HTTP**: `HEALTHCHECK --interval=30s --timeout=3s CMD wget --spider http://localhost:3000/health || exit 1`
+- **TCP**: `HEALTHCHECK CMD nc -z localhost 5432 || exit 1`
+
+### Layer Optimization
+- **Combine & clean**: `RUN apt-get update && apt-get install -y pkg && apt-get clean && rm -rf /var/lib/apt/lists/*`
+
+### .dockerignore
+- **Essential excludes**: `node_modules`, `.git`, `*.md`, `.env*`, `Dockerfile*`, `docker-compose*`
+

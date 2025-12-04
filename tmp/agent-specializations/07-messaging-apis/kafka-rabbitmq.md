@@ -2,7 +2,7 @@
 name: kafka-rabbitmq
 type: messaging
 priority: 2
-token_estimate: 400
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,145 +12,132 @@ requires: []
 # Kafka/RabbitMQ Messaging Expertise
 
 ## Specialist Profile
-Message broker specialist building event-driven systems. Expert in pub/sub patterns, event sourcing, and reliable messaging.
+Message broker specialist building event-driven systems. Expert in pub/sub patterns, reliability, and event streaming.
 
-## Implementation Guidelines
+---
 
-### Kafka Producer
+## Patterns to Follow
 
-```typescript
-// producers/userEventProducer.ts
-import { Kafka, CompressionTypes } from 'kafkajs';
+### Message Design
+- **Unique message IDs**: For idempotency
+- **Correlation IDs**: Trace across services
+- **Event type in header**: Route without parsing body
+- **Schema versioning**: Avro, Protobuf, JSON Schema
+- **Timestamp in message**: For ordering, debugging
 
-const kafka = new Kafka({
-  clientId: 'user-service',
-  brokers: process.env.KAFKA_BROKERS!.split(','),
-});
+### Kafka Patterns
+- **Idempotent producer**: `idempotent: true` (exactly-once)
+- **Consumer groups**: Parallel consumption
+- **Partitioning by key**: Order guarantees per key
+- **Compression**: GZIP, Snappy, LZ4
+- **Exactly-once semantics**: Transactions when needed
 
-const producer = kafka.producer({
-  idempotent: true,
-  maxInFlightRequests: 5,
-});
+### RabbitMQ Patterns
+- **Durable exchanges/queues**: Survive restarts
+- **Persistent messages**: `persistent: true`
+- **Topic exchanges**: Flexible routing
+- **Dead letter exchanges**: Failed message handling
+- **Prefetch for backpressure**: `channel.prefetch(10)`
 
-export async function publishUserEvent(event: UserEvent): Promise<void> {
-  await producer.send({
-    topic: 'user-events',
-    compression: CompressionTypes.GZIP,
-    messages: [
-      {
-        key: event.userId,
-        value: JSON.stringify(event),
-        headers: {
-          'event-type': event.type,
-          'correlation-id': event.correlationId,
-          timestamp: Date.now().toString(),
-        },
-      },
-    ],
-  });
-}
-```
+### Consumer Patterns
+- **Idempotent processing**: Handle duplicates gracefully
+- **Graceful shutdown**: Finish in-flight, stop consuming
+- **Retry with backoff**: Exponential delays
+- **Dead letter queue**: After max retries
+- **Circuit breaker**: For downstream dependencies
 
-### Kafka Consumer
+### Ordering & Delivery
+- **Kafka**: Order per partition, use key for related events
+- **RabbitMQ**: Order per queue (single consumer)
+- **At-least-once default**: Plan for duplicates
+- **Exactly-once**: Idempotent consumers or transactions
 
-```typescript
-// consumers/userEventConsumer.ts
-const consumer = kafka.consumer({
-  groupId: 'notification-service',
-  sessionTimeout: 30000,
-  heartbeatInterval: 3000,
-});
+### Monitoring
+- **Consumer lag**: How far behind
+- **Throughput**: Messages/second
+- **Error rates**: Dead letters, retries
+- **Processing time**: Per message latency
 
-export async function startConsumer() {
-  await consumer.connect();
-  await consumer.subscribe({ topic: 'user-events', fromBeginning: false });
-
-  await consumer.run({
-    eachMessage: async ({ topic, partition, message }) => {
-      const event = JSON.parse(message.value!.toString()) as UserEvent;
-
-      try {
-        await processEvent(event);
-        // Offset committed automatically on success
-      } catch (error) {
-        logger.error({ error, event }, 'Failed to process event');
-        // Dead letter or retry logic
-        await publishToDeadLetter(event, error);
-      }
-    },
-  });
-}
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await consumer.disconnect();
-});
-```
-
-### RabbitMQ Publisher
-
-```typescript
-// publishers/orderPublisher.ts
-import amqp from 'amqplib';
-
-let channel: amqp.Channel;
-
-export async function initRabbitMQ() {
-  const connection = await amqp.connect(process.env.RABBITMQ_URL!);
-  channel = await connection.createChannel();
-
-  await channel.assertExchange('orders', 'topic', { durable: true });
-  await channel.assertQueue('order-notifications', { durable: true });
-  await channel.bindQueue('order-notifications', 'orders', 'order.*');
-}
-
-export async function publishOrderEvent(event: OrderEvent): Promise<void> {
-  const routingKey = `order.${event.type}`;
-
-  channel.publish('orders', routingKey, Buffer.from(JSON.stringify(event)), {
-    persistent: true,
-    contentType: 'application/json',
-    headers: {
-      'x-correlation-id': event.correlationId,
-    },
-  });
-}
-```
-
-### RabbitMQ Consumer
-
-```typescript
-// consumers/orderConsumer.ts
-export async function startOrderConsumer() {
-  await channel.prefetch(10);
-
-  channel.consume('order-notifications', async (msg) => {
-    if (!msg) return;
-
-    const event = JSON.parse(msg.content.toString()) as OrderEvent;
-
-    try {
-      await processOrderEvent(event);
-      channel.ack(msg);
-    } catch (error) {
-      logger.error({ error, event }, 'Failed to process order event');
-      // Requeue on transient errors, reject on permanent
-      const requeue = isTransientError(error);
-      channel.nack(msg, false, requeue);
-    }
-  });
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ Fire-and-forget without acks
-- ❌ Blocking in message handlers
-- ❌ Missing dead letter queues
-- ❌ Unbounded consumers
+
+### Producer Anti-Patterns
+- ❌ **Fire-and-forget without acks**: Lost messages
+- ❌ **Large messages**: >1MB problematic
+- ❌ **No compression**: Bandwidth waste
+- ❌ **Blocking on send**: Use async
+
+### Consumer Anti-Patterns
+- ❌ **Blocking in handlers**: Reduces throughput
+- ❌ **No dead letter handling**: Poison messages block queue
+- ❌ **Acking before processing**: Lost on failure
+- ❌ **Unbounded retry**: Infinite loops
+- ❌ **No backpressure**: Memory exhaustion
+
+### Design Anti-Patterns
+- ❌ **Request-reply over queues**: Use HTTP/gRPC for sync
+- ❌ **Coupling to message format**: Use schemas
+- ❌ **No correlation/trace IDs**: Can't debug flows
+- ❌ **Ignoring message order**: When order matters
+
+### Operational Anti-Patterns
+- ❌ **No monitoring**: Blind to lag, errors
+- ❌ **Missing graceful shutdown**: Lost messages
+- ❌ **No retention policy**: Disk exhaustion
+- ❌ **Single consumer for critical queue**: No HA
+
+---
 
 ## Verification Checklist
-- [ ] Idempotent consumers
-- [ ] Dead letter handling
+
+### Producer
+- [ ] Idempotent production (Kafka)
+- [ ] Persistent messages (RabbitMQ)
+- [ ] Compression enabled
+- [ ] Correlation IDs included
+
+### Consumer
+- [ ] Idempotent processing
+- [ ] Dead letter queue configured
 - [ ] Graceful shutdown
-- [ ] Message ordering strategy
-- [ ] Monitoring lag/throughput
+- [ ] Retry with backoff
+
+### Reliability
+- [ ] Durable queues/topics
+- [ ] Acks configured properly
+- [ ] Ordering strategy defined
+- [ ] Schema versioning
+
+### Operations
+- [ ] Lag monitoring
+- [ ] Error rate alerting
+- [ ] Retention policies
+- [ ] Throughput dashboards
+
+---
+
+## Code Patterns (Reference)
+
+### Kafka Producer
+- **Setup**: `producer({ idempotent: true, maxInFlightRequests: 5 })`
+- **Send**: `producer.send({ topic, messages: [{ key: userId, value: JSON.stringify(event), headers: { 'event-type': type } }] })`
+
+### Kafka Consumer
+- **Setup**: `consumer({ groupId: 'service', sessionTimeout: 30000 })`
+- **Run**: `consumer.run({ eachMessage: async ({ message }) => { await process(message); } })`
+- **Graceful shutdown**: `process.on('SIGTERM', () => consumer.disconnect())`
+
+### RabbitMQ Publisher
+- **Exchange**: `channel.assertExchange('events', 'topic', { durable: true })`
+- **Publish**: `channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(event)), { persistent: true })`
+
+### RabbitMQ Consumer
+- **Prefetch**: `channel.prefetch(10)`
+- **Consume**: `channel.consume(queue, async (msg) => { await process(msg); channel.ack(msg); })`
+- **Nack with requeue**: `channel.nack(msg, false, isTransientError)`
+
+### Dead Letter
+- **RabbitMQ DLX**: `{ 'x-dead-letter-exchange': 'dlx', 'x-dead-letter-routing-key': 'failed' }`
+- **Kafka**: Publish to `topic.DLT` on final failure
+

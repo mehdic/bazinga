@@ -2,7 +2,7 @@
 name: graphql
 type: api
 priority: 2
-token_estimate: 450
+token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
 requires: [typescript]
 ---
@@ -12,178 +12,121 @@ requires: [typescript]
 # GraphQL Engineering Expertise
 
 ## Specialist Profile
-GraphQL specialist building flexible APIs. Expert in schema design, resolvers, and performance optimization.
+GraphQL specialist building flexible APIs. Expert in schema design, federation, and performance optimization.
 
-## Implementation Guidelines
+---
 
-### Schema Definition
+## Patterns to Follow
 
-```graphql
-# schema.graphql
-type Query {
-  user(id: ID!): User
-  users(filter: UserFilter, pagination: PaginationInput): UserConnection!
-}
+### Schema Design
+- **Relay connection spec**: Cursor pagination with edges/nodes
+- **Nullable by default**: Embrace GraphQL's error model
+- **Input types for mutations**: Separate from output types
+- **Payload pattern**: `{ user, errors }` for mutations
+- **Versionless API**: Add fields, deprecate, never remove
 
-type Mutation {
-  createUser(input: CreateUserInput!): CreateUserPayload!
-  updateUser(id: ID!, input: UpdateUserInput!): UpdateUserPayload!
-}
+### Federation (2025)
+- **Subgraphs per domain**: Users, products, orders
+- **Gateway composes schema**: Single entry point
+- **@key for entity resolution**: Cross-service references
+- **Authenticate at gateway**: Forward identity to subgraphs
+- **Authorize in subgraphs**: Each service enforces its rules
 
-type User implements Node {
-  id: ID!
-  email: String!
-  displayName: String!
-  status: UserStatus!
-  orders(first: Int, after: String): OrderConnection!
-  createdAt: DateTime!
-}
+### Performance Patterns
+- **DataLoader for N+1**: Batch and cache per request
+- **Persisted queries**: Client sends hash, not query
+- **Query complexity limits**: Cost per field/type
+- **Depth limits**: Prevent deep nesting attacks
+- **APQ (Automatic Persisted Queries)**: Reduce bandwidth
 
-type UserConnection {
-  edges: [UserEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
+### Security
+- **Trusted documents**: Allowlist of operations (first-party clients)
+- **Query complexity analysis**: Reject expensive queries
+- **Depth limiting**: Max nesting depth
+- **Introspection control**: Disable in production for private APIs
+- **Rate limiting**: Per-query cost-based
 
-type UserEdge {
-  node: User!
-  cursor: String!
-}
+### Best Practices
+- **Codegen for types**: Generate from schema
+- **Resolvers return promises**: Async by default
+- **Context for request scope**: User, dataloaders
+- **Field-level resolvers**: Lazy loading
 
-input CreateUserInput {
-  email: String!
-  displayName: String!
-}
-
-type CreateUserPayload {
-  user: User
-  errors: [Error!]
-}
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  PENDING
-}
-```
-
-### Resolvers
-
-```typescript
-// resolvers/user.ts
-import { Resolvers } from '../generated/graphql';
-
-export const userResolvers: Resolvers = {
-  Query: {
-    user: async (_, { id }, { dataSources }) => {
-      return dataSources.userAPI.getById(id);
-    },
-    users: async (_, { filter, pagination }, { dataSources }) => {
-      const { nodes, totalCount, hasNextPage } =
-        await dataSources.userAPI.list({ filter, ...pagination });
-
-      return {
-        edges: nodes.map((node) => ({
-          node,
-          cursor: encodeCursor(node.id),
-        })),
-        pageInfo: {
-          hasNextPage,
-          endCursor: nodes.length ? encodeCursor(nodes.at(-1)!.id) : null,
-        },
-        totalCount,
-      };
-    },
-  },
-
-  Mutation: {
-    createUser: async (_, { input }, { dataSources }) => {
-      try {
-        const user = await dataSources.userAPI.create(input);
-        return { user, errors: null };
-      } catch (error) {
-        return { user: null, errors: [formatError(error)] };
-      }
-    },
-  },
-
-  User: {
-    orders: async (parent, args, { dataSources }) => {
-      return dataSources.orderAPI.getByUserId(parent.id, args);
-    },
-  },
-};
-```
-
-### DataLoader for N+1
-
-```typescript
-// dataloaders/userLoader.ts
-import DataLoader from 'dataloader';
-
-export function createUserLoader(db: Database) {
-  return new DataLoader<string, User>(async (ids) => {
-    const users = await db.users.findMany({
-      where: { id: { in: [...ids] } },
-    });
-
-    const userMap = new Map(users.map((u) => [u.id, u]));
-    return ids.map((id) => userMap.get(id) ?? null);
-  });
-}
-
-// Context setup
-export function createContext({ req }: { req: Request }) {
-  return {
-    userLoader: createUserLoader(db),
-    currentUser: req.user,
-  };
-}
-
-// Usage in resolver
-User: {
-  organization: (parent, _, { userLoader }) => {
-    return userLoader.load(parent.organizationId);
-  },
-}
-```
-
-### Input Validation
-
-```typescript
-// directives/validation.ts
-import { mapSchema, getDirective, MapperKind } from '@graphql-tools/utils';
-import { GraphQLError } from 'graphql';
-
-export function validationDirective(schema: GraphQLSchema) {
-  return mapSchema(schema, {
-    [MapperKind.INPUT_OBJECT_FIELD]: (fieldConfig, fieldName, typeName) => {
-      const constraint = getDirective(schema, fieldConfig, 'constraint')?.[0];
-      if (constraint) {
-        const { resolve = defaultFieldResolver } = fieldConfig;
-        fieldConfig.resolve = async (source, args, context, info) => {
-          const value = source[fieldName];
-          if (constraint.minLength && value.length < constraint.minLength) {
-            throw new GraphQLError(`${fieldName} must be at least ${constraint.minLength} characters`);
-          }
-          return resolve(source, args, context, info);
-        };
-      }
-      return fieldConfig;
-    },
-  });
-}
-```
+---
 
 ## Patterns to Avoid
-- ❌ N+1 queries (use DataLoader)
-- ❌ Unbounded list queries
-- ❌ Over-fetching in resolvers
-- ❌ Missing error handling
+
+### Schema Anti-Patterns
+- ❌ **Verbs in field names**: `getUser` vs `user`
+- ❌ **Breaking changes**: Deprecate, don't remove
+- ❌ **Giant input types**: Split by concern
+- ❌ **Missing pagination**: Unbounded lists
+
+### Performance Anti-Patterns
+- ❌ **N+1 queries**: Use DataLoader
+- ❌ **Over-fetching in resolvers**: Select only needed fields
+- ❌ **No query complexity limits**: DoS vulnerability
+- ❌ **Missing caching**: Use persisted queries, response cache
+
+### Federation Anti-Patterns
+- ❌ **Overly complex @key fields**: Performance overhead
+- ❌ **Ignoring resolver variability**: Different subgraph speeds
+- ❌ **Missing gateway metrics**: Chokepoint visibility
+- ❌ **No trace propagation**: Disconnected traces
+
+### Security Anti-Patterns
+- ❌ **Introspection always on**: Schema exposure
+- ❌ **No depth limits**: Nested query attacks
+- ❌ **Trusting client-sent queries**: Use persisted queries
+- ❌ **Missing rate limits**: Resource exhaustion
+
+---
 
 ## Verification Checklist
+
+### Schema
+- [ ] Relay-style pagination
+- [ ] Input types for mutations
+- [ ] Payload pattern for errors
+- [ ] Deprecation before removal
+
+### Performance
 - [ ] DataLoader for batching
-- [ ] Cursor-based pagination
-- [ ] Input validation
-- [ ] Error payload pattern
 - [ ] Query complexity limits
+- [ ] Depth limits configured
+- [ ] Caching strategy defined
+
+### Federation
+- [ ] Subgraphs per domain
+- [ ] Gateway authentication
+- [ ] Subgraph authorization
+- [ ] Trace context propagation
+
+### Security
+- [ ] Introspection disabled in prod
+- [ ] Rate limiting configured
+- [ ] Persisted queries (if applicable)
+- [ ] Input validation
+
+---
+
+## Code Patterns (Reference)
+
+### Schema
+- **Connection**: `type UserConnection { edges: [UserEdge!]!; pageInfo: PageInfo!; totalCount: Int! }`
+- **Edge**: `type UserEdge { node: User!; cursor: String! }`
+- **Payload**: `type CreateUserPayload { user: User; errors: [Error!] }`
+- **Input**: `input CreateUserInput { email: String!; displayName: String! }`
+
+### DataLoader
+- **Create**: `new DataLoader(async (ids) => { const users = await db.users.findMany({ where: { id: { in: ids } } }); return ids.map(id => users.find(u => u.id === id)); })`
+- **Use**: `User: { organization: (parent, _, { orgLoader }) => orgLoader.load(parent.orgId) }`
+
+### Federation
+- **Entity**: `type User @key(fields: "id") { id: ID!; email: String! }`
+- **Reference resolver**: `User: { __resolveReference: (ref) => users.findById(ref.id) }`
+
+### Security
+- **Complexity**: `createComplexityLimitRule(1000)` directive
+- **Depth**: `depthLimit(10)` validation rule
+

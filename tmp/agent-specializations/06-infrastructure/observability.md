@@ -2,7 +2,7 @@
 name: observability
 type: infrastructure
 priority: 2
-token_estimate: 450
+token_estimate: 550
 compatible_with: [developer, senior_software_engineer]
 requires: []
 ---
@@ -12,157 +12,129 @@ requires: []
 # Observability Engineering Expertise
 
 ## Specialist Profile
-Observability specialist implementing monitoring, logging, and tracing. Expert in metrics, structured logging, and distributed tracing.
+Observability specialist implementing the three pillars. Expert in metrics, structured logging, and distributed tracing.
 
-## Implementation Guidelines
+---
+
+## Patterns to Follow
 
 ### Structured Logging
+- **JSON format**: Machine-parseable
+- **Consistent fields**: service, version, environment, timestamp
+- **Request context**: requestId, userId, traceId
+- **Log levels semantically**: debug, info, warn, error
+- **Child loggers**: Add context progressively
 
-```typescript
-// lib/logger.ts
-import pino from 'pino';
-
-export const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  formatters: {
-    level: (label) => ({ level: label }),
-  },
-  base: {
-    service: process.env.SERVICE_NAME,
-    version: process.env.APP_VERSION,
-    environment: process.env.NODE_ENV,
-  },
-});
-
-// Usage with context
-export function createRequestLogger(req: Request) {
-  return logger.child({
-    requestId: req.headers['x-request-id'],
-    path: req.url,
-    method: req.method,
-  });
-}
-
-// Structured log examples
-logger.info({ userId, action: 'login' }, 'User logged in');
-logger.error({ err, orderId }, 'Failed to process order');
-```
-
-### Metrics with Prometheus
-
-```typescript
-// lib/metrics.ts
-import { Registry, Counter, Histogram, collectDefaultMetrics } from 'prom-client';
-
-const register = new Registry();
-collectDefaultMetrics({ register });
-
-export const httpRequestDuration = new Histogram({
-  name: 'http_request_duration_seconds',
-  help: 'Duration of HTTP requests in seconds',
-  labelNames: ['method', 'route', 'status'],
-  buckets: [0.01, 0.05, 0.1, 0.5, 1, 5],
-  registers: [register],
-});
-
-export const httpRequestTotal = new Counter({
-  name: 'http_requests_total',
-  help: 'Total number of HTTP requests',
-  labelNames: ['method', 'route', 'status'],
-  registers: [register],
-});
-
-// Middleware
-export function metricsMiddleware(req, res, next) {
-  const end = httpRequestDuration.startTimer();
-  res.on('finish', () => {
-    const labels = { method: req.method, route: req.route?.path || req.path, status: res.statusCode };
-    end(labels);
-    httpRequestTotal.inc(labels);
-  });
-  next();
-}
-
-// Endpoint
-app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
-});
-```
+### Metrics (RED/USE Methods)
+- **RED for services**: Rate, Errors, Duration
+- **USE for resources**: Utilization, Saturation, Errors
+- **Histograms for latency**: Buckets for percentiles
+- **Counters for totals**: Monotonically increasing
+- **Labels carefully**: Low cardinality only
 
 ### Distributed Tracing
+- **OpenTelemetry**: Vendor-neutral standard
+- **Auto-instrumentation**: HTTP, DB, cache automatic
+- **Manual spans for business**: Key operations
+- **Context propagation**: Across service boundaries
+- **Span attributes**: Add business context
 
-```typescript
-// lib/tracing.ts
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { trace, SpanStatusCode } from '@opentelemetry/api';
+### Health Endpoints
+- **Liveness (/health)**: Is process alive?
+- **Readiness (/ready)**: Can serve traffic?
+- **Startup probe**: For slow-starting apps
+- **Dependency checks**: DB, cache connectivity
 
-const sdk = new NodeSDK({
-  serviceName: process.env.SERVICE_NAME,
-  traceExporter: new OTLPTraceExporter({
-    url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-  }),
-  instrumentations: [getNodeAutoInstrumentations()],
-});
+### Alerting
+- **Alert on symptoms**: User impact, not causes
+- **SLO-based alerts**: Error budget consumption
+- **Runbooks**: Link in alert description
+- **Reduce noise**: High signal, low fatigue
+- **Escalation paths**: On-call rotations
 
-sdk.start();
+### Dashboards
+- **Service overview**: Golden signals (latency, traffic, errors, saturation)
+- **Drill-down capability**: Top-level → component → instance
+- **Business metrics**: Revenue, signups, conversions
+- **Comparisons**: Current vs. baseline/yesterday/last week
 
-// Manual spans
-const tracer = trace.getTracer('api');
-
-export async function processOrder(orderId: string) {
-  return tracer.startActiveSpan('processOrder', async (span) => {
-    try {
-      span.setAttribute('order.id', orderId);
-
-      const result = await db.orders.process(orderId);
-      span.setAttribute('order.status', result.status);
-
-      return result;
-    } catch (error) {
-      span.recordException(error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
-      throw error;
-    } finally {
-      span.end();
-    }
-  });
-}
-```
-
-### Health Checks
-
-```typescript
-// routes/health.ts
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.get('/ready', async (req, res) => {
-  const checks = await Promise.allSettled([
-    db.query('SELECT 1'),
-    redis.ping(),
-  ]);
-
-  const healthy = checks.every((c) => c.status === 'fulfilled');
-  res.status(healthy ? 200 : 503).json({
-    status: healthy ? 'ready' : 'not_ready',
-    checks: { db: checks[0].status, redis: checks[1].status },
-  });
-});
-```
+---
 
 ## Patterns to Avoid
-- ❌ Unstructured log messages
-- ❌ Missing request correlation
-- ❌ No error tracking
-- ❌ Unbounded cardinality labels
+
+### Logging Anti-Patterns
+- ❌ **Unstructured log messages**: Hard to query
+- ❌ **Missing request correlation**: Can't trace flows
+- ❌ **PII in logs**: Compliance violation
+- ❌ **Excessive debug in prod**: Cost and noise
+- ❌ **Log and throw exception**: Double logging
+
+### Metrics Anti-Patterns
+- ❌ **Unbounded cardinality labels**: userId, orderId as labels
+- ❌ **Missing units in names**: `_seconds`, `_bytes` suffix
+- ❌ **Gauges for request counts**: Use counters
+- ❌ **No histograms for latency**: Can't calculate percentiles
+- ❌ **Too many metrics**: Focus on actionable
+
+### Tracing Anti-Patterns
+- ❌ **Not propagating context**: Broken traces
+- ❌ **Too much span detail**: High cost, noise
+- ❌ **Missing business attributes**: Can't filter by user/order
+- ❌ **Sampling without strategy**: Miss important traces
+
+### Alerting Anti-Patterns
+- ❌ **Alert on causes not symptoms**: Low signal
+- ❌ **No runbook attached**: On-call confusion
+- ❌ **Too many alerts**: Alert fatigue
+- ❌ **Static thresholds only**: Missing anomalies
+
+---
 
 ## Verification Checklist
-- [ ] Structured JSON logging
+
+### Logging
+- [ ] JSON structured format
 - [ ] Request ID propagation
-- [ ] Key business metrics
-- [ ] Distributed tracing
-- [ ] Health/readiness endpoints
+- [ ] Appropriate log levels
+- [ ] No PII in logs
+
+### Metrics
+- [ ] RED metrics for services
+- [ ] Histogram for latency
+- [ ] Low-cardinality labels
+- [ ] /metrics endpoint exposed
+
+### Tracing
+- [ ] OpenTelemetry configured
+- [ ] Auto-instrumentation enabled
+- [ ] Manual spans for key ops
+- [ ] Context propagation verified
+
+### Health
+- [ ] Liveness endpoint
+- [ ] Readiness endpoint
+- [ ] Dependency checks
+- [ ] Graceful degradation
+
+---
+
+## Code Patterns (Reference)
+
+### Logging (pino)
+- **Setup**: `const logger = pino({ level: 'info', base: { service: 'api', version: '1.0' } })`
+- **Child logger**: `const reqLogger = logger.child({ requestId, path })`
+- **Usage**: `logger.info({ userId, action: 'login' }, 'User logged in')`
+
+### Metrics (Prometheus)
+- **Histogram**: `new Histogram({ name: 'http_request_duration_seconds', labelNames: ['method', 'route', 'status'], buckets: [0.01, 0.1, 0.5, 1] })`
+- **Counter**: `new Counter({ name: 'http_requests_total', labelNames: ['method', 'status'] })`
+- **Middleware**: `const end = histogram.startTimer(); res.on('finish', () => end({ method, status }))`
+
+### Tracing (OpenTelemetry)
+- **Setup**: `new NodeSDK({ serviceName: 'api', traceExporter: new OTLPTraceExporter(), instrumentations: [getNodeAutoInstrumentations()] })`
+- **Manual span**: `tracer.startActiveSpan('processOrder', async (span) => { span.setAttribute('order.id', id); ... span.end(); })`
+
+### Health Checks
+- **Liveness**: `GET /health → { status: 'ok' }`
+- **Readiness**: `GET /ready → { status: 'ready', checks: { db: 'ok', redis: 'ok' } }`
+
