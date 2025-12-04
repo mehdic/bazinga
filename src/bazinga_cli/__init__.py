@@ -334,6 +334,8 @@ class BazingaSetup:
                 return False
 
         copied_count = 0
+
+        # Copy top-level .md files
         for template_file in source_templates.glob("*.md"):
             try:
                 # SECURITY: Validate filename doesn't contain path traversal
@@ -349,6 +351,30 @@ class BazingaSetup:
             except SecurityError as e:
                 console.print(f"[red]✗ Skipping unsafe file {template_file.name}: {e}[/red]")
                 continue
+
+        # Copy subdirectories (e.g., specializations/)
+        for subdir in source_templates.iterdir():
+            if subdir.is_dir():
+                try:
+                    # SECURITY: Validate directory name
+                    safe_dirname = PathValidator.validate_filename(subdir.name)
+                    dest_subdir = templates_dir / safe_dirname
+
+                    # SECURITY: Ensure destination is within templates_dir
+                    PathValidator.ensure_within_directory(dest_subdir, templates_dir)
+
+                    # Remove existing and copy fresh
+                    if dest_subdir.exists():
+                        shutil.rmtree(dest_subdir)
+                    shutil.copytree(subdir, dest_subdir)
+
+                    # Count files in subdirectory
+                    subdir_files = list(dest_subdir.rglob("*.md"))
+                    console.print(f"  ✓ Copied {safe_dirname}/ ({len(subdir_files)} files)")
+                    copied_count += len(subdir_files)
+                except SecurityError as e:
+                    console.print(f"[red]✗ Skipping unsafe directory {subdir.name}: {e}[/red]")
+                    continue
 
         return copied_count > 0
 
