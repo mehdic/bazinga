@@ -1203,73 +1203,104 @@ ELSE IF PM chose "parallel":
 
 ## §Specialization Loading
 
-**Purpose:** Provide technology-specific patterns and best practices to spawned agents.
+**Purpose:** Inject technology-specific patterns into agent prompts via specialization-loader skill.
 
 **Location:** `bazinga/templates/specializations/{category}/{technology}.md`
 
 ### Two-Phase Specialization Workflow
 
-**Phase 1: PM Assignment (during planning)**
+**Phase 1: PM Assignment (during planning)** - UNCHANGED
 - PM reads `bazinga/project_context.json` (created by Tech Stack Scout at Step 0.5)
 - PM assigns specializations PER TASK GROUP based on:
   - Which component(s) the group's task targets (frontend/, backend/, etc.)
   - Scout's suggested_specializations for that component
 - PM stores specializations via `bazinga-db create-task-group --specializations '[...]'`
 
-**Phase 2: Orchestrator Loading (at agent spawn)**
-- Query DB for group's specializations
-- Validate paths exist under `bazinga/templates/specializations/`
-- Include validated paths in agent prompt
+**Phase 2: Orchestrator Loading (at agent spawn)** - NEW SKILL-BASED
+- Check if specializations enabled in skills_config.json
+- Check if agent type is in enabled_agents list
+- Invoke specialization-loader skill to compose block
+- Prepend composed block to agent prompt
 
 ### Process (at agent spawn)
 
-**Step 1: Query DB for group's specializations**
+**Step 1: Check if enabled**
+```
+Read bazinga/skills_config.json
+IF specializations.enabled == false:
+    Skip specialization loading, continue to spawn
+IF agent_type NOT IN specializations.enabled_agents:
+    Skip specialization loading, continue to spawn
+```
+
+**Step 2: Query DB for group's specializations**
 ```
 bazinga-db, get task groups for session [session_id]
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Step 2: Extract specializations for this group**
+**Step 3: Extract and validate specializations**
 ```
 specializations = task_group["specializations"]  # JSON array or null
+IF specializations is null OR empty:
+    Skip specialization loading, continue to spawn
 ```
 
-**Step 3: Validate paths (skip invalid)**
+**Step 4: Invoke specialization-loader skill**
+
+Provide context before invoking:
 ```
-valid_paths = []
-for path in specializations:
-    if path.startswith("bazinga/templates/specializations/") and file_exists(path):
-        valid_paths.append(path)
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
+Model: {model from model_selection.json}
+Specialization Paths: {JSON array from step 3}
 ```
 
-**Step 4: Add to prompt (if specializations exist)**
+Then invoke: `Skill(command: "specialization-loader")`
+
+**Step 5: Extract composed block**
+
+The skill returns a composed block between markers:
+```
+[SPECIALIZATION_BLOCK_START]
+{composed markdown block}
+[SPECIALIZATION_BLOCK_END]
+```
+
+Extract the block content.
+
+**Step 6: Prepend to agent prompt**
+
+The composed block goes at the TOP of the agent prompt, before the task description:
 ```markdown
-## Specialization References
+{composed_specialization_block}
 
-Read and apply these patterns BEFORE implementation:
-{for each valid_path}
-- `{path}`
-{end for}
+---
 
-⚠️ MANDATORY: Apply ALL patterns from these files. These are required practices.
+## Your Task
+{task_description from PM}
 ```
 
 ### Fallback Scenarios
 
 | Scenario | Action |
 |----------|--------|
-| No specializations in DB (null/empty) | Check project_context.json directly (legacy support) |
-| project_context.json also missing | Skip specializations (graceful degradation) |
-| Path doesn't exist | Skip that path, log warning, continue with valid paths |
-| All paths invalid | Skip specializations section entirely |
+| specializations.enabled = false | Skip entirely |
+| Agent type not in enabled_agents | Skip entirely |
+| No specializations in DB (null/empty) | Skip entirely (graceful degradation) |
+| Skill invocation fails | Log warning, spawn without specialization |
+| project_context.json missing | Skill handles (conservative defaults) |
 
-**Legacy support:** If task_group.specializations is null, fall back to reading project_context.json:
-1. Extract `primary_language` → `01-languages/{lang}.md`
-2. Extract `framework` → `02-frameworks-frontend/` or `03-frameworks-backend/{fw}.md`
-3. Use max 2 paths
+### Token Budget (per-model)
 
-**Token budget:** ~40 tokens (paths only - agent reads content).
-**No hard limit:** PM can assign as many specializations as the task requires.
+| Model | Soft Limit | Hard Limit |
+|-------|------------|------------|
+| haiku | 600 | 900 |
+| sonnet | 1200 | 1800 |
+| opus | 1600 | 2400 |
+
+The skill enforces these limits. Orchestrator does not need to track tokens.
 
 ---
 
