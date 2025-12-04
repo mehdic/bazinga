@@ -844,14 +844,15 @@ class BazingaDB:
             # Serialize specializations to JSON (preserve [] vs None distinction)
             specs_json = json.dumps(specializations) if specializations is not None else None
             # Use ON CONFLICT for true upsert - preserves existing metadata
+            # COALESCE for status: INSERT uses 'pending' default, UPDATE preserves existing if None passed
             conn.execute("""
                 INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?)
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
-                    status = excluded.status,
-                    assigned_to = COALESCE(excluded.assigned_to, assigned_to),
-                    specializations = COALESCE(excluded.specializations, specializations),
+                    status = COALESCE(excluded.status, task_groups.status),
+                    assigned_to = COALESCE(excluded.assigned_to, task_groups.assigned_to),
+                    specializations = COALESCE(excluded.specializations, task_groups.specializations),
                     updated_at = CURRENT_TIMESTAMP
             """, (group_id, session_id, name, status, assigned_to, specs_json))
             conn.commit()
@@ -932,6 +933,9 @@ class BazingaDB:
             if last_review_status:
                 updates.append("last_review_status = ?")
                 params.append(last_review_status)
+            if name:
+                updates.append("name = ?")
+                params.append(name)
             if specializations is not None:
                 updates.append("specializations = ?")
                 params.append(json.dumps(specializations))
@@ -1736,7 +1740,8 @@ def main():
             group_id = positional_args[0]
             session_id = positional_args[1]
             name = positional_args[2]
-            status = positional_args[3] if len(positional_args) > 3 else 'pending'
+            # Default to None so upsert preserves existing status; INSERT defaults to 'pending'
+            status = positional_args[3] if len(positional_args) > 3 else None
             assigned_to = positional_args[4] if len(positional_args) > 4 else None
             result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
             print(json.dumps(result, indent=2))
