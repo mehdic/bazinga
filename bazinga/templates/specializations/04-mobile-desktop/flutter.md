@@ -19,8 +19,10 @@ Flutter specialist building cross-platform apps. Expert in state management, wid
 ## Patterns to Follow
 
 ### State Management (2025)
-- **Riverpod 3**: Compile-time safe, composable, @riverpod macro
-- **BLoC for enterprise**: Event → Bloc → State, strict separation
+<!-- version: riverpod >= 2.0 -->
+- **Riverpod 2+**: Compile-time safe, composable, @riverpod macro
+<!-- version: flutter_bloc >= 8.0 -->
+- **BLoC 8+ for enterprise**: Event → Bloc → State, strict separation
 - **Mix solutions**: Riverpod for app-wide, BLoC for feature-specific
 - **Flutter Signals**: Native reactive for simple local UI state
 - **Local state in StatefulWidget**: Modals, form fields, ValueNotifier
@@ -40,10 +42,16 @@ Flutter specialist building cross-platform apps. Expert in state management, wid
 - **Keys for stateful lists**: Preserve state during reordering
 
 ### Dart 3 Patterns
+<!-- version: dart >= 3.0 -->
 - **Sealed classes**: `sealed class UserState {}` for exhaustive switching
 - **Pattern matching**: `switch (state) { UserLoaded(:final users) => ... }`
 - **Records**: `(String name, int age)` for multiple returns
 - **Class modifiers**: `final class`, `interface class`, `base class`
+<!-- version: dart >= 3.3 -->
+- **Extension types**: `extension type UserId(String value) implements String {}`
+<!-- version: flutter >= 3.16 -->
+- **Material 3 default**: New components and theming
+- **Impeller rendering**: GPU-accelerated rendering on iOS
 
 ### Data Layer
 - **Freezed for immutable models**: Unions, copyWith, JSON serialization

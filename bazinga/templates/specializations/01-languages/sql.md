@@ -55,6 +55,22 @@ SQL specialist writing performant, maintainable queries. Expert in query optimiz
 - **Partial indexes**: Index only relevant rows
 - **Connection pooling**: Reuse connections
 
+### Database-Specific Features
+<!-- version: postgresql >= 12 -->
+- **Generated columns**: `ALTER TABLE ADD COLUMN full_name TEXT GENERATED ALWAYS AS (first || ' ' || last) STORED`
+- **JSON path queries**: `jsonb_path_query(data, '$.items[*].price')`
+<!-- version: postgresql >= 13 -->
+- **Incremental sort**: Optimizer uses partially sorted data
+<!-- version: postgresql >= 14 -->
+- **Multirange types**: `INT4MULTIRANGE` for discontinuous ranges
+<!-- version: postgresql >= 15 -->
+- **MERGE statement**: Standard SQL MERGE for upsert operations
+<!-- version: mysql >= 8.0 -->
+- **Window functions**: `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)`
+- **CTEs with recursion**: `WITH RECURSIVE` for hierarchical queries
+<!-- version: mysql >= 8.0.19 -->
+- **TABLE statement**: `TABLE users` as shorthand for `SELECT * FROM users`
+
 ---
 
 ## Patterns to Avoid
@@ -124,5 +140,12 @@ SQL specialist writing performant, maintainable queries. Expert in query optimiz
 - **Keyset pagination**: `WHERE id > :last_id ORDER BY id LIMIT 20`
 - **Safe update**: `BEGIN; UPDATE users SET status = 'inactive' WHERE last_login < '2023-01-01'; COMMIT;`
 - **COALESCE**: `COALESCE(display_name, email, 'Unknown') AS name`
+<!-- version: postgresql >= 11 -->
 - **Covering index**: `CREATE INDEX idx_users_status_email ON users(status) INCLUDE (email)`
+<!-- version: postgresql >= 12 -->
+- **Generated column**: `total NUMERIC GENERATED ALWAYS AS (quantity * price) STORED`
+<!-- version: postgresql >= 15 -->
+- **MERGE**: `MERGE INTO target USING source ON condition WHEN MATCHED THEN UPDATE WHEN NOT MATCHED THEN INSERT`
+<!-- version: mysql >= 8.0 -->
+- **Window rank**: `ROW_NUMBER() OVER (PARTITION BY category ORDER BY sales DESC) as rank`
 

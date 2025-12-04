@@ -25,19 +25,32 @@ Kotlin specialist building concise, safe applications. Expert in null safety, co
 - **Require/check**: `requireNotNull(value)` for preconditions
 
 ### Coroutines Best Practices
+<!-- version: kotlin >= 1.3 -->
 - **Structured concurrency**: Always use scoped coroutines
 - **Inject dispatchers**: Don't hardcode `Dispatchers.IO`
 - **SupervisorJob for isolation**: Child failures don't cancel siblings
 - **CancellationException handling**: Use `ensureActive()` in long operations
 - **External scope for outliving work**: Inject scope for work that must complete
 - **Flow for streams**: Cold streams with backpressure support
+<!-- version: kotlin >= 1.6 -->
+- **SharedFlow/StateFlow**: Preferred over channels for state management
+<!-- version: kotlin >= 1.7 -->
+- **Context receivers**: `context(Logger)` for implicit dependencies (experimental)
 
 ### Data Modeling
 - **Data classes for DTOs**: Automatic `equals`, `hashCode`, `copy`
+<!-- version: kotlin >= 1.5 -->
+- **Sealed interfaces**: More flexible than sealed classes for hierarchies
+- **Value classes**: Zero-cost type safety (`@JvmInline value class UserId(val value: String)`)
+<!-- version: kotlin >= 1.1, kotlin < 1.5 -->
+- **Inline classes**: Use `inline class` (deprecated in 1.5+, use value class)
+<!-- version: kotlin >= 1.0 -->
 - **Sealed classes for state**: Exhaustive when expressions
-- **Value classes**: Zero-cost type safety (`value class UserId(val value: String)`)
 - **Default parameters**: `fun create(name: String, role: Role = Role.User)`
 - **Immutable by default**: `val` over `var`, immutable collections
+<!-- version: kotlin >= 1.9 -->
+- **Data objects**: `data object Singleton` for singletons with toString
+- **Enum entries**: `entries` property instead of `values()`
 
 ### Functional Patterns
 - **Extension functions**: Add behavior without inheritance
@@ -116,9 +129,16 @@ Kotlin specialist building concise, safe applications. Expert in null safety, co
 ### Recommended Constructs
 - **Data class**: `data class User(val id: String, val email: String)`
 - **Sealed class**: `sealed class Result<out T> { data class Success<T>(val data: T) : Result<T>() }`
+<!-- version: kotlin >= 1.5 -->
 - **Value class**: `@JvmInline value class UserId(val value: String)`
+- **Sealed interface**: `sealed interface State { data object Loading : State }`
+<!-- version: kotlin >= 1.3 -->
 - **Coroutine scope**: `coroutineScope { async { ... } }`
+- **Flow**: `flow { emit(value) }.flowOn(Dispatchers.IO)`
+<!-- version: kotlin >= 1.0 -->
 - **Null handling**: `user?.profile?.name ?: "Unknown"`
 - **Extension**: `fun String.toSlug() = lowercase().replace(Regex("[^a-z0-9]+"), "-")`
-- **Flow**: `flow { emit(value) }.flowOn(Dispatchers.IO)`
+<!-- version: kotlin >= 1.9 -->
+- **Data object**: `data object Disconnected : ConnectionState`
+- **Enum entries**: `MyEnum.entries.forEach { ... }` (replaces `values()`)
 

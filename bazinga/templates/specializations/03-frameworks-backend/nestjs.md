@@ -24,6 +24,14 @@ NestJS specialist building enterprise Node.js applications. Expert in decorators
 - **Single responsibility**: Clear module boundaries
 - **Lazy loading**: For large applications
 - **Re-export pattern**: `exports: [UsersService]` for module APIs
+<!-- version: nestjs >= 8.0 -->
+- **Standalone applications**: `NestFactory.createApplicationContext()`
+<!-- version: nestjs >= 9.0 -->
+- **REPL support**: Interactive shell for debugging
+- **ConfigModule improvements**: Better env validation
+<!-- version: nestjs >= 10.0 -->
+- **Node 18+ required**: Minimum Node.js version
+- **Fastify v4 support**: Updated adapter
 
 ### Dependency Injection
 - **Constructor injection**: Let NestJS resolve dependencies

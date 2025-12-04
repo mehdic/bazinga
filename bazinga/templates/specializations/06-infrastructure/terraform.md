@@ -51,6 +51,22 @@ Terraform specialist building infrastructure as code. Expert in modules, state m
 - **Policy as code**: Sentinel, OPA, Conftest
 - **Small blast radius**: Limit scope per workspace/directory
 
+### Terraform Version Features
+<!-- version: terraform >= 1.3 -->
+- **Optional object attributes**: `optional(type, default)` in variable types
+- **Moved blocks**: Refactor without destroy/recreate
+<!-- version: terraform >= 1.4 -->
+- **Null resource replacement**: `terraform_data` resource
+- **Cloud variable sets**: Share variables across workspaces
+<!-- version: terraform >= 1.5 -->
+- **Import blocks**: Declarative import in config
+- **Check blocks**: Custom validation conditions
+<!-- version: terraform >= 1.6 -->
+- **Test framework**: Built-in testing with `terraform test`
+<!-- version: terraform >= 1.7 -->
+- **Removed blocks**: Declarative resource removal
+- **State encryption**: Enhanced state security
+
 ### Drift Detection
 - **Regular plan runs**: Detect manual changes
 - **Automated remediation**: CI job to apply corrections

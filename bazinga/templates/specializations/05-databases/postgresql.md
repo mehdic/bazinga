@@ -58,7 +58,21 @@ PostgreSQL specialist optimizing relational databases. Expert in query optimizat
 - **Full-text search**: tsvector, GIN index, plainto_tsquery
 - **Window functions**: RANK, ROW_NUMBER, LAG, LEAD
 - **UPSERT**: `ON CONFLICT DO UPDATE`
-- **Generated columns**: Computed at write time
+<!-- version: postgresql >= 12 -->
+- **Generated columns**: Computed at write time (STORED)
+- **JSON path queries**: `jsonb_path_query()` for complex extraction
+<!-- version: postgresql >= 13 -->
+- **Incremental sorting**: Optimizer uses partial index order
+- **Parallel VACUUM**: Faster table maintenance
+<!-- version: postgresql >= 14 -->
+- **Multirange types**: `INT4MULTIRANGE` for discontinuous ranges
+- **OUT params in procedures**: Return multiple values
+<!-- version: postgresql >= 15 -->
+- **MERGE statement**: Standard SQL upsert alternative
+- **JSON logging**: `log_destination = 'jsonlog'`
+<!-- version: postgresql >= 16 -->
+- **pg_stat_io**: I/O statistics view
+- **Logical replication from standby**: Reduced primary load
 
 ---
 

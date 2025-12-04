@@ -38,6 +38,15 @@ Observability specialist implementing the three pillars. Expert in metrics, stru
 - **Manual spans for business**: Key operations
 - **Context propagation**: Across service boundaries
 - **Span attributes**: Add business context
+<!-- version: opentelemetry >= 1.0 -->
+- **Stable APIs**: Metrics and traces stable
+- **Semantic conventions**: Standardized attribute names
+<!-- version: opentelemetry >= 1.20 -->
+- **Logs support**: Logs as first-class signals
+- **Profiling integration**: Continuous profiling data
+<!-- version: opentelemetry >= 1.30 -->
+- **Improved auto-instrumentation**: Better framework coverage
+- **OTLP/HTTP default**: Simpler deployment than gRPC
 
 ### Health Endpoints
 - **Liveness (/health)**: Is process alive?

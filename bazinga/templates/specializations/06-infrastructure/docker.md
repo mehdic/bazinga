@@ -57,6 +57,18 @@ Docker specialist building containerized applications. Expert in multi-stage bui
 - **Networks for isolation**: Separate frontend/backend
 - **Environment files**: `.env` for secrets (not committed)
 
+### Docker Build Features
+<!-- version: docker >= 23.0 -->
+- **BuildKit default**: Parallel builds, cache mounts, secrets
+- **--build-context**: Multiple named build contexts
+<!-- version: docker >= 24.0 -->
+- **Bake file improvements**: Better multi-platform builds
+<!-- version: docker >= 25.0 -->
+- **Container storage driver**: containerd default integration
+<!-- version: compose >= 2.0 -->
+- **GPU support**: `deploy.resources.reservations.devices`
+- **Profiles**: Selective service startup with `profiles: [dev]`
+
 ---
 
 ## Patterns to Avoid

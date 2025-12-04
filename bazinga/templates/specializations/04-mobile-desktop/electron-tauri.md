@@ -19,12 +19,17 @@ Desktop app specialist building cross-platform apps. Expert in IPC security, nat
 ## Patterns to Follow
 
 ### Tauri 2.0 (2025 Recommended)
+<!-- version: tauri >= 2.0 -->
 - **Rust backend**: Memory-safe, high performance
 - **OS native webview**: WebView2 (Windows), WebKit (macOS/Linux)
 - **Deny by default security**: Explicit permission grants
 - **3MB binary size**: vs 200MB+ Electron
 - **30MB RAM usage**: vs 250MB+ Electron idle
 - **Mobile support**: iOS and Android in v2.0
+- **Capabilities system**: Fine-grained permission model
+<!-- version: tauri >= 1.0, tauri < 2.0 -->
+- **Allowlist pattern**: Coarser permission model (deprecated in v2)
+- **No mobile support**: Desktop only
 
 ### Tauri Patterns
 - **Commands for IPC**: `#[tauri::command]` decorated functions
@@ -45,6 +50,11 @@ Desktop app specialist building cross-platform apps. Expert in IPC security, nat
 - **Preload bridge**: `contextBridge.exposeInMainWorld`
 - **Window management**: BrowserWindow with proper options
 - **Auto-updates**: electron-updater integration
+<!-- version: electron >= 28 -->
+- **ESM support**: Native ES modules in main process
+- **V8 sandbox by default**: Enhanced security
+<!-- version: electron >= 30 -->
+- **Improved utilityProcess**: Better child process handling
 
 ### Cross-Platform
 - **App icons**: Platform-specific formats

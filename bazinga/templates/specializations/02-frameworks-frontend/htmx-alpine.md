@@ -30,6 +30,12 @@ Hypermedia specialist building interactive apps without heavy JS frameworks. Exp
 - **Polling**: `hx-trigger="every 30s"`
 - **Confirmation**: `hx-confirm="Are you sure?"`
 - **Loading indicators**: `hx-indicator` with CSS transitions
+<!-- version: htmx >= 1.9 -->
+- **hx-on for events**: `hx-on:click="alert('clicked')"` inline handlers
+- **htmx.ajax()**: Programmatic HTMX requests
+<!-- version: htmx >= 2.0 -->
+- **htmx: prefix events**: Events now prefixed (htmx:afterSwap vs afterSwap.htmx)
+- **Deprecated removals**: Some 1.x deprecated features removed
 
 ### Alpine.js Integration
 - **Client-only interactivity**: Dropdowns, modals, tabs
@@ -37,6 +43,12 @@ Hypermedia specialist building interactive apps without heavy JS frameworks. Exp
 - **x-show/x-if**: Conditional rendering
 - **x-transition**: Smooth animations
 - **Complement HTMX**: Alpine for UI, HTMX for data
+<!-- version: alpine >= 3.0 -->
+- **x-bind shorthand**: `:class` instead of `x-bind:class`
+- **x-id for unique IDs**: `x-id="['input', 'label']"` generates unique IDs
+- **$persist plugin**: Persist state to localStorage
+<!-- version: alpine >= 3.10 -->
+- **x-teleport**: Move elements to different DOM location
 
 ### Server-Side Patterns
 - **Return HTML partials**: Not full pages, not JSON

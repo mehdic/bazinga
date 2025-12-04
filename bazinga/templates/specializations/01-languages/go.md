@@ -24,6 +24,14 @@ Go specialist building efficient, concurrent systems. Expert in idiomatic Go, er
 - **Make the zero value useful**: Design types so default value is valid
 - **Clear is better than clever**: Explicit, readable code over tricks
 
+### Generics
+<!-- version: go >= 1.18 -->
+- **Type parameters**: `func Map[T, U any](items []T, f func(T) U) []U`
+- **Constraints**: Use `comparable`, `any`, or custom interfaces
+- **Type inference**: Let compiler infer types when obvious
+<!-- version: go < 1.18 -->
+- **No generics**: Use `interface{}` with type assertions, or code generation
+
 ### Error Handling
 - **Return errors**: Don't panic for expected failures
 - **Wrap errors**: `fmt.Errorf("operation failed: %w", err)` for context
@@ -46,6 +54,13 @@ Go specialist building efficient, concurrent systems. Expert in idiomatic Go, er
 - **errgroup**: For concurrent tasks with error propagation
 - **Mutex for state**: When shared state is simpler than channels
 - **Close channels from sender**: Receiver should not close
+<!-- version: go >= 1.21 -->
+- **Structured logging**: Use `log/slog` for structured, leveled logs
+- **Slices package**: Use `slices.Sort()`, `slices.Contains()` instead of sort.Slice
+- **Maps package**: Use `maps.Clone()`, `maps.Keys()` for map operations
+<!-- version: go >= 1.22 -->
+- **Range over integers**: `for i := range 10 { }` instead of `for i := 0; i < 10; i++`
+- **Enhanced ServeMux**: Pattern matching with `{param}` and methods in patterns
 
 ### Package Design
 - **Internal packages**: For private implementation details
@@ -137,3 +152,12 @@ Go specialist building efficient, concurrent systems. Expert in idiomatic Go, er
 - **Interface declaration**: `type Reader interface { Read(p []byte) (n int, err error) }`
 - **Constructor**: `func NewService(repo Repository) *Service { return &Service{repo: repo} }`
 - **Zero value**: Design so `var s MyStruct` is usable without explicit init
+<!-- version: go >= 1.18 -->
+- **Generic function**: `func Map[T, U any](s []T, f func(T) U) []U { ... }`
+- **Generic constraint**: `type Ordered interface { ~int | ~float64 | ~string }`
+<!-- version: go >= 1.21 -->
+- **Structured log**: `slog.Info("user created", "id", user.ID, "email", user.Email)`
+- **Slices helper**: `slices.Sort(items)` instead of `sort.Slice(items, func(i, j int) bool { ... })`
+<!-- version: go >= 1.22 -->
+- **Range integer**: `for i := range n { use(i) }` for counting loops
+- **HTTP routing**: `mux.HandleFunc("GET /users/{id}", handler)` with method and path params

@@ -52,6 +52,18 @@ Redis specialist building high-performance caches and data stores. Expert in dat
 - **Redlock**: Distributed locking across nodes
 - **Pub/Sub**: Real-time event broadcast
 - **Streams**: Reliable message queue with consumer groups
+<!-- version: redis >= 6.0 -->
+- **ACLs**: Fine-grained access control
+- **Client-side caching**: RESP3 protocol support
+<!-- version: redis >= 6.2 -->
+- **GETDEL/GETEX**: Atomic get-and-delete/get-and-expire
+- **COPY command**: Duplicate keys without GET/SET
+<!-- version: redis >= 7.0 -->
+- **Functions**: Server-side Lua function library
+- **Sharded Pub/Sub**: Scalable pub/sub in cluster mode
+- **Multiple AOF files**: Better persistence performance
+<!-- version: redis >= 7.2 -->
+- **Improved cluster**: Hash slot migration improvements
 
 ---
 

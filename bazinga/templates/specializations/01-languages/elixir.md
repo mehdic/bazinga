@@ -42,10 +42,22 @@ Elixir specialist building fault-tolerant systems. Expert in OTP, pattern matchi
 - **Pipe operator**: Transform data through function chain
 - **`Enum` over recursion**: Built-in functions are optimized
 - **Stream for lazy evaluation**: Large/infinite sequences
+<!-- version: elixir >= 1.12 -->
+- **`then/2` for inline**: `value |> then(fn x -> process(x, extra) end)`
+<!-- version: elixir >= 1.14 -->
+- **`dbg/1` for debugging**: Drop-in debug macro with location info
+<!-- version: elixir >= 1.15 -->
+- **Improved exceptions**: Better stacktraces and error formatting
 
 ### Phoenix (if applicable)
 - **Contexts for business logic**: Bounded contexts, not fat models
 - **Changesets for validation**: Single source of validation truth
+<!-- version: phoenix >= 1.6 -->
+- **HEEx templates**: HTML-aware template syntax
+<!-- version: phoenix >= 1.7 -->
+- **Verified routes**: `~p"/users/#{user.id}"` for type-safe routes
+- **Core components**: Function components over view helpers
+<!-- version: elixir >= 1.5 -->
 - **Live View for real-time**: Server-rendered reactive UIs
 - **PubSub for events**: Decouple components
 
@@ -118,4 +130,10 @@ Elixir specialist building fault-tolerant systems. Expert in OTP, pattern matchi
 - **GenServer**: `use GenServer; def init(state), do: {:ok, state}`
 - **Supervisor**: `children = [{Worker, arg}]; Supervisor.start_link(children, strategy: :one_for_one)`
 - **Typespec**: `@spec find(id :: String.t()) :: {:ok, User.t()} | {:error, :not_found}`
+<!-- version: elixir >= 1.12 -->
+- **then/2**: `user_id |> then(fn id -> get_user(id, opts) end)`
+<!-- version: elixir >= 1.14 -->
+- **dbg**: `value |> transform() |> dbg() |> store()`
+<!-- version: phoenix >= 1.7 -->
+- **Verified route**: `~p"/users/#{@user.id}/edit"`
 

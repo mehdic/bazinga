@@ -36,6 +36,13 @@ Flask specialist building lightweight APIs. Expert in application factories, blu
 - **Flask-SQLAlchemy**: ORM integration
 - **Request context**: `g` for request-scoped data
 - **Proper status codes**: 201 for create, 204 for delete
+<!-- version: flask >= 2.0 -->
+- **Async views**: `async def` routes with ASGI
+- **Nested blueprints**: `bp.register_blueprint(child_bp)`
+- **Shorthand decorators**: `@app.get()`, `@app.post()` instead of `@app.route(methods=[...])`
+<!-- version: flask >= 3.0 -->
+- **Python 3.8+ required**: No more Python 3.7 support
+- **Removed @before_first_request**: Use app context setup instead
 
 ### Error Handling
 - **Global error handlers**: `@app.errorhandler`

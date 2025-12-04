@@ -47,6 +47,16 @@ MongoDB specialist designing document databases. Expert in schema design pattern
 - **$lookup with indexes**: Ensure foreign key indexed
 - **Aggregation explain**: Check execution plan
 - **allowDiskUse for large**: When exceeding memory
+<!-- version: mongodb >= 5.0 -->
+- **Time-series collections**: Native time-series support
+- **Live resharding**: Redistribute data without downtime
+- **Versioned API**: Stable API across major versions
+<!-- version: mongodb >= 6.0 -->
+- **Queryable encryption**: Client-side field-level encryption
+- **Cluster synchronization**: Improved cluster sync
+<!-- version: mongodb >= 7.0 -->
+- **Improved sharding**: Faster balancer, better chunk migrations
+- **$percentile aggregation**: Built-in percentile calculation
 
 ### Performance
 - **Cursor-based pagination**: `_id: { $gt: lastId }` + limit

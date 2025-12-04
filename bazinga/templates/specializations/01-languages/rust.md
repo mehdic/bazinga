@@ -37,6 +37,12 @@ Rust engineer building safe, performant systems. Expert in ownership, lifetimes,
 - **Traits for abstraction**: Define behavior contracts, not inheritance
 - **Generics with bounds**: `<T: Trait>` for compile-time polymorphism
 - **Associated types**: When there's one natural type per implementation
+<!-- version: rust >= 1.51 -->
+- **Const generics**: `struct Array<T, const N: usize>([T; N])` for compile-time sizes
+<!-- version: rust >= 1.75 -->
+- **Async traits**: `async fn` in traits with `#[trait_variant::make(Send)]` or RPITIT
+<!-- version: rust >= 1.65 -->
+- **GATs (Generic Associated Types)**: `type Item<'a>` in trait definitions
 
 ### Memory Management
 - **Stack by default**: Use stack allocation when size is known
@@ -49,6 +55,10 @@ Rust engineer building safe, performant systems. Expert in ownership, lifetimes,
 - **Channels for communication**: `mpsc`, `crossbeam` for message passing
 - **RwLock over Mutex**: When reads are more common than writes
 - **Tokio for async**: Standard async runtime for I/O-bound work
+<!-- version: rust >= 1.63 -->
+- **Scoped threads**: `std::thread::scope` for borrowing data in spawned threads
+<!-- version: rust >= 1.70 -->
+- **OnceCell/OnceLock**: `std::sync::OnceLock` for lazy static initialization
 
 ### API Design
 - **Accept generic iterators**: `impl IntoIterator<Item = T>`
@@ -130,3 +140,11 @@ Rust engineer building safe, performant systems. Expert in ownership, lifetimes,
 - **Option combinators**: `opt.map(f).unwrap_or_default()`
 - **Iterator chains**: `items.iter().filter(p).map(f).collect()`
 - **Error context**: `operation().context("failed to do X")?`
+<!-- version: rust >= 1.51 -->
+- **Const generic**: `fn zeros<const N: usize>() -> [i32; N] { [0; N] }`
+<!-- version: rust >= 1.63 -->
+- **Scoped thread**: `thread::scope(|s| { s.spawn(|| use_borrowed_data(&data)); })`
+<!-- version: rust >= 1.65 -->
+- **Let-else**: `let Some(x) = opt else { return None; };`
+<!-- version: rust >= 1.70 -->
+- **OnceLock**: `static CONFIG: OnceLock<Config> = OnceLock::new();`

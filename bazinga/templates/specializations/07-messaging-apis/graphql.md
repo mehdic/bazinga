@@ -26,11 +26,16 @@ GraphQL specialist building flexible APIs. Expert in schema design, federation, 
 - **Versionless API**: Add fields, deprecate, never remove
 
 ### Federation (2025)
+<!-- version: apollo-federation >= 2.0 -->
 - **Subgraphs per domain**: Users, products, orders
 - **Gateway composes schema**: Single entry point
 - **@key for entity resolution**: Cross-service references
 - **Authenticate at gateway**: Forward identity to subgraphs
 - **Authorize in subgraphs**: Each service enforces its rules
+- **@shareable directive**: Cross-subgraph field sharing
+- **@requires for computed**: Fetch fields from other subgraphs
+<!-- version: apollo-federation >= 1.0, apollo-federation < 2.0 -->
+- **Federation 1.x**: @extends instead of @shareable pattern
 
 ### Performance Patterns
 - **DataLoader for N+1**: Batch and cache per request

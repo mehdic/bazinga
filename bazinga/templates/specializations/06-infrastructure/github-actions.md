@@ -56,6 +56,17 @@ GitHub Actions specialist building CI/CD pipelines. Expert in workflows, securit
 - **Self-hosted for secrets**: When cloud won't work
 - **Early failure**: Fail fast, `fail-fast: true`
 
+### GitHub Actions Features
+<!-- version: github-actions >= 2023 -->
+- **Required workflows**: Org-level workflow enforcement
+- **Larger runners**: 4-64 vCPU options
+- **OIDC for all clouds**: AWS, Azure, GCP native
+<!-- version: github-actions >= 2024 -->
+- **Arm64 runners**: Native ARM builds
+- **GPU runners**: ML/AI workloads (beta)
+- **Immutable actions**: SHA pinning enforcement
+- **Workflow observability**: Built-in insights and metrics
+
 ---
 
 ## Patterns to Avoid

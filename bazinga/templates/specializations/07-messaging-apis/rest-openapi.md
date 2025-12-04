@@ -50,6 +50,13 @@ REST API specialist designing standards-compliant APIs. Expert in OpenAPI, HTTP 
 - **Reusable components**: $ref for schemas, responses
 - **Examples for all**: Request/response examples
 - **operationId for codegen**: Unique, descriptive
+<!-- version: openapi >= 3.1 -->
+- **JSON Schema 2020-12**: Full JSON Schema compatibility
+- **Webhooks support**: Define callback endpoints
+- **pathItems in components**: Reusable path definitions
+<!-- version: openapi >= 3.0, openapi < 3.1 -->
+- **OpenAPI 3.0**: Use subset of JSON Schema
+- **Callbacks**: For async/webhook patterns
 
 ### Security
 - **HTTPS always**: No exceptions

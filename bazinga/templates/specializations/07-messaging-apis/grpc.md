@@ -55,6 +55,16 @@ gRPC specialist building high-performance services. Expert in Protocol Buffers, 
 - **Per-service status**: Fine-grained health
 - **Kubernetes integration**: liveness/readiness probes
 
+### gRPC Version Features
+<!-- version: grpc >= 1.50 -->
+- **xDS support**: Service mesh integration
+- **gRPC-JSON transcoding**: REST-compatible endpoints
+<!-- version: grpc >= 1.55 -->
+- **OpenTelemetry native**: Built-in observability
+<!-- version: protobuf >= 3.21 -->
+- **Edition syntax**: New proto syntax (replaces proto3 features)
+- **Editions tooling**: Migrate from proto2/proto3
+
 ---
 
 ## Patterns to Avoid

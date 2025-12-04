@@ -52,6 +52,17 @@ Elasticsearch specialist building search and analytics solutions. Expert in mapp
 - **Index lifecycle management (ILM)**: Auto-rollover, delete
 - **Hot-warm-cold**: Tiered storage for time-series
 - **Shard allocation**: Aware of zones
+<!-- version: elasticsearch >= 7.0 -->
+- **Default single shard**: 1 primary shard default (was 5)
+- **Security built-in**: Basic auth and TLS in open source
+<!-- version: elasticsearch >= 8.0 -->
+- **Native vector search (kNN)**: Dense vector similarity
+- **Security by default**: TLS and auth required
+- **Lucene 9**: Improved performance and compression
+<!-- version: elasticsearch >= 8.8 -->
+- **ESQL**: New query language for analytics
+<!-- version: elasticsearch >= 8.11 -->
+- **Semantic reranking**: AI-powered result ranking
 
 ---
 

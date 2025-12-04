@@ -50,6 +50,13 @@ Express specialist building Node.js APIs. Expert in middleware patterns, error h
 - **Async wrapper utility**: No try/catch in every route
 - **Promise rejection handling**: Global handler
 - **Graceful shutdown**: Handle SIGTERM/SIGINT
+<!-- version: express >= 5.0 -->
+- **Native async support**: Routes can be async without wrapper
+- **Promise-based middleware**: Errors automatically caught
+- **app.router deprecated**: Use new routing patterns
+<!-- version: express < 5.0 -->
+- **Async wrapper required**: Wrap async routes manually
+- **express-async-errors**: Alternative for global async handling
 
 ---
 

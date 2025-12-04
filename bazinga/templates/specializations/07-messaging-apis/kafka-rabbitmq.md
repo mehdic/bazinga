@@ -31,6 +31,13 @@ Message broker specialist building event-driven systems. Expert in pub/sub patte
 - **Partitioning by key**: Order guarantees per key
 - **Compression**: GZIP, Snappy, LZ4
 - **Exactly-once semantics**: Transactions when needed
+<!-- version: kafka >= 3.0 -->
+- **KRaft mode**: ZooKeeper-free consensus
+- **Tiered storage**: Offload old data to object storage
+<!-- version: kafka >= 3.5 -->
+- **KRaft production ready**: Full ZooKeeper replacement
+<!-- version: kafka >= 3.7 -->
+- **Early access mode**: New consumer improvements
 
 ### RabbitMQ Patterns
 - **Durable exchanges/queues**: Survive restarts

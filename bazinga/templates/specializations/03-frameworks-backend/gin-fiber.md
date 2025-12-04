@@ -31,6 +31,14 @@ Go web framework specialist building high-performance APIs. Expert in Gin, Fiber
 - **Proper status codes**: 201, 204, 400, 404, 500
 - **Error return convention**: Return error, let middleware handle
 - **Binding with validation**: `ShouldBindJSON` + validator tags
+<!-- version: gin >= 1.9 -->
+- **Engine.ContextWithFallback**: Context pool reuse optimizations
+- **Trusted proxies config**: Better proxy detection
+<!-- version: fiber >= 2.0 -->
+- **Express-compatible API**: Familiar syntax for Node.js devs
+- **Zero memory allocation routing**: Fast router implementation
+<!-- version: fiber >= 3.0 -->
+- **Context API changes**: Breaking changes in context methods
 
 ### Middleware
 - **Recovery**: Panic recovery for resilience

@@ -49,6 +49,21 @@ Ruby specialist writing elegant, expressive code. Expert in Ruby idioms, OOP des
 - **`||=` for memoization**: Cache expensive computations
 - **Ternary for simple conditions**: `x ? y : z` not if/else
 
+### Modern Ruby Features
+<!-- version: ruby >= 2.7 -->
+- **Pattern matching**: `case obj in { name:, age: } then ...`
+- **Numbered block params**: `arr.map { _1 * 2 }`
+- **Argument forwarding**: `def foo(...); bar(...); end`
+<!-- version: ruby >= 3.0 -->
+- **Endless methods**: `def double(x) = x * 2`
+- **Ractor for parallelism**: True parallel execution (experimental)
+- **RBS type signatures**: Separate type definition files
+<!-- version: ruby >= 3.1 -->
+- **Hash shorthand**: `{ x:, y: }` when var names match keys
+- **Anonymous block**: `def foo(&); bar(&); end`
+<!-- version: ruby >= 3.2 -->
+- **Data class**: `Data.define(:name, :email)` for immutable structs
+
 ### Code Organization
 - **Module for namespacing**: Group related classes
 - **Concerns for shared behavior**: `include`/`extend` carefully
@@ -131,3 +146,12 @@ Ruby specialist writing elegant, expressive code. Expert in Ruby idioms, OOP des
 - **Enumerable chain**: `users.select(&:active?).map(&:email)`
 - **Frozen object**: `def initialize(...); ...; freeze; end`
 - **Keyword args**: `def create(email:, name:, role: :user)`
+<!-- version: ruby >= 2.7 -->
+- **Pattern match**: `case user in { name:, role: :admin } then grant_access`
+- **Numbered param**: `items.map { _1.name }`
+<!-- version: ruby >= 3.0 -->
+- **Endless method**: `def square(x) = x * x`
+<!-- version: ruby >= 3.1 -->
+- **Hash shorthand**: `{ user:, timestamp: }` (same as `{ user: user, timestamp: timestamp }`)
+<!-- version: ruby >= 3.2 -->
+- **Data class**: `Person = Data.define(:name, :age)`

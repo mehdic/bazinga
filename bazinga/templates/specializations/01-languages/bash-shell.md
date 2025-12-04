@@ -37,6 +37,21 @@ Shell scripting specialist. Expert in POSIX compliance, error handling, ShellChe
 - **File tests**: `-f` (file), `-d` (dir), `-e` (exists), `-r` (readable)
 - **Command substitution**: `$(command)` not backticks
 
+### Modern Bash Features
+<!-- version: bash >= 4.0 -->
+- **Associative arrays**: `declare -A map; map[key]=value`
+- **Globstar**: `shopt -s globstar; for f in **/*.txt`
+<!-- version: bash >= 4.2 -->
+- **lastpipe**: `shopt -s lastpipe` to run last pipe command in current shell
+- **Negative indices**: `${array[-1]}` for last element
+<!-- version: bash >= 4.3 -->
+- **Nameref**: `declare -n ref=var` for variable indirection
+<!-- version: bash >= 4.4 -->
+- **@Q expansion**: `${var@Q}` for quoted representation
+<!-- version: bash >= 5.0 -->
+- **EPOCHSECONDS**: Built-in epoch time variable
+- **wait -p**: Get PID of completed background job
+
 ### Error Handling
 - **Trap for cleanup**: `trap cleanup EXIT`
 - **Error to stderr**: `echo "Error: $msg" >&2`
@@ -129,4 +144,11 @@ Shell scripting specialist. Expert in POSIX compliance, error handling, ShellChe
 - **Function**: `func() { local arg="$1"; ... }`
 - **Error**: `die() { echo "ERROR: $*" >&2; exit 1; }`
 - **Loop**: `for file in *.txt; do process "$file"; done`
+<!-- version: bash >= 4.0 -->
+- **Assoc array**: `declare -A config; config[host]=localhost; echo "${config[host]}"`
+- **Glob recursive**: `shopt -s globstar; for f in **/*.sh; do shellcheck "$f"; done`
+<!-- version: bash >= 4.3 -->
+- **Nameref**: `upvar() { declare -n ref="$1"; ref="$2"; }`
+<!-- version: bash >= 5.0 -->
+- **Epoch time**: `echo "Timestamp: $EPOCHSECONDS"`
 
