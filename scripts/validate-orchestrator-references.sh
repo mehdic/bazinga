@@ -143,8 +143,9 @@ validate_line_references() {
 
 ## Feature 2: Step Reference Validation
 validate_step_references() {
-    # Extract all §Step references (e.g., §Step 2A.1)
-    STEP_REFS=$(grep -oE '§Step [0-9A-Z]+\.[0-9A-Z]+(\.[0-9]+)?' "$ORCHESTRATOR_FILE" | sort -u || true)
+    # Extract all §Step references (e.g., §Step 2A.1, §Step 2A.6b)
+    # Note: [0-9A-Za-z]+ includes lowercase for step suffixes like 'a', 'b', 'c'
+    STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' "$ORCHESTRATOR_FILE" | sort -u || true)
 
     if [ -z "$STEP_REFS" ]; then
         return 0
@@ -159,18 +160,47 @@ validate_step_references() {
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
 
         # Look for section header with this step
+        # Check main orchestrator file first
         SECTION_LINE=$(grep -n "### Step $STEP_ID" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
+        FOUND_IN=""
+
+        # If not found in main file, check template files
+        if [ -z "$SECTION_LINE" ]; then
+            # Step 2A.x sections are in phase_simple.md
+            if [[ "$STEP_ID" == 2A.* ]]; then
+                TEMPLATE_FILE="bazinga/templates/orchestrator/phase_simple.md"
+                if [ -f "$TEMPLATE_FILE" ]; then
+                    SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_FILE" | head -1 | cut -d: -f1 || true)
+                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_FILE"
+                fi
+            fi
+            # Step 2B.x sections are in phase_parallel.md
+            if [[ "$STEP_ID" == 2B.* ]]; then
+                TEMPLATE_FILE="bazinga/templates/orchestrator/phase_parallel.md"
+                if [ -f "$TEMPLATE_FILE" ]; then
+                    SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_FILE" | head -1 | cut -d: -f1 || true)
+                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_FILE"
+                fi
+            fi
+        fi
 
         if [ -z "$SECTION_LINE" ]; then
             echo "  ❌ BROKEN: §Step $STEP_ID (section not found)"
             echo "      Searching for: ### Step $STEP_ID"
-            echo "      Available sections:"
-            grep -n "### Step" "$ORCHESTRATOR_FILE" | grep -E "Step [0-9A-Z]+\.[0-9A-Z]+" | head -5 | sed 's/^/        /'
+            echo "      Checked: $ORCHESTRATOR_FILE"
+            [[ "$STEP_ID" == 2A.* ]] && echo "      Checked: bazinga/templates/orchestrator/phase_simple.md"
+            [[ "$STEP_ID" == 2B.* ]] && echo "      Checked: bazinga/templates/orchestrator/phase_parallel.md"
+            echo "      Available sections in orchestrator:"
+            grep -n "### Step" "$ORCHESTRATOR_FILE" | grep -E "Step [0-9A-Za-z]+\.[0-9A-Za-z]+" | head -5 | sed 's/^/        /' || echo "        (none)"
             echo "      Note: §Step references cannot be auto-fixed (section structure changed)"
             ERRORS=$((ERRORS + 1))
         elif [ "$VERBOSE" = true ]; then
-            SECTION_TITLE=$(sed -n "${SECTION_LINE}p" "$ORCHESTRATOR_FILE")
-            echo "  ✅ §Step $STEP_ID → line $SECTION_LINE"
+            if [ -n "$FOUND_IN" ]; then
+                echo "  ✅ §Step $STEP_ID → $FOUND_IN:$SECTION_LINE"
+            else
+                SECTION_TITLE=$(sed -n "${SECTION_LINE}p" "$ORCHESTRATOR_FILE")
+                echo "  ✅ §Step $STEP_ID → line $SECTION_LINE"
+            fi
         fi
 
     done <<< "$STEP_REFS"
