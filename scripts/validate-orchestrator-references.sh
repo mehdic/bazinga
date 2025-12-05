@@ -73,8 +73,62 @@ if [ ! -f "$ORCHESTRATOR_FILE" ]; then
     exit 1
 fi
 
-# Create temp file for fixes
-TEMP_FILE="${ORCHESTRATOR_FILE}.tmp"
+# Portable sed -i wrapper (works on both GNU and BSD/macOS sed)
+# Usage: portable_sed_i 's/old/new/g' file
+portable_sed_i() {
+    local pattern="$1"
+    local file="$2"
+    if sed --version 2>/dev/null | grep -q GNU; then
+        # GNU sed (Linux)
+        sed -i "$pattern" "$file"
+    else
+        # BSD sed (macOS) - requires extension argument
+        sed -i '' "$pattern" "$file"
+    fi
+}
+
+## Helper: Find step location across all files
+# Usage: find_step_location "2A.1"
+# Sets: STEP_LOCATION_FILE, STEP_LOCATION_LINE (empty if not found)
+find_step_location() {
+    local step_id="$1"
+    # Escape dots for precise regex matching
+    local step_escaped="${step_id//./\\.}"
+
+    STEP_LOCATION_FILE=""
+    STEP_LOCATION_LINE=""
+
+    # Check main orchestrator file first
+    local line
+    line=$(grep -nE "^### Step ${step_escaped}([^0-9]|$)" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
+    if [ -n "$line" ]; then
+        STEP_LOCATION_FILE="$ORCHESTRATOR_FILE"
+        STEP_LOCATION_LINE="$line"
+        return 0
+    fi
+
+    # Check phase_simple.md
+    if [ -f "$TEMPLATE_SIMPLE" ]; then
+        line=$(grep -nE "^### Step ${step_escaped}([^0-9]|$)" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
+        if [ -n "$line" ]; then
+            STEP_LOCATION_FILE="$TEMPLATE_SIMPLE"
+            STEP_LOCATION_LINE="$line"
+            return 0
+        fi
+    fi
+
+    # Check phase_parallel.md
+    if [ -f "$TEMPLATE_PARALLEL" ]; then
+        line=$(grep -nE "^### Step ${step_escaped}([^0-9]|$)" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
+        if [ -n "$line" ]; then
+            STEP_LOCATION_FILE="$TEMPLATE_PARALLEL"
+            STEP_LOCATION_LINE="$line"
+            return 0
+        fi
+    fi
+
+    return 1
+}
 
 ## Feature 1: Content Validation with Keywords
 validate_line_references() {
@@ -108,8 +162,8 @@ validate_line_references() {
                     NEW_LINE=$(grep -nFi -- "$KEYWORD" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || echo "")
                     if [ -n "$NEW_LINE" ]; then
                         echo "  🔧 AUTO-FIX: §line $LINE_NUM → §line $NEW_LINE (found '$KEYWORD' at line $NEW_LINE)"
-                        # Update all references in file
-                        sed -i "s/§line $LINE_NUM/§line $NEW_LINE/g" "$ORCHESTRATOR_FILE"
+                        # Update all references in file (portable for macOS/Linux)
+                        portable_sed_i "s/§line $LINE_NUM/§line $NEW_LINE/g" "$ORCHESTRATOR_FILE"
                         continue
                     fi
                 fi
@@ -134,7 +188,8 @@ validate_line_references() {
                     NEW_LINE=$(grep -nFi -- "$KEYWORD" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || echo "")
                     if [ -n "$NEW_LINE" ] && [ "$NEW_LINE" != "$LINE_NUM" ]; then
                         echo "  🔧 AUTO-FIX: §line $LINE_NUM → §line $NEW_LINE (content mismatch, found '$KEYWORD' at line $NEW_LINE)"
-                        sed -i "s/§line $LINE_NUM/§line $NEW_LINE/g" "$ORCHESTRATOR_FILE"
+                        # Update all references in file (portable for macOS/Linux)
+                        portable_sed_i "s/§line $LINE_NUM/§line $NEW_LINE/g" "$ORCHESTRATOR_FILE"
                         continue
                     fi
                 fi
@@ -167,51 +222,20 @@ validate_step_references() {
 
         # Extract step identifier (e.g., "2A.1")
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
-        # Escape dots for precise regex matching
-        STEP_ID_ESCAPED=$(echo "$STEP_ID" | sed 's/\./\\./g')
 
-        # Look for section header with this step
-        # Check main orchestrator file first
-        # Use ^ anchor and word boundary to prevent false matches (e.g., #### or 2A.1 vs 2A.10)
-        SECTION_LINE=$(grep -nE "^### Step ${STEP_ID_ESCAPED}([^0-9]|$)" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
-        FOUND_IN=""
-
-        # Set FOUND_IN if section found in main orchestrator
-        [ -n "$SECTION_LINE" ] && FOUND_IN="$ORCHESTRATOR_FILE"
-
-        # If not found in main file, check template files
-        if [ -z "$SECTION_LINE" ]; then
-            # Step 2A.x sections are in phase_simple.md
-            if [[ "$STEP_ID" == 2A.* ]]; then
-                if [ -f "$TEMPLATE_SIMPLE" ]; then
-                    SECTION_LINE=$(grep -nE "^### Step ${STEP_ID_ESCAPED}([^0-9]|$)" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
-                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_SIMPLE"
-                fi
-            # Step 2B.x sections are in phase_parallel.md
-            elif [[ "$STEP_ID" == 2B.* ]]; then
-                if [ -f "$TEMPLATE_PARALLEL" ]; then
-                    SECTION_LINE=$(grep -nE "^### Step ${STEP_ID_ESCAPED}([^0-9]|$)" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
-                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_PARALLEL"
-                fi
+        # Use consolidated helper to find step location
+        if find_step_location "$STEP_ID"; then
+            if [ "$VERBOSE" = true ]; then
+                echo "  ✅ §Step $STEP_ID → $STEP_LOCATION_FILE:$STEP_LOCATION_LINE"
             fi
-        fi
-
-        if [ -z "$SECTION_LINE" ]; then
+        else
             echo "  ❌ BROKEN: §Step $STEP_ID (section not found)"
             echo "      Searching for: ### Step $STEP_ID"
-            echo "      Checked: $ORCHESTRATOR_FILE"
-            [[ "$STEP_ID" == 2A.* ]] && echo "      Checked: $TEMPLATE_SIMPLE"
-            [[ "$STEP_ID" == 2B.* ]] && echo "      Checked: $TEMPLATE_PARALLEL"
+            echo "      Checked: $ORCHESTRATOR_FILE, $TEMPLATE_SIMPLE, $TEMPLATE_PARALLEL"
             echo "      Available sections in orchestrator:"
             grep -n "### Step" "$ORCHESTRATOR_FILE" | grep -E "Step [0-9A-Za-z]+\.[0-9A-Za-z]+" | head -5 | sed 's/^/        /' || echo "        (none)"
             echo "      Note: §Step references cannot be auto-fixed (section structure changed)"
             ERRORS=$((ERRORS + 1))
-        elif [ "$VERBOSE" = true ]; then
-            if [ -n "$FOUND_IN" ]; then
-                echo "  ✅ §Step $STEP_ID → $FOUND_IN:$SECTION_LINE"
-            else
-                echo "  ✅ §Step $STEP_ID → $ORCHESTRATOR_FILE:$SECTION_LINE"
-            fi
         fi
 
     done <<< "$STEP_REFS"
@@ -239,38 +263,16 @@ validate_template_step_references() {
         if [ -z "$ref" ]; then continue; fi
 
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
-        # Escape dots for precise regex matching
-        STEP_ID_ESCAPED=$(echo "$STEP_ID" | sed 's/\./\\./g')
-        SECTION_LINE=""
-        FOUND_IN=""
 
-        # Check main orchestrator file first (for Step 0.x, 1.x references)
-        # Use ^ anchor and word boundary to prevent false matches (e.g., #### or 2A.1 vs 2A.10)
-        SECTION_LINE=$(grep -nE "^### Step ${STEP_ID_ESCAPED}([^0-9]|$)" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
-        [ -n "$SECTION_LINE" ] && FOUND_IN="$ORCHESTRATOR_FILE"
-
-        # Check phase_simple.md for Step 2A.x references
-        if [ -z "$SECTION_LINE" ]; then
-            if [ -f "$TEMPLATE_SIMPLE" ]; then
-                SECTION_LINE=$(grep -nE "^### Step ${STEP_ID_ESCAPED}([^0-9]|$)" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
-                [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_SIMPLE"
+        # Use consolidated helper to find step location
+        if find_step_location "$STEP_ID"; then
+            if [ "$VERBOSE" = true ]; then
+                echo "  ✅ §Step $STEP_ID → $STEP_LOCATION_FILE:$STEP_LOCATION_LINE"
             fi
-        fi
-
-        # Check phase_parallel.md for Step 2B.x references
-        if [ -z "$SECTION_LINE" ]; then
-            if [ -f "$TEMPLATE_PARALLEL" ]; then
-                SECTION_LINE=$(grep -nE "^### Step ${STEP_ID_ESCAPED}([^0-9]|$)" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
-                [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_PARALLEL"
-            fi
-        fi
-
-        if [ -z "$SECTION_LINE" ]; then
+        else
             echo "  ❌ BROKEN: §Step $STEP_ID in $TEMPLATE_NAME (section not found)"
             echo "      Checked: $ORCHESTRATOR_FILE, $TEMPLATE_SIMPLE, $TEMPLATE_PARALLEL"
             ERRORS=$((ERRORS + 1))
-        elif [ "$VERBOSE" = true ]; then
-            echo "  ✅ §Step $STEP_ID → $FOUND_IN:$SECTION_LINE"
         fi
 
     done <<< "$STEP_REFS"
@@ -289,6 +291,33 @@ is_step_referenced() {
     return 1
 }
 
+## Helper: Check orphaned steps in a single file
+# Usage: check_file_orphans "/path/to/file.md"
+# Increments global ORPHAN_STEPS counter
+check_file_orphans() {
+    local file="$1"
+
+    if [ ! -f "$file" ]; then
+        return 0
+    fi
+
+    while IFS= read -r line; do
+        local line_num
+        local step_id
+        line_num=$(echo "$line" | cut -d: -f1)
+        # Use || true to handle grep returning 1 when no match (pipefail safe)
+        step_id=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' | sed 's/Step //' || true)
+
+        if [ -n "$step_id" ]; then
+            # Check if this step is referenced anywhere (orchestrator + templates)
+            if ! is_step_referenced "$step_id"; then
+                echo "  ⚠️  ORPHAN: ### Step $step_id ($file:$line_num) - not referenced"
+                ORPHAN_STEPS=$((ORPHAN_STEPS + 1))
+            fi
+        fi
+    done < <(grep -n "^### Step" "$file" || true)
+}
+
 ## Feature 3: Reverse Lookup - Find Orphaned Sections
 check_orphaned_sections() {
     if [ "$CHECK_ORPHANS" != true ]; then
@@ -298,56 +327,11 @@ check_orphaned_sections() {
     echo ""
     echo "🔍 Checking for orphaned sections (not referenced anywhere)..."
 
-    # Find all important sections that could be referenced
-    # Pattern: Look for sections with specific markers or important content
-
-    # Check for sections with ### Step headers in orchestrator
+    # Check for orphaned ### Step headers in all files
     ORPHAN_STEPS=0
-    while IFS= read -r line; do
-        LINE_NUM=$(echo "$line" | cut -d: -f1)
-        # Use || true to handle grep returning 1 when no match (pipefail safe)
-        STEP_ID=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' | sed 's/Step //' || true)
-
-        if [ -n "$STEP_ID" ]; then
-            # Check if this step is referenced anywhere (orchestrator + templates)
-            if ! is_step_referenced "$STEP_ID"; then
-                echo "  ⚠️  ORPHAN: ### Step $STEP_ID ($ORCHESTRATOR_FILE:$LINE_NUM) - not referenced"
-                ORPHAN_STEPS=$((ORPHAN_STEPS + 1))
-            fi
-        fi
-    done < <(grep -n "^### Step" "$ORCHESTRATOR_FILE" || true)
-
-    # Check for sections with ### Step headers in phase_simple.md
-    if [ -f "$TEMPLATE_SIMPLE" ]; then
-        while IFS= read -r line; do
-            LINE_NUM=$(echo "$line" | cut -d: -f1)
-            # Use || true to handle grep returning 1 when no match (pipefail safe)
-            STEP_ID=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' | sed 's/Step //' || true)
-
-            if [ -n "$STEP_ID" ]; then
-                if ! is_step_referenced "$STEP_ID"; then
-                    echo "  ⚠️  ORPHAN: ### Step $STEP_ID ($TEMPLATE_SIMPLE:$LINE_NUM) - not referenced"
-                    ORPHAN_STEPS=$((ORPHAN_STEPS + 1))
-                fi
-            fi
-        done < <(grep -n "^### Step" "$TEMPLATE_SIMPLE" || true)
-    fi
-
-    # Check for sections with ### Step headers in phase_parallel.md
-    if [ -f "$TEMPLATE_PARALLEL" ]; then
-        while IFS= read -r line; do
-            LINE_NUM=$(echo "$line" | cut -d: -f1)
-            # Use || true to handle grep returning 1 when no match (pipefail safe)
-            STEP_ID=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' | sed 's/Step //' || true)
-
-            if [ -n "$STEP_ID" ]; then
-                if ! is_step_referenced "$STEP_ID"; then
-                    echo "  ⚠️  ORPHAN: ### Step $STEP_ID ($TEMPLATE_PARALLEL:$LINE_NUM) - not referenced"
-                    ORPHAN_STEPS=$((ORPHAN_STEPS + 1))
-                fi
-            fi
-        done < <(grep -n "^### Step" "$TEMPLATE_PARALLEL" || true)
-    fi
+    check_file_orphans "$ORCHESTRATOR_FILE"
+    check_file_orphans "$TEMPLATE_SIMPLE"
+    check_file_orphans "$TEMPLATE_PARALLEL"
 
     # Check for sections with <!-- ANCHOR: --> markers (future use)
     ORPHAN_ANCHORS=0
