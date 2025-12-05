@@ -686,6 +686,30 @@ rm -rf tmp/ultrathink-reviews/
 
 **The research folder becomes a living knowledge base of critical decisions.**
 
+### 📝 Code-to-Research Traceability
+
+**When implementing features or fixes based on research documents, add a comment referencing the doc:**
+
+```python
+# See: research/token-budget-strategy.md for rationale
+def calculate_budget(complexity: str) -> int:
+    ...
+```
+
+```typescript
+// Architecture decision: research/parallel-execution-design.md
+class TaskOrchestrator {
+    ...
+```
+
+**When to add:**
+- Complex logic that isn't self-explanatory
+- Architectural decisions with non-obvious trade-offs
+- Bug fixes where root cause analysis is documented
+- Any code that future readers might question "why?"
+
+**Format:** `# See: research/{document}.md` or `// Ref: research/{document}.md`
+
 ---
 
 ## 🔍 PR Review Workflow
