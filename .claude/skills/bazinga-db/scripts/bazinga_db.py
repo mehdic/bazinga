@@ -21,6 +21,15 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 import argparse
 
+# Cross-platform file locking
+# fcntl is Unix/Linux/macOS only; graceful fallback for Windows
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    HAS_FCNTL = False
+    print("Warning: fcntl not available (Windows platform). File locking disabled.", file=sys.stderr)
+
 # Add _shared directory to path for bazinga_paths import
 # Path: .claude/skills/bazinga-db/scripts/bazinga_db.py
 #   -> .claude/skills/bazinga-db/scripts/  (parent)
@@ -56,6 +65,7 @@ class BazingaDB:
     # Transient/operational errors (locked, full disk, readonly) should NOT trigger recovery!
     CORRUPTION_ERRORS = [
         "database disk image is malformed",
+        "malformed database schema",  # Orphan indexes from interrupted table recreations, inconsistent schema catalog
         "file is not a database",
         # "database or disk is full" - operational, not corruption
         # "attempt to write a readonly database" - permission issue, not corruption
@@ -480,40 +490,105 @@ class BazingaDB:
         if not needs_init:
             return
 
-        # If corrupted, backup and delete before reinitializing
-        if is_corrupted and db_path.exists():
-            self._backup_corrupted_db()
-            try:
-                db_path.unlink()
-                print(f"Removed corrupted database file", file=sys.stderr)
-                # Also remove WAL and SHM sidecar files to ensure clean reinit
-                for ext in ['-wal', '-shm']:
-                    sidecar = Path(str(db_path) + ext)
-                    if sidecar.exists():
-                        try:
-                            sidecar.unlink()
-                            print(f"  Also removed {sidecar.name}", file=sys.stderr)
-                        except Exception:
-                            pass  # Non-fatal
-            except Exception as e:
-                print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
+        # CRITICAL: Use file lock to prevent concurrent schema migrations
+        # Multiple parallel agents checking schema simultaneously can all trigger
+        # migration, corrupting the database with orphan indexes
+        lock_file_path = Path(str(db_path) + '.migrate.lock')
+        lock_file = None
+        try:
+            # Create lock file and acquire exclusive lock (append mode avoids inode changes)
+            if HAS_FCNTL:
+                lock_file = open(lock_file_path, 'a')
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                    print(f"Acquired migration lock", file=sys.stderr)
+                except (OSError, IOError) as lock_err:
+                    print(f"Warning: Failed to acquire migration lock: {lock_err}", file=sys.stderr)
+                    print(f"Proceeding without lock - migration may fail if concurrent access occurs", file=sys.stderr)
+                    if lock_file:
+                        lock_file.close()
+                    lock_file = None
+            else:
+                # Windows or no fcntl - proceed without lock, best effort
+                print(f"Warning: File locking not available - proceeding without migration lock", file=sys.stderr)
 
-        # Auto-initialize the database
-        script_dir = Path(__file__).parent
-        init_script = script_dir / "init_db.py"
+            # Re-check schema version while holding lock - another process may have migrated
+            if db_path.exists() and db_path.stat().st_size > 0:
+                try:
+                    with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                        cursor = conn.cursor()
 
-        import subprocess
-        result = subprocess.run(
-            [sys.executable, str(init_script), self.db_path],
-            capture_output=True,
-            text=True
-        )
+                        # If corruption was detected earlier, verify it still exists
+                        if is_corrupted:
+                            integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                            if integrity != "ok":
+                                # Corruption confirmed - continue to recovery below
+                                print(f"Corruption confirmed under lock: {integrity}", file=sys.stderr)
+                            else:
+                                # Corruption was fixed by another process
+                                is_corrupted = False
 
-        if result.returncode != 0:
-            print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
-            sys.exit(1)
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+                        if cursor.fetchone():
+                            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+                            version_row = cursor.fetchone()
+                            current_version = version_row[0] if version_row else 0
+                            if current_version >= EXPECTED_SCHEMA_VERSION and not is_corrupted:
+                                print(f"Schema already up-to-date (migrated by another process)", file=sys.stderr)
+                                return  # Another process already migrated
+                except (sqlite3.Error, OSError) as e:
+                    # Log the specific error for debugging, but don't abort migration
+                    print(f"Warning: Schema re-check failed ({type(e).__name__}): {e}", file=sys.stderr)
+                    # Continue with migration if re-check fails
 
-        print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+            # If corrupted, backup and delete before reinitializing
+            if is_corrupted and db_path.exists():
+                self._backup_corrupted_db()
+                try:
+                    db_path.unlink()
+                    print(f"Removed corrupted database file", file=sys.stderr)
+                    # Also remove WAL and SHM sidecar files to ensure clean reinit
+                    for ext in ['-wal', '-shm']:
+                        sidecar = Path(str(db_path) + ext)
+                        if sidecar.exists():
+                            try:
+                                sidecar.unlink()
+                                print(f"  Also removed {sidecar.name}", file=sys.stderr)
+                            except Exception:
+                                # Non-fatal - sidecar cleanup is best-effort
+                                pass
+                except Exception as e:
+                    print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
+
+            # Auto-initialize the database
+            script_dir = Path(__file__).parent
+            init_script = script_dir / "init_db.py"
+
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, str(init_script), self.db_path],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
+                sys.exit(1)
+
+            print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+
+        finally:
+            # Release lock and clean up
+            if lock_file and HAS_FCNTL:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    lock_file.close()
+                    # DO NOT delete lock file - leaves it for future processes
+                    # Deleting creates race condition: waiting process may hold FD to deleted inode
+                    # while new process creates new file and locks it simultaneously
+                except Exception:
+                    # Ignore errors during lock release - not critical if cleanup fails
+                    pass
 
     def _get_connection(self, retry_on_corruption: bool = True, _lock_retry: int = 0) -> sqlite3.Connection:
         """Get database connection with proper settings.
