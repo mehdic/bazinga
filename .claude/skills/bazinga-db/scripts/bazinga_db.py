@@ -57,7 +57,7 @@ class BazingaDB:
     # Transient/operational errors (locked, full disk, readonly) should NOT trigger recovery!
     CORRUPTION_ERRORS = [
         "database disk image is malformed",
-        "malformed database schema",  # Orphan indexes, inconsistent schema catalog
+        "malformed database schema",  # Orphan indexes from interrupted table recreations, inconsistent schema catalog
         "file is not a database",
         # "database or disk is full" - operational, not corruption
         # "attempt to write a readonly database" - permission issue, not corruption
@@ -550,11 +550,9 @@ class BazingaDB:
                 try:
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
                     lock_file.close()
-                    # Remove lock file (best effort)
-                    try:
-                        lock_file_path.unlink()
-                    except Exception:
-                        pass
+                    # DO NOT delete lock file - leaves it for future processes
+                    # Deleting creates race condition: waiting process may hold FD to deleted inode
+                    # while new process creates new file and locks it simultaneously
                 except Exception:
                     pass
 

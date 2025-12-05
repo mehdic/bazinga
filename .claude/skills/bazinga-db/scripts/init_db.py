@@ -186,6 +186,9 @@ def init_database(db_path: str) -> None:
 
                 # CRITICAL: Table recreation must be atomic to prevent orphan indexes
                 # Use explicit transaction with exclusive locking
+                # See research/sqlite-orphan-index-corruption-ultrathink.md for full root cause analysis
+                # Close any implicit transaction before starting explicit one
+                conn.commit()
                 try:
                     cursor.execute("BEGIN IMMEDIATE")
 
@@ -233,7 +236,7 @@ def init_database(db_path: str) -> None:
                     # Swap tables atomically
                     cursor.execute("DROP TABLE task_groups")
                     cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
-                    cursor.execute("CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status)")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_taskgroups_session ON task_groups(session_id, status)")
 
                     # Verify integrity before committing
                     integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
@@ -247,8 +250,11 @@ def init_database(db_path: str) -> None:
 
                     print("   ✓ Recreated task_groups with expanded status enum")
                 except Exception as e:
-                    cursor.execute("ROLLBACK")
-                    print(f"   ✗ Migration failed, rolled back: {e}")
+                    try:
+                        cursor.execute("ROLLBACK")
+                    except Exception as rollback_exc:
+                        print(f"   ! ROLLBACK failed: {rollback_exc}")
+                    print(f"   ✗ v4→v5 migration failed during task_groups recreation, rolled back: {e}")
                     raise
             else:
                 print("   ⊘ task_groups status enum already expanded")
