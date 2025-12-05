@@ -173,6 +173,21 @@ Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that g
 
 **Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
 
+**Show Prompt Summaries (PER GROUP):** Output structured summary for each group (NOT full prompts):
+```text
+📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
+
+   **Task:** {task_title}
+   {task_description_2_3_sentences}
+
+   **Requirements:**
+   • {requirement_1}
+   • {requirement_2}
+
+   **Branch:** {group_branch}
+   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Skills: {skills_list}
+```
+
 **Spawn ALL in ONE message (MAX 4 groups):**
 ```
 Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=[Group A prompt])
