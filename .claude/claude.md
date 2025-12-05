@@ -688,27 +688,14 @@ rm -rf tmp/ultrathink-reviews/
 
 ### 📝 Code-to-Research Traceability
 
-**When implementing features or fixes based on research documents, add a comment referencing the doc:**
+**When YOU implement code based on an ultrathink research document, add a comment above the new code referencing that document.** This creates traceability for complex changes.
 
 ```python
-# See: research/token-budget-strategy.md for rationale
+# See: research/token-budget-strategy.md
 def calculate_budget(complexity: str) -> int:
-    ...
 ```
 
-```typescript
-// Architecture decision: research/parallel-execution-design.md
-class TaskOrchestrator {
-    ...
-```
-
-**When to add:**
-- Complex logic that isn't self-explanatory
-- Architectural decisions with non-obvious trade-offs
-- Bug fixes where root cause analysis is documented
-- Any code that future readers might question "why?"
-
-**Format:** `# See: research/{document}.md` or `// Ref: research/{document}.md`
+**Add references for:** complex logic, architectural decisions, non-obvious bug fixes—not trivial changes.
 
 ---
 
