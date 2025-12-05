@@ -10,6 +10,7 @@ Path Resolution:
 
 import sqlite3
 import sys
+import time
 from pathlib import Path
 import tempfile
 import shutil
@@ -247,7 +248,22 @@ def init_database(db_path: str) -> None:
                     conn.commit()
 
                     # Force WAL checkpoint to ensure clean state
-                    cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                    # Returns (busy, log_frames, checkpointed_frames)
+                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                    if checkpoint_result:
+                        busy, log_frames, checkpointed = checkpoint_result
+                        if busy:
+                            # Checkpoint couldn't fully complete - retry with backoff
+                            for retry in range(3):
+                                time.sleep(0.5 * (retry + 1))
+                                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                                if checkpoint_result and not checkpoint_result[0]:
+                                    print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                    break
+                            else:
+                                print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
+                        elif log_frames != checkpointed:
+                            print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
 
                     # Post-commit integrity verification (validates final on-disk state)
                     # This is ADDITIONAL to pre-commit check - both are needed:
@@ -312,7 +328,23 @@ def init_database(db_path: str) -> None:
             # Without this, subsequent writes can corrupt the schema catalog
             # causing "orphan index" errors on sqlite_autoindex_task_groups_1
             conn.commit()
-            cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            # Returns (busy, log_frames, checkpointed_frames)
+            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+            if checkpoint_result:
+                busy, log_frames, checkpointed = checkpoint_result
+                if busy:
+                    # Checkpoint couldn't fully complete - retry with backoff
+                    for retry in range(3):
+                        import time
+                        time.sleep(0.5 * (retry + 1))
+                        checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                        if checkpoint_result and not checkpoint_result[0]:
+                            print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                            break
+                    else:
+                        print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
+                elif log_frames != checkpointed:
+                    print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
 
             # Post-commit integrity verification (validates final on-disk state)
             post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]

@@ -22,13 +22,22 @@ from typing import Optional, List, Dict, Any, Tuple
 import argparse
 
 # Cross-platform file locking
-# fcntl is Unix/Linux/macOS only; graceful fallback for Windows
+# fcntl is Unix/Linux/macOS only; msvcrt is Windows only
 try:
     import fcntl
     HAS_FCNTL = True
 except ImportError:
     HAS_FCNTL = False
-    print("Warning: fcntl not available (Windows platform). File locking disabled.", file=sys.stderr)
+
+# Windows file locking via msvcrt
+try:
+    import msvcrt
+    HAS_MSVCRT = True
+except ImportError:
+    HAS_MSVCRT = False
+
+# Deferred warning flag - only warn once when lock is actually needed
+_LOCK_WARNING_SHOWN = False
 
 # Add _shared directory to path for bazinga_paths import
 # Path: .claude/skills/bazinga-db/scripts/bazinga_db.py
@@ -55,6 +64,20 @@ except ImportError:
     print("Warning: Could not import SCHEMA_VERSION from init_db.py, using fallback value 7. "
           "Check if init_db.py exists in the same directory.", file=sys.stderr)
     EXPECTED_SCHEMA_VERSION = 7
+
+
+class DatabaseInitError(Exception):
+    """Exception raised when database initialization fails.
+
+    This allows callers to handle initialization failures gracefully
+    rather than having the process terminated by sys.exit().
+    """
+    pass
+
+
+class MigrationLockError(Exception):
+    """Exception raised when migration lock cannot be acquired after retries."""
+    pass
 
 
 class BazingaDB:
@@ -495,22 +518,68 @@ class BazingaDB:
         # migration, corrupting the database with orphan indexes
         lock_file_path = Path(str(db_path) + '.migrate.lock')
         lock_file = None
+        lock_acquired = False
         try:
-            # Create lock file and acquire exclusive lock (append mode avoids inode changes)
+            # Create lock file and acquire exclusive lock with retry/backoff
             if HAS_FCNTL:
+                # Unix/Linux/macOS: Use fcntl.flock with bounded retry
                 lock_file = open(lock_file_path, 'a')
-                try:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-                    print(f"Acquired migration lock", file=sys.stderr)
-                except (OSError, IOError) as lock_err:
-                    print(f"Warning: Failed to acquire migration lock: {lock_err}", file=sys.stderr)
-                    print(f"Proceeding without lock - migration may fail if concurrent access occurs", file=sys.stderr)
-                    if lock_file:
-                        lock_file.close()
-                    lock_file = None
+                max_retries = 4
+                for attempt in range(max_retries):
+                    try:
+                        # Use LOCK_EX | LOCK_NB for non-blocking to enable retry
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        lock_acquired = True
+                        print(f"Acquired migration lock", file=sys.stderr)
+                        break
+                    except (OSError, IOError) as lock_err:
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                            print(f"Migration lock busy, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...", file=sys.stderr)
+                            time.sleep(wait_time)
+                        else:
+                            # Final attempt failed - abort migration
+                            if lock_file:
+                                lock_file.close()
+                            raise MigrationLockError(
+                                f"Failed to acquire migration lock after {max_retries} attempts: {lock_err}. "
+                                "Another process may be migrating the database."
+                            )
+            elif HAS_MSVCRT:
+                # Windows: Use msvcrt.locking with bounded retry
+                lock_file = open(lock_file_path, 'a+b')
+                max_retries = 4
+                for attempt in range(max_retries):
+                    try:
+                        # LK_NBLCK = non-blocking exclusive lock
+                        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                        lock_acquired = True
+                        print(f"Acquired migration lock (Windows)", file=sys.stderr)
+                        break
+                    except (OSError, IOError) as lock_err:
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                            print(f"Migration lock busy, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...", file=sys.stderr)
+                            time.sleep(wait_time)
+                        else:
+                            # Final attempt failed - abort migration
+                            if lock_file:
+                                lock_file.close()
+                            raise MigrationLockError(
+                                f"Failed to acquire migration lock after {max_retries} attempts: {lock_err}. "
+                                "Another process may be migrating the database."
+                            )
             else:
-                # Windows or no fcntl - proceed without lock, best effort
-                print(f"Warning: File locking not available - proceeding without migration lock", file=sys.stderr)
+                # No locking available - warn once and abort migration to prevent corruption
+                global _LOCK_WARNING_SHOWN
+                if not _LOCK_WARNING_SHOWN:
+                    print("Warning: No file locking mechanism available (fcntl/msvcrt not found).", file=sys.stderr)
+                    _LOCK_WARNING_SHOWN = True
+                raise MigrationLockError(
+                    "Cannot safely migrate database: no file locking mechanism available. "
+                    "This prevents concurrent migration corruption. "
+                    "Please ensure fcntl (Unix) or msvcrt (Windows) is available."
+                )
 
             # Re-check schema version while holding lock - another process may have migrated
             if db_path.exists() and db_path.stat().st_size > 0:
@@ -541,26 +610,19 @@ class BazingaDB:
                     print(f"Warning: Schema re-check failed ({type(e).__name__}): {e}", file=sys.stderr)
                     # Continue with migration if re-check fails
 
-            # If corrupted, backup and delete before reinitializing
+            # If corrupted, use _recover_from_corruption() to properly salvage data
+            # This follows research/sqlite-orphan-index-corruption-ultrathink.md mandate
+            # to extract salvageable data before re-initialization
             if is_corrupted and db_path.exists():
-                self._backup_corrupted_db()
-                try:
-                    db_path.unlink()
-                    print(f"Removed corrupted database file", file=sys.stderr)
-                    # Also remove WAL and SHM sidecar files to ensure clean reinit
-                    for ext in ['-wal', '-shm']:
-                        sidecar = Path(str(db_path) + ext)
-                        if sidecar.exists():
-                            try:
-                                sidecar.unlink()
-                                print(f"  Also removed {sidecar.name}", file=sys.stderr)
-                            except Exception:
-                                # Non-fatal - sidecar cleanup is best-effort
-                                pass
-                except Exception as e:
-                    print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
+                if not self._recover_from_corruption():
+                    raise DatabaseInitError(
+                        f"Failed to recover corrupted database at {self.db_path}. "
+                        "Manual intervention may be required."
+                    )
+                print(f"✓ Database recovered at {self.db_path}", file=sys.stderr)
+                return  # Recovery includes re-initialization, no need to continue
 
-            # Auto-initialize the database
+            # Auto-initialize the database (non-corrupted case: new or schema upgrade)
             script_dir = Path(__file__).parent
             init_script = script_dir / "init_db.py"
 
@@ -572,16 +634,23 @@ class BazingaDB:
             )
 
             if result.returncode != 0:
-                print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
-                sys.exit(1)
+                raise DatabaseInitError(
+                    f"Failed to initialize database at {self.db_path}: {result.stderr}"
+                )
 
             print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
 
         finally:
-            # Release lock and clean up
-            if lock_file and HAS_FCNTL:
+            # Release lock and clean up (handles both Unix fcntl and Windows msvcrt)
+            if lock_file:
                 try:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    if lock_acquired:
+                        if HAS_FCNTL:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                        elif HAS_MSVCRT:
+                            # msvcrt.locking requires unlocking same byte range
+                            lock_file.seek(0)
+                            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
                     lock_file.close()
                     # DO NOT delete lock file - leaves it for future processes
                     # Deleting creates race condition: waiting process may hold FD to deleted inode
