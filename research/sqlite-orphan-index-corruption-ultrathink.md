@@ -325,20 +325,33 @@ If interrupted between DROP and RENAME (crash, timeout, WAL checkpoint issue):
 - Old autoindex `sqlite_autoindex_task_groups_1` becomes orphaned
 - New table structure lacks proper index linkage
 
-**Fix:** Wrapped in explicit transaction:
+**Fix:** Wrapped in explicit transaction with hybrid integrity checking:
 ```python
 try:
     cursor.execute("BEGIN IMMEDIATE")
     # ... CREATE, INSERT, DROP, RENAME, CREATE INDEX ...
+
+    # Pre-commit check: Enables atomic rollback if corrupt
     integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
     if integrity != "ok":
         raise sqlite3.IntegrityError(f"Migration corrupted: {integrity}")
+
     cursor.execute("COMMIT")
     cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+
+    # Post-commit check: Validates finalized on-disk state
+    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+    if post_integrity != "ok":
+        print(f"⚠️ Post-commit integrity check failed: {post_integrity}")
 except Exception:
     cursor.execute("ROLLBACK")
     raise
 ```
+
+**Hybrid approach rationale:**
+- Pre-commit check enables atomic rollback if corruption detected during migration
+- Post-commit check validates the finalized on-disk state after WAL flush
+- Both checks are needed: pre-commit for safety, post-commit for verification
 
 ### Why It Surfaced After Specializations Merge
 

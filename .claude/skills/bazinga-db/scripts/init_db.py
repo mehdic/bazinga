@@ -249,6 +249,15 @@ def init_database(db_path: str) -> None:
                     # Force WAL checkpoint to ensure clean state
                     cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
+                    # Post-commit integrity verification (validates final on-disk state)
+                    # This is ADDITIONAL to pre-commit check - both are needed:
+                    # - Pre-commit: Enables atomic rollback if corrupt
+                    # - Post-commit: Validates finalized disk state after WAL flush
+                    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if post_integrity != "ok":
+                        print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+                        print(f"   ⚠️ Database may be corrupted. Consider: rm {db_path}*")
+
                     # Refresh query planner statistics after major schema change
                     cursor.execute("ANALYZE task_groups;")
 
@@ -304,6 +313,12 @@ def init_database(db_path: str) -> None:
             # causing "orphan index" errors on sqlite_autoindex_task_groups_1
             conn.commit()
             cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+
+            # Post-commit integrity verification (validates final on-disk state)
+            post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+            if post_integrity != "ok":
+                print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+                print(f"   ⚠️ Database may be corrupted. Consider deleting and reinitializing.")
 
             # Refresh query planner statistics after schema change
             cursor.execute("ANALYZE task_groups;")
