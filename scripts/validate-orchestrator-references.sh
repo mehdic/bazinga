@@ -2,10 +2,13 @@
 
 # Validate and auto-fix orchestrator.md section references
 # Supports: §line XXXX (keyword), §Step X.Y.Z, orphan detection, auto-fix
+# Also validates references in template files (phase_simple.md, phase_parallel.md)
 
 set -e
 
 ORCHESTRATOR_FILE="agents/orchestrator.md"
+TEMPLATE_SIMPLE="bazinga/templates/orchestrator/phase_simple.md"
+TEMPLATE_PARALLEL="bazinga/templates/orchestrator/phase_parallel.md"
 ERRORS=0
 WARNINGS=0
 FIX_MODE=false
@@ -30,7 +33,8 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
-            echo "Validate orchestrator.md references (§line XXXX, §Step X.Y.Z)"
+            echo "Validate orchestrator.md and template file references (§line XXXX, §Step X.Y.Z)"
+            echo "Also checks phase_simple.md and phase_parallel.md for cross-file references"
             echo ""
             echo "Options:"
             echo "  --fix             Auto-fix broken line references (updates file)"
@@ -206,6 +210,62 @@ validate_step_references() {
     done <<< "$STEP_REFS"
 }
 
+## Feature 2b: Template File Step Reference Validation
+validate_template_step_references() {
+    local TEMPLATE_FILE="$1"
+    local TEMPLATE_NAME="$2"
+
+    if [ ! -f "$TEMPLATE_FILE" ]; then
+        return 0
+    fi
+
+    # Extract all §Step references from template file
+    STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' "$TEMPLATE_FILE" | sort -u || true)
+
+    if [ -z "$STEP_REFS" ]; then
+        return 0
+    fi
+
+    echo "  → Found $(echo "$STEP_REFS" | wc -l) unique §Step references in $TEMPLATE_NAME"
+
+    while IFS= read -r ref; do
+        if [ -z "$ref" ]; then continue; fi
+
+        STEP_ID=$(echo "$ref" | sed 's/§Step //')
+        SECTION_LINE=""
+        FOUND_IN=""
+
+        # Check main orchestrator file first (for Step 0.x, 1.x references)
+        SECTION_LINE=$(grep -n "### Step $STEP_ID" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
+        [ -n "$SECTION_LINE" ] && FOUND_IN="$ORCHESTRATOR_FILE"
+
+        # Check phase_simple.md for Step 2A.x references
+        if [ -z "$SECTION_LINE" ]; then
+            if [ -f "$TEMPLATE_SIMPLE" ]; then
+                SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
+                [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_SIMPLE"
+            fi
+        fi
+
+        # Check phase_parallel.md for Step 2B.x references
+        if [ -z "$SECTION_LINE" ]; then
+            if [ -f "$TEMPLATE_PARALLEL" ]; then
+                SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
+                [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_PARALLEL"
+            fi
+        fi
+
+        if [ -z "$SECTION_LINE" ]; then
+            echo "  ❌ BROKEN: §Step $STEP_ID in $TEMPLATE_NAME (section not found)"
+            echo "      Checked: $ORCHESTRATOR_FILE, $TEMPLATE_SIMPLE, $TEMPLATE_PARALLEL"
+            ERRORS=$((ERRORS + 1))
+        elif [ "$VERBOSE" = true ]; then
+            echo "  ✅ §Step $STEP_ID → $FOUND_IN:$SECTION_LINE"
+        fi
+
+    done <<< "$STEP_REFS"
+}
+
 ## Feature 3: Reverse Lookup - Find Orphaned Sections
 check_orphaned_sections() {
     if [ "$CHECK_ORPHANS" != true ]; then
@@ -258,8 +318,19 @@ check_orphaned_sections() {
 }
 
 # Run validations
+echo ""
+echo "📄 Validating: $ORCHESTRATOR_FILE"
 validate_line_references
 validate_step_references
+
+echo ""
+echo "📄 Validating: $TEMPLATE_SIMPLE"
+validate_template_step_references "$TEMPLATE_SIMPLE" "phase_simple.md"
+
+echo ""
+echo "📄 Validating: $TEMPLATE_PARALLEL"
+validate_template_step_references "$TEMPLATE_PARALLEL" "phase_parallel.md"
+
 check_orphaned_sections
 
 # Summary
