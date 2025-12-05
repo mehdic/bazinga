@@ -149,8 +149,9 @@ _Reviewed commit: {sha}_
 
 ### Step 3: ONLY THEN Implement
 - Work through the table row by row
-- Update status as you go: `❌ Pending` → `🔄 In Progress` → `✅ Fixed` or `⏭️ Skipped`
+- Update status as you go: `❌ Pending` → `🔄 In Progress` → `✅ Fixed` or `⏭️ Skipped` or `🔒 ON-HOLD`
 - NEVER skip a row without explicit justification
+- For `🔒 ON-HOLD` items: Check if suggestion contradicts research docs (see "Research Document Contradiction Handling")
 
 **🔴 CRITICAL: Never Dismiss Entire Reviews**
 
@@ -171,10 +172,12 @@ If you find ONE false positive in a review, DO NOT dismiss the entire review:
 |--------|-------|
 | ✅ Fixed | X |
 | ⏭️ Skipped | Y |
+| 🔒 ON-HOLD | Z |  ← Present to user AFTER other fixes
 | ❌ Missed | 0 |  ← MUST be zero
 ```
 
 **🔴 IF "Missed" > 0: STOP and fix before proceeding.**
+**🔴 IF "ON-HOLD" > 0: Present to user after pushing other fixes (see "Research Document Contradiction Handling").**
 
 ### Step 5: Post Response to PR (MANDATORY)
 **After committing fixes, you MUST post a response comment to the PR.**
@@ -209,6 +212,81 @@ Use headers that match the LLM reviewer:
 3. **Count verification** - Math doesn't lie
 4. **Prevents "I'll get to it later"** - Everything tracked upfront
 
+## 🔴 CRITICAL: Research Document Contradiction Handling
+
+**When a review suggestion contradicts decisions documented in `research/*.md` or ultrathink documents:**
+
+### Detection
+
+During extraction, check each suggestion against:
+1. `research/*.md` files (especially `*-ultrathink*.md` documents)
+2. Previously agreed decisions in the PR discussion
+3. Architectural decisions documented in the codebase
+
+### Status: ON-HOLD
+
+If a suggestion is **valid** but **contradicts documented decisions**, mark it as `🔒 ON-HOLD`:
+
+```markdown
+| # | Source | Category | Suggestion | Status |
+|---|--------|----------|------------|--------|
+| 1 | OpenAI | Critical | Use X instead of Y | 🔒 ON-HOLD - contradicts research/foo-ultrathink.md |
+| 2 | Gemini | Suggestion | Remove Z handling | 🔒 ON-HOLD - contradicts agreed architecture |
+```
+
+### Workflow
+
+1. **Do NOT implement ON-HOLD items** - Continue with all other fixes
+2. **Complete the normal workflow** - Fix all non-contradicting items
+3. **After all fixes pushed** - Present ON-HOLD items to user:
+
+```markdown
+## 🔒 ON-HOLD Items Requiring User Decision
+
+The following review suggestions are valid but contradict documented decisions:
+
+### Item 1: [Brief description]
+
+**Reviewer says:** [Quote the suggestion]
+
+**Contradicts:** `research/foo-ultrathink.md` section "Decision Rationale"
+
+**What was decided:**
+> [Quote the relevant section from research doc]
+
+**Why they conflict:**
+[Explain specifically how they contradict]
+
+**Options:**
+1. **Keep current approach** - Ignore reviewer suggestion, document as "By Design"
+2. **Accept reviewer suggestion** - Update code AND research doc to reflect new decision
+3. **Hybrid approach** - [If applicable, describe a middle ground]
+
+**Your choice?**
+```
+
+4. **Wait for user decision** - Do NOT proceed until user chooses
+5. **Implement chosen option** - Update code and/or documentation
+6. **Continue review loop** - Check for new reviews after changes
+
+### Why This Matters
+
+- **Ultrathink decisions are deliberate** - They went through multi-LLM review
+- **Reviewers lack context** - They don't see the research documents
+- **Prevents flip-flopping** - Decisions shouldn't change without explicit approval
+- **Maintains audit trail** - User makes the final call on contradictions
+
+### Example Contradiction
+
+**Research doc says:**
+> WAL checkpoint after schema change prevents orphan index corruption
+
+**Reviewer says:**
+> "Checkpoint is unnecessary, SQLite handles this automatically"
+
+**This is ON-HOLD because:**
+The ultrathink analysis specifically identified missing WAL checkpoint as the root cause of corruption. The reviewer's suggestion would reintroduce the bug.
+
 ## Implementation Rules
 
 | Category | Action |
@@ -216,6 +294,7 @@ Use headers that match the LLM reviewer:
 | **Critical/Breaking** | Implement immediately |
 | **Valid improvements** | Implement immediately (don't wait to be asked) |
 | **Minor/Style** | Track in table, implement if quick, otherwise mark `⏭️ Skipped - Minor` |
+| **Contradicts research** | Mark `🔒 ON-HOLD`, present to user after other fixes |
 
 ## 🔴 MANDATORY: Validation Checklist
 
