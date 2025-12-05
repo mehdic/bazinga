@@ -73,7 +73,7 @@ if [ ! -f "$ORCHESTRATOR_FILE" ]; then
     exit 1
 fi
 
-# Portable sed -i wrapper (works on both GNU and BSD/macOS sed)
+# Portable sed -i wrapper (works on GNU, BSD/macOS, and BusyBox sed)
 # Usage: portable_sed_i 's/old/new/g' file
 portable_sed_i() {
     local pattern="$1"
@@ -81,8 +81,11 @@ portable_sed_i() {
     if sed --version 2>/dev/null | grep -q GNU; then
         # GNU sed (Linux)
         sed -i "$pattern" "$file"
+    elif sed --version 2>&1 | grep -qi busybox; then
+        # BusyBox sed (Alpine) - no backup suffix needed
+        sed -i "$pattern" "$file"
     else
-        # BSD sed (macOS) - requires extension argument
+        # BSD sed (macOS) - requires empty extension argument
         sed -i '' "$pattern" "$file"
     fi
 }
@@ -98,34 +101,19 @@ find_step_location() {
     STEP_LOCATION_FILE=""
     STEP_LOCATION_LINE=""
 
-    # Check main orchestrator file first
+    # Check all files: orchestrator, then templates
+    local files=("$ORCHESTRATOR_FILE" "$TEMPLATE_SIMPLE" "$TEMPLATE_PARALLEL")
     local line
-    line=$(grep -nE "^### Step ${step_escaped}([^0-9]|$)" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
-    if [ -n "$line" ]; then
-        STEP_LOCATION_FILE="$ORCHESTRATOR_FILE"
-        STEP_LOCATION_LINE="$line"
-        return 0
-    fi
-
-    # Check phase_simple.md
-    if [ -f "$TEMPLATE_SIMPLE" ]; then
-        line=$(grep -nE "^### Step ${step_escaped}([^0-9]|$)" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
+    for file in "${files[@]}"; do
+        [ -f "$file" ] || continue
+        # Pattern: non-alphanumeric boundary prevents 2A.1 matching 2A.1a or 2A.10
+        line=$(grep -nE "^### Step ${step_escaped}([^0-9A-Za-z]|$)" "$file" | head -1 | cut -d: -f1 || true)
         if [ -n "$line" ]; then
-            STEP_LOCATION_FILE="$TEMPLATE_SIMPLE"
+            STEP_LOCATION_FILE="$file"
             STEP_LOCATION_LINE="$line"
             return 0
         fi
-    fi
-
-    # Check phase_parallel.md
-    if [ -f "$TEMPLATE_PARALLEL" ]; then
-        line=$(grep -nE "^### Step ${step_escaped}([^0-9]|$)" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
-        if [ -n "$line" ]; then
-            STEP_LOCATION_FILE="$TEMPLATE_PARALLEL"
-            STEP_LOCATION_LINE="$line"
-            return 0
-        fi
-    fi
+    done
 
     return 1
 }
@@ -209,6 +197,7 @@ validate_line_references() {
 validate_step_references() {
     # Extract all §Step references (e.g., §Step 2A.1, §Step 2A.6b)
     # Note: [0-9A-Za-z]+ includes lowercase for step suffixes like 'a', 'b', 'c'
+    local STEP_REFS
     STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' "$ORCHESTRATOR_FILE" | sort -u || true)
 
     if [ -z "$STEP_REFS" ]; then
@@ -221,6 +210,7 @@ validate_step_references() {
         if [ -z "$ref" ]; then continue; fi
 
         # Extract step identifier (e.g., "2A.1")
+        local STEP_ID
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
 
         # Use consolidated helper to find step location
@@ -233,7 +223,7 @@ validate_step_references() {
             echo "      Searching for: ### Step $STEP_ID"
             echo "      Checked: $ORCHESTRATOR_FILE, $TEMPLATE_SIMPLE, $TEMPLATE_PARALLEL"
             echo "      Available sections in orchestrator:"
-            grep -n "### Step" "$ORCHESTRATOR_FILE" | grep -E "Step [0-9A-Za-z]+\.[0-9A-Za-z]+" | head -5 | sed 's/^/        /' || echo "        (none)"
+            grep -n "^### Step" "$ORCHESTRATOR_FILE" | grep -E "Step [0-9A-Za-z]+\.[0-9A-Za-z]+" | head -5 | sed 's/^/        /' || echo "        (none)"
             echo "      Note: §Step references cannot be auto-fixed (section structure changed)"
             ERRORS=$((ERRORS + 1))
         fi
@@ -251,6 +241,7 @@ validate_template_step_references() {
     fi
 
     # Extract all §Step references from template file
+    local STEP_REFS
     STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' "$TEMPLATE_FILE" | sort -u || true)
 
     if [ -z "$STEP_REFS" ]; then
@@ -262,6 +253,7 @@ validate_template_step_references() {
     while IFS= read -r ref; do
         if [ -z "$ref" ]; then continue; fi
 
+        local STEP_ID
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
 
         # Use consolidated helper to find step location
@@ -282,12 +274,13 @@ validate_template_step_references() {
 # Must be defined at top level (not inside another function)
 is_step_referenced() {
     local step_id="$1"
-    # Escape dots and use word boundary to prevent false matches (2A.1 vs 2A.10)
+    # Escape dots and use non-alphanumeric boundary to prevent false matches (2A.1 vs 2A.1a or 2A.10)
     local step_escaped="${step_id//./\\.}"
-    # Check orchestrator and both template files
-    grep -qE "§Step ${step_escaped}([^0-9]|$)" "$ORCHESTRATOR_FILE" 2>/dev/null && return 0
-    [ -f "$TEMPLATE_SIMPLE" ] && grep -qE "§Step ${step_escaped}([^0-9]|$)" "$TEMPLATE_SIMPLE" 2>/dev/null && return 0
-    [ -f "$TEMPLATE_PARALLEL" ] && grep -qE "§Step ${step_escaped}([^0-9]|$)" "$TEMPLATE_PARALLEL" 2>/dev/null && return 0
+    local files=("$ORCHESTRATOR_FILE" "$TEMPLATE_SIMPLE" "$TEMPLATE_PARALLEL")
+    for file in "${files[@]}"; do
+        [ -f "$file" ] || continue
+        grep -qE "§Step ${step_escaped}([^0-9A-Za-z]|$)" "$file" 2>/dev/null && return 0
+    done
     return 1
 }
 
@@ -337,8 +330,8 @@ check_orphaned_sections() {
     ORPHAN_ANCHORS=0
     while IFS= read -r line; do
         LINE_NUM=$(echo "$line" | cut -d: -f1)
-        # Use sed instead of grep -P for portability
-        ANCHOR_NAME=$(echo "$line" | sed -n 's/.*<!-- ANCHOR: \([^-]*\) -->.*/\1/p')
+        # Use sed instead of grep -P for portability; [^ ]* allows hyphens in anchor names
+        ANCHOR_NAME=$(echo "$line" | sed -n 's/.*<!-- ANCHOR: \([^ ]*\) -->.*/\1/p')
 
         if [ -n "$ANCHOR_NAME" ]; then
             # Check if this anchor is referenced anywhere
@@ -364,13 +357,18 @@ echo "📄 Validating: $ORCHESTRATOR_FILE"
 validate_line_references
 validate_step_references
 
-echo ""
-echo "📄 Validating: $TEMPLATE_SIMPLE"
-validate_template_step_references "$TEMPLATE_SIMPLE" "phase_simple.md"
+# Only show template validation banners if files exist
+if [ -f "$TEMPLATE_SIMPLE" ]; then
+    echo ""
+    echo "📄 Validating: $TEMPLATE_SIMPLE"
+    validate_template_step_references "$TEMPLATE_SIMPLE" "phase_simple.md"
+fi
 
-echo ""
-echo "📄 Validating: $TEMPLATE_PARALLEL"
-validate_template_step_references "$TEMPLATE_PARALLEL" "phase_parallel.md"
+if [ -f "$TEMPLATE_PARALLEL" ]; then
+    echo ""
+    echo "📄 Validating: $TEMPLATE_PARALLEL"
+    validate_template_step_references "$TEMPLATE_PARALLEL" "phase_parallel.md"
+fi
 
 check_orphaned_sections
 
