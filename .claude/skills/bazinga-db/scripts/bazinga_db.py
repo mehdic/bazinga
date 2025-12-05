@@ -16,6 +16,7 @@ import sqlite3
 import json
 import sys
 import time
+import fcntl  # For file locking during schema migrations
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
@@ -481,40 +482,81 @@ class BazingaDB:
         if not needs_init:
             return
 
-        # If corrupted, backup and delete before reinitializing
-        if is_corrupted and db_path.exists():
-            self._backup_corrupted_db()
-            try:
-                db_path.unlink()
-                print(f"Removed corrupted database file", file=sys.stderr)
-                # Also remove WAL and SHM sidecar files to ensure clean reinit
-                for ext in ['-wal', '-shm']:
-                    sidecar = Path(str(db_path) + ext)
-                    if sidecar.exists():
-                        try:
-                            sidecar.unlink()
-                            print(f"  Also removed {sidecar.name}", file=sys.stderr)
-                        except Exception:
-                            pass  # Non-fatal
-            except Exception as e:
-                print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
+        # CRITICAL: Use file lock to prevent concurrent schema migrations
+        # Multiple parallel agents checking schema simultaneously can all trigger
+        # migration, corrupting the database with orphan indexes
+        lock_file_path = Path(str(db_path) + '.migrate.lock')
+        lock_file = None
+        try:
+            # Create lock file and acquire exclusive lock
+            lock_file = open(lock_file_path, 'w')
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            print(f"Acquired migration lock", file=sys.stderr)
 
-        # Auto-initialize the database
-        script_dir = Path(__file__).parent
-        init_script = script_dir / "init_db.py"
+            # Re-check schema version while holding lock - another process may have migrated
+            if db_path.exists() and db_path.stat().st_size > 0:
+                try:
+                    with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+                        if cursor.fetchone():
+                            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+                            version_row = cursor.fetchone()
+                            current_version = version_row[0] if version_row else 0
+                            if current_version >= EXPECTED_SCHEMA_VERSION:
+                                print(f"Schema already up-to-date (migrated by another process)", file=sys.stderr)
+                                return  # Another process already migrated
+                except Exception:
+                    pass  # Continue with migration if re-check fails
 
-        import subprocess
-        result = subprocess.run(
-            [sys.executable, str(init_script), self.db_path],
-            capture_output=True,
-            text=True
-        )
+            # If corrupted, backup and delete before reinitializing
+            if is_corrupted and db_path.exists():
+                self._backup_corrupted_db()
+                try:
+                    db_path.unlink()
+                    print(f"Removed corrupted database file", file=sys.stderr)
+                    # Also remove WAL and SHM sidecar files to ensure clean reinit
+                    for ext in ['-wal', '-shm']:
+                        sidecar = Path(str(db_path) + ext)
+                        if sidecar.exists():
+                            try:
+                                sidecar.unlink()
+                                print(f"  Also removed {sidecar.name}", file=sys.stderr)
+                            except Exception:
+                                pass  # Non-fatal
+                except Exception as e:
+                    print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
 
-        if result.returncode != 0:
-            print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
-            sys.exit(1)
+            # Auto-initialize the database
+            script_dir = Path(__file__).parent
+            init_script = script_dir / "init_db.py"
 
-        print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, str(init_script), self.db_path],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
+                sys.exit(1)
+
+            print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+
+        finally:
+            # Release lock and clean up
+            if lock_file:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    lock_file.close()
+                    # Remove lock file (best effort)
+                    try:
+                        lock_file_path.unlink()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
 
     def _get_connection(self, retry_on_corruption: bool = True, _lock_retry: int = 0) -> sqlite3.Connection:
         """Get database connection with proper settings.

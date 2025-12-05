@@ -276,7 +276,27 @@ The actual error `"malformed database schema (sqlite_autoindex...)"` was NOT mat
 
 **Fix:** Added `"malformed database schema"` to `CORRUPTION_ERRORS` list.
 
-### Bug 2: Non-Atomic Table Recreation (Root Cause of Corruption)
+### Bug 2: Race Condition in Schema Migration (ACTUAL Root Cause)
+
+**Location:** `bazinga_db.py` `_ensure_db_exists()` (lines 402-517)
+
+**Problem:** No file lock during schema migration. When parallel developers are spawned:
+1. All check schema version simultaneously (v6 < v7)
+2. All see `needs_init = True`
+3. All try to run `init_db.py` concurrently
+4. Multiple `ALTER TABLE task_groups ADD COLUMN specializations` operations run simultaneously
+5. This corrupts the schema catalog with orphan autoindexes
+
+**Fix:** Added file lock (`bazinga.db.migrate.lock`) around migration:
+```python
+lock_file = open(lock_file_path, 'w')
+fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock
+# Re-check schema version (another process may have migrated)
+# Run migration if still needed
+fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)  # Release
+```
+
+### Bug 3: Non-Atomic Table Recreation (Secondary Issue)
 
 **Location:** `init_db.py` v4→v5 migration (lines 228-231)
 
@@ -311,10 +331,13 @@ except Exception:
 
 The specializations merge:
 1. Updated `EXPECTED_SCHEMA_VERSION` to 7
-2. This triggered schema version check (line 439 in bazinga_db.py)
-3. For databases at older versions, this ran migrations
-4. If v4→v5 migration ran and was interrupted, corruption occurred
-5. Bug 1 prevented auto-recovery from detecting and fixing it
+2. Parallel developers were spawned (normal BAZINGA operation)
+3. ALL developers checked schema version simultaneously (v6 < v7)
+4. ALL set `needs_init = True` and tried to run migration
+5. Multiple concurrent `ALTER TABLE task_groups ADD COLUMN specializations` corrupted schema
+6. Bug 1 prevented auto-recovery from detecting and fixing it
+
+**Key insight:** This ONLY happens with parallel developers. Single-developer mode wouldn't trigger this race condition.
 
 ## Multi-LLM Review Integration
 
