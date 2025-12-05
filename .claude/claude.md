@@ -686,6 +686,17 @@ rm -rf tmp/ultrathink-reviews/
 
 **The research folder becomes a living knowledge base of critical decisions.**
 
+### 📝 Code-to-Research Traceability
+
+**When YOU implement code based on an ultrathink research document, add a comment above the new code referencing that document.** This creates traceability for complex changes.
+
+```python
+# See: research/token-budget-strategy.md
+def calculate_budget(complexity: str) -> int:
+```
+
+**Add references for:** complex logic, architectural decisions, non-obvious bug fixes—not trivial changes.
+
 ---
 
 ## 🔍 PR Review Workflow
