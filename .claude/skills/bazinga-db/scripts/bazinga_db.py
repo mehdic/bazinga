@@ -21,6 +21,24 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 import argparse
 
+# Cross-platform file locking
+# fcntl is Unix/Linux/macOS only; msvcrt is Windows only
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    HAS_FCNTL = False
+
+# Windows file locking via msvcrt
+try:
+    import msvcrt
+    HAS_MSVCRT = True
+except ImportError:
+    HAS_MSVCRT = False
+
+# Deferred warning flag - only warn once when lock is actually needed
+_LOCK_WARNING_SHOWN = False
+
 # Add _shared directory to path for bazinga_paths import
 # Path: .claude/skills/bazinga-db/scripts/bazinga_db.py
 #   -> .claude/skills/bazinga-db/scripts/  (parent)
@@ -48,6 +66,20 @@ except ImportError:
     EXPECTED_SCHEMA_VERSION = 7
 
 
+class DatabaseInitError(Exception):
+    """Exception raised when database initialization fails.
+
+    This allows callers to handle initialization failures gracefully
+    rather than having the process terminated by sys.exit().
+    """
+    pass
+
+
+class MigrationLockError(Exception):
+    """Exception raised when migration lock cannot be acquired after retries."""
+    pass
+
+
 class BazingaDB:
     """Database client for BAZINGA orchestration."""
 
@@ -56,6 +88,7 @@ class BazingaDB:
     # Transient/operational errors (locked, full disk, readonly) should NOT trigger recovery!
     CORRUPTION_ERRORS = [
         "database disk image is malformed",
+        "malformed database schema",  # Orphan indexes from interrupted table recreations, inconsistent schema catalog
         "file is not a database",
         # "database or disk is full" - operational, not corruption
         # "attempt to write a readonly database" - permission issue, not corruption
@@ -480,40 +513,169 @@ class BazingaDB:
         if not needs_init:
             return
 
-        # If corrupted, backup and delete before reinitializing
-        if is_corrupted and db_path.exists():
-            self._backup_corrupted_db()
-            try:
-                db_path.unlink()
-                print(f"Removed corrupted database file", file=sys.stderr)
-                # Also remove WAL and SHM sidecar files to ensure clean reinit
-                for ext in ['-wal', '-shm']:
-                    sidecar = Path(str(db_path) + ext)
-                    if sidecar.exists():
-                        try:
-                            sidecar.unlink()
-                            print(f"  Also removed {sidecar.name}", file=sys.stderr)
-                        except Exception:
-                            pass  # Non-fatal
-            except Exception as e:
-                print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
+        # CRITICAL: Use file lock to prevent concurrent schema migrations
+        # Multiple parallel agents checking schema simultaneously can all trigger
+        # migration, corrupting the database with orphan indexes
+        lock_file_path = Path(str(db_path) + '.migrate.lock')
+        lock_file = None
+        lock_acquired = False
+        try:
+            # Create lock file and acquire exclusive lock with retry/backoff
+            if HAS_FCNTL:
+                # Unix/Linux/macOS: Use fcntl.flock with bounded retry
+                lock_file = open(lock_file_path, 'a')
+                max_retries = 4
+                for attempt in range(max_retries):
+                    try:
+                        # Use LOCK_EX | LOCK_NB for non-blocking to enable retry
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        lock_acquired = True
+                        print(f"Acquired migration lock", file=sys.stderr)
+                        break
+                    except (OSError, IOError) as lock_err:
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                            print(f"Migration lock busy, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...", file=sys.stderr)
+                            time.sleep(wait_time)
+                        else:
+                            # Final attempt failed - abort migration
+                            if lock_file:
+                                lock_file.close()
+                            raise MigrationLockError(
+                                f"Failed to acquire migration lock after {max_retries} attempts: {lock_err}. "
+                                "Another process may be migrating the database."
+                            )
+            elif HAS_MSVCRT:
+                # Windows: Use msvcrt.locking with bounded retry
+                # msvcrt.locking locks from current file position, so we must:
+                # 1. Ensure file has at least 1 byte (write sentinel if empty)
+                # 2. Seek to position 0 before locking
+                # 3. Lock the same position we'll unlock (position 0, 1 byte)
+                try:
+                    # Try to open existing file
+                    lock_file = open(lock_file_path, 'r+b')
+                except FileNotFoundError:
+                    # Create new file
+                    lock_file = open(lock_file_path, 'w+b')
 
-        # Auto-initialize the database
-        script_dir = Path(__file__).parent
-        init_script = script_dir / "init_db.py"
+                # Ensure file has at least 1 byte for valid lock region
+                lock_file.seek(0, 2)  # Seek to end
+                if lock_file.tell() == 0:
+                    lock_file.write(b'\x00')  # Write sentinel byte
+                    lock_file.flush()
 
-        import subprocess
-        result = subprocess.run(
-            [sys.executable, str(init_script), self.db_path],
-            capture_output=True,
-            text=True
-        )
+                max_retries = 4
+                for attempt in range(max_retries):
+                    try:
+                        # Always seek to 0 before locking to ensure consistent position
+                        lock_file.seek(0)
+                        # LK_NBLCK = non-blocking exclusive lock
+                        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                        lock_acquired = True
+                        print(f"Acquired migration lock (Windows)", file=sys.stderr)
+                        break
+                    except (OSError, IOError) as lock_err:
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                            print(f"Migration lock busy, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...", file=sys.stderr)
+                            time.sleep(wait_time)
+                        else:
+                            # Final attempt failed - abort migration
+                            if lock_file:
+                                lock_file.close()
+                            raise MigrationLockError(
+                                f"Failed to acquire migration lock after {max_retries} attempts: {lock_err}. "
+                                "Another process may be migrating the database."
+                            )
+            else:
+                # No locking available - warn once and abort migration to prevent corruption
+                global _LOCK_WARNING_SHOWN
+                if not _LOCK_WARNING_SHOWN:
+                    print("Warning: No file locking mechanism available (fcntl/msvcrt not found).", file=sys.stderr)
+                    _LOCK_WARNING_SHOWN = True
+                raise MigrationLockError(
+                    "Cannot safely migrate database: no file locking mechanism available. "
+                    "This prevents concurrent migration corruption. "
+                    "Please ensure fcntl (Unix) or msvcrt (Windows) is available."
+                )
 
-        if result.returncode != 0:
-            print(f"Failed to initialize database: {result.stderr}", file=sys.stderr)
-            sys.exit(1)
+            # Re-check schema version while holding lock - another process may have migrated
+            if db_path.exists() and db_path.stat().st_size > 0:
+                try:
+                    with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                        cursor = conn.cursor()
 
-        print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+                        # If corruption was detected earlier, verify it still exists
+                        if is_corrupted:
+                            integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                            if integrity != "ok":
+                                # Corruption confirmed - continue to recovery below
+                                print(f"Corruption confirmed under lock: {integrity}", file=sys.stderr)
+                            else:
+                                # Corruption was fixed by another process
+                                is_corrupted = False
+
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+                        if cursor.fetchone():
+                            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+                            version_row = cursor.fetchone()
+                            current_version = version_row[0] if version_row else 0
+                            if current_version >= EXPECTED_SCHEMA_VERSION and not is_corrupted:
+                                print(f"Schema already up-to-date (migrated by another process)", file=sys.stderr)
+                                return  # Another process already migrated
+                except (sqlite3.Error, OSError) as e:
+                    # Log the specific error for debugging, but don't abort migration
+                    print(f"Warning: Schema re-check failed ({type(e).__name__}): {e}", file=sys.stderr)
+                    # Continue with migration if re-check fails
+
+            # If corrupted, use _recover_from_corruption() to properly salvage data
+            # This follows research/sqlite-orphan-index-corruption-ultrathink.md mandate
+            # to extract salvageable data before re-initialization
+            if is_corrupted and db_path.exists():
+                if not self._recover_from_corruption():
+                    raise DatabaseInitError(
+                        f"Failed to recover corrupted database at {self.db_path}. "
+                        "Manual intervention may be required."
+                    )
+                print(f"✓ Database recovered at {self.db_path}", file=sys.stderr)
+                return  # Recovery includes re-initialization, no need to continue
+
+            # Auto-initialize the database (non-corrupted case: new or schema upgrade)
+            script_dir = Path(__file__).parent
+            init_script = script_dir / "init_db.py"
+
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, str(init_script), self.db_path],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                raise DatabaseInitError(
+                    f"Failed to initialize database at {self.db_path}: {result.stderr}"
+                )
+
+            print(f"✓ Database auto-initialized at {self.db_path}", file=sys.stderr)
+
+        finally:
+            # Release lock and clean up (handles both Unix fcntl and Windows msvcrt)
+            if lock_file:
+                try:
+                    if lock_acquired:
+                        if HAS_FCNTL:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                        elif HAS_MSVCRT:
+                            # msvcrt.locking requires unlocking same byte range
+                            lock_file.seek(0)
+                            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                    lock_file.close()
+                    # DO NOT delete lock file - leaves it for future processes
+                    # Deleting creates race condition: waiting process may hold FD to deleted inode
+                    # while new process creates new file and locks it simultaneously
+                except Exception:
+                    # Ignore errors during lock release - not critical if cleanup fails
+                    pass
 
     def _get_connection(self, retry_on_corruption: bool = True, _lock_retry: int = 0) -> sqlite3.Connection:
         """Get database connection with proper settings.

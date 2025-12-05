@@ -10,6 +10,7 @@ Path Resolution:
 
 import sqlite3
 import sys
+import time
 from pathlib import Path
 import tempfile
 import shutil
@@ -125,6 +126,7 @@ def init_database(db_path: str) -> None:
             if result and 'CHECK' in result[0]:
                 # Has old CHECK constraint, migrate
                 migrate_v1_to_v2(conn, cursor)
+            current_version = 2  # Advance version to enable subsequent migrations
 
         # Handle v2→v3 migration (add development_plans table)
         if current_version == 2:
@@ -132,6 +134,7 @@ def init_database(db_path: str) -> None:
             # No data migration needed - just add new table
             # Table will be created below with CREATE TABLE IF NOT EXISTS
             print("✓ Migration to v3 complete (development_plans table added)")
+            current_version = 3  # Advance version to enable subsequent migrations
 
         # Handle v3→v4 migration (add success_criteria table)
         if current_version == 3:
@@ -139,6 +142,7 @@ def init_database(db_path: str) -> None:
             # No data migration needed - just add new table
             # Table will be created below with CREATE TABLE IF NOT EXISTS
             print("✓ Migration to v4 complete (success_criteria table added)")
+            current_version = 4  # Advance version to enable subsequent migrations
 
         # Handle v4→v5 migration (merge-on-approval architecture)
         if current_version == 4:
@@ -184,57 +188,111 @@ def init_database(db_path: str) -> None:
             if 'approved_pending_merge' not in schema:
                 print("   Recreating task_groups with expanded status enum...")
 
-                # Create new table with expanded status enum
-                cursor.execute("""
-                    CREATE TABLE task_groups_new (
-                        id TEXT NOT NULL,
-                        session_id TEXT NOT NULL,
-                        name TEXT NOT NULL,
-                        status TEXT CHECK(status IN (
-                            'pending', 'in_progress', 'completed', 'failed',
-                            'approved_pending_merge', 'merging'
-                        )) DEFAULT 'pending',
-                        assigned_to TEXT,
-                        revision_count INTEGER DEFAULT 0,
-                        last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
-                        feature_branch TEXT,
-                        merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),
-                        complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
-                        initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        PRIMARY KEY (id, session_id),
-                        FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-                    )
-                """)
+                # CRITICAL: Table recreation must be atomic to prevent orphan indexes
+                # Use explicit transaction with exclusive locking
+                # See research/sqlite-orphan-index-corruption-ultrathink.md for full root cause analysis
+                # Close any implicit transaction before starting explicit one
+                conn.commit()
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
 
-                # Get existing columns in task_groups
-                cursor.execute("PRAGMA table_info(task_groups)")
-                existing_cols = [row[1] for row in cursor.fetchall()]
+                    # Create new table with expanded status enum
+                    cursor.execute("""
+                        CREATE TABLE task_groups_new (
+                            id TEXT NOT NULL,
+                            session_id TEXT NOT NULL,
+                            name TEXT NOT NULL,
+                            status TEXT CHECK(status IN (
+                                'pending', 'in_progress', 'completed', 'failed',
+                                'approved_pending_merge', 'merging'
+                            )) DEFAULT 'pending',
+                            assigned_to TEXT,
+                            revision_count INTEGER DEFAULT 0,
+                            last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED') OR last_review_status IS NULL),
+                            feature_branch TEXT,
+                            merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure') OR merge_status IS NULL),
+                            complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+                            initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id, session_id),
+                            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                        )
+                    """)
 
-                # Build column list for migration (only columns that exist)
-                all_cols = ['id', 'session_id', 'name', 'status', 'assigned_to', 'revision_count',
-                           'last_review_status', 'feature_branch', 'merge_status', 'complexity',
-                           'initial_tier', 'created_at', 'updated_at']
-                cols_to_copy = [c for c in all_cols if c in existing_cols]
-                cols_str = ', '.join(cols_to_copy)
+                    # Get existing columns in task_groups
+                    cursor.execute("PRAGMA table_info(task_groups)")
+                    existing_cols = [row[1] for row in cursor.fetchall()]
 
-                # Copy data
-                cursor.execute(f"""
-                    INSERT INTO task_groups_new ({cols_str})
-                    SELECT {cols_str} FROM task_groups
-                """)
+                    # Build column list for migration (only columns that exist)
+                    all_cols = ['id', 'session_id', 'name', 'status', 'assigned_to', 'revision_count',
+                               'last_review_status', 'feature_branch', 'merge_status', 'complexity',
+                               'initial_tier', 'created_at', 'updated_at']
+                    cols_to_copy = [c for c in all_cols if c in existing_cols]
+                    cols_str = ', '.join(cols_to_copy)
 
-                # Swap tables
-                cursor.execute("DROP TABLE task_groups")
-                cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
-                cursor.execute("CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status)")
+                    # Copy data
+                    cursor.execute(f"""
+                        INSERT INTO task_groups_new ({cols_str})
+                        SELECT {cols_str} FROM task_groups
+                    """)
 
-                print("   ✓ Recreated task_groups with expanded status enum")
+                    # Swap tables atomically
+                    cursor.execute("DROP TABLE task_groups")
+                    cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_taskgroups_session ON task_groups(session_id, status)")
+
+                    # Verify integrity before committing
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration task_groups v4→v5: Database integrity check failed after table recreation: {integrity}")
+
+                    # Use connection methods for commit/rollback (clearer than SQL strings)
+                    conn.commit()
+
+                    # Force WAL checkpoint to ensure clean state
+                    # Returns (busy, log_frames, checkpointed_frames)
+                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                    if checkpoint_result:
+                        busy, log_frames, checkpointed = checkpoint_result
+                        if busy:
+                            # Checkpoint couldn't fully complete - retry with backoff
+                            for retry in range(3):
+                                time.sleep(0.5 * (retry + 1))
+                                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                                if checkpoint_result and not checkpoint_result[0]:
+                                    print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                    break
+                            else:
+                                print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
+                        elif log_frames != checkpointed:
+                            print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
+
+                    # Post-commit integrity verification (validates final on-disk state)
+                    # This is ADDITIONAL to pre-commit check - both are needed:
+                    # - Pre-commit: Enables atomic rollback if corrupt
+                    # - Post-commit: Validates finalized disk state after WAL flush
+                    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if post_integrity != "ok":
+                        print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+                        print(f"   ⚠️ Database may be corrupted. Consider: rm {db_path}*")
+
+                    # Refresh query planner statistics after major schema change
+                    cursor.execute("ANALYZE task_groups;")
+
+                    print("   ✓ Recreated task_groups with expanded status enum")
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception as rollback_exc:
+                        print(f"   ! ROLLBACK failed: {rollback_exc}")
+                    print(f"   ✗ v4→v5 migration failed during task_groups recreation, rolled back: {e}")
+                    raise
             else:
                 print("   ⊘ task_groups status enum already expanded")
 
             print("✓ Migration to v5 complete (merge-on-approval architecture)")
+            current_version = 5  # Advance version to enable subsequent migrations
 
         # Handle v5→v6 migration (context packages for inter-agent communication)
         if current_version == 5:
@@ -269,6 +327,39 @@ def init_database(db_path: str) -> None:
                     print("   ⊘ task_groups.specializations already exists")
                 else:
                     raise
+
+            # CRITICAL: Force WAL checkpoint after schema change
+            # Without this, subsequent writes can corrupt the schema catalog
+            # causing "orphan index" errors on sqlite_autoindex_task_groups_1
+            conn.commit()
+            # Returns (busy, log_frames, checkpointed_frames)
+            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+            if checkpoint_result:
+                busy, log_frames, checkpointed = checkpoint_result
+                if busy:
+                    # Checkpoint couldn't fully complete - retry with backoff
+                    for retry in range(3):
+                        time.sleep(0.5 * (retry + 1))
+                        checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                        if checkpoint_result and not checkpoint_result[0]:
+                            print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                            break
+                    else:
+                        print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
+                elif log_frames != checkpointed:
+                    print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
+
+            # Post-commit integrity verification (validates final on-disk state)
+            post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+            if post_integrity != "ok":
+                print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+                print(f"   ⚠️ Database may be corrupted. Consider deleting and reinitializing.")
+
+            current_version = 7  # Advance version (final migration)
+
+            # Refresh query planner statistics after schema change
+            cursor.execute("ANALYZE task_groups;")
+            print("   ✓ WAL checkpoint completed")
 
             print("✓ Migration to v7 complete (specializations for tech stack loading)")
 
