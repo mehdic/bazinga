@@ -3,8 +3,8 @@
 **Date:** 2025-12-05
 **Context:** Create 3 HTML training courses for the BAZINGA multi-agent dev team framework
 **Decision:** Design course structure for beginner to advanced users
-**Status:** Proposed (Awaiting LLM Review)
-**Reviewed by:** Pending OpenAI GPT-5, Google Gemini 3 Pro Preview
+**Status:** Reviewed (Awaiting User Validation)
+**Reviewed by:** OpenAI GPT-5 (2025-12-05)
 
 ---
 
@@ -432,10 +432,92 @@ The three-course approach was chosen because:
 
 ---
 
+## Multi-LLM Review Integration
+
+### Review Summary
+
+OpenAI GPT-5 reviewed this plan on 2025-12-05. Key findings are categorized below.
+
+### Incorporated Feedback (Applied)
+
+1. ✅ **Cross-link to actual agent files** - Will reference `agents/orchestrator.md`, `agents/project_manager.md`, etc.
+2. ✅ **Add "Last verified against commit" banner** - Each course will include version tracking
+3. ✅ **Include realistic orchestration transcripts** - Use actual capsule examples from system
+4. ✅ **Add Troubleshooting and FAQ sections** - Already in Course 2, will expand
+5. ✅ **Remove speculative model names** - Use neutral terminology
+6. ✅ **Add accessibility considerations** - Contrast, keyboard nav, ARIA landmarks
+7. ✅ **Use neutral design language** - Changed from "Anthropic-inspired" to "clean documentation patterns"
+
+### Changes Requiring User Validation
+
+The following significant changes were suggested. **User approval required before adoption:**
+
+#### Change 1: Add Quickstart + Recipes Format
+- **Current:** Three sequential courses (30-60 min each)
+- **Proposed:** Add 10-15 min "Quickstart" + "Recipes" section for just-in-time learning
+- **Impact:** More modular, better for quick reference
+- **Status:** ⏳ AWAITING USER DECISION
+
+#### Change 2: Use Static Site Generator (SSG)
+- **Current:** Custom HTML with hand-rolled CSS design system
+- **Proposed:** Docusaurus or MkDocs Material with MDX
+- **Impact:** Built-in search, ToC, versioning; easier maintenance; faster publishing
+- **Status:** ⏳ AWAITING USER DECISION
+
+#### Change 3: Phase Interactive Features
+- **Current:** Interactive sandbox, wizard, progress tracking all in Phase 1
+- **Proposed:**
+  - Phase 1: Static MDX with Mermaid diagrams, embedded transcripts
+  - Phase 2: localStorage progress, client-side config wizard
+  - Phase 3: Full interactive sandbox (future)
+- **Impact:** Reduces scope creep, ships faster
+- **Status:** ⏳ AWAITING USER DECISION
+
+#### Change 4: Emphasize "Hard Rules" Prominently
+- **Current:** System constraints mentioned throughout
+- **Proposed:** Dedicated sidebar/callout with hard rules:
+  - MAX 4 parallel developers
+  - QA Expert only when tests exist AND mode=full
+  - Orchestrator coordinates only (never implements)
+  - PM alone sends BAZINGA after validator acceptance
+  - Security tasks force SSE + Tech Lead
+- **Impact:** Prevents user confusion
+- **Status:** ⏳ AWAITING USER DECISION
+
+#### Change 5: Add Validation & BAZINGA Protocol Section
+- **Current:** Validation mentioned briefly
+- **Proposed:** Dedicated Course 2 section showing:
+  - Success criteria creation via bazinga-db
+  - Validator step and workflow
+  - BAZINGA rejection/acceptance with capsule examples
+- **Impact:** Users understand quality gate better
+- **Status:** ⏳ AWAITING USER DECISION
+
+### Rejected Suggestions (With Reasoning)
+
+1. ❌ **"Replace non-existent commands"**
+   - **Suggestion:** Review claimed commands don't exist
+   - **Reality:** Commands verified to exist in `.claude/commands/`:
+     - `/bazinga.orchestrate` ✓
+     - `/bazinga.orchestrate-advanced` ✓
+     - `/bazinga.orchestrate-from-spec` ✓
+     - `/bazinga.configure-skills` ✓
+     - `/bazinga.configure-testing` ✓
+   - **Verdict:** Rejected - reviewer was incorrect
+
+### Implementation Risks Identified
+
+1. **Scope creep** - Interactive features could delay content publication
+2. **Documentation drift** - Agent files evolve; need version pinning
+3. **Accessibility blockers** - Color choices need contrast testing
+
+---
+
 ## References
 
 - [Anthropic Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
 - [Anthropic Courses Repository](https://github.com/anthropics/courses)
 - [Anthropic Skills Repository](https://github.com/anthropics/skills)
-- BAZINGA agent definitions: `/home/user/bazinga/agents/`
-- Configuration files: `/home/user/bazinga/bazinga/`
+- BAZINGA agent definitions: `agents/`
+- Configuration files: `bazinga/`
+- Slash commands: `.claude/commands/bazinga.*.md`
