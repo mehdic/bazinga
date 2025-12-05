@@ -16,11 +16,19 @@ import sqlite3
 import json
 import sys
 import time
-import fcntl  # For file locking during schema migrations
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 import argparse
+
+# Cross-platform file locking
+# fcntl is Unix/Linux/macOS only; graceful fallback for Windows
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    HAS_FCNTL = False
+    print("Warning: fcntl not available (Windows platform). File locking disabled.", file=sys.stderr)
 
 # Add _shared directory to path for bazinga_paths import
 # Path: .claude/skills/bazinga-db/scripts/bazinga_db.py
@@ -488,10 +496,21 @@ class BazingaDB:
         lock_file_path = Path(str(db_path) + '.migrate.lock')
         lock_file = None
         try:
-            # Create lock file and acquire exclusive lock
-            lock_file = open(lock_file_path, 'w')
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            print(f"Acquired migration lock", file=sys.stderr)
+            # Create lock file and acquire exclusive lock (append mode avoids inode changes)
+            if HAS_FCNTL:
+                lock_file = open(lock_file_path, 'a')
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                    print(f"Acquired migration lock", file=sys.stderr)
+                except (OSError, IOError) as lock_err:
+                    print(f"Warning: Failed to acquire migration lock: {lock_err}", file=sys.stderr)
+                    print(f"Proceeding without lock - migration may fail if concurrent access occurs", file=sys.stderr)
+                    if lock_file:
+                        lock_file.close()
+                    lock_file = None
+            else:
+                # Windows or no fcntl - proceed without lock, best effort
+                print(f"Warning: File locking not available - proceeding without migration lock", file=sys.stderr)
 
             # Re-check schema version while holding lock - another process may have migrated
             if db_path.exists() and db_path.stat().st_size > 0:
@@ -517,9 +536,10 @@ class BazingaDB:
                             if current_version >= EXPECTED_SCHEMA_VERSION and not is_corrupted:
                                 print(f"Schema already up-to-date (migrated by another process)", file=sys.stderr)
                                 return  # Another process already migrated
-                except Exception as e:
-                    print(f"Warning: Schema re-check failed: {e}", file=sys.stderr)
-                    pass  # Continue with migration if re-check fails
+                except (sqlite3.Error, OSError) as e:
+                    # Log the specific error for debugging, but don't abort migration
+                    print(f"Warning: Schema re-check failed ({type(e).__name__}): {e}", file=sys.stderr)
+                    # Continue with migration if re-check fails
 
             # If corrupted, backup and delete before reinitializing
             if is_corrupted and db_path.exists():
@@ -535,7 +555,8 @@ class BazingaDB:
                                 sidecar.unlink()
                                 print(f"  Also removed {sidecar.name}", file=sys.stderr)
                             except Exception:
-                                pass  # Non-fatal
+                                # Non-fatal - sidecar cleanup is best-effort
+                                pass
                 except Exception as e:
                     print(f"Warning: Could not remove corrupted file: {e}", file=sys.stderr)
 
@@ -558,7 +579,7 @@ class BazingaDB:
 
         finally:
             # Release lock and clean up
-            if lock_file:
+            if lock_file and HAS_FCNTL:
                 try:
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
                     lock_file.close()
@@ -566,6 +587,7 @@ class BazingaDB:
                     # Deleting creates race condition: waiting process may hold FD to deleted inode
                     # while new process creates new file and locks it simultaneously
                 except Exception:
+                    # Ignore errors during lock release - not critical if cleanup fails
                     pass
 
     def _get_connection(self, retry_on_corruption: bool = True, _lock_retry: int = 0) -> sqlite3.Connection:

@@ -204,9 +204,9 @@ def init_database(db_path: str) -> None:
                             )) DEFAULT 'pending',
                             assigned_to TEXT,
                             revision_count INTEGER DEFAULT 0,
-                            last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED', NULL)),
+                            last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED') OR last_review_status IS NULL),
                             feature_branch TEXT,
-                            merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure', NULL)),
+                            merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure') OR merge_status IS NULL),
                             complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
                             initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -241,17 +241,21 @@ def init_database(db_path: str) -> None:
                     # Verify integrity before committing
                     integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
                     if integrity != "ok":
-                        raise sqlite3.IntegrityError(f"Migration corrupted database: {integrity}")
+                        raise sqlite3.IntegrityError(f"Migration task_groups v4→v5: Database integrity check failed after table recreation: {integrity}")
 
-                    cursor.execute("COMMIT")
+                    # Use connection methods for commit/rollback (clearer than SQL strings)
+                    conn.commit()
 
                     # Force WAL checkpoint to ensure clean state
                     cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
+                    # Refresh query planner statistics after major schema change
+                    cursor.execute("ANALYZE task_groups;")
+
                     print("   ✓ Recreated task_groups with expanded status enum")
                 except Exception as e:
                     try:
-                        cursor.execute("ROLLBACK")
+                        conn.rollback()
                     except Exception as rollback_exc:
                         print(f"   ! ROLLBACK failed: {rollback_exc}")
                     print(f"   ✗ v4→v5 migration failed during task_groups recreation, rolled back: {e}")
@@ -300,6 +304,9 @@ def init_database(db_path: str) -> None:
             # causing "orphan index" errors on sqlite_autoindex_task_groups_1
             conn.commit()
             cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+
+            # Refresh query planner statistics after schema change
+            cursor.execute("ANALYZE task_groups;")
             print("   ✓ WAL checkpoint completed")
 
             print("✓ Migration to v7 complete (specializations for tech stack loading)")
