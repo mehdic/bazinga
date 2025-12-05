@@ -198,7 +198,7 @@ validate_step_references() {
     # Extract all §Step references (e.g., §Step 2A.1, §Step 2A.6b)
     # Note: [0-9A-Za-z]+ includes lowercase for step suffixes like 'a', 'b', 'c'
     local STEP_REFS
-    STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' "$ORCHESTRATOR_FILE" | sort -u || true)
+    STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9A-Za-z]+)?' "$ORCHESTRATOR_FILE" | sort -u || true)
 
     if [ -z "$STEP_REFS" ]; then
         return 0
@@ -242,7 +242,7 @@ validate_template_step_references() {
 
     # Extract all §Step references from template file
     local STEP_REFS
-    STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' "$TEMPLATE_FILE" | sort -u || true)
+    STEP_REFS=$(grep -oE '§Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9A-Za-z]+)?' "$TEMPLATE_FILE" | sort -u || true)
 
     if [ -z "$STEP_REFS" ]; then
         return 0
