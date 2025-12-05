@@ -106,7 +106,7 @@ find_step_location() {
     local line
     for file in "${files[@]}"; do
         [ -f "$file" ] || continue
-        # Pattern: non-alphanumeric boundary prevents 2A.1 matching 2A.1a or 2A.10
+        # Pattern: alphanumeric boundary ([^0-9A-Za-z]|$) prevents 2A.1 matching 2A.1a or 2A.10
         line=$(grep -nE "^### Step ${step_escaped}([^0-9A-Za-z]|$)" "$file" | head -1 | cut -d: -f1 || true)
         if [ -n "$line" ]; then
             STEP_LOCATION_FILE="$file"
@@ -223,7 +223,7 @@ validate_step_references() {
             echo "      Searching for: ### Step $STEP_ID"
             echo "      Checked: $ORCHESTRATOR_FILE, $TEMPLATE_SIMPLE, $TEMPLATE_PARALLEL"
             echo "      Available sections in orchestrator:"
-            grep -n "^### Step" "$ORCHESTRATOR_FILE" | grep -E "Step [0-9A-Za-z]+\.[0-9A-Za-z]+" | head -5 | sed 's/^/        /' || echo "        (none)"
+            grep -nE "^### Step [0-9A-Za-z]+\.[0-9A-Za-z]+([^0-9A-Za-z]|$)" "$ORCHESTRATOR_FILE" | head -5 | sed 's/^/        /' || echo "        (none)"
             echo "      Note: §Step references cannot be auto-fixed (section structure changed)"
             ERRORS=$((ERRORS + 1))
         fi
@@ -274,7 +274,7 @@ validate_template_step_references() {
 # Must be defined at top level (not inside another function)
 is_step_referenced() {
     local step_id="$1"
-    # Escape dots and use non-alphanumeric boundary to prevent false matches (2A.1 vs 2A.1a or 2A.10)
+    # Escape dots and use alphanumeric boundary ([^0-9A-Za-z]|$) to prevent false matches (2A.1 vs 2A.1a or 2A.10)
     local step_escaped="${step_id//./\\.}"
     local files=("$ORCHESTRATOR_FILE" "$TEMPLATE_SIMPLE" "$TEMPLATE_PARALLEL")
     for file in "${files[@]}"; do
@@ -299,7 +299,7 @@ check_file_orphans() {
         local step_id
         line_num=$(echo "$line" | cut -d: -f1)
         # Use || true to handle grep returning 1 when no match (pipefail safe)
-        step_id=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' | sed 's/Step //' || true)
+        step_id=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9A-Za-z]+)?' | sed 's/Step //' || true)
 
         if [ -n "$step_id" ]; then
             # Check if this step is referenced anywhere (orchestrator + templates)
@@ -330,7 +330,7 @@ check_orphaned_sections() {
     ORPHAN_ANCHORS=0
     while IFS= read -r line; do
         LINE_NUM=$(echo "$line" | cut -d: -f1)
-        # Use sed instead of grep -P for portability; [^ ]* allows hyphens in anchor names
+        # Use sed instead of grep -P for portability; [^ ]* matches non-space chars (including hyphens)
         ANCHOR_NAME=$(echo "$line" | sed -n 's/.*<!-- ANCHOR: \([^ ]*\) -->.*/\1/p')
 
         if [ -n "$ANCHOR_NAME" ]; then
