@@ -172,12 +172,12 @@ If you find ONE false positive in a review, DO NOT dismiss the entire review:
 |--------|-------|
 | ✅ Fixed | X |
 | ⏭️ Skipped | Y |
-| 🔒 ON-HOLD | Z |  ← Present to user AFTER other fixes
+| 🔒 ON-HOLD | Z |  ← Handle at EXIT point only
 | ❌ Missed | 0 |  ← MUST be zero
 ```
 
 **🔴 IF "Missed" > 0: STOP and fix before proceeding.**
-**🔴 IF "ON-HOLD" > 0: Present to user after pushing other fixes (see "Research Document Contradiction Handling").**
+**🔴 IF "ON-HOLD" > 0: Continue workflow normally. Present to user only at EXIT point (see "Research Document Contradiction Handling").**
 
 ### Step 5: Post Response to PR (MANDATORY)
 **After committing fixes, you MUST post a response comment to the PR.**
@@ -214,14 +214,20 @@ Use headers that match the LLM reviewer:
 
 ## 🔴 CRITICAL: Research Document Contradiction Handling
 
-**When a review suggestion contradicts decisions documented in `research/*.md` or ultrathink documents:**
+**When a review suggestion contradicts decisions documented in research docs added/modified in this branch:**
 
 ### Detection
 
-During extraction, check each suggestion against:
-1. `research/*.md` files (especially `*-ultrathink*.md` documents)
-2. Previously agreed decisions in the PR discussion
-3. Architectural decisions documented in the codebase
+**Step 1: Identify relevant research docs (ONLY from this branch)**
+```bash
+# Get research docs added or modified in this branch
+git diff --name-only origin/main...HEAD -- 'research/*.md'
+```
+
+**Step 2: Check each suggestion against ONLY those docs**
+- Do NOT check all `research/*.md` files
+- Only check docs that were added/modified in the current branch
+- Also check previously agreed decisions in the PR discussion
 
 ### Status: ON-HOLD
 
@@ -236,9 +242,12 @@ If a suggestion is **valid** but **contradicts documented decisions**, mark it a
 
 ### Workflow
 
-1. **Do NOT implement ON-HOLD items** - Continue with all other fixes
-2. **Complete the normal workflow** - Fix all non-contradicting items
-3. **After all fixes pushed** - Present ON-HOLD items to user:
+**🔴 CRITICAL: ON-HOLD items are handled at EXIT point, not during the loop**
+
+1. **Mark ON-HOLD items but continue normally** - Don't stop the workflow
+2. **Complete the ENTIRE review loop** - All fix cycles, all review checks
+3. **At EXIT point (when reviews pass)** - Check if any ON-HOLD items exist
+4. **If ON-HOLD items exist** - Present to user BEFORE exiting:
 
 ```markdown
 ## 🔒 ON-HOLD Items Requiring User Decision
@@ -265,9 +274,12 @@ The following review suggestions are valid but contradict documented decisions:
 **Your choice?**
 ```
 
-4. **Wait for user decision** - Do NOT proceed until user chooses
-5. **Implement chosen option** - Update code and/or documentation
-6. **Continue review loop** - Check for new reviews after changes
+5. **Wait for user decision** - Do NOT exit until user chooses
+6. **Implement chosen fixes** - Update code and/or documentation based on user choice
+7. **RESTART the entire workflow** - Go back to Step 1 (fetch reviews, extract, fix, loop)
+   - User's changes may trigger new reviews
+   - New reviews may have new issues
+   - Loop until exit with zero ON-HOLD items
 
 ### Why This Matters
 
