@@ -56,6 +56,7 @@ class BazingaDB:
     # Transient/operational errors (locked, full disk, readonly) should NOT trigger recovery!
     CORRUPTION_ERRORS = [
         "database disk image is malformed",
+        "malformed database schema",  # Orphan indexes, inconsistent schema catalog
         "file is not a database",
         # "database or disk is full" - operational, not corruption
         # "attempt to write a readonly database" - permission issue, not corruption

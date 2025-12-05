@@ -2,8 +2,8 @@
 
 **Date:** 2025-12-05
 **Context:** BAZINGA orchestration fails with `malformed database schema (sqlite_autoindex_task_groups_1) - orphan index` after specializations feature merge
-**Decision:** Pending analysis
-**Status:** Proposed
+**Decision:** Two bugs identified and fixed
+**Status:** Implemented
 
 ---
 
@@ -254,9 +254,71 @@ if is_corrupted:
         )
 ```
 
+## Actual Root Cause (Post-Analysis)
+
+### Bug 1: Error Pattern Not Recognized (Detection Failure)
+
+**Location:** `bazinga_db.py` line 57-62
+
+**Problem:** The `CORRUPTION_ERRORS` list only contained:
+```python
+CORRUPTION_ERRORS = [
+    "database disk image is malformed",
+    "file is not a database",
+]
+```
+
+The actual error `"malformed database schema (sqlite_autoindex...)"` was NOT matched because:
+- `"malformed database schema"` ≠ `"database disk image is malformed"`
+- Different SQLite error messages for different corruption types
+
+**Result:** Error fell through to "May need investigation" branch instead of triggering auto-recovery.
+
+**Fix:** Added `"malformed database schema"` to `CORRUPTION_ERRORS` list.
+
+### Bug 2: Non-Atomic Table Recreation (Root Cause of Corruption)
+
+**Location:** `init_db.py` v4→v5 migration (lines 228-231)
+
+**Problem:** The table swap sequence was NOT wrapped in a transaction:
+```python
+# NOT atomic - interruption between any of these corrupts DB
+cursor.execute("DROP TABLE task_groups")
+cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
+cursor.execute("CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status)")
+```
+
+If interrupted between DROP and RENAME (crash, timeout, WAL checkpoint issue):
+- Old autoindex `sqlite_autoindex_task_groups_1` becomes orphaned
+- New table structure lacks proper index linkage
+
+**Fix:** Wrapped in explicit transaction:
+```python
+try:
+    cursor.execute("BEGIN IMMEDIATE")
+    # ... CREATE, INSERT, DROP, RENAME, CREATE INDEX ...
+    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+    if integrity != "ok":
+        raise sqlite3.IntegrityError(f"Migration corrupted: {integrity}")
+    cursor.execute("COMMIT")
+    cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+except Exception:
+    cursor.execute("ROLLBACK")
+    raise
+```
+
+### Why It Surfaced After Specializations Merge
+
+The specializations merge:
+1. Updated `EXPECTED_SCHEMA_VERSION` to 7
+2. This triggered schema version check (line 439 in bazinga_db.py)
+3. For databases at older versions, this ran migrations
+4. If v4→v5 migration ran and was interrupted, corruption occurred
+5. Bug 1 prevented auto-recovery from detecting and fixing it
+
 ## Multi-LLM Review Integration
 
-*Pending external review from OpenAI GPT-5 and Google Gemini 3 Pro Preview*
+**Reviewed by:** OpenAI GPT-5 (2025-12-05)
 
 ## Decision Rationale
 
