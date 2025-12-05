@@ -547,10 +547,28 @@ class BazingaDB:
                             )
             elif HAS_MSVCRT:
                 # Windows: Use msvcrt.locking with bounded retry
-                lock_file = open(lock_file_path, 'a+b')
+                # msvcrt.locking locks from current file position, so we must:
+                # 1. Ensure file has at least 1 byte (write sentinel if empty)
+                # 2. Seek to position 0 before locking
+                # 3. Lock the same position we'll unlock (position 0, 1 byte)
+                try:
+                    # Try to open existing file
+                    lock_file = open(lock_file_path, 'r+b')
+                except FileNotFoundError:
+                    # Create new file
+                    lock_file = open(lock_file_path, 'w+b')
+
+                # Ensure file has at least 1 byte for valid lock region
+                lock_file.seek(0, 2)  # Seek to end
+                if lock_file.tell() == 0:
+                    lock_file.write(b'\x00')  # Write sentinel byte
+                    lock_file.flush()
+
                 max_retries = 4
                 for attempt in range(max_retries):
                     try:
+                        # Always seek to 0 before locking to ensure consistent position
+                        lock_file.seek(0)
                         # LK_NBLCK = non-blocking exclusive lock
                         msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
                         lock_acquired = True

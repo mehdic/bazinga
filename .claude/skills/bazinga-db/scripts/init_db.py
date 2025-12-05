@@ -126,6 +126,7 @@ def init_database(db_path: str) -> None:
             if result and 'CHECK' in result[0]:
                 # Has old CHECK constraint, migrate
                 migrate_v1_to_v2(conn, cursor)
+            current_version = 2  # Advance version to enable subsequent migrations
 
         # Handle v2→v3 migration (add development_plans table)
         if current_version == 2:
@@ -133,6 +134,7 @@ def init_database(db_path: str) -> None:
             # No data migration needed - just add new table
             # Table will be created below with CREATE TABLE IF NOT EXISTS
             print("✓ Migration to v3 complete (development_plans table added)")
+            current_version = 3  # Advance version to enable subsequent migrations
 
         # Handle v3→v4 migration (add success_criteria table)
         if current_version == 3:
@@ -140,6 +142,7 @@ def init_database(db_path: str) -> None:
             # No data migration needed - just add new table
             # Table will be created below with CREATE TABLE IF NOT EXISTS
             print("✓ Migration to v4 complete (success_criteria table added)")
+            current_version = 4  # Advance version to enable subsequent migrations
 
         # Handle v4→v5 migration (merge-on-approval architecture)
         if current_version == 4:
@@ -289,6 +292,7 @@ def init_database(db_path: str) -> None:
                 print("   ⊘ task_groups status enum already expanded")
 
             print("✓ Migration to v5 complete (merge-on-approval architecture)")
+            current_version = 5  # Advance version to enable subsequent migrations
 
         # Handle v5→v6 migration (context packages for inter-agent communication)
         if current_version == 5:
@@ -335,7 +339,6 @@ def init_database(db_path: str) -> None:
                 if busy:
                     # Checkpoint couldn't fully complete - retry with backoff
                     for retry in range(3):
-                        import time
                         time.sleep(0.5 * (retry + 1))
                         checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
                         if checkpoint_result and not checkpoint_result[0]:
@@ -351,6 +354,8 @@ def init_database(db_path: str) -> None:
             if post_integrity != "ok":
                 print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
                 print(f"   ⚠️ Database may be corrupted. Consider deleting and reinitializing.")
+
+            current_version = 7  # Advance version (final migration)
 
             # Refresh query planner statistics after schema change
             cursor.execute("ANALYZE task_groups;")
