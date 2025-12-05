@@ -276,27 +276,40 @@ The actual error `"malformed database schema (sqlite_autoindex...)"` was NOT mat
 
 **Fix:** Added `"malformed database schema"` to `CORRUPTION_ERRORS` list.
 
-### Bug 2: Race Condition in Schema Migration (ACTUAL Root Cause)
+### Bug 2: Missing WAL Checkpoint After v6→v7 Migration (ACTUAL Root Cause)
 
-**Location:** `bazinga_db.py` `_ensure_db_exists()` (lines 402-517)
+**Location:** `init_db.py` v6→v7 migration (lines 278-299)
 
-**Problem:** No file lock during schema migration. When parallel developers are spawned:
-1. All check schema version simultaneously (v6 < v7)
-2. All see `needs_init = True`
-3. All try to run `init_db.py` concurrently
-4. Multiple `ALTER TABLE task_groups ADD COLUMN specializations` operations run simultaneously
-5. This corrupts the schema catalog with orphan autoindexes
-
-**Fix:** Added file lock (`bazinga.db.migrate.lock`) around migration:
+**Problem:** After `ALTER TABLE task_groups ADD COLUMN specializations`, no WAL checkpoint:
 ```python
-lock_file = open(lock_file_path, 'w')
-fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock
-# Re-check schema version (another process may have migrated)
-# Run migration if still needed
-fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)  # Release
+cursor.execute("ALTER TABLE task_groups ADD COLUMN specializations TEXT")
+conn.commit()  # Writes to WAL, not main DB file
+# NO PRAGMA wal_checkpoint(TRUNCATE) ← MISSING!
 ```
 
-### Bug 3: Non-Atomic Table Recreation (Secondary Issue)
+Timeline of corruption:
+1. Migration runs `ALTER TABLE ADD COLUMN specializations`
+2. `conn.commit()` writes schema change to WAL (not main DB file)
+3. PM immediately writes task groups with specializations field
+4. WAL has mixed schema change + data writes
+5. Schema catalog becomes inconsistent → orphan autoindex
+
+**Fix:** Added explicit WAL checkpoint after schema change:
+```python
+cursor.execute("ALTER TABLE task_groups ADD COLUMN specializations TEXT")
+conn.commit()
+cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")  # ← ADDED
+```
+
+### Bug 3: File Lock for Concurrent Migrations (Defensive)
+
+**Location:** `bazinga_db.py` `_ensure_db_exists()` (lines 482-559)
+
+**Problem:** No lock during schema migration. If multiple processes check simultaneously, they could all trigger migration.
+
+**Fix:** Added file lock (`bazinga.db.migrate.lock`) around migration block.
+
+### Bug 4: Non-Atomic Table Recreation (Secondary Issue)
 
 **Location:** `init_db.py` v4→v5 migration (lines 228-231)
 
@@ -331,13 +344,15 @@ except Exception:
 
 The specializations merge:
 1. Updated `EXPECTED_SCHEMA_VERSION` to 7
-2. Parallel developers were spawned (normal BAZINGA operation)
-3. ALL developers checked schema version simultaneously (v6 < v7)
-4. ALL set `needs_init = True` and tried to run migration
-5. Multiple concurrent `ALTER TABLE task_groups ADD COLUMN specializations` corrupted schema
-6. Bug 1 prevented auto-recovery from detecting and fixing it
+2. First orchestration after merge triggered v6→v7 migration
+3. Migration ran `ALTER TABLE ADD COLUMN specializations`
+4. `conn.commit()` wrote to WAL (not main DB file)
+5. **NO WAL checkpoint** - schema change still in WAL
+6. PM immediately wrote task groups with specializations field
+7. WAL had mixed schema change + data → corrupted schema catalog
+8. Bug 1 prevented auto-recovery from detecting and fixing it
 
-**Key insight:** This ONLY happens with parallel developers. Single-developer mode wouldn't trigger this race condition.
+**Key insight:** This happens on the FIRST run after merge when PM writes task groups before WAL is checkpointed.
 
 ## Multi-LLM Review Integration
 

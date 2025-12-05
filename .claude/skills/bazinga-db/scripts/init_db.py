@@ -289,6 +289,13 @@ def init_database(db_path: str) -> None:
                 else:
                     raise
 
+            # CRITICAL: Force WAL checkpoint after schema change
+            # Without this, subsequent writes can corrupt the schema catalog
+            # causing "orphan index" errors on sqlite_autoindex_task_groups_1
+            conn.commit()
+            cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            print("   ✓ WAL checkpoint completed")
+
             print("✓ Migration to v7 complete (specializations for tech stack loading)")
 
         # Record version upgrade
