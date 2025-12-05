@@ -498,15 +498,27 @@ class BazingaDB:
                 try:
                     with sqlite3.connect(self.db_path, timeout=10.0) as conn:
                         cursor = conn.cursor()
+
+                        # If corruption was detected earlier, verify it still exists
+                        if is_corrupted:
+                            integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                            if integrity != "ok":
+                                # Corruption confirmed - continue to recovery below
+                                print(f"Corruption confirmed under lock: {integrity}", file=sys.stderr)
+                            else:
+                                # Corruption was fixed by another process
+                                is_corrupted = False
+
                         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
                         if cursor.fetchone():
                             cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
                             version_row = cursor.fetchone()
                             current_version = version_row[0] if version_row else 0
-                            if current_version >= EXPECTED_SCHEMA_VERSION:
+                            if current_version >= EXPECTED_SCHEMA_VERSION and not is_corrupted:
                                 print(f"Schema already up-to-date (migrated by another process)", file=sys.stderr)
                                 return  # Another process already migrated
-                except Exception:
+                except Exception as e:
+                    print(f"Warning: Schema re-check failed: {e}", file=sys.stderr)
                     pass  # Continue with migration if re-check fails
 
             # If corrupted, backup and delete before reinitializing
