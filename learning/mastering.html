@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mastering BAZINGA - Advanced Workflows & Configuration</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="site-logo">BAZINGA Training</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="quickstart.html">Quickstart</a>
+        <a href="essentials.html">Essentials</a>
+        <a href="mastering.html" class="active">Mastering</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="recipes.html">Recipes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article>
+      <header class="article-header">
+        <div class="container content">
+          <span class="badge intermediate">Intermediate</span>
+          <h1>Mastering BAZINGA</h1>
+          <p style="font-size: var(--font-size-lg); color: var(--color-text-muted); margin-top: var(--space-4);">
+            Advanced Workflows & Configuration
+          </p>
+          <div class="article-meta">
+            <span>45 min read</span>
+            <span>Prerequisite: Completed Essentials</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="container content article-content">
+        <div class="version-banner">
+          Last verified: BAZINGA v1.0 &bull; <a href="../bazinga/">View Configuration Files</a>
+        </div>
+
+        <p class="lead" style="font-size: var(--font-size-lg); color: var(--color-text-muted);">
+          Configure BAZINGA for your workflow, leverage parallel mode for complex features, use advanced commands, and understand the validation protocol that ensures quality.
+        </p>
+
+        <nav class="toc">
+          <h4>On this page</h4>
+          <ol>
+            <li><a href="#configuration">Configuration Deep Dive</a></li>
+            <li><a href="#parallel">Parallel Mode Mastery</a></li>
+            <li><a href="#commands">Advanced Orchestration Commands</a></li>
+            <li><a href="#escalation">Escalation & Quality Gates</a></li>
+            <li><a href="#validation">The Validation Protocol</a></li>
+            <li><a href="#troubleshooting">Troubleshooting Guide</a></li>
+          </ol>
+        </nav>
+
+        <!-- Hard Rules -->
+        <div class="hard-rules">
+          <h4>Hard Rules to Remember</h4>
+          <ul>
+            <li><strong>MAX 4 parallel developers</strong> - More task groups are split into execution phases</li>
+            <li><strong>QA Expert only runs</strong> when integration/E2E tests exist AND testing mode = full</li>
+            <li><strong>Orchestrator coordinates only</strong> - It spawns agents, never implements code</li>
+            <li><strong>PM alone sends BAZINGA</strong> - Only after Validator confirms success</li>
+            <li><strong>Security tasks force SSE</strong> - Auth/crypto/security tasks route to Senior Software Engineer</li>
+          </ul>
+        </div>
+
+        <!-- Section 1: Configuration -->
+        <section id="configuration">
+          <h2>1. Configuration Deep Dive</h2>
+
+          <p>BAZINGA's behavior is controlled by three JSON configuration files in the <code>bazinga/</code> folder:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>model_selection.json</code></td>
+                <td>Which AI model each agent uses (haiku/sonnet/opus)</td>
+              </tr>
+              <tr>
+                <td><code>skills_config.json</code></td>
+                <td>Which skills are available/mandatory for each agent</td>
+              </tr>
+              <tr>
+                <td><code>challenge_levels.json</code></td>
+                <td>QA Expert's 5-level test challenge configuration</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>1.1 Model Selection Strategy</h3>
+
+          <p>Each agent runs on a specific model. The default assignments balance cost and capability:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Default Model</th>
+                <th>Rationale</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="agent-badge dev">Developer</span></td>
+                <td>Haiku</td>
+                <td>Cost-efficient for straightforward implementation</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge sse">Senior Software Engineer</span></td>
+                <td>Sonnet</td>
+                <td>Handles escalated complexity and failures</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge qa">QA Expert</span></td>
+                <td>Sonnet</td>
+                <td>Balanced for test generation and validation</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge tl">Tech Lead</span></td>
+                <td><strong>Opus</strong></td>
+                <td>Always Opus - critical architectural decisions</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge pm">Project Manager</span></td>
+                <td><strong>Opus</strong></td>
+                <td>Always Opus - strategic planning, final quality gate</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout tip">
+            <div class="callout-title">Configuration Scenarios</div>
+            <ul style="margin-bottom: 0;">
+              <li><strong>"I want faster iterations"</strong> &rarr; Keep Developer on Haiku</li>
+              <li><strong>"I need bulletproof code"</strong> &rarr; Upgrade Developer to Sonnet</li>
+              <li><strong>"Cost is no concern"</strong> &rarr; Set all agents to Opus</li>
+            </ul>
+          </div>
+
+          <h3>1.2 Testing Configuration</h3>
+
+          <p>Configure testing mode using the slash command:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.configure-testing</code></pre>
+
+          <p>Three modes are available:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Mode</th>
+                <th>QA Expert</th>
+                <th>Tests Required</th>
+                <th>Use Case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Full</strong></td>
+                <td>Enabled</td>
+                <td>Unit + Integration + E2E</td>
+                <td>Production code, quality-critical</td>
+              </tr>
+              <tr>
+                <td><strong>Minimal</strong></td>
+                <td>Disabled</td>
+                <td>Unit tests only</td>
+                <td>Rapid iteration, development</td>
+              </tr>
+              <tr>
+                <td><strong>Disabled</strong></td>
+                <td>Disabled</td>
+                <td>Lint checks only</td>
+                <td>Prototyping (not recommended for production)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4>QA Expert's 5-Level Challenge System</h4>
+
+          <p>When QA Expert runs (mode=full with tests), it applies progressive testing challenges:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Name</th>
+                <th>What It Tests</th>
+                <th>On Failure</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>Boundary Probing</td>
+                <td>Edge cases, null values, max/min</td>
+                <td>Developer retry</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Mutation Analysis</td>
+                <td>Code mutations to verify test completeness</td>
+                <td>Developer retry</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Behavioral Contracts</td>
+                <td>Pre/post conditions, invariants</td>
+                <td><strong>Escalate to SSE</strong></td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Security Adversary</td>
+                <td>Injection attacks, auth bypass</td>
+                <td><strong>Escalate to SSE</strong></td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>Production Chaos</td>
+                <td>Network failures, race conditions</td>
+                <td><strong>Escalate to SSE</strong></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>1.3 Skills Configuration</h3>
+
+          <p>Skills are specialized capabilities agents can invoke. Configure them with:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.configure-skills</code></pre>
+
+          <p>Two preset profiles:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Profile</th>
+                <th>Skills Included</th>
+                <th>Best For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Lite</strong> (default)</td>
+                <td>lint-check, security-scan, test-coverage</td>
+                <td>Fast development, standard projects</td>
+              </tr>
+              <tr>
+                <td><strong>Advanced</strong></td>
+                <td>All skills including codebase-analysis, pattern-miner, api-contract-validation</td>
+                <td>Complex projects, comprehensive analysis</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4>Key Skills</h4>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Skill</th>
+                <th>What It Does</th>
+                <th>Used By</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>security-scan</code></td>
+                <td>Detects vulnerabilities (SQL injection, XSS, hardcoded secrets)</td>
+                <td>Tech Lead (mandatory)</td>
+              </tr>
+              <tr>
+                <td><code>test-coverage</code></td>
+                <td>Generates coverage reports, identifies untested code</td>
+                <td>Tech Lead (mandatory)</td>
+              </tr>
+              <tr>
+                <td><code>lint-check</code></td>
+                <td>Code quality, style, best practices</td>
+                <td>Developer, Tech Lead</td>
+              </tr>
+              <tr>
+                <td><code>codebase-analysis</code></td>
+                <td>Finds similar features, reusable utilities</td>
+                <td>SSE (mandatory)</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Section 2: Parallel Mode -->
+        <section id="parallel">
+          <h2>2. Parallel Mode Mastery</h2>
+
+          <h3>2.1 Understanding Execution Modes</h3>
+
+          <p>The PM decides between two execution modes based on your requirements:</p>
+
+          <div class="comparison">
+            <div class="comparison-bad" style="background: var(--color-surface); border-color: var(--color-border);">
+              <div class="label" style="color: var(--color-text);">Simple Mode</div>
+              <ul style="margin: 8px 0 0; padding-left: 20px;">
+                <li>1 Developer at a time</li>
+                <li>Sequential execution</li>
+                <li>Best for: Single focused tasks</li>
+                <li>Faster per-task, but serial</li>
+              </ul>
+            </div>
+            <div class="comparison-good">
+              <div class="label">Parallel Mode</div>
+              <ul style="margin: 8px 0 0; padding-left: 20px;">
+                <li>2-4 Developers simultaneously</li>
+                <li>Concurrent execution</li>
+                <li>Best for: Multi-component features</li>
+                <li>Faster overall for complex work</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="callout rule">
+            <div class="callout-title">Hard Limit: MAX 4 Parallel Developers</div>
+            <p>If PM identifies more than 4 independent task groups, they're split into <strong>execution phases</strong>:</p>
+            <ul style="margin-bottom: 0;">
+              <li>Phase 1: Groups 1-4 (parallel)</li>
+              <li>Phase 2: Groups 5-8 (parallel, after Phase 1 completes)</li>
+              <li>And so on...</li>
+            </ul>
+          </div>
+
+          <h3>2.2 Structuring Requests for Parallelism</h3>
+
+          <p>PM looks for <strong>independent work</strong> that can run concurrently:</p>
+
+          <div class="comparison">
+            <div class="comparison-good">
+              <div class="label">Good for Parallel</div>
+              <pre style="margin: 8px 0 0; background: white; color: var(--color-text); font-size: 13px;"><code>Build dashboard with 4 widgets:
+- User stats widget
+- Revenue chart widget
+- Activity feed widget
+- Notifications widget</code></pre>
+              <p style="margin-top: 8px; font-size: 14px;">4 independent components = 4 parallel developers</p>
+            </div>
+            <div class="comparison-bad">
+              <div class="label">Sequential Dependencies</div>
+              <pre style="margin: 8px 0 0; background: white; color: var(--color-text); font-size: 13px;"><code>Build auth system:
+1. First create User model
+2. Then add auth middleware
+3. Then create login endpoint
+4. Finally add session management</code></pre>
+              <p style="margin-top: 8px; font-size: 14px;">Each step depends on previous = simple mode</p>
+            </div>
+          </div>
+
+          <h3>2.3 Monitoring Parallel Execution</h3>
+
+          <p>During parallel execution, you'll see status for each group:</p>
+
+          <div class="capsule">
+            <div class="capsule-header">Parallel Mode Transcript</div>
+            <div class="capsule-body">
+              <div class="capsule-message pm">
+                <strong>PM</strong>: Created 4 task groups. Mode: PARALLEL<br>
+                - US1: User stats widget<br>
+                - US2: Revenue chart widget<br>
+                - US3: Activity feed widget<br>
+                - US4: Notifications widget
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Spawning 4 developers in parallel...
+              </div>
+              <div class="capsule-message dev">
+                <strong>DEV[US1]</strong>: User stats widget complete. READY_FOR_REVIEW
+              </div>
+              <div class="capsule-message dev">
+                <strong>DEV[US3]</strong>: Activity feed widget complete. READY_FOR_REVIEW
+              </div>
+              <div class="capsule-message dev">
+                <strong>DEV[US2]</strong>: Revenue chart widget complete. READY_FOR_REVIEW
+              </div>
+              <div class="capsule-message dev">
+                <strong>DEV[US4]</strong>: Notifications widget complete. READY_FOR_REVIEW
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: All groups complete. Routing to Tech Lead...
+              </div>
+            </div>
+          </div>
+
+          <p>Each group flows through the pipeline independently (Dev → QA → Tech Lead), but they run concurrently.</p>
+        </section>
+
+        <!-- Section 3: Advanced Commands -->
+        <section id="commands">
+          <h2>3. Advanced Orchestration Commands</h2>
+
+          <h3>3.1 Standard Orchestration</h3>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate [requirements]</code></pre>
+
+          <p>Use for: Clear, well-defined tasks where you know what you want.</p>
+
+          <h3>3.2 Advanced Orchestration (with Discovery)</h3>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate-advanced [requirements]</code></pre>
+
+          <p>Adds a <strong>Requirements Engineer</strong> phase before PM:</p>
+
+          <ol>
+            <li>Requirements Engineer clarifies ambiguities</li>
+            <li>Analyzes codebase for reusable components</li>
+            <li>Identifies complexity and parallelization opportunities</li>
+            <li>Generates Enhanced Requirements Document</li>
+            <li>Then PM receives enriched context</li>
+          </ol>
+
+          <div class="callout tip">
+            <div class="callout-title">When to Use Advanced</div>
+            <ul style="margin-bottom: 0;">
+              <li>Vague or ambiguous requirements</li>
+              <li>Large unfamiliar codebase</li>
+              <li>Complex refactoring</li>
+              <li>Production-critical features</li>
+            </ul>
+          </div>
+
+          <h3>3.3 Spec-Kit Orchestration</h3>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate-from-spec</code></pre>
+
+          <p>For planning-first workflows. Expects spec-kit files in <code>.specify/features/</code>:</p>
+
+          <ul>
+            <li><code>spec.md</code> - Feature specification</li>
+            <li><code>tasks.md</code> - Task breakdown with markers</li>
+            <li><code>plan.md</code> - Implementation plan</li>
+          </ul>
+
+          <h4>Task Markers</h4>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Marker</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>[P]</code></td>
+                <td>Parallelizable task</td>
+              </tr>
+              <tr>
+                <td><code>[US1]</code></td>
+                <td>User story group 1</td>
+              </tr>
+              <tr>
+                <td><code>[R1]</code></td>
+                <td>Research task (pre-implementation)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>3.4 Choosing the Right Command</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Situation</th>
+                <th>Command</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Clear requirements, know what you want</td>
+                <td><code>/bazinga.orchestrate</code></td>
+              </tr>
+              <tr>
+                <td>Vague requirements, need discovery</td>
+                <td><code>/bazinga.orchestrate-advanced</code></td>
+              </tr>
+              <tr>
+                <td>Already have spec-kit files</td>
+                <td><code>/bazinga.orchestrate-from-spec</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Section 4: Escalation -->
+        <section id="escalation">
+          <h2>4. Escalation & Quality Gates</h2>
+
+          <h3>4.1 Escalation Triggers</h3>
+
+          <p>BAZINGA automatically escalates when issues arise:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Trigger</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Developer fails 1 time</td>
+                <td>Escalate to <span class="agent-badge sse">SSE</span> (Sonnet)</td>
+              </tr>
+              <tr>
+                <td>QA Level 3+ fails</td>
+                <td>Escalate to <span class="agent-badge sse">SSE</span> (Sonnet)</td>
+              </tr>
+              <tr>
+                <td>Security-sensitive task detected</td>
+                <td>Force <span class="agent-badge sse">SSE</span> + mandatory Tech Lead</td>
+              </tr>
+              <tr>
+                <td>Complex blocker</td>
+                <td>Spawn <span class="agent-badge inv">Investigator</span> (Opus)</td>
+              </tr>
+              <tr>
+                <td>Tech Lead blocked 3+ times</td>
+                <td>Escalate to Opus model</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout warning">
+            <div class="callout-title">Security-Sensitive Tasks</div>
+            <p>Tasks containing keywords like <code>auth</code>, <code>security</code>, <code>crypto</code>, <code>password</code>, or <code>token</code> automatically route to Senior Software Engineer with mandatory Tech Lead review, regardless of complexity.</p>
+          </div>
+
+          <h3>4.2 Quality Gates</h3>
+
+          <p>Every piece of code passes through multiple quality checkpoints:</p>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Developer Gate</h4>
+              <p>Unit tests + lint checks must pass before proceeding.</p>
+            </div>
+            <div class="step">
+              <h4>QA Gate (if enabled)</h4>
+              <p>Integration/E2E tests with 5-level challenge progression.</p>
+            </div>
+            <div class="step">
+              <h4>Tech Lead Gate</h4>
+              <p>Security scan + test coverage + code review. Must approve or request changes.</p>
+            </div>
+            <div class="step">
+              <h4>PM Gate</h4>
+              <p>Verifies all success criteria before attempting BAZINGA.</p>
+            </div>
+            <div class="step">
+              <h4>Validator Gate</h4>
+              <p>Independent verification before accepting BAZINGA.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 5: Validation Protocol -->
+        <section id="validation">
+          <h2>5. The Validation Protocol</h2>
+
+          <p>This section covers the <strong>BAZINGA validation protocol</strong> - the final quality gate that ensures "BAZINGA" truly means "done."</p>
+
+          <h3>5.1 Success Criteria</h3>
+
+          <p>During planning, PM creates success criteria stored in the database:</p>
+
+          <div class="code-header">Example Success Criteria</div>
+          <pre><code>[
+  "Rate limiter middleware exists at src/middleware/rateLimiter.ts",
+  "Unit tests cover >80% of limiter logic",
+  "Integration test verifies 429 response after limit exceeded",
+  "Security scan passes with no high/medium findings",
+  "Code review approved by Tech Lead"
+]</code></pre>
+
+          <h3>5.2 The BAZINGA Flow</h3>
+
+          <div class="steps">
+            <div class="step">
+              <h4>PM Checks Criteria</h4>
+              <p>PM queries the database to verify each success criterion is met.</p>
+            </div>
+            <div class="step">
+              <h4>PM Sends BAZINGA</h4>
+              <p>If all criteria pass, PM sends <strong>BAZINGA</strong> to the Orchestrator.</p>
+            </div>
+            <div class="step">
+              <h4>Orchestrator Spawns Validator</h4>
+              <p>The Orchestrator spawns an independent <strong>Validator</strong> agent.</p>
+            </div>
+            <div class="step">
+              <h4>Validator Verifies Independently</h4>
+              <p>Validator runs tests, checks criteria, and verifies claims without trusting PM's word.</p>
+            </div>
+            <div class="step">
+              <h4>Accept or Reject</h4>
+              <p><strong>ACCEPT</strong>: Project complete!<br><strong>REJECT</strong>: PM re-spawned with findings to fix issues.</p>
+            </div>
+          </div>
+
+          <div class="callout rule">
+            <div class="callout-title">Zero Tolerance Policy</div>
+            <p>The Validator has <strong>zero tolerance</strong> for incomplete work:</p>
+            <ul style="margin-bottom: 0;">
+              <li>One failing test = REJECT</li>
+              <li>One unmet criterion = REJECT</li>
+              <li>Security issue found = REJECT</li>
+            </ul>
+            <p style="margin-top: 8px;">This ensures BAZINGA is a reliable signal of true completion.</p>
+          </div>
+
+          <h3>5.3 Rejection Handling</h3>
+
+          <p>When Validator rejects, the flow continues:</p>
+
+          <div class="capsule">
+            <div class="capsule-header">Rejection & Recovery</div>
+            <div class="capsule-body">
+              <div class="capsule-message pm">
+                <strong>PM</strong>: All criteria verified. BAZINGA!
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Spawning Validator for independent verification...
+              </div>
+              <div class="capsule-message" style="background: #FEE2E2; border-left-color: #EF4444;">
+                <strong>VALIDATOR</strong>: REJECT<br>
+                - Integration test failing: expected 429, got 200<br>
+                - Coverage at 72%, required 80%
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Re-spawning PM with validator findings...
+              </div>
+              <div class="capsule-message pm">
+                <strong>PM</strong>: Addressing validator findings. Spawning Developer to fix...
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 6: Troubleshooting -->
+        <section id="troubleshooting">
+          <h2>6. Troubleshooting Guide</h2>
+
+          <h3>Common Issues</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Problem</th>
+                <th>Likely Cause</th>
+                <th>Solution</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Orchestration seems stuck</td>
+                <td>Agent processing complex task</td>
+                <td>Wait longer; check logs in <code>bazinga/bazinga.db</code></td>
+              </tr>
+              <tr>
+                <td>Developer keeps failing</td>
+                <td>Task too complex for Haiku</td>
+                <td>Let escalation happen, or upgrade Developer to Sonnet</td>
+              </tr>
+              <tr>
+                <td>QA keeps rejecting</td>
+                <td>Tests too strict or code quality issues</td>
+                <td>Review QA feedback; consider minimal testing mode</td>
+              </tr>
+              <tr>
+                <td>BAZINGA rejected multiple times</td>
+                <td>Systematic issue with implementation</td>
+                <td>Review validator findings; may need to restart with clearer requirements</td>
+              </tr>
+              <tr>
+                <td>No QA phase running</td>
+                <td>Testing mode not "full" or no tests written</td>
+                <td>Check <code>/bazinga.configure-testing</code>; ensure Dev writes tests</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Reading Orchestration Logs</h3>
+
+          <p>All orchestration state is stored in <code>bazinga/bazinga.db</code> (SQLite). Key tables:</p>
+
+          <ul>
+            <li><code>sessions</code> - Orchestration sessions with status</li>
+            <li><code>orchestration_logs</code> - Timestamped agent interactions</li>
+            <li><code>task_groups</code> - All task groups and their status</li>
+            <li><code>success_criteria</code> - PM's success criteria for the project</li>
+          </ul>
+
+          <h3>When to Restart vs Continue</h3>
+
+          <div class="comparison">
+            <div class="comparison-good">
+              <div class="label">Continue (let it retry)</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Normal failures and retries</li>
+                <li>Escalation happening as expected</li>
+                <li>Progress being made each iteration</li>
+              </ul>
+            </div>
+            <div class="comparison-bad">
+              <div class="label">Restart with clearer requirements</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Same error repeating 3+ times</li>
+                <li>PM asking clarifying questions</li>
+                <li>Fundamental misunderstanding of task</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- What's Next -->
+        <section>
+          <h2>What's Next?</h2>
+
+          <p>You're now equipped to configure and operate BAZINGA effectively. To go even deeper:</p>
+
+          <div class="course-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="course-card">
+              <span class="badge advanced">Advanced</span>
+              <h3>BAZINGA Architecture</h3>
+              <p>Create custom skills, modify agents, and integrate BAZINGA into your toolchain.</p>
+              <a href="architecture.html" class="cta">Continue Learning &rarr;</a>
+            </div>
+            <div class="course-card">
+              <h3>Quick Recipes</h3>
+              <p>Jump to specific solutions for common scenarios.</p>
+              <a href="recipes.html" class="cta">Browse Recipes &rarr;</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Navigation -->
+        <nav class="nav-buttons">
+          <a href="essentials.html" class="nav-button">
+            <span class="label">&larr; Previous</span>
+            <span class="title">BAZINGA Essentials</span>
+          </a>
+          <a href="architecture.html" class="nav-button next">
+            <span class="label">Next &rarr;</span>
+            <span class="title">BAZINGA Architecture</span>
+          </a>
+        </nav>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>BAZINGA Training &bull; Multi-Agent Framework for Claude Code</p>
+    </div>
+  </footer>
+</body>
+</html>

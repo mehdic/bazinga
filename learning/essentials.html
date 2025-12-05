@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAZINGA Essentials - Your AI Dev Team in Action</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="site-logo">BAZINGA Training</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="quickstart.html">Quickstart</a>
+        <a href="essentials.html" class="active">Essentials</a>
+        <a href="mastering.html">Mastering</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="recipes.html">Recipes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article>
+      <header class="article-header">
+        <div class="container content">
+          <span class="badge beginner">Beginner</span>
+          <h1>BAZINGA Essentials</h1>
+          <p style="font-size: var(--font-size-lg); color: var(--color-text-muted); margin-top: var(--space-4);">
+            Your AI Dev Team in Action
+          </p>
+          <div class="article-meta">
+            <span>30 min read</span>
+            <span>Prerequisite: Claude Code basics</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="container content article-content">
+        <div class="version-banner">
+          Last verified: BAZINGA v1.0 &bull; <a href="../agents/">View Agent Definitions</a>
+        </div>
+
+        <p class="lead" style="font-size: var(--font-size-lg); color: var(--color-text-muted);">
+          Learn the fundamentals of BAZINGA: what it is, how agents collaborate, how to craft effective requests, and how to interpret results.
+        </p>
+
+        <nav class="toc">
+          <h4>On this page</h4>
+          <ol>
+            <li><a href="#welcome">Welcome to Your AI Dev Team</a></li>
+            <li><a href="#first-orchestration">Your First Orchestration</a></li>
+            <li><a href="#anatomy">Anatomy of a Good Request</a></li>
+            <li><a href="#interpreting">Interpreting Results</a></li>
+          </ol>
+        </nav>
+
+        <!-- Hard Rules Box -->
+        <div class="hard-rules">
+          <h4>Hard Rules to Remember</h4>
+          <ul>
+            <li><strong>MAX 4 parallel developers</strong> - More task groups are split into phases</li>
+            <li><strong>QA Expert only runs</strong> when integration/E2E tests exist AND testing mode = full</li>
+            <li><strong>Orchestrator coordinates only</strong> - It spawns agents, never implements code</li>
+            <li><strong>PM alone sends BAZINGA</strong> - Only after validator confirms success</li>
+            <li><strong>Security tasks force SSE</strong> - Auth/crypto work routes to Senior Software Engineer + Tech Lead</li>
+          </ul>
+        </div>
+
+        <!-- Section 1: Welcome -->
+        <section id="welcome">
+          <h2>1. Welcome to Your AI Dev Team</h2>
+
+          <h3>1.1 What is BAZINGA?</h3>
+
+          <p>BAZINGA is a <strong>multi-agent orchestration system</strong> for Claude Code. Instead of one AI handling everything, specialized agents collaborate like a real development team:</p>
+
+          <div class="workflow">
+            <span class="agent-badge pm">PM</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge dev">Developer</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge qa">QA Expert</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge tl">Tech Lead</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge pm">PM</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span style="font-weight: 600; color: var(--color-primary);">BAZINGA!</span>
+          </div>
+
+          <h4>Meet the Team</h4>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Role</th>
+                <th>Key Responsibilities</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="agent-badge pm">Project Manager</span></td>
+                <td>Strategic planning & completion</td>
+                <td>Analyzes requirements, creates task groups, decides mode (simple/parallel), sends BAZINGA when done</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge dev">Developer</span></td>
+                <td>Implementation</td>
+                <td>Writes code, creates tests, reports status (READY_FOR_QA or READY_FOR_REVIEW)</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge sse">Senior Software Engineer</span></td>
+                <td>Escalated complexity</td>
+                <td>Handles failures, security-sensitive code, Level 3+ challenge failures</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge qa">QA Expert</span></td>
+                <td>Quality assurance</td>
+                <td>Runs integration/E2E tests, applies 5-level challenge progression</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge tl">Tech Lead</span></td>
+                <td>Code review & security</td>
+                <td>Reviews architecture, runs security scans, approves or requests changes</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge inv">Investigator</span></td>
+                <td>Deep analysis</td>
+                <td>Root cause analysis for complex blockers</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>1.2 Why Multi-Agent vs Single-Agent?</h3>
+
+          <p>When should you use BAZINGA instead of regular Claude Code?</p>
+
+          <div class="comparison">
+            <div class="comparison-good">
+              <div class="label">Use BAZINGA for:</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Complex features with multiple components</li>
+                <li>Quality-critical code needing review</li>
+                <li>Tasks requiring multiple skills (dev + test + review)</li>
+                <li>Large refactoring efforts</li>
+                <li>Security-sensitive implementations</li>
+              </ul>
+            </div>
+            <div class="comparison-bad">
+              <div class="label">Use Solo Claude for:</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Quick fixes and small edits</li>
+                <li>Exploratory coding / prototyping</li>
+                <li>Simple questions about code</li>
+                <li>File operations and searches</li>
+                <li>Learning and experimentation</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="callout info">
+            <div class="callout-title">Key Insight</div>
+            <p>BAZINGA adds overhead (multiple agents, reviews, validation) that pays off for complex tasks but is unnecessary for quick fixes. Choose the right tool for the job.</p>
+          </div>
+        </section>
+
+        <!-- Section 2: First Orchestration -->
+        <section id="first-orchestration">
+          <h2>2. Your First Orchestration</h2>
+
+          <h3>2.1 Running an Orchestration</h3>
+
+          <p>Start an orchestration with the slash command:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate [your requirements here]</code></pre>
+
+          <p>Example:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Add a rate limiter middleware that limits requests to 100/minute per IP address, with configurable limits and Redis-backed storage</code></pre>
+
+          <h3>2.2 Understanding the Agent Flow</h3>
+
+          <p>Here's what happens during a typical orchestration:</p>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Phase 1: Planning</h4>
+              <p>The Orchestrator spawns the <span class="agent-badge pm">Project Manager</span>, who analyzes your requirements, creates task groups, and decides whether to use simple mode (1 developer) or parallel mode (2-4 developers).</p>
+            </div>
+            <div class="step">
+              <h4>Phase 2: Implementation</h4>
+              <p><span class="agent-badge dev">Developer(s)</span> implement the code and write tests. They report either <code>READY_FOR_QA</code> (tests written) or <code>READY_FOR_REVIEW</code> (no tests).</p>
+            </div>
+            <div class="step">
+              <h4>Phase 3: Quality Assurance</h4>
+              <p>If tests exist and mode is "full", <span class="agent-badge qa">QA Expert</span> runs integration and E2E tests using a 5-level challenge system. Results: <code>PASS</code> or <code>FAIL</code>.</p>
+            </div>
+            <div class="step">
+              <h4>Phase 4: Code Review</h4>
+              <p><span class="agent-badge tl">Tech Lead</span> reviews code quality, runs security scans, and checks test coverage. Results: <code>APPROVED</code> or <code>CHANGES_REQUESTED</code>.</p>
+            </div>
+            <div class="step">
+              <h4>Phase 5: Completion</h4>
+              <p><span class="agent-badge pm">Project Manager</span> verifies all success criteria are met, then sends <strong>BAZINGA!</strong> to signal completion.</p>
+            </div>
+          </div>
+
+          <h3>2.3 The Routing Logic</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>Status</th>
+                <th>Routes To</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="agent-badge dev">Developer</span></td>
+                <td><code>READY_FOR_QA</code></td>
+                <td><span class="agent-badge qa">QA Expert</span> (if tests exist & mode=full)</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge dev">Developer</span></td>
+                <td><code>READY_FOR_REVIEW</code></td>
+                <td><span class="agent-badge tl">Tech Lead</span> (directly)</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge qa">QA Expert</span></td>
+                <td><code>PASS</code></td>
+                <td><span class="agent-badge tl">Tech Lead</span></td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge qa">QA Expert</span></td>
+                <td><code>FAIL</code> (Levels 1-2)</td>
+                <td><span class="agent-badge dev">Developer</span> (retry)</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge qa">QA Expert</span></td>
+                <td><code>FAIL</code> (Levels 3-5)</td>
+                <td><span class="agent-badge sse">Senior Software Engineer</span> (escalate)</td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge tl">Tech Lead</span></td>
+                <td><code>APPROVED</code></td>
+                <td><span class="agent-badge pm">Project Manager</span></td>
+              </tr>
+              <tr>
+                <td><span class="agent-badge tl">Tech Lead</span></td>
+                <td><code>CHANGES_REQUESTED</code></td>
+                <td><span class="agent-badge dev">Developer</span> (fix & retry)</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Section 3: Anatomy of a Good Request -->
+        <section id="anatomy">
+          <h2>3. Anatomy of a Good Request</h2>
+
+          <h3>3.1 Crafting Effective Prompts</h3>
+
+          <p>The quality of your request directly affects the quality of the output. Be specific about what you want.</p>
+
+          <div class="comparison">
+            <div class="comparison-bad">
+              <div class="label">Too Vague</div>
+              <pre style="margin: 8px 0 0; background: white; color: var(--color-text);"><code>/bazinga.orchestrate Fix the bug</code></pre>
+              <p style="margin-top: 8px; font-size: 14px;">PM will ask clarifying questions, wasting time.</p>
+            </div>
+            <div class="comparison-good">
+              <div class="label">Specific & Clear</div>
+              <pre style="margin: 8px 0 0; background: white; color: var(--color-text);"><code>/bazinga.orchestrate Fix the login timeout bug in auth.js that causes sessions to expire after 30 seconds instead of 30 minutes</code></pre>
+              <p style="margin-top: 8px; font-size: 14px;">Clear problem, location, expected behavior.</p>
+            </div>
+          </div>
+
+          <h3>3.2 Good Request Components</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Example</th>
+                <th>Why It Helps</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>What</strong></td>
+                <td>"Add rate limiting middleware"</td>
+                <td>Core functionality requested</td>
+              </tr>
+              <tr>
+                <td><strong>Where</strong></td>
+                <td>"in the Express app at src/middleware/"</td>
+                <td>Location context</td>
+              </tr>
+              <tr>
+                <td><strong>How</strong></td>
+                <td>"using Redis for distributed storage"</td>
+                <td>Technical constraints</td>
+              </tr>
+              <tr>
+                <td><strong>Acceptance</strong></td>
+                <td>"should return 429 when limit exceeded"</td>
+                <td>Success criteria</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>3.3 Request Examples by Type</h3>
+
+          <h4>Feature Request</h4>
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Add user profile avatars:
+- Allow uploading images (max 5MB, png/jpg/gif)
+- Store in S3 with presigned URLs
+- Add avatar field to User model
+- Create upload/delete API endpoints
+- Include image resizing to 200x200</code></pre>
+
+          <h4>Bug Fix</h4>
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Fix the race condition in OrderService.processPayment() where concurrent requests can double-charge customers. The bug occurs when two payment webhooks arrive within 100ms of each other.</code></pre>
+
+          <h4>Refactoring</h4>
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Refactor the monolithic UserController into separate controllers:
+- AuthController (login, logout, register)
+- ProfileController (get, update, delete)
+- PreferencesController (settings, notifications)
+Maintain existing API contracts and add tests for each.</code></pre>
+
+          <h3>3.4 Common Beginner Mistakes</h3>
+
+          <div class="callout warning">
+            <div class="callout-title">Avoid These Mistakes</div>
+            <ul style="margin-bottom: 0;">
+              <li><strong>Too vague</strong> - "Fix the issues" gives PM nothing to work with</li>
+              <li><strong>Too micro-managing</strong> - "First create file X, then add line Y at position Z" undermines agent autonomy</li>
+              <li><strong>Interrupting</strong> - Stopping orchestration mid-flow loses context; let it finish</li>
+              <li><strong>No acceptance criteria</strong> - How does PM know when it's done?</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Section 4: Interpreting Results -->
+        <section id="interpreting">
+          <h2>4. Interpreting Results</h2>
+
+          <h3>4.1 Success Indicators</h3>
+
+          <p>A successful orchestration ends with <strong>BAZINGA!</strong> from the PM:</p>
+
+          <div class="capsule">
+            <div class="capsule-header">Success Transcript</div>
+            <div class="capsule-body">
+              <div class="capsule-message pm">
+                <strong>PM</strong>: All task groups completed. Success criteria verified:<br>
+                - Rate limiter middleware created<br>
+                - Tests passing (12/12)<br>
+                - Security scan clean<br>
+                - Code review approved<br><br>
+                <strong style="color: var(--color-primary);">BAZINGA!</strong>
+              </div>
+            </div>
+          </div>
+
+          <h3>4.2 Understanding Failures & Retries</h3>
+
+          <p>Seeing failures and retries is <strong>normal behavior</strong>. BAZINGA is designed to handle them:</p>
+
+          <div class="capsule">
+            <div class="capsule-header">Normal Retry Flow</div>
+            <div class="capsule-body">
+              <div class="capsule-message dev">
+                <strong>DEVELOPER</strong>: Implementation complete. Status: READY_FOR_QA
+              </div>
+              <div class="capsule-message qa">
+                <strong>QA</strong>: Level 2 (Mutation Analysis) - FAIL<br>
+                Mutation at line 45 not caught by tests.
+              </div>
+              <div class="capsule-message dev">
+                <strong>DEVELOPER</strong>: Added test for edge case. Status: READY_FOR_QA
+              </div>
+              <div class="capsule-message qa">
+                <strong>QA</strong>: All levels passed. Status: PASS
+              </div>
+            </div>
+          </div>
+
+          <div class="callout tip">
+            <div class="callout-title">Retries Are Good</div>
+            <p>When you see Developer retry after QA failure, the system is working as designed. Each iteration improves code quality.</p>
+          </div>
+
+          <h3>4.3 Escalation Chain</h3>
+
+          <p>When issues persist, BAZINGA escalates to stronger models:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Trigger</th>
+                <th>Escalation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Developer fails 1 time</td>
+                <td>Escalate to <span class="agent-badge sse">Senior Software Engineer</span></td>
+              </tr>
+              <tr>
+                <td>QA Level 3+ fails</td>
+                <td>Escalate to <span class="agent-badge sse">Senior Software Engineer</span></td>
+              </tr>
+              <tr>
+                <td>Tech Lead blocked 3+ times</td>
+                <td>Escalate to Opus model</td>
+              </tr>
+              <tr>
+                <td>Complex blocker</td>
+                <td>Spawn <span class="agent-badge inv">Investigator</span> for root cause analysis</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>4.4 The Validation Layer</h3>
+
+          <p>Before BAZINGA is accepted, an independent <strong>Validator</strong> verifies:</p>
+
+          <ul>
+            <li>All success criteria are actually met</li>
+            <li>Tests pass independently</li>
+            <li>No critical issues were missed</li>
+          </ul>
+
+          <p>If the Validator rejects, PM is re-spawned with the findings to address issues.</p>
+
+          <div class="callout info">
+            <div class="callout-title">Zero Tolerance Policy</div>
+            <p>The Validator has zero tolerance for incomplete work. One failing test = rejection. This ensures BAZINGA truly means "done."</p>
+          </div>
+        </section>
+
+        <!-- What's Next -->
+        <section>
+          <h2>What's Next?</h2>
+
+          <p>You now understand the fundamentals of BAZINGA. To go deeper:</p>
+
+          <div class="course-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="course-card">
+              <span class="badge intermediate">Intermediate</span>
+              <h3>Mastering BAZINGA</h3>
+              <p>Configure models, leverage parallel mode, and understand the validation protocol.</p>
+              <a href="mastering.html" class="cta">Continue Learning &rarr;</a>
+            </div>
+            <div class="course-card">
+              <h3>Quick Recipes</h3>
+              <p>Jump to specific solutions for common scenarios.</p>
+              <a href="recipes.html" class="cta">Browse Recipes &rarr;</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Navigation -->
+        <nav class="nav-buttons">
+          <a href="quickstart.html" class="nav-button">
+            <span class="label">&larr; Previous</span>
+            <span class="title">Quickstart</span>
+          </a>
+          <a href="mastering.html" class="nav-button next">
+            <span class="label">Next &rarr;</span>
+            <span class="title">Mastering BAZINGA</span>
+          </a>
+        </nav>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>BAZINGA Training &bull; Multi-Agent Framework for Claude Code</p>
+    </div>
+  </footer>
+</body>
+</html>
