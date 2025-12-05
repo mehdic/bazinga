@@ -162,28 +162,31 @@ validate_step_references() {
 
         # Extract step identifier (e.g., "2A.1")
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
+        # Escape dots for precise regex matching
+        STEP_ID_ESCAPED=$(echo "$STEP_ID" | sed 's/\./\\./g')
 
         # Look for section header with this step
         # Check main orchestrator file first
-        SECTION_LINE=$(grep -n "### Step $STEP_ID" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
+        # Use word boundary to prevent substring matches (e.g., 2A.1 vs 2A.10)
+        SECTION_LINE=$(grep -n "### Step ${STEP_ID_ESCAPED}\>" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
         FOUND_IN=""
+
+        # Set FOUND_IN if section found in main orchestrator
+        [ -n "$SECTION_LINE" ] && FOUND_IN="$ORCHESTRATOR_FILE"
 
         # If not found in main file, check template files
         if [ -z "$SECTION_LINE" ]; then
             # Step 2A.x sections are in phase_simple.md
             if [[ "$STEP_ID" == 2A.* ]]; then
-                TEMPLATE_FILE="bazinga/templates/orchestrator/phase_simple.md"
-                if [ -f "$TEMPLATE_FILE" ]; then
-                    SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_FILE" | head -1 | cut -d: -f1 || true)
-                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_FILE"
+                if [ -f "$TEMPLATE_SIMPLE" ]; then
+                    SECTION_LINE=$(grep -n "### Step ${STEP_ID_ESCAPED}\>" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
+                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_SIMPLE"
                 fi
-            fi
             # Step 2B.x sections are in phase_parallel.md
-            if [[ "$STEP_ID" == 2B.* ]]; then
-                TEMPLATE_FILE="bazinga/templates/orchestrator/phase_parallel.md"
-                if [ -f "$TEMPLATE_FILE" ]; then
-                    SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_FILE" | head -1 | cut -d: -f1 || true)
-                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_FILE"
+            elif [[ "$STEP_ID" == 2B.* ]]; then
+                if [ -f "$TEMPLATE_PARALLEL" ]; then
+                    SECTION_LINE=$(grep -n "### Step ${STEP_ID_ESCAPED}\>" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
+                    [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_PARALLEL"
                 fi
             fi
         fi
@@ -232,17 +235,20 @@ validate_template_step_references() {
         if [ -z "$ref" ]; then continue; fi
 
         STEP_ID=$(echo "$ref" | sed 's/§Step //')
+        # Escape dots for precise regex matching
+        STEP_ID_ESCAPED=$(echo "$STEP_ID" | sed 's/\./\\./g')
         SECTION_LINE=""
         FOUND_IN=""
 
         # Check main orchestrator file first (for Step 0.x, 1.x references)
-        SECTION_LINE=$(grep -n "### Step $STEP_ID" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
+        # Use word boundary to prevent substring matches (e.g., 2A.1 vs 2A.10)
+        SECTION_LINE=$(grep -n "### Step ${STEP_ID_ESCAPED}\>" "$ORCHESTRATOR_FILE" | head -1 | cut -d: -f1 || true)
         [ -n "$SECTION_LINE" ] && FOUND_IN="$ORCHESTRATOR_FILE"
 
         # Check phase_simple.md for Step 2A.x references
         if [ -z "$SECTION_LINE" ]; then
             if [ -f "$TEMPLATE_SIMPLE" ]; then
-                SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
+                SECTION_LINE=$(grep -n "### Step ${STEP_ID_ESCAPED}\>" "$TEMPLATE_SIMPLE" | head -1 | cut -d: -f1 || true)
                 [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_SIMPLE"
             fi
         fi
@@ -250,7 +256,7 @@ validate_template_step_references() {
         # Check phase_parallel.md for Step 2B.x references
         if [ -z "$SECTION_LINE" ]; then
             if [ -f "$TEMPLATE_PARALLEL" ]; then
-                SECTION_LINE=$(grep -n "### Step $STEP_ID" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
+                SECTION_LINE=$(grep -n "### Step ${STEP_ID_ESCAPED}\>" "$TEMPLATE_PARALLEL" | head -1 | cut -d: -f1 || true)
                 [ -n "$SECTION_LINE" ] && FOUND_IN="$TEMPLATE_PARALLEL"
             fi
         fi
@@ -282,7 +288,7 @@ check_orphaned_sections() {
     ORPHAN_STEPS=0
     while IFS= read -r line; do
         LINE_NUM=$(echo "$line" | cut -d: -f1)
-        STEP_ID=$(echo "$line" | grep -oE 'Step [0-9A-Z]+\.[0-9A-Z]+(\.[0-9]+)?' | sed 's/Step //')
+        STEP_ID=$(echo "$line" | grep -oE 'Step [0-9A-Za-z]+\.[0-9A-Za-z]+(\.[0-9]+)?' | sed 's/Step //')
 
         if [ -n "$STEP_ID" ]; then
             # Check if this step is referenced anywhere
