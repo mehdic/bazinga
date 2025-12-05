@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipes - BAZINGA Quick Solutions</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="site-logo">BAZINGA Training</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="quickstart.html">Quickstart</a>
+        <a href="essentials.html">Essentials</a>
+        <a href="mastering.html">Mastering</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="recipes.html" class="active">Recipes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article>
+      <header class="article-header">
+        <div class="container content">
+          <h1>Recipes</h1>
+          <p style="font-size: var(--font-size-lg); color: var(--color-text-muted); margin-top: var(--space-4);">
+            Quick solutions for common BAZINGA scenarios. Jump directly to what you need.
+          </p>
+        </div>
+      </header>
+
+      <div class="container content article-content">
+        <!-- Quick Nav -->
+        <nav class="toc">
+          <h4>Jump to Recipe</h4>
+          <ol>
+            <li><a href="#parallel-mode">Run Parallel Mode</a></li>
+            <li><a href="#fix-qa-failure">Fix QA Failures</a></li>
+            <li><a href="#configure-testing">Configure Testing Mode</a></li>
+            <li><a href="#use-spec-kit">Use Spec-Kit Workflow</a></li>
+            <li><a href="#troubleshoot-stuck">Troubleshoot Stuck Orchestration</a></li>
+            <li><a href="#security-tasks">Handle Security-Sensitive Tasks</a></li>
+            <li><a href="#change-models">Change Agent Models</a></li>
+            <li><a href="#skip-qa">Skip QA for Rapid Iteration</a></li>
+            <li><a href="#resume-session">Resume a Previous Session</a></li>
+            <li><a href="#force-escalation">Force Escalation to Senior Engineer</a></li>
+          </ol>
+        </nav>
+
+        <!-- Recipe 1: Parallel Mode -->
+        <section id="parallel-mode">
+          <h2>Run Parallel Mode</h2>
+
+          <p><strong>Goal:</strong> Execute multiple developers simultaneously for faster completion of complex features.</p>
+
+          <h3>How PM Decides</h3>
+          <p>PM automatically chooses parallel mode when it identifies 2+ <strong>independent</strong> task groups. Structure your request to highlight independence:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Build user dashboard with these independent widgets:
+- Widget 1: User statistics display (reads from /api/stats)
+- Widget 2: Revenue chart (reads from /api/revenue)
+- Widget 3: Activity feed (reads from /api/activity)
+- Widget 4: Notification center (reads from /api/notifications)
+
+Each widget is self-contained with its own API endpoint.</code></pre>
+
+          <h3>Key Points</h3>
+          <ul>
+            <li><strong>Maximum 4 parallel developers</strong> - More groups are split into phases</li>
+            <li><strong>Independence is key</strong> - Dependencies force sequential execution</li>
+            <li><strong>Use clear structure</strong> - Bullet points help PM identify parallelizable work</li>
+          </ul>
+
+          <div class="callout tip">
+            <div class="callout-title">Pro Tip</div>
+            <p>Explicitly mention "independent" or "can be built in parallel" to guide PM's decision.</p>
+          </div>
+        </section>
+
+        <!-- Recipe 2: Fix QA Failure -->
+        <section id="fix-qa-failure">
+          <h2>Fix QA Failures</h2>
+
+          <p><strong>Goal:</strong> Understand and resolve failing QA challenge levels.</p>
+
+          <h3>Understanding the Failure</h3>
+          <p>QA Expert's 5-level challenges test progressively deeper issues:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>What Failed</th>
+                <th>How to Fix</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1 - Boundary</td>
+                <td>Edge case not handled</td>
+                <td>Add validation for null, empty, max values</td>
+              </tr>
+              <tr>
+                <td>2 - Mutation</td>
+                <td>Test doesn't catch code changes</td>
+                <td>Add more specific assertions</td>
+              </tr>
+              <tr>
+                <td>3 - Contract</td>
+                <td>Pre/post conditions violated</td>
+                <td>Add input validation, ensure outputs match contract</td>
+              </tr>
+              <tr>
+                <td>4 - Security</td>
+                <td>Vulnerability found</td>
+                <td>Fix injection, sanitize inputs, check auth</td>
+              </tr>
+              <tr>
+                <td>5 - Chaos</td>
+                <td>Fails under stress</td>
+                <td>Add error handling, timeouts, retries</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>What Happens Automatically</h3>
+          <ul>
+            <li><strong>Levels 1-2 fail:</strong> Developer retries with QA feedback</li>
+            <li><strong>Levels 3-5 fail:</strong> Escalates to Senior Software Engineer</li>
+          </ul>
+
+          <div class="callout info">
+            <div class="callout-title">Usually No Action Needed</div>
+            <p>BAZINGA handles failures automatically. Only intervene if the same failure repeats 3+ times with no progress.</p>
+          </div>
+        </section>
+
+        <!-- Recipe 3: Configure Testing -->
+        <section id="configure-testing">
+          <h2>Configure Testing Mode</h2>
+
+          <p><strong>Goal:</strong> Switch between full, minimal, and disabled testing modes.</p>
+
+          <h3>Using the Configuration Command</h3>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.configure-testing</code></pre>
+
+          <p>Choose from:</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Mode</th>
+                <th>QA Expert</th>
+                <th>Tests Required</th>
+                <th>Best For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>full</strong></td>
+                <td>Enabled</td>
+                <td>Unit + Integration + E2E</td>
+                <td>Production code</td>
+              </tr>
+              <tr>
+                <td><strong>minimal</strong></td>
+                <td>Disabled</td>
+                <td>Unit only</td>
+                <td>Rapid development</td>
+              </tr>
+              <tr>
+                <td><strong>disabled</strong></td>
+                <td>Disabled</td>
+                <td>Lint only</td>
+                <td>Prototyping</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Direct JSON Edit</h3>
+
+          <p>Alternatively, edit <code>bazinga/testing_config.json</code>:</p>
+
+          <div class="code-header">bazinga/testing_config.json</div>
+          <pre><code>{
+  "_testing_framework": {
+    "enabled": true,
+    "mode": "minimal",
+    "qa_workflow": {
+      "enable_qa_expert": false
+    }
+  }
+}</code></pre>
+        </section>
+
+        <!-- Recipe 4: Spec-Kit -->
+        <section id="use-spec-kit">
+          <h2>Use Spec-Kit Workflow</h2>
+
+          <p><strong>Goal:</strong> Use planning-first workflow with pre-defined task breakdown.</p>
+
+          <h3>Step 1: Create Spec Files</h3>
+
+          <div class="code-header">.specify/features/user-auth/spec.md</div>
+          <pre><code># User Authentication Feature
+
+## Overview
+Add JWT-based authentication with login, logout, and session management.
+
+## Requirements
+- Login endpoint with email/password
+- JWT token generation and validation
+- Logout with token invalidation
+- Protected route middleware</code></pre>
+
+          <div class="code-header">.specify/features/user-auth/tasks.md</div>
+          <pre><code># Tasks
+
+## User Story 1: Login Flow
+- [P][US1] Create login endpoint POST /api/auth/login
+- [P][US1] Implement JWT token generation
+- [US1] Add password validation
+
+## User Story 2: Session Management
+- [P][US2] Create logout endpoint POST /api/auth/logout
+- [P][US2] Implement token blacklist
+- [US2] Add session cleanup job
+
+## Research
+- [R1] Investigate existing auth patterns in codebase</code></pre>
+
+          <h3>Step 2: Run Spec-Kit Orchestration</h3>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate-from-spec</code></pre>
+
+          <h3>Task Markers Reference</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Marker</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>[P]</code></td>
+                <td>Parallelizable - can run with other [P] tasks</td>
+              </tr>
+              <tr>
+                <td><code>[US1]</code></td>
+                <td>User Story 1 group - tasks in same group are related</td>
+              </tr>
+              <tr>
+                <td><code>[R1]</code></td>
+                <td>Research task - runs before implementation</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Recipe 5: Troubleshoot Stuck -->
+        <section id="troubleshoot-stuck">
+          <h2>Troubleshoot Stuck Orchestration</h2>
+
+          <p><strong>Goal:</strong> Diagnose and fix orchestration that seems frozen.</p>
+
+          <h3>Common Causes</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Symptom</th>
+                <th>Likely Cause</th>
+                <th>Solution</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>No output for 2+ minutes</td>
+                <td>Agent processing complex task</td>
+                <td>Wait - large codebases take time</td>
+              </tr>
+              <tr>
+                <td>Same error repeating</td>
+                <td>Fundamental misunderstanding</td>
+                <td>Restart with clearer requirements</td>
+              </tr>
+              <tr>
+                <td>PM asking questions</td>
+                <td>Ambiguous requirements</td>
+                <td>Answer questions or restart with more detail</td>
+              </tr>
+              <tr>
+                <td>"BLOCKED" status</td>
+                <td>Agent can't proceed</td>
+                <td>Wait for Investigator spawn or provide guidance</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Check Session State</h3>
+
+          <p>The database stores all orchestration state:</p>
+
+          <div class="code-header">Terminal</div>
+          <pre><code># Check recent logs
+sqlite3 bazinga/bazinga.db "SELECT * FROM orchestration_logs ORDER BY timestamp DESC LIMIT 10;"
+
+# Check task group status
+sqlite3 bazinga/bazinga.db "SELECT group_id, status FROM task_groups;"</code></pre>
+
+          <h3>When to Restart</h3>
+
+          <div class="callout warning">
+            <div class="callout-title">Restart If</div>
+            <ul style="margin-bottom: 0;">
+              <li>Same error 3+ times with no progress</li>
+              <li>PM fundamentally misunderstood the task</li>
+              <li>Requirements changed significantly</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Recipe 6: Security Tasks -->
+        <section id="security-tasks">
+          <h2>Handle Security-Sensitive Tasks</h2>
+
+          <p><strong>Goal:</strong> Properly handle authentication, encryption, and security implementations.</p>
+
+          <h3>Automatic Detection</h3>
+
+          <p>BAZINGA automatically detects security-sensitive tasks by keywords:</p>
+
+          <ul>
+            <li><code>auth</code>, <code>authentication</code>, <code>login</code></li>
+            <li><code>password</code>, <code>credential</code>, <code>secret</code></li>
+            <li><code>token</code>, <code>jwt</code>, <code>oauth</code></li>
+            <li><code>encrypt</code>, <code>decrypt</code>, <code>crypto</code></li>
+            <li><code>security</code>, <code>permission</code>, <code>authorization</code></li>
+          </ul>
+
+          <h3>What Happens</h3>
+
+          <p>When security keywords are detected:</p>
+
+          <ol>
+            <li>Task routes to <span class="agent-badge sse">Senior Software Engineer</span> (not regular Developer)</li>
+            <li><span class="agent-badge tl">Tech Lead</span> review is mandatory</li>
+            <li>Security scan runs in <strong>advanced mode</strong> (all severities)</li>
+          </ol>
+
+          <div class="callout tip">
+            <div class="callout-title">Best Practice</div>
+            <p>Be explicit about security requirements:</p>
+            <pre style="margin-top: 8px;"><code>/bazinga.orchestrate Implement JWT authentication:
+- Use bcrypt for password hashing (cost factor 12)
+- Token expiry: 15 minutes access, 7 days refresh
+- Implement token rotation on refresh
+- Add rate limiting to prevent brute force</code></pre>
+          </div>
+        </section>
+
+        <!-- Recipe 7: Change Models -->
+        <section id="change-models">
+          <h2>Change Agent Models</h2>
+
+          <p><strong>Goal:</strong> Upgrade or downgrade models for specific agents.</p>
+
+          <h3>Edit model_selection.json</h3>
+
+          <div class="code-header">bazinga/model_selection.json</div>
+          <pre><code>{
+  "agents": {
+    "developer": "sonnet",           // Upgraded from haiku
+    "senior_software_engineer": "sonnet",
+    "qa_expert": "sonnet",
+    "tech_lead": "opus",             // Always opus (don't change)
+    "project_manager": "opus",       // Always opus (don't change)
+    "investigator": "opus",
+    "validator": "sonnet"
+  }
+}</code></pre>
+
+          <h3>Common Adjustments</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Goal</th>
+                <th>Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Higher quality code</td>
+                <td>Developer: haiku → sonnet</td>
+              </tr>
+              <tr>
+                <td>Faster iteration</td>
+                <td>Keep Developer on haiku (default)</td>
+              </tr>
+              <tr>
+                <td>Cost reduction</td>
+                <td>QA Expert: sonnet → haiku</td>
+              </tr>
+              <tr>
+                <td>Maximum quality</td>
+                <td>All agents → opus (expensive!)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout danger">
+            <div class="callout-title">Never Downgrade</div>
+            <p>Tech Lead and Project Manager must stay on <strong>opus</strong>. These roles make critical decisions that require the strongest model.</p>
+          </div>
+        </section>
+
+        <!-- Recipe 8: Skip QA -->
+        <section id="skip-qa">
+          <h2>Skip QA for Rapid Iteration</h2>
+
+          <p><strong>Goal:</strong> Bypass QA Expert for faster development cycles.</p>
+
+          <h3>Option 1: Minimal Testing Mode</h3>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.configure-testing</code></pre>
+
+          <p>Select "minimal" - QA Expert is disabled, only unit tests required.</p>
+
+          <h3>Option 2: No Tests (READY_FOR_REVIEW)</h3>
+
+          <p>When Developer reports <code>READY_FOR_REVIEW</code> instead of <code>READY_FOR_QA</code>, the workflow skips QA and goes directly to Tech Lead.</p>
+
+          <p>This happens automatically when:</p>
+          <ul>
+            <li>Testing mode is "minimal" or "disabled"</li>
+            <li>No integration/E2E tests were written</li>
+          </ul>
+
+          <div class="callout warning">
+            <div class="callout-title">Trade-off</div>
+            <p>Skipping QA is faster but reduces code quality verification. Use for prototyping, not production code.</p>
+          </div>
+        </section>
+
+        <!-- Recipe 9: Resume Session -->
+        <section id="resume-session">
+          <h2>Resume a Previous Session</h2>
+
+          <p><strong>Goal:</strong> Continue work from a previous orchestration session.</p>
+
+          <h3>Automatic Resume</h3>
+
+          <p>BAZINGA automatically checks for active sessions when you start a new orchestration. If found, it will prompt to resume.</p>
+
+          <h3>Check Session Status</h3>
+
+          <div class="code-header">Terminal</div>
+          <pre><code># List all sessions
+sqlite3 bazinga/bazinga.db "SELECT session_id, status, created_at FROM sessions ORDER BY created_at DESC;"
+
+# Check specific session
+sqlite3 bazinga/bazinga.db "SELECT * FROM task_groups WHERE session_id = 'bazinga_20251205_143022';"</code></pre>
+
+          <h3>Manual Resume</h3>
+
+          <p>If automatic resume doesn't trigger, you can reference the session in your request:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Continue the rate limiter implementation from session bazinga_20251205_143022</code></pre>
+        </section>
+
+        <!-- Recipe 10: Force Escalation -->
+        <section id="force-escalation">
+          <h2>Force Escalation to Senior Engineer</h2>
+
+          <p><strong>Goal:</strong> Skip Haiku Developer and go directly to Senior Software Engineer.</p>
+
+          <h3>Option 1: Use Security Keywords</h3>
+
+          <p>Include security-related keywords in your request to trigger automatic SSE routing:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Implement secure data encryption for user PII fields</code></pre>
+
+          <h3>Option 2: Indicate Complexity</h3>
+
+          <p>Signal that the task requires senior-level expertise:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate [COMPLEX] Refactor the event sourcing system to support snapshotting with configurable intervals and replay capabilities</code></pre>
+
+          <h3>Option 3: Upgrade Developer Model</h3>
+
+          <p>Change Developer to use Sonnet in <code>model_selection.json</code> - effectively making all developers "senior" level.</p>
+
+          <div class="callout info">
+            <div class="callout-title">Natural Escalation</div>
+            <p>Remember: if Haiku Developer fails once, automatic escalation to SSE happens. Sometimes it's okay to let the system try the cheaper model first.</p>
+          </div>
+        </section>
+
+        <!-- Navigation -->
+        <nav class="nav-buttons">
+          <a href="architecture.html" class="nav-button">
+            <span class="label">&larr; Previous</span>
+            <span class="title">BAZINGA Architecture</span>
+          </a>
+          <a href="index.html" class="nav-button next">
+            <span class="label">Back to &rarr;</span>
+            <span class="title">Home</span>
+          </a>
+        </nav>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>BAZINGA Training &bull; Multi-Agent Framework for Claude Code</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quickstart - BAZINGA Training</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="site-logo">BAZINGA Training</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="quickstart.html" class="active">Quickstart</a>
+        <a href="essentials.html">Essentials</a>
+        <a href="mastering.html">Mastering</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="recipes.html">Recipes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article>
+      <header class="article-header">
+        <div class="container content">
+          <span class="badge" style="background: var(--callout-info-bg); color: var(--callout-info-text);">Quickstart</span>
+          <h1>Your First Orchestration in 10 Minutes</h1>
+          <div class="article-meta">
+            <span>10 min read</span>
+            <span>No prerequisites</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="container content article-content">
+        <div class="version-banner">
+          Last verified: BAZINGA v1.0
+        </div>
+
+        <p class="lead" style="font-size: var(--font-size-lg); color: var(--color-text-muted);">
+          Get BAZINGA running and see your AI dev team in action. By the end of this guide, you'll have completed your first multi-agent orchestration.
+        </p>
+
+        <nav class="toc">
+          <h4>On this page</h4>
+          <ol>
+            <li><a href="#what-is-bazinga">What is BAZINGA?</a></li>
+            <li><a href="#prerequisites">Prerequisites</a></li>
+            <li><a href="#run-orchestration">Run Your First Orchestration</a></li>
+            <li><a href="#understand-output">Understand the Output</a></li>
+            <li><a href="#next-steps">Next Steps</a></li>
+          </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <section id="what-is-bazinga">
+          <h2>1. What is BAZINGA?</h2>
+
+          <p>BAZINGA transforms Claude Code into a <strong>multi-agent development team</strong>. Instead of one AI doing everything, specialized agents collaborate:</p>
+
+          <div class="workflow">
+            <span class="agent-badge pm">PM</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge dev">Developer</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge qa">QA</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge tl">Tech Lead</span>
+            <span class="workflow-arrow">&rarr;</span>
+            <span class="agent-badge pm">PM</span>
+          </div>
+
+          <ul>
+            <li><strong>Project Manager</strong> - Analyzes requirements, creates task groups, signals completion</li>
+            <li><strong>Developer</strong> - Implements code and writes tests</li>
+            <li><strong>QA Expert</strong> - Runs integration and E2E tests</li>
+            <li><strong>Tech Lead</strong> - Reviews code quality and security</li>
+          </ul>
+
+          <p>When the PM is satisfied that all requirements are met, it sends <strong>"BAZINGA!"</strong> - your signal that the work is complete.</p>
+        </section>
+
+        <!-- Section 2 -->
+        <section id="prerequisites">
+          <h2>2. Prerequisites</h2>
+
+          <div class="callout info">
+            <div class="callout-title">Requirements</div>
+            <ul style="margin-bottom: 0;">
+              <li>Claude Code installed and working</li>
+              <li>A project directory with some code</li>
+              <li>BAZINGA files in your project (via <code>bazinga install</code> or manual setup)</li>
+            </ul>
+          </div>
+
+          <h3>Verify Your Setup</h3>
+
+          <p>Check that the BAZINGA slash commands are available:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate</code></pre>
+
+          <p>If this command is recognized, you're ready to go. If not, ensure the <code>.claude/commands/bazinga.orchestrate.md</code> file exists in your project.</p>
+        </section>
+
+        <!-- Section 3 -->
+        <section id="run-orchestration">
+          <h2>3. Run Your First Orchestration</h2>
+
+          <p>Let's run a simple orchestration. In Claude Code, type:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Add a health check endpoint at /api/health that returns { "status": "ok", "timestamp": "ISO date" }</code></pre>
+
+          <div class="callout tip">
+            <div class="callout-title">Good First Tasks</div>
+            <p>Start with something concrete and self-contained:</p>
+            <ul style="margin-bottom: 0;">
+              <li>Add a utility function</li>
+              <li>Create an API endpoint</li>
+              <li>Add input validation</li>
+              <li>Write a new test file</li>
+            </ul>
+          </div>
+
+          <h3>What Happens Next</h3>
+
+          <p>Once you hit enter, BAZINGA springs into action:</p>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Orchestrator Initializes</h4>
+              <p>The orchestrator loads configuration and spawns the Project Manager.</p>
+            </div>
+            <div class="step">
+              <h4>PM Analyzes Requirements</h4>
+              <p>The PM breaks down your request into task groups and decides execution mode (simple or parallel).</p>
+            </div>
+            <div class="step">
+              <h4>Developer Implements</h4>
+              <p>A Developer agent writes the code and tests.</p>
+            </div>
+            <div class="step">
+              <h4>QA Tests (if applicable)</h4>
+              <p>If integration tests exist and testing mode is "full", QA Expert runs them.</p>
+            </div>
+            <div class="step">
+              <h4>Tech Lead Reviews</h4>
+              <p>Tech Lead runs security scans and reviews code quality.</p>
+            </div>
+            <div class="step">
+              <h4>PM Validates & Sends BAZINGA</h4>
+              <p>PM verifies success criteria are met and signals completion.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4 -->
+        <section id="understand-output">
+          <h2>4. Understand the Output</h2>
+
+          <p>During orchestration, you'll see status messages like this:</p>
+
+          <div class="capsule">
+            <div class="capsule-header">Orchestration Transcript</div>
+            <div class="capsule-body">
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Initializing session bazinga_20251205_143022...
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Phase 1 - Spawning Project Manager...
+              </div>
+              <div class="capsule-message pm">
+                <strong>PM</strong>: Analyzing requirements... Created 1 task group. Mode: SIMPLE
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Phase 2 - Spawning Developer for group US1...
+              </div>
+              <div class="capsule-message dev">
+                <strong>DEVELOPER</strong>: Implementing health check endpoint... Status: READY_FOR_REVIEW
+              </div>
+              <div class="capsule-message orchestrator">
+                <strong>ORCHESTRATOR</strong>: Routing to Tech Lead...
+              </div>
+              <div class="capsule-message tl">
+                <strong>TECH LEAD</strong>: Running security scan... Code review passed. Status: APPROVED
+              </div>
+              <div class="capsule-message pm">
+                <strong>PM</strong>: All success criteria verified. <strong style="color: var(--color-primary);">BAZINGA!</strong>
+              </div>
+            </div>
+          </div>
+
+          <h3>Key Status Codes</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Meaning</th>
+                <th>Next Step</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>READY_FOR_QA</code></td>
+                <td>Developer finished with tests</td>
+                <td>Routes to QA Expert</td>
+              </tr>
+              <tr>
+                <td><code>READY_FOR_REVIEW</code></td>
+                <td>Developer finished without tests</td>
+                <td>Routes to Tech Lead</td>
+              </tr>
+              <tr>
+                <td><code>PASS</code></td>
+                <td>QA tests passed</td>
+                <td>Routes to Tech Lead</td>
+              </tr>
+              <tr>
+                <td><code>APPROVED</code></td>
+                <td>Tech Lead approved code</td>
+                <td>Routes back to PM</td>
+              </tr>
+              <tr>
+                <td><code>BAZINGA</code></td>
+                <td>All done!</td>
+                <td>Project complete</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Section 5 -->
+        <section id="next-steps">
+          <h2>5. Next Steps</h2>
+
+          <p>Congratulations! You've completed your first BAZINGA orchestration. Here's where to go next:</p>
+
+          <div class="course-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="course-card">
+              <h3>Learn the Fundamentals</h3>
+              <p>Understand how agents collaborate, how to craft effective requests, and common patterns.</p>
+              <a href="essentials.html" class="cta">BAZINGA Essentials &rarr;</a>
+            </div>
+            <div class="course-card">
+              <h3>Quick Solutions</h3>
+              <p>Jump to specific recipes for parallel mode, configuration, and troubleshooting.</p>
+              <a href="recipes.html" class="cta">Browse Recipes &rarr;</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Hard Rules -->
+        <div class="hard-rules">
+          <h4>Hard Rules to Remember</h4>
+          <ul>
+            <li><strong>Don't interrupt</strong> - Let BAZINGA finish; agents handle retries automatically</li>
+            <li><strong>BAZINGA = done</strong> - When PM sends BAZINGA, the work is complete</li>
+            <li><strong>Failures are normal</strong> - Seeing retries and escalations is expected behavior</li>
+          </ul>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="nav-buttons">
+          <a href="index.html" class="nav-button">
+            <span class="label">&larr; Previous</span>
+            <span class="title">Home</span>
+          </a>
+          <a href="essentials.html" class="nav-button next">
+            <span class="label">Next &rarr;</span>
+            <span class="title">BAZINGA Essentials</span>
+          </a>
+        </nav>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>BAZINGA Training &bull; Multi-Agent Framework for Claude Code</p>
+    </div>
+  </footer>
+</body>
+</html>
