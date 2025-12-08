@@ -935,3 +935,90 @@ The warning message in console provides debugging info for developers.
 | Skipped inline comment | ✅ Yes (explain why) | ❌ No (leave open) |
 | PR comment (any) | ✅ Yes (response table) | N/A |
 | Bot analysis | ✅ Yes (response table) | N/A |
+
+---
+
+## 🔍 Final Step: Implementation vs Original Requirements Comparison
+
+**After the review loop completes (all reviews pass or timeout), you MUST perform a final comparison.**
+
+### Purpose
+
+PR reviews can cause implementation drift. Reviewers suggest changes that improve code quality but may inadvertently alter the original intent. This step ensures the core requirements are still met.
+
+### Comparison Template
+
+```markdown
+## Implementation vs Original Requirements Comparison
+
+### Original Problem
+[What issue/feature was being addressed]
+
+### Original Solution Approach
+[What was the planned fix/implementation]
+
+---
+
+### How PR Reviews Changed the Implementation
+
+| Aspect | Original Design | After Reviews |
+|--------|-----------------|---------------|
+| [Area 1] | [What we planned] | [What we implemented] |
+| [Area 2] | [What we planned] | [What we implemented] |
+| ... | ... | ... |
+
+---
+
+### Key Differences from Original Intent
+
+1. **[Category]** - [Description of change and why]
+2. **[Category]** - [Description of change and why]
+
+---
+
+### Items NOT Changed (By Design)
+
+- [Item]: [Why we kept original approach despite reviewer suggestion]
+
+---
+
+### Summary
+
+[Confirm original requirements are met / Note any scope changes]
+```
+
+### Categories to Compare
+
+| Category | Questions to Ask |
+|----------|------------------|
+| **Core Logic** | Did the fundamental approach change? |
+| **Security** | Were security measures added that weren't originally planned? |
+| **Error Handling** | Is error handling more/less strict than intended? |
+| **Edge Cases** | Were new edge cases handled that change behavior? |
+| **Performance** | Were optimizations added that change complexity? |
+| **API/Interface** | Did function signatures or interfaces change? |
+
+### When to Flag Concerns
+
+**🟢 No concern:**
+- Reviews added defensive improvements (security, validation, error handling)
+- Reviews improved code quality without changing behavior
+- Reviews added support for edge cases within original scope
+
+**🟡 Note but proceed:**
+- Reviews expanded scope slightly (e.g., added aliases, new formats)
+- Reviews changed implementation details but preserved intent
+- Reviews added features "for free" that align with original goals
+
+**🔴 Discuss with user:**
+- Reviews fundamentally changed the approach
+- Reviews removed originally planned functionality
+- Reviews added complexity that may not be needed
+- Original requirements may no longer be fully met
+
+### Output
+
+Present the comparison to the user before declaring the PR review complete. This ensures:
+1. User understands what changed
+2. Any scope drift is intentional
+3. Original problem is still solved
