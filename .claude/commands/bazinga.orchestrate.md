@@ -1266,8 +1266,10 @@ IF specializations is null OR empty:
 
 **Step 4: Invoke specialization-loader skill**
 
-Provide context before invoking:
-```
+**🔴 CRITICAL: TWO SEPARATE ACTIONS** (the Skill tool reads context from conversation, not parameters)
+
+**Action 4a: Output context as text FIRST (not in tool call):**
+```text
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
@@ -1275,7 +1277,12 @@ Model: {model from model_selection.json}
 Specialization Paths: {JSON array from step 3}
 ```
 
-Then invoke: `Skill(command: "specialization-loader")`
+**Action 4b: THEN invoke the skill:**
+```
+Skill(command: "specialization-loader")
+```
+
+The skill reads the context you output above and returns the composed block.
 
 **Step 5: Extract composed block**
 

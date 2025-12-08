@@ -40,18 +40,49 @@ Model: {haiku|sonnet|opus}
 Specialization Paths: {JSON array of template paths}
 ```
 
-### Step 2: Read Project Context
+### Step 2: Read Project Context (with Fallback Detection)
 
+**Step 2a: Try reading cached project context**
 ```bash
 cat bazinga/project_context.json
 ```
 
-Extract:
-- `primary_language` and version (if detected)
+**Step 2b: If file missing → Run inline fallback detection**
+
+If `project_context.json` doesn't exist, detect versions from common config files:
+
+```bash
+# TypeScript/Node version
+cat package.json 2>/dev/null | grep -E '"typescript"|"node"' || true
+
+# Python version
+cat pyproject.toml 2>/dev/null | grep -E 'python|requires-python' || true
+cat .python-version 2>/dev/null || true
+
+# Go version
+cat go.mod 2>/dev/null | head -3 || true
+
+# Java version
+cat pom.xml 2>/dev/null | grep -E '<java.version>|<maven.compiler' || true
+cat build.gradle 2>/dev/null | grep -E 'sourceCompatibility|targetCompatibility' || true
+```
+
+**Parse detected versions into a temporary context:**
+```
+detected_versions = {
+  "typescript": "5.x" (from package.json),
+  "node": "20.x" (from package.json engines),
+  "python": "3.11" (from pyproject.toml),
+  ...
+}
+```
+
+**Step 2c: Extract for version guards**
+- `primary_language` and version (from project_context OR fallback detection)
 - `components[].framework` and version
 - `components[].type` (frontend/backend/fullstack)
 
-If project_context.json missing, use conservative defaults (no version-specific sections).
+**Fallback priority:** project_context.json > inline detection > conservative defaults (no version guards)
 
 ### Step 3: Determine Token Budget
 
@@ -351,7 +382,8 @@ Metadata:
 
 | Scenario | Action |
 |----------|--------|
-| project_context.json missing | Use conservative defaults, skip version guards |
+| project_context.json missing | **Run inline fallback detection** (Step 2b) from package.json, pyproject.toml, go.mod, etc. |
+| Fallback detection finds nothing | Use conservative defaults (no version-specific sections) |
 | Template file not found | Skip that template, log warning, continue |
 | All templates invalid | Return minimal identity-only block |
 | Token budget exceeded | Apply trimming strategy, never exceed hard limit |

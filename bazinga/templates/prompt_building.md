@@ -111,16 +111,23 @@ If null or empty → skip specialization loading.
 
 **Step 3: Invoke specialization-loader skill**
 
-Provide context, then invoke:
-```
+**🔴 CRITICAL: TWO SEPARATE ACTIONS** (the Skill tool reads context from conversation, not parameters)
+
+**Action 3a: Output context as text FIRST (not in tool call):**
+```text
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
 Model: {haiku|sonnet|opus}
-Specialization Paths: {JSON array}
+Specialization Paths: {JSON array from Step 2}
+```
 
+**Action 3b: THEN invoke the skill:**
+```
 Skill(command: "specialization-loader")
 ```
+
+The skill reads the context you output above and returns the composed block.
 
 **Step 4: Extract and prepend composed block**
 

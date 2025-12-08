@@ -171,7 +171,7 @@ Limit: 3
 ```
 Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that group's prompt (see Simple Mode §Context Package Routing Rules for format). Query errors are non-blocking.
 
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md`. **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
+**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
 
 **Show Prompt Summaries (PER GROUP):** Output structured summary for each group (NOT full prompts):
 ```text
@@ -185,7 +185,7 @@ Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that g
    • {requirement_2}
 
    **Branch:** {group_branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Skills: {skills_list}
+   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 
 **Spawn ALL in ONE message (MAX 4 groups):**
