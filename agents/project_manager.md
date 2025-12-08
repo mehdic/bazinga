@@ -1531,13 +1531,63 @@ If `project_context.json` exists but lacks `components[].suggested_specializatio
 **Helper functions:**
 
 ```
+# Build MAPPING_TABLE from the canonical key table above
+MAPPING_TABLE = {
+  "typescript": "bazinga/templates/specializations/01-languages/typescript.md",
+  "javascript": "bazinga/templates/specializations/01-languages/javascript.md",
+  "python": "bazinga/templates/specializations/01-languages/python.md",
+  "java": "bazinga/templates/specializations/01-languages/java.md",
+  "go": "bazinga/templates/specializations/01-languages/go.md",
+  "rust": "bazinga/templates/specializations/01-languages/rust.md",
+  "react": "bazinga/templates/specializations/02-frameworks-frontend/react.md",
+  "nextjs": "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
+  "vue": "bazinga/templates/specializations/02-frameworks-frontend/vue.md",
+  "angular": "bazinga/templates/specializations/02-frameworks-frontend/angular.md",
+  "express": "bazinga/templates/specializations/03-frameworks-backend/express.md",
+  "fastapi": "bazinga/templates/specializations/03-frameworks-backend/fastapi.md",
+  "django": "bazinga/templates/specializations/03-frameworks-backend/django.md",
+  "springboot": "bazinga/templates/specializations/03-frameworks-backend/spring-boot.md",
+  "kubernetes": "bazinga/templates/specializations/06-infrastructure/kubernetes.md",
+  "docker": "bazinga/templates/specializations/06-infrastructure/docker.md",
+  "postgresql": "bazinga/templates/specializations/05-databases/postgresql.md",
+  "mongodb": "bazinga/templates/specializations/05-databases/mongodb.md",
+  "playwright": "bazinga/templates/specializations/08-testing/playwright-cypress.md",
+  "jest": "bazinga/templates/specializations/08-testing/jest-vitest.md"
+}
+
+# Utility: Remove punctuation characters from string
+FUNCTION remove_punctuation(text):
+  # Remove characters: . - _ and other punctuation
+  result = ""
+  FOR each char in text:
+    IF char is alphanumeric or space:
+      result += char
+  RETURN result
+
+# Utility: Remove all spaces from string
+FUNCTION remove_spaces(text):
+  RETURN text.replace(" ", "")
+
+# Utility: Check if file exists on filesystem
+FUNCTION file_exists(path):
+  # Use os.path.exists() or pathlib.Path(path).exists()
+  RETURN true if file exists at path, false otherwise
+
 # Normalize input to canonical key (lowercase, remove punctuation/spaces)
+# Normalization rules:
+# 1. Convert to lowercase
+# 2. Strip leading/trailing whitespace
+# 3. Remove punctuation (., -, _) → "Next.js" becomes "nextjs", "Spring Boot" becomes "springboot"
+# 4. Remove all spaces → "spring boot" becomes "springboot"
+# 5. Apply explicit alias mapping for common abbreviations
 FUNCTION normalize_key(input):
   key = input.lower().strip()
   key = remove_punctuation(key)  # "Next.js" → "nextjs", "Spring Boot" → "springboot"
   key = remove_spaces(key)       # "spring boot" → "springboot"
 
   # Explicit alias mapping for edge cases
+  # Note: "spring" intentionally maps to "springboot" as Spring Boot is the most common usage
+  # in modern projects. If Spring Framework (non-Boot) specialization is needed, add separate entry.
   ALIAS_MAP = {
     "k8s": "kubernetes",
     "ts": "typescript",
@@ -1574,12 +1624,20 @@ FUNCTION dedupe_stable(items):
   RETURN result
 
 # Lookup with normalization and file existence check
+# Emits warnings for unmapped technologies or missing files to aid diagnosis
 FUNCTION lookup_and_validate(input):
   key = normalize_key(input)
   path = MAPPING_TABLE.get(key)  # Returns None if not found
-  IF path AND file_exists(path):
-    RETURN path
-  RETURN None
+
+  IF path is None:
+    LOG_WARNING("Technology '{}' (normalized: '{}') not found in mapping table", input, key)
+    RETURN None
+
+  IF NOT file_exists(path):
+    LOG_WARNING("Template file does not exist: {}", path)
+    RETURN None
+
+  RETURN path
 ```
 
 **Fallback logic:**
@@ -1599,20 +1657,26 @@ IF project_context has NO components[].suggested_specializations:
       path = lookup_and_validate(fw)
       IF path: specializations.append(path)
 
-  # Map database (if available in project_context)
+  # Map database(s) - may contain multiple like "PostgreSQL, Redis"
   IF project_context.database:
-    path = lookup_and_validate(project_context.database)
-    IF path: specializations.append(path)
+    databases = parse_frameworks(project_context.database)  # Reuse parser for consistency
+    FOR each db in databases:
+      path = lookup_and_validate(db)
+      IF path: specializations.append(path)
 
-  # Map infrastructure (if available)
+  # Map infrastructure - may contain multiple like "Docker, Kubernetes"
   IF project_context.infrastructure:
-    path = lookup_and_validate(project_context.infrastructure)
-    IF path: specializations.append(path)
+    infra_items = parse_frameworks(project_context.infrastructure)  # Reuse parser for consistency
+    FOR each item in infra_items:
+      path = lookup_and_validate(item)
+      IF path: specializations.append(path)
 
-  # Map testing framework (if available)
+  # Map testing framework(s) - may contain multiple like "Jest, Playwright"
   IF project_context.testing:
-    path = lookup_and_validate(project_context.testing)
-    IF path: specializations.append(path)
+    test_frameworks = parse_frameworks(project_context.testing)  # Reuse parser for consistency
+    FOR each tf in test_frameworks:
+      path = lookup_and_validate(tf)
+      IF path: specializations.append(path)
 
   # Stable deduplicate (preserves order)
   specializations = dedupe_stable(specializations)
@@ -1652,12 +1716,27 @@ Example project_context.json structure:
 
 ```
 # Helper: Check if target_path is within component.path (proper boundary)
+# Uses proper path normalization and guards against path traversal attacks
 FUNCTION path_matches(target_path, component_path):
-  # Normalize: ensure component_path ends with /
-  normalized_component = component_path.rstrip("/") + "/"
-  normalized_target = target_path.rstrip("/") + "/"
-  # Match if target is at or inside component path
-  RETURN normalized_target.startswith(normalized_component) OR target_path == component_path.rstrip("/")
+  # Import: os.path (or pathlib.Path)
+
+  # Normalize both paths to handle:
+  # - OS-specific separators (\ on Windows, / on Unix)
+  # - Remove redundant separators (// → /)
+  # - Resolve relative components (but NOT symlinks for security)
+  norm_target = os.path.normpath(target_path)
+  norm_component = os.path.normpath(component_path)
+
+  # Guard against path traversal: Check if target is within component boundary
+  # os.path.commonpath returns the longest common sub-path
+  # If common path equals component path, target is within or equal to component
+  TRY:
+    common = os.path.commonpath([norm_target, norm_component])
+    # Target is within component if common path equals component path
+    RETURN common == norm_component OR norm_target == norm_component
+  CATCH ValueError:
+    # Raised when paths are on different drives (Windows) or no common path
+    RETURN False
 
 FOR each task_group:
   specializations = []
@@ -1694,16 +1773,25 @@ FOR each task_group:
         IF path: specializations.append(path)
 
     IF project_context.database:
-      path = lookup_and_validate(project_context.database)
-      IF path: specializations.append(path)
+      # Parse database(s) - may contain multiple like "PostgreSQL, Redis"
+      databases = parse_frameworks(project_context.database)
+      FOR each db in databases:
+        path = lookup_and_validate(db)
+        IF path: specializations.append(path)
 
     IF project_context.infrastructure:
-      path = lookup_and_validate(project_context.infrastructure)
-      IF path: specializations.append(path)
+      # Parse infrastructure - may contain multiple like "Docker, Kubernetes"
+      infra_items = parse_frameworks(project_context.infrastructure)
+      FOR each item in infra_items:
+        path = lookup_and_validate(item)
+        IF path: specializations.append(path)
 
     IF project_context.testing:
-      path = lookup_and_validate(project_context.testing)
-      IF path: specializations.append(path)
+      # Parse testing framework(s) - may contain multiple like "Jest, Playwright"
+      test_frameworks = parse_frameworks(project_context.testing)
+      FOR each tf in test_frameworks:
+        path = lookup_and_validate(tf)
+        IF path: specializations.append(path)
 
     specializations = dedupe_stable(specializations)  # Preserve insertion order
 
