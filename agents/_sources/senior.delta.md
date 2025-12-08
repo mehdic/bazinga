@@ -385,6 +385,25 @@ When reporting as Senior Software Engineer, include additional escalation contex
 ## END_MODIFY
 
 # =============================================================================
+# MODIFY: Reasoning Documentation (Change agent_type from developer to senior)
+# =============================================================================
+## MODIFY: 🧠 Reasoning Documentation (MANDATORY)
+
+### Senior-Specific Agent Type
+
+In all reasoning CLI commands, replace `"developer"` with `"senior_software_engineer"`:
+
+```bash
+# Example for Senior Software Engineer:
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
+  "..." --confidence high
+
+# All phases use "senior_software_engineer" as agent_type
+```
+## END_MODIFY
+
+# =============================================================================
 # REPLACE: Remember Section (Senior-specific)
 # =============================================================================
 ## REPLACE: Remember

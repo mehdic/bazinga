@@ -372,6 +372,115 @@ Action:
 
 ---
 
+## 🧠 Reasoning Documentation (MANDATORY)
+
+**CRITICAL**: You MUST document your reasoning via the bazinga-db skill. This is NOT optional.
+
+### Why This Matters
+
+Your reasoning is:
+- **Queryable** by PM/Tech Lead for reviews
+- **Passed** to next agent in workflow (handoffs)
+- **Preserved** across context compactions
+- **Available** for debugging failures
+- **Used** by Investigator for root cause analysis
+- **Secrets automatically redacted** before storage
+
+### Required Reasoning Phases
+
+| Phase | When | What to Document |
+|-------|------|-----------------|
+| `understanding` | **REQUIRED** at task start | Your interpretation of requirements, what's unclear |
+| `approach` | After analysis | Your planned solution, why this approach |
+| `decisions` | During implementation | Key choices made, alternatives considered |
+| `risks` | If identified | What could go wrong, mitigations |
+| `blockers` | If stuck | What's blocking, what you tried |
+| `pivot` | If changing approach | Why original approach didn't work |
+| `completion` | **REQUIRED** at task end | Summary of what was done and key learnings |
+
+**Minimum requirement:** `understanding` at start + `completion` at end
+
+### How to Save Reasoning
+
+```bash
+# At task START - Document your understanding (REQUIRED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "developer" "understanding" \
+  "## Understanding
+
+### Task Interpretation
+[What I understand the task to be]
+
+### Key Requirements
+1. [Requirement 1]
+2. [Requirement 2]
+
+### Unclear Points
+- [What needs clarification]
+
+### Files to Examine
+- [file1.py]
+- [file2.py]" \
+  --confidence high \
+  --references '["file1.py", "file2.py"]'
+
+# During implementation - Document decisions (RECOMMENDED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "developer" "decisions" \
+  "## Decisions
+
+### Chosen Approach
+[What approach I chose]
+
+### Why This Approach
+1. [Reason 1]
+2. [Reason 2]
+
+### Alternatives Considered
+- [Alternative 1] → [Why rejected]
+- [Alternative 2] → [Why rejected]" \
+  --confidence medium
+
+# At task END - Document completion (REQUIRED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "developer" "completion" \
+  "## Completion Summary
+
+### What Was Done
+- [Change 1]
+- [Change 2]
+
+### Key Learnings
+- [Learning 1]
+- [Learning 2]
+
+### Open Questions
+- [Any remaining questions for Tech Lead]" \
+  --confidence high \
+  --references '["modified_file1.py", "modified_file2.py"]'
+```
+
+### When to Document Each Phase
+
+1. **understanding** - IMMEDIATELY after receiving task, BEFORE any implementation
+2. **approach** - After initial analysis, when you've decided how to proceed
+3. **decisions** - When making key architectural/implementation choices
+4. **risks** - When you identify potential issues or edge cases
+5. **blockers** - When you encounter obstacles you can't immediately resolve
+6. **pivot** - When you need to change your approach significantly
+7. **completion** - AFTER all implementation is done, BEFORE reporting status
+
+### Integration with Workflow
+
+Your workflow becomes:
+1. Receive task → **Save `understanding` reasoning** → Read context
+2. Plan approach → **Save `approach` reasoning** (optional but recommended)
+3. Implement → **Save `decisions` reasoning** as needed
+4. Test → Fix issues
+5. Complete → **Save `completion` reasoning** → Report status
+
+---
+
 ## Pre-Implementation Code Quality Tools
 
 **Before implementing, you have access to automated Skills:**

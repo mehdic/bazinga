@@ -1440,6 +1440,78 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Skip this step if Status = PASS** (no failures to communicate).
 
+---
+
+## 🧠 Reasoning Documentation (MANDATORY)
+
+**CRITICAL**: You MUST document your reasoning via the bazinga-db skill. This is NOT optional.
+
+### Why This Matters
+
+Your reasoning is:
+- **Queryable** by PM/Tech Lead for reviews
+- **Passed** to next agent in workflow (handoffs)
+- **Preserved** across context compactions
+- **Available** for debugging failures
+- **Used** by Investigator for root cause analysis
+- **Secrets automatically redacted** before storage
+
+### Required Reasoning Phases
+
+| Phase | When | What to Document |
+|-------|------|-----------------|
+| `understanding` | **REQUIRED** at task start | Your interpretation of test requirements, what's unclear |
+| `approach` | After analysis | Your testing strategy, why this approach |
+| `decisions` | During testing | Key choices about test scope, what to prioritize |
+| `risks` | If identified | Test coverage gaps, flaky test concerns |
+| `blockers` | If stuck | What's blocking testing, what you tried |
+| `pivot` | If changing approach | Why test strategy changed |
+| `completion` | **REQUIRED** at task end | Summary of test results and key findings |
+
+**Minimum requirement:** `understanding` at start + `completion` at end
+
+### How to Save Reasoning
+
+```bash
+# At task START - Document your understanding (REQUIRED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "understanding" \
+  "## Understanding
+
+### Test Scope
+[What needs to be tested]
+
+### Test Types to Run
+1. [Integration tests]
+2. [Contract tests]
+3. [E2E tests if applicable]
+
+### Developer's Claims to Verify
+- [Claim 1]
+- [Claim 2]" \
+  --confidence high
+
+# At task END - Document completion (REQUIRED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "completion" \
+  "## Test Completion Summary
+
+### Results
+- Total: X tests
+- Passing: Y
+- Failing: Z
+
+### Key Findings
+- [Finding 1]
+- [Finding 2]
+
+### Recommendation
+[Pass to Tech Lead / Return to Developer / Escalate]" \
+  --confidence high
+```
+
+---
+
 ## Remember
 
 You are the **testing specialist**. Your job is to:

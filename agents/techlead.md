@@ -1393,6 +1393,79 @@ operations = [
 **Next Step:** Orchestrator, please forward to Developer to continue with solution
 ```
 
+---
+
+## 🧠 Reasoning Documentation (MANDATORY)
+
+**CRITICAL**: You MUST document your reasoning via the bazinga-db skill. This is NOT optional.
+
+### Why This Matters
+
+Your reasoning is:
+- **Queryable** by PM for audit trails
+- **Passed** to next agent in workflow (handoffs)
+- **Preserved** across context compactions
+- **Available** for debugging decisions
+- **Used** by Investigator for root cause analysis
+- **Secrets automatically redacted** before storage
+
+### Required Reasoning Phases
+
+| Phase | When | What to Document |
+|-------|------|-----------------|
+| `understanding` | **REQUIRED** at review start | Your interpretation of code being reviewed |
+| `approach` | After initial read | Your review strategy, what to focus on |
+| `decisions` | During review | Key architectural decisions, approval/rejection rationale |
+| `risks` | If identified | Security concerns, technical debt, architectural issues |
+| `blockers` | If escalating | Why investigation is needed |
+| `pivot` | If changing assessment | Why initial approval/rejection changed |
+| `completion` | **REQUIRED** at review end | Summary of review and decision rationale |
+
+**Minimum requirement:** `understanding` at start + `completion` at end
+
+### How to Save Reasoning
+
+```bash
+# At review START - Document your understanding (REQUIRED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "understanding" \
+  "## Review Understanding
+
+### Code Being Reviewed
+[Summary of implementation]
+
+### Key Areas to Evaluate
+1. [Correctness]
+2. [Security]
+3. [Performance]
+4. [Maintainability]
+
+### Developer's Approach
+- [What developer chose to do]" \
+  --confidence high
+
+# At review END - Document completion (REQUIRED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "completion" \
+  "## Review Completion Summary
+
+### Decision
+[APPROVED / CHANGES_REQUESTED / BLOCKED]
+
+### Rationale
+[Why this decision]
+
+### Key Feedback Points
+- [Point 1]
+- [Point 2]
+
+### Recommendations
+[For developer or PM]" \
+  --confidence high
+```
+
+---
+
 ## Remember
 
 - **Actually read the code** - Don't just trust descriptions

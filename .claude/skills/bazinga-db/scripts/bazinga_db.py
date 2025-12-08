@@ -25,12 +25,26 @@ import argparse
 # Secret patterns for redaction (compiled for performance)
 # See: research/agent-reasoning-capture-ultrathink.md
 SECRET_PATTERNS = [
+    # Generic patterns
     (re.compile(r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?([a-zA-Z0-9_-]{20,})["\']?'), 'API_KEY_REDACTED'),
     (re.compile(r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*["\']?([^\s"\']+)["\']?'), 'SECRET_REDACTED'),
     (re.compile(r'(?i)(token|bearer)\s*[=:]\s*["\']?([a-zA-Z0-9_.-]{20,})["\']?'), 'TOKEN_REDACTED'),
+    # OpenAI
     (re.compile(r'sk-[a-zA-Z0-9]{20,}'), 'OPENAI_KEY_REDACTED'),
+    # Anthropic
+    (re.compile(r'sk-ant-[a-zA-Z0-9-]{20,}'), 'ANTHROPIC_KEY_REDACTED'),
+    # GitHub
     (re.compile(r'ghp_[a-zA-Z0-9]{36}'), 'GITHUB_TOKEN_REDACTED'),
+    (re.compile(r'gho_[a-zA-Z0-9]{36}'), 'GITHUB_OAUTH_REDACTED'),
+    (re.compile(r'github_pat_[a-zA-Z0-9_]{22,}'), 'GITHUB_PAT_REDACTED'),
+    # AWS
+    (re.compile(r'AKIA[0-9A-Z]{16}'), 'AWS_ACCESS_KEY_REDACTED'),
+    (re.compile(r'(?i)aws[_-]?secret[_-]?access[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9/+=]{40})["\']?'), 'AWS_SECRET_REDACTED'),
+    # Private keys
     (re.compile(r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'), 'PRIVATE_KEY_REDACTED'),
+    (re.compile(r'-----BEGIN OPENSSH PRIVATE KEY-----'), 'SSH_KEY_REDACTED'),
+    # Slack
+    (re.compile(r'xox[baprs]-[a-zA-Z0-9-]{10,}'), 'SLACK_TOKEN_REDACTED'),
 ]
 
 
@@ -1944,6 +1958,49 @@ class BazingaDB:
 
         return "\n".join(lines)
 
+    # Mandatory reasoning phases that must be documented
+    MANDATORY_PHASES = frozenset({'understanding', 'completion'})
+
+    def check_mandatory_phases(self, session_id: str, group_id: str,
+                               agent_type: str) -> Dict[str, Any]:
+        """Check if mandatory reasoning phases have been documented.
+
+        Args:
+            session_id: Session identifier
+            group_id: Task group identifier
+            agent_type: Type of agent to check
+
+        Returns:
+            Dict with:
+                - complete: bool - True if all mandatory phases documented
+                - missing: List[str] - Phases not yet documented
+                - documented: List[str] - Phases that have been documented
+        """
+        conn = self._get_connection()
+
+        # Get all reasoning phases for this agent/group
+        rows = conn.execute("""
+            SELECT DISTINCT reasoning_phase
+            FROM orchestration_logs
+            WHERE session_id = ? AND group_id = ? AND agent_type = ?
+              AND log_type = 'reasoning' AND reasoning_phase IS NOT NULL
+        """, (session_id, group_id, agent_type)).fetchall()
+        conn.close()
+
+        documented = {row['reasoning_phase'] for row in rows}
+        missing = list(self.MANDATORY_PHASES - documented)
+        documented_mandatory = list(self.MANDATORY_PHASES & documented)
+
+        return {
+            'complete': len(missing) == 0,
+            'missing': sorted(missing),
+            'documented': sorted(documented_mandatory),
+            'all_documented': sorted(documented),
+            'session_id': session_id,
+            'group_id': group_id,
+            'agent_type': agent_type,
+        }
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -2026,6 +2083,9 @@ REASONING CAPTURE OPERATIONS:
                                               Get reasoning entries with optional filters (default: limit=50)
   reasoning-timeline <session> [--group_id X] [--format json|markdown]
                                               Get chronological reasoning timeline (default: format=json)
+  check-mandatory-phases <session> <group_id> <agent_type>
+                                              Check if mandatory phases (understanding, completion) are documented
+                                              Returns exit code 1 if phases are missing
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -2431,6 +2491,22 @@ def main():
 
             result = db.reasoning_timeline(session_id, group_id=group_id, format=fmt)
             print(result)
+        elif cmd == 'check-mandatory-phases':
+            # Required: session_id, group_id, agent_type
+            if len(cmd_args) < 3:
+                print("Error: check-mandatory-phases requires 3 args: <session_id> <group_id> <agent_type>", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            agent_type = cmd_args[2]
+
+            result = db.check_mandatory_phases(session_id, group_id, agent_type)
+            print(json.dumps(result, indent=2))
+
+            # Exit with error code if mandatory phases are missing
+            if not result['complete']:
+                sys.exit(1)
         elif cmd == 'query':
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)
