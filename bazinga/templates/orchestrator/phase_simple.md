@@ -76,7 +76,7 @@ Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
    • {requirement_3_if_applicable}
 
    **Branch:** {branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
+   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
    **Testing:** {testing_mode} | QA: {qa_status}
 ```
 **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
@@ -229,7 +229,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
    **Dev's test coverage:** {coverage_pct}%
 
    **Challenge Level:** {challenge_level}/5 ({challenge_name})
-   **Config:** Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
+   **Config:** Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
 
@@ -317,7 +317,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
    **Dev summary:** {dev_summary_truncated} (max 100 chars)
    **QA result:** {qa_result} | Coverage: {coverage_pct}% | Tests: {tests_passed}/{tests_total}
 
-   **Config:** Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
+   **Config:** Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
 

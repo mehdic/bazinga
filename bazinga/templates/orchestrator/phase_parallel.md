@@ -185,7 +185,7 @@ Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that g
    • {requirement_2}
 
    **Branch:** {group_branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
+   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 
 **Spawn ALL in ONE message (MAX 4 groups):**
