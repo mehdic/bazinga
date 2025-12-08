@@ -32,10 +32,10 @@ SECRET_PATTERNS = [
     (re.compile(r'(?i)\b(api[_-]?key|apikey)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}["\']?'), r'\1=REDACTED'),
     (re.compile(r'(?i)\b(secret|password|passwd|pwd)\s*[=:]\s*["\']?[^\s"\']+["\']?'), r'\1=REDACTED'),
     (re.compile(r'(?i)\b(token)\s*[=:]\s*["\']?[a-zA-Z0-9_.-]{20,}["\']?'), r'\1=REDACTED'),
+    # Anthropic - MUST be before generic OpenAI pattern (more specific prefix)
+    (re.compile(r'\bsk-ant-[a-zA-Z0-9-]{20,}\b'), 'ANTHROPIC_KEY_REDACTED'),
     # OpenAI (including sk-proj-* format with hyphens) - word boundary prevents flask-sk-... matches
     (re.compile(r'\bsk-[a-zA-Z0-9-]{20,}\b'), 'OPENAI_KEY_REDACTED'),
-    # Anthropic (must match before generic OpenAI pattern - more specific)
-    (re.compile(r'\bsk-ant-[a-zA-Z0-9-]{20,}\b'), 'ANTHROPIC_KEY_REDACTED'),
     # GitHub
     (re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'), 'GITHUB_TOKEN_REDACTED'),
     (re.compile(r'\bgho_[a-zA-Z0-9]{36}\b'), 'GITHUB_OAUTH_REDACTED'),
@@ -1824,7 +1824,9 @@ class BazingaDB:
                     agent_id, iteration, confidence, references,
                     _retry_count=_retry_count + 1
                 )
-            raise
+            # Retries exhausted or non-lock error - return structured error (don't raise)
+            self._print_error(f"Database error saving {agent_type} reasoning: {str(e)}")
+            return {"success": False, "error": str(e)}
         except Exception as e:
             if conn:
                 try:
@@ -1840,7 +1842,8 @@ class BazingaDB:
     def get_reasoning(self, session_id: str, group_id: Optional[str] = None,
                       agent_type: Optional[str] = None,
                       phase: Optional[str] = None,
-                      limit: int = 50) -> List[Dict]:
+                      limit: int = 50,
+                      output_format: str = 'json') -> Any:
         """Get reasoning entries with optional filtering.
 
         Args:
@@ -1849,9 +1852,11 @@ class BazingaDB:
             agent_type: Optional agent type filter
             phase: Optional reasoning phase filter
             limit: Maximum number of results (default 50)
+            output_format: Output format - 'json' (default) or 'prompt-summary'
+                           prompt-summary returns pre-truncated markdown ready for prompts
 
         Returns:
-            List of reasoning entries
+            List of reasoning entries (json) or formatted markdown string (prompt-summary)
         """
         conn = self._get_connection()
 
@@ -1898,6 +1903,42 @@ class BazingaDB:
             del entry['references_json']
             entry['redacted'] = bool(entry.get('redacted', 0))
             results.append(entry)
+
+        # Return based on output format
+        if output_format == 'prompt-summary':
+            # Return pre-formatted markdown ready for prompt injection
+            # Truncates content to 300 chars per entry (per orchestrator template spec)
+            if not results:
+                return "No previous reasoning found for this context."
+
+            lines = [
+                "## Previous Agent Reasoning (Handoff Context)",
+                "",
+                "Prior agents documented their decision-making for this task:",
+                "",
+                "| Agent | Phase | Confidence | Key Points (max 300 chars) |",
+                "|-------|-------|------------|----------------------------|"
+            ]
+            for entry in results:
+                agent = entry.get('agent_type', 'unknown')
+                phase = entry.get('reasoning_phase', 'unknown')
+                confidence = entry.get('confidence_level', '-')
+                content = entry.get('content', '')
+                # Truncate content to 300 chars
+                if len(content) > 300:
+                    content = content[:297] + "..."
+                # Escape pipe characters and newlines for markdown table
+                content = content.replace('|', '\\|').replace('\n', ' ')
+                lines.append(f"| {agent} | {phase} | {confidence} | {content} |")
+
+            lines.extend([
+                "",
+                "**Use this to:**",
+                "- Understand WHY prior decisions were made (not just WHAT)",
+                "- Avoid repeating failed approaches (check `pivot` and `blockers` phases)",
+                "- Build on prior agent's understanding"
+            ])
+            return '\n'.join(lines)
 
         return results
 
@@ -2425,27 +2466,48 @@ def main():
             db.update_context_references(group_id, session_id, package_ids)
         elif cmd == 'save-reasoning':
             # Parse positional and optional args
-            # Required: session_id, group_id, agent_type, phase, content
-            # Optional: --agent_id, --iteration, --confidence, --references
-            if len(cmd_args) < 5:
-                print("Error: save-reasoning requires at least 5 args: <session_id> <group_id> <agent_type> <phase> <content>", file=sys.stderr)
+            # Required: session_id, group_id, agent_type, phase, content (or --content-file)
+            # Optional: --agent_id, --iteration, --confidence, --references, --content-file
+            valid_flags = {'--agent_id', '--iteration', '--confidence', '--references', '--content-file'}
+
+            if len(cmd_args) < 4:
+                print("Error: save-reasoning requires: <session_id> <group_id> <agent_type> <phase> <content>", file=sys.stderr)
+                print("       Or use --content-file to read content from a file", file=sys.stderr)
                 sys.exit(1)
 
             session_id = cmd_args[0]
             group_id = cmd_args[1]
             agent_type = cmd_args[2]
             phase = cmd_args[3]
-            content = cmd_args[4]
+
+            # Check if content is provided positionally or via --content-file
+            content = None
+            kwargs = {}
+            i = 4
+
+            # If 5th arg exists and doesn't start with --, it's the content
+            if len(cmd_args) > 4 and not cmd_args[4].startswith('--'):
+                content = cmd_args[4]
+                i = 5
 
             # Parse optional flags
-            kwargs = {}
-            i = 5
             while i < len(cmd_args):
-                if cmd_args[i].startswith('--') and i + 1 < len(cmd_args):
-                    key = cmd_args[i].lstrip('--')
+                arg = cmd_args[i]
+                if arg.startswith('--'):
+                    if arg not in valid_flags:
+                        print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                        sys.exit(1)
+                    if i + 1 >= len(cmd_args):
+                        print(f"Error: Flag '{arg}' requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    key = arg.lstrip('--')
                     value = cmd_args[i + 1]
                     if key == 'iteration':
-                        value = int(value)
+                        try:
+                            value = int(value)
+                        except ValueError:
+                            print(f"Error: --iteration must be an integer, got '{value}'", file=sys.stderr)
+                            sys.exit(1)
                     elif key == 'references':
                         try:
                             value = json.loads(value)
@@ -2454,23 +2516,41 @@ def main():
                         except json.JSONDecodeError as e:
                             print(f"Error: Invalid JSON for --references: {e}", file=sys.stderr)
                             sys.exit(1)
+                    elif key == 'content-file':
+                        # Read content from file (avoids shell escaping and process table exposure)
+                        try:
+                            content = Path(value).read_text()
+                        except Exception as e:
+                            print(f"Error: Could not read content file '{value}': {e}", file=sys.stderr)
+                            sys.exit(1)
+                        i += 2
+                        continue  # Don't add to kwargs
                     kwargs[key] = value
                     i += 2
                 else:
-                    i += 1
+                    # Unexpected positional argument - fail fast
+                    print(f"Error: Unexpected argument '{arg}' after positional args.", file=sys.stderr)
+                    print("Usage: save-reasoning <session_id> <group_id> <agent_type> <phase> [<content>] [--content-file FILE] [--agent_id X] [--iteration N] [--confidence X] [--references JSON]", file=sys.stderr)
+                    sys.exit(1)
+
+            # Validate content was provided
+            if content is None:
+                print("Error: Content is required. Provide as 5th argument or use --content-file FILE", file=sys.stderr)
+                sys.exit(1)
 
             result = db.save_reasoning(session_id, group_id, agent_type, phase, content, **kwargs)
             print(json.dumps(result, indent=2))
         elif cmd == 'get-reasoning':
             # Required: session_id
-            # Optional: --group_id, --agent_type, --phase, --limit
+            # Optional: --group_id, --agent_type, --phase, --limit, --format
             if len(cmd_args) < 1:
                 print("Error: get-reasoning requires at least 1 arg: <session_id>", file=sys.stderr)
                 sys.exit(1)
 
             session_id = cmd_args[0]
             kwargs = {}
-            valid_flags = {'--group_id', '--agent_type', '--phase', '--limit'}
+            output_format = 'json'
+            valid_flags = {'--group_id', '--agent_type', '--phase', '--limit', '--format'}
             i = 1
             while i < len(cmd_args):
                 arg = cmd_args[i]
@@ -2484,17 +2564,31 @@ def main():
                     key = arg.lstrip('--')
                     value = cmd_args[i + 1]
                     if key == 'limit':
-                        value = int(value)
+                        try:
+                            value = int(value)
+                        except ValueError:
+                            print(f"Error: --limit must be an integer, got '{value}'", file=sys.stderr)
+                            sys.exit(1)
+                    elif key == 'format':
+                        if value not in ('json', 'prompt-summary'):
+                            print(f"Error: --format must be 'json' or 'prompt-summary', got '{value}'", file=sys.stderr)
+                            sys.exit(1)
+                        output_format = value
+                        i += 2
+                        continue  # Don't add to kwargs
                     kwargs[key] = value
                     i += 2
                 else:
                     # Unexpected positional argument - fail fast
                     print(f"Error: Unexpected argument '{arg}'. Use --flag syntax for options.", file=sys.stderr)
-                    print(f"Usage: get-reasoning <session_id> [--group_id X] [--agent_type X] [--phase X] [--limit N]", file=sys.stderr)
+                    print(f"Usage: get-reasoning <session_id> [--group_id X] [--agent_type X] [--phase X] [--limit N] [--format json|prompt-summary]", file=sys.stderr)
                     sys.exit(1)
 
-            result = db.get_reasoning(session_id, **kwargs)
-            print(json.dumps(result, indent=2))
+            result = db.get_reasoning(session_id, output_format=output_format, **kwargs)
+            if output_format == 'prompt-summary':
+                print(result)  # Already formatted string
+            else:
+                print(json.dumps(result, indent=2))
         elif cmd == 'reasoning-timeline':
             # Required: session_id
             # Optional: --group_id, --format
