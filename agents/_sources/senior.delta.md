@@ -385,6 +385,88 @@ When reporting as Senior Software Engineer, include additional escalation contex
 ## END_MODIFY
 
 # =============================================================================
+# REPLACE: How to Save Reasoning (Complete replacement with correct agent_type)
+# =============================================================================
+## REPLACE: How to Save Reasoning
+
+### How to Save Reasoning
+
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
+```bash
+# At task START - Document your understanding (REQUIRED)
+# Step 1: Write reasoning to temp file
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Understanding
+
+### Task Interpretation
+[What I understand the task to be]
+
+### Key Requirements
+1. [Requirement 1]
+2. [Requirement 2]
+
+### Unclear Points
+- [What needs clarification]
+
+### Files to Examine
+- [file1.py]
+- [file2.py]
+REASONING_EOF
+
+# Step 2: Save via --content-file (avoids process table exposure)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
+  --confidence high \
+  --references '["file1.py", "file2.py"]'
+
+# During implementation - Document decisions (RECOMMENDED)
+cat > /tmp/reasoning_decisions.md << 'REASONING_EOF'
+## Decisions
+
+### Chosen Approach
+[What approach I chose]
+
+### Why This Approach
+1. [Reason 1]
+2. [Reason 2]
+
+### Alternatives Considered
+- [Alternative 1] → [Why rejected]
+- [Alternative 2] → [Why rejected]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "decisions" \
+  --content-file /tmp/reasoning_decisions.md \
+  --confidence medium
+
+# At task END - Document completion (REQUIRED)
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Completion Summary
+
+### What Was Done
+- [Change 1]
+- [Change 2]
+
+### Key Learnings
+- [Learning 1]
+- [Learning 2]
+
+### Open Questions
+- [Any remaining questions for Tech Lead]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "completion" \
+  --content-file /tmp/reasoning_completion.md \
+  --confidence high \
+  --references '["modified_file1.py", "modified_file2.py"]'
+```
+## END_REPLACE
+
+# =============================================================================
 # REPLACE: Remember Section (Senior-specific)
 # =============================================================================
 ## REPLACE: Remember

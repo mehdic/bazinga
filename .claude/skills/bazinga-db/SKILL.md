@@ -26,6 +26,9 @@ You are the bazinga-db skill. When invoked, you handle database operations for t
 - Any agent needs to save or query context packages (research, failures, decisions, handoffs)
 - Orchestrator needs to get context packages for agent spawning
 - Any agent needs to mark context packages as consumed
+- Any agent needs to document their reasoning process (understanding, decisions, risks, etc.)
+- Orchestrator/Tech Lead/Investigator needs to review agent reasoning timeline
+- Agent mentions "save reasoning", "document reasoning", or "reasoning capture"
 
 **Do NOT invoke when:**
 - Requesting read-only file operations (use Read tool directly)
@@ -90,6 +93,9 @@ Extract from the calling agent's request:
 - "get context packages" / "query context" → get-context-packages
 - "mark context consumed" / "context consumed" → mark-context-consumed
 - "update context references" / "link context to group" → update-context-references
+- "save reasoning" / "document reasoning" / "log reasoning" → save-reasoning
+- "get reasoning" / "query reasoning" → get-reasoning
+- "reasoning timeline" / "reasoning history" → reasoning-timeline
 
 **Required parameters:**
 - session_id (almost always required)
@@ -256,6 +262,40 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet mark-context-con
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-context-references \
   "<group_id>" "<session_id>" "<package_ids_json>"
 ```
+
+### Reasoning Capture Operations (Agent Reasoning Documentation)
+
+**Save reasoning (mandatory phases: understanding, completion):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "<session_id>" "<group_id>" "<agent_type>" "<phase>" "<content>" \
+  [--agent_id X] [--iteration N] [--confidence high|medium|low] [--references '["file1.py","file2.py"]']
+```
+
+Parameters:
+- `phase`: understanding, approach, decisions, risks, blockers, pivot, completion
+- `confidence`: Optional confidence level (high, medium, low)
+- `references`: Optional JSON array of files consulted
+- Auto-redacts secrets (API keys, passwords, tokens) from content
+
+**Get reasoning entries:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "<session_id>" [--group_id X] [--agent_type Y] [--phase Z] [--limit N]
+```
+
+**Get reasoning timeline:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
+  "<session_id>" [--group_id X] [--format json|markdown]
+```
+
+**Check mandatory phases (for workflow validation):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases \
+  "<session_id>" "<group_id>" "<agent_type>"
+```
+Returns exit code 1 if mandatory phases (understanding, completion) are missing.
 
 **Full command reference:** See `scripts/bazinga_db.py --help` for all available operations.
 
@@ -566,6 +606,74 @@ Expected output (minimal):
     "size_bytes": 21504
   }
 ]
+```
+
+---
+
+**Scenario 8: Developer Saving Reasoning (Understanding Phase)**
+
+Input: Developer documenting initial understanding of assigned task
+
+Request from developer:
+```
+bazinga-db, save my reasoning:
+
+Session ID: bazinga_20250203_143530
+Group ID: group_a
+Agent Type: developer
+Phase: understanding
+Content: Analyzing authentication requirements for HIN OAuth2 integration. Key constraints: must support PKCE flow, token refresh within 5 minutes of expiry, and secure storage of refresh tokens. Identified 3 files to modify: auth/oauth.py, middleware/token.py, config/security.yaml.
+Confidence: high
+References: ["src/auth/oauth.py", "docs/hin-api-spec.md"]
+```
+
+Expected output (minimal):
+```json
+{
+  "success": true,
+  "log_id": 42,
+  "session_id": "bazinga_20250203_143530",
+  "group_id": "group_a",
+  "agent_type": "developer",
+  "reasoning_phase": "understanding",
+  "content_length": 312,
+  "timestamp": "2025-02-03 14:42:15",
+  "redacted": false
+}
+```
+
+---
+
+**Scenario 9: Tech Lead Querying Reasoning Timeline**
+
+Input: Tech Lead reviewing all reasoning before code review
+
+Request from tech lead:
+```
+bazinga-db, get reasoning timeline:
+
+Session ID: bazinga_20250203_143530
+Group ID: group_a
+Format: markdown
+```
+
+Expected output:
+```markdown
+# Reasoning Timeline
+
+## Group: group_a
+
+### [2025-02-03 14:42:15] developer - understanding [high]
+
+Analyzing authentication requirements for HIN OAuth2 integration...
+
+---
+
+### [2025-02-03 14:55:30] developer - decisions [medium]
+
+Decided to use PKCE flow with...
+
+---
 ```
 
 ---

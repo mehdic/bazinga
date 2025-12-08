@@ -16,10 +16,63 @@ import sqlite3
 import json
 import sys
 import time
+import re
+import random
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 import argparse
+
+# Secret patterns for redaction (compiled for performance)
+# See: research/agent-reasoning-capture-ultrathink.md
+# Context-preserving: patterns with capture groups use \1= to keep variable names
+# Word boundaries (\b) prevent false positives from partial matches in URLs/identifiers
+SECRET_PATTERNS = [
+    # Generic patterns (preserve variable name context)
+    (re.compile(r'(?i)\b(api[_-]?key|apikey)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}["\']?'), r'\1=REDACTED'),
+    (re.compile(r'(?i)\b(secret|password|passwd|pwd)\s*[=:]\s*["\']?[^\s"\']+["\']?'), r'\1=REDACTED'),
+    (re.compile(r'(?i)\b(token)\s*[=:]\s*["\']?[a-zA-Z0-9_.-]{20,}["\']?'), r'\1=REDACTED'),
+    # Anthropic - MUST be before generic OpenAI pattern (more specific prefix)
+    (re.compile(r'\bsk-ant-[a-zA-Z0-9-]{20,}\b'), 'ANTHROPIC_KEY_REDACTED'),
+    # OpenAI (including sk-proj-* format with hyphens) - word boundary prevents flask-sk-... matches
+    (re.compile(r'\bsk-[a-zA-Z0-9-]{20,}\b'), 'OPENAI_KEY_REDACTED'),
+    # GitHub
+    (re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'), 'GITHUB_TOKEN_REDACTED'),
+    (re.compile(r'\bgho_[a-zA-Z0-9]{36}\b'), 'GITHUB_OAUTH_REDACTED'),
+    (re.compile(r'\bgithub_pat_[a-zA-Z0-9_]{22,}\b'), 'GITHUB_PAT_REDACTED'),
+    # AWS (preserve variable name context)
+    (re.compile(r'\bAKIA[0-9A-Z]{16}\b'), 'AWS_ACCESS_KEY_REDACTED'),
+    (re.compile(r'(?i)\b(aws[_-]?secret[_-]?access[_-]?key)\s*[=:]\s*["\']?[a-zA-Z0-9/+=]{40}["\']?'), r'\1=REDACTED'),
+    # Private keys (match entire block from BEGIN to END)
+    (re.compile(r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |DSA )?PRIVATE KEY-----'), 'PRIVATE_KEY_REDACTED'),
+    (re.compile(r'-----BEGIN OPENSSH PRIVATE KEY-----[\s\S]*?-----END OPENSSH PRIVATE KEY-----'), 'SSH_KEY_REDACTED'),
+    # Slack
+    (re.compile(r'\bxox[baprs]-[a-zA-Z0-9-]{10,}\b'), 'SLACK_TOKEN_REDACTED'),
+    # Stripe
+    (re.compile(r'\bpk_(test|live)_[a-zA-Z0-9]{10,}\b'), 'STRIPE_PK_REDACTED'),
+    (re.compile(r'\bsk_(test|live)_[a-zA-Z0-9]{10,}\b'), 'STRIPE_SK_REDACTED'),
+    # Authorization headers (preserve header name)
+    (re.compile(r'(?i)\b(authorization):\s*bearer\s+[a-zA-Z0-9._-]{10,}'), r'\1: Bearer REDACTED'),
+]
+
+
+def scan_and_redact(text: str) -> Tuple[str, bool]:
+    """Scan text for secrets and redact them.
+
+    Args:
+        text: The text to scan and potentially redact
+
+    Returns:
+        Tuple of (redacted_text, was_redacted)
+    """
+    redacted = False
+    result = text
+    for pattern, replacement in SECRET_PATTERNS:
+        # Use subn for single-pass operation (returns replacement count)
+        result, num_subs = pattern.subn(replacement, result)
+        if num_subs > 0:
+            redacted = True
+    return result, redacted
 
 # Cross-platform file locking
 # fcntl is Unix/Linux/macOS only; msvcrt is Windows only
@@ -869,8 +922,8 @@ class BazingaDB:
             if conn:
                 try:
                     conn.rollback()
-                except:
-                    pass
+                except Exception:
+                    pass  # Best-effort cleanup, ignore rollback failures
             # Check if it's a corruption error
             if self._is_corruption_error(e):
                 if self._recover_from_corruption():
@@ -884,8 +937,8 @@ class BazingaDB:
             if conn:
                 try:
                     conn.rollback()
-                except:
-                    pass
+                except Exception:
+                    pass  # Best-effort cleanup, ignore rollback failures
             self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
             return {"success": False, "error": str(e)}
         finally:
@@ -1644,6 +1697,383 @@ class BazingaDB:
         conn.close()
         self._print_success(f"✓ Updated context references for {group_id}: {package_ids}")
 
+    # ==================== REASONING CAPTURE OPERATIONS ====================
+    # See: research/agent-reasoning-capture-ultrathink.md
+
+    # Valid reasoning phases
+    VALID_REASONING_PHASES = frozenset({
+        'understanding',  # Initial problem comprehension
+        'approach',       # Strategy selection
+        'decisions',      # Key choices made
+        'risks',          # Identified risks/concerns
+        'blockers',       # Issues preventing progress
+        'pivot',          # Strategy changes mid-execution
+        'completion',     # Final summary/outcome
+    })
+
+    # Valid confidence levels
+    VALID_CONFIDENCE_LEVELS = frozenset({'high', 'medium', 'low'})
+
+    def save_reasoning(self, session_id: str, group_id: str, agent_type: str,
+                       reasoning_phase: str, content: str,
+                       agent_id: Optional[str] = None, iteration: Optional[int] = None,
+                       confidence: Optional[str] = None,
+                       references: Optional[List[str]] = None,
+                       _retry_count: int = 0) -> Dict[str, Any]:
+        """Save agent reasoning to the database with secret redaction.
+
+        Args:
+            session_id: Session identifier
+            group_id: Task group identifier
+            agent_type: Type of agent (e.g., 'developer', 'tech_lead')
+            reasoning_phase: Phase of reasoning (understanding, approach, decisions, etc.)
+            content: The reasoning text to save
+            agent_id: Optional specific agent ID
+            iteration: Optional iteration number
+            confidence: Optional confidence level (high, medium, low)
+            references: Optional list of file paths consulted
+            _retry_count: Internal retry counter for exponential backoff
+
+        Returns:
+            Dict with success status and log details
+        """
+        # Validate inputs
+        if not session_id or not session_id.strip():
+            raise ValueError("session_id cannot be empty")
+        if not group_id or not group_id.strip():
+            raise ValueError("group_id cannot be empty")
+        if not agent_type or not agent_type.strip():
+            raise ValueError("agent_type cannot be empty")
+        if not reasoning_phase or not reasoning_phase.strip():
+            raise ValueError("reasoning_phase cannot be empty")
+        if reasoning_phase not in self.VALID_REASONING_PHASES:
+            raise ValueError(f"Invalid reasoning_phase: {reasoning_phase}. Must be one of: {sorted(self.VALID_REASONING_PHASES)}")
+        if not content or not content.strip():
+            raise ValueError("content cannot be empty")
+        if confidence is not None and confidence not in self.VALID_CONFIDENCE_LEVELS:
+            raise ValueError(f"Invalid confidence: {confidence}. Must be one of: {sorted(self.VALID_CONFIDENCE_LEVELS)}")
+
+        # Validate and coerce references to list of strings
+        if references is not None:
+            if not isinstance(references, list):
+                raise TypeError(f"references must be a list, got {type(references).__name__}")
+            for i, ref in enumerate(references):
+                if not isinstance(ref, str):
+                    raise TypeError(f"references[{i}] must be a string, got {type(ref).__name__}")
+
+        # Scan and redact secrets
+        redacted_content, was_redacted = scan_and_redact(content)
+        if was_redacted:
+            self._print_error("Warning: Secrets detected and redacted from reasoning content")
+
+        # Serialize references
+        references_json = json.dumps(references) if references else None
+
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.execute("""
+                INSERT INTO orchestration_logs
+                (session_id, iteration, agent_type, agent_id, content, log_type,
+                 reasoning_phase, confidence_level, references_json, redacted, group_id)
+                VALUES (?, ?, ?, ?, ?, 'reasoning', ?, ?, ?, ?, ?)
+            """, (session_id, iteration, agent_type, agent_id, redacted_content,
+                  reasoning_phase, confidence, references_json,
+                  1 if was_redacted else 0, group_id))
+            log_id = cursor.lastrowid
+            conn.commit()
+
+            # Verify the insert
+            verify = conn.execute("""
+                SELECT id, session_id, agent_type, reasoning_phase, LENGTH(content) as content_length,
+                       timestamp, redacted, group_id
+                FROM orchestration_logs WHERE id = ?
+            """, (log_id,)).fetchone()
+
+            if not verify:
+                raise RuntimeError(f"Failed to verify reasoning save for log_id={log_id}")
+
+            result = {
+                'success': True,
+                'log_id': log_id,
+                'session_id': verify['session_id'],
+                'group_id': verify['group_id'],
+                'agent_type': verify['agent_type'],
+                'reasoning_phase': verify['reasoning_phase'],
+                'content_length': verify['content_length'],
+                'timestamp': verify['timestamp'],
+                'redacted': bool(verify['redacted']),
+            }
+
+            self._print_success(f"✓ Saved {agent_type} reasoning ({reasoning_phase}, log_id={log_id}, {result['content_length']} chars)")
+            return result
+
+        except sqlite3.OperationalError as e:
+            # Handle "database is locked" with exponential backoff + jitter
+            if "database is locked" in str(e).lower() and _retry_count < 4:
+                wait_time = (2 ** _retry_count) + random.uniform(0, 0.5)  # Jitter prevents thundering herd
+                self._print_error(f"Database locked, retrying in {wait_time:.1f}s (attempt {_retry_count + 1}/4)...")
+                time.sleep(wait_time)
+                if conn:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass  # Best-effort cleanup, ignore close failures
+                return self.save_reasoning(
+                    session_id, group_id, agent_type, reasoning_phase, content,
+                    agent_id, iteration, confidence, references,
+                    _retry_count=_retry_count + 1
+                )
+            # Retries exhausted or non-lock error - return structured error (don't raise)
+            self._print_error(f"Database error saving {agent_type} reasoning: {str(e)}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass  # Best-effort cleanup, ignore rollback failures
+            self._print_error(f"Failed to save {agent_type} reasoning: {str(e)}")
+            return {"success": False, "error": str(e)}
+        finally:
+            if conn:
+                conn.close()
+
+    def get_reasoning(self, session_id: str, group_id: Optional[str] = None,
+                      agent_type: Optional[str] = None,
+                      phase: Optional[str] = None,
+                      limit: int = 50,
+                      output_format: str = 'json') -> Any:
+        """Get reasoning entries with optional filtering.
+
+        Args:
+            session_id: Session identifier
+            group_id: Optional task group filter
+            agent_type: Optional agent type filter
+            phase: Optional reasoning phase filter
+            limit: Maximum number of results (default 50)
+            output_format: Output format - 'json' (default) or 'prompt-summary'
+                           prompt-summary returns pre-truncated markdown ready for prompts
+
+        Returns:
+            List of reasoning entries (json) or formatted markdown string (prompt-summary)
+        """
+        conn = self._get_connection()
+
+        query = """
+            SELECT id, session_id, group_id, agent_type, agent_id, iteration,
+                   reasoning_phase, confidence_level, content, references_json,
+                   redacted, timestamp
+            FROM orchestration_logs
+            WHERE session_id = ? AND log_type = 'reasoning'
+        """
+        params: List[Any] = [session_id]
+
+        if group_id:
+            query += " AND group_id = ?"
+            params.append(group_id)
+
+        if agent_type:
+            query += " AND agent_type = ?"
+            params.append(agent_type)
+
+        if phase:
+            if phase not in self.VALID_REASONING_PHASES:
+                raise ValueError(f"Invalid phase: {phase}. Must be one of: {sorted(self.VALID_REASONING_PHASES)}")
+            query += " AND reasoning_phase = ?"
+            params.append(phase)
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+        results = []
+        for row in rows:
+            entry = dict(row)
+            # Parse references_json back to list
+            if entry.get('references_json'):
+                try:
+                    entry['references'] = json.loads(entry['references_json'])
+                except json.JSONDecodeError:
+                    entry['references'] = []
+            else:
+                entry['references'] = []
+            del entry['references_json']
+            entry['redacted'] = bool(entry.get('redacted', 0))
+            results.append(entry)
+
+        # Return based on output format
+        if output_format == 'prompt-summary':
+            # Return pre-formatted markdown ready for prompt injection
+            # Truncates content to 300 chars per entry, max 5 entries (per orchestrator template spec)
+            if not results:
+                return "No previous reasoning found for this context."
+
+            # Limit to max 5 entries for prompt injection (prevents context bloat)
+            max_entries = 5
+            limited_results = results[:max_entries]
+            total_count = len(results)
+
+            lines = [
+                "## Previous Agent Reasoning (Handoff Context)",
+                "",
+                "Prior agents documented their decision-making for this task:",
+                "",
+                "| Agent | Phase | Confidence | Key Points (max 300 chars) |",
+                "|-------|-------|------------|----------------------------|"
+            ]
+            for entry in limited_results:
+                agent = entry.get('agent_type', 'unknown')
+                phase = entry.get('reasoning_phase', 'unknown')
+                confidence = entry.get('confidence_level', '-')
+                content = entry.get('content', '')
+                # Truncate content to 300 chars
+                if len(content) > 300:
+                    content = content[:297] + "..."
+                # Escape pipe characters and newlines for markdown table
+                content = content.replace('|', '\\|').replace('\n', ' ')
+                lines.append(f"| {agent} | {phase} | {confidence} | {content} |")
+
+            # Add truncation notice if entries were limited
+            if total_count > max_entries:
+                lines.append(f"\n*Showing {max_entries} of {total_count} entries (use --format json for full data)*")
+
+            lines.extend([
+                "",
+                "**Use this to:**",
+                "- Understand WHY prior decisions were made (not just WHAT)",
+                "- Avoid repeating failed approaches (check `pivot` and `blockers` phases)",
+                "- Build on prior agent's understanding"
+            ])
+            return '\n'.join(lines)
+
+        return results
+
+    def reasoning_timeline(self, session_id: str, group_id: Optional[str] = None,
+                           output_format: str = 'json') -> str:
+        """Get a timeline of reasoning across all agents.
+
+        Args:
+            session_id: Session identifier
+            group_id: Optional task group filter
+            output_format: Output format ('json' or 'markdown')
+
+        Returns:
+            Formatted timeline string
+        """
+        conn = self._get_connection()
+
+        query = """
+            SELECT id, group_id, agent_type, agent_id, iteration,
+                   reasoning_phase, confidence_level, content, redacted, timestamp
+            FROM orchestration_logs
+            WHERE session_id = ? AND log_type = 'reasoning'
+        """
+        params: List[Any] = [session_id]
+
+        if group_id:
+            query += " AND group_id = ?"
+            params.append(group_id)
+
+        query += " ORDER BY timestamp ASC"
+
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+        entries = [dict(row) for row in rows]
+
+        if output_format == 'json':
+            return json.dumps(entries, indent=2)
+
+        # Markdown format
+        if not entries:
+            return "# Reasoning Timeline\n\nNo reasoning entries found."
+
+        lines = ["# Reasoning Timeline", ""]
+        current_group = None
+
+        for entry in entries:
+            # Group header
+            if entry['group_id'] != current_group:
+                current_group = entry['group_id']
+                lines.append(f"## Group: {current_group or 'global'}")
+                lines.append("")
+
+            # Entry
+            timestamp = entry['timestamp']
+            agent = entry['agent_type']
+            if entry['agent_id']:
+                agent = f"{agent} ({entry['agent_id']})"
+            phase = entry['reasoning_phase']
+            confidence = entry.get('confidence_level', '')
+            confidence_badge = f" [{confidence}]" if confidence else ""
+            redacted_badge = " 🔒" if entry.get('redacted') else ""
+
+            lines.append(f"### [{timestamp}] {agent} - {phase}{confidence_badge}{redacted_badge}")
+            lines.append("")
+
+            # Truncate long content for timeline view (300 chars per template spec)
+            content = entry['content']
+            if len(content) > 300:
+                content = content[:300] + "..."
+            # Escape backtick sequences to prevent code fence breakout (security: prevents prompt injection)
+            # Replace ``` with `\u200b`\u200b` (zero-width space breaks the fence sequence)
+            content = content.replace('```', '`\u200b`\u200b`')
+            # Wrap in code fence to escape markdown special chars (prevents formatting injection)
+            lines.append("```text")
+            lines.append(content)
+            lines.append("```")
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    # Mandatory reasoning phases that must be documented
+    MANDATORY_PHASES = frozenset({'understanding', 'completion'})
+
+    def check_mandatory_phases(self, session_id: str, group_id: str,
+                               agent_type: str) -> Dict[str, Any]:
+        """Check if mandatory reasoning phases have been documented.
+
+        Args:
+            session_id: Session identifier
+            group_id: Task group identifier
+            agent_type: Type of agent to check
+
+        Returns:
+            Dict with:
+                - complete: bool - True if all mandatory phases documented
+                - missing: List[str] - Phases not yet documented
+                - documented: List[str] - Phases that have been documented
+        """
+        conn = self._get_connection()
+
+        # Get all reasoning phases for this agent/group
+        rows = conn.execute("""
+            SELECT DISTINCT reasoning_phase
+            FROM orchestration_logs
+            WHERE session_id = ? AND group_id = ? AND agent_type = ?
+              AND log_type = 'reasoning' AND reasoning_phase IS NOT NULL
+        """, (session_id, group_id, agent_type)).fetchall()
+        conn.close()
+
+        documented = {row['reasoning_phase'] for row in rows}
+        missing = list(self.MANDATORY_PHASES - documented)
+        documented_mandatory = list(self.MANDATORY_PHASES & documented)
+
+        return {
+            'complete': len(missing) == 0,
+            'missing': sorted(missing),
+            'documented': sorted(documented_mandatory),
+            'all_documented': sorted(documented),
+            'session_id': session_id,
+            'group_id': group_id,
+            'agent_type': agent_type,
+        }
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -1716,6 +2146,19 @@ CONTEXT PACKAGE OPERATIONS:
                                               Mark package as consumed (default: iteration=1)
   update-context-references <group_id> <session> <package_ids_json>
                                               Update task group context references
+
+REASONING CAPTURE OPERATIONS:
+  save-reasoning <session> <group_id> <agent_type> <phase> <content> [options]
+                                              Save agent reasoning (auto-redacts secrets)
+                                              Options: [--agent_id X] [--iteration N] [--confidence high|medium|low] [--references JSON]
+                                              Phases: understanding, approach, decisions, risks, blockers, pivot, completion
+  get-reasoning <session> [--group_id X] [--agent_type Y] [--phase Z] [--limit N]
+                                              Get reasoning entries with optional filters (default: limit=50)
+  reasoning-timeline <session> [--group_id X] [--format json|markdown]
+                                              Get chronological reasoning timeline (default: format=json)
+  check-mandatory-phases <session> <group_id> <agent_type>
+                                              Check if mandatory phases (understanding, completion) are documented
+                                              Returns exit code 1 if phases are missing
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -2033,6 +2476,196 @@ def main():
                 print("Expected: JSON array of integers, e.g., [1, 3, 5]", file=sys.stderr)
                 sys.exit(1)
             db.update_context_references(group_id, session_id, package_ids)
+        elif cmd == 'save-reasoning':
+            # Parse positional and optional args
+            # Required: session_id, group_id, agent_type, phase, content (or --content-file)
+            # Optional: --agent_id, --iteration, --confidence, --references, --content-file
+            valid_flags = {'--agent_id', '--iteration', '--confidence', '--references', '--content-file'}
+
+            if len(cmd_args) < 4:
+                print("Error: save-reasoning requires: <session_id> <group_id> <agent_type> <phase> <content>", file=sys.stderr)
+                print("       Or use --content-file to read content from a file", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            agent_type = cmd_args[2]
+            phase = cmd_args[3]
+
+            # Check if content is provided positionally or via --content-file
+            content = None
+            kwargs = {}
+            i = 4
+
+            # If 5th arg exists and doesn't start with --, it's the content
+            if len(cmd_args) > 4 and not cmd_args[4].startswith('--'):
+                content = cmd_args[4]
+                i = 5
+
+            # Parse optional flags
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg.startswith('--'):
+                    if arg not in valid_flags:
+                        print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                        sys.exit(1)
+                    if i + 1 >= len(cmd_args):
+                        print(f"Error: Flag '{arg}' requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    key = arg.lstrip('--')
+                    value = cmd_args[i + 1]
+                    if key == 'iteration':
+                        try:
+                            value = int(value)
+                        except ValueError:
+                            print(f"Error: --iteration must be an integer, got '{value}'", file=sys.stderr)
+                            sys.exit(1)
+                    elif key == 'references':
+                        try:
+                            value = json.loads(value)
+                            if not isinstance(value, list):
+                                raise ValueError("references must be a JSON array")
+                        except json.JSONDecodeError as e:
+                            print(f"Error: Invalid JSON for --references: {e}", file=sys.stderr)
+                            sys.exit(1)
+                    elif key == 'content-file':
+                        # Read content from file (avoids shell escaping and process table exposure)
+                        try:
+                            content = Path(value).read_text()
+                        except Exception as e:
+                            print(f"Error: Could not read content file '{value}': {e}", file=sys.stderr)
+                            sys.exit(1)
+                        i += 2
+                        continue  # Don't add to kwargs
+                    kwargs[key] = value
+                    i += 2
+                else:
+                    # Unexpected positional argument - fail fast
+                    print(f"Error: Unexpected argument '{arg}' after positional args.", file=sys.stderr)
+                    print("Usage: save-reasoning <session_id> <group_id> <agent_type> <phase> [<content>] [--content-file FILE] [--agent_id X] [--iteration N] [--confidence X] [--references JSON]", file=sys.stderr)
+                    sys.exit(1)
+
+            # Validate content was provided
+            if content is None:
+                print("Error: Content is required. Provide as 5th argument or use --content-file FILE", file=sys.stderr)
+                sys.exit(1)
+
+            try:
+                result = db.save_reasoning(session_id, group_id, agent_type, phase, content, **kwargs)
+                print(json.dumps(result, indent=2))
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        elif cmd == 'get-reasoning':
+            # Required: session_id
+            # Optional: --group_id, --agent_type, --phase, --limit, --format
+            if len(cmd_args) < 1:
+                print("Error: get-reasoning requires at least 1 arg: <session_id>", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            kwargs = {}
+            output_format = 'json'
+            valid_flags = {'--group_id', '--agent_type', '--phase', '--limit', '--format'}
+            i = 1
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg.startswith('--'):
+                    if arg not in valid_flags:
+                        print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                        sys.exit(1)
+                    if i + 1 >= len(cmd_args):
+                        print(f"Error: Flag '{arg}' requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    key = arg.lstrip('--')
+                    value = cmd_args[i + 1]
+                    if key == 'limit':
+                        try:
+                            value = int(value)
+                        except ValueError:
+                            print(f"Error: --limit must be an integer, got '{value}'", file=sys.stderr)
+                            sys.exit(1)
+                    elif key == 'format':
+                        if value not in ('json', 'prompt-summary'):
+                            print(f"Error: --format must be 'json' or 'prompt-summary', got '{value}'", file=sys.stderr)
+                            sys.exit(1)
+                        output_format = value
+                        i += 2
+                        continue  # Don't add to kwargs
+                    kwargs[key] = value
+                    i += 2
+                else:
+                    # Unexpected positional argument - fail fast
+                    print(f"Error: Unexpected argument '{arg}'. Use --flag syntax for options.", file=sys.stderr)
+                    print(f"Usage: get-reasoning <session_id> [--group_id X] [--agent_type X] [--phase X] [--limit N] [--format json|prompt-summary]", file=sys.stderr)
+                    sys.exit(1)
+
+            try:
+                result = db.get_reasoning(session_id, output_format=output_format, **kwargs)
+                if output_format == 'prompt-summary':
+                    print(result)  # Already formatted string
+                else:
+                    print(json.dumps(result, indent=2))
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        elif cmd == 'reasoning-timeline':
+            # Required: session_id
+            # Optional: --group_id, --format
+            if len(cmd_args) < 1:
+                print("Error: reasoning-timeline requires at least 1 arg: <session_id>", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            group_id = None
+            fmt = 'json'
+            valid_flags = {'--group_id', '--format'}
+
+            i = 1
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg == '--group_id':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --group_id requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    group_id = cmd_args[i + 1]
+                    i += 2
+                elif arg == '--format':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --format requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    fmt = cmd_args[i + 1]
+                    if fmt not in ('json', 'markdown'):
+                        print(f"Error: --format must be 'json' or 'markdown', got '{fmt}'", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg.startswith('--'):
+                    print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                    sys.exit(1)
+                else:
+                    # Unexpected positional argument - fail fast
+                    print(f"Error: Unexpected argument '{arg}'. Use --flag syntax for options.", file=sys.stderr)
+                    print(f"Usage: reasoning-timeline <session_id> [--group_id X] [--format json|markdown]", file=sys.stderr)
+                    sys.exit(1)
+
+            result = db.reasoning_timeline(session_id, group_id=group_id, output_format=fmt)
+            print(result)
+        elif cmd == 'check-mandatory-phases':
+            # Required: session_id, group_id, agent_type
+            if len(cmd_args) < 3:
+                print("Error: check-mandatory-phases requires 3 args: <session_id> <group_id> <agent_type>", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            agent_type = cmd_args[2]
+
+            result = db.check_mandatory_phases(session_id, group_id, agent_type)
+            print(json.dumps(result, indent=2))
+
+            # Exit with error code if mandatory phases are missing
+            if not result['complete']:
+                sys.exit(1)
         elif cmd == 'query':
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)

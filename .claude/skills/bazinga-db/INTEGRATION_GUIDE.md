@@ -144,7 +144,7 @@ Bazinga-DB skill:
 
 ### Input Validation
 - `session_id`: Must be non-empty string
-- `agent_type`: Must be one of: `pm`, `developer`, `qa`, `tech_lead`, `orchestrator`
+- `agent_type`: Common values: `pm`, `developer`, `qa_expert`, `tech_lead`, `orchestrator`, `investigator`, `senior_software_engineer`, `requirements_engineer` (extensible - any string accepted)
 - `content`: Must be non-empty string (the agent response)
 - `iteration`: Optional integer
 - `agent_id`: Optional string
@@ -256,9 +256,9 @@ All new orchestrations using the updated bazinga-db will automatically:
 
 ### "agent_type cannot be empty"
 - Ensure agent_type is provided and not an empty string
-- Common agent types: pm, developer, qa_expert, techlead, orchestrator, investigator
+- Common agent types: pm, developer, qa_expert, tech_lead, orchestrator, investigator
 - Note: System is extensible - any agent type is accepted (no hardcoded validation)
-- Tip: Use agent filenames as agent_type for consistency (e.g., 'techlead' not 'tech_lead')
+- Tip: Use snake_case for agent_type (e.g., 'tech_lead', 'qa_expert', 'senior_software_engineer')
 
 ### "Failed to verify log insertion"
 - Database may be corrupted

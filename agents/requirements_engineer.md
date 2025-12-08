@@ -732,3 +732,90 @@ Add this section to your final response (after the Status section):
 ### Why This Matters
 
 Without registration, your research deliverable is just a file. The orchestrator queries the database to find relevant packages and includes them in developer prompts. **No registration = developers never see your findings.**
+
+---
+
+## 🧠 Reasoning Documentation (MANDATORY)
+
+**CRITICAL**: You MUST document your reasoning via the bazinga-db skill. This is NOT optional.
+
+### Why This Matters
+
+Your reasoning is:
+- **Queryable** by PM for understanding your analysis approach
+- **Passed** to developers who implement your recommendations
+- **Preserved** across context compactions
+- **Available** for debugging requirement misunderstandings
+- **Secrets automatically redacted** before storage
+
+### Required Reasoning Phases
+
+| Phase | When | What to Document |
+|-------|------|-----------------|
+| `understanding` | **REQUIRED** at start | Your interpretation of user request, what clarification was needed |
+| `approach` | After clarification | Your discovery strategy, what to search for |
+| `decisions` | During discovery | Key choices about scope, complexity assessment rationale |
+| `risks` | If identified | Project risks, unclear requirements, missing information |
+| `blockers` | If stuck | What's blocking analysis, external info needed |
+| `pivot` | If changing assessment | Why initial complexity/scope estimate changed |
+| `completion` | **REQUIRED** at end | Summary of requirements and recommendations |
+
+**Minimum requirement:** `understanding` at start + `completion` at end
+
+### How to Save Reasoning
+
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
+```bash
+# At analysis START - Document understanding (REQUIRED)
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Requirements Analysis Understanding
+
+### User Request
+[Original request text]
+
+### Initial Interpretation
+[What I think they want]
+
+### Clarification Needed
+- [Question 1]
+- [Question 2]
+
+### Assumptions Made
+- [Assumption 1]
+- [Assumption 2]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
+  --confidence medium
+
+# At analysis END - Document completion (REQUIRED)
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Requirements Analysis Complete
+
+### Clarified Requirements
+[What was determined after clarification/discovery]
+
+### Codebase Findings
+- [Existing infrastructure]
+- [Missing components]
+
+### Complexity Assessment
+[LOW/MEDIUM/HIGH with rationale]
+
+### Recommendations
+- Mode: [SIMPLE/PARALLEL]
+- Task Groups: [Number and rationale]
+
+### Key Risks Identified
+- [Risk 1]
+- [Risk 2]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "completion" \
+  --content-file /tmp/reasoning_completion.md \
+  --confidence high
+```

@@ -63,7 +63,41 @@ Read these files BEFORE starting implementation:
 
 Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations** for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**🔴 Reasoning Context Query (AFTER context packages, for workflow handoffs):**
+
+Query previous agent reasoning for this group (provides WHY context):
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "{session_id}" --group_id "{group_id}" --limit 5
+```
+
+**Reasoning Context Routing Rules:**
+| Query Result | Action |
+|--------------|--------|
+| Reasoning found (N > 0) | Include "Previous Agent Reasoning" section in prompt |
+| No reasoning (N = 0) | Proceed without reasoning section (normal for first spawn) |
+| Query error | Log warning, proceed without reasoning (non-blocking) |
+
+**Previous Agent Reasoning Prompt Section** (include when reasoning found):
+
+**⚠️ Size limits:** Truncate each entry to 300 chars max. Include max 5 entries total.
+
+```markdown
+## Previous Agent Reasoning (Handoff Context)
+
+Prior agents documented their decision-making for this task:
+
+| Agent | Phase | Confidence | Key Points (max 300 chars) |
+|-------|-------|------------|----------------------------|
+| {agent_type} | {reasoning_phase} | {confidence_level} | {summary_truncated_300_chars}... |
+
+**Use this to:**
+- Understand WHY prior decisions were made (not just WHAT)
+- Avoid repeating failed approaches (check `pivot` and `blockers` phases)
+- Build on prior agent's understanding
+```
+
+**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations** for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
 
@@ -114,6 +148,40 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 ### Step 2A.3: Route Developer Response
 
 **IF Developer reports READY_FOR_QA:**
+
+**🔴 MANDATORY REASONING CHECK (Before QA routing):**
+
+Check that the current agent (developer OR senior_software_engineer) documented required reasoning phases:
+```bash
+# Use the agent_type that just completed (from Step 2A.1 tier decision)
+# Could be "developer" or "senior_software_engineer" depending on escalation
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases \
+  "{session_id}" "{group_id}" "{agent_type}"
+```
+
+**Routing based on check result:**
+| Result | Action |
+|--------|--------|
+| `"complete": true` | Proceed to QA routing below |
+| `"complete": false` | Respawn same agent with reminder to document missing phases |
+
+**IF reasoning check fails (missing understanding OR completion):**
+- Build prompt for the SAME agent type (developer/SSE) with missing phase reminder:
+  ```
+  ⚠️ REASONING DOCUMENTATION INCOMPLETE
+
+  Missing phases: {missing_phases}
+
+  Before reporting READY_FOR_QA, you MUST:
+  1. Document `understanding` phase (your interpretation of the task)
+  2. Document `completion` phase (summary of what was done)
+
+  Use --content-file pattern shown in your agent instructions.
+  ```
+- Spawn the SAME agent type (developer or senior_software_engineer) with reminder → Return to Step 2A.2
+- **Do NOT proceed to QA with incomplete reasoning**
+
+**IF reasoning check passes:**
 - Check testing_config.json for qa_expert_enabled
 - IF QA enabled → **IMMEDIATELY continue to Step 2A.4 (Spawn QA). Do NOT stop.**
 - IF QA disabled → **IMMEDIATELY skip to Step 2A.6 (Spawn Tech Lead). Do NOT stop.**
@@ -306,7 +374,40 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**🔴 Implementation Reasoning Query (BEFORE building prompt):**
+
+Query reasoning from all implementation agents (developer, SSE, RE):
+```bash
+# Query each agent type separately (CLI doesn't support comma-separated)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "{session_id}" --group_id "{group_id}" --agent_type developer --limit 2
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "{session_id}" --group_id "{group_id}" --agent_type senior_software_engineer --limit 2
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "{session_id}" --group_id "{group_id}" --agent_type requirements_engineer --limit 1
+```
+**Merge results:** Combine all returned entries, sort by timestamp, take most recent 5 total.
+
+**Implementation Reasoning Prompt Section** (include when reasoning found):
+
+**⚠️ Size limits:** Truncate each entry to 300 chars max. Include max 5 entries total.
+
+```markdown
+## Implementation Reasoning (Dev/SSE/RE)
+
+Prior implementers documented their decision-making:
+
+| Agent | Phase | Confidence | Summary (max 300 chars) |
+|-------|-------|------------|-------------------------|
+| {agent_type} | {reasoning_phase} | {confidence_level} | {summary_truncated_300_chars}... |
+
+**Review Focus:**
+- Verify decisions align with architectural standards
+- Check if `pivot` or `blockers` entries indicate workarounds to evaluate
+- Understand WHY implementation choices were made
+```
+
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
 
@@ -629,10 +730,37 @@ Skill(command: "velocity-tracker")
 **IF PM sends INVESTIGATION_NEEDED:**
 - **Immediately spawn Investigator** (no user permission required)
 - Extract problem description from PM response
+
+**🔴 Reasoning Timeline Query (BEFORE building Investigator prompt):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
+  "{session_id}" --group_id "{group_id}"
+```
+
+**Reasoning Timeline Prompt Section** (include when timeline found):
+
+**⚠️ Size limits:** Truncate each entry to 300 chars max. Include max 10 entries total. Prioritize `blockers` and `pivot` phases.
+
+```markdown
+## Agent Reasoning Timeline (Investigation Context)
+
+Prior agents' documented decision progression:
+
+| Time | Agent | Phase | Confidence | Summary (max 300 chars) |
+|------|-------|-------|------------|-------------------------|
+| {timestamp} | {agent_type} | {phase} | {confidence} | {summary_truncated_300_chars}... |
+
+**Investigation Focus:**
+- Review `blockers` and `pivot` entries for failed approaches
+- Check confidence drops that may indicate problem areas
+- Use timeline to avoid repeating prior failed hypotheses
+```
+
 - Build Investigator prompt with context:
   * Session ID, Group ID, Branch
   * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
   * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
+  * **Reasoning Timeline (if any)** - prior agent decisions and pivots
 - Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)

@@ -376,9 +376,25 @@ def main():
     print("\nApplying operations...")
     result = apply_operations(base_content, operations)
 
-    # Add generated file header for non-base files
+    # Add generated file header for non-base files (AFTER frontmatter, not before)
+    # Frontmatter must be at line 1 for YAML parsing to work
     if 'senior' in output_path.name.lower():
-        result = GENERATED_FILE_HEADER + result
+        # Extract frontmatter if present
+        if result.startswith('---'):
+            # Find closing ---
+            second_delim = result.find('---', 3)
+            if second_delim != -1:
+                # Find end of frontmatter line
+                end_of_frontmatter = result.find('\n', second_delim) + 1
+                frontmatter = result[:end_of_frontmatter]
+                rest = result[end_of_frontmatter:]
+                result = frontmatter + '\n' + GENERATED_FILE_HEADER + rest
+            else:
+                # No closing ---, prepend header (will break parsing anyway)
+                result = GENERATED_FILE_HEADER + result
+        else:
+            # No frontmatter, prepend header
+            result = GENERATED_FILE_HEADER + result
 
     # Write output
     output_path.parent.mkdir(parents=True, exist_ok=True)

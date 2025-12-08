@@ -1060,3 +1060,90 @@ When you receive investigation request from Tech Lead:
 Let's solve this systematically! 🔍
 
 **Remember: Database logging is MANDATORY for dashboard tracking and audit trail.**
+
+---
+
+## 🧠 Reasoning Documentation (MANDATORY)
+
+**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the bazinga-db skill.
+
+### Why This Matters
+
+Your reasoning documentation captures the **WHY** behind your investigation decisions:
+- **Queryable** by Tech Lead/PM for understanding your approach
+- **Passed** to Developer when providing fix recommendations
+- **Preserved** across context compactions
+- **Available** for post-mortem analysis
+- **Secrets automatically redacted** before storage
+
+### Required Reasoning Phases
+
+| Phase | When | What to Document |
+|-------|------|-----------------|
+| `understanding` | **REQUIRED** at investigation start | Your interpretation of the problem, initial assessment |
+| `approach` | After hypothesis formation | Your investigation strategy, hypothesis ranking |
+| `decisions` | When choosing tests | Why testing this hypothesis first, expected outcomes |
+| `risks` | If identified | Alternative explanations, what could mislead investigation |
+| `blockers` | If stuck | What's blocking progress, what you've ruled out |
+| `pivot` | If changing direction | Why previous hypothesis was wrong |
+| `completion` | **REQUIRED** at investigation end | Root cause summary, confidence level, recommendations |
+
+**Minimum requirement:** `understanding` at start + `completion` at end
+
+### How to Save Reasoning
+
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
+```bash
+# At investigation START - Document understanding (REQUIRED)
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Investigation Understanding
+
+### Problem Statement
+[What's being investigated]
+
+### Initial Assessment
+[First impressions of the issue]
+
+### Hypothesis Matrix Initial
+1. [H1]: [Description] - [Initial confidence %]
+2. [H2]: [Description] - [Initial confidence %]
+
+### Investigation Plan
+- [First test approach]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
+  --confidence medium
+
+# At investigation END - Document completion (REQUIRED)
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Investigation Completion
+
+### Root Cause
+[What was found]
+
+### Confidence Level
+[High/Medium/Low] - [Why this confidence]
+
+### Evidence
+1. [Evidence 1]
+2. [Evidence 2]
+
+### Recommended Fix
+[Specific solution]
+
+### Eliminated Hypotheses
+- [H1]: [Why ruled out]
+- [H2]: [Why ruled out]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
+  --content-file /tmp/reasoning_completion.md \
+  --confidence high
+```
+
+**Note:** This reasoning documentation is SEPARATE from your iteration logs. The iteration logs track WHAT you tested; reasoning docs capture WHY you made those choices.

@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -148,226 +148,399 @@ def init_database(db_path: str) -> None:
         if current_version == 4:
             print("🔄 Migrating schema from v4 to v5...")
 
-            # 1. Add initial_branch to sessions
-            try:
-                cursor.execute("ALTER TABLE sessions ADD COLUMN initial_branch TEXT DEFAULT 'main'")
-                print("   ✓ Added sessions.initial_branch")
-            except sqlite3.OperationalError as e:
-                if "duplicate column" in str(e).lower():
-                    print("   ⊘ sessions.initial_branch already exists")
-                else:
-                    raise
+            # Check if sessions table exists (for fresh databases, skip all ALTER and let CREATE TABLE handle it)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+            sessions_exists = cursor.fetchone() is not None
 
-            # 2. Add feature_branch to task_groups
-            try:
-                cursor.execute("ALTER TABLE task_groups ADD COLUMN feature_branch TEXT")
-                print("   ✓ Added task_groups.feature_branch")
-            except sqlite3.OperationalError as e:
-                if "duplicate column" in str(e).lower():
-                    print("   ⊘ task_groups.feature_branch already exists")
-                else:
-                    raise
-
-            # 3. Add merge_status to task_groups (without CHECK - SQLite limitation)
-            # NOTE: ALTER TABLE cannot add CHECK constraints in SQLite
-            # The CHECK constraint is applied in step 4 when we recreate the table
-            try:
-                cursor.execute("ALTER TABLE task_groups ADD COLUMN merge_status TEXT")
-                print("   ✓ Added task_groups.merge_status (CHECK constraint applied in step 4)")
-            except sqlite3.OperationalError as e:
-                if "duplicate column" in str(e).lower():
-                    print("   ⊘ task_groups.merge_status already exists")
-                else:
-                    raise
-
-            # 4. Recreate task_groups with expanded status enum AND proper CHECK constraints
-            # This step applies CHECK constraints that couldn't be added via ALTER TABLE
-            cursor.execute("SELECT sql FROM sqlite_master WHERE name='task_groups'")
-            schema = cursor.fetchone()[0]
-
-            if 'approved_pending_merge' not in schema:
-                print("   Recreating task_groups with expanded status enum...")
-
-                # CRITICAL: Table recreation must be atomic to prevent orphan indexes
-                # Use explicit transaction with exclusive locking
-                # See research/sqlite-orphan-index-corruption-ultrathink.md for full root cause analysis
-                # Close any implicit transaction before starting explicit one
-                conn.commit()
-                try:
-                    cursor.execute("BEGIN IMMEDIATE")
-
-                    # Create new table with expanded status enum
-                    cursor.execute("""
-                        CREATE TABLE task_groups_new (
-                            id TEXT NOT NULL,
-                            session_id TEXT NOT NULL,
-                            name TEXT NOT NULL,
-                            status TEXT CHECK(status IN (
-                                'pending', 'in_progress', 'completed', 'failed',
-                                'approved_pending_merge', 'merging'
-                            )) DEFAULT 'pending',
-                            assigned_to TEXT,
-                            revision_count INTEGER DEFAULT 0,
-                            last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED') OR last_review_status IS NULL),
-                            feature_branch TEXT,
-                            merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure') OR merge_status IS NULL),
-                            complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
-                            initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            PRIMARY KEY (id, session_id),
-                            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-                        )
-                    """)
-
-                    # Get existing columns in task_groups
-                    cursor.execute("PRAGMA table_info(task_groups)")
-                    existing_cols = [row[1] for row in cursor.fetchall()]
-
-                    # Build column list for migration (only columns that exist)
-                    all_cols = ['id', 'session_id', 'name', 'status', 'assigned_to', 'revision_count',
-                               'last_review_status', 'feature_branch', 'merge_status', 'complexity',
-                               'initial_tier', 'created_at', 'updated_at']
-                    cols_to_copy = [c for c in all_cols if c in existing_cols]
-                    cols_str = ', '.join(cols_to_copy)
-
-                    # Copy data
-                    cursor.execute(f"""
-                        INSERT INTO task_groups_new ({cols_str})
-                        SELECT {cols_str} FROM task_groups
-                    """)
-
-                    # Swap tables atomically
-                    cursor.execute("DROP TABLE task_groups")
-                    cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
-                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_taskgroups_session ON task_groups(session_id, status)")
-
-                    # Verify integrity before committing
-                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
-                    if integrity != "ok":
-                        raise sqlite3.IntegrityError(f"Migration task_groups v4→v5: Database integrity check failed after table recreation: {integrity}")
-
-                    # Use connection methods for commit/rollback (clearer than SQL strings)
-                    conn.commit()
-
-                    # Force WAL checkpoint to ensure clean state
-                    # Returns (busy, log_frames, checkpointed_frames)
-                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
-                    if checkpoint_result:
-                        busy, log_frames, checkpointed = checkpoint_result
-                        if busy:
-                            # Checkpoint couldn't fully complete - retry with backoff
-                            for retry in range(3):
-                                time.sleep(0.5 * (retry + 1))
-                                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
-                                if checkpoint_result and not checkpoint_result[0]:
-                                    print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
-                                    break
-                            else:
-                                print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
-                        elif log_frames != checkpointed:
-                            print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
-
-                    # Post-commit integrity verification (validates final on-disk state)
-                    # This is ADDITIONAL to pre-commit check - both are needed:
-                    # - Pre-commit: Enables atomic rollback if corrupt
-                    # - Post-commit: Validates finalized disk state after WAL flush
-                    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
-                    if post_integrity != "ok":
-                        print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
-                        print(f"   ⚠️ Database may be corrupted. Consider: rm {db_path}*")
-
-                    # Refresh query planner statistics after major schema change
-                    cursor.execute("ANALYZE task_groups;")
-
-                    print("   ✓ Recreated task_groups with expanded status enum")
-                except Exception as e:
-                    try:
-                        conn.rollback()
-                    except Exception as rollback_exc:
-                        print(f"   ! ROLLBACK failed: {rollback_exc}")
-                    print(f"   ✗ v4→v5 migration failed during task_groups recreation, rolled back: {e}")
-                    raise
+            if not sessions_exists:
+                print("   ⊘ Base tables don't exist yet - will be created with full schema below")
+                print("✓ Migration to v5 complete (fresh database, skipped)")
+                current_version = 5  # Skip to next migration, CREATE TABLE will handle it
             else:
-                print("   ⊘ task_groups status enum already expanded")
+                # 1. Add initial_branch to sessions
+                try:
+                    cursor.execute("ALTER TABLE sessions ADD COLUMN initial_branch TEXT DEFAULT 'main'")
+                    print("   ✓ Added sessions.initial_branch")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ sessions.initial_branch already exists")
+                    else:
+                        raise
 
-            print("✓ Migration to v5 complete (merge-on-approval architecture)")
-            current_version = 5  # Advance version to enable subsequent migrations
+                # 2. Add feature_branch to task_groups
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN feature_branch TEXT")
+                    print("   ✓ Added task_groups.feature_branch")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.feature_branch already exists")
+                    else:
+                        raise
+
+                # 3. Add merge_status to task_groups (without CHECK - SQLite limitation)
+                # NOTE: ALTER TABLE cannot add CHECK constraints in SQLite
+                # The CHECK constraint is applied in step 4 when we recreate the table
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN merge_status TEXT")
+                    print("   ✓ Added task_groups.merge_status (CHECK constraint applied in step 4)")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.merge_status already exists")
+                    else:
+                        raise
+
+                # 4. Recreate task_groups with expanded status enum AND proper CHECK constraints
+                # This step applies CHECK constraints that couldn't be added via ALTER TABLE
+                cursor.execute("SELECT sql FROM sqlite_master WHERE name='task_groups'")
+                schema = cursor.fetchone()[0]
+
+                if 'approved_pending_merge' not in schema:
+                    print("   Recreating task_groups with expanded status enum...")
+
+                    # CRITICAL: Table recreation must be atomic to prevent orphan indexes
+                    # Use explicit transaction with exclusive locking
+                    # See research/sqlite-orphan-index-corruption-ultrathink.md for full root cause analysis
+                    # Close any implicit transaction before starting explicit one
+                    conn.commit()
+                    try:
+                        cursor.execute("BEGIN IMMEDIATE")
+
+                        # Create new table with expanded status enum
+                        cursor.execute("""
+                            CREATE TABLE task_groups_new (
+                                id TEXT NOT NULL,
+                                session_id TEXT NOT NULL,
+                                name TEXT NOT NULL,
+                                status TEXT CHECK(status IN (
+                                    'pending', 'in_progress', 'completed', 'failed',
+                                    'approved_pending_merge', 'merging'
+                                )) DEFAULT 'pending',
+                                assigned_to TEXT,
+                                revision_count INTEGER DEFAULT 0,
+                                last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUESTED') OR last_review_status IS NULL),
+                                feature_branch TEXT,
+                                merge_status TEXT CHECK(merge_status IN ('pending', 'in_progress', 'merged', 'conflict', 'test_failure') OR merge_status IS NULL),
+                                complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+                                initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                PRIMARY KEY (id, session_id),
+                                FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                            )
+                        """)
+
+                        # Get existing columns in task_groups
+                        cursor.execute("PRAGMA table_info(task_groups)")
+                        existing_cols = [row[1] for row in cursor.fetchall()]
+
+                        # Build column list for migration (only columns that exist)
+                        all_cols = ['id', 'session_id', 'name', 'status', 'assigned_to', 'revision_count',
+                                   'last_review_status', 'feature_branch', 'merge_status', 'complexity',
+                                   'initial_tier', 'created_at', 'updated_at']
+                        cols_to_copy = [c for c in all_cols if c in existing_cols]
+                        cols_str = ', '.join(cols_to_copy)
+
+                        # Copy data
+                        cursor.execute(f"""
+                            INSERT INTO task_groups_new ({cols_str})
+                            SELECT {cols_str} FROM task_groups
+                        """)
+
+                        # Swap tables atomically
+                        cursor.execute("DROP TABLE task_groups")
+                        cursor.execute("ALTER TABLE task_groups_new RENAME TO task_groups")
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_taskgroups_session ON task_groups(session_id, status)")
+
+                        # Verify integrity before committing
+                        integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                        if integrity != "ok":
+                            raise sqlite3.IntegrityError(f"Migration task_groups v4→v5: Database integrity check failed after table recreation: {integrity}")
+
+                        # Use connection methods for commit/rollback (clearer than SQL strings)
+                        conn.commit()
+
+                        # Force WAL checkpoint to ensure clean state
+                        # Returns (busy, log_frames, checkpointed_frames)
+                        checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                        if checkpoint_result:
+                            busy, log_frames, checkpointed = checkpoint_result
+                            if busy:
+                                # Checkpoint couldn't fully complete - retry with backoff
+                                for retry in range(3):
+                                    time.sleep(0.5 * (retry + 1))
+                                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                                    if checkpoint_result and not checkpoint_result[0]:
+                                        print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                        break
+                                else:
+                                    print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
+                            elif log_frames != checkpointed:
+                                print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
+
+                        # Post-commit integrity verification (validates final on-disk state)
+                        # This is ADDITIONAL to pre-commit check - both are needed:
+                        # - Pre-commit: Enables atomic rollback if corrupt
+                        # - Post-commit: Validates finalized disk state after WAL flush
+                        post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                        if post_integrity != "ok":
+                            print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+                            print(f"   ⚠️ Database may be corrupted. Consider: rm {db_path}*")
+
+                        # Refresh query planner statistics after major schema change
+                        cursor.execute("ANALYZE task_groups;")
+
+                        print("   ✓ Recreated task_groups with expanded status enum")
+                    except Exception as e:
+                        try:
+                            conn.rollback()
+                        except Exception as rollback_exc:
+                            print(f"   ! ROLLBACK failed: {rollback_exc}")
+                        print(f"   ✗ v4→v5 migration failed during task_groups recreation, rolled back: {e}")
+                        raise
+                else:
+                    print("   ⊘ task_groups status enum already expanded")
+
+                print("✓ Migration to v5 complete (merge-on-approval architecture)")
+                current_version = 5  # Advance version to enable subsequent migrations
 
         # Handle v5→v6 migration (context packages for inter-agent communication)
         if current_version == 5:
             print("🔄 Migrating schema from v5 to v6...")
 
-            # 1. Add context_references to task_groups
-            try:
-                cursor.execute("ALTER TABLE task_groups ADD COLUMN context_references TEXT")
-                print("   ✓ Added task_groups.context_references")
-            except sqlite3.OperationalError as e:
-                if "duplicate column" in str(e).lower():
-                    print("   ⊘ task_groups.context_references already exists")
-                else:
-                    raise
+            # Check if task_groups table exists (for fresh databases, skip ALTER)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'")
+            task_groups_exists = cursor.fetchone() is not None
 
-            # 2. Create context_packages table (will be created below with IF NOT EXISTS)
-            # 3. Create context_package_consumers table (will be created below with IF NOT EXISTS)
+            if not task_groups_exists:
+                print("   ⊘ Base tables don't exist yet - will be created with full schema below")
+                print("✓ Migration to v6 complete (fresh database, skipped)")
+                current_version = 6
+            else:
+                # 1. Add context_references to task_groups
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN context_references TEXT")
+                    print("   ✓ Added task_groups.context_references")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.context_references already exists")
+                    else:
+                        raise
 
-            print("✓ Migration to v6 complete (context packages for inter-agent communication)")
-            current_version = 6
+                # 2. Create context_packages table (will be created below with IF NOT EXISTS)
+                # 3. Create context_package_consumers table (will be created below with IF NOT EXISTS)
+
+                print("✓ Migration to v6 complete (context packages for inter-agent communication)")
+                current_version = 6
 
         # Migration from v6 to v7: Add specializations to task_groups
         if current_version == 6:
             print("🔄 Migrating schema from v6 to v7...")
 
-            # Add specializations column to task_groups
-            try:
-                cursor.execute("ALTER TABLE task_groups ADD COLUMN specializations TEXT")
-                print("   ✓ Added task_groups.specializations")
-            except sqlite3.OperationalError as e:
-                if "duplicate column" in str(e).lower():
-                    print("   ⊘ task_groups.specializations already exists")
-                else:
-                    raise
+            # Check if task_groups table exists (for fresh databases, skip ALTER)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'")
+            task_groups_exists = cursor.fetchone() is not None
 
-            # CRITICAL: Force WAL checkpoint after schema change
-            # Without this, subsequent writes can corrupt the schema catalog
-            # causing "orphan index" errors on sqlite_autoindex_task_groups_1
-            conn.commit()
-            # Returns (busy, log_frames, checkpointed_frames)
-            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
-            if checkpoint_result:
-                busy, log_frames, checkpointed = checkpoint_result
-                if busy:
-                    # Checkpoint couldn't fully complete - retry with backoff
-                    for retry in range(3):
-                        time.sleep(0.5 * (retry + 1))
-                        checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
-                        if checkpoint_result and not checkpoint_result[0]:
-                            print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
-                            break
+            if not task_groups_exists:
+                print("   ⊘ Base tables don't exist yet - will be created with full schema below")
+                print("✓ Migration to v7 complete (fresh database, skipped)")
+                current_version = 7
+            else:
+                # Add specializations column to task_groups
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN specializations TEXT")
+                    print("   ✓ Added task_groups.specializations")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.specializations already exists")
                     else:
-                        print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
-                elif log_frames != checkpointed:
-                    print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
+                        raise
 
-            # Post-commit integrity verification (validates final on-disk state)
-            post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
-            if post_integrity != "ok":
-                print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
-                print(f"   ⚠️ Database may be corrupted. Consider deleting and reinitializing.")
+                # CRITICAL: Force WAL checkpoint after schema change
+                # Without this, subsequent writes can corrupt the schema catalog
+                # causing "orphan index" errors on sqlite_autoindex_task_groups_1
+                conn.commit()
+                # Returns (busy, log_frames, checkpointed_frames)
+                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                if checkpoint_result:
+                    busy, log_frames, checkpointed = checkpoint_result
+                    if busy:
+                        # Checkpoint couldn't fully complete - retry with backoff
+                        for retry in range(3):
+                            time.sleep(0.5 * (retry + 1))
+                            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                            if checkpoint_result and not checkpoint_result[0]:
+                                print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                break
+                        else:
+                            print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}, log={log_frames}, checkpointed={checkpointed}")
+                    elif log_frames != checkpointed:
+                        print(f"   ⚠️ WAL checkpoint partial: {checkpointed}/{log_frames} frames checkpointed")
 
-            current_version = 7  # Advance version (final migration)
+                # Post-commit integrity verification (validates final on-disk state)
+                post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                if post_integrity != "ok":
+                    print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+                    print(f"   ⚠️ Database may be corrupted. Consider deleting and reinitializing.")
 
-            # Refresh query planner statistics after schema change
-            cursor.execute("ANALYZE task_groups;")
-            print("   ✓ WAL checkpoint completed")
+                current_version = 7  # Advance version
 
-            print("✓ Migration to v7 complete (specializations for tech stack loading)")
+                # Refresh query planner statistics after schema change
+                cursor.execute("ANALYZE task_groups;")
+                print("   ✓ WAL checkpoint completed")
+
+                print("✓ Migration to v7 complete (specializations for tech stack loading)")
+
+        # Migration from v7 to v8: Add reasoning capture columns to orchestration_logs
+        if current_version == 7:
+            print("🔄 Migrating schema from v7 to v8...")
+
+            # Check if orchestration_logs table exists (for fresh databases, skip ALTER)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orchestration_logs'")
+            logs_exists = cursor.fetchone() is not None
+
+            if not logs_exists:
+                print("   ⊘ Base tables don't exist yet - will be created with full schema below")
+                print("✓ Migration to v8 complete (fresh database, skipped)")
+                current_version = 8
+            else:
+                # Add log_type column (defaults to 'interaction' for existing rows)
+                try:
+                    cursor.execute("""
+                        ALTER TABLE orchestration_logs
+                        ADD COLUMN log_type TEXT DEFAULT 'interaction'
+                    """)
+                    print("   ✓ Added orchestration_logs.log_type")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ orchestration_logs.log_type already exists")
+                    else:
+                        raise
+
+                # Add reasoning_phase column
+                try:
+                    cursor.execute("""
+                        ALTER TABLE orchestration_logs
+                        ADD COLUMN reasoning_phase TEXT
+                    """)
+                    print("   ✓ Added orchestration_logs.reasoning_phase")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ orchestration_logs.reasoning_phase already exists")
+                    else:
+                        raise
+
+                # Add confidence_level column
+                try:
+                    cursor.execute("""
+                        ALTER TABLE orchestration_logs
+                        ADD COLUMN confidence_level TEXT
+                    """)
+                    print("   ✓ Added orchestration_logs.confidence_level")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ orchestration_logs.confidence_level already exists")
+                    else:
+                        raise
+
+                # Add references_json column (JSON array of file paths consulted)
+                try:
+                    cursor.execute("""
+                        ALTER TABLE orchestration_logs
+                        ADD COLUMN references_json TEXT
+                    """)
+                    print("   ✓ Added orchestration_logs.references_json")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ orchestration_logs.references_json already exists")
+                    else:
+                        raise
+
+                # Add redacted column (1 if secrets were redacted)
+                try:
+                    cursor.execute("""
+                        ALTER TABLE orchestration_logs
+                        ADD COLUMN redacted INTEGER DEFAULT 0
+                    """)
+                    print("   ✓ Added orchestration_logs.redacted")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ orchestration_logs.redacted already exists")
+                    else:
+                        raise
+
+                # Add group_id column for reasoning context
+                try:
+                    cursor.execute("""
+                        ALTER TABLE orchestration_logs
+                        ADD COLUMN group_id TEXT
+                    """)
+                    print("   ✓ Added orchestration_logs.group_id")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ orchestration_logs.group_id already exists")
+                    else:
+                        raise
+
+                # Create index for reasoning queries
+                try:
+                    cursor.execute("""
+                        CREATE INDEX idx_logs_reasoning
+                        ON orchestration_logs(session_id, log_type, reasoning_phase)
+                        WHERE log_type = 'reasoning'
+                    """)
+                    print("   ✓ Created idx_logs_reasoning index")
+                except sqlite3.OperationalError as e:
+                    if "already exists" in str(e).lower():
+                        print("   ⊘ idx_logs_reasoning index already exists")
+                    else:
+                        raise
+
+                # Create index for group-based reasoning queries
+                try:
+                    cursor.execute("""
+                        CREATE INDEX idx_logs_group_reasoning
+                        ON orchestration_logs(session_id, group_id, log_type)
+                        WHERE log_type = 'reasoning'
+                    """)
+                    print("   ✓ Created idx_logs_group_reasoning index")
+                except sqlite3.OperationalError as e:
+                    if "already exists" in str(e).lower():
+                        print("   ⊘ idx_logs_group_reasoning index already exists")
+                    else:
+                        raise
+
+                # Commit and checkpoint
+                conn.commit()
+                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                if checkpoint_result:
+                    busy, log_frames, checkpointed = checkpoint_result
+                    if busy:
+                        for retry in range(3):
+                            time.sleep(0.5 * (retry + 1))
+                            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                            if checkpoint_result and not checkpoint_result[0]:
+                                print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                break
+                        else:
+                            print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+
+                # Post-commit integrity verification
+                post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                if post_integrity != "ok":
+                    print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+
+                # Refresh query planner statistics
+                cursor.execute("ANALYZE orchestration_logs;")
+                print("   ✓ WAL checkpoint completed")
+
+                current_version = 8
+                print("✓ Migration to v8 complete (agent reasoning capture)")
 
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Specializations for tech stack loading"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Agent reasoning capture"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -391,6 +564,8 @@ def init_database(db_path: str) -> None:
     print("✓ Created sessions table")
 
     # Orchestration logs table (replaces orchestration-log.md)
+    # Extended in v8 to support agent reasoning capture
+    # CHECK constraints enforce valid enumeration values at database layer
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orchestration_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -400,6 +575,18 @@ def init_database(db_path: str) -> None:
             agent_type TEXT NOT NULL,
             agent_id TEXT,
             content TEXT NOT NULL,
+            log_type TEXT DEFAULT 'interaction'
+                CHECK(log_type IN ('interaction', 'reasoning')),
+            reasoning_phase TEXT
+                CHECK(reasoning_phase IS NULL OR reasoning_phase IN (
+                    'understanding', 'approach', 'decisions', 'risks',
+                    'blockers', 'pivot', 'completion'
+                )),
+            confidence_level TEXT
+                CHECK(confidence_level IS NULL OR confidence_level IN ('high', 'medium', 'low')),
+            references_json TEXT,
+            redacted INTEGER DEFAULT 0 CHECK(redacted IN (0, 1)),
+            group_id TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
@@ -410,6 +597,16 @@ def init_database(db_path: str) -> None:
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_logs_agent_type
         ON orchestration_logs(session_id, agent_type)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_logs_reasoning
+        ON orchestration_logs(session_id, log_type, reasoning_phase)
+        WHERE log_type = 'reasoning'
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_logs_group_reasoning
+        ON orchestration_logs(session_id, group_id, log_type)
+        WHERE log_type = 'reasoning'
     """)
     print("✓ Created orchestration_logs table with indexes")
 
