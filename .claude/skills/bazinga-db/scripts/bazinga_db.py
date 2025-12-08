@@ -17,6 +17,7 @@ import json
 import sys
 import time
 import re
+import random
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
@@ -24,32 +25,34 @@ import argparse
 
 # Secret patterns for redaction (compiled for performance)
 # See: research/agent-reasoning-capture-ultrathink.md
+# Context-preserving: patterns with capture groups use \1= to keep variable names
+# Word boundaries (\b) prevent false positives from partial matches in URLs/identifiers
 SECRET_PATTERNS = [
-    # Generic patterns
-    (re.compile(r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?([a-zA-Z0-9_-]{20,})["\']?'), 'API_KEY_REDACTED'),
-    (re.compile(r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*["\']?([^\s"\']+)["\']?'), 'SECRET_REDACTED'),
-    (re.compile(r'(?i)(token|bearer)\s*[=:]\s*["\']?([a-zA-Z0-9_.-]{20,})["\']?'), 'TOKEN_REDACTED'),
-    # OpenAI (including sk-proj-* format with hyphens)
-    (re.compile(r'sk-[a-zA-Z0-9-]{20,}'), 'OPENAI_KEY_REDACTED'),
-    # Anthropic
-    (re.compile(r'sk-ant-[a-zA-Z0-9-]{20,}'), 'ANTHROPIC_KEY_REDACTED'),
+    # Generic patterns (preserve variable name context)
+    (re.compile(r'(?i)\b(api[_-]?key|apikey)\s*[=:]\s*["\']?[a-zA-Z0-9_-]{20,}["\']?'), r'\1=REDACTED'),
+    (re.compile(r'(?i)\b(secret|password|passwd|pwd)\s*[=:]\s*["\']?[^\s"\']+["\']?'), r'\1=REDACTED'),
+    (re.compile(r'(?i)\b(token)\s*[=:]\s*["\']?[a-zA-Z0-9_.-]{20,}["\']?'), r'\1=REDACTED'),
+    # OpenAI (including sk-proj-* format with hyphens) - word boundary prevents flask-sk-... matches
+    (re.compile(r'\bsk-[a-zA-Z0-9-]{20,}\b'), 'OPENAI_KEY_REDACTED'),
+    # Anthropic (must match before generic OpenAI pattern - more specific)
+    (re.compile(r'\bsk-ant-[a-zA-Z0-9-]{20,}\b'), 'ANTHROPIC_KEY_REDACTED'),
     # GitHub
-    (re.compile(r'ghp_[a-zA-Z0-9]{36}'), 'GITHUB_TOKEN_REDACTED'),
-    (re.compile(r'gho_[a-zA-Z0-9]{36}'), 'GITHUB_OAUTH_REDACTED'),
-    (re.compile(r'github_pat_[a-zA-Z0-9_]{22,}'), 'GITHUB_PAT_REDACTED'),
-    # AWS
-    (re.compile(r'AKIA[0-9A-Z]{16}'), 'AWS_ACCESS_KEY_REDACTED'),
-    (re.compile(r'(?i)aws[_-]?secret[_-]?access[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9/+=]{40})["\']?'), 'AWS_SECRET_REDACTED'),
+    (re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'), 'GITHUB_TOKEN_REDACTED'),
+    (re.compile(r'\bgho_[a-zA-Z0-9]{36}\b'), 'GITHUB_OAUTH_REDACTED'),
+    (re.compile(r'\bgithub_pat_[a-zA-Z0-9_]{22,}\b'), 'GITHUB_PAT_REDACTED'),
+    # AWS (preserve variable name context)
+    (re.compile(r'\bAKIA[0-9A-Z]{16}\b'), 'AWS_ACCESS_KEY_REDACTED'),
+    (re.compile(r'(?i)\b(aws[_-]?secret[_-]?access[_-]?key)\s*[=:]\s*["\']?[a-zA-Z0-9/+=]{40}["\']?'), r'\1=REDACTED'),
     # Private keys (match entire block from BEGIN to END)
     (re.compile(r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |DSA )?PRIVATE KEY-----'), 'PRIVATE_KEY_REDACTED'),
     (re.compile(r'-----BEGIN OPENSSH PRIVATE KEY-----[\s\S]*?-----END OPENSSH PRIVATE KEY-----'), 'SSH_KEY_REDACTED'),
     # Slack
-    (re.compile(r'xox[baprs]-[a-zA-Z0-9-]{10,}'), 'SLACK_TOKEN_REDACTED'),
+    (re.compile(r'\bxox[baprs]-[a-zA-Z0-9-]{10,}\b'), 'SLACK_TOKEN_REDACTED'),
     # Stripe
-    (re.compile(r'pk_(test|live)_[a-zA-Z0-9]{10,}'), 'STRIPE_PK_REDACTED'),
-    (re.compile(r'sk_(test|live)_[a-zA-Z0-9]{10,}'), 'STRIPE_SK_REDACTED'),
-    # Authorization headers
-    (re.compile(r'(?i)authorization:\s*bearer\s+[a-zA-Z0-9._-]{10,}'), 'BEARER_TOKEN_REDACTED'),
+    (re.compile(r'\bpk_(test|live)_[a-zA-Z0-9]{10,}\b'), 'STRIPE_PK_REDACTED'),
+    (re.compile(r'\bsk_(test|live)_[a-zA-Z0-9]{10,}\b'), 'STRIPE_SK_REDACTED'),
+    # Authorization headers (preserve header name)
+    (re.compile(r'(?i)\b(authorization):\s*bearer\s+[a-zA-Z0-9._-]{10,}'), r'\1: Bearer REDACTED'),
 ]
 
 
@@ -65,8 +68,9 @@ def scan_and_redact(text: str) -> Tuple[str, bool]:
     redacted = False
     result = text
     for pattern, replacement in SECRET_PATTERNS:
-        if pattern.search(result):
-            result = pattern.sub(replacement, result)
+        # Use subn for single-pass operation (returns replacement count)
+        result, num_subs = pattern.subn(replacement, result)
+        if num_subs > 0:
             redacted = True
     return result, redacted
 
@@ -1749,6 +1753,14 @@ class BazingaDB:
         if confidence is not None and confidence not in self.VALID_CONFIDENCE_LEVELS:
             raise ValueError(f"Invalid confidence: {confidence}. Must be one of: {sorted(self.VALID_CONFIDENCE_LEVELS)}")
 
+        # Validate and coerce references to list of strings
+        if references is not None:
+            if not isinstance(references, list):
+                raise TypeError(f"references must be a list, got {type(references).__name__}")
+            for i, ref in enumerate(references):
+                if not isinstance(ref, str):
+                    raise TypeError(f"references[{i}] must be a string, got {type(ref).__name__}")
+
         # Scan and redact secrets
         redacted_content, was_redacted = scan_and_redact(content)
         if was_redacted:
@@ -1797,10 +1809,10 @@ class BazingaDB:
             return result
 
         except sqlite3.OperationalError as e:
-            # Handle "database is locked" with exponential backoff
+            # Handle "database is locked" with exponential backoff + jitter
             if "database is locked" in str(e).lower() and _retry_count < 4:
-                wait_time = 2 ** _retry_count  # 1, 2, 4, 8 seconds
-                self._print_error(f"Database locked, retrying in {wait_time}s (attempt {_retry_count + 1}/4)...")
+                wait_time = (2 ** _retry_count) + random.uniform(0, 0.5)  # Jitter prevents thundering herd
+                self._print_error(f"Database locked, retrying in {wait_time:.1f}s (attempt {_retry_count + 1}/4)...")
                 time.sleep(wait_time)
                 if conn:
                     try:
@@ -1952,11 +1964,14 @@ class BazingaDB:
             lines.append(f"### [{timestamp}] {agent} - {phase}{confidence_badge}{redacted_badge}")
             lines.append("")
 
-            # Truncate long content for timeline view
+            # Truncate long content for timeline view (300 chars per template spec)
             content = entry['content']
-            if len(content) > 500:
-                content = content[:500] + "..."
+            if len(content) > 300:
+                content = content[:300] + "..."
+            # Wrap in code fence to escape markdown special chars (prevents formatting injection)
+            lines.append("```text")
             lines.append(content)
+            lines.append("```")
             lines.append("")
             lines.append("---")
             lines.append("")
@@ -2455,17 +2470,28 @@ def main():
 
             session_id = cmd_args[0]
             kwargs = {}
+            valid_flags = {'--group_id', '--agent_type', '--phase', '--limit'}
             i = 1
             while i < len(cmd_args):
-                if cmd_args[i].startswith('--') and i + 1 < len(cmd_args):
-                    key = cmd_args[i].lstrip('--')
+                arg = cmd_args[i]
+                if arg.startswith('--'):
+                    if arg not in valid_flags:
+                        print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                        sys.exit(1)
+                    if i + 1 >= len(cmd_args):
+                        print(f"Error: Flag '{arg}' requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    key = arg.lstrip('--')
                     value = cmd_args[i + 1]
                     if key == 'limit':
                         value = int(value)
                     kwargs[key] = value
                     i += 2
                 else:
-                    i += 1
+                    # Unexpected positional argument - fail fast
+                    print(f"Error: Unexpected argument '{arg}'. Use --flag syntax for options.", file=sys.stderr)
+                    print(f"Usage: get-reasoning <session_id> [--group_id X] [--agent_type X] [--phase X] [--limit N]", file=sys.stderr)
+                    sys.exit(1)
 
             result = db.get_reasoning(session_id, **kwargs)
             print(json.dumps(result, indent=2))
@@ -2479,20 +2505,34 @@ def main():
             session_id = cmd_args[0]
             group_id = None
             fmt = 'json'
+            valid_flags = {'--group_id', '--format'}
 
             i = 1
             while i < len(cmd_args):
-                if cmd_args[i] == '--group_id' and i + 1 < len(cmd_args):
+                arg = cmd_args[i]
+                if arg == '--group_id':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --group_id requires a value", file=sys.stderr)
+                        sys.exit(1)
                     group_id = cmd_args[i + 1]
                     i += 2
-                elif cmd_args[i] == '--format' and i + 1 < len(cmd_args):
+                elif arg == '--format':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --format requires a value", file=sys.stderr)
+                        sys.exit(1)
                     fmt = cmd_args[i + 1]
                     if fmt not in ('json', 'markdown'):
                         print(f"Error: --format must be 'json' or 'markdown', got '{fmt}'", file=sys.stderr)
                         sys.exit(1)
                     i += 2
+                elif arg.startswith('--'):
+                    print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                    sys.exit(1)
                 else:
-                    i += 1
+                    # Unexpected positional argument - fail fast
+                    print(f"Error: Unexpected argument '{arg}'. Use --flag syntax for options.", file=sys.stderr)
+                    print(f"Usage: reasoning-timeline <session_id> [--group_id X] [--format json|markdown]", file=sys.stderr)
+                    sys.exit(1)
 
             result = db.reasoning_timeline(session_id, group_id=group_id, output_format=fmt)
             print(result)

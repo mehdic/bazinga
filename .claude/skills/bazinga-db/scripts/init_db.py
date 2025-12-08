@@ -565,6 +565,7 @@ def init_database(db_path: str) -> None:
 
     # Orchestration logs table (replaces orchestration-log.md)
     # Extended in v8 to support agent reasoning capture
+    # CHECK constraints enforce valid enumeration values at database layer
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orchestration_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -574,11 +575,17 @@ def init_database(db_path: str) -> None:
             agent_type TEXT NOT NULL,
             agent_id TEXT,
             content TEXT NOT NULL,
-            log_type TEXT DEFAULT 'interaction',
-            reasoning_phase TEXT,
-            confidence_level TEXT,
+            log_type TEXT DEFAULT 'interaction'
+                CHECK(log_type IN ('interaction', 'reasoning')),
+            reasoning_phase TEXT
+                CHECK(reasoning_phase IS NULL OR reasoning_phase IN (
+                    'understanding', 'approach', 'decisions', 'risks',
+                    'blockers', 'pivot', 'completion'
+                )),
+            confidence_level TEXT
+                CHECK(confidence_level IS NULL OR confidence_level IN ('high', 'medium', 'low')),
             references_json TEXT,
-            redacted INTEGER DEFAULT 0,
+            redacted INTEGER DEFAULT 0 CHECK(redacted IN (0, 1)),
             group_id TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
