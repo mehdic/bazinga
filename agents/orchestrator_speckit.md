@@ -208,6 +208,21 @@ Decision: PARALLEL MODE (2 developers for phase 1)
 
 ### Step 4: Spawn Developers with Spec-Kit Context
 
+**🔴 Context Package Query (MANDATORY before spawn):**
+
+Same as regular orchestrator - query context packages before spawning:
+```
+bazinga-db, please get context packages:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: developer
+Limit: 3
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+Include any returned packages in the prompt (see `bazinga/templates/orchestrator/phase_simple.md` §Context Package Routing Rules).
+
 For each developer, provide:
 ```
 **SPEC-KIT INTEGRATION ACTIVE**

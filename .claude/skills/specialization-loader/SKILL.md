@@ -77,12 +77,15 @@ detected_versions = {
 }
 ```
 
-**Step 2c: Extract for version guards**
+**Step 2c: Extract for version guards and conventions**
 - `primary_language` and version (from project_context OR fallback detection)
 - `components[].framework` and version
 - `components[].type` (frontend/backend/fullstack)
+- `conventions.file_structure` (for Project Conventions section)
+- `conventions.naming` (for Project Conventions section)
+- `conventions.error_handling` (optional, if present)
 
-**Fallback priority:** project_context.json > inline detection > conservative defaults (no version guards)
+**Fallback priority:** project_context.json > inline detection > conservative defaults (no version guards, no conventions)
 
 ### Step 3: Determine Token Budget
 
@@ -199,6 +202,15 @@ Your expertise includes:
 
 ### Patterns to Avoid
 {Combined anti-patterns bullet list}
+
+### Project Conventions
+{IF project_context.conventions exists}
+- File structure: {conventions.file_structure}
+- Naming: {conventions.naming}
+{IF conventions.error_handling exists}
+- Error handling: {conventions.error_handling}
+{ENDIF}
+{ENDIF}
 
 {IF token budget allows}
 ### Verification Checklist
@@ -368,12 +380,17 @@ public Optional<User> findById(Long id) {
 - Returning null from methods
 - Missing @Transactional on write operations
 
+### Project Conventions
+- File structure: `src/main/java/{package}/{layer}/`
+- Naming: camelCase for methods, PascalCase for classes
+
 [SPECIALIZATION_BLOCK_END]
 
 Metadata:
 - Templates: 3 loaded
-- Tokens: 580/600
+- Tokens: 620/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
+- Conventions: included from project_context.json
 ```
 
 ---

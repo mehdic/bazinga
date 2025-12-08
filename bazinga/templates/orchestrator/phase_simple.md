@@ -19,6 +19,27 @@
 
 **🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
 
+**🔴 Context Package Verification (after RE/QA/TL completes):**
+
+When agent completes with a status that should create a context package, verify registration:
+
+| Agent | Expected Package | Verification |
+|-------|------------------|--------------|
+| Requirements Engineer (READY_FOR_REVIEW) | `research` package | Query: `bazinga-db get-context-packages {session} {group} developer 1` |
+| QA Expert (FAIL) | `failures` package | Query: `bazinga-db get-context-packages {session} {group} developer 1` |
+| Tech Lead (decision made) | `decisions` package | Query: `bazinga-db get-context-packages {session} {group} developer 1` |
+
+**If expected package NOT found:**
+1. Log warning: `⚠️ Context package expected but not registered by {agent}`
+2. Continue workflow (non-blocking) - agents may have valid reasons to skip
+3. Consider prompting agent in retry if this causes issues downstream
+
+**Fallback (if DB query fails):**
+Scan `bazinga/artifacts/{session_id}/` for files matching:
+- `research_group_{group_id}*.md` → research package exists
+- `failures_group_{group_id}*.md` → failures package exists
+- `decisions_group_{group_id}*.md` → decisions package exists
+
 **🔴 Context Package Query (MANDATORY before spawn):**
 
 Query available context packages for this agent:
