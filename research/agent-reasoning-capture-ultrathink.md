@@ -3,8 +3,8 @@
 **Date:** 2025-12-08
 **Context:** Need to capture subagent reasoning/thinking for debugging and audit trails
 **Decision:** Implement prompt-based reasoning documentation with database storage
-**Status:** Proposed
-**Reviewed by:** Pending OpenAI GPT-5, Google Gemini 3 Pro Preview
+**Status:** Reviewed - Ready for Implementation
+**Reviewed by:** OpenAI GPT-5
 
 ---
 
@@ -43,11 +43,11 @@ In BAZINGA orchestration:
 
 ---
 
-## Proposed Solution
+## Approved Solution
 
 ### Core Approach: Prompt-Injected Reasoning Documentation
 
-Instead of trying to capture internal thinking blocks (not possible), we instruct agents to **explicitly document their reasoning** as structured output saved to the database.
+Agents **explicitly document their reasoning** as structured output saved to the database via CLI commands. This is **MANDATORY** for all agents.
 
 ### Architecture
 
@@ -55,33 +55,34 @@ Instead of trying to capture internal thinking blocks (not possible), we instruc
 ┌─────────────────────────────────────────────────────────────┐
 │                    Agent Prompt (Modified)                   │
 │                                                              │
-│  ## Reasoning Documentation Requirement                      │
+│  ## Reasoning Documentation Requirement (MANDATORY)          │
 │  Before implementing, document your analysis:                │
-│  1. Save reasoning to database via bazinga-db skill          │
+│  1. Save reasoning to database via bazinga-db CLI            │
 │  2. Include: understanding, approach, risks, decisions       │
 │  3. Update when approach changes significantly               │
+│  4. All 7 phases available, minimum 2 required               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    bazinga-db Skill                          │
 │                                                              │
-│  NEW COMMAND: save-reasoning                                 │
-│  - session_id, group_id, agent_type, agent_id               │
-│  - reasoning_phase: understanding|approach|decisions|risks  │
-│  - reasoning_text: structured markdown                       │
-│  - timestamp: auto-generated                                 │
+│  EXTENDED: orchestration_logs table                          │
+│  - NEW log_type: 'reasoning'                                 │
+│  - NEW reasoning_phase column                                │
+│  - Secret scanning/redaction before storage                  │
+│  - Retry with exponential backoff                            │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    SQLite Database                           │
 │                                                              │
-│  NEW TABLE: agent_reasoning                                  │
-│  - Indexed by session_id, group_id, agent_type              │
-│  - Queryable by orchestrator, PM, Tech Lead                 │
+│  EXTENDED: orchestration_logs table                          │
+│  - Full reasoning text stored (DB is source of truth)        │
+│  - Indexed by session_id, group_id, agent_type, phase        │
+│  - Queryable by orchestrator, PM, Tech Lead                  │
 │  - Persists across compactions                               │
-│  - Provides audit trail                                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,17 +90,17 @@ Instead of trying to capture internal thinking blocks (not possible), we instruc
 
 ## Detailed Design
 
-### 1. New Database Table: `agent_reasoning`
+### 1. Extended Database Schema: `orchestration_logs`
+
+Extend the existing `orchestration_logs` table instead of creating a new table:
 
 ```sql
-CREATE TABLE agent_reasoning (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
-    group_id TEXT,  -- NULL for orchestrator/PM global reasoning
-    agent_type TEXT NOT NULL,  -- developer, qa_expert, tech_lead, pm, etc.
-    agent_id TEXT,  -- specific instance (e.g., developer_1)
-    iteration INTEGER DEFAULT 1,
-    reasoning_phase TEXT NOT NULL CHECK(reasoning_phase IN (
+-- Add new columns to existing orchestration_logs table
+ALTER TABLE orchestration_logs ADD COLUMN log_type TEXT DEFAULT 'interaction'
+    CHECK(log_type IN ('interaction', 'reasoning'));
+
+ALTER TABLE orchestration_logs ADD COLUMN reasoning_phase TEXT
+    CHECK(reasoning_phase IS NULL OR reasoning_phase IN (
         'understanding',  -- Initial task comprehension
         'approach',       -- Planned solution strategy
         'decisions',      -- Key architectural/implementation decisions
@@ -107,65 +108,146 @@ CREATE TABLE agent_reasoning (
         'blockers',       -- What's blocking progress
         'pivot',          -- Why approach changed mid-task
         'completion'      -- Final summary of what was done and why
-    )),
-    reasoning_text TEXT NOT NULL,
-    confidence_level TEXT CHECK(confidence_level IN ('high', 'medium', 'low')),
-    references TEXT,  -- JSON array of file paths, context packages consulted
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-);
+    ));
 
--- Indexes for efficient querying
-CREATE INDEX idx_reasoning_session ON agent_reasoning(session_id, created_at DESC);
-CREATE INDEX idx_reasoning_group ON agent_reasoning(session_id, group_id, agent_type);
-CREATE INDEX idx_reasoning_phase ON agent_reasoning(reasoning_phase);
+ALTER TABLE orchestration_logs ADD COLUMN confidence_level TEXT
+    CHECK(confidence_level IS NULL OR confidence_level IN ('high', 'medium', 'low'));
+
+ALTER TABLE orchestration_logs ADD COLUMN references_json TEXT;  -- JSON array of file paths consulted
+
+ALTER TABLE orchestration_logs ADD COLUMN redacted INTEGER DEFAULT 0;  -- 1 if secrets were redacted
+
+-- Add index for reasoning queries
+CREATE INDEX idx_logs_reasoning ON orchestration_logs(session_id, log_type, reasoning_phase)
+    WHERE log_type = 'reasoning';
 ```
 
-### 2. New bazinga-db Commands
+**Why extend existing table:**
+- Simpler schema, fewer migrations
+- Reuses existing indexes and connections
+- Single source for all agent activity
+- Easier dashboard integration
+
+### 2. Secret Scanning/Redaction
+
+Before storing reasoning, scan and redact sensitive content:
+
+```python
+import re
+
+SECRET_PATTERNS = [
+    (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?([a-zA-Z0-9_-]{20,})["\']?', 'API_KEY_REDACTED'),
+    (r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*["\']?([^\s"\']+)["\']?', 'SECRET_REDACTED'),
+    (r'(?i)(token|bearer)\s*[=:]\s*["\']?([a-zA-Z0-9_.-]{20,})["\']?', 'TOKEN_REDACTED'),
+    (r'sk-[a-zA-Z0-9]{20,}', 'OPENAI_KEY_REDACTED'),
+    (r'ghp_[a-zA-Z0-9]{36}', 'GITHUB_TOKEN_REDACTED'),
+    (r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----', 'PRIVATE_KEY_REDACTED'),
+]
+
+def scan_and_redact(text: str) -> tuple[str, bool]:
+    """Scan text for secrets and redact them.
+
+    Returns:
+        (redacted_text, was_redacted)
+    """
+    redacted = False
+    result = text
+    for pattern, replacement in SECRET_PATTERNS:
+        if re.search(pattern, result):
+            result = re.sub(pattern, replacement, result)
+            redacted = True
+    return result, redacted
+```
+
+### 3. Retry with Exponential Backoff
+
+Add to BazingaDB class for all write operations:
+
+```python
+def save_reasoning(self, session_id: str, group_id: str, agent_type: str,
+                   reasoning_phase: str, reasoning_text: str,
+                   agent_id: str = None, iteration: int = 1,
+                   confidence: str = None, references: list = None,
+                   _retry_count: int = 0) -> Dict[str, Any]:
+    """Save agent reasoning with secret scanning and retry logic."""
+
+    # Prevent infinite recursion
+    if _retry_count > 3:
+        return {"success": False, "error": "Max retries exceeded"}
+
+    # Scan and redact secrets
+    redacted_text, was_redacted = scan_and_redact(reasoning_text)
+
+    try:
+        conn = self._get_connection()
+        cursor = conn.execute("""
+            INSERT INTO orchestration_logs
+            (session_id, agent_type, agent_id, iteration, content,
+             log_type, reasoning_phase, confidence_level, references_json, redacted)
+            VALUES (?, ?, ?, ?, ?, 'reasoning', ?, ?, ?, ?)
+        """, (session_id, agent_type, agent_id, iteration, redacted_text,
+              reasoning_phase, confidence,
+              json.dumps(references) if references else None,
+              1 if was_redacted else 0))
+        conn.commit()
+        # ... verification and return
+
+    except sqlite3.OperationalError as e:
+        if "database is locked" in str(e).lower() and _retry_count < 3:
+            wait_time = 2 ** _retry_count  # 1s, 2s, 4s
+            time.sleep(wait_time)
+            return self.save_reasoning(
+                session_id, group_id, agent_type, reasoning_phase, reasoning_text,
+                agent_id, iteration, confidence, references,
+                _retry_count=_retry_count + 1
+            )
+        raise
+```
+
+### 4. New bazinga-db CLI Commands
 
 ```bash
-# Save reasoning
-python3 bazinga_db.py save-reasoning \
+# Save reasoning (with automatic secret scanning)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
   "<session_id>" "<group_id>" "<agent_type>" "<reasoning_phase>" "<reasoning_text>" \
   [--agent_id X] [--iteration N] [--confidence high|medium|low] [--references '["file1","file2"]']
 
 # Get reasoning for a group (for handoffs)
-python3 bazinga_db.py get-reasoning \
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
   "<session_id>" "<group_id>" [--agent_type X] [--phase Y] [--limit N]
 
 # Get reasoning timeline (for debugging)
-python3 bazinga_db.py reasoning-timeline \
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
   "<session_id>" [--group_id X] [--format markdown|json]
 ```
 
-### 3. Agent Prompt Injection
+### 5. Agent Prompt Injection (MANDATORY for ALL agents)
 
-Add to **all agent prompts** (developer, qa_expert, tech_lead, pm, investigator, sse):
+Add to **ALL agent prompts** (developer, senior_software_engineer, qa_expert, techlead, project_manager, investigator, requirements_engineer):
 
 ```markdown
-## 🧠 Reasoning Documentation Requirement
+## 🧠 Reasoning Documentation Requirement (MANDATORY)
 
-**CRITICAL**: Document your reasoning to enable debugging and audit trails.
+**CRITICAL**: You MUST document your reasoning. This is NOT optional.
 
-### When to Save Reasoning
+### Required Reasoning Phases
 
 | Phase | When | What to Document |
 |-------|------|-----------------|
-| understanding | Start of task | Your interpretation of requirements, what's unclear |
+| understanding | **REQUIRED** at task start | Your interpretation of requirements, what's unclear |
 | approach | After analysis | Your planned solution, why this approach |
-| decisions | During impl | Key choices made, alternatives considered |
+| decisions | During implementation | Key choices made, alternatives considered |
 | risks | If identified | What could go wrong, mitigations |
 | blockers | If stuck | What's blocking, what you tried |
-| pivot | If changing | Why original approach didn't work |
-| completion | End of task | Summary of what was done and key learnings |
+| pivot | If changing approach | Why original approach didn't work |
+| completion | **REQUIRED** at task end | Summary of what was done and key learnings |
+
+**Minimum requirement:** `understanding` at start + `completion` at end
 
 ### How to Save Reasoning
 
 ```bash
-# Via bazinga-db skill
-Skill(command: "bazinga-db")
-
-# Then execute:
+# Save via bazinga-db CLI (secrets automatically redacted)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "{AGENT_TYPE}" "approach" \
   "## Approach
@@ -190,18 +272,6 @@ Implementing JWT auth using PyJWT library with HS256.
   --references '["src/utils/auth.py", "requirements.txt"]'
 ```
 
-### Minimum Reasoning Requirements
-
-**At minimum, every agent MUST save:**
-1. `understanding` phase at task start
-2. `completion` phase at task end
-
-**Additional phases are STRONGLY ENCOURAGED when:**
-- Making non-obvious decisions
-- Encountering unexpected behavior
-- Changing approach mid-task
-- Identifying risks
-
 ### Why This Matters
 
 Your reasoning is:
@@ -210,13 +280,14 @@ Your reasoning is:
 - **Preserved** across context compactions
 - **Available** for debugging failures
 - **Used** by Investigator for root cause analysis
+- **Secrets automatically redacted** before storage
 ```
 
-### 4. Integration Points
+### 6. Integration Points
 
 #### A. Orchestrator Spawn Enhancement
 
-When spawning agents, orchestrator can query previous reasoning:
+When spawning agents, orchestrator queries previous reasoning:
 
 ```python
 # Get reasoning from previous agents for context
@@ -235,7 +306,7 @@ spawn_prompt += f"""
 
 #### B. Tech Lead Review Enhancement
 
-Tech Lead can review developer reasoning before code review:
+Tech Lead reviews developer reasoning before code review:
 
 ```python
 # Tech Lead queries developer reasoning
@@ -278,7 +349,7 @@ What assumptions proved incorrect?
 
 #### D. PM Audit Trail
 
-PM can query reasoning for BAZINGA validation:
+PM queries reasoning for BAZINGA validation:
 
 ```python
 # Get all completion reasoning for final review
@@ -298,19 +369,21 @@ for criteria in success_criteria:
 ## Implementation Plan
 
 ### Phase 1: Database Schema (30 min)
-1. Add `agent_reasoning` table to `init_db.py`
-2. Add schema version migration
-3. Update `references/schema.md`
+1. Add migration to extend `orchestration_logs` table
+2. Add new columns: `log_type`, `reasoning_phase`, `confidence_level`, `references_json`, `redacted`
+3. Add index for reasoning queries
+4. Update schema version
 
-### Phase 2: bazinga-db Commands (1 hour)
-1. Add `save_reasoning()` method to BazingaDB class
-2. Add `get_reasoning()` method with filters
-3. Add `reasoning_timeline()` method
-4. Add CLI commands to main()
-5. Update SKILL.md with new commands
+### Phase 2: bazinga-db Commands (1.5 hours)
+1. Add `scan_and_redact()` function for secret scanning
+2. Add `save_reasoning()` method with retry/backoff
+3. Add `get_reasoning()` method with filters
+4. Add `reasoning_timeline()` method
+5. Add CLI commands to main()
+6. Update SKILL.md with new commands
 
 ### Phase 3: Agent Prompt Updates (2 hours)
-1. Update `agents/developer.md` with reasoning section
+1. Update `agents/developer.md` with mandatory reasoning section
 2. Update `agents/senior_software_engineer.md`
 3. Update `agents/qa_expert.md`
 4. Update `agents/techlead.md`
@@ -325,192 +398,33 @@ for criteria in success_criteria:
 
 ### Phase 5: Testing (1 hour)
 1. Test save/get reasoning commands
-2. Test reasoning in agent workflow
-3. Verify persistence across compactions
+2. Test secret redaction
+3. Test retry/backoff under load
+4. Test reasoning in agent workflow
+5. Verify persistence across compactions
 
 ---
 
-## Critical Analysis
+## Key Design Decisions
 
-### Pros ✅
-
-1. **No System Changes Required**
-   - Uses existing bazinga-db infrastructure
-   - No hooks, no special Claude Code features needed
-   - Works today with current architecture
-
-2. **Structured & Queryable**
-   - SQLite with indexes = fast queries
-   - Filterable by phase, agent, group
-   - Supports timeline reconstruction
-
-3. **Persists Across Compactions**
-   - Database survives context compaction
-   - Reasoning available for entire session lifetime
-   - Can query historical reasoning
-
-4. **Enables New Capabilities**
-   - Tech Lead can review reasoning before code
-   - Investigator has full context for debugging
-   - PM has audit trail for decisions
-   - Better handoffs between agents
-
-5. **Minimal Token Overhead**
-   - Reasoning is saved once, not repeated
-   - Query only relevant reasoning for spawns
-   - Much cheaper than repeating context
-
-### Cons ⚠️
-
-1. **Relies on Agent Compliance**
-   - Agents must follow prompt instructions
-   - Can't force reasoning documentation
-   - Quality varies by agent attention
-
-2. **Token Cost for Writing**
-   - Each reasoning save uses tokens
-   - Verbose reasoning = more cost
-   - Need balance between detail and efficiency
-
-3. **Not Real-Time**
-   - Reasoning saved at discrete points
-   - Can't see "thinking in progress"
-   - Post-hoc, not streaming
-
-4. **Potential for Noise**
-   - Low-quality reasoning clutters database
-   - Need clear guidelines on what's useful
-   - May need cleanup mechanisms
-
-5. **Doesn't Capture Implicit Reasoning**
-   - Only what agents explicitly document
-   - Internal thinking blocks still hidden
-   - May miss unconscious assumptions
-
-### Verdict
-
-**RECOMMENDED** - This approach provides 80% of the value with 20% of the complexity. The key insight is that **explicit reasoning documentation is more useful than captured thinking blocks** because:
-
-1. It's structured and queryable
-2. It forces agents to articulate decisions
-3. It's designed for human consumption
-4. It persists and survives compactions
-
-The main risk is agent compliance, but this can be mitigated with:
-- Clear prompt instructions
-- PM validation of reasoning completeness
-- Tech Lead review of reasoning quality
-
----
-
-## Comparison to Alternatives
-
-### Alternative 1: SubagentStop Hook + Transcript Parsing
-
-**Approach:** Parse JSONL transcript when agent stops
-
-**Pros:**
-- Captures all tool calls
-- No agent prompt changes needed
-
-**Cons:**
-- Thinking blocks stripped from transcript
-- Complex parsing required
-- Only captures after completion
-- No structured phases
-
-**Verdict:** Inferior - transcript doesn't include thinking, and parsing is fragile.
-
-### Alternative 2: State File Decoupling
-
-**Approach:** SubagentStop saves to file, UserPromptSubmit injects
-
-**Pros:**
-- Works with current hooks
-
-**Cons:**
-- Complex hook setup
-- File-based (not queryable)
-- Timing issues
-- Doesn't capture reasoning structure
-
-**Verdict:** Inferior - too complex, not queryable, not structured.
-
-### Alternative 3: Git-Based Persistence
-
-**Approach:** PostToolUse commits reasoning files
-
-**Pros:**
-- Version controlled
-- Diff-able
-
-**Cons:**
-- Pollutes git history
-- Not queryable
-- Overhead per save
-- Merge conflicts possible
-
-**Verdict:** Inferior - wrong tool for the job.
-
-### Alternative 4: External Observability System
-
-**Approach:** Real-time hook monitoring (like disler/claude-code-hooks-multi-agent-observability)
-
-**Pros:**
-- Real-time visibility
-- Dashboard UI
-
-**Cons:**
-- Doesn't capture thinking
-- Complex setup
-- External dependency
-- Still no structured reasoning
-
-**Verdict:** Complementary - good for monitoring, but doesn't solve reasoning capture.
-
-### Winner: Prompt-Injected Database Storage
-
-Our proposed approach combines:
-- Simplicity of prompt-based instructions
-- Structure of database storage
-- Queryability of SQL
-- Integration with existing bazinga-db skill
-
----
-
-## Open Questions
-
-1. **Reasoning Length Limits?**
-   - Should we cap reasoning_text at N characters?
-   - Pro: Prevents token bloat
-   - Con: May truncate important context
-   - **Recommendation:** Soft limit of 2000 chars, warn if exceeded
-
-2. **Automatic vs Manual Phases?**
-   - Should some phases be auto-triggered?
-   - E.g., auto-save "completion" when agent reports READY_FOR_QA
-   - **Recommendation:** Start manual, add automation if adoption is low
-
-3. **Reasoning Review in Tech Lead?**
-   - Should Tech Lead explicitly review reasoning quality?
-   - Could add "Reasoning Quality" to review criteria
-   - **Recommendation:** Yes, add as optional review dimension
-
-4. **Retention Policy?**
-   - Keep reasoning forever? Archive after session complete?
-   - **Recommendation:** Keep for 30 days, then archive to cold storage
-
-5. **Privacy/Security?**
-   - Reasoning may contain sensitive implementation details
-   - **Recommendation:** Same access controls as code
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| CLI vs Natural Language | **CLI commands** | Consistent with existing bazinga-db usage, explicit and reliable |
+| New table vs Extend existing | **Extend orchestration_logs** | Simpler schema, reuses indexes, single activity source |
+| Scope | **All agents, all 7 phases** | Comprehensive audit trail, mandatory minimum of 2 phases |
+| Auto-extract vs Manual | **Manual agent documentation** | Agents do all reasoning documentation explicitly |
+| Storage location | **Full text in DB** | Database is source of truth, queryable, no file I/O |
+| Secret handling | **Scan and redact** | Prevent accidental secret leakage |
+| Configurability | **Mandatory (not optional)** | Reasoning capture is always required |
+| Concurrency | **Retry with exponential backoff** | Handle parallel agent writes gracefully |
 
 ---
 
 ## Success Metrics
 
 1. **Adoption Rate**
-   - Target: 80% of agent spawns include at least `understanding` + `completion` phases
-   - Measure: `SELECT COUNT(DISTINCT agent_id) FROM agent_reasoning / total spawns`
+   - Target: 100% of agent spawns include at least `understanding` + `completion` phases
+   - Measure: `SELECT COUNT(*) FROM orchestration_logs WHERE log_type='reasoning' AND reasoning_phase IN ('understanding', 'completion')`
 
 2. **Debugging Utility**
    - Target: 50% reduction in Investigator iteration count
@@ -524,6 +438,42 @@ Our proposed approach combines:
    - Target: 30% fewer "context lost" escalations
    - Measure: Escalation reasons citing missing context
 
+5. **Secret Safety**
+   - Target: 0 secrets stored in reasoning text
+   - Measure: `SELECT COUNT(*) FROM orchestration_logs WHERE redacted=1`
+
+---
+
+## Multi-LLM Review Integration
+
+### OpenAI GPT-5 Review Summary
+
+**Critical feedback received and addressed:**
+
+1. ✅ **Concurrency/locking** - Added retry with exponential backoff
+2. ✅ **Secret scanning** - Added redaction before storage
+3. ❌ **Natural language protocol** - Rejected: CLI is more explicit and reliable
+4. ✅ **Schema fragmentation** - Accepted: Extend existing table instead of new one
+5. ❌ **Start minimal** - Rejected: All agents, all phases from start
+6. ❌ **Auto-extract from reports** - Rejected: Agents manually document
+7. ❌ **Files + DB summary** - Rejected: DB is source of truth
+8. ❌ **Configurable** - Rejected: Mandatory, not optional
+
+### Incorporated Feedback
+- Extended `orchestration_logs` table instead of new `agent_reasoning` table
+- Added secret scanning with regex patterns for common secrets
+- Added retry with exponential backoff (1s, 2s, 4s) for DB writes
+- Added `redacted` column to track when secrets were removed
+
+### Rejected Suggestions (With Reasoning)
+| Suggestion | Why Rejected |
+|------------|--------------|
+| Natural language protocol | CLI is explicit, consistent with existing skill usage |
+| Start with 2 phases, 2 agents | Comprehensive from start enables full audit trail |
+| Auto-extract from reports | Agents should explicitly articulate reasoning, not auto-parse |
+| Store long-form in files | DB is single source of truth, files add complexity |
+| Make configurable | Reasoning is always valuable, no reason to disable |
+
 ---
 
 ## References
@@ -532,9 +482,4 @@ Our proposed approach combines:
 - [SubagentStop Hook Documentation](https://code.claude.com/docs/en/hooks)
 - [Context Package System](research/context-package-system.md)
 - [bazinga-db Schema Reference](/.claude/skills/bazinga-db/references/schema.md)
-
----
-
-## Multi-LLM Review Integration
-
-*Pending review from OpenAI GPT-5 and Google Gemini 3 Pro Preview*
+- [OpenAI GPT-5 Review](tmp/ultrathink-reviews/openai-review.md)
