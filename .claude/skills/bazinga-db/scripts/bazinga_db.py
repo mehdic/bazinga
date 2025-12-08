@@ -45,6 +45,11 @@ SECRET_PATTERNS = [
     (re.compile(r'-----BEGIN OPENSSH PRIVATE KEY-----'), 'SSH_KEY_REDACTED'),
     # Slack
     (re.compile(r'xox[baprs]-[a-zA-Z0-9-]{10,}'), 'SLACK_TOKEN_REDACTED'),
+    # Stripe
+    (re.compile(r'pk_(test|live)_[a-zA-Z0-9]{10,}'), 'STRIPE_PK_REDACTED'),
+    (re.compile(r'sk_(test|live)_[a-zA-Z0-9]{10,}'), 'STRIPE_SK_REDACTED'),
+    # Authorization headers
+    (re.compile(r'(?i)authorization:\s*bearer\s+[a-zA-Z0-9._-]{10,}'), 'BEARER_TOKEN_REDACTED'),
 ]
 
 

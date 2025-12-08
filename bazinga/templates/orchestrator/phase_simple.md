@@ -80,14 +80,16 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
 
 **Previous Agent Reasoning Prompt Section** (include when reasoning found):
 
+**⚠️ Size limits:** Truncate each entry to 300 chars max. Include max 5 entries total.
+
 ```markdown
 ## Previous Agent Reasoning (Handoff Context)
 
 Prior agents documented their decision-making for this task:
 
-| Agent | Phase | Confidence | Key Points |
-|-------|-------|------------|------------|
-| {agent_type} | {reasoning_phase} | {confidence_level} | {summary_truncated_100_chars}... |
+| Agent | Phase | Confidence | Key Points (max 300 chars) |
+|-------|-------|------------|----------------------------|
+| {agent_type} | {reasoning_phase} | {confidence_level} | {summary_truncated_300_chars}... |
 
 **Use this to:**
 - Understand WHY prior decisions were made (not just WHAT)
@@ -338,23 +340,32 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**🔴 Developer Reasoning Query (BEFORE building prompt):**
+**🔴 Implementation Reasoning Query (BEFORE building prompt):**
 
-Query developer reasoning to understand implementation decisions:
+Query reasoning from all implementation agents (developer, SSE, RE):
 ```bash
+# Query each agent type separately (CLI doesn't support comma-separated)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" "{group_id}" --agent_type developer --limit 3
+  "{session_id}" "{group_id}" --agent_type developer --limit 2
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "{session_id}" "{group_id}" --agent_type senior_software_engineer --limit 2
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
+  "{session_id}" "{group_id}" --agent_type requirements_engineer --limit 1
 ```
+**Merge results:** Combine all returned entries, sort by timestamp, take most recent 5 total.
 
-**Developer Reasoning Prompt Section** (include when reasoning found):
+**Implementation Reasoning Prompt Section** (include when reasoning found):
+
+**⚠️ Size limits:** Truncate each entry to 300 chars max. Include max 5 entries total.
+
 ```markdown
-## Developer's Implementation Reasoning
+## Implementation Reasoning (Dev/SSE/RE)
 
-The developer documented their decision-making:
+Prior implementers documented their decision-making:
 
-| Phase | Confidence | Summary |
-|-------|------------|---------|
-| {reasoning_phase} | {confidence_level} | {summary_truncated_150_chars}... |
+| Agent | Phase | Confidence | Summary (max 300 chars) |
+|-------|-------|------------|-------------------------|
+| {agent_type} | {reasoning_phase} | {confidence_level} | {summary_truncated_300_chars}... |
 
 **Review Focus:**
 - Verify decisions align with architectural standards
@@ -362,7 +373,7 @@ The developer documented their decision-making:
 - Understand WHY implementation choices were made
 ```
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Developer Reasoning (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
 
@@ -693,14 +704,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeli
 ```
 
 **Reasoning Timeline Prompt Section** (include when timeline found):
+
+**⚠️ Size limits:** Truncate each entry to 300 chars max. Include max 10 entries total. Prioritize `blockers` and `pivot` phases.
+
 ```markdown
 ## Agent Reasoning Timeline (Investigation Context)
 
 Prior agents' documented decision progression:
 
-| Time | Agent | Phase | Confidence | Summary |
-|------|-------|-------|------------|---------|
-| {timestamp} | {agent_type} | {phase} | {confidence} | {summary_100chars}... |
+| Time | Agent | Phase | Confidence | Summary (max 300 chars) |
+|------|-------|-------|------------|-------------------------|
+| {timestamp} | {agent_type} | {phase} | {confidence} | {summary_truncated_300_chars}... |
 
 **Investigation Focus:**
 - Review `blockers` and `pivot` entries for failed approaches

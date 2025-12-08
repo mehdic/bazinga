@@ -11,8 +11,9 @@
 ## What Was Implemented
 
 ### Phase 1: Database Schema
-- `agent_reasoning` table with columns: session_id, group_id, agent_type, agent_id, iteration, reasoning_phase, confidence_level, content, references, redacted, timestamp
-- Migration v8 in init_db.py
+- Reasoning stored in `orchestration_logs` table with `log_type='reasoning'`
+- Columns used: session_id, group_id, agent_type, agent_id, iteration, reasoning_phase, confidence_level, content, references, redacted, timestamp
+- No separate `agent_reasoning` table - reasoning is a specialized log entry type
 
 ### Phase 2: CLI Commands
 - `save-reasoning` - Store agent reasoning with auto-secret redaction
@@ -34,27 +35,30 @@
 
 ## Critical Analysis: Identified Flaws
 
-### 1. SECRET REDACTION IS INCOMPLETE (SEVERITY: HIGH)
+### 1. SECRET REDACTION ANALYSIS (SEVERITY: MEDIUM - CORRECTED)
 
-**Evidence from testing:**
+**Initial test was misleading:**
 ```
 Input: "Found API key sk-abc123def456xyz789 in config. Using JWT_SECRET=mysupersecretkey"
 Output: "Found API key sk-abc123def456xyz789 in config. Using JWT_SECRET_REDACTED"
 ```
 
-**Problem:** The `sk-abc123def456xyz789` API key was NOT redacted. Only `KEY=value` patterns are caught.
+**Why test key wasn't redacted:** The pattern `sk-[a-zA-Z0-9]{20,}` requires 20+ characters after `sk-`. Test key `sk-abc123def456xyz789` has only 18 chars - too short for real OpenAI keys.
 
-**Missing patterns:**
-- `sk-*` (OpenAI API keys)
-- `pk_*`, `sk_*` (Stripe keys)
-- `ghp_*`, `gho_*` (GitHub tokens)
-- `AKIA*` (AWS access keys)
-- Bearer tokens in headers
-- Base64-encoded credentials
+**Existing patterns (already implemented):**
+- ✅ `sk-[a-zA-Z0-9]{20,}` (OpenAI API keys)
+- ✅ `sk-ant-*` (Anthropic keys)
+- ✅ `ghp_*`, `gho_*`, `github_pat_*` (GitHub tokens)
+- ✅ `AKIA*` (AWS access keys)
+- ✅ `xox[baprs]-*` (Slack tokens)
 
-**Risk:** Agents could inadvertently log real API keys to the database, creating a security exposure.
+**Patterns added in fix:**
+- ✅ `pk_(test|live)_*`, `sk_(test|live)_*` (Stripe keys)
+- ✅ `authorization: bearer *` (Authorization headers)
 
-**Fix needed:** Expand regex patterns in `redact_secrets()` function.
+**Remaining gaps (acceptable risk):**
+- Base64-encoded credentials (too many false positives)
+- Generic JWT tokens (would over-redact)
 
 ---
 
@@ -79,9 +83,9 @@ Output: "Found API key sk-abc123def456xyz789 in config. Using JWT_SECRET_REDACTE
 
 ---
 
-### 3. NO REASONING CONTENT SIZE LIMITS (SEVERITY: MEDIUM)
+### 3. NO REASONING CONTENT SIZE LIMITS (SEVERITY: MEDIUM - FIXED)
 
-**Current:** `content` column is TEXT with no size limit.
+**Previous state:** `content` column is TEXT with no size limit.
 
 **Risk scenario:**
 1. Agent saves verbose 10KB reasoning entry
@@ -91,34 +95,38 @@ Output: "Found API key sk-abc123def456xyz789 in config. Using JWT_SECRET_REDACTE
 
 **Impact:** Context bloat, increased token costs, potential prompt truncation.
 
-**Fix needed:**
-- Add `content_length` constraint (e.g., max 2000 chars)
-- Or: Truncate at query time with `--max-chars` flag
+**Fix applied:**
+- ✅ Orchestrator templates now specify: "Truncate each entry to 300 chars max"
+- ✅ Templates specify: "Include max 5 entries total" (10 for Investigator timeline)
+- ⚠️ Truncation is advisory (orchestrator instruction), not enforced in CLI
 
 ---
 
-### 4. TECH LEAD DEVELOPER QUERY IS AMBIGUOUS (SEVERITY: MEDIUM)
+### 4. TECH LEAD QUERY WAS TOO NARROW (SEVERITY: MEDIUM - FIXED)
 
-**Current query:**
+**Previous query:**
 ```bash
 get-reasoning "{session_id}" "{group_id}" --agent_type developer --limit 3
 ```
 
-**Problem:** What if work was done by SSE (Senior Software Engineer) or RE (Requirements Engineer)?
+**Problem:** Query missed SSE and RE reasoning in escalation/research cases.
 
-**The query filters `agent_type = 'developer'` which will MISS:**
-- `senior_software_engineer` reasoning (escalation cases)
-- `requirements_engineer` reasoning (research tasks)
+**Fix applied:**
+```bash
+# Now queries all implementation agents:
+get-reasoning ... --agent_type developer --limit 2
+get-reasoning ... --agent_type senior_software_engineer --limit 2
+get-reasoning ... --agent_type requirements_engineer --limit 1
+# Merge results, sort by timestamp, take most recent 5 total
+```
 
-**Result:** Tech Lead reviews code but lacks reasoning from the actual implementer.
-
-**Fix needed:** Query all implementation agents: `--agent_type developer,senior_software_engineer,requirements_engineer`
+**Result:** Tech Lead now receives reasoning from whoever actually did the implementation.
 
 ---
 
-### 5. REASONING TIMELINE CAN OVERWHELM INVESTIGATOR (SEVERITY: MEDIUM)
+### 5. REASONING TIMELINE CAN OVERWHELM INVESTIGATOR (SEVERITY: MEDIUM - MITIGATED)
 
-**Current:** Investigator gets full `reasoning-timeline` for group.
+**Previous concern:** Investigator gets full `reasoning-timeline` for group.
 
 **Problem scenario:**
 - Complex parallel workflow with 4 groups
@@ -126,12 +134,11 @@ get-reasoning "{session_id}" "{group_id}" --agent_type developer --limit 3
 - Investigator investigating Group A issue
 - Timeline returns 60 entries (potentially 30KB+ of content)
 
-**Impact:** Investigator prompt bloated with irrelevant reasoning from other groups.
-
-**Fix needed:** Filter timeline by relevance:
-- Same group only: `--group_id {group_id}` (already supported)
-- Or: Time window: `--since "1 hour ago"`
-- Or: Only blockers/pivots: `--phase blockers,pivot`
+**Mitigation applied:**
+- ✅ Template now specifies: "max 10 entries total"
+- ✅ Template now specifies: "Truncate each entry to 300 chars max"
+- ✅ Template now specifies: "Prioritize `blockers` and `pivot` phases"
+- ✅ Query already filters by `--group_id {group_id}` (same group only)
 
 ---
 
