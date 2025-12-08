@@ -8,7 +8,7 @@
 
 **Before:**
 ```sql
-agent_type TEXT CHECK(agent_type IN ('pm', 'developer', 'qa_expert', 'techlead', 'orchestrator'))
+agent_type TEXT CHECK(agent_type IN ('pm', 'developer', 'qa_expert', 'tech_lead', 'orchestrator'))
 ```
 
 **After:**
@@ -243,12 +243,12 @@ The system now supports all current and future agent types:
 **Current agents:**
 - `pm` (project_manager)
 - `developer`
+- `senior_software_engineer`
 - `qa_expert`
-- `techlead`
+- `tech_lead`
 - `orchestrator`
 - `investigator`
 - `requirements_engineer`
-- `orchestrator_speckit`
 
 **Future agents:** Any new agent type can be added without schema changes.
 

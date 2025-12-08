@@ -105,7 +105,7 @@ CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id
 - `session_id`: Foreign key to sessions table
 - `timestamp`: When the interaction occurred
 - `iteration`: Orchestration iteration number
-- `agent_type`: Type of agent (accepts any agent type for extensibility: `pm`, `developer`, `qa_expert`, `techlead`, `orchestrator`, `investigator`, `requirements_engineer`, `orchestrator_speckit`, or any future agent types)
+- `agent_type`: Type of agent (accepts any agent type for extensibility: `pm`, `developer`, `qa_expert`, `tech_lead`, `orchestrator`, `investigator`, `requirements_engineer`, `senior_software_engineer`, or any future agent types)
 - `agent_id`: Specific agent instance (e.g., `developer_1`)
 - `content`: Full agent response text or reasoning content
 - `log_type`: Entry type - `interaction` (default) for normal logs, `reasoning` for reasoning capture
