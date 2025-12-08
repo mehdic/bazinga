@@ -148,6 +148,38 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 ### Step 2A.3: Route Developer Response
 
 **IF Developer reports READY_FOR_QA:**
+
+**🔴 MANDATORY REASONING CHECK (Before QA routing):**
+
+Check that developer documented required reasoning phases:
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases \
+  "{session_id}" "{group_id}" "developer"
+```
+
+**Routing based on check result:**
+| Result | Action |
+|--------|--------|
+| `"complete": true` | Proceed to QA routing below |
+| `"complete": false` | Respawn Developer with reminder to document missing phases |
+
+**IF reasoning check fails (missing understanding OR completion):**
+- Build Developer prompt with missing phase reminder:
+  ```
+  ⚠️ REASONING DOCUMENTATION INCOMPLETE
+
+  Missing phases: {missing_phases}
+
+  Before reporting READY_FOR_QA, you MUST:
+  1. Document `understanding` phase (your interpretation of the task)
+  2. Document `completion` phase (summary of what was done)
+
+  Use --content-file pattern shown in your agent instructions.
+  ```
+- Spawn Developer with reminder → Return to Step 2A.2
+- **Do NOT proceed to QA with incomplete reasoning**
+
+**IF reasoning check passes:**
 - Check testing_config.json for qa_expert_enabled
 - IF QA enabled → **IMMEDIATELY continue to Step 2A.4 (Spawn QA). Do NOT stop.**
 - IF QA disabled → **IMMEDIATELY skip to Step 2A.6 (Spawn Tech Lead). Do NOT stop.**

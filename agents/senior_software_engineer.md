@@ -464,11 +464,13 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
 ```bash
 # At task START - Document your understanding (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "developer" "understanding" \
-  "## Understanding
+# Step 1: Write reasoning to temp file
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Understanding
 
 ### Task Interpretation
 [What I understand the task to be]
@@ -482,14 +484,19 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Files to Examine
 - [file1.py]
-- [file2.py]" \
+- [file2.py]
+REASONING_EOF
+
+# Step 2: Save via --content-file (avoids process table exposure)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
   --confidence high \
   --references '["file1.py", "file2.py"]'
 
 # During implementation - Document decisions (RECOMMENDED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "developer" "decisions" \
-  "## Decisions
+cat > /tmp/reasoning_decisions.md << 'REASONING_EOF'
+## Decisions
 
 ### Chosen Approach
 [What approach I chose]
@@ -500,13 +507,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Alternatives Considered
 - [Alternative 1] → [Why rejected]
-- [Alternative 2] → [Why rejected]" \
+- [Alternative 2] → [Why rejected]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "decisions" \
+  --content-file /tmp/reasoning_decisions.md \
   --confidence medium
 
 # At task END - Document completion (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "developer" "completion" \
-  "## Completion Summary
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Completion Summary
 
 ### What Was Done
 - [Change 1]
@@ -517,11 +528,15 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 - [Learning 2]
 
 ### Open Questions
-- [Any remaining questions for Tech Lead]" \
+- [Any remaining questions for Tech Lead]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "completion" \
+  --content-file /tmp/reasoning_completion.md \
   --confidence high \
   --references '["modified_file1.py", "modified_file2.py"]'
 ```
-
 ### When to Document Each Phase
 
 1. **understanding** - IMMEDIATELY after receiving task, BEFORE any implementation
@@ -543,20 +558,6 @@ Your workflow becomes:
 
 ---
 
-
-
-### Senior-Specific Agent Type
-
-In all reasoning CLI commands, replace `"developer"` with `"senior_software_engineer"`:
-
-```bash
-# Example for Senior Software Engineer:
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
-  "..." --confidence high
-
-# All phases use "senior_software_engineer" as agent_type
-```
 ## Pre-Implementation Code Quality Tools
 
 **Before implementing, you have access to automated Skills:**
