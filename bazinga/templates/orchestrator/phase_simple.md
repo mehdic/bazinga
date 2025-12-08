@@ -63,7 +63,7 @@ Read these files BEFORE starting implementation:
 
 Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations** for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
 
@@ -76,7 +76,7 @@ Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
    • {requirement_3_if_applicable}
 
    **Branch:** {branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Skills: {skills_list}
+   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
    **Testing:** {testing_mode} | QA: {qa_status}
 ```
 **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
@@ -147,7 +147,7 @@ Before moving to the next group or ending your message, verify:
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
-2. Add configuration from `bazinga/templates/prompt_building.md` (loaded at initialization)
+2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**)
 3. Include in prompt:
    - Summary of work completed so far
    - Specific gaps/issues that remain (extract from developer response)
@@ -218,7 +218,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section + **specializations**), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
 
@@ -229,7 +229,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
    **Dev's test coverage:** {coverage_pct}%
 
    **Challenge Level:** {challenge_level}/5 ({challenge_name})
-   **Config:** Specs: {specs_status} | Skills: {skills_list}
+   **Config:** Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
 ```
 **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
 
@@ -270,8 +270,9 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
-2. Include QA feedback and failed tests
-3. Track revision count in database (increment by 1)
+2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**)
+3. Include QA feedback and failed tests
+4. Track revision count in database (increment by 1)
 
 **Spawn developer Task:**
 ```
@@ -305,7 +306,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Specializations (per §Specialization Loading)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
 
@@ -316,7 +317,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
    **Dev summary:** {dev_summary_truncated} (max 100 chars)
    **QA result:** {qa_result} | Coverage: {coverage_pct}% | Tests: {tests_passed}/{tests_total}
 
-   **Config:** Specs: {specs_status} | Skills: {skills_list}
+   **Config:** Specs: {specs_status} | Specializations: {spec_status} | Skills: {skills_list}
 ```
 **Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
 
