@@ -69,7 +69,7 @@ db.update_session_status('bazinga_20250112_143022', 'completed')
 
 ### orchestration_logs
 
-Stores all agent interactions (replaces `orchestration-log.md`).
+Stores all agent interactions and reasoning (replaces `orchestration-log.md`). Extended in schema v8 to support agent reasoning capture.
 
 ```sql
 CREATE TABLE orchestration_logs (
@@ -80,12 +80,24 @@ CREATE TABLE orchestration_logs (
     agent_type TEXT NOT NULL,
     agent_id TEXT,
     content TEXT NOT NULL,
+    -- Reasoning capture columns (v8)
+    log_type TEXT DEFAULT 'interaction',  -- 'interaction' or 'reasoning'
+    reasoning_phase TEXT,  -- understanding, approach, decisions, risks, blockers, pivot, completion
+    confidence_level TEXT,  -- high, medium, low
+    references_json TEXT,  -- JSON array of files consulted
+    redacted INTEGER DEFAULT 0,  -- 1 if secrets were redacted
+    group_id TEXT,  -- Task group for reasoning context
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 )
 
 -- Indexes
 CREATE INDEX idx_logs_session ON orchestration_logs(session_id, timestamp DESC);
 CREATE INDEX idx_logs_agent_type ON orchestration_logs(session_id, agent_type);
+-- Reasoning-specific indexes (partial indexes for efficiency)
+CREATE INDEX idx_logs_reasoning ON orchestration_logs(session_id, log_type, reasoning_phase)
+    WHERE log_type = 'reasoning';
+CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id, log_type)
+    WHERE log_type = 'reasoning';
 ```
 
 **Columns:**
@@ -95,13 +107,28 @@ CREATE INDEX idx_logs_agent_type ON orchestration_logs(session_id, agent_type);
 - `iteration`: Orchestration iteration number
 - `agent_type`: Type of agent (accepts any agent type for extensibility: `pm`, `developer`, `qa_expert`, `techlead`, `orchestrator`, `investigator`, `requirements_engineer`, `orchestrator_speckit`, or any future agent types)
 - `agent_id`: Specific agent instance (e.g., `developer_1`)
-- `content`: Full agent response text
+- `content`: Full agent response text or reasoning content
+- `log_type`: Entry type - `interaction` (default) for normal logs, `reasoning` for reasoning capture
+- `reasoning_phase`: Phase of reasoning (only for log_type='reasoning'):
+  - `understanding`: Initial problem comprehension
+  - `approach`: Strategy selection
+  - `decisions`: Key choices made
+  - `risks`: Identified risks/concerns
+  - `blockers`: Issues preventing progress
+  - `pivot`: Strategy changes mid-execution
+  - `completion`: Final summary/outcome
+- `confidence_level`: Agent's confidence in reasoning (`high`, `medium`, `low`)
+- `references_json`: JSON array of file paths consulted during reasoning
+- `redacted`: 1 if secrets were detected and redacted from content
+- `group_id`: Task group ID for associating reasoning with specific work
 
 **Indexes:**
 - `idx_logs_session`: Fast session-based queries sorted by time
 - `idx_logs_agent_type`: Filter by agent type efficiently
+- `idx_logs_reasoning`: Efficient reasoning queries by phase (partial index)
+- `idx_logs_group_reasoning`: Efficient reasoning queries by group (partial index)
 
-**Usage Example:**
+**Usage Example - Interactions:**
 ```python
 # Log agent interaction
 db.log_interaction(
@@ -114,6 +141,35 @@ db.log_interaction(
 
 # Query recent logs
 logs = db.get_logs('bazinga_123', limit=10, agent_type='developer')
+```
+
+**Usage Example - Reasoning Capture:**
+```python
+# Save agent reasoning (auto-redacts secrets)
+result = db.save_reasoning(
+    session_id='bazinga_123',
+    group_id='group_a',
+    agent_type='developer',
+    reasoning_phase='understanding',
+    content='Analyzing HIN OAuth2 requirements...',
+    confidence='high',
+    references=['src/auth/oauth.py', 'docs/hin-spec.md']
+)
+
+# Get reasoning entries for a group
+reasoning = db.get_reasoning(
+    session_id='bazinga_123',
+    group_id='group_a',
+    agent_type='developer',
+    phase='understanding'
+)
+
+# Get full reasoning timeline
+timeline = db.reasoning_timeline(
+    session_id='bazinga_123',
+    group_id='group_a',
+    format='markdown'
+)
 ```
 
 ---
