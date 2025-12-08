@@ -1907,9 +1907,14 @@ class BazingaDB:
         # Return based on output format
         if output_format == 'prompt-summary':
             # Return pre-formatted markdown ready for prompt injection
-            # Truncates content to 300 chars per entry (per orchestrator template spec)
+            # Truncates content to 300 chars per entry, max 5 entries (per orchestrator template spec)
             if not results:
                 return "No previous reasoning found for this context."
+
+            # Limit to max 5 entries for prompt injection (prevents context bloat)
+            max_entries = 5
+            limited_results = results[:max_entries]
+            total_count = len(results)
 
             lines = [
                 "## Previous Agent Reasoning (Handoff Context)",
@@ -1919,7 +1924,7 @@ class BazingaDB:
                 "| Agent | Phase | Confidence | Key Points (max 300 chars) |",
                 "|-------|-------|------------|----------------------------|"
             ]
-            for entry in results:
+            for entry in limited_results:
                 agent = entry.get('agent_type', 'unknown')
                 phase = entry.get('reasoning_phase', 'unknown')
                 confidence = entry.get('confidence_level', '-')
@@ -1930,6 +1935,10 @@ class BazingaDB:
                 # Escape pipe characters and newlines for markdown table
                 content = content.replace('|', '\\|').replace('\n', ' ')
                 lines.append(f"| {agent} | {phase} | {confidence} | {content} |")
+
+            # Add truncation notice if entries were limited
+            if total_count > max_entries:
+                lines.append(f"\n*Showing {max_entries} of {total_count} entries (use --format json for full data)*")
 
             lines.extend([
                 "",
