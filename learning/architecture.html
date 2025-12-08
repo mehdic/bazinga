@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAZINGA Architecture - Extending & Customizing Your Dev Team</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="site-logo">BAZINGA Training</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="quickstart.html">Quickstart</a>
+        <a href="essentials.html">Essentials</a>
+        <a href="mastering.html">Mastering</a>
+        <a href="architecture.html" class="active">Architecture</a>
+        <a href="recipes.html">Recipes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article>
+      <header class="article-header">
+        <div class="container content">
+          <span class="badge advanced">Advanced</span>
+          <h1>BAZINGA Architecture</h1>
+          <p style="font-size: var(--font-size-lg); color: var(--color-text-muted); margin-top: var(--space-4);">
+            Extending & Customizing Your Dev Team
+          </p>
+          <div class="article-meta">
+            <span>60 min read</span>
+            <span>Prerequisite: Completed Mastering</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="container content article-content">
+        <div class="version-banner">
+          Last verified: BAZINGA v1.0 &bull; <a href="../agents/">Agent Definitions</a> &bull; <a href="../.claude/skills/">Skills</a>
+        </div>
+
+        <p class="lead" style="font-size: var(--font-size-lg); color: var(--color-text-muted);">
+          Deep dive into BAZINGA's internal architecture. Learn to create custom skills, modify agent behavior, and integrate BAZINGA into your development toolchain.
+        </p>
+
+        <nav class="toc">
+          <h4>On this page</h4>
+          <ol>
+            <li><a href="#overview">Architecture Overview</a></li>
+            <li><a href="#skills">Creating Custom Skills</a></li>
+            <li><a href="#agents">Agent Customization</a></li>
+            <li><a href="#integration">Integration Patterns</a></li>
+            <li><a href="#contributing">Contributing to BAZINGA</a></li>
+          </ol>
+        </nav>
+
+        <!-- Hard Rules -->
+        <div class="hard-rules">
+          <h4>Hard Rules to Remember</h4>
+          <ul>
+            <li><strong>Orchestrator coordinates only</strong> - It NEVER implements, only spawns agents and routes messages</li>
+            <li><strong>Single source of truth</strong> - Edit <code>agents/orchestrator.md</code>, not the generated slash command</li>
+            <li><strong>Database = memory</strong> - All state stored in SQLite via bazinga-db skill</li>
+            <li><strong>Skills use correct invocation</strong> - <code>Skill(command: "name")</code>, NOT <code>Skill(skill: "name")</code></li>
+            <li><strong>Agent files have size limits</strong> - Keep edits surgical and compact</li>
+          </ul>
+        </div>
+
+        <!-- Section 1: Architecture Overview -->
+        <section id="overview">
+          <h2>1. Architecture Overview</h2>
+
+          <h3>1.1 The Orchestrator Pattern</h3>
+
+          <p>The Orchestrator is a <strong>coordinator, not an implementer</strong>. It follows a strict "spawn and route" model:</p>
+
+          <div class="comparison">
+            <div class="comparison-good">
+              <div class="label">Orchestrator CAN</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Spawn agents using Task tool</li>
+                <li>Write to logs and state files</li>
+                <li>Read configuration from bazinga/</li>
+                <li>Output status messages to user</li>
+                <li>Route information between agents</li>
+              </ul>
+            </div>
+            <div class="comparison-bad">
+              <div class="label">Orchestrator CANNOT</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Analyze requirements (PM's job)</li>
+                <li>Implement code (Developer's job)</li>
+                <li>Review code (Tech Lead's job)</li>
+                <li>Run tests (QA Expert's job)</li>
+                <li>Read/edit source code files</li>
+              </ul>
+            </div>
+          </div>
+
+          <h4>Session Lifecycle</h4>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Initialize</h4>
+              <p>Create session ID (<code>bazinga_YYYYMMDD_HHMMSS</code>), load configuration from JSON files.</p>
+            </div>
+            <div class="step">
+              <h4>Plan</h4>
+              <p>Spawn PM to analyze requirements, create task groups, decide mode.</p>
+            </div>
+            <div class="step">
+              <h4>Execute</h4>
+              <p>Route work through agents based on PM's plan. Handle statuses and escalations.</p>
+            </div>
+            <div class="step">
+              <h4>Validate</h4>
+              <p>When PM sends BAZINGA, spawn Validator for independent verification.</p>
+            </div>
+            <div class="step">
+              <h4>Complete</h4>
+              <p>If Validator accepts, mark session complete. Otherwise, loop back with findings.</p>
+            </div>
+          </div>
+
+          <h3>1.2 Agent Definition Structure</h3>
+
+          <p>Agent files live in <code>agents/</code> and follow this structure:</p>
+
+          <div class="code-header">agents/developer.md</div>
+          <pre><code>---
+name: developer
+description: Implements code and writes tests
+model: haiku
+allowed_tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Glob
+  - Grep
+---
+
+# Developer Agent
+
+## Your Role
+You are a Developer responsible for implementing code...
+
+## Status Codes
+- READY_FOR_QA: Tests written, ready for QA
+- READY_FOR_REVIEW: No tests, ready for Tech Lead
+- BLOCKED: Need help from Tech Lead
+- ESCALATE_SENIOR: Beyond my capability
+
+## Instructions
+1. Read the task assignment
+2. Implement the code
+3. Write tests (if required)
+4. Report status with evidence</code></pre>
+
+          <h4>Key Frontmatter Fields</h4>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Purpose</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>name</code></td>
+                <td>Agent identifier</td>
+                <td>Used in routing logic</td>
+              </tr>
+              <tr>
+                <td><code>description</code></td>
+                <td>Brief role description</td>
+                <td>For documentation</td>
+              </tr>
+              <tr>
+                <td><code>model</code></td>
+                <td>Default model</td>
+                <td><strong>Documentation only</strong> - actual model comes from <code>model_selection.json</code></td>
+              </tr>
+              <tr>
+                <td><code>allowed_tools</code></td>
+                <td>Tools agent can use</td>
+                <td>Enforced at runtime</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>1.3 Database Architecture</h3>
+
+          <p>All state is stored in <code>bazinga/bazinga.db</code> (SQLite with WAL mode for concurrency):</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>sessions</code></td>
+                <td>Orchestration sessions (ID, status, timestamps)</td>
+              </tr>
+              <tr>
+                <td><code>orchestration_logs</code></td>
+                <td>Timestamped agent interactions</td>
+              </tr>
+              <tr>
+                <td><code>state_snapshots</code></td>
+                <td>PM state, orchestrator state, group status</td>
+              </tr>
+              <tr>
+                <td><code>task_groups</code></td>
+                <td>All task groups with metadata and status</td>
+              </tr>
+              <tr>
+                <td><code>success_criteria</code></td>
+                <td>PM's success criteria for validation</td>
+              </tr>
+              <tr>
+                <td><code>skill_outputs</code></td>
+                <td>Results from skill invocations</td>
+              </tr>
+              <tr>
+                <td><code>token_usage</code></td>
+                <td>Token tracking per agent/model</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout info">
+            <div class="callout-title">Access Pattern</div>
+            <p>Agents access the database <strong>only through the bazinga-db skill</strong>. Never write raw SQL - use the skill's structured interface.</p>
+          </div>
+        </section>
+
+        <!-- Section 2: Creating Custom Skills -->
+        <section id="skills">
+          <h2>2. Creating Custom Skills</h2>
+
+          <h3>2.1 Skill Anatomy</h3>
+
+          <p>Skills live in <code>.claude/skills/</code> and consist of a <code>SKILL.md</code> file with optional supporting files:</p>
+
+          <div class="code-header">.claude/skills/my-skill/SKILL.md</div>
+          <pre><code>---
+version: "1.0"
+name: dependency-auditor
+description: Audit project dependencies for vulnerabilities and outdated packages
+---
+
+# Dependency Auditor Skill
+
+## When to Invoke
+
+Invoke this skill when:
+- Reviewing code that adds new dependencies
+- Performing security audits
+- Preparing for production deployment
+
+## Your Task
+
+When this skill is invoked:
+
+1. **Scan dependencies**
+   - Read package.json or requirements.txt
+   - Check for known vulnerabilities
+   - Identify outdated packages
+
+2. **Generate report**
+   - List vulnerable packages with CVE IDs
+   - Suggest upgrade paths
+   - Flag breaking changes
+
+3. **Output format**
+   Return a structured report:
+   ```
+   ## Dependency Audit Report
+
+   ### Vulnerabilities Found: X
+   | Package | Current | CVE | Severity |
+
+   ### Outdated Packages: Y
+   | Package | Current | Latest |
+   ```</code></pre>
+
+          <h3>2.2 Building Your First Skill</h3>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Create the skill directory</h4>
+              <div class="code-header">Terminal</div>
+              <pre><code>mkdir -p .claude/skills/dependency-auditor</code></pre>
+            </div>
+            <div class="step">
+              <h4>Write SKILL.md</h4>
+              <p>Include required frontmatter (<code>version</code>, <code>name</code>, <code>description</code>) plus "When to Invoke" and "Your Task" sections.</p>
+            </div>
+            <div class="step">
+              <h4>Add to skills_config.json</h4>
+              <div class="code-header">bazinga/skills_config.json</div>
+              <pre><code>{
+  "tech_lead": {
+    "dependency-auditor": "optional"
+  }
+}</code></pre>
+            </div>
+            <div class="step">
+              <h4>Test your skill</h4>
+              <p>Invoke it manually to verify it works:</p>
+              <div class="code-header">Claude Code</div>
+              <pre><code>Use skill: dependency-auditor</code></pre>
+            </div>
+          </div>
+
+          <div class="callout danger">
+            <div class="callout-title">Critical: Correct Invocation Syntax</div>
+            <p>When invoking skills programmatically, use the correct parameter name:</p>
+            <pre style="margin-top: 8px;"><code>// CORRECT
+Skill(command: "dependency-auditor")
+
+// WRONG - will silently fail!
+Skill(skill: "dependency-auditor")</code></pre>
+          </div>
+
+          <h3>2.3 Skill Configuration Levels</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Behavior</th>
+                <th>Use Case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>mandatory</code></td>
+                <td>Always runs automatically</td>
+                <td>Security scan, lint check</td>
+              </tr>
+              <tr>
+                <td><code>optional</code></td>
+                <td>Agent can invoke if needed</td>
+                <td>Codebase analysis, pattern mining</td>
+              </tr>
+              <tr>
+                <td><code>disabled</code></td>
+                <td>Not available to agent</td>
+                <td>Temporarily disable a skill</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>2.4 Advanced Skill Patterns</h3>
+
+          <h4>Skills with References</h4>
+
+          <p>For complex skills, put verbose documentation in a <code>references/</code> subfolder:</p>
+
+          <pre><code>.claude/skills/my-skill/
+├── SKILL.md           # Keep under 250 lines
+└── references/
+    └── usage.md       # Detailed examples and documentation</code></pre>
+
+          <h4>Database-Backed Skills</h4>
+
+          <p>Skills can store/retrieve data using the bazinga-db skill:</p>
+
+          <div class="code-header">Example: Storing skill output</div>
+          <pre><code>## Your Task
+
+1. Perform your analysis
+2. Store results via bazinga-db skill:
+   - Use Skill(command: "bazinga-db")
+   - Action: save_skill_output
+   - Include session_id, skill_name, output_data</code></pre>
+        </section>
+
+        <!-- Section 3: Agent Customization -->
+        <section id="agents">
+          <h2>3. Agent Customization</h2>
+
+          <h3>3.1 When to Customize vs Configure</h3>
+
+          <div class="comparison">
+            <div class="comparison-good">
+              <div class="label">Use Configuration</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Change which model an agent uses</li>
+                <li>Enable/disable skills</li>
+                <li>Adjust testing mode</li>
+                <li>Modify escalation thresholds</li>
+              </ul>
+              <p style="margin-top: 8px; font-size: 14px;">Edit JSON files in <code>bazinga/</code></p>
+            </div>
+            <div class="comparison-bad" style="background: var(--color-surface); border-color: var(--color-border);">
+              <div class="label" style="color: var(--color-text);">Use Customization</div>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Change agent behavior/instructions</li>
+                <li>Add new status codes</li>
+                <li>Modify routing logic</li>
+                <li>Add entirely new agents</li>
+              </ul>
+              <p style="margin-top: 8px; font-size: 14px;">Edit agent files in <code>agents/</code></p>
+            </div>
+          </div>
+
+          <h3>3.2 Safe Modification Patterns</h3>
+
+          <div class="callout warning">
+            <div class="callout-title">Agent File Size Limits</div>
+            <p>Agent files are near size limits. Follow these rules:</p>
+            <ul style="margin-bottom: 0;">
+              <li><strong>Surgical</strong> - Precise, targeted changes only</li>
+              <li><strong>Compact</strong> - Minimal lines added</li>
+              <li><strong>Clear</strong> - No vague "when needed" logic; explicit rules only</li>
+            </ul>
+          </div>
+
+          <h4>Adding a New Status Code</h4>
+
+          <div class="code-header">agents/developer.md - Adding NEEDS_RESEARCH status</div>
+          <pre><code>## Status Codes
+- READY_FOR_QA: Tests written, ready for QA
+- READY_FOR_REVIEW: No tests, ready for Tech Lead
+- BLOCKED: Need help from Tech Lead
+- ESCALATE_SENIOR: Beyond my capability
++ NEEDS_RESEARCH: Requires codebase investigation before proceeding</code></pre>
+
+          <p>Then update the orchestrator to handle the new status:</p>
+
+          <div class="code-header">agents/orchestrator.md - Routing update</div>
+          <pre><code>### Developer Status Routing
+| Status | Route To |
+| NEEDS_RESEARCH | Spawn Investigator |</code></pre>
+
+          <h3>3.3 Adding New Agents</h3>
+
+          <p>To add a new agent type:</p>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Create agent definition</h4>
+              <p>Create <code>agents/my-agent.md</code> with frontmatter and instructions.</p>
+            </div>
+            <div class="step">
+              <h4>Add to model_selection.json</h4>
+              <div class="code-header">bazinga/model_selection.json</div>
+              <pre><code>{
+  "agents": {
+    "my-agent": "sonnet"
+  }
+}</code></pre>
+            </div>
+            <div class="step">
+              <h4>Update orchestrator routing</h4>
+              <p>Add routing logic for when to spawn your agent.</p>
+            </div>
+            <div class="step">
+              <h4>Configure skills (optional)</h4>
+              <p>Add skill assignments in <code>skills_config.json</code>.</p>
+            </div>
+            <div class="step">
+              <h4>Rebuild slash commands</h4>
+              <div class="code-header">Terminal</div>
+              <pre><code>./scripts/build-slash-commands.sh</code></pre>
+            </div>
+          </div>
+
+          <h3>3.4 Specialization Templates</h3>
+
+          <p>BAZINGA supports tech-stack specializations that inject domain knowledge into agents:</p>
+
+          <pre><code>bazinga/templates/specializations/
+├── backend/
+│   ├── nodejs.md
+│   ├── python.md
+│   └── golang.md
+├── frontend/
+│   ├── react.md
+│   └── vue.md
+└── infrastructure/
+    ├── kubernetes.md
+    └── terraform.md</code></pre>
+
+          <p>The <strong>specialization-loader</strong> skill loads relevant templates based on <code>bazinga/project_context.json</code> (detected by Tech Stack Scout).</p>
+        </section>
+
+        <!-- Section 4: Integration Patterns -->
+        <section id="integration">
+          <h2>4. Integration Patterns</h2>
+
+          <h3>4.1 CI/CD Integration</h3>
+
+          <p>Trigger BAZINGA from CI pipelines for automated development tasks:</p>
+
+          <div class="code-header">.github/workflows/bazinga.yml</div>
+          <pre><code>name: BAZINGA Orchestration
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  orchestrate:
+    if: contains(github.event.comment.body, '/bazinga')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run BAZINGA
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude-code --command "/bazinga.orchestrate ${{ github.event.comment.body }}"</code></pre>
+
+          <h3>4.2 IDE Integration Concepts</h3>
+
+          <p>For VS Code or JetBrains integration, consider:</p>
+
+          <ul>
+            <li><strong>Command palette</strong> - Register BAZINGA commands as editor commands</li>
+            <li><strong>Status bar</strong> - Show orchestration progress</li>
+            <li><strong>Output channel</strong> - Stream agent transcripts</li>
+            <li><strong>Notifications</strong> - Alert on BAZINGA completion or rejection</li>
+          </ul>
+
+          <h3>4.3 Team Workflows</h3>
+
+          <h4>Shared Configuration</h4>
+
+          <p>Commit your <code>bazinga/</code> configuration to version control so all team members use consistent settings:</p>
+
+          <div class="code-header">.gitignore</div>
+          <pre><code># Include BAZINGA config
+!bazinga/*.json
+
+# Exclude runtime state
+bazinga/bazinga.db
+bazinga/artifacts/</code></pre>
+
+          <h4>PR Review Integration</h4>
+
+          <p>Use BAZINGA for automated PR reviews:</p>
+
+          <div class="code-header">Claude Code</div>
+          <pre><code>/bazinga.orchestrate Review PR #123: Check for security issues, test coverage, and code quality. Leave comments on the PR with findings.</code></pre>
+        </section>
+
+        <!-- Section 5: Contributing -->
+        <section id="contributing">
+          <h2>5. Contributing to BAZINGA</h2>
+
+          <h3>5.1 Development Workflow</h3>
+
+          <div class="callout rule">
+            <div class="callout-title">Single Source of Truth</div>
+            <p><strong>agents/orchestrator.md</strong> is the ONLY file to edit for orchestration logic.</p>
+            <p><strong>.claude/commands/bazinga.orchestrate.md</strong> is AUTO-GENERATED - never edit directly!</p>
+          </div>
+
+          <div class="steps">
+            <div class="step">
+              <h4>Install git hooks</h4>
+              <div class="code-header">Terminal</div>
+              <pre><code>./scripts/install-hooks.sh</code></pre>
+              <p>This enables automatic rebuilding of slash commands on commit.</p>
+            </div>
+            <div class="step">
+              <h4>Edit agent source</h4>
+              <p>Make changes to <code>agents/orchestrator.md</code> (or other agent files).</p>
+            </div>
+            <div class="step">
+              <h4>Commit your changes</h4>
+              <p>The pre-commit hook automatically:</p>
+              <ul>
+                <li>Detects changes to agent files</li>
+                <li>Runs <code>scripts/build-slash-commands.sh</code></li>
+                <li>Regenerates slash command files</li>
+                <li>Stages the generated files</li>
+              </ul>
+            </div>
+            <div class="step">
+              <h4>Test your changes</h4>
+              <p>Run an orchestration to verify behavior.</p>
+            </div>
+          </div>
+
+          <h3>5.2 Testing Changes</h3>
+
+          <p>Before submitting changes:</p>
+
+          <ol>
+            <li>Run a simple orchestration to verify basic flow</li>
+            <li>Run a parallel orchestration to verify multi-group handling</li>
+            <li>Trigger an escalation to verify escalation paths</li>
+            <li>Check that validation works correctly</li>
+          </ol>
+
+          <h3>5.3 PR Guidelines</h3>
+
+          <ul>
+            <li>Keep agent file changes surgical and minimal</li>
+            <li>Document any new status codes or routing changes</li>
+            <li>Update this training course if behavior changes significantly</li>
+            <li>Include test transcripts showing the change in action</li>
+          </ul>
+        </section>
+
+        <!-- What's Next -->
+        <section>
+          <h2>Congratulations!</h2>
+
+          <p>You've completed the BAZINGA training course. You now understand:</p>
+
+          <ul>
+            <li>How BAZINGA orchestrates multi-agent development</li>
+            <li>How to configure and customize the system</li>
+            <li>How to create custom skills and modify agents</li>
+            <li>How to integrate BAZINGA into your toolchain</li>
+          </ul>
+
+          <div class="course-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="course-card">
+              <h3>Quick Reference</h3>
+              <p>Jump to specific solutions for common scenarios.</p>
+              <a href="recipes.html" class="cta">Browse Recipes &rarr;</a>
+            </div>
+            <div class="course-card">
+              <h3>Agent Definitions</h3>
+              <p>Explore the source agent files directly.</p>
+              <a href="../agents/" class="cta">View Agents &rarr;</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Navigation -->
+        <nav class="nav-buttons">
+          <a href="mastering.html" class="nav-button">
+            <span class="label">&larr; Previous</span>
+            <span class="title">Mastering BAZINGA</span>
+          </a>
+          <a href="recipes.html" class="nav-button next">
+            <span class="label">Next &rarr;</span>
+            <span class="title">Recipes</span>
+          </a>
+        </nav>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>BAZINGA Training &bull; Multi-Agent Framework for Claude Code</p>
+    </div>
+  </footer>
+</body>
+</html>
