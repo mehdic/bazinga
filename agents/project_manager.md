@@ -1499,6 +1499,55 @@ Read(file_path: "bazinga/project_context.json")
 
 **If file missing or empty:** Skip specializations (graceful degradation). Continue to Step 3.6.
 
+**Step 3.5.1b: Fallback Mapping Table (if components[].suggested_specializations missing)**
+
+If `project_context.json` exists but lacks `components[].suggested_specializations`, use this mapping table to convert technology names to template paths:
+
+| Technology | Template Path |
+|------------|---------------|
+| typescript / TypeScript | `bazinga/templates/specializations/01-languages/typescript.md` |
+| javascript / JavaScript | `bazinga/templates/specializations/01-languages/javascript.md` |
+| python / Python | `bazinga/templates/specializations/01-languages/python.md` |
+| java / Java | `bazinga/templates/specializations/01-languages/java.md` |
+| go / Go / Golang | `bazinga/templates/specializations/01-languages/go.md` |
+| rust / Rust | `bazinga/templates/specializations/01-languages/rust.md` |
+| react / React | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
+| nextjs / Next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| vue / Vue | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
+| angular / Angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
+| express / Express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
+| fastapi / FastAPI | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
+| django / Django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
+| spring / Spring Boot | `bazinga/templates/specializations/03-frameworks-backend/spring-boot.md` |
+| kubernetes / Kubernetes / k8s | `bazinga/templates/specializations/06-infrastructure/kubernetes.md` |
+| docker / Docker | `bazinga/templates/specializations/06-infrastructure/docker.md` |
+| postgresql / PostgreSQL | `bazinga/templates/specializations/05-databases/postgresql.md` |
+| mongodb / MongoDB | `bazinga/templates/specializations/05-databases/mongodb.md` |
+| playwright / Playwright | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
+
+**Fallback logic:**
+```
+IF project_context has NO components[].suggested_specializations:
+  specializations = []
+
+  # Map primary_language
+  IF project_context.primary_language:
+    lang = project_context.primary_language.lower()
+    path = lookup_mapping_table(lang)
+    IF path exists: specializations.append(path)
+
+  # Map framework(s) - may contain multiple like "React (Frontend), Express (Backend)"
+  IF project_context.framework:
+    frameworks = parse_frameworks(project_context.framework)  # Split by comma, strip parens
+    FOR each framework in frameworks:
+      fw = framework.lower().strip()
+      path = lookup_mapping_table(fw)
+      IF path exists: specializations.append(path)
+
+  # Deduplicate
+  specializations = list(set(specializations))
+```
+
 **Step 3.5.2: Map Task Groups to Components**
 
 For each task group, determine which component(s) it targets:
@@ -1533,25 +1582,39 @@ Example project_context.json structure:
 
 ```
 FOR each task_group:
-  target_paths = extract file paths from task description
-  matched_components = []
+  specializations = []
 
-  FOR each component in project_context.components:
-    IF any target_path starts with component.path:
-      matched_components.append(component)
+  # FIRST: Check if project_context has components with suggested_specializations (schema 2.0)
+  IF project_context.components EXISTS AND has suggested_specializations:
+    target_paths = extract file paths from task description
+    matched_components = []
 
-  IF len(matched_components) == 0:
-    # Task doesn't match specific component - use project-level defaults
-    specializations = []
+    FOR each component in project_context.components:
+      IF any target_path starts with component.path:
+        matched_components.append(component)
+
+    IF len(matched_components) > 0:
+      # Combine suggested_specializations from all matched components
+      FOR component in matched_components:
+        specializations.extend(component.suggested_specializations)
+      specializations = list(set(specializations))  # Deduplicate
+
+  # FALLBACK: Use mapping table if no suggested_specializations found
+  IF len(specializations) == 0:
+    # Use Step 3.5.1b mapping table to convert technology names to paths
     IF project_context.primary_language:
-      specializations.append(f"bazinga/templates/specializations/01-languages/{primary_language}.md")
-  ELSE:
-    # Combine suggested_specializations from all matched components
-    specializations = []
-    FOR component in matched_components:
-      specializations.extend(component.suggested_specializations)
-    # Deduplicate
-    specializations = list(set(specializations))
+      lang = project_context.primary_language.lower()
+      path = lookup_mapping_table(lang)  # See table in Step 3.5.1b
+      IF path exists: specializations.append(path)
+
+    IF project_context.framework:
+      # Parse frameworks like "React (Frontend), Express (Backend)"
+      frameworks = split_and_clean(project_context.framework)
+      FOR each fw in frameworks:
+        path = lookup_mapping_table(fw.lower())
+        IF path exists: specializations.append(path)
+
+    specializations = list(set(specializations))  # Deduplicate
 
   task_group.specializations = specializations
 ```
