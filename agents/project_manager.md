@@ -1503,27 +1503,84 @@ Read(file_path: "bazinga/project_context.json")
 
 If `project_context.json` exists but lacks `components[].suggested_specializations`, use this mapping table to convert technology names to template paths:
 
-| Technology | Template Path |
-|------------|---------------|
-| typescript / TypeScript | `bazinga/templates/specializations/01-languages/typescript.md` |
-| javascript / JavaScript | `bazinga/templates/specializations/01-languages/javascript.md` |
-| python / Python | `bazinga/templates/specializations/01-languages/python.md` |
-| java / Java | `bazinga/templates/specializations/01-languages/java.md` |
-| go / Go / Golang | `bazinga/templates/specializations/01-languages/go.md` |
-| rust / Rust | `bazinga/templates/specializations/01-languages/rust.md` |
-| react / React | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
-| nextjs / Next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
-| vue / Vue | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
-| angular / Angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
-| express / Express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
-| fastapi / FastAPI | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
-| django / Django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
-| spring / Spring Boot | `bazinga/templates/specializations/03-frameworks-backend/spring-boot.md` |
-| kubernetes / Kubernetes / k8s | `bazinga/templates/specializations/06-infrastructure/kubernetes.md` |
-| docker / Docker | `bazinga/templates/specializations/06-infrastructure/docker.md` |
-| postgresql / PostgreSQL | `bazinga/templates/specializations/05-databases/postgresql.md` |
-| mongodb / MongoDB | `bazinga/templates/specializations/05-databases/mongodb.md` |
-| playwright / Playwright | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
+**Canonical Key → Template Path Mapping:**
+
+| Canonical Key | Aliases | Template Path |
+|---------------|---------|---------------|
+| typescript | TypeScript, ts | `bazinga/templates/specializations/01-languages/typescript.md` |
+| javascript | JavaScript, js | `bazinga/templates/specializations/01-languages/javascript.md` |
+| python | Python, py | `bazinga/templates/specializations/01-languages/python.md` |
+| java | Java | `bazinga/templates/specializations/01-languages/java.md` |
+| go | Go, Golang, golang | `bazinga/templates/specializations/01-languages/go.md` |
+| rust | Rust | `bazinga/templates/specializations/01-languages/rust.md` |
+| react | React, reactjs | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
+| nextjs | Next.js, next, next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| vue | Vue, vuejs, vue.js | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
+| angular | Angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
+| express | Express, expressjs | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
+| fastapi | FastAPI, fast-api | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
+| django | Django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
+| springboot | Spring Boot, spring-boot, spring | `bazinga/templates/specializations/03-frameworks-backend/spring-boot.md` |
+| kubernetes | Kubernetes, k8s, K8s | `bazinga/templates/specializations/06-infrastructure/kubernetes.md` |
+| docker | Docker | `bazinga/templates/specializations/06-infrastructure/docker.md` |
+| postgresql | PostgreSQL, postgres, pg | `bazinga/templates/specializations/05-databases/postgresql.md` |
+| mongodb | MongoDB, mongo | `bazinga/templates/specializations/05-databases/mongodb.md` |
+| playwright | Playwright | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
+| jest | Jest | `bazinga/templates/specializations/08-testing/jest-vitest.md` |
+
+**Helper functions:**
+
+```
+# Normalize input to canonical key (lowercase, remove punctuation/spaces)
+FUNCTION normalize_key(input):
+  key = input.lower().strip()
+  key = remove_punctuation(key)  # "Next.js" → "nextjs", "Spring Boot" → "springboot"
+  key = remove_spaces(key)       # "spring boot" → "springboot"
+
+  # Explicit alias mapping for edge cases
+  ALIAS_MAP = {
+    "k8s": "kubernetes",
+    "ts": "typescript",
+    "js": "javascript",
+    "py": "python",
+    "pg": "postgresql",
+    "mongo": "mongodb",
+    "next": "nextjs",
+    "spring": "springboot",
+    "golang": "go"
+  }
+  IF key IN ALIAS_MAP: key = ALIAS_MAP[key]
+
+  RETURN key
+
+# Parse framework string like "React (Frontend), Express (Backend)"
+FUNCTION parse_frameworks(framework_string):
+  parts = framework_string.split(",")
+  frameworks = []
+  FOR each part in parts:
+    # Strip parenthetical annotations: "React (Frontend)" → "React"
+    clean = regex_replace(part, r"\s*\([^)]*\)\s*", "").strip()
+    IF clean: frameworks.append(clean)
+  RETURN frameworks
+
+# Stable deduplication preserving insertion order
+FUNCTION dedupe_stable(items):
+  seen = set()
+  result = []
+  FOR item in items:
+    IF item NOT IN seen:
+      seen.add(item)
+      result.append(item)
+  RETURN result
+
+# Lookup with normalization and file existence check
+FUNCTION lookup_and_validate(input):
+  key = normalize_key(input)
+  path = MAPPING_TABLE.get(key)  # Returns None if not found
+  IF path AND file_exists(path):
+    RETURN path
+  RETURN None
+```
 
 **Fallback logic:**
 ```
@@ -1532,20 +1589,33 @@ IF project_context has NO components[].suggested_specializations:
 
   # Map primary_language
   IF project_context.primary_language:
-    lang = project_context.primary_language.lower()
-    path = lookup_mapping_table(lang)
-    IF path exists: specializations.append(path)
+    path = lookup_and_validate(project_context.primary_language)
+    IF path: specializations.append(path)
 
   # Map framework(s) - may contain multiple like "React (Frontend), Express (Backend)"
   IF project_context.framework:
-    frameworks = parse_frameworks(project_context.framework)  # Split by comma, strip parens
-    FOR each framework in frameworks:
-      fw = framework.lower().strip()
-      path = lookup_mapping_table(fw)
-      IF path exists: specializations.append(path)
+    frameworks = parse_frameworks(project_context.framework)
+    FOR each fw in frameworks:
+      path = lookup_and_validate(fw)
+      IF path: specializations.append(path)
 
-  # Deduplicate
-  specializations = list(set(specializations))
+  # Map database (if available in project_context)
+  IF project_context.database:
+    path = lookup_and_validate(project_context.database)
+    IF path: specializations.append(path)
+
+  # Map infrastructure (if available)
+  IF project_context.infrastructure:
+    path = lookup_and_validate(project_context.infrastructure)
+    IF path: specializations.append(path)
+
+  # Map testing framework (if available)
+  IF project_context.testing:
+    path = lookup_and_validate(project_context.testing)
+    IF path: specializations.append(path)
+
+  # Stable deduplicate (preserves order)
+  specializations = dedupe_stable(specializations)
 ```
 
 **Step 3.5.2: Map Task Groups to Components**
@@ -1581,6 +1651,14 @@ Example project_context.json structure:
 **Mapping logic:**
 
 ```
+# Helper: Check if target_path is within component.path (proper boundary)
+FUNCTION path_matches(target_path, component_path):
+  # Normalize: ensure component_path ends with /
+  normalized_component = component_path.rstrip("/") + "/"
+  normalized_target = target_path.rstrip("/") + "/"
+  # Match if target is at or inside component path
+  RETURN normalized_target.startswith(normalized_component) OR target_path == component_path.rstrip("/")
+
 FOR each task_group:
   specializations = []
 
@@ -1590,31 +1668,44 @@ FOR each task_group:
     matched_components = []
 
     FOR each component in project_context.components:
-      IF any target_path starts with component.path:
-        matched_components.append(component)
+      FOR each target_path in target_paths:
+        IF path_matches(target_path, component.path):
+          matched_components.append(component)
+          BREAK  # Avoid duplicate matches for same component
 
     IF len(matched_components) > 0:
       # Combine suggested_specializations from all matched components
       FOR component in matched_components:
         specializations.extend(component.suggested_specializations)
-      specializations = list(set(specializations))  # Deduplicate
+      specializations = dedupe_stable(specializations)  # Preserve insertion order
 
   # FALLBACK: Use mapping table if no suggested_specializations found
   IF len(specializations) == 0:
-    # Use Step 3.5.1b mapping table to convert technology names to paths
+    # Use Step 3.5.1b helper functions (normalize_key, lookup_and_validate, etc.)
     IF project_context.primary_language:
-      lang = project_context.primary_language.lower()
-      path = lookup_mapping_table(lang)  # See table in Step 3.5.1b
-      IF path exists: specializations.append(path)
+      path = lookup_and_validate(project_context.primary_language)
+      IF path: specializations.append(path)
 
     IF project_context.framework:
       # Parse frameworks like "React (Frontend), Express (Backend)"
-      frameworks = split_and_clean(project_context.framework)
+      frameworks = parse_frameworks(project_context.framework)
       FOR each fw in frameworks:
-        path = lookup_mapping_table(fw.lower())
-        IF path exists: specializations.append(path)
+        path = lookup_and_validate(fw)
+        IF path: specializations.append(path)
 
-    specializations = list(set(specializations))  # Deduplicate
+    IF project_context.database:
+      path = lookup_and_validate(project_context.database)
+      IF path: specializations.append(path)
+
+    IF project_context.infrastructure:
+      path = lookup_and_validate(project_context.infrastructure)
+      IF path: specializations.append(path)
+
+    IF project_context.testing:
+      path = lookup_and_validate(project_context.testing)
+      IF path: specializations.append(path)
+
+    specializations = dedupe_stable(specializations)  # Preserve insertion order
 
   task_group.specializations = specializations
 ```
