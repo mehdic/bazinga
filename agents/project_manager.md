@@ -1525,13 +1525,13 @@ If `project_context.json` exists but lacks `components[].suggested_specializatio
 | docker | Docker | `bazinga/templates/specializations/06-infrastructure/docker.md` |
 | postgresql | PostgreSQL, postgres, pg | `bazinga/templates/specializations/05-databases/postgresql.md` |
 | mongodb | MongoDB, mongo | `bazinga/templates/specializations/05-databases/mongodb.md` |
-| playwright | Playwright | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
-| jest | Jest | `bazinga/templates/specializations/08-testing/jest-vitest.md` |
+| playwright | Playwright, Cypress, cypress | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
+| jest | Jest, Vitest, vitest | `bazinga/templates/specializations/08-testing/jest-vitest.md` |
 
 **Helper functions:**
 
 ```
-# Build MAPPING_TABLE from the canonical key table above
+# Build MAPPING_TABLE from the canonical key table above (canonical keys only)
 MAPPING_TABLE = {
   "typescript": "bazinga/templates/specializations/01-languages/typescript.md",
   "javascript": "bazinga/templates/specializations/01-languages/javascript.md",
@@ -1552,52 +1552,71 @@ MAPPING_TABLE = {
   "postgresql": "bazinga/templates/specializations/05-databases/postgresql.md",
   "mongodb": "bazinga/templates/specializations/05-databases/mongodb.md",
   "playwright": "bazinga/templates/specializations/08-testing/playwright-cypress.md",
-  "jest": "bazinga/templates/specializations/08-testing/jest-vitest.md"
+  "cypress": "bazinga/templates/specializations/08-testing/playwright-cypress.md",
+  "jest": "bazinga/templates/specializations/08-testing/jest-vitest.md",
+  "vitest": "bazinga/templates/specializations/08-testing/jest-vitest.md"
 }
 
-# Utility: Remove punctuation characters from string
+# Utility: Remove punctuation characters from string (preserves + and # for C++/C#)
 FUNCTION remove_punctuation(text):
-  # Remove characters: . - _ and other punctuation
+  # Remove only: . - _ / \ (common separators)
+  # Keep: + # (for C++, C#, F# language names)
+  # Implementation: text.translate() or regex replace
   result = ""
   FOR each char in text:
-    IF char is alphanumeric or space:
+    IF char is alphanumeric OR char is space OR char in ['+', '#']:
       result += char
   RETURN result
 
-# Utility: Remove all spaces from string
-FUNCTION remove_spaces(text):
-  RETURN text.replace(" ", "")
+# Utility: Remove all whitespace from string (spaces, tabs, newlines)
+FUNCTION remove_whitespace(text):
+  # Use regex \s to match all whitespace types
+  # Implementation: re.sub(r'\s', '', text) or text.split() then join
+  RETURN text with all whitespace removed
 
-# Utility: Check if file exists on filesystem
+# Utility: Check if file exists on filesystem (and is a file, not directory)
 FUNCTION file_exists(path):
-  # Use os.path.exists() or pathlib.Path(path).exists()
-  RETURN true if file exists at path, false otherwise
+  # Use os.path.isfile(path) or pathlib.Path(path).is_file()
+  # Returns true only if path exists AND is a regular file
+  RETURN os.path.isfile(path)
 
-# Normalize input to canonical key (lowercase, remove punctuation/spaces)
+# Utility: Simple logging function for debugging unmapped technologies
+FUNCTION LOG_WARNING(message, *args):
+  # Output warning to stderr or logging system
+  # Implementation: print(message.format(*args), file=sys.stderr)
+  # In agent context: just note the warning and continue
+  PASS  # Silent in production, logged in debug mode
+
+# Normalize input to canonical key (lowercase, remove punctuation/whitespace)
 # Normalization rules:
 # 1. Convert to lowercase
 # 2. Strip leading/trailing whitespace
-# 3. Remove punctuation (., -, _) → "Next.js" becomes "nextjs", "Spring Boot" becomes "springboot"
-# 4. Remove all spaces → "spring boot" becomes "springboot"
+# 3. Remove punctuation (., -, _, /, \) but keep + and # (for C++/C#)
+# 4. Remove all whitespace (spaces, tabs, etc.) → "spring boot" becomes "springboot"
 # 5. Apply explicit alias mapping for common abbreviations
 FUNCTION normalize_key(input):
   key = input.lower().strip()
   key = remove_punctuation(key)  # "Next.js" → "nextjs", "Spring Boot" → "springboot"
-  key = remove_spaces(key)       # "spring boot" → "springboot"
+  key = remove_whitespace(key)   # "spring boot" → "springboot"
 
-  # Explicit alias mapping for edge cases
+  # Explicit alias mapping for edge cases not resolved by punctuation/whitespace removal
   # Note: "spring" intentionally maps to "springboot" as Spring Boot is the most common usage
   # in modern projects. If Spring Framework (non-Boot) specialization is needed, add separate entry.
+  # These aliases handle short forms and variants that survive normalization
   ALIAS_MAP = {
     "k8s": "kubernetes",
     "ts": "typescript",
     "js": "javascript",
     "py": "python",
     "pg": "postgresql",
+    "postgres": "postgresql",
     "mongo": "mongodb",
     "next": "nextjs",
     "spring": "springboot",
-    "golang": "go"
+    "golang": "go",
+    "reactjs": "react",
+    "vuejs": "vue",
+    "expressjs": "express"
   }
   IF key IN ALIAS_MAP: key = ALIAS_MAP[key]
 
@@ -1609,7 +1628,16 @@ FUNCTION parse_frameworks(framework_string):
   frameworks = []
   FOR each part in parts:
     # Strip parenthetical annotations: "React (Frontend)" → "React"
-    clean = regex_replace(part, r"\s*\([^)]*\)\s*", "").strip()
+    # Implementation: re.sub(r'\s*\([^)]*\)\s*', '', part).strip()
+    # This removes any text in parentheses along with surrounding whitespace
+    clean = part
+    IF "(" in clean:
+      # Find and remove parenthetical content
+      start = clean.find("(")
+      end = clean.find(")", start)
+      IF end > start:
+        clean = clean[:start] + clean[end+1:]
+    clean = clean.strip()
     IF clean: frameworks.append(clean)
   RETURN frameworks
 
@@ -1717,15 +1745,21 @@ Example project_context.json structure:
 ```
 # Helper: Check if target_path is within component.path (proper boundary)
 # Uses proper path normalization and guards against path traversal attacks
+# Resolves symlinks to prevent symlink-based security bypass
 FUNCTION path_matches(target_path, component_path):
   # Import: os.path (or pathlib.Path)
+
+  # Resolve symlinks FIRST to prevent symlink-based traversal attacks
+  # os.path.realpath follows symlinks to get the actual filesystem path
+  real_target = os.path.realpath(target_path)
+  real_component = os.path.realpath(component_path)
 
   # Normalize both paths to handle:
   # - OS-specific separators (\ on Windows, / on Unix)
   # - Remove redundant separators (// → /)
-  # - Resolve relative components (but NOT symlinks for security)
-  norm_target = os.path.normpath(target_path)
-  norm_component = os.path.normpath(component_path)
+  # - Resolve relative components (.., .)
+  norm_target = os.path.normpath(real_target)
+  norm_component = os.path.normpath(real_component)
 
   # Guard against path traversal: Check if target is within component boundary
   # os.path.commonpath returns the longest common sub-path
@@ -1733,7 +1767,9 @@ FUNCTION path_matches(target_path, component_path):
   TRY:
     common = os.path.commonpath([norm_target, norm_component])
     # Target is within component if common path equals component path
-    RETURN common == norm_component OR norm_target == norm_component
+    # Note: equality case is covered by commonpath logic (when paths are equal,
+    # commonpath returns that path, which equals norm_component)
+    RETURN common == norm_component
   CATCH ValueError:
     # Raised when paths are on different drives (Windows) or no common path
     RETURN False
