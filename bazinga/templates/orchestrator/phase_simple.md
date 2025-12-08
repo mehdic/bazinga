@@ -68,7 +68,7 @@ Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 Query previous agent reasoning for this group (provides WHY context):
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" "{group_id}" --limit 5
+  "{session_id}" --group_id "{group_id}" --limit 5
 ```
 
 **Reasoning Context Routing Rules:**
@@ -346,11 +346,11 @@ Query reasoning from all implementation agents (developer, SSE, RE):
 ```bash
 # Query each agent type separately (CLI doesn't support comma-separated)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" "{group_id}" --agent_type developer --limit 2
+  "{session_id}" --group_id "{group_id}" --agent_type developer --limit 2
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" "{group_id}" --agent_type senior_software_engineer --limit 2
+  "{session_id}" --group_id "{group_id}" --agent_type senior_software_engineer --limit 2
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" "{group_id}" --agent_type requirements_engineer --limit 1
+  "{session_id}" --group_id "{group_id}" --agent_type requirements_engineer --limit 1
 ```
 **Merge results:** Combine all returned entries, sort by timestamp, take most recent 5 total.
 
@@ -700,7 +700,7 @@ Skill(command: "velocity-tracker")
 **🔴 Reasoning Timeline Query (BEFORE building Investigator prompt):**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
-  "{session_id}" "{group_id}"
+  "{session_id}" --group_id "{group_id}"
 ```
 
 **Reasoning Timeline Prompt Section** (include when timeline found):

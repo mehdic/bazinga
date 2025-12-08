@@ -29,8 +29,8 @@ SECRET_PATTERNS = [
     (re.compile(r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\']?([a-zA-Z0-9_-]{20,})["\']?'), 'API_KEY_REDACTED'),
     (re.compile(r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*["\']?([^\s"\']+)["\']?'), 'SECRET_REDACTED'),
     (re.compile(r'(?i)(token|bearer)\s*[=:]\s*["\']?([a-zA-Z0-9_.-]{20,})["\']?'), 'TOKEN_REDACTED'),
-    # OpenAI
-    (re.compile(r'sk-[a-zA-Z0-9]{20,}'), 'OPENAI_KEY_REDACTED'),
+    # OpenAI (including sk-proj-* format with hyphens)
+    (re.compile(r'sk-[a-zA-Z0-9-]{20,}'), 'OPENAI_KEY_REDACTED'),
     # Anthropic
     (re.compile(r'sk-ant-[a-zA-Z0-9-]{20,}'), 'ANTHROPIC_KEY_REDACTED'),
     # GitHub
@@ -40,9 +40,9 @@ SECRET_PATTERNS = [
     # AWS
     (re.compile(r'AKIA[0-9A-Z]{16}'), 'AWS_ACCESS_KEY_REDACTED'),
     (re.compile(r'(?i)aws[_-]?secret[_-]?access[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9/+=]{40})["\']?'), 'AWS_SECRET_REDACTED'),
-    # Private keys
-    (re.compile(r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'), 'PRIVATE_KEY_REDACTED'),
-    (re.compile(r'-----BEGIN OPENSSH PRIVATE KEY-----'), 'SSH_KEY_REDACTED'),
+    # Private keys (match entire block from BEGIN to END)
+    (re.compile(r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |DSA )?PRIVATE KEY-----'), 'PRIVATE_KEY_REDACTED'),
+    (re.compile(r'-----BEGIN OPENSSH PRIVATE KEY-----[\s\S]*?-----END OPENSSH PRIVATE KEY-----'), 'SSH_KEY_REDACTED'),
     # Slack
     (re.compile(r'xox[baprs]-[a-zA-Z0-9-]{10,}'), 'SLACK_TOKEN_REDACTED'),
     # Stripe
@@ -918,8 +918,8 @@ class BazingaDB:
             if conn:
                 try:
                     conn.rollback()
-                except:
-                    pass
+                except Exception:
+                    pass  # Best-effort cleanup, ignore rollback failures
             # Check if it's a corruption error
             if self._is_corruption_error(e):
                 if self._recover_from_corruption():
@@ -933,8 +933,8 @@ class BazingaDB:
             if conn:
                 try:
                     conn.rollback()
-                except:
-                    pass
+                except Exception:
+                    pass  # Best-effort cleanup, ignore rollback failures
             self._print_error(f"Failed to log {agent_type} interaction: {str(e)}")
             return {"success": False, "error": str(e)}
         finally:
@@ -1805,8 +1805,8 @@ class BazingaDB:
                 if conn:
                     try:
                         conn.close()
-                    except:
-                        pass
+                    except Exception:
+                        pass  # Best-effort cleanup, ignore close failures
                 return self.save_reasoning(
                     session_id, group_id, agent_type, reasoning_phase, content,
                     agent_id, iteration, confidence, references,
@@ -1817,8 +1817,8 @@ class BazingaDB:
             if conn:
                 try:
                     conn.rollback()
-                except:
-                    pass
+                except Exception:
+                    pass  # Best-effort cleanup, ignore rollback failures
             self._print_error(f"Failed to save {agent_type} reasoning: {str(e)}")
             return {"success": False, "error": str(e)}
         finally:
@@ -1890,13 +1890,13 @@ class BazingaDB:
         return results
 
     def reasoning_timeline(self, session_id: str, group_id: Optional[str] = None,
-                           format: str = 'json') -> str:
+                           output_format: str = 'json') -> str:
         """Get a timeline of reasoning across all agents.
 
         Args:
             session_id: Session identifier
             group_id: Optional task group filter
-            format: Output format ('json' or 'markdown')
+            output_format: Output format ('json' or 'markdown')
 
         Returns:
             Formatted timeline string
@@ -1922,7 +1922,7 @@ class BazingaDB:
 
         entries = [dict(row) for row in rows]
 
-        if format == 'json':
+        if output_format == 'json':
             return json.dumps(entries, indent=2)
 
         # Markdown format
@@ -2494,7 +2494,7 @@ def main():
                 else:
                     i += 1
 
-            result = db.reasoning_timeline(session_id, group_id=group_id, format=fmt)
+            result = db.reasoning_timeline(session_id, group_id=group_id, output_format=fmt)
             print(result)
         elif cmd == 'check-mandatory-phases':
             # Required: session_id, group_id, agent_type

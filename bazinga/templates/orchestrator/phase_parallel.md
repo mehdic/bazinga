@@ -176,7 +176,7 @@ Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that g
 For each group, query prior agent reasoning:
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" "{group_id}" --limit 5
+  "{session_id}" --group_id "{group_id}" --limit 5
 ```
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
