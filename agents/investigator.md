@@ -1092,11 +1092,12 @@ Your reasoning documentation captures the **WHY** behind your investigation deci
 
 ### How to Save Reasoning
 
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
 ```bash
 # At investigation START - Document understanding (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
-  "## Investigation Understanding
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Investigation Understanding
 
 ### Problem Statement
 [What's being investigated]
@@ -1109,13 +1110,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 2. [H2]: [Description] - [Initial confidence %]
 
 ### Investigation Plan
-- [First test approach]" \
+- [First test approach]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
   --confidence medium
 
 # At investigation END - Document completion (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
-  "## Investigation Completion
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Investigation Completion
 
 ### Root Cause
 [What was found]
@@ -1132,7 +1137,12 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Eliminated Hypotheses
 - [H1]: [Why ruled out]
-- [H2]: [Why ruled out]" \
+- [H2]: [Why ruled out]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
+  --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```
 

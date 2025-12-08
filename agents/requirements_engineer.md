@@ -764,11 +764,12 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
 ```bash
 # At analysis START - Document understanding (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "understanding" \
-  "## Requirements Analysis Understanding
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Requirements Analysis Understanding
 
 ### User Request
 [Original request text]
@@ -782,13 +783,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Assumptions Made
 - [Assumption 1]
-- [Assumption 2]" \
+- [Assumption 2]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
   --confidence medium
 
 # At analysis END - Document completion (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "completion" \
-  "## Requirements Analysis Complete
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Requirements Analysis Complete
 
 ### Clarified Requirements
 [What was determined after clarification/discovery]
@@ -806,6 +811,11 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Key Risks Identified
 - [Risk 1]
-- [Risk 2]" \
+- [Risk 2]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "completion" \
+  --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```

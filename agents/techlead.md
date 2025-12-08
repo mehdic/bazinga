@@ -1425,11 +1425,12 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
 ```bash
 # At review START - Document your understanding (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "understanding" \
-  "## Review Understanding
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Review Understanding
 
 ### Code Being Reviewed
 [Summary of implementation]
@@ -1441,13 +1442,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 4. [Maintainability]
 
 ### Developer's Approach
-- [What developer chose to do]" \
+- [What developer chose to do]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
   --confidence high
 
 # At review END - Document completion (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "completion" \
-  "## Review Completion Summary
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Review Completion Summary
 
 ### Decision
 [APPROVED / CHANGES_REQUESTED / BLOCKED]
@@ -1460,7 +1465,12 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 - [Point 2]
 
 ### Recommendations
-[For developer or PM]" \
+[For developer or PM]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "completion" \
+  --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```
 

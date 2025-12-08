@@ -2295,11 +2295,12 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
 ```bash
 # At task START - Document your understanding (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "understanding" \
-  "## Project Understanding
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Project Understanding
 
 ### User Request Summary
 [What the user wants]
@@ -2313,13 +2314,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Success Criteria
 - [Criterion 1]
-- [Criterion 2]" \
+- [Criterion 2]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
   --confidence high
 
 # Execution mode decision - Document approach (RECOMMENDED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "approach" \
-  "## Execution Strategy
+cat > /tmp/reasoning_approach.md << 'REASONING_EOF'
+## Execution Strategy
 
 ### Mode
 [SIMPLE / PARALLEL]
@@ -2332,13 +2337,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 2. [Group B]: [Description]
 
 ### Developer Allocation
-[How many developers and why]" \
+[How many developers and why]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "approach" \
+  --content-file /tmp/reasoning_approach.md \
   --confidence high
 
 # At BAZINGA - Document completion (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "completion" \
-  "## Project Completion Summary
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Project Completion Summary
 
 ### What Was Delivered
 - [Deliverable 1]
@@ -2353,7 +2362,12 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 - [Decision 2]
 
 ### Lessons Learned
-[For future projects]" \
+[For future projects]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "completion" \
+  --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```
 

@@ -2018,6 +2018,9 @@ class BazingaDB:
             content = entry['content']
             if len(content) > 300:
                 content = content[:300] + "..."
+            # Escape backtick sequences to prevent code fence breakout (security: prevents prompt injection)
+            # Replace ``` with `\u200b`\u200b` (zero-width space breaks the fence sequence)
+            content = content.replace('```', '`\u200b`\u200b`')
             # Wrap in code fence to escape markdown special chars (prevents formatting injection)
             lines.append("```text")
             lines.append(content)
@@ -2547,8 +2550,12 @@ def main():
                 print("Error: Content is required. Provide as 5th argument or use --content-file FILE", file=sys.stderr)
                 sys.exit(1)
 
-            result = db.save_reasoning(session_id, group_id, agent_type, phase, content, **kwargs)
-            print(json.dumps(result, indent=2))
+            try:
+                result = db.save_reasoning(session_id, group_id, agent_type, phase, content, **kwargs)
+                print(json.dumps(result, indent=2))
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
         elif cmd == 'get-reasoning':
             # Required: session_id
             # Optional: --group_id, --agent_type, --phase, --limit, --format
@@ -2593,11 +2600,15 @@ def main():
                     print(f"Usage: get-reasoning <session_id> [--group_id X] [--agent_type X] [--phase X] [--limit N] [--format json|prompt-summary]", file=sys.stderr)
                     sys.exit(1)
 
-            result = db.get_reasoning(session_id, output_format=output_format, **kwargs)
-            if output_format == 'prompt-summary':
-                print(result)  # Already formatted string
-            else:
-                print(json.dumps(result, indent=2))
+            try:
+                result = db.get_reasoning(session_id, output_format=output_format, **kwargs)
+                if output_format == 'prompt-summary':
+                    print(result)  # Already formatted string
+                else:
+                    print(json.dumps(result, indent=2))
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
         elif cmd == 'reasoning-timeline':
             # Required: session_id
             # Optional: --group_id, --format

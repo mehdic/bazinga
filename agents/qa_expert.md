@@ -1472,11 +1472,12 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+
 ```bash
 # At task START - Document your understanding (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "understanding" \
-  "## Understanding
+cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
+## Understanding
 
 ### Test Scope
 [What needs to be tested]
@@ -1488,13 +1489,17 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ### Developer's Claims to Verify
 - [Claim 1]
-- [Claim 2]" \
+- [Claim 2]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "understanding" \
+  --content-file /tmp/reasoning_understanding.md \
   --confidence high
 
 # At task END - Document completion (REQUIRED)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "completion" \
-  "## Test Completion Summary
+cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
+## Test Completion Summary
 
 ### Results
 - Total: X tests
@@ -1506,7 +1511,12 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 - [Finding 2]
 
 ### Recommendation
-[Pass to Tech Lead / Return to Developer / Escalate]" \
+[Pass to Tech Lead / Return to Developer / Escalate]
+REASONING_EOF
+
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "completion" \
+  --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```
 

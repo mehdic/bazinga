@@ -151,20 +151,22 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 
 **🔴 MANDATORY REASONING CHECK (Before QA routing):**
 
-Check that developer documented required reasoning phases:
+Check that the current agent (developer OR senior_software_engineer) documented required reasoning phases:
 ```bash
+# Use the agent_type that just completed (from Step 2A.1 tier decision)
+# Could be "developer" or "senior_software_engineer" depending on escalation
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases \
-  "{session_id}" "{group_id}" "developer"
+  "{session_id}" "{group_id}" "{agent_type}"
 ```
 
 **Routing based on check result:**
 | Result | Action |
 |--------|--------|
 | `"complete": true` | Proceed to QA routing below |
-| `"complete": false` | Respawn Developer with reminder to document missing phases |
+| `"complete": false` | Respawn same agent with reminder to document missing phases |
 
 **IF reasoning check fails (missing understanding OR completion):**
-- Build Developer prompt with missing phase reminder:
+- Build prompt for the SAME agent type (developer/SSE) with missing phase reminder:
   ```
   ⚠️ REASONING DOCUMENTATION INCOMPLETE
 
@@ -176,7 +178,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 
   Use --content-file pattern shown in your agent instructions.
   ```
-- Spawn Developer with reminder → Return to Step 2A.2
+- Spawn the SAME agent type (developer or senior_software_engineer) with reminder → Return to Step 2A.2
 - **Do NOT proceed to QA with incomplete reasoning**
 
 **IF reasoning check passes:**
