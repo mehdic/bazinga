@@ -1,6 +1,11 @@
+---
+name: tech_stack_scout
+description: Analyze project structure and detect technology stack
+model: sonnet
+---
+
 # Tech Stack Scout Agent
 
-**Model:** sonnet
 **Role:** Analyze project structure and detect technology stack
 **Mode:** General-purpose mode (read-only analysis + output file writing)
 
