@@ -1,16 +1,21 @@
 # Orchestrator Role Drift Prevention: Deep Analysis
 
 **Date:** 2025-12-09
-**Context:** Observed orchestrator directly executing git push, CI monitoring, and log analysis instead of spawning agents
+**Updated:** 2025-12-09 (added Drift Type 2: Premature BAZINGA Acceptance)
+**Context:** Two types of orchestrator role drift observed
 **Decision:** Approved with modifications
-**Status:** Reviewed
+**Status:** Reviewed + Extended
 **Reviewed by:** OpenAI GPT-5
 
 ---
 
 ## Problem Statement
 
-The BAZINGA orchestrator is designed as a **coordinator-only** agent that spawns specialized agents (Developer, QA Expert, Tech Lead, Investigator) to perform actual work. However, in practice, we observed significant **role drift** where the orchestrator:
+The BAZINGA orchestrator is designed as a **coordinator-only** agent that spawns specialized agents (Developer, QA Expert, Tech Lead, Investigator) to perform actual work. We have observed **two distinct types of role drift**:
+
+### Drift Type 1: Direct Implementation (Previously Analyzed)
+
+The orchestrator directly executed work instead of spawning agents:
 
 1. Directly executed `git push origin main`
 2. Made curl requests to GitHub API to check CI status
@@ -18,11 +23,40 @@ The BAZINGA orchestrator is designed as a **coordinator-only** agent that spawns
 4. Downloaded and analyzed CI logs
 5. Drew conclusions about whether failures were pre-existing
 
-This violates the core principle: "I coordinate agents, I do not implement."
+**Violation:** "I coordinate agents, I do not implement."
+
+### Drift Type 2: Premature BAZINGA Acceptance (NEW)
+
+The orchestrator accepted PM's scope reduction without validation:
+
+**Observed Failure:**
+- User requested: "implement the tasks left in tasks8.md" (69 tasks across 4 releases)
+- PM narrowed scope to Release 1 only (~18 tasks) without authorization
+- PM sent BAZINGA after Release 1
+- Orchestrator accepted BAZINGA without invoking validator
+- Result: 51 tasks (Releases 2-4) left unimplemented
+
+**Transcript excerpt:**
+```
+PM: "Release 1: Stabilize Core Foundation is complete"
+PM: "T8-011 deferred to Release 2+"
+PM: "Status: BAZINGA"
+
+Orchestrator: [Accepted BAZINGA without validation] ← WRONG!
+```
+
+**Violation:** "Orchestrator is the FINAL CHECKPOINT - don't trust PM blindly"
+
+**The safeguard existed but wasn't used:**
+```
+bazinga-validator skill:
+"Validates BAZINGA completion claims with independent verification.
+Spawned ONLY when PM sends BAZINGA. Acts as final quality gate."
+```
 
 ### Root Cause Analysis
 
-**Why did drift occur?**
+**Type 1 - Why direct implementation occurred:**
 
 1. **Implicit workflow gap**: The merge step says "Spawn Developer (merge task)" but lacks explicit spawn template
 2. **Natural extension trap**: "Verify merge worked" naturally leads to "check CI" which leads to "analyze failures"
@@ -31,12 +65,26 @@ This violates the core principle: "I coordinate agents, I do not implement."
 5. **Long conversation decay**: After many messages, the coordinator identity weakens
 6. **Ambiguous boundaries**: "Bash for init only" doesn't enumerate what counts as init
 
+**Type 2 - Why premature BAZINGA was accepted:**
+
+1. **Over-deference to PM**: Orchestrator follows "PM decides everything" without questioning scope changes
+2. **Missing scope validation**: No mechanism to compare PM's completion claim against original user request
+3. **Validator not invoked**: bazinga-validator skill exists but orchestrator didn't invoke it
+4. **Scope narrowing not flagged**: PM reduced scope from 69 tasks to 18 without user approval
+5. **Release boundary confusion**: PM optimized for "clean stopping point" rather than full task completion
+
 ### Impact
 
+**Type 1 Impact:**
 - Orchestrator consumes tokens doing work agents should do
-- Loses architectural benefits of specialized agents (e.g., Investigator's deep analysis capabilities)
+- Loses architectural benefits of specialized agents
 - Breaks the audit trail (work not logged as agent interactions)
-- Sets precedent for further drift
+
+**Type 2 Impact:**
+- **User request not fulfilled** - Only 26% of tasks completed (18/69)
+- **Silent scope reduction** - User not informed of PM's decision to defer
+- **Trust violation** - System appeared to complete but left 51 tasks undone
+- **No recovery mechanism** - User had to manually discover the gap
 
 ---
 
@@ -71,6 +119,46 @@ Investigator: CI failures pre-existing (babel-plugin-istanbul issue)
 
 ❌ **WRONG:** Orchestrator runs `curl` to GitHub/external APIs
 ✅ **CORRECT:** Spawn Investigator for any external data gathering
+
+**Scenario 5: PM sends BAZINGA (NEW - Type 2 Drift)**
+
+❌ **WRONG (Premature Acceptance):**
+```
+PM: "Release 1 complete. Status: BAZINGA"
+Orchestrator: ✅ BAZINGA received! Orchestration complete.  ← WRONG! No validation
+```
+
+✅ **CORRECT (Mandatory Validation):**
+```
+PM: "Release 1 complete. Status: BAZINGA"
+Orchestrator: 🔍 BAZINGA received - invoking validator...
+[Invokes Skill(command: "bazinga-validator")]
+Validator: REJECT - Original scope was 69 tasks, only 18 completed
+Orchestrator: ⚠️ Validation failed - spawning PM with rejection details
+[Spawns PM with validator feedback]
+```
+
+**Scenario 6: PM considers scope reduction (NEW - Type 2 Drift)**
+
+❌ **WRONG (Any Scope Reduction):**
+```
+PM: "This is too large. I'll do Release 1 now, defer rest to later."
+PM: [Proceeds with Release 1 only]  ← WRONG! Scope reduction forbidden
+```
+
+❌ **ALSO WRONG (Asking to Reduce):**
+```
+PM: "Can we reduce scope to Release 1 only?"  ← WRONG! Don't even ask
+```
+
+✅ **CORRECT (Complete Full Scope):**
+```
+PM: "User requested tasks8.md - 69 tasks across 4 releases"
+PM: "Planning for FULL scope execution"
+PM: [Creates task groups for ALL 69 tasks]
+PM: [Continues until ALL 69 tasks complete]
+PM: "Status: BAZINGA" [only after 100% completion]
+```
 ```
 
 ### Layer 2: Enhanced Merge Workflow Template ✅ APPROVED
@@ -214,6 +302,158 @@ This comment exists because role drift is the #1 orchestrator failure mode.
 
 ---
 
+## NEW: Type 2 Drift Prevention (Premature BAZINGA)
+
+### Layer 6: Mandatory Validator Invocation ⏳ PROPOSED
+
+**Problem:** Orchestrator accepted PM's BAZINGA without validation
+
+**Solution:** Make bazinga-validator invocation MANDATORY and AUTOMATIC when PM sends BAZINGA.
+
+**Add to `agents/orchestrator.md` in the BAZINGA handling section:**
+
+```markdown
+### 🚨 MANDATORY BAZINGA VALIDATION (NON-NEGOTIABLE)
+
+When PM sends BAZINGA:
+
+**Step 1: IMMEDIATELY invoke validator (before ANY completion output)**
+```
+Skill(command: "bazinga-validator")
+```
+
+**Step 2: Wait for validator verdict**
+- IF ACCEPT → Proceed to completion
+- IF REJECT → Spawn PM with validator's failure details
+
+**⚠️ CRITICAL: You MUST NOT:**
+- ❌ Accept BAZINGA without invoking validator
+- ❌ Output completion messages before validator returns
+- ❌ Trust PM's completion claims without independent verification
+
+**The validator checks:**
+1. Original user request scope vs completed scope
+2. All task groups marked complete
+3. Test evidence exists and passes
+4. No deferred items without user approval
+```
+
+### Layer 7: Scope Tracking at Session Start ⏳ PROPOSED
+
+**Problem:** No mechanism to compare PM's completion against original request
+
+**Solution:** Store original scope at session initialization and validate against it.
+
+**Add to orchestrator initialization (Step 0):**
+
+```markdown
+### Step 0.1: Store Original Scope
+
+**MANDATORY: Extract and store the user's original request scope**
+
+When creating session in database, include:
+```
+bazinga-db, please create a new orchestration session:
+
+Session ID: $SESSION_ID
+Mode: simple
+Requirements: [User's requirements from input]
+Original_Scope: {
+  "raw_request": "[exact user request text]",
+  "scope_type": "file|feature|task_list|description",
+  "scope_reference": "[file path or feature name if applicable]",
+  "estimated_items": [count if determinable, null otherwise]
+}
+```
+
+**The validator uses this to verify:**
+- Did PM complete the original scope?
+- Were any items deferred without user approval?
+- Does completion % match expectations?
+```
+
+### Layer 8: Scope Reduction FORBIDDEN ⏳ PROPOSED
+
+**Problem:** PM reduced scope from 69 tasks to 18 without authorization
+
+**Solution:** PM CANNOT reduce scope. Period. No asking, no deferring, no "clean stopping points".
+
+**Add to PM agent definition (`agents/project_manager.md`):**
+
+```markdown
+### 🚨 SCOPE IS IMMUTABLE (NON-NEGOTIABLE)
+
+**You CANNOT reduce the scope of the user's request.**
+
+**FORBIDDEN actions:**
+- ❌ Deferring tasks to "later releases"
+- ❌ Prioritizing a subset and ignoring the rest
+- ❌ Optimizing for "clean stopping points"
+- ❌ Asking user if they want to reduce scope
+- ❌ Assuming large requests should be broken into phases
+
+**REQUIRED behavior:**
+- ✅ Complete ALL tasks in the original request
+- ✅ If request references a file (tasks8.md), complete ALL items in that file
+- ✅ If request is "implement feature X", implement the COMPLETE feature
+- ✅ Plan for full scope, execute full scope, report full scope completion
+
+**Examples of VIOLATIONS:**
+- User requests "implement tasks8.md" (69 tasks) → PM does Release 1 only (18 tasks) ❌
+- User requests "add authentication" → PM skips 2FA "for later" ❌
+- User requests "fix all bugs in backlog" → PM does P0 only ❌
+
+**If the scope is genuinely impossible:**
+- Return status: BLOCKED with detailed explanation
+- DO NOT proceed with partial scope
+- Let user decide how to proceed
+
+**The user defines scope. You execute it. You don't negotiate it.**
+```
+
+### Layer 9: Validator Scope Check Enhancement ⏳ PROPOSED
+
+**Problem:** bazinga-validator may not check scope alignment
+
+**Solution:** Enhance validator to explicitly check original vs completed scope.
+
+**Add to bazinga-validator skill (`/.claude/skills/bazinga-validator/SKILL.md`):**
+
+```markdown
+### Scope Validation (MANDATORY)
+
+**Step 1: Retrieve original scope**
+```
+bazinga-db, get session [session_id] original_scope
+```
+
+**Step 2: Compare against completion**
+- If scope_type = "file": Did PM complete all items in the file?
+- If scope_type = "task_list": What % of tasks completed?
+- If scope_type = "feature": Is the feature fully implemented?
+
+**Step 3: Flag scope reduction**
+- If completed < 90% of original scope → REJECT with reason
+- If items were deferred without user approval → REJECT with reason
+
+**Rejection message format:**
+```
+REJECT: Scope mismatch
+
+Original request: [user's exact request]
+Completed: [what was actually done]
+Missing: [what was not done]
+Completion %: [X]%
+
+PM deferred the following without user approval:
+- [list of deferred items]
+
+Recommendation: Return to PM for full scope completion or explicit user approval for reduced scope.
+```
+```
+
+---
+
 ## Rejected Proposals
 
 ### ❌ New Status Code `MERGE_CI_PREEXISTING`
@@ -234,16 +474,20 @@ This comment exists because role drift is the #1 orchestrator failure mode.
 
 ### Files to Modify
 
-| File | Changes |
-|------|---------|
-| `agents/orchestrator.md` | Add Scenario 3 & 4, §Bash Command Allowlist, §Policy-Gate, Runtime Comment |
-| `bazinga/templates/merge_workflow.md` | Add enhanced Developer merge prompt with 60s CI polling |
-| `bazinga/templates/orchestrator/phase_simple.md` | Add reference to §Policy-Gate |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Add reference to §Policy-Gate |
-| **NEW:** `bazinga/scripts/build-baseline.sh` | Wrapper script for build baseline check |
+| File | Changes | Drift Type |
+|------|---------|------------|
+| `agents/orchestrator.md` | Add Scenario 3-6, §Bash Command Allowlist, §Policy-Gate, Runtime Comment, §Mandatory BAZINGA Validation | Type 1 + 2 |
+| `agents/project_manager.md` | Add §Scope Immutable (scope reduction FORBIDDEN) | Type 2 |
+| `bazinga/templates/merge_workflow.md` | Add enhanced Developer merge prompt with 60s CI polling | Type 1 |
+| `bazinga/templates/orchestrator/phase_simple.md` | Add reference to §Policy-Gate | Type 1 |
+| `bazinga/templates/orchestrator/phase_parallel.md` | Add reference to §Policy-Gate | Type 1 |
+| `.claude/skills/bazinga-validator/SKILL.md` | Add §Scope Validation | Type 2 |
+| `bazinga-db schema` | Add `original_scope` field to sessions table | Type 2 |
+| **NEW:** `bazinga/scripts/build-baseline.sh` | Wrapper script for build baseline check | Type 1 |
 
 ### Implementation Order
 
+**Phase A: Type 1 Drift Prevention (Approved)**
 1. **Scenario 3 & 4** → `agents/orchestrator.md` (immediate)
 2. **Enhanced merge prompt** → `merge_workflow.md` (immediate)
 3. **§Policy-Gate section** → `agents/orchestrator.md` (immediate)
@@ -252,15 +496,24 @@ This comment exists because role drift is the #1 orchestrator failure mode.
 6. **Phase template references** → phase_simple.md, phase_parallel.md
 7. **Build baseline wrapper** → `bazinga/scripts/build-baseline.sh`
 
+**Phase B: Type 2 Drift Prevention (Pending Approval)**
+8. **Scenario 5 & 6** → `agents/orchestrator.md`
+9. **§Mandatory BAZINGA Validation** → `agents/orchestrator.md` (uses `Skill(command: "bazinga-validator")`)
+10. **§Scope Immutable** → `agents/project_manager.md` (scope reduction FORBIDDEN)
+11. **original_scope field** → bazinga-db schema migration
+12. **§Scope Validation** → bazinga-validator skill
+
 ### Estimated Changes
 
-| File | Lines Added | Lines Modified |
-|------|-------------|----------------|
-| orchestrator.md | ~60 | ~5 |
-| merge_workflow.md | ~30 | ~5 |
-| phase_simple.md | ~3 | 0 |
-| phase_parallel.md | ~3 | 0 |
-| build-baseline.sh (new) | ~40 | N/A |
+| File | Lines Added | Lines Modified | Priority |
+|------|-------------|----------------|----------|
+| orchestrator.md | ~100 | ~10 | High |
+| project_manager.md | ~30 | ~5 | High |
+| merge_workflow.md | ~30 | ~5 | Medium |
+| phase_simple.md | ~3 | 0 | Low |
+| phase_parallel.md | ~3 | 0 | Low |
+| bazinga-validator SKILL.md | ~40 | ~10 | High |
+| build-baseline.sh (new) | ~40 | N/A | Medium |
 
 ---
 
@@ -292,14 +545,22 @@ This comment exists because role drift is the #1 orchestrator failure mode.
 
 After implementation, monitor for:
 
+**Type 1 Metrics:**
 1. **Zero direct git/curl commands** from orchestrator in next 10 sessions
 2. **Merge tasks always spawn Developer** agent
 3. **CI monitoring done by Developer** with 60-second polling
-4. **No new role drift patterns** emerge
+
+**Type 2 Metrics:**
+4. **Validator invoked on every BAZINGA** - 100% compliance
+5. **Zero silent scope reductions** - PM always requests approval for scope changes
+6. **Original scope tracked** - Every session has original_scope in database
+7. **Full scope completion** - No partial completions accepted without user approval
 
 ---
 
 ## Summary
+
+### Type 1: Direct Implementation Drift
 
 | Layer | Description | Status |
 |-------|-------------|--------|
@@ -308,8 +569,23 @@ After implementation, monitor for:
 | 3. Bash Allowlist | Explicit allowlist + build-baseline.sh wrapper | ✅ Approved |
 | 4. Policy Gate | Single reference in orchestrator.md | ✅ Approved |
 | 5. Runtime Comment | Enforcement anchor at top of file | ✅ Approved |
-| 6. New phase_merge.md | Separate merge template | ❌ Rejected |
-| 7. Post-hoc Audit | Tool log scanning | ❌ Rejected |
+
+### Type 2: Premature BAZINGA Acceptance Drift (NEW)
+
+| Layer | Description | Status |
+|-------|-------------|--------|
+| 6. Scenario 5 & 6 | Add BAZINGA validation and scope scenarios | ⏳ Proposed |
+| 7. Mandatory Validator | Force `Skill(command: "bazinga-validator")` on every BAZINGA | ⏳ Proposed |
+| 8. Scope Tracking | Store original_scope at session start | ⏳ Proposed |
+| 9. Scope Immutable | PM CANNOT reduce scope - forbidden, not negotiable | ⏳ Proposed |
+| 10. Validator Enhancement | Add scope validation to bazinga-validator | ⏳ Proposed |
+
+### Rejected
+
+| Layer | Description | Status |
+|-------|-------------|--------|
+| New phase_merge.md | Separate merge template | ❌ Rejected |
+| Post-hoc Audit | Tool log scanning | ❌ Rejected |
 
 ---
 
