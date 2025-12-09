@@ -1424,7 +1424,9 @@ The skill enforces these limits. Orchestrator does not need to track tokens.
 
 ## Phase 2A: Simple Mode Execution
 
-**🔴 MANDATORY: Load Simple Mode Template**
+**🔴🔴🔴 MANDATORY: Load Simple Mode Template - NO EXCEPTIONS 🔴🔴🔴**
+
+**You MUST read the template. DO NOT spawn any agents without reading this template first.**
 
 ```
 Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
@@ -1432,27 +1434,25 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_simple.md` and STOP.
 
-**After reading the template:** Execute all steps (2A.1 through 2A.9) as defined in the template.
+**🚨 TEMPLATE VERIFICATION CHECKPOINT:**
+After calling Read, verify you have the template content visible in your context:
+- ✅ Can you see "🔴🔴🔴 MANDATORY SPAWN SEQUENCE"?
+- ✅ Can you see "SPAWN STEP 2: Load Specializations"?
+- ✅ Can you see the specialization-loader skill invocation?
 
-**Quick Reference (full details in template):**
-- Step 2A.1: Spawn Developer (tier from PM decision)
-- Step 2A.2: Receive Developer response, output capsule
-- Step 2A.3: Route based on status (READY_FOR_QA → QA, BLOCKED → Investigator, etc.)
-- Step 2A.4: Spawn QA Expert (if enabled)
-- Step 2A.5: Route QA response
-- Step 2A.6: Spawn Tech Lead for review
-- Step 2A.6b: Investigation loop (if INVESTIGATION_IN_PROGRESS)
-- Step 2A.6c: Tech Lead validation of investigation
-- Step 2A.7: Route Tech Lead response (APPROVED → merge, CHANGES_REQUESTED → respawn)
-- Step 2A.7a: Spawn Developer for merge (immediate after approval)
-- Step 2A.8: Spawn PM for final check
-- Step 2A.9: Route PM response (BAZINGA → Completion, CONTINUE → loop)
+**IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
+
+**Execute all steps (2A.1 through 2A.9) EXACTLY as defined in the template.**
+
+**⚠️ WARNING: The template contains MANDATORY SPAWN SEQUENCE with specialization loading. If you spawn agents without following the 4-step sequence in the template, specializations will NOT be loaded. This is a CRITICAL BUG.**
 
 ---
 
 ## Phase 2B: Parallel Mode Execution
 
-**🔴 MANDATORY: Load Parallel Mode Template**
+**🔴🔴🔴 MANDATORY: Load Parallel Mode Template - NO EXCEPTIONS 🔴🔴🔴**
+
+**You MUST read the template. DO NOT spawn any agents without reading this template first.**
 
 ```
 Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
@@ -1460,24 +1460,18 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_parallel.md` and STOP.
 
-**After reading the template:** Execute all steps (2B.0 through 2B.9) as defined in the template.
+**🚨 TEMPLATE VERIFICATION CHECKPOINT:**
+After calling Read, verify you have the template content visible in your context:
+- ✅ Can you see "🔴🔴🔴 MANDATORY PARALLEL SPAWN SEQUENCE"?
+- ✅ Can you see "PARALLEL SPAWN STEP 2: Load Specializations FOR EACH GROUP"?
+- ✅ Can you see the specialization-loader skill invocation per group?
+- ✅ Can you see the 2d-FAILURE handling section?
 
-**Quick Reference (full details in template):**
-- Step 2B.0: Context optimization checkpoint (≥3 developers)
-- Step 2B.1: Spawn ALL developers in ONE message (MAX 4 parallel)
-- Step 2B.2: Receive all developer responses
-- Step 2B.2a: Mandatory batch processing (LAYER 1)
-- Step 2B.3-2B.7: Route each group independently (same as 2A workflow)
-- Step 2B.7a: Spawn Developer for merge (per group)
-- Step 2B.7b: Phase continuation check (CRITICAL - prevents hang)
-- Step 2B.7c: Pre-stop verification gate (LAYER 3)
-- Step 2B.8: Spawn PM when all groups complete
-- Step 2B.9: Route PM response
+**IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
 
-**Three-Layer Defense (full details in template):**
-- LAYER 1: Batch processing (parse all → build queue → spawn all)
-- LAYER 2: Step-level self-checks (verify Task spawned for each group)
-- LAYER 3: Pre-stop verification gate (verify all responses processed)
+**Execute all steps (2B.0 through 2B.9) EXACTLY as defined in the template.**
+
+**⚠️ WARNING: The template contains MANDATORY PARALLEL SPAWN SEQUENCE with specialization loading for EACH group. If you spawn agents without following the 4-step sequence per group, specializations will NOT be loaded. This is a CRITICAL BUG.**
 
 ---
 

@@ -288,14 +288,19 @@ specializations_status[group_id] = "disabled"
 **IF ANY checkpoint fails for ANY group: GO BACK and complete the missing step.**
 
 **Spawn ALL agents (use MODEL_CONFIG based on PM's tier decision per group):**
-```
-# For each group, use MODEL_CONFIG[tier] where tier is from PM's initial_tier decision:
-# - "developer" → MODEL_CONFIG["developer"]
-# - "senior_software_engineer" → MODEL_CONFIG["senior_software_engineer"]
-# - "requirements_engineer" → MODEL_CONFIG["requirements_engineer"]
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier_A], description="Dev A: {task[:90]}", prompt=full_prompts["A"])
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier_B], description="Dev B: {task[:90]}", prompt=full_prompts["B"])
+**How to get the model for each group:**
+```
+# For group A: task_groups["A"].initial_tier = "developer" or "senior_software_engineer" or "requirements_engineer"
+# Look up: MODEL_CONFIG[task_groups["A"].initial_tier]
+# Example: If initial_tier="developer" → MODEL_CONFIG["developer"] → "haiku"
+# Example: If initial_tier="senior_software_engineer" → MODEL_CONFIG["senior_software_engineer"] → "sonnet"
+```
+
+**Spawn commands:**
+```
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["A"].initial_tier], description="Dev A: {task[:90]}", prompt=full_prompts["A"])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initial_tier], description="Dev B: {task[:90]}", prompt=full_prompts["B"])
 ... (for each group)
 ```
 

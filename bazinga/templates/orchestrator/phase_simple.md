@@ -196,8 +196,17 @@ specializations_status = "disabled"
 **IF ANY checkpoint fails: GO BACK and complete the missing step.**
 
 **Spawn the agent:**
+
+**How to get the model:**
 ```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=full_prompt)
+# PM's initial_tier for this task = "developer" or "senior_software_engineer" or "requirements_engineer"
+# Look up: MODEL_CONFIG[task_group.initial_tier]
+# Example: If initial_tier="developer" → MODEL_CONFIG["developer"] → "haiku"
+# Example: If initial_tier="senior_software_engineer" → MODEL_CONFIG["senior_software_engineer"] → "sonnet"
+```
+
+```
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier], description=desc, prompt=full_prompt)
 ```
 
 ---
