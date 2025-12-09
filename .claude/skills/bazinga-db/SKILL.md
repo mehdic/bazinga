@@ -89,6 +89,8 @@ Extract from the calling agent's request:
 - "save success criteria" / "store criteria" → save-success-criteria
 - "get success criteria" / "query criteria" → get-success-criteria
 - "update success criterion" / "update criterion status" → update-success-criterion
+- "log validator verdict" / "save validator verdict" → log-validator-verdict
+- "get session" / "get session with scope" → get-session
 - "save context package" / "create context package" → save-context-package
 - "get context packages" / "query context" → get-context-packages
 - "mark context consumed" / "context consumed" → mark-context-consumed
@@ -134,8 +136,22 @@ Returns JSON array of recent sessions (default 10, ordered by created_at DESC).
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-session \
   "<session_id>" \
   "<mode>" \
-  "<requirements>"
+  "<requirements>" \
+  [--initial_branch "<branch_name>"] \
+  [--original_scope '<json_object>']
 ```
+
+**Parameters:**
+- `initial_branch`: Git branch at session start (for merge operations)
+- `original_scope`: JSON object with scope tracking for validator:
+  ```json
+  {
+    "raw_request": "implement tasks8.md",
+    "scope_type": "file|feature|task_list|description",
+    "scope_reference": "docs/tasks8.md",
+    "estimated_items": 69
+  }
+  ```
 
 **IMPORTANT:** This command will auto-initialize the database if it doesn't exist. No separate initialization needed!
 
@@ -230,6 +246,30 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-success-criterion \
   "<session_id>" "<criterion_text>" --status "met" --actual "711/711 passing"
 ```
+
+### Validator Verdict Logging (BAZINGA Validation)
+
+**Log validator verdict (after BAZINGA validation):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet log-validator-verdict \
+  "<session_id>" "<verdict>" "<reason>" \
+  [--scope_check "pass|fail"] [--completed_items N] [--total_items M]
+```
+
+**Parameters:**
+- `verdict`: ACCEPT or REJECT
+- `reason`: Detailed explanation of verdict
+- `scope_check`: pass/fail - whether scope validation passed
+- `completed_items`: Number of items completed (from PM's Completion Summary)
+- `total_items`: Total items in original scope
+
+**Get session with original scope (for validator):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session \
+  "<session_id>" --include-scope
+```
+
+Returns session data including `original_scope` JSON for validator comparison.
 
 ### Context Package Operations (Inter-Agent Communication)
 

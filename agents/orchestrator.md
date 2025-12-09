@@ -567,9 +567,23 @@ Display:
    Session ID: $SESSION_ID
    Mode: simple
    Requirements: [User's requirements from input]
+   Initial_Branch: [result of git branch --show-current]
+   Original_Scope: {
+     "raw_request": "[exact user request text verbatim]",
+     "scope_type": "[file|feature|task_list|description]",
+     "scope_reference": "[file path if scope_type=file, otherwise null]",
+     "estimated_items": [count if determinable from file/list, null otherwise]
+   }
    ```
 
+   **Scope Type Detection:**
+   - `file` - User references a file (e.g., "implement tasks8.md")
+   - `task_list` - User provides numbered/bulleted list
+   - `feature` - User requests a feature (e.g., "add authentication")
+   - `description` - General description
+
    **Note:** Mode is initially set to "simple" as a default. The PM will analyze requirements and may update this to "parallel" if multiple independent tasks are detected.
+   **Note:** Original_Scope is MANDATORY for validator scope checking. The validator uses this to verify PM's completion claims.
 
    Then invoke:
    ```
