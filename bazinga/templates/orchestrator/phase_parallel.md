@@ -180,7 +180,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
 ```
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
+**Build Base Prompt PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
 **Show Prompt Summaries (PER GROUP):** Output structured summary for each group (NOT full prompts):
 ```text
@@ -197,16 +197,29 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
    **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 
-**Spawn ALL in ONE message (MAX 4 groups):**
+**🔴 Spawn ALL with Specializations (MAX 4 groups) - SEQUENTIAL PER AGENT:**
+
+Per §Spawn Agent with Specializations **Parallel Mode: Isolation Rule** (`spawn_with_specializations.md`):
+
 ```
-Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=[Group A prompt])
-Task(subagent_type="general-purpose", model=models["B"], description="SSE B: {task[:90]}", prompt=[Group B prompt])
-... # MAX 4 Task() calls in ONE message
+# Group A:
+1. Follow spawn_with_specializations.md Steps 1-4 for Group A
+   (output context → Skill → extract block)
+2. Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=[Group A prompt WITH specialization])
+
+# Group B:
+3. Follow spawn_with_specializations.md Steps 1-4 for Group B
+   (output context → Skill → extract block)
+4. Task(subagent_type="general-purpose", model=models["B"], description="SSE B: {task[:90]}", prompt=[Group B prompt WITH specialization])
+
+# ... repeat for Groups C, D (MAX 4)
 ```
+
+**⚠️ ISOLATION RULE:** Complete context→skill→spawn for each agent BEFORE starting the next. Do NOT interleave contexts.
 
 **🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
 
-**🔴 DO NOT spawn in separate messages** (sequential). **🔴 DO NOT spawn >4** (breaks system).
+**🔴 DO NOT spawn >4** (breaks system).
 
 **AFTER receiving ALL developer responses:**
 

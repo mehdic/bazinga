@@ -1499,220 +1499,9 @@ Read(file_path: "bazinga/project_context.json")
 
 **If file missing or empty:** Skip specializations (graceful degradation). Continue to Step 3.6.
 
-**Step 3.5.1b: Fallback Mapping Table (if components[].suggested_specializations missing)**
-
-If `project_context.json` exists but lacks `components[].suggested_specializations`, use this mapping table to convert technology names to template paths:
-
-**Canonical Key → Template Path Mapping:**
-
-| Canonical Key | Aliases | Template Path |
-|---------------|---------|---------------|
-| typescript | TypeScript, ts | `bazinga/templates/specializations/01-languages/typescript.md` |
-| javascript | JavaScript, js | `bazinga/templates/specializations/01-languages/javascript.md` |
-| python | Python, py | `bazinga/templates/specializations/01-languages/python.md` |
-| java | Java | `bazinga/templates/specializations/01-languages/java.md` |
-| go | Go, Golang, golang | `bazinga/templates/specializations/01-languages/go.md` |
-| rust | Rust | `bazinga/templates/specializations/01-languages/rust.md` |
-| react | React, reactjs | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
-| nextjs | Next.js, next, next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
-| vue | Vue, vuejs, vue.js | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
-| angular | Angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
-| express | Express, expressjs | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
-| fastapi | FastAPI, fast-api | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
-| django | Django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
-| springboot | Spring Boot, spring-boot, spring | `bazinga/templates/specializations/03-frameworks-backend/spring-boot.md` |
-| kubernetes | Kubernetes, k8s, K8s | `bazinga/templates/specializations/06-infrastructure/kubernetes.md` |
-| docker | Docker | `bazinga/templates/specializations/06-infrastructure/docker.md` |
-| postgresql | PostgreSQL, postgres, pg | `bazinga/templates/specializations/05-databases/postgresql.md` |
-| mongodb | MongoDB, mongo | `bazinga/templates/specializations/05-databases/mongodb.md` |
-| playwright | Playwright, Cypress, cypress | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
-| jest | Jest, Vitest, vitest | `bazinga/templates/specializations/08-testing/jest-vitest.md` |
-
-**Helper functions:**
-
-```
-# Build MAPPING_TABLE from the canonical key table above (canonical keys only)
-MAPPING_TABLE = {
-  "typescript": "bazinga/templates/specializations/01-languages/typescript.md",
-  "javascript": "bazinga/templates/specializations/01-languages/javascript.md",
-  "python": "bazinga/templates/specializations/01-languages/python.md",
-  "java": "bazinga/templates/specializations/01-languages/java.md",
-  "go": "bazinga/templates/specializations/01-languages/go.md",
-  "rust": "bazinga/templates/specializations/01-languages/rust.md",
-  "react": "bazinga/templates/specializations/02-frameworks-frontend/react.md",
-  "nextjs": "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
-  "vue": "bazinga/templates/specializations/02-frameworks-frontend/vue.md",
-  "angular": "bazinga/templates/specializations/02-frameworks-frontend/angular.md",
-  "express": "bazinga/templates/specializations/03-frameworks-backend/express.md",
-  "fastapi": "bazinga/templates/specializations/03-frameworks-backend/fastapi.md",
-  "django": "bazinga/templates/specializations/03-frameworks-backend/django.md",
-  "springboot": "bazinga/templates/specializations/03-frameworks-backend/spring-boot.md",
-  "kubernetes": "bazinga/templates/specializations/06-infrastructure/kubernetes.md",
-  "docker": "bazinga/templates/specializations/06-infrastructure/docker.md",
-  "postgresql": "bazinga/templates/specializations/05-databases/postgresql.md",
-  "mongodb": "bazinga/templates/specializations/05-databases/mongodb.md",
-  "playwright": "bazinga/templates/specializations/08-testing/playwright-cypress.md",
-  "cypress": "bazinga/templates/specializations/08-testing/playwright-cypress.md",
-  "jest": "bazinga/templates/specializations/08-testing/jest-vitest.md",
-  "vitest": "bazinga/templates/specializations/08-testing/jest-vitest.md"
-}
-
-# Utility: Remove punctuation characters from string (preserves + and # for C++/C#)
-FUNCTION remove_punctuation(text):
-  # Remove only: . - _ / \ (common separators)
-  # Keep: + # (for C++, C#, F# language names)
-  # Implementation: text.translate() or regex replace
-  result = ""
-  FOR each char in text:
-    IF char is alphanumeric OR char is space OR char in ['+', '#']:
-      result += char
-  RETURN result
-
-# Utility: Remove all whitespace from string (spaces, tabs, newlines)
-FUNCTION remove_whitespace(text):
-  # Use regex \s to match all whitespace types
-  # Implementation: re.sub(r'\s', '', text) or text.split() then join
-  RETURN text with all whitespace removed
-
-# Utility: Check if file exists on filesystem (and is a file, not directory)
-FUNCTION file_exists(path):
-  # Use os.path.isfile(path) or pathlib.Path(path).is_file()
-  # Returns true only if path exists AND is a regular file
-  RETURN os.path.isfile(path)
-
-# Utility: Simple logging function for debugging unmapped technologies
-FUNCTION LOG_WARNING(message, *args):
-  # Output warning to stderr or logging system
-  # Implementation: print(message.format(*args), file=sys.stderr)
-  # In agent context: just note the warning and continue
-  PASS  # Silent in production, logged in debug mode
-
-# Normalize input to canonical key (lowercase, remove punctuation/whitespace)
-# Normalization rules:
-# 1. Convert to lowercase
-# 2. Strip leading/trailing whitespace
-# 3. Remove punctuation (., -, _, /, \) but keep + and # (for C++/C#)
-# 4. Remove all whitespace (spaces, tabs, etc.) → "spring boot" becomes "springboot"
-# 5. Apply explicit alias mapping for common abbreviations
-FUNCTION normalize_key(input):
-  key = input.lower().strip()
-  key = remove_punctuation(key)  # "Next.js" → "nextjs", "Spring Boot" → "springboot"
-  key = remove_whitespace(key)   # "spring boot" → "springboot"
-
-  # Explicit alias mapping for edge cases not resolved by punctuation/whitespace removal
-  # Note: "spring" intentionally maps to "springboot" as Spring Boot is the most common usage
-  # in modern projects. If Spring Framework (non-Boot) specialization is needed, add separate entry.
-  # These aliases handle short forms and variants that survive normalization
-  ALIAS_MAP = {
-    "k8s": "kubernetes",
-    "ts": "typescript",
-    "js": "javascript",
-    "py": "python",
-    "pg": "postgresql",
-    "postgres": "postgresql",
-    "mongo": "mongodb",
-    "next": "nextjs",
-    "spring": "springboot",
-    "golang": "go",
-    "reactjs": "react",
-    "vuejs": "vue",
-    "expressjs": "express"
-  }
-  IF key IN ALIAS_MAP: key = ALIAS_MAP[key]
-
-  RETURN key
-
-# Parse framework string like "React (Frontend), Express (Backend)"
-FUNCTION parse_frameworks(framework_string):
-  parts = framework_string.split(",")
-  frameworks = []
-  FOR each part in parts:
-    # Strip parenthetical annotations: "React (Frontend)" → "React"
-    # Implementation: re.sub(r'\s*\([^)]*\)\s*', '', part).strip()
-    # This removes any text in parentheses along with surrounding whitespace
-    clean = part
-    IF "(" in clean:
-      # Find and remove parenthetical content
-      start = clean.find("(")
-      end = clean.find(")", start)
-      IF end > start:
-        clean = clean[:start] + clean[end+1:]
-    clean = clean.strip()
-    IF clean: frameworks.append(clean)
-  RETURN frameworks
-
-# Stable deduplication preserving insertion order
-FUNCTION dedupe_stable(items):
-  seen = set()
-  result = []
-  FOR item in items:
-    IF item NOT IN seen:
-      seen.add(item)
-      result.append(item)
-  RETURN result
-
-# Lookup with normalization and file existence check
-# Emits warnings for unmapped technologies or missing files to aid diagnosis
-FUNCTION lookup_and_validate(input):
-  key = normalize_key(input)
-  path = MAPPING_TABLE.get(key)  # Returns None if not found
-
-  IF path is None:
-    LOG_WARNING("Technology '{}' (normalized: '{}') not found in mapping table", input, key)
-    RETURN None
-
-  IF NOT file_exists(path):
-    LOG_WARNING("Template file does not exist: {}", path)
-    RETURN None
-
-  RETURN path
-```
-
-**Fallback logic:**
-```
-IF project_context has NO components[].suggested_specializations:
-  specializations = []
-
-  # Map primary_language
-  IF project_context.primary_language:
-    path = lookup_and_validate(project_context.primary_language)
-    IF path: specializations.append(path)
-
-  # Map framework(s) - may contain multiple like "React (Frontend), Express (Backend)"
-  IF project_context.framework:
-    frameworks = parse_frameworks(project_context.framework)
-    FOR each fw in frameworks:
-      path = lookup_and_validate(fw)
-      IF path: specializations.append(path)
-
-  # Map database(s) - may contain multiple like "PostgreSQL, Redis"
-  IF project_context.database:
-    databases = parse_frameworks(project_context.database)  # Reuse parser for consistency
-    FOR each db in databases:
-      path = lookup_and_validate(db)
-      IF path: specializations.append(path)
-
-  # Map infrastructure - may contain multiple like "Docker, Kubernetes"
-  IF project_context.infrastructure:
-    infra_items = parse_frameworks(project_context.infrastructure)  # Reuse parser for consistency
-    FOR each item in infra_items:
-      path = lookup_and_validate(item)
-      IF path: specializations.append(path)
-
-  # Map testing framework(s) - may contain multiple like "Jest, Playwright"
-  IF project_context.testing:
-    test_frameworks = parse_frameworks(project_context.testing)  # Reuse parser for consistency
-    FOR each tf in test_frameworks:
-      path = lookup_and_validate(tf)
-      IF path: specializations.append(path)
-
-  # Stable deduplicate (preserves order)
-  specializations = dedupe_stable(specializations)
-```
-
 **Step 3.5.2: Map Task Groups to Components**
 
-For each task group, determine which component(s) it targets:
+For each task group, determine which component(s) it targets and extract specializations:
 
 ```
 Example project_context.json structure:
@@ -1743,48 +1532,16 @@ Example project_context.json structure:
 **Mapping logic:**
 
 ```
-# Helper: Check if target_path is within component.path (proper boundary)
-# Uses proper path normalization and guards against path traversal attacks
-# Resolves symlinks to prevent symlink-based security bypass
-FUNCTION path_matches(target_path, component_path):
-  # Import: os.path (or pathlib.Path)
-
-  # Resolve symlinks FIRST to prevent symlink-based traversal attacks
-  # os.path.realpath follows symlinks to get the actual filesystem path
-  real_target = os.path.realpath(target_path)
-  real_component = os.path.realpath(component_path)
-
-  # Normalize both paths to handle:
-  # - OS-specific separators (\ on Windows, / on Unix)
-  # - Remove redundant separators (// → /)
-  # - Resolve relative components (.., .)
-  norm_target = os.path.normpath(real_target)
-  norm_component = os.path.normpath(real_component)
-
-  # Guard against path traversal: Check if target is within component boundary
-  # os.path.commonpath returns the longest common sub-path
-  # If common path equals component path, target is within or equal to component
-  TRY:
-    common = os.path.commonpath([norm_target, norm_component])
-    # Target is within component if common path equals component path
-    # Note: equality case is covered by commonpath logic (when paths are equal,
-    # commonpath returns that path, which equals norm_component)
-    RETURN common == norm_component
-  CATCH ValueError:
-    # Raised when paths are on different drives (Windows) or no common path
-    RETURN False
-
 FOR each task_group:
   specializations = []
 
-  # FIRST: Check if project_context has components with suggested_specializations (schema 2.0)
   IF project_context.components EXISTS AND has suggested_specializations:
     target_paths = extract file paths from task description
     matched_components = []
 
     FOR each component in project_context.components:
       FOR each target_path in target_paths:
-        IF path_matches(target_path, component.path):
+        IF target_path starts with component.path:
           matched_components.append(component)
           BREAK  # Avoid duplicate matches for same component
 
@@ -1792,47 +1549,13 @@ FOR each task_group:
       # Combine suggested_specializations from all matched components
       FOR component in matched_components:
         specializations.extend(component.suggested_specializations)
-      specializations = dedupe_stable(specializations)  # Preserve insertion order
-
-  # FALLBACK: Use mapping table if no suggested_specializations found
-  IF len(specializations) == 0:
-    # Use Step 3.5.1b helper functions (normalize_key, lookup_and_validate, etc.)
-    IF project_context.primary_language:
-      path = lookup_and_validate(project_context.primary_language)
-      IF path: specializations.append(path)
-
-    IF project_context.framework:
-      # Parse frameworks like "React (Frontend), Express (Backend)"
-      frameworks = parse_frameworks(project_context.framework)
-      FOR each fw in frameworks:
-        path = lookup_and_validate(fw)
-        IF path: specializations.append(path)
-
-    IF project_context.database:
-      # Parse database(s) - may contain multiple like "PostgreSQL, Redis"
-      databases = parse_frameworks(project_context.database)
-      FOR each db in databases:
-        path = lookup_and_validate(db)
-        IF path: specializations.append(path)
-
-    IF project_context.infrastructure:
-      # Parse infrastructure - may contain multiple like "Docker, Kubernetes"
-      infra_items = parse_frameworks(project_context.infrastructure)
-      FOR each item in infra_items:
-        path = lookup_and_validate(item)
-        IF path: specializations.append(path)
-
-    IF project_context.testing:
-      # Parse testing framework(s) - may contain multiple like "Jest, Playwright"
-      test_frameworks = parse_frameworks(project_context.testing)
-      FOR each tf in test_frameworks:
-        path = lookup_and_validate(tf)
-        IF path: specializations.append(path)
-
-    specializations = dedupe_stable(specializations)  # Preserve insertion order
+      # Deduplicate preserving order
+      specializations = list(dict.fromkeys(specializations))
 
   task_group.specializations = specializations
 ```
+
+**🔴 FALLBACK NOTE:** If you cannot determine specializations from components, leave `specializations = []`. The orchestrator will handle fallback derivation from project_context.json when spawning agents. See: `bazinga/templates/orchestrator/spawn_with_specializations.md`
 
 **Step 3.5.3: Include Specializations in Task Group Definition**
 
