@@ -1091,7 +1091,9 @@ Before continuing to Step 1.3a, verify:
 - PM has work to continue (common when resuming a session)
 - Query task groups: `Skill(command: "bazinga-db")` → get all task groups for session
 - Identify groups with status "pending" or "in_progress"
-- **IMMEDIATELY jump to Phase 2A or 2B** based on mode and spawn the appropriate agents
+- **Read the appropriate phase template** (`phase_simple.md` or `phase_parallel.md`)
+- **🔴 FOLLOW THE MANDATORY SPAWN SEQUENCE** - This includes SPAWN STEP 2 (specialization loading). Do NOT skip specializations!
+- **IMMEDIATELY spawn agents** using the full sequence (Steps 1-4 in phase template)
 - **🔴 You MUST call Task() in THIS message** - do NOT just say "let me spawn"
 
 **IF status = BAZINGA:**

@@ -141,7 +141,17 @@ Skill(command: "specialization-loader")
 - Find content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
 - Store this as `specialization_block`
 
-**2e. Compose final prompt:**
+**2d-FAILURE. Handle skill failure (timeout, error, missing block):**
+
+| Failure Type | Action |
+|--------------|--------|
+| Skill times out | Output: `⚠️ Specialization loading timeout | Proceeding with base prompt` → set `specializations_status = "timeout"` |
+| Skill returns error | Output: `⚠️ Specialization loading failed: {error} | Proceeding with base prompt` → set `specializations_status = "error"` |
+| Block markers not found | Output: `⚠️ Specialization block not found | Proceeding with base prompt` → set `specializations_status = "not_found"` |
+
+**On ANY failure:** `full_prompt = base_prompt` (graceful degradation - proceed without specializations)
+
+**2e. Compose final prompt (on success):**
 ```
 full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
 specializations_status = "loaded"

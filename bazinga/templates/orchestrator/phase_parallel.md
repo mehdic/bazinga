@@ -228,7 +228,22 @@ Skill(command: "specialization-loader")
 - Find content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
 - Store as `specialization_blocks[group_id]`
 
-**2e. Compose final prompt for this group:**
+**2d-FAILURE. Handle skill failure for this group (timeout, error, missing block):**
+
+| Failure Type | Action |
+|--------------|--------|
+| Skill times out | Output: `⚠️ Group {group_id}: Specialization loading timeout | Proceeding with base prompt` |
+| Skill returns error | Output: `⚠️ Group {group_id}: Specialization loading failed: {error} | Proceeding with base prompt` |
+| Block markers not found | Output: `⚠️ Group {group_id}: Specialization block not found | Proceeding with base prompt` |
+
+**On ANY failure for this group:**
+```
+full_prompts[group_id] = base_prompts[group_id]
+specializations_status[group_id] = "failed"
+```
+**Then continue to next group** (graceful degradation - one group's failure doesn't block others)
+
+**2e. Compose final prompt for this group (on success):**
 ```
 full_prompts[group_id] = specialization_blocks[group_id] + "\n\n---\n\n" + base_prompts[group_id]
 specializations_status[group_id] = "loaded"
@@ -272,10 +287,15 @@ specializations_status[group_id] = "disabled"
 
 **IF ANY checkpoint fails for ANY group: GO BACK and complete the missing step.**
 
-**Spawn ALL agents:**
+**Spawn ALL agents (use MODEL_CONFIG based on PM's tier decision per group):**
 ```
-Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=full_prompts["A"])
-Task(subagent_type="general-purpose", model=models["B"], description="Dev B: {task[:90]}", prompt=full_prompts["B"])
+# For each group, use MODEL_CONFIG[tier] where tier is from PM's initial_tier decision:
+# - "developer" → MODEL_CONFIG["developer"]
+# - "senior_software_engineer" → MODEL_CONFIG["senior_software_engineer"]
+# - "requirements_engineer" → MODEL_CONFIG["requirements_engineer"]
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier_A], description="Dev A: {task[:90]}", prompt=full_prompts["A"])
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier_B], description="Dev B: {task[:90]}", prompt=full_prompts["B"])
 ... (for each group)
 ```
 
