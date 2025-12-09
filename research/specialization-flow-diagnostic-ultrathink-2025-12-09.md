@@ -3,7 +3,8 @@
 **Date:** 2025-12-09
 **Context:** Agent prompts (Developer, SSE, QA Expert, Tech Lead) are being spawned WITHOUT specialization content despite extensive documentation and infrastructure
 **Decision:** Root cause analysis and fix implementation
-**Status:** Proposed - awaiting LLM review
+**Status:** ✅ REVIEWED + USER APPROVED
+**Reviewed by:** OpenAI GPT-5 (2025-12-09)
 
 ---
 
@@ -284,167 +285,227 @@ Your expertise includes:
 
 ---
 
-## Proposed Fix
+## Approved Fix: Centralized Spawn with Specializations
 
-### Option A: Explicit Steps in Phase Templates (Recommended)
+### ✅ USER-APPROVED Core Flow (7 Steps)
 
-Add explicit specialization loading steps to `phase_simple.md` and `phase_parallel.md`:
+The following 7-step flow is **APPROVED** and must be implemented:
 
-```markdown
-### Step 2A.1: Spawn Single Developer
+1. **Check if specializations enabled** in `skills_config.json`
+2. **Query DB** for group's specializations array (by session_id + group_id)
+3. **Output context as text** (Session ID, Group ID, Agent Type, Model, Paths)
+4. **Invoke** `Skill(command: "specialization-loader")`
+5. **Extract block** between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
+6. **Prepend** to agent prompt
+7. **Spawn** with `Task(...)`
 
-**User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
+### Architecture: Centralized Spawn Helper (Approved)
 
-**Step 1: Load Specializations (if enabled)**
-
-```
-# Check configuration
-Read bazinga/skills_config.json
-IF specializations.enabled == false OR agent_type NOT IN enabled_agents:
-    specialization_block = "" (empty)
-    SKIP to Step 2
-
-# Query DB for group's specializations
-bazinga-db, get task groups for session {session_id}
-specializations = task_group["specializations"]
-
-IF specializations is null OR empty:
-    specialization_block = "" (empty)
-    SKIP to Step 2
-
-# Invoke skill (TWO ACTIONS)
-OUTPUT (as text, not tool call):
-    Session ID: {session_id}
-    Group ID: {group_id}
-    Agent Type: {developer|senior_software_engineer}
-    Model: {model from MODEL_CONFIG}
-    Specialization Paths: {specializations JSON array}
-
-Skill(command: "specialization-loader")
-
-# Extract block
-Parse skill response between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
-Store as: specialization_block
-```
-
-**Step 2: Build Prompt**
-
-```
-prompt = specialization_block + "\n---\n" + base_prompt + task_details
-```
-
-**Step 3: Spawn**
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier],
-     description=desc, prompt=prompt)
-```
-```
-
-### Option B: Centralized Spawn Function
-
-Create `bazinga/templates/orchestrator/spawn_agent.md` with the complete spawn flow including specializations:
+Create `bazinga/templates/orchestrator/spawn_with_specializations.md` used by ALL spawn paths:
 
 ```markdown
 ## §Spawn Agent with Specializations
 
-**Input:** agent_type, group_id, session_id, task_details, tier
+**Input:** session_id, group_id, agent_type, model, task_details
 
-**Step 1: Load Specializations**
-[full implementation]
-
-**Step 2: Load Context Packages**
-[full implementation]
-
-**Step 3: Load Reasoning Context**
-[full implementation]
-
-**Step 4: Build Prompt**
-[composition of all pieces]
-
-**Step 5: Spawn**
-Task(...)
+### Step 1: Check Configuration
+```
+Read bazinga/skills_config.json
+IF specializations.enabled == false:
+    specialization_block = "" (skip to Step 6)
+IF agent_type NOT IN specializations.enabled_agents:
+    specialization_block = "" (skip to Step 6)
 ```
 
-Then phase templates just reference: "Follow §Spawn Agent with Specializations"
+### Step 2: Query Specializations from DB
+```
+bazinga-db, get task group:
+Session ID: {session_id}
+Group ID: {group_id}
+
+specializations = task_group["specializations"]
+```
+
+### Step 3: Fallback Derivation (if specializations empty)
+```
+IF specializations is null OR empty:
+    # Derive from project_context.json
+    Read bazinga/project_context.json
+
+    # Match task's target files to components
+    FOR each component in project_context.components:
+        IF task_files overlap with component.path:
+            specializations += component.suggested_specializations
+
+    # If still empty, use session-wide defaults
+    IF specializations still empty:
+        specializations = project_context.suggested_specializations
+
+    # Persist back to DB for future spawns
+    IF specializations not empty:
+        bazinga-db update task group --specializations {specializations}
+```
+
+### Step 4: Invoke Specialization Loader
+```
+IF specializations not empty:
+    # TWO SEPARATE ACTIONS (skill reads context from conversation)
+
+    OUTPUT (as text, not tool call):
+        Session ID: {session_id}
+        Group ID: {group_id}
+        Agent Type: {agent_type}
+        Model: {model}
+        Specialization Paths: {specializations JSON array}
+
+    Skill(command: "specialization-loader")
+
+    # Extract block
+    Parse response between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
+    Store as: specialization_block
+ELSE:
+    specialization_block = ""
+```
+
+### Step 5: Log Injection Metadata
+```
+bazinga-db save-skill-output {session_id} "specialization-injection" '{
+    "group_id": "{group_id}",
+    "agent_type": "{agent_type}",
+    "injected": {true|false},
+    "templates_count": {N},
+    "block_tokens": {estimated_tokens}
+}'
+```
+
+### Step 6: Build Complete Prompt
+```
+prompt = specialization_block + "\n---\n" + base_prompt + task_details
+```
+
+### Step 7: Spawn Agent
+```
+Task(subagent_type="general-purpose", model={model},
+     description={desc}, prompt={prompt})
+```
+
+### Parallel Mode: Isolation Rule
+```
+FOR EACH agent in batch:
+    # Do context→skill→spawn as TIGHT SEQUENCE per agent
+    # Do NOT interleave contexts for multiple agents
+
+    1. Output THIS agent's context
+    2. Invoke skill
+    3. Extract block
+    4. Spawn THIS agent immediately
+    5. THEN proceed to next agent
+```
+```
 
 ---
 
-## Comparison: Option A vs Option B
+## Implementation Plan (Approved)
 
-| Aspect | Option A: Explicit Steps | Option B: Centralized |
-|--------|-------------------------|----------------------|
-| Implementation effort | Medium (update 2 files) | High (new file + updates) |
-| Token cost | Higher (duplicated in 2A and 2B) | Lower (single reference) |
-| Clarity | Very clear (step by step) | Requires template lookup |
-| Risk of drift | Each template may diverge | Single source of truth |
-| Debugging | Easy to see what's missing | Need to read separate file |
+### Phase 1: Create Centralized Spawn Template
 
-**Recommendation:** Option A for immediate fix (explicit is better than implicit), then migrate to Option B in a future optimization pass.
+1. **Create** `bazinga/templates/orchestrator/spawn_with_specializations.md`
+   - Full implementation of 7-step flow above
+   - Include fallback derivation logic
+   - Include parallel mode isolation rule
+   - Include injection verification logging
+
+### Phase 2: Update Phase Templates
+
+2. **Update `phase_simple.md`**:
+   - Replace inline spawn instructions with: "Follow §Spawn Agent with Specializations"
+   - Apply to: Step 2A.1 (Developer), 2A.3 (SSE escalation), 2A.4 (QA), 2A.5 (QA respawn), 2A.6 (Tech Lead), 2A.7 (Developer fix)
+
+3. **Update `phase_parallel.md`**:
+   - Same changes
+   - **CRITICAL:** In Step 2B.1, process each agent sequentially per isolation rule
+   - Apply to all spawn points
+
+4. **Update `merge_workflow.md`**:
+   - Apply same pattern for Developer merge spawns
+
+### Phase 3: Cover All Orchestrators
+
+5. **Update `orchestrator_speckit.md`**:
+   - Same centralized spawn reference
+   - Ensure spec-kit agents get specializations too
+
+### Phase 4: Add Verification Gate
+
+6. **Extend bazinga-validator** (optional):
+   - Check that spawned prompts contain `[SPECIALIZATION_BLOCK_START]` when:
+     - `specializations.enabled == true`
+     - Templates exist for the project's stack
+   - Report violations as warnings (not blockers initially)
+
+### Phase 5: Validation
+
+7. **Test scenarios:**
+   - Simple mode: Dev with specializations
+   - Parallel mode: 4 devs with different specializations per group
+   - Fallback: PM doesn't assign → derived from project_context.json
+   - Escalation: Developer fails → SSE gets specializations
+   - Disabled: specializations.enabled=false → graceful skip
 
 ---
 
-## Implementation Plan
+## Multi-LLM Review Integration
 
-### Phase 1: Immediate Fix (Option A)
+### Reviewer
+- **OpenAI GPT-5** (2025-12-09)
 
-1. **Update `phase_simple.md`** (Step 2A.1):
-   - Add explicit specialization loading steps before "Build:" instruction
-   - Include the Skill() invocation pattern
-   - Add block extraction and prepend logic
+### Incorporated Feedback (User Approved)
 
-2. **Update `phase_parallel.md`** (Step 2B.1):
-   - Same changes for parallel spawn
-   - Apply to each group in the parallel spawn loop
+| Change | Description | Status |
+|--------|-------------|--------|
+| Centralized Spawn Helper | Single "Spawn Agent with Specializations" procedure used by ALL paths | ✅ APPROVED |
+| Parallel Mode Isolation | context→skill→spawn as tight sequence PER agent (no interleaving) | ✅ APPROVED |
+| Fallback Derivation | If PM misses specializations, derive from project_context.json | ✅ APPROVED |
+| Injection Verification | Log {injected, templates_count, block_tokens} per spawn | ✅ APPROVED |
+| Spec-Kit Coverage | Update orchestrator_speckit.md to use same pattern | ✅ APPROVED |
 
-3. **Update escalation spawns:**
-   - SSE escalation (Step 2A.3)
-   - QA respawn (Step 2A.5)
-   - Developer respawn after TL rejection (Step 2A.7)
+### Rejected Suggestions (With Reasoning)
 
-### Phase 2: Validation
+| Suggestion | Reason for Rejection |
+|------------|---------------------|
+| **Caching composed blocks** | Each task group should have targeted specializations. While cache key includes (session_id, group_id, agent_type, model), caching adds complexity without clear benefit. Specialization-loader already runs quickly. Can add later if latency becomes an issue. |
 
-1. Run orchestration with a project that has `project_context.json`
-2. Verify specialization-loader skill is invoked
-3. Verify block appears in spawned agent prompts
-4. Verify agents apply the patterns
+### Additional LLM Suggestions (Noted for Future)
 
-### Phase 3: Future Optimization (Option B)
-
-Create centralized spawn template to reduce duplication.
+1. **Orchestration-level token budgeting** - Define priority order for prompt sections. Defer to future optimization.
+2. **Validator hook for BAZINGA** - Extend bazinga-validator to assert specialization blocks present. Added as optional Phase 4.
 
 ---
 
-## Risk Assessment
+## Risk Assessment (Updated)
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
 | Breaking existing flow | LOW | HIGH | Specialization loading is additive, not replacing |
 | Token budget exceeded | MEDIUM | MEDIUM | Skill has built-in token limits |
 | Skill not returning valid block | LOW | MEDIUM | Fallback: proceed without specialization |
-| PM not assigning specializations | MEDIUM | LOW | Tech Stack Scout creates project_context.json |
+| PM not assigning specializations | MEDIUM | LOW | **NEW:** Fallback derivation from project_context.json |
+| Parallel mode context collision | MEDIUM | HIGH | **NEW:** Isolation rule - tight sequence per agent |
+| Silent injection failures | MEDIUM | MEDIUM | **NEW:** Injection verification logging |
 
 ---
 
-## Success Criteria
+## Success Criteria (Updated)
 
-1. Agent prompts include `## SPECIALIZATION GUIDANCE` section at top
-2. Specialization-loader skill is invoked before each agent spawn
-3. Token budget respected (haiku: 600, sonnet: 1200, opus: 1600)
-4. Graceful degradation when specializations disabled/empty
-5. No regression in existing orchestration flow
-
----
-
-## Questions for Validation
-
-1. Should specialization loading be mandatory (always attempt) or opt-in (only if config enabled)?
-   - **Current design:** Opt-in based on `skills_config.json` setting
-
-2. Should specialization loading happen for ALL agent types or only certain ones?
-   - **Current design:** Controlled by `enabled_agents` array in config
-
-3. What if the skill invocation fails?
-   - **Current design:** Log warning, proceed without specialization (non-blocking)
+1. ✅ Agent prompts include `## SPECIALIZATION GUIDANCE` section at top
+2. ✅ Specialization-loader skill is invoked before each agent spawn
+3. ✅ Token budget respected (haiku: 600, sonnet: 1200, opus: 1600)
+4. ✅ Graceful degradation when specializations disabled/empty
+5. ✅ No regression in existing orchestration flow
+6. ✅ **NEW:** Parallel mode spawns have correct per-agent specializations
+7. ✅ **NEW:** Injection metadata logged for audit trail
+8. ✅ **NEW:** Fallback derivation works when PM doesn't assign
+9. ✅ **NEW:** Spec-kit orchestrator also injects specializations
 
 ---
 
@@ -456,3 +517,4 @@ Create centralized spawn template to reduce duplication.
 - `bazinga/templates/orchestrator/phase_parallel.md`
 - `.claude/skills/specialization-loader/SKILL.md`
 - `research/orchestrator-specialization-integration-ultrathink-2025-12-04.md`
+- `tmp/ultrathink-reviews/combined-review.md` (OpenAI GPT-5 review)
