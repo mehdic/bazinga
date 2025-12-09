@@ -533,11 +533,83 @@ Recommendation: Return to PM for full scope completion or explicit user approval
 
 1. **CI monitoring via API polling** - Developer polls every 60 seconds (user preference over artifact-driven)
 2. **No post-hoc drift detection** - User declined this layer
+3. **Scope reduction FORBIDDEN** - PM cannot reduce scope, not even ask (stricter than LLM suggested)
+
+### LLM Suggestions - User Decisions (Type 2)
+
+| Suggestion | Decision | Reason |
+|------------|----------|--------|
+| Replace build-baseline.sh with skill | ❌ NO | Keep wrapper script approach |
+| Create ci-status-skill for multi-provider | ❌ NO | GitHub-only is acceptable |
+| PM saves scope_universe during planning | 📋 LATER | Too complex for now, revisit later |
+| Validator always runs tests if files exist | ❌ NO | Keep current behavior |
+| Log validator verdicts to bazinga-db | ✅ YES | Add audit trail |
+| Pre-existing CI failures require baseline diff | ✅ YES | Objective classification |
 
 ### Rejected LLM Suggestions
 
 1. **Delegate build baseline to QA Expert** - User chose wrapper script approach instead
 2. **Post-hoc tool audit** - User declined
+3. **Replace Bash with skills** - Keep build-baseline.sh wrapper
+4. **Multi-provider CI skill** - GitHub-only sufficient
+5. **Auto-run tests if files exist** - Keep explicit criteria
+
+---
+
+## Additional Proposals (Non-LLM)
+
+### Proposal A: PM BAZINGA Format Enforcement ⏳ PROPOSED
+
+**Problem:** PM's BAZINGA message was vague - no explicit completion counts
+
+**Solution:** Require PM to include explicit completion statistics:
+
+```markdown
+### PM BAZINGA Format (MANDATORY)
+
+When sending BAZINGA, PM MUST include:
+
+Status: BAZINGA
+Completed_Items: [count]
+Total_Items: [count from original request]
+Deferred_Items: [] (MUST be empty unless BLOCKED)
+Completion_Percentage: [X]%
+```
+
+**Impact:** Makes scope visible in BAZINGA claim, easy to verify
+
+### Proposal B: Pre-Validator Sanity Check ⏳ PROPOSED
+
+**Problem:** Orchestrator might skip validator or invoke it blindly
+
+**Solution:** Quick sanity check before validator invocation:
+
+```markdown
+### Pre-Validator Sanity Check
+
+When PM sends BAZINGA:
+1. Extract Completed_Items and Total_Items from PM's response
+2. IF Completed_Items < Total_Items:
+   → REJECT immediately (don't invoke validator)
+   → Output: "⚠️ Incomplete scope: {completed}/{total} items"
+   → Spawn PM with rejection
+3. IF check passes → Invoke validator for full verification
+```
+
+**Impact:** Catches obvious mismatches before expensive validator run
+
+### Proposal C: Progress Tracking in Status Messages ⏳ PROPOSED
+
+**Problem:** User had no visibility into scope completion during execution
+
+**Solution:** Include progress in orchestrator capsules:
+
+```
+✅ Group A complete | 5/69 items (7%) | 64 remaining → Next group
+✅ All groups complete | 69/69 items (100%) | Ready for BAZINGA
+```
+
+**Impact:** User sees progress throughout, can catch scope issues early
 
 ---
 
