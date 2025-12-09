@@ -96,15 +96,23 @@ Use Read tool to check these files.
 
 ### 2.3: Run Tests with Timeout
 
+**Timeout Configuration:**
+- Default: 60 seconds
+- Configurable via `bazinga/validator_config.json` → `test_timeout_seconds` field
+- Large test suites may need 180-300 seconds
+
 ```bash
+# Read timeout from config (or use default 60)
+TIMEOUT=$(python3 -c "import json; print(json.load(open('bazinga/validator_config.json', 'r')).get('test_timeout_seconds', 60))" 2>/dev/null || echo 60)
+
 # Example for Node.js
-timeout 60 npm test 2>&1 | tee bazinga/test_output.txt
+timeout $TIMEOUT npm test 2>&1 | tee bazinga/test_output.txt
 
 # Example for Python
-timeout 60 pytest --tb=short 2>&1 | tee bazinga/test_output.txt
+timeout $TIMEOUT pytest --tb=short 2>&1 | tee bazinga/test_output.txt
 
 # Example for Go
-timeout 60 go test ./... 2>&1 | tee bazinga/test_output.txt
+timeout $TIMEOUT go test ./... 2>&1 | tee bazinga/test_output.txt
 ```
 
 **If timeout occurs:**
@@ -231,19 +239,41 @@ bazinga-db, get session [session_id] with original scope information
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Step 2: Extract PM's Completion Summary from BAZINGA message**
+**Step 2: Query PM's BAZINGA message from database**
+```
+bazinga-db, get PM BAZINGA message for session [session_id]
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**⚠️ The orchestrator logs this BEFORE invoking you. If missing, REJECT with reason "PM BAZINGA message not found".**
+
+**Step 3: Extract PM's Completion Summary from BAZINGA message**
 Look for:
 - Completed_Items: [N]
 - Total_Items: [M]
 - Completion_Percentage: [X]%
 - Deferred_Items: [list]
 
-**Step 3: Compare against original request**
-- If Completed_Items < Total_Items AND Deferred_Items not empty → REJECT
-- If scope_type = "file" and original file had N items but only M completed → REJECT
-- If Completion_Percentage < 90% without BLOCKED status → REJECT
+**Step 4: Check for user-approved scope change**
+```
+bazinga-db, get scope change for session [session_id]
+```
+Then invoke: `Skill(command: "bazinga-db")`
 
-**Step 4: Flag scope reduction**
+**IF scope change record exists:**
+- User explicitly approved scope reduction
+- Compare PM's completion against `approved_scope` (NOT original_scope)
+- Log: "Using user-approved scope: [approved_scope summary]"
+
+**IF no scope change record:**
+- Compare against original_scope (default behavior)
+
+**Step 5: Compare against applicable scope**
+- If Completed_Items < Total_Items AND Deferred_Items not empty → REJECT (unless covered by approved_scope)
+- If scope_type = "file" and original file had N items but only M completed → REJECT
+- If Completion_Percentage < 100% without BLOCKED status → REJECT (unless user-approved scope change exists)
+
+**Step 6: Flag scope reduction**
 ```
 REJECT: Scope mismatch
 
@@ -258,7 +288,7 @@ PM deferred without user approval:
 Action: Return to PM for full scope completion.
 ```
 
-**Step 5: Log verdict to database**
+**Step 7: Log verdict to database**
 ```
 bazinga-db, log validator verdict:
 Session ID: [session_id]
@@ -463,8 +493,8 @@ Accept BAZINGA and proceed to shutdown protocol.
 **Test command fails (timeout):**
 ```
 → Return: REJECT
-→ Reason: "Cannot verify test status (timeout after 60s)"
-→ Action: "Provide recent test output file OR optimize test suite"
+→ Reason: "Cannot verify test status (timeout after {TIMEOUT}s)"
+→ Action: "Provide recent test output file OR increase test_timeout_seconds in bazinga/validator_config.json"
 ```
 
 **Evidence file missing:**
@@ -483,7 +513,7 @@ Accept BAZINGA and proceed to shutdown protocol.
 3. **Zero tolerance for test failures** - Even 1 failure = REJECT
 4. **Verify evidence** - Don't accept claims without proof
 5. **Structured response** - Orchestrator parses your verdict
-6. **Timeout protection** - Use 60 second timeout for tests
+6. **Timeout protection** - Use configurable timeout (default 60s, see bazinga/validator_config.json)
 7. **Clear reasoning** - Explain WHY you accepted or rejected
 
 ---

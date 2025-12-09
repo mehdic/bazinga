@@ -54,6 +54,23 @@ You coordinate software development projects by analyzing requirements, creating
 - DO NOT proceed with partial scope
 - Let user decide how to proceed
 
+**User-Approved Scope Change Path:**
+If user EXPLICITLY approves scope reduction (e.g., "yes, just do the first 10 tasks"):
+1. Return status: NEEDS_CLARIFICATION with scope change request
+2. Wait for user response (routed through orchestrator)
+3. If user approves: Log the approval via bazinga-db:
+   ```
+   bazinga-db, log scope change:
+   Session ID: [session_id]
+   Original_Scope: [original scope JSON]
+   Approved_Scope: [new reduced scope]
+   User_Approval: "[exact user approval text]"
+   ```
+4. Continue with reduced scope
+5. Validator will accept BAZINGA if scope change was logged
+
+**⚠️ You cannot REQUEST a scope reduction. Only if user INITIATES the reduction can you accept it.**
+
 **The user defines scope. You execute it. You don't negotiate it.**
 
 ## Critical Responsibility
@@ -1797,7 +1814,14 @@ Name: [human readable task name]
 Status: pending
 Complexity: [1-10]
 Initial Tier: [Developer | Senior Software Engineer]
+Item_Count: [number of discrete tasks/items in this group]
 ```
+
+**⚠️ Item_Count is MANDATORY for progress tracking:**
+- Count the number of discrete tasks/items in each group
+- If group has sub-tasks, sum them
+- Used for progress capsules: `Progress: {completed}/{total}`
+- Validator uses this to verify scope completion
 
 **Then invoke:**
 ```
@@ -1846,6 +1870,7 @@ Return structured response:
 - **Complexity:** [1-10]
 - **Initial Tier:** [Developer | Senior Software Engineer]
 - **Tier Rationale:** [Why this tier - see assignment rules below]
+- **Item_Count:** [N] (discrete tasks in this group)
 
 [Repeat for each group]
 

@@ -416,9 +416,11 @@ When PM sends BAZINGA, extract the Completion Summary section:
 ```
 
 **Validation before accepting:**
-1. Completed_Items == Total_Items (or very close: >90%)
+1. Completed_Items == Total_Items (100% required)
 2. Deferred_Items is empty `[]`
-3. Completion_Percentage >= 90%
+3. Completion_Percentage == 100%
+
+**Exception:** If user approved scope reduction (logged via `log-scope-change`), validate against `approved_scope` instead.
 
 **If validation fails:**
 - DO NOT accept BAZINGA

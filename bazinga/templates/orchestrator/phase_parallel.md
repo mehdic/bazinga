@@ -327,11 +327,17 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 | Status | Action |
 |--------|--------|
-| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2B.7b |
+| `MERGE_SUCCESS` | Update group + progress (see below) → Step 2B.7b |
 | `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
 | *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason |
+
+**MERGE_SUCCESS Progress Tracking:**
+1. Update task_group: status="completed", merge_status="merged"
+2. Get group's item_count from task_groups table
+3. Update session completed_items_count: `completed_items_count += group.item_count`
+4. Output capsule with progress: `✅ Group {id} merged | Progress: {completed}/{total}`
 
 **Escalation:** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 

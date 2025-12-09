@@ -1546,6 +1546,16 @@ When PM sends BAZINGA:
 
 ### 🚨 MANDATORY BAZINGA VALIDATION (NON-NEGOTIABLE)
 
+**Step 0: Log PM BAZINGA message for validator access**
+```
+bazinga-db, log PM BAZINGA message:
+Session ID: [session_id]
+Message: [PM's full BAZINGA response text including Completion Summary]
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**⚠️ This is MANDATORY so validator can access PM's completion claims.**
+
 **Step 1: IMMEDIATELY invoke validator (before ANY completion output)**
 ```
 Skill(command: "bazinga-validator")

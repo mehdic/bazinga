@@ -716,11 +716,21 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 | Status | Action |
 |--------|--------|
-| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2A.8 (PM check) |
+| `MERGE_SUCCESS` | Update group + progress (see below) → Step 2A.8 (PM check) |
 | `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
 | *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason → Tech Lead assesses |
+
+**MERGE_SUCCESS Progress Tracking:**
+1. Update task_group: status="completed", merge_status="merged"
+2. Get group's item_count from task_groups table
+3. Update session completed_items_count: `completed_items_count += group.item_count`
+   ```
+   bazinga-db, update session [session_id]:
+   Increment completed_items_count by: [group.item_count]
+   ```
+4. Output capsule with progress: `✅ Group {id} merged | Progress: {completed}/{total}`
 
 **Escalation (from template):** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 
