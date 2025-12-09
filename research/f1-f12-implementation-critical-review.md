@@ -542,3 +542,246 @@ Revised approach: 2 new columns, 2 generic commands
 7. Add tests
 
 **STOP: Presenting this analysis to user for approval before ANY implementation.**
+
+---
+
+## Post-Implementation Critical Review #2 (2025-12-09)
+
+**VERDICT: IMPLEMENTATION IS ~60% COMPLETE - CRITICAL GAPS REMAIN**
+
+### What Was Actually Implemented
+
+| Planned Item | Status | Evidence |
+|--------------|--------|----------|
+| Schema v9 migration | ✅ DONE | SCHEMA_VERSION = 9 in init_db.py |
+| orchestration_logs.event_subtype | ✅ DONE | Column added in migration |
+| orchestration_logs.event_payload | ✅ DONE | Column added in migration |
+| sessions.metadata | ✅ DONE | Column added in migration |
+| task_groups.item_count | ✅ DONE | Column added in migration |
+| save-event command | ✅ DONE | Function + CLI handler implemented |
+| get-events command | ✅ DONE | Function + CLI handler implemented |
+| create_session --initial_branch | ✅ DONE | Parameter added |
+| create_session --metadata | ✅ DONE | Parameter added |
+| create_task_group --item_count | ✅ DONE | Parameter added |
+| validator_config.json | ✅ DONE | Created in .claude/skills/bazinga-validator/resources/ |
+| SKILL.md update for new commands | ✅ DONE | save-event/get-events documented |
+| Unit tests | ❌ NOT DONE | No tests written |
+| Integration tests | ❌ NOT DONE | No tests written |
+
+### CRITICAL ISSUE #1: DOC-CODE DRIFT PERSISTS
+
+**Problem:** SKILL.md still documents 6+ commands that DON'T EXIST:
+
+| Fake Command | Line in SKILL.md | Actually Exists? |
+|--------------|------------------|------------------|
+| `log-pm-bazinga` | 305 | ❌ NO |
+| `get-pm-bazinga` | 314 | ❌ NO |
+| `log-scope-change` | 324 | ❌ NO |
+| `get-scope-change` | 335 | ❌ NO |
+| `log-validator-verdict` | 345 | ❌ NO |
+| `increment-session-progress` | 249 | ❌ NO |
+| `get-session --include-scope` | 328 | ❌ NO |
+
+**Impact:** Agents will try to use these commands and FAIL at runtime.
+
+**Root Cause:** I implemented the GENERIC `save-event`/`get-events` pattern (per GPT-5 recommendation) but FAILED to:
+1. Remove the old fake command documentation
+2. Update templates to use the new generic pattern
+3. Update validator SKILL.md to use new pattern
+
+### CRITICAL ISSUE #2: Progress Tracking Still Broken
+
+**Problem:** Templates require `increment-session-progress` and `sessions.completed_items_count`:
+- `bazinga/templates/orchestrator/phase_simple.md:716-733`
+- `bazinga/templates/orchestrator/phase_parallel.md:327-336`
+
+**But:**
+- Schema v9 does NOT add `sessions.completed_items_count` column
+- `increment-session-progress` command NOT implemented
+- Progress tracking WILL FAIL
+
+**Decision Required:** Either:
+A) Add `completed_items_count` column and `increment-session-progress` command
+B) Change templates to compute progress from `task_groups.item_count` (no session counter)
+
+### CRITICAL ISSUE #3: Security Vulnerabilities in build-baseline.sh
+
+**Problem:** `bazinga/scripts/build-baseline.sh:18-36,57-69` executes untrusted installs:
+```bash
+npm install && npm run build  # Runs arbitrary postinstall scripts
+bundle install               # Runs arbitrary gem extensions
+```
+
+**Impact:** Running "baseline check" can mutate environment and execute malicious code.
+
+**Fix Required:** Gate behind env flag or use safe alternatives:
+```bash
+npm ci --ignore-scripts
+npx tsc --noEmit
+python -m compileall -q -x '(^|/)(venv|.venv|env|site-packages)/'
+mvn -B -DskipTests validate
+bundle config set path vendor/bundle && bundle install --without development test --quiet
+```
+
+### CRITICAL ISSUE #4: Shell Injection Risk in orchestrator.md
+
+**Problem:** `agents/orchestrator.md:177-215` has unsafe patterns:
+```bash
+cat bazinga/*.json              # Overbroad glob
+kill -0 $(cat bazinga/dashboard.pid)  # Unquoted PID substitution
+```
+
+**Impact:** Word-splitting errors, potential command injection.
+
+**Fix Required:**
+```bash
+# Explicit files instead of glob
+cat bazinga/skills_config.json bazinga/testing_config.json
+
+# Safe PID check
+pgrep -F bazinga/dashboard.pid 2>/dev/null || kill -0 -- "$(tr -d '\n' < bazinga/dashboard.pid)" 2>/dev/null
+```
+
+### Validator SKILL.md Still Uses Fake Commands
+
+**Problem:** `.claude/skills/bazinga-validator/SKILL.md:229-307` references:
+- `bazinga-db, get session [session_id] with original scope information`
+- `bazinga-db, get PM BAZINGA message for session [session_id]`
+- `bazinga-db, get scope change for session [session_id]`
+- `bazinga-db, log validator verdict`
+
+None of these work because the underlying commands don't exist.
+
+**Fix Required:** Update validator to use:
+```bash
+# Instead of get-pm-bazinga:
+save-event <session> "pm_bazinga" "<message>"
+get-events <session> "pm_bazinga" --limit 1
+
+# Instead of log-scope-change:
+save-event <session> "scope_change" '{"original": ..., "approved": ...}'
+get-events <session> "scope_change"
+
+# Instead of log-validator-verdict:
+save-event <session> "validator_verdict" '{"verdict": "ACCEPT", ...}'
+```
+
+---
+
+## Updated Implementation Status
+
+| Fix | Backend | Schema | Docs Aligned | Actual Status |
+|-----|---------|--------|--------------|---------------|
+| F1: CI polling | N/A | N/A | ✅ | Working |
+| F2: Original_Scope | ✅ (via metadata) | ✅ | ❌ | **PARTIAL** |
+| F3: bazinga-db commands | ✅ (generic) | ✅ | ❌ | **PARTIAL** |
+| F4: PM git removal | N/A | N/A | ⚠️ | Partial |
+| F5: initial_branch | ✅ | ✅ | ⚠️ | **MOSTLY WORKING** |
+| F6: build-baseline.sh | ✅ | N/A | N/A | Working (but unsafe) |
+| F7: item_count | ✅ | ✅ | ⚠️ | **MOSTLY WORKING** |
+| F8: progress tracking | ❌ | ❌ | ❌ | **STILL BROKEN** |
+| F9: PM BAZINGA logging | ✅ (via save-event) | ✅ | ❌ | **PARTIAL** |
+| F10: config timeout | ✅ | N/A | ✅ | Working |
+| F11: scope change | ✅ (via save-event) | ✅ | ❌ | **PARTIAL** |
+| F12: 100% threshold | N/A | N/A | ✅ | Working |
+
+**Completion Rate: ~60%** (backend done, documentation misaligned)
+
+---
+
+## Remaining Work Required
+
+### Priority 1: Fix Doc-Code Drift (BLOCKING)
+
+1. **Remove fake commands from SKILL.md:**
+   - Delete lines 82, 93-97, 249, 305-357 (all fake command sections)
+   - Keep ONLY commands that actually exist
+
+2. **Update validator SKILL.md:**
+   - Replace fake bazinga-db queries with save-event/get-events pattern
+   - Update Step 5.5 scope validation to use `get-events <session> "scope_change"`
+
+3. **Update orchestrator templates:**
+   - phase_simple.md: Remove increment-session-progress references
+   - phase_parallel.md: Remove increment-session-progress references
+   - Compute progress from task_groups.item_count instead
+
+### Priority 2: Fix Progress Tracking
+
+**Option A (Recommended):** Remove session-level counter, compute from task groups
+- Query: `SELECT SUM(item_count) FROM task_groups WHERE session_id = ? AND status = 'completed'`
+- No schema change needed
+- Update templates to query task_groups
+
+**Option B:** Add session counter
+- Add `sessions.completed_items_count INTEGER DEFAULT 0`
+- Implement `increment-session-progress` command
+- More work, risk of state drift
+
+### Priority 3: Fix Security Issues
+
+1. **build-baseline.sh:** Add `ALLOW_BASELINE_BUILD` env flag
+2. **orchestrator.md:** Replace glob with explicit file list, fix PID check
+
+### Priority 4: Add Tests
+
+1. Unit tests for save-event/get-events
+2. Unit tests for extended create_session/create_task_group
+3. Integration test for scope validation flow
+
+---
+
+## Honest Assessment
+
+**What I did right:**
+- Schema v9 migration is correct and follows existing patterns
+- Generic save-event/get-events is a cleaner approach than 10 specific commands
+- validator_config.json is in the correct location (skill resources folder)
+- Functions actually work (tested)
+
+**What I did wrong:**
+- Left old fake commands documented in SKILL.md
+- Didn't update validator to use new pattern
+- Didn't update templates to use new pattern
+- Didn't add completed_items_count column (progress tracking still broken)
+- Didn't write any tests
+- Didn't fix security issues in build-baseline.sh
+
+**The half-done implementation is WORSE than not implementing at all because:**
+1. Agents will see both old (fake) and new (real) command documentation
+2. Agents will try the documented fake commands first and fail
+3. The confusion will cause more failures than before
+
+---
+
+## Verdict
+
+**Implementation Completeness: 60%**
+- Backend: ✅ 90% complete
+- Schema: ✅ 80% complete (missing completed_items_count)
+- Documentation: ❌ 30% complete (still documents fake commands)
+- Testing: ❌ 0% complete
+
+**Production Readiness: ❌ NOT READY**
+
+**Will it work at runtime: ❌ PARTIAL**
+- New commands work IF agents use them
+- Old documented commands will fail
+- Progress tracking will fail
+
+**Root Cause:** I rushed to commit backend changes without completing the documentation alignment phase. Classic "shipped code, forgot docs" anti-pattern.
+
+---
+
+## Required Actions to Complete
+
+1. [ ] Remove fake command sections from SKILL.md (lines 82, 93-97, 249, 305-357)
+2. [ ] Update validator SKILL.md to use save-event/get-events pattern
+3. [ ] Update phase_simple.md and phase_parallel.md templates
+4. [ ] Either implement increment-session-progress OR remove session counter approach
+5. [ ] Fix build-baseline.sh security issues
+6. [ ] Fix orchestrator.md shell injection risks
+7. [ ] Add unit tests
+8. [ ] Add integration tests
+
+**This is NOT complete. Further implementation required.**
