@@ -1705,14 +1705,18 @@ Set `parallel_count` in response (MUST be ≤4).
 
 This step has THREE required sub-steps that MUST all be completed:
 
-#### Sub-step 5.1: Capture Initial Branch
+#### Sub-step 5.1: Get Initial Branch from Session
 
-Run this bash command to get the current branch:
-```bash
-git branch --show-current
+**Query the session for initial_branch (set by orchestrator at init):**
+
 ```
+bazinga-db, get session [session_id] with initial_branch
+```
+Then invoke: `Skill(command: "bazinga-db")`
 
-Store the output in `initial_branch` field. This is the branch all work will be merged back to.
+The orchestrator stores `initial_branch` when creating the session. Use that value.
+
+**⚠️ DO NOT run git commands** - PM tool constraints forbid git. The orchestrator handles branch detection.
 
 #### Sub-step 5.2: Save PM State to Database
 
@@ -1725,7 +1729,7 @@ Session ID: [session_id from orchestrator]
 State Type: pm
 State Data: {
   "session_id": "[session_id]",
-  "initial_branch": "[output from git branch --show-current]",
+  "initial_branch": "[from session data queried in Sub-step 5.1]",
   "mode": "simple" or "parallel",
   "mode_reasoning": "Explanation of why you chose this mode",
   "original_requirements": "Full user requirements",

@@ -711,24 +711,23 @@ Display:
 
 6. **Run build baseline check:**
 
-   **Note:** Run build check silently. No user output needed unless build fails. If build fails, output: `❌ Build failed | {error_type} | Cannot proceed - fix required`
+   **Note:** Run build check silently. No user output needed unless build fails.
 
    ```bash
-   # Detect project language (check for package.json, go.mod, pom.xml, requirements.txt, Gemfile, etc.)
-   # Run appropriate build command based on detected language:
-   #   - JS/TS: npm run build || tsc --noEmit && npm run build
-   #   - Go: go build ./...
-   #   - Java: mvn compile || gradle compileJava
-   #   - Python: python -m compileall . && mypy .
-   #   - Ruby: bundle exec rubocop --parallel
-
-   # Save results to bazinga/artifacts/{SESSION_ID}/build_baseline.log
-   # and bazinga/artifacts/{SESSION_ID}/build_baseline_status.txt
+   bash bazinga/scripts/build-baseline.sh "$SESSION_ID"
    ```
 
-   Display result (only if errors):
-   - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
-   - (If successful or unknown: silent, no output)
+   The wrapper script:
+   - Auto-detects project language (package.json, go.mod, etc.)
+   - Runs appropriate build command
+   - Saves results to `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
+   - Returns exit code: 0=success, 1=error
+
+   **Check result:**
+   - If exit code 0: Silent (no output)
+   - If exit code 1: `⚠️ Build baseline | Existing errors detected | Will track new errors`
+
+   **⚠️ DO NOT run inline npm/go/python commands** - use the wrapper script per §Bash Command Allowlist.
 
    **AFTER build baseline check: IMMEDIATELY continue to step 7 (Load template guides). Do NOT stop.**
 
