@@ -134,6 +134,20 @@ Operation → Check result → If error: Output capsule with error
 
 **Your job is to keep the workflow moving forward autonomously. Only PM can stop the workflow by sending BAZINGA.**
 
+**🔴🔴🔴 CRITICAL BUG PATTERN: INTENT WITHOUT ACTION 🔴🔴🔴**
+
+**THE BUG:** Saying "Now let me spawn..." or "I will spawn..." but NOT calling `Task()` in the same message.
+
+**WHY IT HAPPENS:** The orchestrator outputs text describing what it plans to do, then ends the message. The workflow hangs because no actual tool was called.
+
+**THE RULE:**
+- ❌ FORBIDDEN: `"Now let me spawn the SSE..."` (text only - workflow hangs)
+- ✅ REQUIRED: `"Spawning SSE:" + Task(subagent_type="general-purpose", ...)` (text + actual tool call)
+
+**SELF-CHECK:** Before ending ANY message, verify: **Did I call the tool I said I would call?** If you wrote "spawn", "route", "invoke" → the tool call MUST be in THIS message.
+
+---
+
 **Your ONLY allowed tools:**
 - ✅ **Task** - Spawn agents
 - ✅ **Skill** - MANDATORY: Invoke bazinga-db skill for:
@@ -450,7 +464,34 @@ Display:
 
 ---
 
-**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-5 in sequence without stopping. These are not optional - they are the MANDATORY resume workflow.
+**Step 6: Handle PM Response in Resume (CRITICAL)**
+
+**After PM responds, route based on PM's status code:**
+
+| PM Status | Action |
+|-----------|--------|
+| `CONTINUE` | **IMMEDIATELY spawn agents** for pending groups. Call `Task()` in THIS message. |
+| `BAZINGA` | Session is complete → Jump to Completion phase, invoke validator |
+| `PLANNING_COMPLETE` | New work added → Jump to Step 1.4, then Phase 2 |
+| `NEEDS_CLARIFICATION` | Surface question to user |
+
+**🔴🔴🔴 INTENT WITHOUT ACTION BUG PREVENTION 🔴🔴🔴**
+
+In resume scenarios, the most common bug is:
+- PM responds with CONTINUE
+- Orchestrator says "Now let me spawn the developer..."
+- Orchestrator ends message WITHOUT calling `Task()`
+- Workflow hangs
+
+**RULE:** When PM says CONTINUE, your response MUST contain:
+1. Status capsule (text output)
+2. The actual `Task()` call (tool invocation)
+
+Both in the SAME message. If you don't call `Task()`, you didn't spawn anything.
+
+---
+
+**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-6 in sequence without stopping. These are not optional - they are the MANDATORY resume workflow.
 
 ---
 
@@ -1024,14 +1065,39 @@ Before continuing to Step 1.3a, verify:
 
 **Detection:** Check PM Status code from response
 
-**Expected status codes from initial PM spawn:**
+**Expected status codes from PM spawn:**
 - `PLANNING_COMPLETE` - PM completed planning, proceed to execution
+- `CONTINUE` - PM has more work to do (common in resume scenarios)
+- `BAZINGA` - PM declares completion (edge case: resumed session already done)
 - `NEEDS_CLARIFICATION` - PM needs user input before planning
 - `INVESTIGATION_ONLY` - User only asked questions, no implementation needed
+
+**🔴🔴🔴 CRITICAL: INTENT WITHOUT ACTION IS A BUG 🔴🔴🔴**
+
+**The orchestrator stopping bug happens when you:**
+- Say "Now let me spawn..." or "I will spawn..." (intent)
+- But DON'T call `Task()` in the same message (no action)
+
+**RULE:** If you write "spawn", "route", "invoke", "call" → the actual tool call MUST appear in the SAME message. Saying you will do something is NOT doing it.
+
+---
 
 **IF status = PLANNING_COMPLETE:**
 - PM has completed planning (created mode decision and task groups)
 - **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
+
+**IF status = CONTINUE:**
+- PM has work to continue (common when resuming a session)
+- Query task groups: `Skill(command: "bazinga-db")` → get all task groups for session
+- Identify groups with status "pending" or "in_progress"
+- **IMMEDIATELY jump to Phase 2A or 2B** based on mode and spawn the appropriate agents
+- **🔴 You MUST call Task() in THIS message** - do NOT just say "let me spawn"
+
+**IF status = BAZINGA:**
+- PM declares the work is complete (edge case: resumed session was already finished)
+- **IMMEDIATELY jump to Completion phase**
+- Invoke `Skill(command: "bazinga-validator")` to verify completion
+- Do NOT stop - continue to completion flow
 
 **IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
@@ -1041,9 +1107,11 @@ Before continuing to Step 1.3a, verify:
 - **END orchestration** (no development work needed)
 
 **IF status is missing or unclear:**
-- Apply fallback: If response contains task groups or mode decision, treat as PLANNING_COMPLETE
-- If response contains questions/clarifications, treat as NEEDS_CLARIFICATION
-- **IMMEDIATELY jump to Step 1.4. Do NOT stop.**
+- Apply fallback: Scan response for patterns:
+  - Contains "continue", "proceed", "Phase N", "pending groups" → treat as CONTINUE
+  - Contains task groups or mode decision → treat as PLANNING_COMPLETE
+  - Contains questions/clarifications → treat as NEEDS_CLARIFICATION
+- **IMMEDIATELY jump to appropriate phase. Do NOT stop.**
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
