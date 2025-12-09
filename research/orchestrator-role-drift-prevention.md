@@ -1,10 +1,10 @@
 # Orchestrator Role Drift Prevention: Deep Analysis
 
 **Date:** 2025-12-09
-**Updated:** 2025-12-09 (added Drift Type 2: Premature BAZINGA Acceptance)
+**Updated:** 2025-12-09 (finalized with all approvals)
 **Context:** Two types of orchestrator role drift observed
-**Decision:** Approved with modifications
-**Status:** Reviewed + Extended
+**Decision:** Approved - 12 layers across Type 1 and Type 2
+**Status:** Ready for Implementation
 **Reviewed by:** OpenAI GPT-5
 
 ---
@@ -477,12 +477,14 @@ Recommendation: Return to PM for full scope completion or explicit user approval
 | File | Changes | Drift Type |
 |------|---------|------------|
 | `agents/orchestrator.md` | Add Scenario 3-6, §Bash Command Allowlist, §Policy-Gate, Runtime Comment, §Mandatory BAZINGA Validation | Type 1 + 2 |
-| `agents/project_manager.md` | Add §Scope Immutable (scope reduction FORBIDDEN) | Type 2 |
+| `agents/project_manager.md` | Add §Scope Immutable, §PM BAZINGA Format | Type 2 |
 | `bazinga/templates/merge_workflow.md` | Add enhanced Developer merge prompt with 60s CI polling | Type 1 |
 | `bazinga/templates/orchestrator/phase_simple.md` | Add reference to §Policy-Gate | Type 1 |
 | `bazinga/templates/orchestrator/phase_parallel.md` | Add reference to §Policy-Gate | Type 1 |
-| `.claude/skills/bazinga-validator/SKILL.md` | Add §Scope Validation | Type 2 |
-| `bazinga-db schema` | Add `original_scope` field to sessions table | Type 2 |
+| `bazinga/templates/response_parsing.md` | Add PM BAZINGA Completion Summary parsing | Type 2 |
+| `bazinga/templates/message_templates.md` | Add progress tracking to capsule format | Type 2 |
+| `.claude/skills/bazinga-validator/SKILL.md` | Add §Scope Validation, log verdicts to DB | Type 2 |
+| `bazinga-db schema` | Add `original_scope`, `completed_items_count` fields | Type 2 |
 | **NEW:** `bazinga/scripts/build-baseline.sh` | Wrapper script for build baseline check | Type 1 |
 
 ### Implementation Order
@@ -496,12 +498,14 @@ Recommendation: Return to PM for full scope completion or explicit user approval
 6. **Phase template references** → phase_simple.md, phase_parallel.md
 7. **Build baseline wrapper** → `bazinga/scripts/build-baseline.sh`
 
-**Phase B: Type 2 Drift Prevention (Pending Approval)**
+**Phase B: Type 2 Drift Prevention (Approved)**
 8. **Scenario 5 & 6** → `agents/orchestrator.md`
 9. **§Mandatory BAZINGA Validation** → `agents/orchestrator.md` (uses `Skill(command: "bazinga-validator")`)
 10. **§Scope Immutable** → `agents/project_manager.md` (scope reduction FORBIDDEN)
 11. **original_scope field** → bazinga-db schema migration
 12. **§Scope Validation** → bazinga-validator skill
+13. **PM BAZINGA Format** → `agents/project_manager.md` + `bazinga/templates/response_parsing.md`
+14. **Progress Tracking** → `bazinga/templates/message_templates.md` + orchestrator state
 
 ### Estimated Changes
 
@@ -558,56 +562,90 @@ Recommendation: Return to PM for full scope completion or explicit user approval
 
 ## Additional Proposals (Non-LLM)
 
-### Proposal A: PM BAZINGA Format Enforcement ⏳ PROPOSED
+### Proposal A: PM BAZINGA Format Enforcement ✅ APPROVED
 
 **Problem:** PM's BAZINGA message was vague - no explicit completion counts
 
 **Solution:** Require PM to include explicit completion statistics:
 
-```markdown
-### PM BAZINGA Format (MANDATORY)
-
-When sending BAZINGA, PM MUST include:
-
-Status: BAZINGA
-Completed_Items: [count]
-Total_Items: [count from original request]
-Deferred_Items: [] (MUST be empty unless BLOCKED)
-Completion_Percentage: [X]%
-```
-
-**Impact:** Makes scope visible in BAZINGA claim, easy to verify
-
-### Proposal B: Pre-Validator Sanity Check ⏳ PROPOSED
-
-**Problem:** Orchestrator might skip validator or invoke it blindly
-
-**Solution:** Quick sanity check before validator invocation:
+**Add to PM agent definition (`agents/project_manager.md`):**
 
 ```markdown
-### Pre-Validator Sanity Check
+### PM BAZINGA Response Format (MANDATORY)
 
-When PM sends BAZINGA:
-1. Extract Completed_Items and Total_Items from PM's response
-2. IF Completed_Items < Total_Items:
-   → REJECT immediately (don't invoke validator)
-   → Output: "⚠️ Incomplete scope: {completed}/{total} items"
-   → Spawn PM with rejection
-3. IF check passes → Invoke validator for full verification
+When sending BAZINGA, you MUST include a Completion Summary section:
+
+## PM Status: BAZINGA
+
+### Completion Summary
+- Completed_Items: [count]
+- Total_Items: [count from original request]
+- Completion_Percentage: [X]%
+- Deferred_Items: [] (MUST be empty unless BLOCKED)
+
+### Final Report
+[existing report content]
 ```
 
-**Impact:** Catches obvious mismatches before expensive validator run
+**Update `bazinga/templates/response_parsing.md`:**
 
-### Proposal C: Progress Tracking in Status Messages ⏳ PROPOSED
+```markdown
+### PM BAZINGA Parsing
+
+When PM sends BAZINGA, extract Completion Summary:
+- Look for "### Completion Summary" section
+- Extract Completed_Items, Total_Items, Completion_Percentage
+- Verify Deferred_Items is empty (if not empty → validation fails)
+```
+
+**Impact:** Makes scope visible in BAZINGA claim, validator can verify counts
+
+### Proposal B: Pre-Validator Sanity Check ❌ REJECTED
+
+**Reason:** User declined. Validator invocation is sufficient.
+
+### Proposal C: Progress Tracking in Status Messages ✅ APPROVED
 
 **Problem:** User had no visibility into scope completion during execution
 
-**Solution:** Include progress in orchestrator capsules:
+**Solution:** Include progress in orchestrator capsules throughout execution.
 
+**Implementation:**
+
+**Step 1: Store total_items at session start (in original_scope)**
+```json
+{
+  "raw_request": "implement tasks8.md",
+  "scope_type": "file",
+  "scope_reference": "docs/tasks8.md",
+  "total_items": 69
+}
 ```
-✅ Group A complete | 5/69 items (7%) | 64 remaining → Next group
-✅ All groups complete | 69/69 items (100%) | Ready for BAZINGA
+
+**Step 2: Track completed_items in orchestrator state**
+- Add `completed_items_count` field to orchestrator state
+- Increment as groups complete
+
+**Step 3: Update capsule format in `bazinga/templates/message_templates.md`**
+
+```markdown
+### Group Completion Capsule (with progress)
+
+**Format:**
+✅ Group {id} complete | {summary} | Progress: {completed}/{total} ({percentage}%) | → {next_step}
+
+**Examples:**
+✅ Group A complete | JWT auth | Progress: 5/69 (7%) | → QA review
+✅ Group B complete | Database schema | Progress: 12/69 (17%) | → QA review
+✅ Group Z complete | Final cleanup | Progress: 69/69 (100%) | → PM check
 ```
+
+**Step 4: PM sets item counts during planning**
+- Each task_group gets `item_count` field
+- PM calculates based on scope_type:
+  - file: count items in referenced file
+  - feature: estimate during planning
+  - task_list: count from provided list
 
 **Impact:** User sees progress throughout, can catch scope issues early
 
@@ -646,11 +684,13 @@ After implementation, monitor for:
 
 | Layer | Description | Status |
 |-------|-------------|--------|
-| 6. Scenario 5 & 6 | Add BAZINGA validation and scope scenarios | ⏳ Proposed |
-| 7. Mandatory Validator | Force `Skill(command: "bazinga-validator")` on every BAZINGA | ⏳ Proposed |
-| 8. Scope Tracking | Store original_scope at session start | ⏳ Proposed |
-| 9. Scope Immutable | PM CANNOT reduce scope - forbidden, not negotiable | ⏳ Proposed |
-| 10. Validator Enhancement | Add scope validation to bazinga-validator | ⏳ Proposed |
+| 6. Scenario 5 & 6 | Add BAZINGA validation and scope scenarios | ✅ Approved |
+| 7. Mandatory Validator | Force `Skill(command: "bazinga-validator")` on every BAZINGA | ✅ Approved |
+| 8. Scope Tracking | Store original_scope at session start | ✅ Approved |
+| 9. Scope Immutable | PM CANNOT reduce scope - forbidden, not negotiable | ✅ Approved |
+| 10. Validator Enhancement | Add scope validation to bazinga-validator | ✅ Approved |
+| 11. PM BAZINGA Format | Include Completion Summary with counts | ✅ Approved |
+| 12. Progress Tracking | Show progress in status capsules | ✅ Approved |
 
 ### Rejected
 
@@ -658,6 +698,7 @@ After implementation, monitor for:
 |-------|-------------|--------|
 | New phase_merge.md | Separate merge template | ❌ Rejected |
 | Post-hoc Audit | Tool log scanning | ❌ Rejected |
+| Pre-Validator Sanity Check | Quick check before validator | ❌ Rejected |
 
 ---
 
