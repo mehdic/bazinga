@@ -98,12 +98,12 @@ Use Read tool to check these files.
 
 **Timeout Configuration:**
 - Default: 60 seconds
-- Configurable via `bazinga/validator_config.json` → `test_timeout_seconds` field
+- Configurable via `.claude/skills/bazinga-validator/resources/validator_config.json` → `test_timeout_seconds` field
 - Large test suites may need 180-300 seconds
 
 ```bash
 # Read timeout from config (or use default 60)
-TIMEOUT=$(python3 -c "import json; print(json.load(open('bazinga/validator_config.json', 'r')).get('test_timeout_seconds', 60))" 2>/dev/null || echo 60)
+TIMEOUT=$(python3 -c "import json; print(json.load(open('.claude/skills/bazinga-validator/resources/validator_config.json', 'r')).get('test_timeout_seconds', 60))" 2>/dev/null || echo 60)
 
 # Example for Node.js
 timeout $TIMEOUT npm test 2>&1 | tee bazinga/test_output.txt
@@ -494,7 +494,7 @@ Accept BAZINGA and proceed to shutdown protocol.
 ```
 → Return: REJECT
 → Reason: "Cannot verify test status (timeout after {TIMEOUT}s)"
-→ Action: "Provide recent test output file OR increase test_timeout_seconds in bazinga/validator_config.json"
+→ Action: "Provide recent test output file OR increase test_timeout_seconds in .claude/skills/bazinga-validator/resources/validator_config.json"
 ```
 
 **Evidence file missing:**
@@ -513,7 +513,7 @@ Accept BAZINGA and proceed to shutdown protocol.
 3. **Zero tolerance for test failures** - Even 1 failure = REJECT
 4. **Verify evidence** - Don't accept claims without proof
 5. **Structured response** - Orchestrator parses your verdict
-6. **Timeout protection** - Use configurable timeout (default 60s, see bazinga/validator_config.json)
+6. **Timeout protection** - Use configurable timeout (default 60s, see .claude/skills/bazinga-validator/resources/validator_config.json)
 7. **Clear reasoning** - Explain WHY you accepted or rejected
 
 ---

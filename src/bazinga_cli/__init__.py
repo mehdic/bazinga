@@ -50,7 +50,6 @@ class BazingaSetup:
         "model_selection.json",
         "challenge_levels.json",
         "skills_config.json",
-        "validator_config.json",
     ]
 
     def __init__(self, source_dir: Optional[Path] = None):
