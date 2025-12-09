@@ -91,11 +91,16 @@ The specialization loading implementation has been verified against the approved
 | Old "loaded via prompt_building" references removed | ✅ No matches found |
 | STRICT ADJACENCY RULE documented | ✅ Line 131 in spawn template |
 
+### Fixed During Review
+
+| Item | Status |
+|------|--------|
+| `merge_workflow.md` | ✅ FIXED - 3 spawn points updated (was missed initially) |
+
 ### Not Applicable / Skipped
 
 | Item | Reason |
 |------|--------|
-| `merge_workflow.md` | File does not exist (mentioned in spec but not present) |
 | Phase 4: bazinga-validator extension | Marked as OPTIONAL in spec |
 | Phase 5: Integration tests | Testing phase, not implementation |
 
@@ -152,6 +157,7 @@ The implementation follows the spec exactly. All critical components are in plac
 | `bazinga/templates/orchestrator/spawn_with_specializations.md` | NEW | Central spawn procedure |
 | `bazinga/templates/orchestrator/phase_simple.md` | MODIFIED | 8 spawn point references |
 | `bazinga/templates/orchestrator/phase_parallel.md` | MODIFIED | Parallel spawn with isolation |
+| `bazinga/templates/merge_workflow.md` | MODIFIED | 3 spawn points (conflict, test failure, blocked) |
 | `agents/orchestrator_speckit.md` | MODIFIED | Specialization section |
 | `agents/project_manager.md` | MODIFIED | Removed ~277 lines of fallback tables |
 
