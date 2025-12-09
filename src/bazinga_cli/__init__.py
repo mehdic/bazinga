@@ -585,6 +585,73 @@ def check_command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def update_gitignore(target_dir: Path) -> bool:
+    """
+    Add BAZINGA-specific entries to the project's .gitignore file.
+
+    This ensures database files and artifacts are never tracked, preventing
+    merge conflicts when sub-agents work on separate branches.
+
+    Args:
+        target_dir: The project root directory
+
+    Returns:
+        True if gitignore was updated or already configured, False on error
+    """
+    # Skip if not a git repository
+    git_dir = target_dir / ".git"
+    if not git_dir.exists():
+        console.print("  [dim]Not a git repository, skipping[/dim]")
+        return True
+
+    gitignore_path = target_dir / ".gitignore"
+
+    # The marker and entries we'll add
+    marker = "# BAZINGA - Auto-generated (do not edit this section)"
+    bazinga_entries = f"""{marker}
+bazinga/*.db*
+bazinga/artifacts/
+"""
+
+    try:
+        # Check if .gitignore exists and already has our section
+        if gitignore_path.exists():
+            # Security: Ensure .gitignore is a regular file, not a symlink or directory
+            if not gitignore_path.is_file() or gitignore_path.is_symlink():
+                console.print("  [yellow]⚠️  .gitignore is not a regular file, skipping[/yellow]")
+                return False
+
+            existing_content = gitignore_path.read_text(encoding='utf-8')
+
+            # Already configured - nothing to do
+            if marker in existing_content:
+                console.print("  [dim]Already configured[/dim]")
+                return True
+
+            # Detect newline style to preserve it
+            newline_style = '\r\n' if '\r\n' in existing_content else '\n'
+
+            # Append our section (with blank line separator if needed)
+            separator = newline_style if existing_content and not existing_content.endswith(('\n', '\r\n')) else ""
+            separator += newline_style if existing_content else ""
+
+            # Normalize bazinga_entries to match the file's newline style
+            normalized_entries = bazinga_entries.replace('\n', newline_style)
+
+            gitignore_path.write_text(existing_content + separator + normalized_entries, encoding='utf-8')
+            console.print("  [green]✓ Added BAZINGA entries to .gitignore[/green]")
+        else:
+            # Create new .gitignore with our entries
+            gitignore_path.write_text(bazinga_entries, encoding='utf-8')
+            console.print("  [green]✓ Created .gitignore with BAZINGA entries[/green]")
+
+        return True
+
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Failed to update .gitignore: {e}[/yellow]")
+        return False
+
+
 def detect_project_language(target_dir: Path) -> Optional[str]:
     """
     Detect the project language based on files present.
@@ -1446,6 +1513,10 @@ def init(
         except subprocess.CalledProcessError:
             console.print("[yellow]⚠️  Git initialization failed[/yellow]")
 
+    # Update .gitignore to prevent database merge conflicts
+    console.print("\n[bold cyan]11. Configuring .gitignore[/bold cyan]")
+    update_gitignore(target_dir)
+
     # Success message
     profile_desc = {
         "lite": "Lite (3 core skills, fast development)",
@@ -2077,6 +2148,10 @@ def update(
         install_dashboard_dependencies(target_dir, force)
     else:
         console.print("  [dim]Skipped[/dim]")
+
+    # Update .gitignore to prevent database merge conflicts
+    console.print("\n[bold cyan]9. Configuring .gitignore[/bold cyan]")
+    update_gitignore(target_dir)
 
     # Success message
     success_message = (

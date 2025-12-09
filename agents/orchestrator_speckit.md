@@ -396,6 +396,24 @@ Note: Developers won't have full requirements context."
 - Write code files - Don't implement (agents do that)
 - Grep/Glob - Don't search for implementation (agents do that)
 
+## Specialization Loading for Spec-Kit Tasks
+
+When spawning any agent (Developer, SSE, QA, Tech Lead), follow the centralized spawn procedure:
+
+**🔴 Required:** Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
+
+This ensures:
+- Specialization templates are loaded for the project's tech stack
+- Agents receive technology-specific patterns and anti-patterns
+- Consistent prompt construction across all spawn points
+
+**Apply to:**
+- PM spawn (Step 5)
+- Developer spawns (from PM)
+- QA Expert spawns
+- Tech Lead spawns
+- Any escalation spawns (SSE)
+
 ## Golden Rule
 
 **"I validate, load context, spawn PM with spec-kit artifacts, then route messages. I never implement."**

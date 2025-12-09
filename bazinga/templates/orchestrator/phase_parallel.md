@@ -180,7 +180,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
 ```
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
+**Build Base Prompt PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 
 **Show Prompt Summaries (PER GROUP):** Output structured summary for each group (NOT full prompts):
 ```text
@@ -197,16 +197,41 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
    **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 
-**Spawn ALL in ONE message (MAX 4 groups):**
+**🔴 Spawn ALL with Specializations (MAX 4 groups) - SEQUENTIAL PER AGENT (INLINE EXECUTABLE):**
+
+**⚠️ ISOLATION RULE:** Complete context→skill→spawn for EACH agent BEFORE starting the next. Do NOT interleave contexts.
+
+**FOR EACH group (A, B, C, D - MAX 4):**
+
 ```
-Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=[Group A prompt])
-Task(subagent_type="general-purpose", model=models["B"], description="SSE B: {task[:90]}", prompt=[Group B prompt])
-... # MAX 4 Task() calls in ONE message
+# GROUP [A/B/C/D] - repeat for each group:
+
+Step 1: Output specialization context (skill reads from conversation):
+[SPEC_CTX_START group={group_id} agent={agent_type}]
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Model: {model}
+Specialization Paths: {task_group.specializations as JSON array}
+[SPEC_CTX_END group={group_id}]
+
+Step 2: IMMEDIATELY invoke skill (no other output between context and this):
+Skill(command: "specialization-loader")
+
+Step 3: Extract block from skill response between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
+
+Step 4: Prepend block to base_prompt:
+full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
+
+Step 5: Spawn agent (replace group_letter with A, B, C, or D):
+Task(subagent_type="general-purpose", model=models[group_letter], description="Dev {group_letter}: {task[:90]}", prompt=full_prompt)
+
+# THEN move to next group...
 ```
 
 **🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
 
-**🔴 DO NOT spawn in separate messages** (sequential). **🔴 DO NOT spawn >4** (breaks system).
+**🔴 DO NOT spawn >4** (breaks system).
 
 **AFTER receiving ALL developer responses:**
 

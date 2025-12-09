@@ -88,9 +88,21 @@ Parse the Developer's merge response. Extract status:
 - Update task_group in database:
   - status: "in_progress"
   - merge_status: "conflict"
-- **Spawn Developer** with conflict resolution context:
-  * Include conflicting files list
-  * Instructions:
+- **🔴 Spawn Developer with Specializations (INLINE)** - conflict resolution:
+  1. Output this context block (skill reads from conversation):
+     ```
+     [SPEC_CTX_START group={group_id} agent=developer]
+     Session ID: {session_id}
+     Group ID: {group_id}
+     Agent Type: developer
+     Model: {model}
+     Specialization Paths: {task_group.specializations as JSON array}
+     [SPEC_CTX_END group={group_id}]
+     ```
+  2. IMMEDIATELY invoke: `Skill(command: "specialization-loader")`
+  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`, prepend to base_prompt
+  4. Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev: resolve conflicts", prompt=full_prompt)`
+  * Instructions for Developer in prompt:
     1. Checkout feature_branch: `git checkout {feature_branch}`
     2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
     3. Resolve all conflicts
@@ -104,9 +116,21 @@ Parse the Developer's merge response. Extract status:
 - Update task_group in database:
   - status: "in_progress"
   - merge_status: "test_failure"  # NOT "conflict" - these are distinct issues
-- **Spawn Developer** with test failure context:
-  * Include test output and failures
-  * Instructions:
+- **🔴 Spawn Developer with Specializations (INLINE)** - test failure:
+  1. Output this context block (skill reads from conversation):
+     ```
+     [SPEC_CTX_START group={group_id} agent=developer]
+     Session ID: {session_id}
+     Group ID: {group_id}
+     Agent Type: developer
+     Model: {model}
+     Specialization Paths: {task_group.specializations as JSON array}
+     [SPEC_CTX_END group={group_id}]
+     ```
+  2. IMMEDIATELY invoke: `Skill(command: "specialization-loader")`
+  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`, prepend to base_prompt
+  4. Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev: fix test failures", prompt=full_prompt)`
+  * Instructions for Developer in prompt:
     1. Checkout feature_branch: `git checkout {feature_branch}`
     2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
     3. Fix the integration test failures
@@ -120,7 +144,20 @@ Parse the Developer's merge response. Extract status:
 - Update task_group in database:
   - status: "in_progress"
   - merge_status: "blocked"
-- **Spawn Tech Lead** to assess the blockage and determine next steps
+- **🔴 Spawn Tech Lead with Specializations (INLINE)** - assess blockage:
+  1. Output this context block (skill reads from conversation):
+     ```
+     [SPEC_CTX_START group={group_id} agent=tech_lead]
+     Session ID: {session_id}
+     Group ID: {group_id}
+     Agent Type: tech_lead
+     Model: {model}
+     Specialization Paths: {task_group.specializations as JSON array}
+     [SPEC_CTX_END group={group_id}]
+     ```
+  2. IMMEDIATELY invoke: `Skill(command: "specialization-loader")`
+  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`, prepend to base_prompt
+  4. Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TechLead: assess blockage", prompt=full_prompt)`
 
 ---
 
