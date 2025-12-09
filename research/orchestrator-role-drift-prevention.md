@@ -702,6 +702,75 @@ After implementation, monitor for:
 
 ---
 
+## Post-Implementation Critical Review (2025-12-09)
+
+### Implementation Status: INCOMPLETE
+
+**Initial F1-F12 implementation was documentation-only. Backend code was NOT modified.**
+
+| Fix | Documentation | Python Code | Schema | Actual Status |
+|-----|---------------|-------------|--------|---------------|
+| F1: CI polling | ✅ | N/A | N/A | Working |
+| F2: Original_Scope | ✅ | ❌ | ❌ | BROKEN |
+| F3: bazinga-db commands | ✅ | ❌ | ❌ | BROKEN |
+| F4: PM git removal | ✅ | N/A | N/A | Partial |
+| F5: initial_branch | ✅ | ❌ | Exists unused | BROKEN |
+| F6: build-baseline.sh | ✅ | ✅ | N/A | Working |
+| F7: item_count | ✅ | ❌ | ❌ | BROKEN |
+| F8: progress tracking | ✅ | ❌ | ❌ | BROKEN |
+| F9: PM BAZINGA logging | ✅ | ❌ | ❌ | BROKEN |
+| F10: config timeout | ✅ | N/A | ❌ | Partial |
+| F11: scope change | ✅ | ❌ | ❌ | BROKEN |
+| F12: 100% threshold | ✅ | N/A | N/A | Working |
+
+### Critical Issue: Fake Commands Documented
+
+10+ bazinga-db commands were documented in SKILL.md but never implemented in Python:
+- `log-pm-bazinga`, `get-pm-bazinga`
+- `increment-session-progress`
+- `log-scope-change`, `get-scope-change`
+- `log-validator-verdict`
+- `--original_scope`, `--initial_branch`, `--item_count` params
+
+### LLM-Recommended Fix (GPT-5)
+
+**Simpler approach using event logging instead of new tables:**
+
+1. Schema v9 migration:
+   - `orchestration_logs.event_subtype TEXT`
+   - `orchestration_logs.event_payload TEXT`
+   - `sessions.metadata TEXT` (for original_scope)
+   - `task_groups.item_count INTEGER`
+
+2. Generic commands:
+   - `save-event <session> <subtype> <json_payload>`
+   - `get-events <session> [subtype] [limit]`
+
+3. Extend existing functions:
+   - `create_session` → add `--initial_branch`, `--metadata`
+   - `create_task_group` → add `--item_count`
+
+### Implementation Priority (Revised)
+
+**Phase 1: Backend Implementation**
+1. Schema v9 migration in `init_db.py`
+2. `save-event`/`get-events` in `bazinga_db.py`
+3. Extend `create_session` signature
+4. Extend `create_task_group` signature
+5. Create `validator_config.json`
+
+**Phase 2: Documentation Alignment**
+6. Update SKILL.md to match actual CLI
+7. Update agent docs to use correct commands
+
+**Phase 3: Testing**
+8. Unit tests for new commands
+9. Integration test for scope validation
+
+**Full analysis:** `research/f1-f12-implementation-critical-review.md`
+
+---
+
 ## References
 
 - Observed failure transcript (user-provided)
@@ -710,3 +779,4 @@ After implementation, monitor for:
 - `bazinga/templates/orchestrator/phase_simple.md` - Simple mode template
 - `bazinga/templates/orchestrator/phase_parallel.md` - Parallel mode template
 - OpenAI GPT-5 review feedback
+- Post-implementation critical review (2025-12-09)
