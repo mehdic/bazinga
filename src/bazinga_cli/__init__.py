@@ -585,6 +585,56 @@ def check_command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def update_gitignore(target_dir: Path) -> bool:
+    """
+    Add BAZINGA-specific entries to the project's .gitignore file.
+
+    This ensures database files and artifacts are never tracked, preventing
+    merge conflicts when sub-agents work on separate branches.
+
+    Args:
+        target_dir: The project root directory
+
+    Returns:
+        True if gitignore was updated or already configured, False on error
+    """
+    gitignore_path = target_dir / ".gitignore"
+
+    # The marker and entries we'll add
+    marker = "# BAZINGA - Auto-generated (do not edit this section)"
+    bazinga_entries = f"""{marker}
+bazinga/*.db*
+bazinga/artifacts/
+"""
+
+    try:
+        # Check if .gitignore exists and already has our section
+        if gitignore_path.exists():
+            existing_content = gitignore_path.read_text()
+
+            # Already configured - nothing to do
+            if marker in existing_content:
+                console.print("  [dim]Already configured[/dim]")
+                return True
+
+            # Append our section (with blank line separator if needed)
+            separator = "\n" if existing_content and not existing_content.endswith("\n") else ""
+            separator += "\n" if existing_content else ""
+
+            gitignore_path.write_text(existing_content + separator + bazinga_entries)
+            console.print("  [green]✓ Added BAZINGA entries to .gitignore[/green]")
+        else:
+            # Create new .gitignore with our entries
+            gitignore_path.write_text(bazinga_entries)
+            console.print("  [green]✓ Created .gitignore with BAZINGA entries[/green]")
+
+        return True
+
+    except Exception as e:
+        console.print(f"  [yellow]⚠️  Failed to update .gitignore: {e}[/yellow]")
+        return False
+
+
 def detect_project_language(target_dir: Path) -> Optional[str]:
     """
     Detect the project language based on files present.
@@ -1446,6 +1496,10 @@ def init(
         except subprocess.CalledProcessError:
             console.print("[yellow]⚠️  Git initialization failed[/yellow]")
 
+    # Update .gitignore to prevent database merge conflicts
+    console.print("\n[bold cyan]11. Configuring .gitignore[/bold cyan]")
+    update_gitignore(target_dir)
+
     # Success message
     profile_desc = {
         "lite": "Lite (3 core skills, fast development)",
@@ -2077,6 +2131,10 @@ def update(
         install_dashboard_dependencies(target_dir, force)
     else:
         console.print("  [dim]Skipped[/dim]")
+
+    # Update .gitignore to prevent database merge conflicts
+    console.print("\n[bold cyan]9. Configuring .gitignore[/bold cyan]")
+    update_gitignore(target_dir)
 
     # Success message
     success_message = (
