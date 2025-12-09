@@ -204,7 +204,7 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
 **FOR EACH group (A, B, C, D - MAX 4):**
 
 ```
-# GROUP {X}:
+# GROUP [A/B/C/D] - repeat for each group:
 
 Step 1: Output specialization context (skill reads from conversation):
 [SPEC_CTX_START group={group_id} agent={agent_type}]
@@ -223,8 +223,8 @@ Step 3: Extract block from skill response between [SPECIALIZATION_BLOCK_START] a
 Step 4: Prepend block to base_prompt:
 full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
 
-Step 5: Spawn agent:
-Task(subagent_type="general-purpose", model=models["{X}"], description="Dev {X}: {task[:90]}", prompt=full_prompt)
+Step 5: Spawn agent (replace group_letter with A, B, C, or D):
+Task(subagent_type="general-purpose", model=models[group_letter], description="Dev {group_letter}: {task[:90]}", prompt=full_prompt)
 
 # THEN move to next group...
 ```
