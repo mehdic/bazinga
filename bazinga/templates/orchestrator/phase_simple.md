@@ -97,7 +97,9 @@ Prior agents documented their decision-making for this task:
 - Build on prior agent's understanding
 ```
 
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations** for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build Base Prompt:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format.
+
+**Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
 
@@ -113,7 +115,16 @@ Prior agents documented their decision-making for this task:
    **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
    **Testing:** {testing_mode} | QA: {qa_status}
 ```
-**Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG[tier], description=desc, prompt=[prompt])`
+
+**🔴 Spawn with Specializations:**
+
+Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+- session_id: {session_id}
+- group_id: {group_id}
+- agent_type: {developer|senior_software_engineer|requirements_engineer}
+- model: MODEL_CONFIG[tier]
+- base_prompt: [prompt built above]
+- task_description: desc
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -197,7 +208,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 **IF Developer reports ESCALATE_SENIOR:**
 - **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
 - Build prompt with: original task, developer's attempt, reason for escalation
-- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: explicit escalation", prompt=[senior engineer prompt])
+- **🔴 Follow §Spawn Agent with Specializations** (`spawn_with_specializations.md`) with agent_type="senior_software_engineer", base_prompt=[senior engineer prompt], task_description="SeniorEng: explicit escalation"
 - This is an explicit request, not revision-based escalation
 
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
@@ -215,7 +226,7 @@ Before moving to the next group or ending your message, verify:
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
-2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**)
+2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config)
 3. Include in prompt:
    - Summary of work completed so far
    - Specific gaps/issues that remain (extract from developer response)
@@ -229,15 +240,12 @@ Before moving to the next group or ending your message, verify:
    ```
    Invoke: `Skill(command: "bazinga-db")`
 
-**Spawn developer Task:**
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: continue work", prompt=[new prompt])
-```
+**🔴 Spawn with Specializations:** Follow `spawn_with_specializations.md` with agent_type="developer", base_prompt=[new prompt], task_description="Dev {id}: continue work"
 
 **IF revision count >= 1 (Developer failed once):**
 - Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"], handles complex issues)
 - Build prompt with: original task, developer's attempt, failure details
-- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: escalated task", prompt=[senior engineer prompt])
+- **🔴 Follow §Spawn Agent with Specializations** (`spawn_with_specializations.md`) with agent_type="senior_software_engineer", base_prompt=[senior engineer prompt], task_description="SeniorEng: escalated task"
 
 **IF Senior Software Engineer also fails (revision count >= 2 after Senior Eng):**
 - Spawn Tech Lead for architectural guidance
@@ -286,7 +294,9 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ### 🔴 MANDATORY QA EXPERT PROMPT BUILDING
 
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section + **specializations**), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build Base Prompt:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`.
+
+**Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
 
@@ -299,7 +309,8 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
    **Challenge Level:** {challenge_level}/5 ({challenge_name})
    **Config:** Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
-**Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=[prompt])`
+
+**🔴 Spawn with Specializations:** Follow `spawn_with_specializations.md` with agent_type="qa_expert", base_prompt=[prompt], task_description=desc
 
 
 **AFTER receiving the QA Expert's response:**
@@ -338,14 +349,11 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
-2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**)
+2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config)
 3. Include QA feedback and failed tests
 4. Track revision count in database (increment by 1)
 
-**Spawn developer Task:**
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: fix QA issues", prompt=[prompt with QA feedback])
-```
+**🔴 Spawn with Specializations:** Follow `spawn_with_specializations.md` with agent_type="developer", base_prompt=[prompt with QA feedback], task_description="Dev {id}: fix QA issues"
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
 - Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
@@ -353,7 +361,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 **IF QA reports ESCALATE_SENIOR explicitly:**
 - **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
-- Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: QA challenge escalation", prompt=[senior engineer prompt with challenge failures])
+- **🔴 Follow §Spawn Agent with Specializations** (`spawn_with_specializations.md`) with agent_type="senior_software_engineer", base_prompt=[senior engineer prompt with challenge failures], task_description="SeniorEng: QA challenge escalation"
 - This bypasses revision count check - explicit escalation from QA's challenge testing
 
 **🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
@@ -407,7 +415,9 @@ Prior implementers documented their decision-making:
 - Understand WHY implementation choices were made
 ```
 
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations. **Description:** `f"TechLead {group_id}: review"`. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build Base Prompt:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks. **Description:** `f"TechLead {group_id}: review"`.
+
+**Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
 
@@ -420,7 +430,8 @@ Prior implementers documented their decision-making:
 
    **Config:** Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
-**Spawn:** `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=[prompt])`
+
+**🔴 Spawn with Specializations:** Follow `spawn_with_specializations.md` with agent_type="tech_lead", base_prompt=[prompt], task_description=desc
 
 
 **AFTER receiving the Tech Lead's response:**
