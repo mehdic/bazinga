@@ -27,7 +27,7 @@ bazinga-db, please get context packages:
 
 Session ID: {session_id}
 Group ID: {group_id}
-Agent Type: {developer|senior_software_engineer|requirements_engineer}
+Agent Type: {agent_type}
 Limit: 3
 ```
 Then invoke: `Skill(command: "bazinga-db")`
@@ -127,7 +127,7 @@ Check bazinga/skills_config.json: IF specializations.enabled == true AND agent_t
 [SPEC_CTX_START group={group_id} agent={agent_type}]
 Session ID: {session_id}
 Group ID: {group_id}
-Agent Type: {developer|senior_software_engineer|requirements_engineer}
+Agent Type: {agent_type}
 Model: {model from MODEL_CONFIG}
 Specialization Paths: {task_group.specializations from PM as JSON array}
 [SPEC_CTX_END group={group_id}]
