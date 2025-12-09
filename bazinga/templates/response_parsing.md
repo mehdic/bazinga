@@ -402,6 +402,33 @@ Starting Phase 1...
 [Show final report]
 ```
 
+### PM BAZINGA Completion Summary Parsing
+
+When PM sends BAZINGA, extract the Completion Summary section:
+
+**Look for:**
+```
+### Completion Summary
+- Completed_Items: [N]
+- Total_Items: [M]
+- Completion_Percentage: [X]%
+- Deferred_Items: [list]
+```
+
+**Validation before accepting:**
+1. Completed_Items == Total_Items (or very close: >90%)
+2. Deferred_Items is empty `[]`
+3. Completion_Percentage >= 90%
+
+**If validation fails:**
+- DO NOT accept BAZINGA
+- Invoke validator: `Skill(command: "bazinga-validator")`
+- Validator will provide detailed rejection reason
+
+**If Completion Summary is missing:**
+- Flag as incomplete BAZINGA format
+- Validator will query original scope from database
+
 **Capsule construction (CONTINUE):**
 
 ```

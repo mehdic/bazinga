@@ -1,5 +1,7 @@
 ## Phase 2A: Simple Mode Execution
 
+**Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
+
 ### Step 2A.1: Spawn Single Developer
 
 **User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`

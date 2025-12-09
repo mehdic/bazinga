@@ -221,6 +221,55 @@ IF blocker is fixable:
 
 ---
 
+## Step 5.5: Scope Validation (MANDATORY)
+
+**Problem:** PM may reduce scope without authorization (e.g., completing 18/69 tasks)
+
+**Step 1: Query session's original scope**
+```
+bazinga-db, get session [session_id] with original scope information
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Step 2: Extract PM's Completion Summary from BAZINGA message**
+Look for:
+- Completed_Items: [N]
+- Total_Items: [M]
+- Completion_Percentage: [X]%
+- Deferred_Items: [list]
+
+**Step 3: Compare against original request**
+- If Completed_Items < Total_Items AND Deferred_Items not empty → REJECT
+- If scope_type = "file" and original file had N items but only M completed → REJECT
+- If Completion_Percentage < 90% without BLOCKED status → REJECT
+
+**Step 4: Flag scope reduction**
+```
+REJECT: Scope mismatch
+
+Original request: [user's exact request]
+Completed: [what was done]
+Missing: [what was not done]
+Completion: X/Y items (Z%)
+
+PM deferred without user approval:
+- [list of deferred items]
+
+Action: Return to PM for full scope completion.
+```
+
+**Step 5: Log verdict to database**
+```
+bazinga-db, log validator verdict:
+Session ID: [session_id]
+Verdict: [ACCEPT/REJECT]
+Reason: [summary]
+Scope_Check: [pass/fail]
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+---
+
 ## Step 6: Calculate Completion & Return Verdict
 
 ```
