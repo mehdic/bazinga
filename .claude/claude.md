@@ -515,12 +515,26 @@ Skill(skill: "skill-name")  # Wrong parameter name!
 
 ## 🧠 ULTRATHINK: Deep Analysis with Multi-LLM Review
 
+**🚨 CRITICAL RULE: NEVER IMPLEMENT AFTER ULTRATHINK WITHOUT USER APPROVAL**
+
+When ultrathink is requested, you MUST:
+1. Complete the analysis
+2. Get external LLM reviews
+3. **STOP and present the analysis document to the user**
+4. **WAIT for explicit user approval** before implementing ANYTHING
+5. Even if the user says "implement it" in the same message, you MUST show the analysis first and ask for confirmation
+
+**This rule is ABSOLUTE.** The purpose of ultrathink is deep analysis - implementing without review defeats the purpose.
+
+---
+
 **When the user includes the keyword "ultrathink" in their request, you MUST:**
 
 1. **Perform deep critical analysis** of the problem/solution
 2. **Get external LLM reviews** (OpenAI + Gemini) on your analysis
 3. **Integrate feedback** from external reviewers
 4. **Save the refined document** to research folder
+5. **PRESENT the document to the user and STOP** - do NOT implement
 
 ### Environment Setup Required
 
