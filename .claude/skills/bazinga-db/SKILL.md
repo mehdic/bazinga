@@ -79,7 +79,6 @@ Extract from the calling agent's request:
 - "update task group" / "mark complete" → update-task-group
 - "get task groups" / "get all task groups" → get-task-groups
 - "update session status" → update-session-status
-- "increment session progress" / "update progress" → increment-session-progress
 - "log tokens" / "track token usage" → log-tokens
 - "save skill output" → save-skill-output
 - "dashboard snapshot" / "get dashboard data" → dashboard-snapshot
@@ -90,12 +89,6 @@ Extract from the calling agent's request:
 - "save success criteria" / "store criteria" → save-success-criteria
 - "get success criteria" / "query criteria" → get-success-criteria
 - "update success criterion" / "update criterion status" → update-success-criterion
-- "log PM BAZINGA" / "log BAZINGA message" → log-pm-bazinga
-- "get PM BAZINGA" / "get BAZINGA message" → get-pm-bazinga
-- "log scope change" / "save scope change" → log-scope-change
-- "get scope change" / "check scope change" → get-scope-change
-- "log validator verdict" / "save validator verdict" → log-validator-verdict
-- "get session" / "get session with scope" → get-session
 - "save context package" / "create context package" → save-context-package
 - "get context packages" / "query context" → get-context-packages
 - "mark context consumed" / "context consumed" → mark-context-consumed
@@ -244,15 +237,6 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 
 Returns JSON array of matching events (default limit 50).
 
-**Increment session progress (for completed_items_count tracking):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet increment-session-progress \
-  "<session_id>" <increment_amount>
-```
-
-Parameters:
-- `increment_amount`: Number to add to completed_items_count (typically group.item_count)
-
 **Dashboard snapshot:**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot \
@@ -297,70 +281,6 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-success-criterion \
   "<session_id>" "<criterion_text>" --status "met" --actual "711/711 passing"
 ```
-
-### PM BAZINGA Message Logging (For Validator Access)
-
-**Log PM BAZINGA message (BEFORE validator invocation):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet log-pm-bazinga \
-  "<session_id>" "<message>"
-```
-
-**Parameters:**
-- `message`: PM's full BAZINGA response text including Completion Summary
-
-**Get PM BAZINGA message (for validator):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-pm-bazinga \
-  "<session_id>"
-```
-
-Returns the logged PM BAZINGA message for validator scope checking.
-
-### User-Approved Scope Change Logging
-
-**Log scope change approval (when user explicitly reduces scope):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet log-scope-change \
-  "<session_id>" "<original_scope_json>" "<approved_scope_json>" "<user_approval_text>"
-```
-
-**Parameters:**
-- `original_scope_json`: JSON of original scope from session
-- `approved_scope_json`: JSON of new reduced scope
-- `user_approval_text`: Exact text of user's approval
-
-**Get scope change (for validator):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-scope-change \
-  "<session_id>"
-```
-
-Returns scope change record if user approved a reduction. Validator accepts BAZINGA against approved_scope if this exists.
-
-### Validator Verdict Logging (BAZINGA Validation)
-
-**Log validator verdict (after BAZINGA validation):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet log-validator-verdict \
-  "<session_id>" "<verdict>" "<reason>" \
-  [--scope_check "pass|fail"] [--completed_items N] [--total_items M]
-```
-
-**Parameters:**
-- `verdict`: ACCEPT or REJECT
-- `reason`: Detailed explanation of verdict
-- `scope_check`: pass/fail - whether scope validation passed
-- `completed_items`: Number of items completed (from PM's Completion Summary)
-- `total_items`: Total items in original scope
-
-**Get session with original scope (for validator):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session \
-  "<session_id>" --include-scope
-```
-
-Returns session data including `original_scope` JSON for validator comparison.
 
 ### Context Package Operations (Inter-Agent Communication)
 

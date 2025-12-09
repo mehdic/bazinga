@@ -186,8 +186,8 @@ Operation → Check result → If error: Output capsule with error
 | `SESSION_ID=bazinga_$(date...)` | Generate session ID |
 | `mkdir -p bazinga/artifacts/...` | Create directories |
 | `test -f bazinga/...` | Check file existence |
-| `cat bazinga/*.json` | Read config files |
-| `kill -0 $(cat bazinga/dashboard.pid)` | Dashboard check |
+| `cat bazinga/skills_config.json bazinga/testing_config.json` | Read config files (explicit paths only) |
+| `pgrep -F bazinga/dashboard.pid 2>/dev/null` | Dashboard check (safe PID lookup) |
 | `bash bazinga/scripts/start-dashboard.sh` | Start dashboard |
 | `bash bazinga/scripts/build-baseline.sh` | Run build baseline |
 | `git branch --show-current` | Get current branch (init only) |
@@ -342,8 +342,8 @@ PM Response: BAZINGA → END
 **FIRST: Start dashboard if not running (applies to ALL paths):**
 
 ```bash
-# Check if dashboard is running
-if [ -f bazinga/dashboard.pid ] && kill -0 $(cat bazinga/dashboard.pid) 2>/dev/null; then
+# Check if dashboard is running (safe PID check)
+if [ -f bazinga/dashboard.pid ] && pgrep -F bazinga/dashboard.pid >/dev/null 2>&1; then
     echo "Dashboard already running"
 else
     # Start dashboard in background

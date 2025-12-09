@@ -724,13 +724,13 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 **MERGE_SUCCESS Progress Tracking:**
 1. Update task_group: status="completed", merge_status="merged"
-2. Get group's item_count from task_groups table
-3. Update session completed_items_count: `completed_items_count += group.item_count`
+2. Query completed progress from task_groups:
+   ```bash
+   # Get completed items (sum of item_count for completed groups)
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "[session_id]" "completed"
+   # Sum item_count from result
    ```
-   bazinga-db, update session [session_id]:
-   Increment completed_items_count by: [group.item_count]
-   ```
-4. Output capsule with progress: `✅ Group {id} merged | Progress: {completed}/{total}`
+3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 
 **Escalation (from template):** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 

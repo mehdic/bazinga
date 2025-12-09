@@ -233,47 +233,43 @@ IF blocker is fixable:
 
 **Problem:** PM may reduce scope without authorization (e.g., completing 18/69 tasks)
 
-**Step 1: Query session's original scope**
+**Step 1: Query PM's BAZINGA message from database**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "pm_bazinga" --limit 1
 ```
-bazinga-db, get session [session_id] with original scope information
-```
-Then invoke: `Skill(command: "bazinga-db")`
+This returns the PM's BAZINGA message logged by orchestrator.
 
-**Step 2: Query PM's BAZINGA message from database**
-```
-bazinga-db, get PM BAZINGA message for session [session_id]
-```
-Then invoke: `Skill(command: "bazinga-db")`
+**⚠️ The orchestrator logs this BEFORE invoking you. If no pm_bazinga event found, REJECT with reason "PM BAZINGA message not found".**
 
-**⚠️ The orchestrator logs this BEFORE invoking you. If missing, REJECT with reason "PM BAZINGA message not found".**
-
-**Step 3: Extract PM's Completion Summary from BAZINGA message**
-Look for:
+**Step 2: Extract PM's Completion Summary from BAZINGA message**
+Parse the event_payload JSON for:
 - Completed_Items: [N]
 - Total_Items: [M]
 - Completion_Percentage: [X]%
 - Deferred_Items: [list]
 
-**Step 4: Check for user-approved scope change**
+**Step 3: Check for user-approved scope change**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "scope_change" --limit 1
 ```
-bazinga-db, get scope change for session [session_id]
-```
-Then invoke: `Skill(command: "bazinga-db")`
 
-**IF scope change record exists:**
+**IF scope_change event exists:**
 - User explicitly approved scope reduction
-- Compare PM's completion against `approved_scope` (NOT original_scope)
+- Parse event_payload for `approved_scope`
+- Compare PM's completion against `approved_scope` (NOT original)
 - Log: "Using user-approved scope: [approved_scope summary]"
 
-**IF no scope change record:**
-- Compare against original_scope (default behavior)
+**IF no scope_change event:**
+- Compare against original scope from session metadata
 
-**Step 5: Compare against applicable scope**
+**Step 4: Compare against applicable scope**
 - If Completed_Items < Total_Items AND Deferred_Items not empty → REJECT (unless covered by approved_scope)
 - If scope_type = "file" and original file had N items but only M completed → REJECT
 - If Completion_Percentage < 100% without BLOCKED status → REJECT (unless user-approved scope change exists)
 
-**Step 6: Flag scope reduction**
+**Step 5: Flag scope reduction**
 ```
 REJECT: Scope mismatch
 
@@ -288,15 +284,11 @@ PM deferred without user approval:
 Action: Return to PM for full scope completion.
 ```
 
-**Step 7: Log verdict to database**
+**Step 6: Log verdict to database**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "[session_id]" "validator_verdict" '{"verdict": "ACCEPT|REJECT", "reason": "...", "scope_check": "pass|fail"}'
 ```
-bazinga-db, log validator verdict:
-Session ID: [session_id]
-Verdict: [ACCEPT/REJECT]
-Reason: [summary]
-Scope_Check: [pass/fail]
-```
-Then invoke: `Skill(command: "bazinga-db")`
 
 ---
 

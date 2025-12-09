@@ -335,9 +335,8 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 **MERGE_SUCCESS Progress Tracking:**
 1. Update task_group: status="completed", merge_status="merged"
-2. Get group's item_count from task_groups table
-3. Update session completed_items_count: `completed_items_count += group.item_count`
-4. Output capsule with progress: `✅ Group {id} merged | Progress: {completed}/{total}`
+2. Query completed progress from task_groups (sum item_count for completed groups)
+3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 
 **Escalation:** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 
