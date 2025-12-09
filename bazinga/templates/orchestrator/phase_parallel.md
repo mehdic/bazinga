@@ -180,9 +180,73 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
 ```
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
-**Build Base Prompt PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+**🔴🔴🔴 MANDATORY PARALLEL SPAWN SEQUENCE - CANNOT BE SKIPPED 🔴🔴🔴**
 
-**Show Prompt Summaries (PER GROUP):** Output structured summary for each group (NOT full prompts):
+**You MUST execute ALL steps below in exact order FOR EACH GROUP. Skipping any step is a CRITICAL FAILURE.**
+
+---
+
+### PARALLEL SPAWN STEP 1: Build Base Prompts (ALL GROUPS)
+
+For EACH group: Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+
+Store as `base_prompts[group_id]` for each group.
+
+---
+
+### PARALLEL SPAWN STEP 2: Load Specializations FOR EACH GROUP (MANDATORY - DO THIS NOW)
+
+**🚨 CRITICAL: You MUST complete this step for EACH GROUP before spawning ANY agent.**
+
+**⚠️ ISOLATION RULE:** Complete context→skill→extract for EACH group sequentially. Do NOT interleave.
+
+**2a. Check if specializations enabled (once):**
+```
+Read bazinga/skills_config.json
+Check: specializations.enabled == true
+```
+
+**FOR EACH group (A, B, C, D - MAX 4) - IF specializations enabled:**
+
+**2b. Output specialization context block for this group:**
+```
+[SPEC_CTX_START group={group_id} agent={agent_type}]
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Model: {model from MODEL_CONFIG}
+Specialization Paths: {task_group.specializations from PM as JSON array}
+[SPEC_CTX_END group={group_id}]
+```
+
+**2c. IMMEDIATELY invoke skill** (no other output between context and this):
+```
+Skill(command: "specialization-loader")
+```
+
+**2d. Extract block from response:**
+- Find content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
+- Store as `specialization_blocks[group_id]`
+
+**2e. Compose final prompt for this group:**
+```
+full_prompts[group_id] = specialization_blocks[group_id] + "\n\n---\n\n" + base_prompts[group_id]
+specializations_status[group_id] = "loaded"
+```
+
+**THEN move to next group and repeat 2b-2e.**
+
+**IF specializations disabled:**
+```
+For each group: full_prompts[group_id] = base_prompts[group_id]
+specializations_status[group_id] = "disabled"
+```
+
+---
+
+### PARALLEL SPAWN STEP 3: Show Prompt Summaries (ALL GROUPS)
+
+**Output structured summary for EACH group (NOT full prompts):**
 ```text
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
 
@@ -194,44 +258,34 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
    • {requirement_2}
 
    **Branch:** {group_branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
+   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status[group_id]} | Skills: {skills_list}
 ```
 
-**🔴 Spawn ALL with Specializations (MAX 4 groups) - SEQUENTIAL PER AGENT (INLINE EXECUTABLE):**
+---
 
-**⚠️ ISOLATION RULE:** Complete context→skill→spawn for EACH agent BEFORE starting the next. Do NOT interleave contexts.
+### PARALLEL SPAWN STEP 4: Execute Task Spawns (ALL GROUPS)
 
-**FOR EACH group (A, B, C, D - MAX 4):**
+**🚨 CHECKPOINT: Before spawning, verify FOR EACH GROUP:**
+- ✅ Base prompt built (Step 1)?
+- ✅ Specialization loading executed (Step 2)? If enabled, did you invoke `Skill(command: "specialization-loader")` for this group?
+- ✅ `full_prompts[group_id]` contains specialization block (if enabled)?
 
+**IF ANY checkpoint fails for ANY group: GO BACK and complete the missing step.**
+
+**Spawn ALL agents:**
 ```
-# GROUP [A/B/C/D] - repeat for each group:
-
-Step 1: Output specialization context (skill reads from conversation):
-[SPEC_CTX_START group={group_id} agent={agent_type}]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: {agent_type}
-Model: {model}
-Specialization Paths: {task_group.specializations as JSON array}
-[SPEC_CTX_END group={group_id}]
-
-Step 2: IMMEDIATELY invoke skill (no other output between context and this):
-Skill(command: "specialization-loader")
-
-Step 3: Extract block from skill response between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
-
-Step 4: Prepend block to base_prompt:
-full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
-
-Step 5: Spawn agent (replace group_letter with A, B, C, or D):
-Task(subagent_type="general-purpose", model=models[group_letter], description="Dev {group_letter}: {task[:90]}", prompt=full_prompt)
-
-# THEN move to next group...
+Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=full_prompts["A"])
+Task(subagent_type="general-purpose", model=models["B"], description="Dev B: {task[:90]}", prompt=full_prompts["B"])
+... (for each group)
 ```
 
 **🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
 
 **🔴 DO NOT spawn >4** (breaks system).
+
+---
+
+**🔴🔴🔴 END MANDATORY PARALLEL SPAWN SEQUENCE 🔴🔴🔴**
 
 **AFTER receiving ALL developer responses:**
 

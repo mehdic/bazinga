@@ -165,6 +165,28 @@ Operation → Check result → If error: Output capsule with error
 
 ---
 
+## 🔴🔴🔴 MANDATORY: SPECIALIZATION LOADING BEFORE EVERY AGENT SPAWN 🔴🔴🔴
+
+**THIS RULE APPLIES TO ALL AGENT SPAWNS (Developer, SSE, QA, Tech Lead, RE, Investigator).**
+
+**🚨 BEFORE INVOKING Task() TO SPAWN ANY AGENT, YOU MUST:**
+
+1. **Check** if specializations are enabled in `bazinga/skills_config.json`
+2. **IF enabled** for this agent type:
+   - **Output** the specialization context block with `[SPEC_CTX_START]...[SPEC_CTX_END]`
+   - **Invoke** `Skill(command: "specialization-loader")`
+   - **Extract** the block from the response
+   - **Prepend** the block to the agent's prompt
+3. **THEN** invoke `Task()` with the full prompt
+
+**🚫 FORBIDDEN: Spawning any agent WITHOUT going through this sequence when specializations are enabled.**
+
+**Why this matters:** Specializations provide critical technology-specific guidance (Java 8 patterns, Spring Boot 2.7 conventions, etc.) that significantly improve agent output quality. Skipping this makes agents generic and miss project-specific patterns.
+
+**See:** Phase templates (`phase_simple.md`, `phase_parallel.md`) for the complete SPAWN STEP 2 procedure.
+
+---
+
 ## 🚨 ROLE DRIFT PREVENTION: Internal Discipline Check
 
 **BEFORE EVERY RESPONSE, internally remind yourself (DO NOT OUTPUT TO USER):**
