@@ -598,6 +598,12 @@ def update_gitignore(target_dir: Path) -> bool:
     Returns:
         True if gitignore was updated or already configured, False on error
     """
+    # Skip if not a git repository
+    git_dir = target_dir / ".git"
+    if not git_dir.exists():
+        console.print("  [dim]Not a git repository, skipping[/dim]")
+        return True
+
     gitignore_path = target_dir / ".gitignore"
 
     # The marker and entries we'll add
@@ -610,22 +616,33 @@ bazinga/artifacts/
     try:
         # Check if .gitignore exists and already has our section
         if gitignore_path.exists():
-            existing_content = gitignore_path.read_text()
+            # Security: Ensure .gitignore is a regular file, not a symlink or directory
+            if not gitignore_path.is_file() or gitignore_path.is_symlink():
+                console.print("  [yellow]⚠️  .gitignore is not a regular file, skipping[/yellow]")
+                return False
+
+            existing_content = gitignore_path.read_text(encoding='utf-8')
 
             # Already configured - nothing to do
             if marker in existing_content:
                 console.print("  [dim]Already configured[/dim]")
                 return True
 
-            # Append our section (with blank line separator if needed)
-            separator = "\n" if existing_content and not existing_content.endswith("\n") else ""
-            separator += "\n" if existing_content else ""
+            # Detect newline style to preserve it
+            newline_style = '\r\n' if '\r\n' in existing_content else '\n'
 
-            gitignore_path.write_text(existing_content + separator + bazinga_entries)
+            # Append our section (with blank line separator if needed)
+            separator = newline_style if existing_content and not existing_content.endswith(('\n', '\r\n')) else ""
+            separator += newline_style if existing_content else ""
+
+            # Normalize bazinga_entries to match the file's newline style
+            normalized_entries = bazinga_entries.replace('\n', newline_style)
+
+            gitignore_path.write_text(existing_content + separator + normalized_entries, encoding='utf-8')
             console.print("  [green]✓ Added BAZINGA entries to .gitignore[/green]")
         else:
             # Create new .gitignore with our entries
-            gitignore_path.write_text(bazinga_entries)
+            gitignore_path.write_text(bazinga_entries, encoding='utf-8')
             console.print("  [green]✓ Created .gitignore with BAZINGA entries[/green]")
 
         return True
