@@ -88,9 +88,11 @@ Parse the Developer's merge response. Extract status:
 - Update task_group in database:
   - status: "in_progress"
   - merge_status: "conflict"
-- **Spawn Developer** with conflict resolution context:
-  * Include conflicting files list
-  * Instructions:
+- **🔴 Spawn Developer with Specializations** - conflict resolution context:
+  * Follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+    - agent_type: "developer"
+    - base_prompt: Include conflicting files list + instructions below
+  * Instructions for Developer:
     1. Checkout feature_branch: `git checkout {feature_branch}`
     2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
     3. Resolve all conflicts
@@ -104,9 +106,11 @@ Parse the Developer's merge response. Extract status:
 - Update task_group in database:
   - status: "in_progress"
   - merge_status: "test_failure"  # NOT "conflict" - these are distinct issues
-- **Spawn Developer** with test failure context:
-  * Include test output and failures
-  * Instructions:
+- **🔴 Spawn Developer with Specializations** - test failure context:
+  * Follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+    - agent_type: "developer"
+    - base_prompt: Include test output/failures + instructions below
+  * Instructions for Developer:
     1. Checkout feature_branch: `git checkout {feature_branch}`
     2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
     3. Fix the integration test failures
@@ -120,7 +124,10 @@ Parse the Developer's merge response. Extract status:
 - Update task_group in database:
   - status: "in_progress"
   - merge_status: "blocked"
-- **Spawn Tech Lead** to assess the blockage and determine next steps
+- **🔴 Spawn Tech Lead with Specializations** to assess blockage:
+  * Follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+    - agent_type: "tech_lead"
+    - base_prompt: Include blocker reason + assessment context
 
 ---
 
