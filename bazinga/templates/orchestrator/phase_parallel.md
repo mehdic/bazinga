@@ -197,25 +197,37 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
    **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
 ```
 
-**🔴 Spawn ALL with Specializations (MAX 4 groups) - SEQUENTIAL PER AGENT:**
+**🔴 Spawn ALL with Specializations (MAX 4 groups) - SEQUENTIAL PER AGENT (INLINE EXECUTABLE):**
 
-Per §Spawn Agent with Specializations **Parallel Mode: Isolation Rule** (`spawn_with_specializations.md`):
+**⚠️ ISOLATION RULE:** Complete context→skill→spawn for EACH agent BEFORE starting the next. Do NOT interleave contexts.
+
+**FOR EACH group (A, B, C, D - MAX 4):**
 
 ```
-# Group A:
-1. Follow spawn_with_specializations.md Steps 1-4 for Group A
-   (output context → Skill → extract block)
-2. Task(subagent_type="general-purpose", model=models["A"], description="Dev A: {task[:90]}", prompt=[Group A prompt WITH specialization])
+# GROUP [A/B/C/D] - repeat for each group:
 
-# Group B:
-3. Follow spawn_with_specializations.md Steps 1-4 for Group B
-   (output context → Skill → extract block)
-4. Task(subagent_type="general-purpose", model=models["B"], description="SSE B: {task[:90]}", prompt=[Group B prompt WITH specialization])
+Step 1: Output specialization context (skill reads from conversation):
+[SPEC_CTX_START group={group_id} agent={agent_type}]
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Model: {model}
+Specialization Paths: {task_group.specializations as JSON array}
+[SPEC_CTX_END group={group_id}]
 
-# ... repeat for Groups C, D (MAX 4)
+Step 2: IMMEDIATELY invoke skill (no other output between context and this):
+Skill(command: "specialization-loader")
+
+Step 3: Extract block from skill response between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
+
+Step 4: Prepend block to base_prompt:
+full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
+
+Step 5: Spawn agent (replace group_letter with A, B, C, or D):
+Task(subagent_type="general-purpose", model=models[group_letter], description="Dev {group_letter}: {task[:90]}", prompt=full_prompt)
+
+# THEN move to next group...
 ```
-
-**⚠️ ISOLATION RULE:** Complete context→skill→spawn for each agent BEFORE starting the next. Do NOT interleave contexts.
 
 **🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
 
