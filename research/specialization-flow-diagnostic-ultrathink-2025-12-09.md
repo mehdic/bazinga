@@ -407,11 +407,53 @@ FOR EACH agent in batch:
 
 ## Implementation Plan (Approved)
 
+### Phase 0: PM Token Optimization (Option C) ✅ APPROVED
+
+**Problem:** PM agent is ~23,556 tokens with ~200 lines of duplicate fallback mapping tables.
+
+**Solution:** Move fallback derivation responsibility from PM to orchestrator.
+
+**Changes to `agents/project_manager.md`:**
+
+1. **Remove** the fallback mapping table (lines ~1500-1700):
+   - Delete the `MAPPING_TABLE` dictionary
+   - Delete the `lookup_and_validate()` helper
+   - Delete the `normalize_technology_name()` helper
+   - Delete the fallback logic block
+
+2. **Keep** PM's primary responsibility:
+   - PM still reads `project_context.json`
+   - PM still assigns `specializations` array per task group
+   - PM still stores via `bazinga-db create-task-group --specializations`
+
+3. **Simplify** PM's specialization section to:
+   ```markdown
+   ### Step 3.5: Assign Specializations per Task Group
+
+   Read bazinga/project_context.json and assign specializations:
+
+   FOR each task_group:
+       target_component = identify which component(s) this group targets
+       specializations = project_context.components[target].suggested_specializations
+
+       IF specializations found:
+           Store with task group: --specializations '{specializations}'
+       ELSE:
+           Store empty array: --specializations '[]'
+           (Orchestrator will derive fallback at spawn time)
+   ```
+
+**Token savings:** ~500 tokens (removes ~200 lines of mapping tables)
+
+**Workflow impact:** None - PM still assigns, orchestrator handles fallback if PM misses.
+
+---
+
 ### Phase 1: Create Centralized Spawn Template
 
 1. **Create** `bazinga/templates/orchestrator/spawn_with_specializations.md`
    - Full implementation of 7-step flow above
-   - Include fallback derivation logic
+   - Include fallback derivation logic (moved from PM)
    - Include parallel mode isolation rule
    - Include injection verification logging
 
@@ -468,6 +510,7 @@ FOR EACH agent in batch:
 | Fallback Derivation | If PM misses specializations, derive from project_context.json | ✅ APPROVED |
 | Injection Verification | Log {injected, templates_count, block_tokens} per spawn | ✅ APPROVED |
 | Spec-Kit Coverage | Update orchestrator_speckit.md to use same pattern | ✅ APPROVED |
+| **PM Token Optimization (Option C)** | Move fallback mapping tables from PM to orchestrator, saves ~500 tokens | ✅ APPROVED |
 
 ### Rejected Suggestions (With Reasoning)
 
