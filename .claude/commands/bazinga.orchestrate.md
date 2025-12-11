@@ -440,15 +440,16 @@ Display:
 - `BAZINGA` → Session already complete, proceed to Completion phase
 - `NEEDS_CLARIFICATION` → Follow clarification workflow
 
-**🔴 CRITICAL - DO NOT STOP AFTER PM RESPONSE:**
+**🔴 CRITICAL - DO NOT STOP FOR USER INPUT AFTER PM RESPONSE:**
 1. Log PM interaction to database
 2. Parse PM status (CONTINUE/BAZINGA/etc)
-3. **In the SAME message**, spawn the next agent or proceed to completion
-4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Task() tool NOW
+3. **Continue to next action without waiting for user input** - spawn agent or proceed to completion
+4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Task() tool
+5. Sequential tool calls (DB query → spawn) are fine; stopping for user input is NOT
 
 ---
 
-**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-5 in sequence without stopping. After PM responds, you MUST route according to Step 1.3a and spawn agents in the SAME message. These are not optional - they are the MANDATORY resume workflow.
+**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-5 in sequence without stopping. After PM responds, you MUST route according to Step 1.3a and continue spawning agents without waiting for user input. These are not optional - they are the MANDATORY resume workflow.
 
 ---
 
@@ -1035,16 +1036,15 @@ Before continuing to Step 1.3a, verify:
 
 **IF status = CONTINUE (CRITICAL FOR RESUME SCENARIOS):**
 - PM verified state and determined work should continue
-- **IMMEDIATELY spawn agent for in_progress/pending groups**
-- **🔴 DO NOT STOP after logging - you MUST initiate next action in the SAME message**
+- **🔴 DO NOT STOP FOR USER INPUT** - keep making tool calls until agents are spawned
 - **Step 1:** Query task groups: `bazinga-db get all task groups for session [session_id]`
-- **Step 2:** After receiving DB results, find groups with status: `in_progress` or `pending`
-- **Step 3:** For each such group, spawn the appropriate agent (Developer/SSE/QA/TL based on group state)
+- **Step 2:** Find groups with status: `in_progress` or `pending`
+- **Step 3:** Spawn appropriate agent (Developer/SSE/QA/TL based on group state)
   - **⚠️ CAPACITY LIMIT: Respect MAX 4 PARALLEL DEVELOPERS hard limit**
   - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
-  - Track active developer count in database before spawning
-- **IMMEDIATELY jump to Step 2A.1 or 2B.1 to spawn agents. Do NOT stop.**
-- **Note:** DB query in one message, then spawn in the next message is acceptable; what matters is NO stopping for user input
+- **Continue to Step 2A.1 or 2B.1 to spawn agents**
+
+**Clarification:** Sequential tool calls (DB query → spawn) across messages are fine. The rule is: **never stop to wait for user input** between receiving PM CONTINUE and spawning agents.
 
 **IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
