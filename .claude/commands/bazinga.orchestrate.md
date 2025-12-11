@@ -131,6 +131,17 @@ Operation → Check result → If error: Output capsule with error
 - ❌ **NEVER stop just to give status updates** - status messages are just progress indicators, not stop points
 - ❌ **NEVER wait for user to tell you what to do next** - follow the workflow automatically
 - ❌ **NEVER ask "Would you like me to continue?"** - just continue automatically
+- ❌ **NEVER say "Now let me spawn..." and then STOP** - call Task() in the same turn (before user input)
+
+**🔴 INTENT WITHOUT ACTION IS A CRITICAL BUG:**
+```
+❌ WRONG: "Database updated. Now let me spawn the SSE for FORECAST group..." [STOPS]
+   → The agent never gets spawned. Your message ends. Workflow hangs.
+
+✅ CORRECT: "Database updated." [Task(subagent_type="general-purpose", ...)]
+   → The agent is spawned in the same turn. Workflow continues.
+```
+Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. The Task() tool must be CALLED.
 
 **Your job is to keep the workflow moving forward autonomously. Only PM can stop the workflow by sending BAZINGA.**
 
@@ -424,11 +435,21 @@ Display:
 - User's current request
 - PM state loaded from database
 
-**This allows PM to pick up where it left off.**
+**After PM responds:** Route using Step 1.3a. In resume scenarios, PM typically returns:
+- `CONTINUE` → Immediately spawn agents for in_progress/pending groups (Step 2A.1 or 2B.1)
+- `BAZINGA` → Session already complete, proceed to Completion phase
+- `NEEDS_CLARIFICATION` → Follow clarification workflow
+
+**🔴 CRITICAL - COMPLETE ALL STEPS IN SAME TURN (NO USER WAIT):**
+1. Log PM interaction to database
+2. Parse PM status (CONTINUE/BAZINGA/etc)
+3. Spawn agent or proceed to completion - **all within this turn**
+4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Task() tool NOW
+5. Multi-step sequences (DB query → spawn) are expected within the same turn
 
 ---
 
-**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-5 in sequence without stopping. These are not optional - they are the MANDATORY resume workflow.
+**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-5 in sequence without stopping. After PM responds, you MUST route according to Step 1.3a and continue spawning agents without waiting for user input. These are not optional - they are the MANDATORY resume workflow.
 
 ---
 
@@ -1002,14 +1023,28 @@ Before continuing to Step 1.3a, verify:
 
 **Detection:** Check PM Status code from response
 
-**Expected status codes from initial PM spawn:**
+**Expected status codes from PM spawn (initial or resume):**
 - `PLANNING_COMPLETE` - PM completed planning, proceed to execution
+- `CONTINUE` - PM verified state and work should continue (common in RESUME scenarios)
 - `NEEDS_CLARIFICATION` - PM needs user input before planning
-- `INVESTIGATION_ONLY` - User only asked questions, no implementation needed
+- `INVESTIGATION_ONLY` - Investigation-only request; no implementation needed
+- `BAZINGA` - All work complete (rare in initial spawn, common in final assessment)
 
 **IF status = PLANNING_COMPLETE:**
 - PM has completed planning (created mode decision and task groups)
 - **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
+
+**IF status = CONTINUE (CRITICAL FOR RESUME SCENARIOS):**
+- PM verified state and determined work should continue
+- **🔴 DO NOT STOP FOR USER INPUT** - keep making tool calls until agents are spawned
+- **Step 1:** Query task groups: `bazinga-db get all task groups for session [session_id]`
+- **Step 2:** Find groups with status: `in_progress` or `pending`
+- **Step 3:** Spawn appropriate agent (Developer/SSE/QA/TL based on group state)
+  - **⚠️ CAPACITY LIMIT: Respect MAX 4 PARALLEL DEVELOPERS hard limit**
+  - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
+- **Continue to Step 2A.1 or 2B.1 to spawn agents**
+
+**Clarification:** Multi-step tool sequences (DB query → spawn) within the same assistant turn are expected. The rule is: **complete all steps before your turn ends** - never stop to wait for user input between receiving PM CONTINUE and spawning agents.
 
 **IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
@@ -1018,10 +1053,24 @@ Before continuing to Step 1.3a, verify:
 - Display PM's investigation findings to user
 - **END orchestration** (no development work needed)
 
+**IF status = BAZINGA:**
+- All work complete (if PM returns this early, likely a resume of already-complete session)
+- **MANDATORY: Invoke `Skill(command: "bazinga-validator")` to verify completion**
+  - IF validator returns ACCEPT → Proceed to completion
+  - IF validator returns REJECT → Spawn PM with validator's failure details
+- **IMMEDIATELY proceed to Completion phase ONLY after validator ACCEPTS**
+
 **IF status is missing or unclear:**
 - Apply fallback: If response contains task groups or mode decision, treat as PLANNING_COMPLETE
+- If response mentions "continue", "proceed", "Phase N", treat as CONTINUE
 - If response contains questions/clarifications, treat as NEEDS_CLARIFICATION
-- **IMMEDIATELY jump to Step 1.4. Do NOT stop.**
+- **IMMEDIATELY jump to Step 1.4 or spawn agents. Do NOT stop.**
+
+**🔴 ANTI-PATTERN - INTENT WITHOUT ACTION:**
+❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS - turn ends without Task call]
+✅ **CORRECT:** "Database updated." [Task call in same turn, before turn ends]
+
+Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call the Task tool in the same turn (before user input).
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
