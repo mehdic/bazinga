@@ -766,45 +766,7 @@ Build failing on production target with linker errors.
 - Hypothesis: Missing library dependencies or compiler flag differences
 ```
 
-**Example 2 - Deployment Blocker:**
-```
-## PM Status Update
-
-### Critical Issue Detected
-Deployment to staging environment blocked - pods failing health checks.
-
-### Analysis
-- Docker images build successfully
-- Kubernetes pods start but fail readiness probe
-- Logs show connection timeouts
-- Root cause: Unknown
-
-**Status:** INVESTIGATION_NEEDED
-**Next Action:** Orchestrator should spawn Investigator with:
-- Problem: Staging deployment health check failures
-- Context: Images build, pods start, but fail readiness
-- Hypothesis: Network config, missing env vars, or service dependencies
-```
-
-**Example 3 - Performance Regression:**
-```
-## PM Status Update
-
-### Critical Issue Detected
-API response times increased 5x after recent deployment.
-
-### Analysis
-- No code changes to query logic
-- Database queries show normal execution time
-- Load hasn't increased
-- Root cause: Unknown
-
-**Status:** INVESTIGATION_NEEDED
-**Next Action:** Orchestrator should spawn Investigator with:
-- Problem: 5x performance degradation on API endpoints
-- Context: No query changes, normal DB performance, consistent load
-- Hypothesis: Connection pooling, cache invalidation, or middleware overhead
-```
+**Other scenarios** (same pattern): Deployment blockers (pods failing health checks), performance regressions (unexplained slowdowns), test infrastructure failures, mysterious CI breakages.
 
 ### Tech Debt Gate (Before BAZINGA)
 
@@ -1042,20 +1004,7 @@ ELSE IF <100% criteria met:
   - Test failures, coverage gaps, config issues, bugs, performance problems
   - Missing mocks or test data (infrastructure, fixable)
   - Dependency version conflicts (solvable)
-- **Action:** Send BAZINGA with blocker documentation
-- **⚠️ CRITICAL ENFORCEMENT:** Before using Path B, you MUST run test suite and count failures:
-  ```bash
-  # Check test status
-  [run test command with --list or similar to count total vs passing]
-  # If ANY failures exist (even "pre-existing" ones), Path B is FORBIDDEN
-  # Use Path C instead to fix all failures
-  ```
-- **Path B Blocker Check:** If there are N test failures and you're considering Path B, ask yourself:
-  - Can developers write mocks for these tests? → YES = Use Path C
-  - Can developers fix the test logic? → YES = Use Path C
-  - Can developers update dependencies? → YES = Use Path C
-  - Is this a test failure of any kind? → YES = Use Path C (ALWAYS)
-  - **Only use Path B if answer to ALL above is NO** (extremely rare)
+- **Action:** Send BAZINGA with blocker documentation (see "Path B Strict Requirements" below for enforcement rules)
 - **Required format:**
   ```
   ## Pre-BAZINGA Verification
@@ -2500,81 +2449,25 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
-**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table.**
 
 ```bash
-# At task START - Document your understanding (REQUIRED)
-cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
-## Project Understanding
-
-### User Request Summary
-[What the user wants]
-
-### Scope Assessment
-[Size and complexity]
-
-### Key Requirements
-1. [Requirement 1]
-2. [Requirement 2]
-
-### Success Criteria
-- [Criterion 1]
-- [Criterion 2]
+# Template pattern (same for all phases: understanding, approach, completion, etc.)
+cat > /tmp/reasoning_{phase}.md << 'REASONING_EOF'
+## {Phase Title}
+[Phase-specific content - see sections below]
 REASONING_EOF
 
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "understanding" \
-  --content-file /tmp/reasoning_understanding.md \
-  --confidence high
-
-# Execution mode decision - Document approach (RECOMMENDED)
-cat > /tmp/reasoning_approach.md << 'REASONING_EOF'
-## Execution Strategy
-
-### Mode
-[SIMPLE / PARALLEL]
-
-### Why This Mode
-[Rationale]
-
-### Task Groups
-1. [Group A]: [Description]
-2. [Group B]: [Description]
-
-### Developer Allocation
-[How many developers and why]
-REASONING_EOF
-
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "approach" \
-  --content-file /tmp/reasoning_approach.md \
-  --confidence high
-
-# At BAZINGA - Document completion (REQUIRED)
-cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
-## Project Completion Summary
-
-### What Was Delivered
-- [Deliverable 1]
-- [Deliverable 2]
-
-### Success Criteria Met
-- [x] [Criterion 1]
-- [x] [Criterion 2]
-
-### Key Decisions Made
-- [Decision 1]
-- [Decision 2]
-
-### Lessons Learned
-[For future projects]
-REASONING_EOF
-
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "completion" \
-  --content-file /tmp/reasoning_completion.md \
+  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "{phase}" \
+  --content-file /tmp/reasoning_{phase}.md \
   --confidence high
 ```
+
+**Phase-specific sections:**
+- `understanding` (REQUIRED at start): User Request Summary, Scope Assessment, Key Requirements, Success Criteria
+- `approach`: Mode (simple/parallel), Why This Mode, Task Groups, Developer Allocation
+- `completion` (REQUIRED at BAZINGA): What Was Delivered, Success Criteria Met, Key Decisions, Lessons Learned
 
 ---
 
