@@ -28,6 +28,16 @@ Instead of treating memory as a simple chat log, BAZINGA implements a **Tiered M
 - **State Offloading:** Heavy research and file contents are offloaded to **Context Packages** (Artifacts), preventing token bloat. Agents receive pointers to this data and must actively "read" it, keeping the working context clean.
 - **Reasoning Capture:** We separate *what* happened (Interaction Logs) from *why* it happened (Reasoning Logs), allowing agents to evolve strategies without carrying the full weight of execution history.
 
+### The Problem & Solution
+
+![The Context Window Fallacy](docs/reference/TheContextWindowsFlallacy.png)
+*The "Infinite Context" Fallacy vs. the Compiled View Architecture—why bigger context windows don't equal better performance.*
+
+### BAZINGA's Implementation
+
+![The BAZINGA Playbook](docs/reference/TheBazingaPlaybook.png)
+*How BAZINGA implements the 9 scaling principles: tiered memory, state offloading, schema-driven summarization, and sub-agent isolation.*
+
 For a detailed breakdown of the theory and our implementation, see the [Agentic Context Engineering Reference](docs/reference/agentic_context_engineering.md).
 
 ---
