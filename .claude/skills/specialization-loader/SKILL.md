@@ -239,6 +239,17 @@ Metadata:
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
+
+---
+**ORCHESTRATOR: CONTINUE TO TURN 2 NOW**
+
+The specialization block above is ready. You MUST immediately:
+1. Extract content between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
+2. Combine with base_prompt: `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
+3. Call `Task()` to spawn the agent with the FULL_PROMPT
+
+🔴 DO NOT wait for user input. DO NOT end your message without calling Task().
+🔴 This is Turn 2 of the TWO-TURN SPAWN SEQUENCE. You MUST call Task() NOW.
 ```
 
 ---
@@ -374,6 +385,17 @@ Metadata:
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
+
+---
+**ORCHESTRATOR: CONTINUE TO TURN 2 NOW**
+
+The specialization block above is ready. You MUST immediately:
+1. Extract content between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
+2. Combine with base_prompt: `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
+3. Call `Task()` to spawn the agent with the FULL_PROMPT
+
+🔴 DO NOT wait for user input. DO NOT end your message without calling Task().
+🔴 This is Turn 2 of the TWO-TURN SPAWN SEQUENCE. You MUST call Task() NOW.
 ```
 
 ---
@@ -399,3 +421,4 @@ Metadata:
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
 6. Block returned in expected format
+7. **Continuation instruction included at end** (critical for orchestrator to continue)
