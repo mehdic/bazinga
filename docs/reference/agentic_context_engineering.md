@@ -158,7 +158,7 @@ This allows the system to reconstruct **why** a decision was made (the "Playbook
 
 ### Video Resource
 
-Here is a relevant video on the topic: [Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models](https://www.youtube.com/watch?v=example). This video provides a comprehensive overview of the ACE framework discussed in the document.
+Here is a relevant video on the topic: [Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models](https://www.youtube.com/watch?v=wu7QoQjM8Pg). This video provides a comprehensive overview of the ACE framework discussed in the document.
 
 ---
 
