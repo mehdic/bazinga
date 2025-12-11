@@ -153,22 +153,26 @@ Operation → Check result → If error: Output capsule with error
 ❌ WRONG: "Database updated. Now let me spawn the SSE for FORECAST group..." [STOPS]
    → The agent never gets spawned. Your message ends. Workflow hangs.
 
-✅ CORRECT: "Database updated." [Task(subagent_type="general-purpose", ...)]
+✅ CORRECT (specializations enabled): "Database updated." [Skill(command: "specialization-loader")]
+   → Turn 1 starts. Workflow continues to Turn 2 with Task().
+
+✅ CORRECT (specializations disabled): "Database updated." [Task(subagent_type="general-purpose", ...)]
    → The agent is spawned in the same turn. Workflow continues.
 ```
-Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. The Task() tool must be CALLED.
+Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool (Skill or Task) MUST be CALLED.
 
 **Your job is to keep the workflow moving forward autonomously. Only PM can stop the workflow by sending BAZINGA.**
 
 **🔴🔴🔴 CRITICAL BUG PATTERN: INTENT WITHOUT ACTION 🔴🔴🔴**
 
-**THE BUG:** Saying "Now let me spawn..." or "I will spawn..." but NOT calling `Task()` in the same message.
+**THE BUG:** Saying "Now let me spawn..." or "I will spawn..." but NOT calling any tool in the same turn.
 
 **WHY IT HAPPENS:** The orchestrator outputs text describing what it plans to do, then ends the message. The workflow hangs because no actual tool was called.
 
 **THE RULE:**
 - ❌ FORBIDDEN: `"Now let me spawn the SSE..."` (text only - workflow hangs)
-- ✅ REQUIRED: `"Spawning SSE:" + Task(subagent_type="general-purpose", ...)` (text + actual tool call)
+- ✅ REQUIRED (specializations enabled): `"Loading specialization:" + Skill(command: "specialization-loader")` (Turn 1)
+- ✅ REQUIRED (specializations disabled): `"Spawning SSE:" + Task(subagent_type="general-purpose", ...)` (direct spawn)
 
 **SELF-CHECK:** Before ending ANY message, verify: **Did I call the tool I said I would call?** If you wrote "spawn", "route", "invoke" → the tool call MUST be in THIS message.
 
@@ -1215,9 +1219,9 @@ Before continuing to Step 1.3a, verify:
 
 **The orchestrator stopping bug happens when you:**
 - Say "Now let me spawn..." or "I will spawn..." (intent)
-- But DON'T call any tool in the same message (no action)
+- But DON'T call any tool in the same turn (no action)
 
-**RULE:** If you write "spawn", "route", "invoke", "call" → you MUST call SOME tool in the SAME message:
+**RULE:** If you write "spawn", "route", "invoke", "call" → you MUST call SOME tool in the SAME turn:
 - For spawns with specializations: Call `Skill(command: "specialization-loader")` in Turn 1, then `Task()` in Turn 2
 - For spawns without specializations: Call `Task()` directly
 - Saying you will do something is NOT doing it. The tool call must happen NOW.
@@ -1240,6 +1244,7 @@ Before continuing to Step 1.3a, verify:
   - **⚠️ CAPACITY LIMIT: Respect MAX 4 PARALLEL DEVELOPERS hard limit**
   - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
 - **🔴 You MUST call SOME tool in THIS turn** - either Skill() or Task(). Do NOT just say "let me spawn"
+  - **Key insight:** Calling `Skill(command: "specialization-loader")` FULLY satisfies the "act now" requirement. Task() will follow in Turn 2.
 
 **Clarification:** Multi-step tool sequences (DB query → spawn) within the same assistant turn are expected. The rule is: **complete all steps before your turn ends** - never stop to wait for user input between receiving PM CONTINUE and spawning agents.
 
@@ -1270,9 +1275,10 @@ Before continuing to Step 1.3a, verify:
 
 **🔴 ANTI-PATTERN - INTENT WITHOUT ACTION:**
 ❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS - turn ends without Task/Skill call]
-✅ **CORRECT:** "Database updated." [Skill() or Task() call in same turn, before turn ends]
+✅ **CORRECT (specializations enabled):** "Database updated." [Skill(command: "specialization-loader") in this turn → Task() in next turn]
+✅ **CORRECT (specializations disabled):** "Database updated." [Task() call in same turn, before turn ends]
 
-Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call the Skill() or Task() tool in the same turn (before user input).
+Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill() or Task() in the same turn. **Note:** When specializations are enabled, calling Skill() satisfies the "act now" requirement - Task() follows in Turn 2 after receiving the specialization block.
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
