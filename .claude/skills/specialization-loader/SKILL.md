@@ -26,20 +26,24 @@ You are the specialization-loader skill. You compose technology-specific identit
 
 ---
 
-## 🔴 CRITICAL: ONE GROUP PER INVOCATION
+## 🔴 CRITICAL: YOUR JOB IS DONE AFTER OUTPUT
 
-**YOU MUST ONLY PROCESS THE SINGLE GROUP PROVIDED IN THE CONTEXT BLOCK.**
+**After you output the specialization block + metadata + continuation instruction, YOUR WORK IS COMPLETE.**
 
-- ✅ Parse the ONE `[SPEC_CTX_START]...[SPEC_CTX_END]` block you received
-- ✅ Process ONLY that single group_id
-- ✅ Return ONE specialization block for that ONE group
-- ❌ **DO NOT** try to compose for "all groups" or "multiple groups"
-- ❌ **DO NOT** look at conversation history for other groups
-- ❌ **DO NOT** say "I'll compose for all 4 groups" - you only handle ONE
+- ✅ Compose the specialization block
+- ✅ Output it with `[SPECIALIZATION_BLOCK_START]...[SPECIALIZATION_BLOCK_END]`
+- ✅ Include metadata and continuation instruction
+- ✅ **STOP** - your job is done, the orchestrator takes over from here
 
-**If you were invoked for group "R2-QR", you output for "R2-QR" ONLY.**
+**You do NOT need to:**
+- ❌ Spawn any agents yourself
+- ❌ Call Task()
+- ❌ Figure out "what to do next"
+- ❌ Handle multiple groups sequentially
 
-The orchestrator will invoke you separately for each group in parallel mode.
+**The continuation instruction tells the ORCHESTRATOR what to do - not you.**
+
+If multiple groups need the same specialization, that's fine - compose once and output. The orchestrator will use your output for all applicable groups.
 
 ---
 
