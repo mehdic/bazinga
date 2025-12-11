@@ -747,7 +747,64 @@ Phase 4 complete! Would you like me to:
 
 **Workflow:** PM (investigation request) → Orchestrator spawns Investigator → Investigator→Tech Lead→Developer
 
-**Examples:** Build failure (linker errors, works locally fails CI) | Deployment blocker (pods fail health checks) | Performance regression (5x slower, unknown cause) → All use `INVESTIGATION_NEEDED` status with problem/context/hypothesis for Investigator.
+**Example 1 - Build Failure:**
+```
+## PM Status Update
+
+### Critical Issue Detected
+Build failing on production target with linker errors.
+
+### Analysis
+- Local dev builds succeed
+- CI/CD pipeline fails at link stage
+- Root cause: Unknown
+
+**Status:** INVESTIGATION_NEEDED
+**Next Action:** Orchestrator should spawn Investigator with:
+- Problem: Production build linker errors (undefined references)
+- Context: Works locally, fails in CI
+- Hypothesis: Missing library dependencies or compiler flag differences
+```
+
+**Example 2 - Deployment Blocker:**
+```
+## PM Status Update
+
+### Critical Issue Detected
+Deployment to staging environment blocked - pods failing health checks.
+
+### Analysis
+- Docker images build successfully
+- Kubernetes pods start but fail readiness probe
+- Logs show connection timeouts
+- Root cause: Unknown
+
+**Status:** INVESTIGATION_NEEDED
+**Next Action:** Orchestrator should spawn Investigator with:
+- Problem: Staging deployment health check failures
+- Context: Images build, pods start, but fail readiness
+- Hypothesis: Network config, missing env vars, or service dependencies
+```
+
+**Example 3 - Performance Regression:**
+```
+## PM Status Update
+
+### Critical Issue Detected
+API response times increased 5x after recent deployment.
+
+### Analysis
+- No code changes to query logic
+- Database queries show normal execution time
+- Load hasn't increased
+- Root cause: Unknown
+
+**Status:** INVESTIGATION_NEEDED
+**Next Action:** Orchestrator should spawn Investigator with:
+- Problem: 5x performance degradation on API endpoints
+- Context: No query changes, normal DB performance, consistent load
+- Hypothesis: Connection pooling, cache invalidation, or middleware overhead
+```
 
 ### Tech Debt Gate (Before BAZINGA)
 
@@ -1276,13 +1333,61 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 **When PM is spawned with existing task groups (resume scenario):**
 
-1. Query: `bazinga-db, get task groups for session [session_id]` → Skill(command: "bazinga-db")
-2. Check each group for null/empty `specializations` or `item_count`
-3. For missing fields: derive specializations from project_context.json (or fallback table), default item_count=1
-4. Update via bazinga-db with ONLY the missing fields (don't overwrite existing values)
-5. Log: `📋 Backfilled {N} task groups: {fields_updated}`
+1. **Query existing task groups:**
+   ```
+   bazinga-db, get task groups for session [session_id]
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
 
-**Skip if:** NEW session (no existing task groups).
+2. **Check each group for missing required fields:**
+   ```
+   FOR each task_group in result:
+     needs_specializations = task_group.specializations is null OR empty
+     needs_item_count = task_group.item_count is null OR 0
+
+     IF needs_specializations OR needs_item_count:
+       → This group needs backfill
+   ```
+
+3. **Backfill missing fields:**
+   ```
+   Read(file_path: "bazinga/project_context.json")
+
+   FOR each group needing backfill:
+
+     # Build update command with ONLY the fields that need backfill
+     update_flags = []
+
+     # Backfill specializations if missing
+     IF needs_specializations:
+       Derive specializations using:
+         - primary_language → language template
+         - framework → framework template
+         - (Use mapping table from Step 3.5)
+       update_flags.append('--specializations \'["derived/paths/here"]\'')
+
+     # Backfill item_count if missing (default to 1)
+     IF needs_item_count:
+       update_flags.append('--item_count 1')
+
+     # Update with ONLY the missing fields (don't overwrite good values!)
+     bazinga-db, update task group:
+     Group ID: {group_id}
+     {update_flags joined}
+
+     Skill(command: "bazinga-db")
+   ```
+
+   **⚠️ CRITICAL:** Only include flags for fields that ACTUALLY need backfill.
+   Do NOT include `--specializations` if group already has them.
+   Do NOT include `--item_count` if group already has it.
+
+4. **Log the backfill:**
+   ```
+   📋 Backfilled {N} task groups: {fields_updated}
+   ```
+
+**Skip this step if:** This is a NEW session (no existing task groups).
 
 ---
 
