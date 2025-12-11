@@ -385,41 +385,48 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 3. END this message (wait for all skill responses)
 
 **Turn 2 (after skill responses):**
-1. Read each skill response (internally - DO NOT echo to user)
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group → store as `spec_blocks[group_id]`
-3. Build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each group
-4. **🔴 IMMEDIATELY output capsule and call ALL `Task()` spawns in THIS message**
 
-**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCKS 🔴🔴🔴**
 
-After extracting ALL specialization blocks (silently), you MUST:
-1. Output ONLY the spawn summary capsule (not the spec blocks)
-2. **Call Task() for EACH group in THIS SAME MESSAGE**
-3. DO NOT end the message without Task() calls
+The skill just output specialization block(s). You MUST process them SILENTLY:
 
-**WRONG (Bug Pattern - echoing spec blocks):**
+1. **INTERNALLY** extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
+2. **INTERNALLY** store as `spec_blocks[group_id]`
+3. **INTERNALLY** build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each group
+4. **OUTPUT** only a brief capsule (see below)
+5. **CALL** `Task()` for EACH group
+
+**🔴 FORBIDDEN - DO NOT OUTPUT ANY OF THESE:**
+- ❌ The specialization block content
+- ❌ The FULL_PROMPT content for any group
+- ❌ The base_prompt content for any group
+- ❌ Any "here's what I'm sending to the agents..." preview
+
+**✅ ONLY OUTPUT THIS:**
+```
+🔧 Specializations: ✓ | {identity}
+```
+Then IMMEDIATELY call `Task()` for each group.
+
+**WRONG (echoing blocks/prompts - THIS IS THE BUG):**
 ```
 [SPECIALIZATION_BLOCK_START]
 ...
-[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
+[SPECIALIZATION_BLOCK_END]  ← WRONG! You printed the block!
 
 📝 Spawning 4 developers...
+Here's the full prompt for each...  ← WRONG! Don't show prompts!
 
 [MESSAGE ENDS - NO TASK() CALLS]  ← BUG! Workflow hangs
 ```
 
-**CORRECT (silent extraction, capsule only):**
+**CORRECT (silent, capsule only, Tasks called):**
 ```
-🔧 Specializations loaded: A (3 templates), B (3 templates), C (3 templates)
+🔧 Specializations: ✓ | TypeScript/React Developer
 
-📝 Spawning 3 developers in parallel:
-• Group A: Developer | Initialize Delivery App Structure | Specializations: ✓
-• Group B: Developer | Delivery Request List & Detail | Specializations: ✓
-• Group C: Developer | Order Tracking Dashboard | Specializations: ✓
-
-Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize Delivery App Structure", prompt=FULL_PROMPT_A)
-Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery Request List & Detail", prompt=FULL_PROMPT_B)
-Task(subagent_type="general-purpose", model="haiku", description="Developer C: Order Tracking Dashboard", prompt=FULL_PROMPT_C)
+Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize App", prompt=FULL_PROMPT_A)
+Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery List", prompt=FULL_PROMPT_B)
+Task(subagent_type="general-purpose", model="haiku", description="Developer C: Dashboard", prompt=FULL_PROMPT_C)
 ```
 
 **🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
