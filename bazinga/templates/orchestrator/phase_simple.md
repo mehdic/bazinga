@@ -97,121 +97,85 @@ Prior agents documented their decision-making for this task:
 - Build on prior agent's understanding
 ```
 
-**🔴🔴🔴 MANDATORY SPAWN SEQUENCE - CANNOT BE SKIPPED 🔴🔴🔴**
+## SPAWN DEVELOPER (ATOMIC SEQUENCE)
 
-**You MUST execute ALL steps below in exact order. Skipping any step is a CRITICAL FAILURE.**
+**To spawn a developer, you MUST produce this EXACT output sequence in your message.**
 
----
-
-### SPAWN STEP 1: Build Base Prompt
-
-Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format.
+**There is no Task() without the Skill() first. They are ONE action, not separate steps.**
 
 ---
 
-### SPAWN STEP 2: Load Specializations (MANDATORY - DO THIS NOW)
+### PART A: Build Base Prompt (internal)
 
-**🚨 CRITICAL: You MUST complete this step BEFORE spawning. DO NOT skip to Task().**
+Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
 
-**2a. Check if enabled:**
+Store as `base_prompt`. Do not output to user.
+
+---
+
+### PART B: Load Specializations → Then Spawn (FUSED ACTION)
+
+**Check `bazinga/skills_config.json`:** Is `specializations.enabled == true` AND `agent_type` in `enabled_agents`?
+
+**IF YES (specializations enabled):** Your message MUST contain this exact sequence:
+
 ```
-Read bazinga/skills_config.json
-Check: specializations.enabled == true AND agent_type in enabled_agents
-```
+🔧 Loading specializations for {agent_type}...
 
-**IF enabled (proceed with 2b-2e):**
-
-**2b. Output specialization context block** (the skill reads from conversation history):
-```
 [SPEC_CTX_START group={group_id} agent={agent_type}]
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {agent_type}
-Model: {model from MODEL_CONFIG}
-Specialization Paths: {task_group.specializations from PM as JSON array}
-[SPEC_CTX_END group={group_id}]
+Model: {MODEL_CONFIG[initial_tier]}
+Specialization Paths: {task_group.specializations as JSON array}
+[SPEC_CTX_END]
 ```
 
-**2c. IMMEDIATELY invoke the skill** (no other output between context and this):
+Then IMMEDIATELY call (no other text between):
 ```
 Skill(command: "specialization-loader")
 ```
 
-**2d. Wait for skill response and extract block:**
-- Find content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
-- Store this as `specialization_block`
+Then wait for response. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`.
 
-**2d-FAILURE. Handle skill failure (timeout, error, missing block):**
-
-| Failure Type | Action |
-|--------------|--------|
-| Skill times out | Output: `⚠️ Specialization loading timeout | Proceeding with base prompt` → set `specializations_status = "timeout"` |
-| Skill returns error | Output: `⚠️ Specialization loading failed: {error} | Proceeding with base prompt` → set `specializations_status = "error"` |
-| Block markers not found | Output: `⚠️ Specialization block not found | Proceeding with base prompt` → set `specializations_status = "not_found"` |
-
-**On ANY failure:** `full_prompt = base_prompt` (graceful degradation - proceed without specializations)
-
-**2e. Compose final prompt (on success):**
+Then output capsule and spawn:
 ```
-full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
-specializations_status = "loaded"
-```
+🔧 Specializations: loaded ({N} templates) | {identity_summary}
 
-**IF disabled or agent not in enabled_agents:**
-```
-full_prompt = base_prompt
-specializations_status = "disabled"
-```
-
----
-
-### SPAWN STEP 3: Show Prompt Summary
-
-**Output structured summary (NOT full prompt):**
-```text
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
-
-   **Task:** {task_title}
-   {task_description_2_3_sentences}
-
-   **Requirements:**
-   • {requirement_1}
-   • {requirement_2}
-   • {requirement_3_if_applicable}
-
+   **Task:** {task_summary}
    **Branch:** {branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
-   **Testing:** {testing_mode} | QA: {qa_status}
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{initial_tier}"], description="{tier}: {task[:90]}", prompt={specialization_block + base_prompt})
+```
+
+**IF skill fails (timeout/error/no block):**
+```
+⚠️ Specializations failed | Proceeding with base prompt
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{initial_tier}"], description="{tier}: {task[:90]}", prompt={base_prompt})
+```
+
+**IF NO (specializations disabled):** Skip skill, spawn directly:
+```
+📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
+   **Task:** {task_summary}
+   **Specializations:** disabled
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{initial_tier}"], description="{tier}: {task[:90]}", prompt={base_prompt})
 ```
 
 ---
 
-### SPAWN STEP 4: Execute Task Spawn
+### SELF-CHECK (Read This Before Sending)
 
-**🚨 CHECKPOINT: Before proceeding, verify:**
-- ✅ Base prompt built (Step 1)?
-- ✅ Specialization loading executed (Step 2)? If enabled, did you invoke `Skill(command: "specialization-loader")`?
-- ✅ `full_prompt` contains specialization block (if enabled)?
+Before you send your message, verify:
+- **If specializations enabled:** Does your message contain `[SPEC_CTX_START`? Does it contain `Skill(command: "specialization-loader")`?
+- **If your message has Task() but NO Skill():** You skipped specializations. Add them NOW.
 
-**IF ANY checkpoint fails: GO BACK and complete the missing step.**
-
-**Spawn the agent:**
-
-**How to get the model:**
-```
-# PM's initial_tier for this task = "developer" or "senior_software_engineer" or "requirements_engineer"
-# Look up: MODEL_CONFIG[task_group.initial_tier]
-# Example: If initial_tier="developer" → MODEL_CONFIG["developer"] → "haiku"
-# Example: If initial_tier="senior_software_engineer" → MODEL_CONFIG["senior_software_engineer"] → "sonnet"
-```
-
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier], description=desc, prompt=full_prompt)
-```
+**The Skill() and Task() must be in the SAME message. Do not split them across turns.**
 
 ---
-
-**🔴🔴🔴 END MANDATORY SPAWN SEQUENCE 🔴🔴🔴**
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -293,14 +257,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
   * Continue workflow automatically
 
 **IF Developer reports ESCALATE_SENIOR:**
-- **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
-- Build prompt with: original task, developer's attempt, reason for escalation
-- **🔴 Spawn SSE with Specializations (INLINE):**
-  1. Output: `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]` + Session/Group/Agent/Model/Paths + `[SPEC_CTX_END]`
-  2. `Skill(command: "specialization-loader")`
-  3. Extract block, prepend to base_prompt
-  4. `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: explicit escalation", prompt=full_prompt)`
-- This is an explicit request, not revision-based escalation
+- Build SSE prompt with: original task, developer's attempt, reason for escalation
+- **Spawn SSE (fused):** Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
 
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
 
@@ -331,20 +289,11 @@ Before moving to the next group or ending your message, verify:
    ```
    Invoke: `Skill(command: "bazinga-db")`
 
-**🔴 Spawn Developer with Specializations (INLINE):**
-1. Output: `[SPEC_CTX_START group={group_id} agent=developer]` + Session/Group/Agent/Model/Paths + `[SPEC_CTX_END]`
-2. `Skill(command: "specialization-loader")`
-3. Extract block, prepend to base_prompt
-4. `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: continue work", prompt=full_prompt)`
+**Spawn Developer (fused):** Output `[SPEC_CTX_START group={group_id} agent=developer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["developer"], prompt={spec_block + base})`
 
 **IF revision count >= 1 (Developer failed once):**
-- Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"], handles complex issues)
-- Build prompt with: original task, developer's attempt, failure details
-- **🔴 Spawn SSE with Specializations (INLINE):**
-  1. Output: `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]` + Session/Group/Agent/Model/Paths + `[SPEC_CTX_END]`
-  2. `Skill(command: "specialization-loader")`
-  3. Extract block, prepend to base_prompt
-  4. `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: escalated task", prompt=full_prompt)`
+- Escalate to SSE. Build prompt with: original task, developer's attempt, failure details
+- **Spawn SSE (fused):** Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
 
 **IF Senior Software Engineer also fails (revision count >= 2 after Senior Eng):**
 - Spawn Tech Lead for architectural guidance
@@ -391,34 +340,17 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 ✅ Testing | Running tests + coverage analysis
 ```
 
-### 🔴 MANDATORY QA EXPERT SPAWN (Follow MANDATORY SPAWN SEQUENCE)
+### SPAWN QA EXPERT (ATOMIC SEQUENCE)
 
-**Apply the MANDATORY SPAWN SEQUENCE from Step 2A.1 (SPAWN STEP 1-4) with these QA-specific values:**
+**Build QA prompt:** Read `agents/qa_expert.md` + `bazinga/templates/prompt_building.md`. Include: Agent=QA Expert, Group, Mode, Session, Skills/Testing, Context (dev changes), files to test.
 
-**Base Prompt:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`.
-
-**🔴🔴🔴 EXECUTE SPAWN STEPS 1-4 NOW:**
-
-1. **SPAWN STEP 1**: Build base prompt (as above)
-2. **SPAWN STEP 2**: Load Specializations (MANDATORY)
-   - Check skills_config.json for specializations.enabled
-   - IF enabled: Output `[SPEC_CTX_START group={group_id} agent=qa_expert]...` → Invoke `Skill(command: "specialization-loader")` → Extract and prepend block
-3. **SPAWN STEP 3**: Show prompt summary:
-```text
-📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
-
-   **Task:** Validate {dev_task_title} implementation
-   {what_dev_implemented_summary}
-
-   **Files to test:** {files_truncated} (showing first 3, +{files_remaining} more if applicable)
-   **Dev's test coverage:** {coverage_pct}%
-
-   **Challenge Level:** {challenge_level}/5 ({challenge_name})
-   **Config:** Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
+**Spawn QA (fused):** Output `[SPEC_CTX_START group={group_id} agent=qa_expert]...` → `Skill(command: "specialization-loader")` → extract block → output summary:
 ```
-4. **SPAWN STEP 4**: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description=desc, prompt=full_prompt)`
-
-**🚨 DO NOT skip Step 2 (specialization loading) - it is MANDATORY.**
+📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
+   **Task:** Validate {dev_task_title} | **Challenge Level:** {level}/5
+   **Specializations:** {status}
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt={spec_block + base})`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -461,24 +393,14 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 3. Include QA feedback and failed tests
 4. Track revision count in database (increment by 1)
 
-**🔴 Spawn Developer with Specializations (INLINE):**
-1. Output: `[SPEC_CTX_START group={group_id} agent=developer]` + Session/Group/Agent/Model/Paths + `[SPEC_CTX_END]`
-2. `Skill(command: "specialization-loader")`
-3. Extract block, prepend to base_prompt
-4. `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {id}: fix QA issues", prompt=full_prompt)`
+**Spawn Developer (fused):** Output `[SPEC_CTX_START group={group_id} agent=developer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["developer"], prompt={spec_block + base})`
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
-- Escalate to Senior Software Engineer (uses MODEL_CONFIG["senior_software_engineer"])
-- Include QA's challenge level findings in prompt
+- Escalate to SSE with QA's challenge level findings
+- **Spawn SSE (fused):** Output `[SPEC_CTX_START...]` → `Skill(command: "specialization-loader")` → extract → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
 
 **IF QA reports ESCALATE_SENIOR explicitly:**
-- **Immediately spawn Senior Software Engineer** (uses MODEL_CONFIG["senior_software_engineer"])
-- **🔴 Spawn SSE with Specializations (INLINE):**
-  1. Output: `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]` + Session/Group/Agent/Model/Paths + `[SPEC_CTX_END]`
-  2. `Skill(command: "specialization-loader")`
-  3. Extract block, prepend to base_prompt
-  4. `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SeniorEng: QA challenge escalation", prompt=full_prompt)`
-- This bypasses revision count check - explicit escalation from QA's challenge testing
+- **Spawn SSE (fused):** Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")` → extract → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
 
 **🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
 - ALWAYS spawn Senior Software Engineer for fixes (never regular Developer)
@@ -531,41 +453,17 @@ Prior implementers documented their decision-making:
 - Understand WHY implementation choices were made
 ```
 
-**🔴🔴🔴 EXECUTE SPAWN STEPS 1-4 NOW (Tech Lead):**
+### SPAWN TECH LEAD (ATOMIC SEQUENCE)
 
-1. **SPAWN STEP 1**: Build base prompt
-   - Read `agents/techlead.md`
-   - Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section)
-   - Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**
-   - **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks
-   - **Description:** `f"TechLead {group_id}: review"`
+**Build TL prompt:** Read `agents/techlead.md` + `bazinga/templates/prompt_building.md`. Include: Agent=Tech Lead, Group, Mode, Session, Skills/Testing, Context (impl+QA summary), Implementation Reasoning (if any).
 
-2. **SPAWN STEP 2**: Load Specializations (MANDATORY)
-   - Check skills_config.json for specializations.enabled
-   - IF enabled: Output `[SPEC_CTX_START group={group_id} agent=tech_lead]` + Session/Group/Agent/Model/Paths + `[SPEC_CTX_END]`
-   - Invoke `Skill(command: "specialization-loader")`
-   - Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
-   - Prepend to base_prompt → `full_prompt`
-   - Set `specializations_status = "loaded"`
-   - IF disabled: `full_prompt = base_prompt`, `specializations_status = "disabled"`
-
-3. **SPAWN STEP 3**: Show prompt summary:
-```text
-📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
-
-   **Task:** Review {task_title} implementation
-   {what_was_implemented_summary}
-
-   **Files to review:** {files_truncated} (first 3, +{files_remaining} more if applicable)
-   **Dev summary:** {dev_summary_truncated} (max 100 chars)
-   **QA result:** {qa_result} | Coverage: {coverage_pct}% | Tests: {tests_passed}/{tests_total}
-
-   **Config:** Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
+**Spawn Tech Lead (fused):** Output `[SPEC_CTX_START group={group_id} agent=tech_lead]...` → `Skill(command: "specialization-loader")` → extract block → output summary:
 ```
-
-4. **SPAWN STEP 4**: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description=desc, prompt=full_prompt)`
-
-**🚨 DO NOT skip Step 2 (specialization loading) - it is MANDATORY.**
+📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
+   **Task:** Review {task_title} | **QA:** {result} | **Coverage:** {pct}%
+   **Specializations:** {status}
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt={spec_block + base})`
 
 
 **AFTER receiving the Tech Lead's response:**

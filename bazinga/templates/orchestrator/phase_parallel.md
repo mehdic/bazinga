@@ -180,137 +180,93 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
 ```
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
-**🔴🔴🔴 MANDATORY PARALLEL SPAWN SEQUENCE - CANNOT BE SKIPPED 🔴🔴🔴**
+## SPAWN DEVELOPERS - PARALLEL (ATOMIC SEQUENCE PER GROUP)
 
-**You MUST execute ALL steps below in exact order FOR EACH GROUP. Skipping any step is a CRITICAL FAILURE.**
+**To spawn developers in parallel, you MUST produce specializations THEN spawns for EACH group.**
 
----
-
-### PARALLEL SPAWN STEP 1: Build Base Prompts (ALL GROUPS)
-
-For EACH group: Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
-
-Store as `base_prompts[group_id]` for each group.
+**There is no Task() without the Skill() first. They are ONE action per group.**
 
 ---
 
-### PARALLEL SPAWN STEP 2: Load Specializations FOR EACH GROUP (MANDATORY - DO THIS NOW)
+### PART A: Build Base Prompts (internal, all groups)
 
-**🚨 CRITICAL: You MUST complete this step for EACH GROUP before spawning ANY agent.**
+For EACH group: Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode=Parallel, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
 
-**⚠️ ISOLATION RULE:** Complete context→skill→extract for EACH group sequentially. Do NOT interleave.
+Store as `base_prompts[group_id]`. Do not output to user.
 
-**2a. Check if specializations enabled (once):**
+---
+
+### PART B: Load Specializations → Then Spawn (FUSED ACTION PER GROUP)
+
+**Check `bazinga/skills_config.json` once:** Is `specializations.enabled == true`?
+
+**IF YES (specializations enabled):** For EACH group, your message MUST contain this sequence:
+
 ```
-Read bazinga/skills_config.json
-Check: specializations.enabled == true
-```
+🔧 Loading specializations for Group {group_id} ({agent_type})...
 
-**FOR EACH group (A, B, C, D - MAX 4) - IF specializations enabled:**
-
-**2b. Output specialization context block for this group:**
-```
 [SPEC_CTX_START group={group_id} agent={agent_type}]
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {agent_type}
-Model: {model from MODEL_CONFIG}
-Specialization Paths: {task_group.specializations from PM as JSON array}
-[SPEC_CTX_END group={group_id}]
+Model: {MODEL_CONFIG[initial_tier]}
+Specialization Paths: {task_group.specializations as JSON array}
+[SPEC_CTX_END]
 ```
 
-**2c. IMMEDIATELY invoke skill** (no other output between context and this):
+Then IMMEDIATELY call:
 ```
 Skill(command: "specialization-loader")
 ```
 
-**2d. Extract block from response:**
-- Find content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
-- Store as `specialization_blocks[group_id]`
+Then extract block from response. Store as `specialization_blocks[group_id]`.
 
-**2d-FAILURE. Handle skill failure for this group (timeout, error, missing block):**
+**Repeat for EACH group (A, B, C, D - MAX 4) before spawning any Task.**
 
-| Failure Type | Action |
-|--------------|--------|
-| Skill times out | Output: `⚠️ Group {group_id}: Specialization loading timeout | Proceeding with base prompt` |
-| Skill returns error | Output: `⚠️ Group {group_id}: Specialization loading failed: {error} | Proceeding with base prompt` |
-| Block markers not found | Output: `⚠️ Group {group_id}: Specialization block not found | Proceeding with base prompt` |
-
-**On ANY failure for this group:**
+**After ALL specializations loaded, output summary and spawn ALL:**
 ```
-full_prompts[group_id] = base_prompts[group_id]
-specializations_status[group_id] = "failed"
-```
-**Then continue to next group** (graceful degradation - one group's failure doesn't block others)
+🔧 Specializations loaded: A ({N} templates), b ({N} templates), C ({N} templates)
 
-**2e. Compose final prompt for this group (on success):**
-```
-full_prompts[group_id] = specialization_blocks[group_id] + "\n\n---\n\n" + base_prompts[group_id]
-specializations_status[group_id] = "loaded"
+📝 Spawning {count} developers in parallel:
+• Group A: {tier} | {task_summary}
+• Group B: {tier} | {task_summary}
+...
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_A}"], description="{tier} A: {task[:90]}", prompt={spec_block_A + base_A})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_B}"], description="{tier} B: {task[:90]}", prompt={spec_block_B + base_B})
+...
 ```
 
-**THEN move to next group and repeat 2b-2e.**
+**IF any group's skill fails:** Use base_prompt for that group, note in summary:
+```
+🔧 Specializations: A (loaded), B (⚠️ failed), C (loaded)
+```
 
-**IF specializations disabled:**
+**IF NO (specializations disabled):** Skip all Skill() calls, spawn directly:
 ```
-For each group: full_prompts[group_id] = base_prompts[group_id]
-specializations_status[group_id] = "disabled"
+📝 Spawning {count} developers in parallel | Specializations: disabled
+• Group A: {tier} | {task_summary}
+...
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_A}"], description="{tier} A: {task[:90]}", prompt={base_A})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_B}"], description="{tier} B: {task[:90]}", prompt={base_B})
+...
 ```
+
+**🔴 MAX 4 groups.** If >4, spawn first 4, defer rest.
 
 ---
 
-### PARALLEL SPAWN STEP 3: Show Prompt Summaries (ALL GROUPS)
+### SELF-CHECK (Read This Before Sending)
 
-**Output structured summary for EACH group (NOT full prompts):**
-```text
-📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
+Before you send your message, verify:
+- **If specializations enabled:** Does your message contain `[SPEC_CTX_START` for EACH group? Does it contain `Skill(command: "specialization-loader")` calls (one per group)?
+- **If your message has Task() calls but NO Skill() calls:** You skipped specializations. Add them NOW.
+- **Count your Task() calls:** Should match number of groups (max 4).
 
-   **Task:** {task_title}
-   {task_description_2_3_sentences}
-
-   **Requirements:**
-   • {requirement_1}
-   • {requirement_2}
-
-   **Branch:** {group_branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status[group_id]} | Skills: {skills_list}
-```
+**All Skill() calls must complete BEFORE any Task() calls. Same message, sequenced.**
 
 ---
-
-### PARALLEL SPAWN STEP 4: Execute Task Spawns (ALL GROUPS)
-
-**🚨 CHECKPOINT: Before spawning, verify FOR EACH GROUP:**
-- ✅ Base prompt built (Step 1)?
-- ✅ Specialization loading executed (Step 2)? If enabled, did you invoke `Skill(command: "specialization-loader")` for this group?
-- ✅ `full_prompts[group_id]` contains specialization block (if enabled)?
-
-**IF ANY checkpoint fails for ANY group: GO BACK and complete the missing step.**
-
-**Spawn ALL agents (use MODEL_CONFIG based on PM's tier decision per group):**
-
-**How to get the model for each group:**
-```
-# For group A: task_groups["A"].initial_tier = "developer" or "senior_software_engineer" or "requirements_engineer"
-# Look up: MODEL_CONFIG[task_groups["A"].initial_tier]
-# Example: If initial_tier="developer" → MODEL_CONFIG["developer"] → "haiku"
-# Example: If initial_tier="senior_software_engineer" → MODEL_CONFIG["senior_software_engineer"] → "sonnet"
-```
-
-**Spawn commands:**
-```
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["A"].initial_tier], description="Dev A: {task[:90]}", prompt=full_prompts["A"])
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initial_tier], description="Dev B: {task[:90]}", prompt=full_prompts["B"])
-... (for each group)
-```
-
-**🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
-
-**🔴 DO NOT spawn >4** (breaks system).
-
----
-
-**🔴🔴🔴 END MANDATORY PARALLEL SPAWN SEQUENCE 🔴🔴🔴**
 
 **AFTER receiving ALL developer responses:**
 
