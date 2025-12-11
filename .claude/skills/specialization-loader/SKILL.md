@@ -26,27 +26,6 @@ You are the specialization-loader skill. You compose technology-specific identit
 
 ---
 
-## 🔴 CRITICAL: YOUR JOB IS DONE AFTER OUTPUT
-
-**After you output the specialization block + metadata + continuation instruction, YOUR WORK IS COMPLETE.**
-
-- ✅ Compose the specialization block
-- ✅ Output it with `[SPECIALIZATION_BLOCK_START]...[SPECIALIZATION_BLOCK_END]`
-- ✅ Include metadata and continuation instruction
-- ✅ **STOP** - your job is done, the orchestrator takes over from here
-
-**You do NOT need to:**
-- ❌ Spawn any agents yourself
-- ❌ Call Task()
-- ❌ Figure out "what to do next"
-- ❌ Handle multiple groups sequentially
-
-**The continuation instruction tells the ORCHESTRATOR what to do - not you.**
-
-If multiple groups need the same specialization, that's fine - compose once and output. The orchestrator will use your output for all applicable groups.
-
----
-
 ## Your Task
 
 ### Step 1: Parse Input Context
@@ -280,6 +259,12 @@ The specialization block above is ready. You MUST immediately:
 🔴 DO NOT wait for user input. DO NOT end your message without calling Task().
 🔴 This is Turn 2 of the TWO-TURN SPAWN SEQUENCE. You MUST call Task() NOW.
 ```
+
+**🔴 YOUR JOB IS DONE AFTER THIS OUTPUT:**
+- ❌ Do NOT spawn agents yourself or call Task()
+- ❌ Do NOT figure out "what to do next"
+- ✅ The continuation instruction tells the ORCHESTRATOR what to do - not you
+- ✅ If multiple groups share the same specialization, compose once - orchestrator handles the rest
 
 ---
 
