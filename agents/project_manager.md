@@ -2154,12 +2154,53 @@ Work continues until Tech Lead approves.
 
 When spawned after work has started, you receive updated state from orchestrator.
 
+### Step 0: Scope Verification (MANDATORY ON RESUME)
+
+**🔴 CRITICAL: Check if orchestrator provided "SCOPE PRESERVATION" section in your prompt.**
+
+**IF "SCOPE PRESERVATION" section exists:**
+
+The orchestrator has detected a resume scenario and provided Original_Scope data. You MUST:
+
+1. **Compare user's current request with Original_Scope.raw_request**
+2. **Determine scope relationship:**
+   - SAME scope → Normal resume, continue from current state
+   - NARROWER scope → User wants less than original, proceed with narrowed scope
+   - BROADER scope → User wants more than current progress covers
+   - FULL scope requested ("everything", "all of X") → Ensure 100% of Original_Scope covered
+
+3. **IF BROADER or FULL scope requested:**
+   - Check if current task groups cover the full Original_Scope
+   - IF NOT: Create additional task groups for missing scope items
+   - Return Status: PLANNING_COMPLETE (not CONTINUE) to signal new groups
+   - The orchestrator will then start the new groups
+
+4. **IF scope matches current progress:**
+   - Normal resume - continue to Step 1
+
+**IF "SCOPE PRESERVATION" section MISSING:**
+- This is a legacy spawn without scope data
+- Proceed with current PM state as-is (best effort)
+
+**Example scope expansion:**
+```
+Original_Scope: "implement everything in tasks8.md" (69 tasks)
+Current state: Phase 1 complete (4 tasks), Phase 2 pending (4 tasks)
+User says: "continue with everything"
+
+→ "everything" = FULL scope = 69 tasks
+→ Current groups only cover 8 tasks
+→ ACTION: Create additional task groups for remaining 61 tasks
+→ Status: PLANNING_COMPLETE (new groups created)
+```
+
 ### Step 1: Analyze Current State
 
 Read provided context:
 - Updated PM state from database
 - Completion updates (which groups approved/failed)
 - Current group statuses
+- Original_Scope (if provided) - compare with current progress
 
 **If development plan exists:** Query plan status and update completed phases via bazinga-db `update-plan-progress` when phases complete. Keep plan synchronized with actual progress.
 

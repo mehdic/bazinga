@@ -516,13 +516,35 @@ bazinga-db, get PM state for session: [session_id] - mode, task groups, last sta
 ```
 Invoke: `Skill(command: "bazinga-db")`
 
-Extract PM state, then IMMEDIATELY continue to Step 4.
+Extract PM state, then IMMEDIATELY continue to Step 3.5.
+
+---
+
+**Step 3.5: Load Original Scope (CRITICAL FOR SCOPE PRESERVATION)**
+
+**YOU MUST query the session's Original_Scope to prevent scope narrowing.**
+
+Request to bazinga-db skill:
+```
+bazinga-db, get session details for: [session_id]
+I need the Original_Scope field specifically.
+```
+Invoke: `Skill(command: "bazinga-db")`
+
+Extract the `Original_Scope` object which contains:
+- `raw_request`: The exact user request that started this session
+- `scope_type`: file, feature, task_list, or description
+- `scope_reference`: File path if scope_type=file
+- `estimated_items`: Item count if determinable
+
+**CRITICAL: Store this Original_Scope - you MUST pass it to PM in Step 5.**
 
 ---
 
 **Step 4: Analyze Resume Context**
 
 From PM state: mode (simple/parallel), task groups (statuses), last activity, next steps.
+From Original_Scope: What the user originally asked for (FULL scope, not current progress).
 
 ---
 
@@ -564,6 +586,34 @@ Display:
 - The resume context (what was done, what's next)
 - User's current request
 - PM state loaded from database
+- **🔴 CRITICAL: Original_Scope from Step 3.5** (to prevent scope narrowing)
+
+**PM Spawn Prompt MUST include this scope comparison section:**
+```
+## 🔴 SCOPE PRESERVATION (MANDATORY FOR RESUME)
+
+**Original Scope (from session creation):**
+- Raw Request: {Original_Scope.raw_request}
+- Scope Type: {Original_Scope.scope_type}
+- Scope Reference: {Original_Scope.scope_reference}
+- Estimated Items: {Original_Scope.estimated_items}
+
+**User's Current Request:** {user_current_message}
+
+**YOUR TASK - SCOPE COMPARISON:**
+1. Compare user's current request with Original_Scope.raw_request
+2. IF current request implies SAME OR NARROWER scope:
+   - Normal resume - continue from where we left off
+3. IF current request implies BROADER scope (more items, more phases, additional work):
+   - DO NOT narrow to current PM state
+   - Create additional task groups for the expanded scope
+   - Status: PLANNING_COMPLETE (not CONTINUE) to signal new groups created
+4. IF user explicitly requests "everything" or "all of [file/feature]":
+   - This means FULL Original_Scope, not just current progress
+   - Ensure task groups cover 100% of Original_Scope
+
+**NEVER reduce scope below Original_Scope without explicit user approval.**
+```
 
 **After PM responds:** Route using Step 1.3a. In resume scenarios, PM typically returns:
 - `CONTINUE` → Immediately spawn agents for in_progress/pending groups (Step 2A.1 or 2B.1)
