@@ -2,8 +2,8 @@
 
 **Date:** 2025-12-11
 **Context:** Skill outputs text directly, causing user-visible display and turn termination
-**Decision:** TBD
-**Status:** Proposed
+**Decision:** Use Bash heredoc instead of text output
+**Status:** ✅ IMPLEMENTED
 
 ---
 
@@ -51,7 +51,7 @@ When `specialization-loader` skill runs:
 
 ## Options Analysis
 
-### Option A: Save to bazinga-db (RECOMMENDED)
+### Option A: Save to bazinga-db (NOT IMPLEMENTED - too complex)
 
 **Change:** Skill saves block to DB, outputs minimal confirmation
 
@@ -99,7 +99,7 @@ python3 bazinga_db.py get-skill-output "{session}" "specialization-loader" --gro
 
 ---
 
-### Option B: Save to temp file
+### Option B: Save to temp file (NOT IMPLEMENTED)
 
 **Change:** Skill writes block to file, orchestrator reads file
 
@@ -128,7 +128,7 @@ cat bazinga/temp/spec_{session}_{group}.md
 
 ---
 
-### Option C: Return block via environment variable
+### Option C: Return block via environment variable (NOT IMPLEMENTED)
 
 **Change:** Skill sets env var, orchestrator reads it
 
@@ -149,7 +149,7 @@ export SPEC_BLOCK_R2_INIT="..."
 
 ---
 
-### Option D: Inline specialization (remove skill)
+### Option D: Inline specialization (remove skill) (NOT IMPLEMENTED)
 
 **Change:** Orchestrator reads templates directly, no skill
 
@@ -166,42 +166,48 @@ export SPEC_BLOCK_R2_INIT="..."
 
 ---
 
-## Recommendation: Option A (bazinga-db)
+## Recommendation: Bash Heredoc (Simplest)
+
+**Key Insight:** The problem is not WHERE data goes, but HOW it's returned:
+- Text output → Turn ends, visible to user
+- Tool call (Bash) → Turn continues, orchestrator extracts from result
+
+**Solution:** Skill outputs via Bash heredoc instead of direct text.
 
 **Rationale:**
-1. **Already partially implemented** - Step 7 already saves to DB, just needs to include the block
-2. **Proven pattern** - bazinga-db is used throughout orchestration
-3. **Solves both problems** - No text output = no user display + turn continues
-4. **Audit trail** - Block persisted for debugging
+1. **Minimal change** - Only SKILL.md Step 8 needs modification
+2. **No DB changes** - Existing marker extraction still works
+3. **No file storage** - Block stays in tool result
+4. **Proven mechanism** - bazinga-db already works this way
 
 ---
 
-## Implementation Plan
+## Implementation Plan (IMPLEMENTED)
 
 ### File 1: `.claude/skills/specialization-loader/SKILL.md`
 
-**Step 7 changes:**
-- Add `spec_block` field to the JSON payload
-- Block needs to be properly escaped (base64 or escaped JSON string)
-
 **Step 8 changes:**
-- Remove all text output instructions
-- Just say "Step 7's Bash call is your final action"
+- Changed from "output text directly" to "call Bash with heredoc"
+- Block content goes through Bash tool call
+- Turn stays alive, orchestrator continues
 
-### File 2: `bazinga/templates/orchestrator/phase_parallel.md`
+```bash
+cat << 'SPECBLOCK'
+[SPECIALIZATION_BLOCK_START]
+{block content}
+[SPECIALIZATION_BLOCK_END]
 
-**After Skill() returns:**
-- Read block from DB: `get-skill-output "{session}" "specialization-loader" --group "{group}"`
-- Extract `spec_block` field
-- Use in Task() prompt building
+Metadata:
+- Group: {group_id}
+...
+SPECBLOCK
+```
 
-### File 3: `bazinga/templates/orchestrator/phase_simple.md`
+### No other files need changes
 
-**Same changes as phase_parallel.md** - simple mode also uses specialization-loader
-
-### File 4: bazinga-db skill (if needed)
-
-May need to add `--group` filter to `get-skill-output` command if not already supported.
+- Orchestrator already extracts blocks from skill output
+- Same markers `[SPECIALIZATION_BLOCK_START]...[SPECIALIZATION_BLOCK_END]` work
+- Just extracted from Bash tool result instead of text output
 
 ---
 

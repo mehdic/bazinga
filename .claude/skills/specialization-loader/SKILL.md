@@ -225,23 +225,18 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-outpu
   }'
 ```
 
-### Step 8: Return Result
+### Step 8: Return Result via Bash
 
-Return the composed specialization block as your response. The orchestrator will prepend this to the agent spawn prompt.
+**🔴 CRITICAL: Use Bash to output the block, NOT direct text output.**
 
-**🔴 OUTPUT RULES - KEEP IT MINIMAL:**
-- ❌ **DO NOT** say "I'll compose the specialization blocks..." or similar preamble
-- ❌ **DO NOT** narrate what you're doing ("Let me read the templates...")
-- ❌ **DO NOT** explain your process or reasoning
-- ✅ **JUST OUTPUT** the block + metadata + continuation instruction directly
-- ✅ Start your response with `[SPECIALIZATION_BLOCK_START]` immediately
+Direct text output ends your turn. Bash output keeps the turn alive so the orchestrator can continue.
 
-**Output format (output EXACTLY this, nothing else before it):**
+**Use this Bash command to output your composed block:**
 
-⚠️ The format below shows what to output. Do NOT output backticks - they are documentation only.
-
+```bash
+cat << 'SPECBLOCK'
 [SPECIALIZATION_BLOCK_START]
-{The composed markdown block}
+{The composed markdown block - paste your composed content here}
 [SPECIALIZATION_BLOCK_END]
 
 Metadata:
@@ -249,18 +244,16 @@ Metadata:
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
+SPECBLOCK
+```
 
----
-**ORCHESTRATOR: SPECIALIZATION BLOCK READY**
+**🔴 RULES:**
+- ✅ Call `Bash` tool with the heredoc above as your ONLY action
+- ✅ Replace `{...}` placeholders with actual values
+- ❌ Do NOT output any text before or after the Bash call
+- ❌ Do NOT say "I'll compose..." or narrate your process
 
-Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
-Continue to Turn 2 when ALL needed specialization blocks are collected.
-
-**🔴 YOUR JOB IS DONE AFTER THIS OUTPUT:**
-- ❌ Do NOT spawn agents yourself or call Task()
-- ❌ Do NOT figure out "what to do next"
-- ✅ The orchestrator decides when to proceed to Turn 2 (after ALL blocks ready)
-- ✅ If multiple groups share the same specialization, compose once - orchestrator handles the rest
+**After the Bash call completes, your job is done.** The orchestrator extracts the block from the Bash output and continues to Task().
 
 ---
 
@@ -340,8 +333,10 @@ Specialization Paths: [
 ]
 ```
 
-**Output (no backticks in actual output - shown here for readability):**
+**Skill calls Bash with heredoc (this is the ONLY output):**
 
+```bash
+cat << 'SPECBLOCK'
 [SPECIALIZATION_BLOCK_START]
 ## SPECIALIZATION GUIDANCE (Advisory)
 
@@ -361,33 +356,15 @@ Your expertise includes:
 - RESTful API design: proper status codes, pagination, error handling
 
 ### Patterns to Apply
-
-**Constructor Injection:**
-```java
-@Service
-public class UserService {
-    private final UserRepository userRepository;
-
-    @Autowired
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-}
-```
-
-**Optional for Nullable Returns:**
-```java
-public Optional<User> findById(Long id) {
-    return repository.findById(id);
-}
-```
+- Constructor injection (not field injection)
+- Optional for nullable returns
+- @Transactional on write operations
 
 ### Patterns to Avoid
-- `var` keyword (Java 10+ only)
+- var keyword (Java 10+ only)
 - Records (Java 14+ only)
 - Field injection (@Autowired on fields)
 - Returning null from methods
-- Missing @Transactional on write operations
 
 [SPECIALIZATION_BLOCK_END]
 
@@ -396,14 +373,10 @@ Metadata:
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
+SPECBLOCK
+```
 
----
-**ORCHESTRATOR: SPECIALIZATION BLOCK READY**
-
-Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
-Continue to Turn 2 when ALL needed specialization blocks are collected.
-
-**Note:** The skill outputs NOTHING before `[SPECIALIZATION_BLOCK_START]`. No preamble, no explanation, no "I'll compose..." - just the block directly.
+**Note:** The skill calls Bash with NO text output before or after. The Bash heredoc IS the entire output.
 
 ---
 
@@ -427,5 +400,5 @@ Continue to Turn 2 when ALL needed specialization blocks are collected.
 3. Identity string matches agent type and detected stack
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
-6. Block returned in expected format
-7. **"BLOCK READY" signal included at end** (orchestrator collects all blocks before Turn 2)
+6. **Block returned via Bash heredoc** (NOT direct text output)
+7. **No text output before/after Bash call** (turn stays alive for orchestrator)
