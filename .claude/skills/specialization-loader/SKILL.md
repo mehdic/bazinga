@@ -229,17 +229,38 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-outpu
 
 Return the composed specialization block as your response. The orchestrator will prepend this to the agent spawn prompt.
 
-**Output format:**
-```
+**🔴 OUTPUT RULES - KEEP IT MINIMAL:**
+- ❌ **DO NOT** say "I'll compose the specialization blocks..." or similar preamble
+- ❌ **DO NOT** narrate what you're doing ("Let me read the templates...")
+- ❌ **DO NOT** explain your process or reasoning
+- ✅ **JUST OUTPUT** the block + metadata + continuation instruction directly
+- ✅ Start your response with `[SPECIALIZATION_BLOCK_START]` immediately
+
+**Output format (output EXACTLY this, nothing else before it):**
+
+⚠️ The format below shows what to output. Do NOT output backticks - they are documentation only.
+
 [SPECIALIZATION_BLOCK_START]
 {The composed markdown block}
 [SPECIALIZATION_BLOCK_END]
 
 Metadata:
+- Group: {group_id}
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
-```
+
+---
+**ORCHESTRATOR: SPECIALIZATION BLOCK READY**
+
+Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
+Continue to Turn 2 when ALL needed specialization blocks are collected.
+
+**🔴 YOUR JOB IS DONE AFTER THIS OUTPUT:**
+- ❌ Do NOT spawn agents yourself or call Task()
+- ❌ Do NOT figure out "what to do next"
+- ✅ The orchestrator decides when to proceed to Turn 2 (after ALL blocks ready)
+- ✅ If multiple groups share the same specialization, compose once - orchestrator handles the rest
 
 ---
 
@@ -319,8 +340,8 @@ Specialization Paths: [
 ]
 ```
 
-**Output:**
-```
+**Output (no backticks in actual output - shown here for readability):**
+
 [SPECIALIZATION_BLOCK_START]
 ## SPECIALIZATION GUIDANCE (Advisory)
 
@@ -371,10 +392,18 @@ public Optional<User> findById(Long id) {
 [SPECIALIZATION_BLOCK_END]
 
 Metadata:
+- Group: AUTH
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
-```
+
+---
+**ORCHESTRATOR: SPECIALIZATION BLOCK READY**
+
+Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
+Continue to Turn 2 when ALL needed specialization blocks are collected.
+
+**Note:** The skill outputs NOTHING before `[SPECIALIZATION_BLOCK_START]`. No preamble, no explanation, no "I'll compose..." - just the block directly.
 
 ---
 
@@ -399,3 +428,4 @@ Metadata:
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
 6. Block returned in expected format
+7. **"BLOCK READY" signal included at end** (orchestrator collects all blocks before Turn 2)

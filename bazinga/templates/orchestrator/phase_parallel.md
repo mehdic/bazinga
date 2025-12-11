@@ -377,50 +377,101 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 
 ### TWO-TURN SPAWN SEQUENCE (Parallel Mode)
 
-**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from each Skill()'s response.
+**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from Skill()'s response.
+
+**🔴 SHARED SPECIALIZATION OPTIMIZATION:**
+
+If ALL groups need the SAME specialization (same template paths):
+- Call Skill() **ONCE** (not per-group)
+- Get **ONE** spec_block
+- Use that **SAME** spec_block for **ALL** groups
+- Still call Task() for **EACH** group (same spec_block + different base_prompts)
+
+**🔴 AFTER SKILL RETURNS (CRITICAL - THIS IS WHERE YOU WERE STOPPING):**
+
+After receiving ALL skill response(s), **IMMEDIATELY call Task() for ALL groups**:
+1. You have N spec_blocks (where N = number of Skill() calls you made)
+2. Map each group to its spec_block (groups with same paths share the same block)
+3. **IMMEDIATELY call Task() for ALL groups** - don't stop to think, don't wait
+4. Each Task() gets: its_spec_block + that group's unique base_prompt
+
+**Examples:**
+- 4 groups, 1 skill call (all same spec) → 4 Task()s using the ONE shared block
+- 4 groups, 4 skill calls (all different) → 4 Task()s, each with its own block
+- 4 groups, 2 skill calls (partial overlap) → 4 Task()s, mapping groups to their blocks
 
 **Turn 1 (this message):**
-1. For EACH group, output the `[SPEC_CTX_START group=X]...[SPEC_CTX_END]` block
-2. Call `Skill(command: "specialization-loader")` for EACH group (all in this message)
-3. END this message (wait for all skill responses)
 
-**Turn 2 (after skill responses):**
-1. Read each skill response (internally - DO NOT echo to user)
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group → store as `spec_blocks[group_id]`
-3. Build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each group
-4. **🔴 IMMEDIATELY output capsule and call ALL `Task()` spawns in THIS message**
+**Option A - All groups share same specialization:**
+1. Output ONE `[SPEC_CTX_START]...[SPEC_CTX_END]` block (any group's context)
+2. Call `Skill(command: "specialization-loader")` ONCE
+3. END this message
 
-**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+**Option B - Groups have different specializations:**
+1. For EACH group, output `[SPEC_CTX_START group=X]...[SPEC_CTX_END]` block
+2. Call `Skill(command: "specialization-loader")` for EACH group
+3. END this message
 
-After extracting ALL specialization blocks (silently), you MUST:
-1. Output ONLY the spawn summary capsule (not the spec blocks)
-2. **Call Task() for EACH group in THIS SAME MESSAGE**
-3. DO NOT end the message without Task() calls
+**Turn 2 (after skill response):**
 
-**WRONG (Bug Pattern - echoing spec blocks):**
+**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
+
+The skill output a specialization block. Process it SILENTLY then spawn ALL agents:
+
+**If shared specialization (ONE block for ALL groups):**
+1. **INTERNALLY** extract the ONE block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
+2. **INTERNALLY** store as `shared_spec_block`
+3. **INTERNALLY** build `FULL_PROMPT_X = shared_spec_block + "\n\n---\n\n" + base_prompts[X]` for EACH group
+4. **OUTPUT** only: `🔧 Specializations: ✓ | {identity}`
+5. **CALL** `Task()` for **EACH** group (A, B, C, D) - all use the SAME spec_block
+
+**If different specializations (multiple blocks):**
+1. **INTERNALLY** extract each block
+2. **INTERNALLY** store as `spec_blocks[group_id]`
+3. **INTERNALLY** build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each
+4. **OUTPUT** only: `🔧 Specializations: ✓ | {identity}`
+5. **CALL** `Task()` for EACH group
+
+**🔴 FORBIDDEN - DO NOT OUTPUT ANY OF THESE:**
+- ❌ The specialization block content
+- ❌ The FULL_PROMPT content for any group
+- ❌ The base_prompt content for any group
+- ❌ Any "here's what I'm sending to the agents..." preview
+
+**✅ ONLY OUTPUT THIS:**
+```
+🔧 Specializations: ✓ | {identity}
+```
+Then IMMEDIATELY call `Task()` for each group.
+
+**WRONG (echoing blocks/prompts - THIS IS THE BUG):**
 ```
 [SPECIALIZATION_BLOCK_START]
 ...
-[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
+[SPECIALIZATION_BLOCK_END]  ← WRONG! You printed the block!
 
 📝 Spawning 4 developers...
+Here's the full prompt for each...  ← WRONG! Don't show prompts!
 
 [MESSAGE ENDS - NO TASK() CALLS]  ← BUG! Workflow hangs
 ```
 
-**CORRECT (silent extraction, capsule only):**
+**CORRECT (shared spec, silent, capsule, ALL 4 Tasks called):**
 ```
-🔧 Specializations loaded: A (3 templates), B (3 templates), C (3 templates)
+🔧 Specializations: ✓ | TypeScript/React Developer
 
-📝 Spawning 3 developers in parallel:
-• Group A: Developer | Initialize Delivery App Structure | Specializations: ✓
-• Group B: Developer | Delivery Request List & Detail | Specializations: ✓
-• Group C: Developer | Order Tracking Dashboard | Specializations: ✓
-
-Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize Delivery App Structure", prompt=FULL_PROMPT_A)
-Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery Request List & Detail", prompt=FULL_PROMPT_B)
-Task(subagent_type="general-purpose", model="haiku", description="Developer C: Order Tracking Dashboard", prompt=FULL_PROMPT_C)
+Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize App", prompt=FULL_PROMPT_A)
+Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery List", prompt=FULL_PROMPT_B)
+Task(subagent_type="general-purpose", model="haiku", description="Developer C: Dashboard", prompt=FULL_PROMPT_C)
+Task(subagent_type="general-purpose", model="haiku", description="Developer D: Settings", prompt=FULL_PROMPT_D)
 ```
+
+**🔴 KEY: Even with ONE shared spec_block, you MUST call Task() for EACH group.**
+Each FULL_PROMPT_X = shared_spec_block + base_prompt_X (different tasks, same specialization)
+
+**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+
+Turn 2 is NOT complete until you call Task() for ALL groups. DO NOT end your message without calling Task().
 
 **🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
 

@@ -295,36 +295,44 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 3. END this message (wait for skill response)
 
 **Turn 2 (after skill response):**
-1. Read the skill's response (internally - DO NOT echo to user)
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` → store as `spec_block`
-3. Build `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
-4. **🔴 IMMEDIATELY output capsule and call `Task()` in THIS message**
 
-**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
 
-After extracting the specialization block (silently), you MUST:
-1. Output ONLY the spawn summary capsule (not the spec block)
-2. **Call Task() in THIS SAME MESSAGE**
-3. DO NOT end the message without a Task() call
+The skill just output a specialization block. You MUST process it SILENTLY:
 
-**WRONG (Bug Pattern - echoing spec block):**
+1. **INTERNALLY** extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
+2. **INTERNALLY** store as `spec_block` variable
+3. **INTERNALLY** build `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
+4. **OUTPUT** only a brief capsule (see below)
+5. **CALL** `Task()` with FULL_PROMPT
+
+**🔴 FORBIDDEN - DO NOT OUTPUT ANY OF THESE:**
+- ❌ The specialization block content
+- ❌ The FULL_PROMPT content
+- ❌ The base_prompt content
+- ❌ Any "here's what I'm sending to the agent..." preview
+
+**✅ ONLY OUTPUT THIS:**
+```
+🔧 Specializations: ✓ | {N} templates | {identity}
+```
+Then IMMEDIATELY call `Task()`.
+
+**WRONG (echoing block/prompt - THIS IS THE BUG):**
 ```
 [SPECIALIZATION_BLOCK_START]
 ...
-[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
+[SPECIALIZATION_BLOCK_END]  ← WRONG! You printed the block!
 
 📝 **Developer Prompt** | Group: main | Model: haiku
+Here's the full prompt I'm sending...  ← WRONG! Don't show prompt!
 
 [MESSAGE ENDS - NO TASK() CALL]  ← BUG! Workflow hangs
 ```
 
-**CORRECT (silent extraction, capsule only):**
+**CORRECT (silent, capsule only, Task called):**
 ```
-🔧 Specializations loaded (3 templates) | React/TypeScript Frontend Developer
-
-📝 **Developer Prompt** | Group: main | Model: haiku
-   Task: Implement delivery list page
-   Specializations: ✓ loaded
+🔧 Specializations: ✓ | 3 templates | React/TypeScript Developer
 
 Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement delivery list page", prompt=FULL_PROMPT)
 ```
