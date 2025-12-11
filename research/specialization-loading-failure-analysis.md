@@ -545,93 +545,80 @@ Before Task():
 
 ---
 
-## REVISED Solution: DB-Backed Enforcement
+## IMPLEMENTED Solution: Fused Atomic Action Pattern
 
-Based on review feedback, the solution shifts from **prose enforcement** to **procedural enforcement**:
+**Note:** While the external review recommended DB-backed enforcement, we implemented a simpler **fused atomic action** pattern first. DB enforcement remains a potential future enhancement if this approach proves insufficient.
 
-### New Spawn Sequence (Phase Templates)
+### Why Fused Action Instead of DB Enforcement
 
-```markdown
-### SPAWN STEP 2: Load Specializations (DB-VERIFIED)
+1. **Simpler implementation** - No bazinga-db changes needed
+2. **Same-message guarantee** - Skill() and Task() must be in same message
+3. **Removes skip path** - No numbered steps to skip (Step 1, 2, 3, 4)
+4. **Template-based** - Orchestrator copies/fills a template, not interprets instructions
 
-**2a. Check if enabled:**
-```bash
-cat bazinga/skills_config.json | grep -A5 '"specializations"'
-# Check: enabled == true AND agent_type in enabled_agents
-```
-
-**IF disabled:** Skip to Step 3, set `specializations_status = "disabled"`
-
-**2b. Check DB for existing specialization (REQUIRED):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output \
-  "{session_id}" "specialization-loader" --filter "group_id={group_id},agent_type={agent_type}"
-```
-
-**2c. IF DB has valid record (not stale):**
-- Use cached `specialization_block` from DB
-- Set `specializations_status = "cached"`
-- Output capsule: `🔧 Specializations: cached | Group: {group_id}`
-- Skip to Step 3
-
-**2d. IF DB missing OR stale (need fresh load):**
-- Output SPEC_CTX block (internal, not user-visible):
-```
-[SPEC_CTX_START group={group_id} agent={agent_type}]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: {agent_type}
-Model: {model}
-Specialization Paths: {paths}
-[SPEC_CTX_END]
-```
-- Invoke skill: `Skill(command: "specialization-loader")`
-- Extract block from response
-- Save to DB for future reuse
-
-**2e. Validate and proceed:**
-- IF block received: Set `specializations_status = "loaded"`, output capsule: `🔧 Specializations: loaded (N templates)`
-- IF failed: Set `specializations_status = "error"`, output capsule: `⚠️ Specializations failed; proceeding without`
-
-**2f. CRITICAL: ALL ABOVE IN SAME MESSAGE AS Task() SPAWN**
-Do not end message after Step 2. Continue immediately to Steps 3-4.
-```
-
-### New Orchestration Invariant (orchestrator.md)
+### Implemented Spawn Sequence (Phase Templates)
 
 ```markdown
-## 🔴 Specialization Loading Invariant
+## SPAWN DEVELOPER (ATOMIC SEQUENCE)
 
-**Hard Rule:** Before any Task() spawn where specializations are enabled:
+**To spawn a developer, you MUST produce this EXACT output sequence in your message.**
 
-1. Query bazinga-db for specialization-loader output for (session_id, group_id, agent_type)
-2. IF missing: invoke specialization-loader skill NOW
-3. IF invocation fails: proceed with base prompt, set status="error"
-4. NEVER spawn without completing this check
+**There is no Task() without the Skill() first. They are ONE action, not separate steps.**
 
-**Verification:** After each spawn, the DB MUST contain a specialization record for that (session, group, agent_type). Missing record = bug.
+### PART B: Load Specializations → Then Spawn (FUSED ACTION)
+
+**Check skills_config.json:** Is specializations.enabled == true AND agent_type in enabled_agents?
+
+**IF YES:** Your message MUST contain this exact sequence:
+1. Output SPEC_CTX block
+2. Call Skill(command: "specialization-loader")
+3. Extract specialization block from response
+4. Output capsule and call Task()
+
+**SELF-CHECK:** If your message has Task() but NO Skill(), you skipped specializations.
 ```
 
-### Success Criteria (Revised)
+### Key Differences from DB Enforcement
 
-1. **Primary:** Every Task() spawn preceded by DB query for specialization record
-2. **Secondary:** If specializations enabled and no DB record, skill invocation occurs
-3. **Tertiary:** Single capsule line confirms status (loaded/cached/failed/disabled)
-4. **Audit:** DB contains specialization records for all spawns
+| Aspect | DB Enforcement (Proposed) | Fused Action (Implemented) |
+|--------|--------------------------|---------------------------|
+| Verification | Query DB before Task() | Self-check in same message |
+| Caching | DB stores blocks | No caching (fresh each spawn) |
+| Complexity | Requires bazinga-db changes | No infrastructure changes |
+| Enforcement | Procedural (query result) | Structural (template pattern) |
+
+### Future Enhancement: Add DB Caching
+
+If fused action proves insufficient, we can layer DB enforcement on top:
+1. Before Skill(), query DB for cached specialization
+2. If cache hit, use cached block
+3. If cache miss, invoke Skill(), save to DB
+4. Proceed to Task()
+
+### Success Criteria (Implemented)
+
+1. **Primary:** Every Task() spawn in same message as Skill() call (fused action)
+2. **Secondary:** Self-check in template catches Task() without Skill()
+3. **Tertiary:** Single capsule line confirms status (loaded/failed/disabled)
+4. **Template-based:** Orchestrator follows exact output template, not interprets prose
 
 ---
 
-## Implementation Priority
+## Implementation Complete
 
-1. **FIRST:** Add DB-backed pre-spawn enforcement to phase templates
-2. **SECOND:** Add orchestration invariant to orchestrator.md
-3. **THIRD:** Update bazinga-db to support get-skill-output query with filters
-4. **FOURTH:** Add specialization health metrics to velocity-tracker
+**Commits:**
+1. `7ce0f46` - fix: rewrite spawn sequences as fused atomic actions
+2. (this commit) - fix: address validation issues in phase templates
+
+**Files Modified:**
+- `bazinga/templates/orchestrator/phase_simple.md` - Fused atomic sequence
+- `bazinga/templates/orchestrator/phase_parallel.md` - Fused atomic sequence per group
+- `agents/orchestrator.md` - Updated verification checkpoints
 
 ---
 
 ## Status
 
-**Status:** Reviewed - Awaiting user approval before implementation
+**Status:** Implemented (Fused Atomic Action pattern)
 
-**Confidence after review:** Medium-High (DB enforcement is verifiable, not prose-dependent)
+**Confidence:** Medium - Removes skip path, but still relies on Claude following the fused pattern. If this proves insufficient, DB enforcement can be layered on top.

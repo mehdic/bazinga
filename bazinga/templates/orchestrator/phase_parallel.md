@@ -198,9 +198,9 @@ Store as `base_prompts[group_id]`. Do not output to user.
 
 ### PART B: Load Specializations → Then Spawn (FUSED ACTION PER GROUP)
 
-**Check `bazinga/skills_config.json` once:** Is `specializations.enabled == true`?
+**Check `bazinga/skills_config.json` once:** Is `specializations.enabled == true` AND agent_type in `enabled_agents`?
 
-**IF YES (specializations enabled):** For EACH group, your message MUST contain this sequence:
+**IF YES (specializations enabled for this agent type):** For EACH group, your message MUST contain this sequence:
 
 ```
 🔧 Loading specializations for Group {group_id} ({agent_type})...
@@ -209,8 +209,8 @@ Store as `base_prompts[group_id]`. Do not output to user.
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {agent_type}
-Model: {MODEL_CONFIG[initial_tier]}
-Specialization Paths: {task_group.specializations as JSON array}
+Model: {MODEL_CONFIG[task_groups[group_id].initial_tier]}
+Specialization Paths: {task_groups[group_id].specializations as JSON array}
 [SPEC_CTX_END]
 ```
 
@@ -225,15 +225,15 @@ Then extract block from response. Store as `specialization_blocks[group_id]`.
 
 **After ALL specializations loaded, output summary and spawn ALL:**
 ```
-🔧 Specializations loaded: A ({N} templates), b ({N} templates), C ({N} templates)
+🔧 Specializations loaded: A ({N} templates), B ({N} templates), C ({N} templates)
 
 📝 Spawning {count} developers in parallel:
-• Group A: {tier} | {task_summary}
-• Group B: {tier} | {task_summary}
+• Group A: {task_groups["A"].initial_tier} | {task_groups["A"].title}
+• Group B: {task_groups["B"].initial_tier} | {task_groups["B"].title}
 ...
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_A}"], description="{tier} A: {task[:90]}", prompt={spec_block_A + base_A})
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_B}"], description="{tier} B: {task[:90]}", prompt={spec_block_B + base_B})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["A"].initial_tier], description=f"{task_groups['A'].initial_tier} A: {task_groups['A'].title[:90]}", prompt={spec_block_A + base_A})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initial_tier], description=f"{task_groups['B'].initial_tier} B: {task_groups['B'].title[:90]}", prompt={spec_block_B + base_B})
 ...
 ```
 
@@ -242,14 +242,14 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_B}"], descriptio
 🔧 Specializations: A (loaded), B (⚠️ failed), C (loaded)
 ```
 
-**IF NO (specializations disabled):** Skip all Skill() calls, spawn directly:
+**IF NO (specializations disabled or agent not in enabled_agents):** Skip all Skill() calls, spawn directly:
 ```
 📝 Spawning {count} developers in parallel | Specializations: disabled
-• Group A: {tier} | {task_summary}
+• Group A: {task_groups["A"].initial_tier} | {task_groups["A"].title}
 ...
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_A}"], description="{tier} A: {task[:90]}", prompt={base_A})
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{tier_B}"], description="{tier} B: {task[:90]}", prompt={base_B})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["A"].initial_tier], description=f"{task_groups['A'].initial_tier} A: {task_groups['A'].title[:90]}", prompt={base_A})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initial_tier], description=f"{task_groups['B'].initial_tier} B: {task_groups['B'].title[:90]}", prompt={base_B})
 ...
 ```
 

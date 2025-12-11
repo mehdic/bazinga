@@ -1436,15 +1436,15 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 
 **🚨 TEMPLATE VERIFICATION CHECKPOINT:**
 After calling Read, verify you have the template content visible in your context:
-- ✅ Can you see "🔴🔴🔴 MANDATORY SPAWN SEQUENCE"?
-- ✅ Can you see "SPAWN STEP 2: Load Specializations"?
-- ✅ Can you see the specialization-loader skill invocation?
+- ✅ Can you see "SPAWN DEVELOPER (ATOMIC SEQUENCE)"?
+- ✅ Can you see "Load Specializations → Then Spawn (FUSED ACTION)"?
+- ✅ Can you see `Skill(command: "specialization-loader")`?
 
 **IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
 
-**Execute all steps (2A.1 through 2A.9) EXACTLY as defined in the template.**
+**Execute the ATOMIC SEQUENCE as defined in the template.**
 
-**⚠️ WARNING: The template contains MANDATORY SPAWN SEQUENCE with specialization loading. If you spawn agents without following the 4-step sequence in the template, specializations will NOT be loaded. This is a CRITICAL BUG.**
+**⚠️ WARNING: The template uses FUSED ACTION pattern - Skill() and Task() are ONE action. If you spawn Task() without first calling Skill() in the same message, specializations will NOT be loaded.**
 
 ---
 
@@ -1462,16 +1462,15 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 
 **🚨 TEMPLATE VERIFICATION CHECKPOINT:**
 After calling Read, verify you have the template content visible in your context:
-- ✅ Can you see "🔴🔴🔴 MANDATORY PARALLEL SPAWN SEQUENCE"?
-- ✅ Can you see "PARALLEL SPAWN STEP 2: Load Specializations FOR EACH GROUP"?
-- ✅ Can you see the specialization-loader skill invocation per group?
-- ✅ Can you see the 2d-FAILURE handling section?
+- ✅ Can you see "SPAWN DEVELOPERS - PARALLEL (ATOMIC SEQUENCE PER GROUP)"?
+- ✅ Can you see "Load Specializations → Then Spawn (FUSED ACTION PER GROUP)"?
+- ✅ Can you see `Skill(command: "specialization-loader")` for each group?
 
 **IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
 
-**Execute all steps (2B.0 through 2B.9) EXACTLY as defined in the template.**
+**Execute the ATOMIC SEQUENCE PER GROUP as defined in the template.**
 
-**⚠️ WARNING: The template contains MANDATORY PARALLEL SPAWN SEQUENCE with specialization loading for EACH group. If you spawn agents without following the 4-step sequence per group, specializations will NOT be loaded. This is a CRITICAL BUG.**
+**⚠️ WARNING: The template uses FUSED ACTION pattern - all Skill() calls must complete BEFORE any Task() calls, in the same message. If you spawn Task() without first calling Skill() for each group, specializations will NOT be loaded.**
 
 ---
 

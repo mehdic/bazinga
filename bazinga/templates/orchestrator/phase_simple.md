@@ -143,26 +143,26 @@ Then output capsule and spawn:
 🔧 Specializations: loaded ({N} templates) | {identity_summary}
 
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
-   **Task:** {task_summary}
+   **Task:** {task_title}
    **Branch:** {branch}
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{initial_tier}"], description="{tier}: {task[:90]}", prompt={specialization_block + base_prompt})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier], description=f"{task_group.initial_tier}: {task_title[:90]}", prompt={specialization_block + base_prompt})
 ```
 
 **IF skill fails (timeout/error/no block):**
 ```
 ⚠️ Specializations failed | Proceeding with base prompt
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{initial_tier}"], description="{tier}: {task[:90]}", prompt={base_prompt})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier], description=f"{task_group.initial_tier}: {task_title[:90]}", prompt={base_prompt})
 ```
 
 **IF NO (specializations disabled):** Skip skill, spawn directly:
 ```
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
-   **Task:** {task_summary}
+   **Task:** {task_title}
    **Specializations:** disabled
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{initial_tier}"], description="{tier}: {task[:90]}", prompt={base_prompt})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier], description=f"{task_group.initial_tier}: {task_title[:90]}", prompt={base_prompt})
 ```
 
 ---
