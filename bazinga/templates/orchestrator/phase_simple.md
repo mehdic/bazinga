@@ -68,10 +68,14 @@ Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 **🔴 Reasoning Context Query (AFTER context packages, for workflow handoffs):**
 
 Query previous agent reasoning for this group (provides WHY context):
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --limit 5
 ```
+bazinga-db, please get reasoning:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Limit: 5
+```
+Then invoke: `Skill(command: "bazinga-db")`
 
 **Reasoning Context Routing Rules:**
 | Query Result | Action |
@@ -436,15 +440,15 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 **🔴 Implementation Reasoning Query (BEFORE building prompt):**
 
 Query reasoning from all implementation agents (developer, SSE, RE):
-```bash
-# Query each agent type separately (CLI doesn't support comma-separated)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --agent_type developer --limit 2
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --agent_type senior_software_engineer --limit 2
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --agent_type requirements_engineer --limit 1
 ```
+bazinga-db, please get reasoning:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: developer
+Limit: 2
+```
+Then invoke: `Skill(command: "bazinga-db")` for each agent type (developer, senior_software_engineer, requirements_engineer).
 **Merge results:** Combine all returned entries, sort by timestamp, take most recent 5 total.
 
 **Implementation Reasoning Prompt Section** (include when reasoning found):
@@ -724,12 +728,15 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 **MERGE_SUCCESS Progress Tracking:**
 1. Update task_group: status="completed", merge_status="merged"
-2. Query completed progress from task_groups:
-   ```bash
-   # Get completed items (sum of item_count for completed groups)
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "[session_id]" "completed"
-   # Sum item_count from result
+2. Query completed progress from task_groups using bazinga-db skill:
    ```
+   bazinga-db, please get task groups:
+
+   Session ID: [session_id]
+   Status: completed
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+   Sum item_count from the returned JSON to get completed items.
 3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 
 **Escalation (from template):** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM

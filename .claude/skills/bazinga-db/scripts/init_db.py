@@ -553,32 +553,98 @@ def init_database(db_path: str) -> None:
                 print("✓ Migration to v9 complete (fresh database, skipped)")
                 current_version = 9
             else:
-                # Add event_subtype column to orchestration_logs
+                # CRITICAL: Recreate orchestration_logs to update CHECK constraint
+                # Old schema has CHECK(log_type IN ('interaction', 'reasoning'))
+                # New schema needs CHECK(log_type IN ('interaction', 'reasoning', 'event'))
+                # SQLite doesn't support ALTER TABLE to modify CHECK constraints
                 if logs_exists:
-                    try:
-                        cursor.execute("""
-                            ALTER TABLE orchestration_logs
-                            ADD COLUMN event_subtype TEXT
-                        """)
-                        print("   ✓ Added orchestration_logs.event_subtype")
-                    except sqlite3.OperationalError as e:
-                        if "duplicate column" in str(e).lower():
-                            print("   ⊘ orchestration_logs.event_subtype already exists")
-                        else:
-                            raise
+                    print("   - Recreating orchestration_logs to update CHECK constraint...")
 
-                    # Add event_payload column to orchestration_logs
-                    try:
-                        cursor.execute("""
-                            ALTER TABLE orchestration_logs
-                            ADD COLUMN event_payload TEXT
-                        """)
-                        print("   ✓ Added orchestration_logs.event_payload")
-                    except sqlite3.OperationalError as e:
-                        if "duplicate column" in str(e).lower():
-                            print("   ⊘ orchestration_logs.event_payload already exists")
-                        else:
-                            raise
+                    # Get column info to handle variable schemas
+                    cursor.execute("PRAGMA table_info(orchestration_logs)")
+                    existing_cols = {row[1] for row in cursor.fetchall()}
+
+                    # Backup existing data with all existing columns
+                    col_list = ', '.join(existing_cols)
+                    cursor.execute(f"SELECT {col_list} FROM orchestration_logs")
+                    logs_data = cursor.fetchall()
+                    col_names = list(existing_cols)
+                    print(f"   - Backed up {len(logs_data)} orchestration log entries")
+
+                    # Drop indexes first (they reference the table)
+                    cursor.execute("DROP INDEX IF EXISTS idx_logs_session")
+                    cursor.execute("DROP INDEX IF EXISTS idx_logs_agent_type")
+                    cursor.execute("DROP INDEX IF EXISTS idx_logs_reasoning")
+                    cursor.execute("DROP INDEX IF EXISTS idx_logs_events")
+
+                    # Drop old table
+                    cursor.execute("DROP TABLE orchestration_logs")
+
+                    # Create new table with updated CHECK constraint (includes 'event')
+                    cursor.execute("""
+                        CREATE TABLE orchestration_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT NOT NULL,
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            iteration INTEGER,
+                            agent_type TEXT NOT NULL,
+                            agent_id TEXT,
+                            content TEXT NOT NULL,
+                            log_type TEXT DEFAULT 'interaction'
+                                CHECK(log_type IN ('interaction', 'reasoning', 'event')),
+                            reasoning_phase TEXT
+                                CHECK(reasoning_phase IS NULL OR reasoning_phase IN (
+                                    'understanding', 'approach', 'decisions', 'risks',
+                                    'blockers', 'pivot', 'completion'
+                                )),
+                            confidence_level TEXT
+                                CHECK(confidence_level IS NULL OR confidence_level IN ('high', 'medium', 'low')),
+                            references_json TEXT,
+                            redacted INTEGER DEFAULT 0 CHECK(redacted IN (0, 1)),
+                            group_id TEXT,
+                            event_subtype TEXT,
+                            event_payload TEXT,
+                            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                        )
+                    """)
+                    print("   ✓ Created orchestration_logs with updated CHECK constraint")
+
+                    # Restore data - map old columns to new schema
+                    if logs_data:
+                        # Build insert for columns that exist in both old and new
+                        new_cols = {'id', 'session_id', 'timestamp', 'iteration', 'agent_type',
+                                   'agent_id', 'content', 'log_type', 'reasoning_phase',
+                                   'confidence_level', 'references_json', 'redacted', 'group_id',
+                                   'event_subtype', 'event_payload'}
+                        common_cols = [c for c in col_names if c in new_cols]
+                        col_indices = {name: idx for idx, name in enumerate(col_names)}
+
+                        placeholders = ', '.join(['?' for _ in common_cols])
+                        insert_cols = ', '.join(common_cols)
+
+                        for row in logs_data:
+                            values = [row[col_indices[c]] for c in common_cols]
+                            cursor.execute(f"""
+                                INSERT INTO orchestration_logs ({insert_cols})
+                                VALUES ({placeholders})
+                            """, values)
+                        print(f"   ✓ Restored {len(logs_data)} orchestration log entries")
+
+                    # Recreate indexes
+                    cursor.execute("""
+                        CREATE INDEX idx_logs_session
+                        ON orchestration_logs(session_id, timestamp DESC)
+                    """)
+                    cursor.execute("""
+                        CREATE INDEX idx_logs_agent_type
+                        ON orchestration_logs(session_id, agent_type)
+                    """)
+                    cursor.execute("""
+                        CREATE INDEX idx_logs_reasoning
+                        ON orchestration_logs(session_id, log_type, reasoning_phase)
+                        WHERE log_type = 'reasoning'
+                    """)
+                    print("   ✓ Recreated indexes")
 
                 # Add metadata column to sessions (for original_scope)
                 if sessions_exists:

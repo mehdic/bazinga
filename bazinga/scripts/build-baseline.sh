@@ -36,13 +36,21 @@ detect_and_build() {
                 exit 1
             fi
         else
-            # Safe check: type-check only, no script execution
-            if npx tsc --noEmit >> "$LOG_FILE" 2>&1; then
-                echo "success" > "$STATUS_FILE"
-                exit 0
+            # Safe check: type-check only using LOCAL tsc (no network fetch)
+            # Use ./node_modules/.bin/tsc to avoid npx fetching from network
+            if [ -x "./node_modules/.bin/tsc" ]; then
+                if ./node_modules/.bin/tsc --noEmit >> "$LOG_FILE" 2>&1; then
+                    echo "success" > "$STATUS_FILE"
+                    exit 0
+                else
+                    echo "error" > "$STATUS_FILE"
+                    exit 1
+                fi
             elif [ -f "tsconfig.json" ]; then
-                echo "error" > "$STATUS_FILE"
-                exit 1
+                # TypeScript config exists but tsc not installed locally
+                echo "skipped (no local tsc, run npm install first)" > "$STATUS_FILE"
+                echo "Note: tsc not found locally. Run npm install to enable type checking." >> "$LOG_FILE"
+                exit 0
             else
                 # No TypeScript, just validate package.json exists
                 echo "success (no tsc)" > "$STATUS_FILE"
@@ -51,30 +59,51 @@ detect_and_build() {
         fi
     elif [ -f "go.mod" ]; then
         echo "Detected: Go" >> "$LOG_FILE"
-        if go build ./... >> "$LOG_FILE" 2>&1; then
-            echo "success" > "$STATUS_FILE"
-            exit 0
+        if [ "$ALLOW_BUILD" = "1" ]; then
+            # go build can execute arbitrary code via go:generate, cgo, plugins
+            if go build ./... >> "$LOG_FILE" 2>&1; then
+                echo "success" > "$STATUS_FILE"
+                exit 0
+            else
+                echo "error" > "$STATUS_FILE"
+                exit 1
+            fi
         else
-            echo "error" > "$STATUS_FILE"
-            exit 1
+            echo "skipped (safe mode - go build disabled)" > "$STATUS_FILE"
+            echo "Note: go build disabled in safe mode. Set ALLOW_BASELINE_BUILD=1 to enable." >> "$LOG_FILE"
+            exit 0
         fi
     elif [ -f "pom.xml" ]; then
         echo "Detected: Java (Maven)" >> "$LOG_FILE"
-        if mvn compile -q >> "$LOG_FILE" 2>&1; then
-            echo "success" > "$STATUS_FILE"
-            exit 0
+        if [ "$ALLOW_BUILD" = "1" ]; then
+            # mvn compile can execute arbitrary plugins
+            if mvn compile -q >> "$LOG_FILE" 2>&1; then
+                echo "success" > "$STATUS_FILE"
+                exit 0
+            else
+                echo "error" > "$STATUS_FILE"
+                exit 1
+            fi
         else
-            echo "error" > "$STATUS_FILE"
-            exit 1
+            echo "skipped (safe mode - mvn compile disabled)" > "$STATUS_FILE"
+            echo "Note: mvn compile disabled in safe mode. Set ALLOW_BASELINE_BUILD=1 to enable." >> "$LOG_FILE"
+            exit 0
         fi
     elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
         echo "Detected: Java (Gradle)" >> "$LOG_FILE"
-        if ./gradlew compileJava -q >> "$LOG_FILE" 2>&1 || gradle compileJava -q >> "$LOG_FILE" 2>&1; then
-            echo "success" > "$STATUS_FILE"
-            exit 0
+        if [ "$ALLOW_BUILD" = "1" ]; then
+            # gradle can execute arbitrary build scripts
+            if ./gradlew compileJava -q >> "$LOG_FILE" 2>&1 || gradle compileJava -q >> "$LOG_FILE" 2>&1; then
+                echo "success" > "$STATUS_FILE"
+                exit 0
+            else
+                echo "error" > "$STATUS_FILE"
+                exit 1
+            fi
         else
-            echo "error" > "$STATUS_FILE"
-            exit 1
+            echo "skipped (safe mode - gradle compile disabled)" > "$STATUS_FILE"
+            echo "Note: gradle compile disabled in safe mode. Set ALLOW_BASELINE_BUILD=1 to enable." >> "$LOG_FILE"
+            exit 0
         fi
     elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
         echo "Detected: Python" >> "$LOG_FILE"
@@ -109,12 +138,19 @@ detect_and_build() {
         fi
     elif [ -f "Cargo.toml" ]; then
         echo "Detected: Rust" >> "$LOG_FILE"
-        if cargo check >> "$LOG_FILE" 2>&1; then
-            echo "success" > "$STATUS_FILE"
-            exit 0
+        if [ "$ALLOW_BUILD" = "1" ]; then
+            # cargo check can execute build scripts and proc macros
+            if cargo check >> "$LOG_FILE" 2>&1; then
+                echo "success" > "$STATUS_FILE"
+                exit 0
+            else
+                echo "error" > "$STATUS_FILE"
+                exit 1
+            fi
         else
-            echo "error" > "$STATUS_FILE"
-            exit 1
+            echo "skipped (safe mode - cargo check disabled)" > "$STATUS_FILE"
+            echo "Note: cargo check disabled in safe mode. Set ALLOW_BASELINE_BUILD=1 to enable." >> "$LOG_FILE"
+            exit 0
         fi
     else
         echo "No recognized build system detected" >> "$LOG_FILE"

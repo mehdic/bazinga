@@ -232,10 +232,12 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 **Get events (filter by session and optionally by subtype):**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "<session_id>" [event_subtype] [--limit N]
+  "<session_id>" [event_subtype] [limit]
 ```
 
-Returns JSON array of matching events (default limit 50).
+Arguments are positional: `<session_id>` required, `[event_subtype]` optional, `[limit]` optional (default 50).
+
+Returns JSON array of matching events.
 
 **Dashboard snapshot:**
 ```bash
