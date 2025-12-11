@@ -377,23 +377,46 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 
 ### TWO-TURN SPAWN SEQUENCE (Parallel Mode)
 
-**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from each Skill()'s response.
+**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from Skill()'s response.
+
+**🔴 SHARED SPECIALIZATION OPTIMIZATION:**
+
+If ALL groups need the SAME specialization (same template paths):
+- Call Skill() **ONCE** (not per-group)
+- Get **ONE** spec_block
+- Use that **SAME** spec_block for **ALL** groups
+- Still call Task() for **EACH** group (same spec_block + different base_prompts)
 
 **Turn 1 (this message):**
-1. For EACH group, output the `[SPEC_CTX_START group=X]...[SPEC_CTX_END]` block
-2. Call `Skill(command: "specialization-loader")` for EACH group (all in this message)
-3. END this message (wait for all skill responses)
 
-**Turn 2 (after skill responses):**
+**Option A - All groups share same specialization:**
+1. Output ONE `[SPEC_CTX_START]...[SPEC_CTX_END]` block (any group's context)
+2. Call `Skill(command: "specialization-loader")` ONCE
+3. END this message
 
-**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCKS 🔴🔴🔴**
+**Option B - Groups have different specializations:**
+1. For EACH group, output `[SPEC_CTX_START group=X]...[SPEC_CTX_END]` block
+2. Call `Skill(command: "specialization-loader")` for EACH group
+3. END this message
 
-The skill just output specialization block(s). You MUST process them SILENTLY:
+**Turn 2 (after skill response):**
 
-1. **INTERNALLY** extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
+**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
+
+The skill output a specialization block. Process it SILENTLY then spawn ALL agents:
+
+**If shared specialization (ONE block for ALL groups):**
+1. **INTERNALLY** extract the ONE block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
+2. **INTERNALLY** store as `shared_spec_block`
+3. **INTERNALLY** build `FULL_PROMPT_X = shared_spec_block + "\n\n---\n\n" + base_prompts[X]` for EACH group
+4. **OUTPUT** only: `🔧 Specializations: ✓ | {identity}`
+5. **CALL** `Task()` for **EACH** group (A, B, C, D) - all use the SAME spec_block
+
+**If different specializations (multiple blocks):**
+1. **INTERNALLY** extract each block
 2. **INTERNALLY** store as `spec_blocks[group_id]`
-3. **INTERNALLY** build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each group
-4. **OUTPUT** only a brief capsule (see below)
+3. **INTERNALLY** build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each
+4. **OUTPUT** only: `🔧 Specializations: ✓ | {identity}`
 5. **CALL** `Task()` for EACH group
 
 **🔴 FORBIDDEN - DO NOT OUTPUT ANY OF THESE:**
@@ -420,14 +443,18 @@ Here's the full prompt for each...  ← WRONG! Don't show prompts!
 [MESSAGE ENDS - NO TASK() CALLS]  ← BUG! Workflow hangs
 ```
 
-**CORRECT (silent, capsule only, Tasks called):**
+**CORRECT (shared spec, silent, capsule, ALL 4 Tasks called):**
 ```
 🔧 Specializations: ✓ | TypeScript/React Developer
 
 Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize App", prompt=FULL_PROMPT_A)
 Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery List", prompt=FULL_PROMPT_B)
 Task(subagent_type="general-purpose", model="haiku", description="Developer C: Dashboard", prompt=FULL_PROMPT_C)
+Task(subagent_type="general-purpose", model="haiku", description="Developer D: Settings", prompt=FULL_PROMPT_D)
 ```
+
+**🔴 KEY: Even with ONE shared spec_block, you MUST call Task() for EACH group.**
+Each FULL_PROMPT_X = shared_spec_block + base_prompt_X (different tasks, same specialization)
 
 **🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
 
