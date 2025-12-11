@@ -1593,11 +1593,13 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 - ❌ "Establish baseline for 695 tests" → Too large, use batching
 - ❌ Multiple "then" statements → Too many sequential steps
 
-### Step 3.5: Assign Specializations per Task Group (🔴 MANDATORY)
+### Step 3.5: Assign Specializations per Task Group (🔴 MANDATORY - BLOCKER)
 
 **Purpose:** Provide technology-specific patterns to agents based on which component(s) each task group targets.
 
-**🔴 THIS STEP IS MANDATORY** - You MUST assign specializations to EVERY task group. Skipping this step causes agents to spawn without technology-specific guidance, degrading code quality.
+**🔴 THIS STEP IS MANDATORY AND BLOCKS PROCEEDING** - You MUST assign specializations to EVERY task group. Skipping this step causes agents to spawn without technology-specific guidance, degrading code quality.
+
+**⚠️ CANNOT SKIP THIS STEP** - If `project_context.json` doesn't exist, you MUST use the fallback mapping table below. There is NO valid reason to create task groups without specializations.
 
 **Step 3.5.1: Read Project Context (from Tech Stack Scout)**
 
@@ -1731,19 +1733,39 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **No specialization limit:** Assign as many specializations as the task requires. The orchestrator validates paths exist before including in agent prompts.
 
-**🔴 SELF-CHECK BEFORE PROCEEDING:**
-```
-FOR each task_group created:
-  ✓ Did I pass --specializations flag to create-task-group?
-  ✓ Is the specializations array non-empty?
-  ✓ Did I use the fallback mapping if project_context.json was missing?
+**🔴 MANDATORY VALIDATION GATE (BLOCKER):**
 
-IF any task group has empty specializations:
-  → Go back and derive using the fallback mapping table above
-  → Update the task group with bazinga-db update-task-group --specializations
+**This step BLOCKS proceeding to Step 3.6. You MUST verify specializations before continuing.**
+
+```
+IMMEDIATE SELF-CHECK after creating each task group:
+
+1. Look at the create-task-group command I just ran
+2. Does it include --specializations with a non-empty array?
+
+   ❌ WRONG: python3 ... create-task-group "AUTH" "sess_123" "Auth feature"
+   ✅ RIGHT: python3 ... create-task-group "AUTH" "sess_123" "Auth feature" pending developer --specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
+
+IF I forgot --specializations:
+   → IMMEDIATELY run update-task-group with --specializations
+   → Use fallback mapping table above if no project_context.json
 ```
 
-**⚠️ DO NOT proceed to Step 3.6 until ALL task groups have specializations.**
+**🔴 FALLBACK DERIVATION IS MANDATORY** - If you don't have `project_context.json`:
+```
+EVERY task group MUST get specializations from the fallback table.
+If the project uses TypeScript + React:
+  → ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/react.md"]
+If unsure about stack, use JUST the language template.
+NEVER leave specializations empty.
+```
+
+**❌ THIS WILL CAUSE FAILURE:**
+- Creating task groups without --specializations flag
+- Leaving specializations as null or empty array
+- Skipping Step 3.5 "because project_context.json doesn't exist"
+
+**⚠️ DO NOT proceed to Step 3.6 until ALL task groups have non-empty specializations.**
 
 ---
 

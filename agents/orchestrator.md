@@ -1499,6 +1499,15 @@ ELSE IF PM chose "parallel":
 - Invoke specialization-loader skill to compose block
 - Prepend composed block to agent prompt
 
+**🔴 FORBIDDEN ACTIONS:**
+- ❌ **DO NOT** search for templates with `Search()` or `Glob()` - the skill handles path resolution
+- ❌ **DO NOT** conclude "no templates exist" based on search results
+- ❌ **DO NOT** skip specialization loading if you can't find template files yourself
+- ✅ **ALWAYS** trust the specializations array from DB or fallback derivation
+- ✅ **ALWAYS** pass paths to the specialization-loader skill - it will handle errors gracefully
+
+**Why?** Working directories vary. The skill uses `cat` with relative paths that work from project root. Search/Glob may run from a different directory and fail to find files that exist.
+
 ### Process (at agent spawn)
 
 **Step 1: Check if enabled**
