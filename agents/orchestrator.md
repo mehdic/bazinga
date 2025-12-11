@@ -1027,7 +1027,7 @@ Before continuing to Step 1.3a, verify:
 - `PLANNING_COMPLETE` - PM completed planning, proceed to execution
 - `CONTINUE` - PM verified state and work should continue (common in RESUME scenarios)
 - `NEEDS_CLARIFICATION` - PM needs user input before planning
-- `INVESTIGATION_ONLY` - User only answered questions, no implementation needed
+- `INVESTIGATION_ONLY` - Investigation-only request; no implementation needed
 - `BAZINGA` - All work complete (rare in initial spawn, common in final assessment)
 
 **IF status = PLANNING_COMPLETE:**
@@ -1037,11 +1037,15 @@ Before continuing to Step 1.3a, verify:
 **IF status = CONTINUE (CRITICAL FOR RESUME SCENARIOS):**
 - PM verified state and determined work should continue
 - **IMMEDIATELY spawn agent for in_progress/pending groups**
-- **🔴 DO NOT STOP after logging or database updates - you MUST spawn in the SAME message**
-- Query task groups: `bazinga-db get all task groups for session [session_id]`
-- Find groups with status: `in_progress` or `pending`
-- For each such group, spawn the appropriate agent (Developer/SSE/QA/TL based on group state)
+- **🔴 DO NOT STOP after logging - you MUST initiate next action in the SAME message**
+- **Step 1:** Query task groups: `bazinga-db get all task groups for session [session_id]`
+- **Step 2:** After receiving DB results, find groups with status: `in_progress` or `pending`
+- **Step 3:** For each such group, spawn the appropriate agent (Developer/SSE/QA/TL based on group state)
+  - **⚠️ CAPACITY LIMIT: Respect MAX 4 PARALLEL DEVELOPERS hard limit**
+  - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
+  - Track active developer count in database before spawning
 - **IMMEDIATELY jump to Step 2A.1 or 2B.1 to spawn agents. Do NOT stop.**
+- **Note:** DB query in one message, then spawn in the next message is acceptable; what matters is NO stopping for user input
 
 **IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
@@ -1052,7 +1056,10 @@ Before continuing to Step 1.3a, verify:
 
 **IF status = BAZINGA:**
 - All work complete (if PM returns this early, likely a resume of already-complete session)
-- **IMMEDIATELY proceed to Completion phase**
+- **MANDATORY: Invoke `Skill(command: "bazinga-validator")` to verify completion**
+  - IF validator returns ACCEPT → Proceed to completion
+  - IF validator returns REJECT → Spawn PM with validator's failure details
+- **IMMEDIATELY proceed to Completion phase ONLY after validator ACCEPTS**
 
 **IF status is missing or unclear:**
 - Apply fallback: If response contains task groups or mode decision, treat as PLANNING_COMPLETE
