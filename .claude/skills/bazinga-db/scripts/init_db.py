@@ -566,14 +566,17 @@ def init_database(db_path: str) -> None:
                         print("   - Recreating orchestration_logs to update CHECK constraint...")
 
                         # Get column info to handle variable schemas
+                        # IMPORTANT: Use ordered list (by cid) to ensure SELECT/INSERT column alignment
                         cursor.execute("PRAGMA table_info(orchestration_logs)")
-                        existing_cols = {row[1] for row in cursor.fetchall()}
+                        col_info = cursor.fetchall()
+                        # Sort by cid (column 0) to ensure deterministic order
+                        col_info_sorted = sorted(col_info, key=lambda x: x[0])
+                        col_names = [row[1] for row in col_info_sorted]  # Ordered list, not set
 
-                        # Backup existing data with all existing columns
-                        col_list = ', '.join(existing_cols)
+                        # Backup existing data with columns in consistent order
+                        col_list = ', '.join(col_names)
                         cursor.execute(f"SELECT {col_list} FROM orchestration_logs")
                         logs_data = cursor.fetchall()
-                        col_names = list(existing_cols)
                         print(f"   - Backed up {len(logs_data)} orchestration log entries")
 
                         # Drop indexes first (they reference the table)
