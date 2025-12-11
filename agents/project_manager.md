@@ -1329,6 +1329,50 @@ IF JSON construction fails:
 
 Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
+### Step 0.9: Backfill Specializations for Existing Task Groups (🔴 MANDATORY ON RESUME)
+
+**When PM is spawned with existing task groups (resume scenario):**
+
+1. **Query existing task groups:**
+   ```
+   bazinga-db, get task groups for session [session_id]
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Check each group for null/empty specializations:**
+   ```
+   FOR each task_group in result:
+     IF task_group.specializations is null OR empty:
+       → This group needs backfill
+   ```
+
+3. **Backfill using fallback derivation:**
+   ```
+   Read(file_path: "bazinga/project_context.json")
+
+   FOR each group needing backfill:
+     Derive specializations using:
+       - primary_language → language template
+       - framework → framework template
+       - (Use mapping table from Step 3.5)
+
+     Update the task group:
+     bazinga-db, update task group:
+     Group ID: {group_id}
+     --specializations '["derived/paths/here"]'
+
+     Skill(command: "bazinga-db")
+   ```
+
+4. **Log the backfill:**
+   ```
+   📋 Backfilled specializations for {N} task groups
+   ```
+
+**Skip this step if:** This is a NEW session (no existing task groups).
+
+---
+
 ### Step 1: Analyze Requirements
 
 **FIRST: Extract Explicit Success Criteria**
@@ -1549,9 +1593,11 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 - ❌ "Establish baseline for 695 tests" → Too large, use batching
 - ❌ Multiple "then" statements → Too many sequential steps
 
-### Step 3.5: Assign Specializations per Task Group (NEW)
+### Step 3.5: Assign Specializations per Task Group (🔴 MANDATORY)
 
 **Purpose:** Provide technology-specific patterns to agents based on which component(s) each task group targets.
+
+**🔴 THIS STEP IS MANDATORY** - You MUST assign specializations to EVERY task group. Skipping this step causes agents to spawn without technology-specific guidance, degrading code quality.
 
 **Step 3.5.1: Read Project Context (from Tech Stack Scout)**
 
@@ -1559,7 +1605,9 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 Read(file_path: "bazinga/project_context.json")
 ```
 
-**If file missing or empty:** Skip specializations (graceful degradation). Continue to Step 3.6.
+**If file exists:** Extract specializations from `components[].suggested_specializations`
+
+**If file MISSING or EMPTY:** You MUST derive specializations manually using the fallback mapping below.
 
 **Step 3.5.2: Map Task Groups to Components**
 
@@ -1617,7 +1665,37 @@ FOR each task_group:
   task_group.specializations = specializations
 ```
 
-**🔴 FALLBACK NOTE:** If you cannot determine specializations from components, leave `specializations = []`. The orchestrator will handle fallback derivation from project_context.json when spawning agents. See: `bazinga/templates/orchestrator/spawn_with_specializations.md`
+**🔴 FALLBACK DERIVATION (when components don't have suggested_specializations):**
+
+If project_context.json is missing, empty, or lacks `suggested_specializations`, you MUST derive specializations using this mapping table:
+
+| Technology | Template Path |
+|------------|---------------|
+| typescript, ts | `bazinga/templates/specializations/01-languages/typescript.md` |
+| javascript, js | `bazinga/templates/specializations/01-languages/javascript.md` |
+| python, py | `bazinga/templates/specializations/01-languages/python.md` |
+| java | `bazinga/templates/specializations/01-languages/java.md` |
+| go, golang | `bazinga/templates/specializations/01-languages/go.md` |
+| rust | `bazinga/templates/specializations/01-languages/rust.md` |
+| react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
+| nextjs, next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| vue | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
+| angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
+| express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
+| fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
+| django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
+| spring | `bazinga/templates/specializations/03-frameworks-backend/spring.md` |
+
+**Example fallback derivation:**
+```
+project_context.json has: primary_language = "typescript", framework = "nextjs"
+→ specializations = [
+    "bazinga/templates/specializations/01-languages/typescript.md",
+    "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"
+  ]
+```
+
+**Apply to ALL task groups** - Every group should get at least the language specialization.
 
 **Step 3.5.3: Include Specializations in Task Group Definition**
 
@@ -1652,6 +1730,20 @@ Initial Tier: Developer
 Then invoke: `Skill(command: "bazinga-db")`
 
 **No specialization limit:** Assign as many specializations as the task requires. The orchestrator validates paths exist before including in agent prompts.
+
+**🔴 SELF-CHECK BEFORE PROCEEDING:**
+```
+FOR each task_group created:
+  ✓ Did I pass --specializations flag to create-task-group?
+  ✓ Is the specializations array non-empty?
+  ✓ Did I use the fallback mapping if project_context.json was missing?
+
+IF any task group has empty specializations:
+  → Go back and derive using the fallback mapping table above
+  → Update the task group with bazinga-db update-task-group --specializations
+```
+
+**⚠️ DO NOT proceed to Step 3.6 until ALL task groups have specializations.**
 
 ---
 
