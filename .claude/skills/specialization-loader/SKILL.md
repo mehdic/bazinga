@@ -237,7 +237,9 @@ Return the composed specialization block as your response. The orchestrator will
 - ✅ Start your response with `[SPECIALIZATION_BLOCK_START]` immediately
 
 **Output format (output EXACTLY this, nothing else before it):**
-```
+
+⚠️ The format below shows what to output. Do NOT output backticks - they are documentation only.
+
 [SPECIALIZATION_BLOCK_START]
 {The composed markdown block}
 [SPECIALIZATION_BLOCK_END]
@@ -253,7 +255,6 @@ Metadata:
 
 Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
 Continue to Turn 2 when ALL needed specialization blocks are collected.
-```
 
 **🔴 YOUR JOB IS DONE AFTER THIS OUTPUT:**
 - ❌ Do NOT spawn agents yourself or call Task()
@@ -339,8 +340,8 @@ Specialization Paths: [
 ]
 ```
 
-**Output:**
-```
+**Output (no backticks in actual output - shown here for readability):**
+
 [SPECIALIZATION_BLOCK_START]
 ## SPECIALIZATION GUIDANCE (Advisory)
 
@@ -401,7 +402,6 @@ Metadata:
 
 Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
 Continue to Turn 2 when ALL needed specialization blocks are collected.
-```
 
 **Note:** The skill outputs NOTHING before `[SPECIALIZATION_BLOCK_START]`. No preamble, no explanation, no "I'll compose..." - just the block directly.
 
