@@ -1539,11 +1539,19 @@ ELSE IF PM chose "parallel":
 - ❌ **DO NOT** conclude "no templates exist" based on search results
 - ❌ **DO NOT** skip specialization loading if you can't find template files yourself
 - ❌ **DO NOT** try to "pre-verify" or "quickly check" before invoking the skill - this is role drift
-- ✅ **ALWAYS** trust the specializations array from DB or fallback derivation
+- ✅ **ALWAYS** pass the specializations array to the skill - it handles validation
 - ✅ **ALWAYS** invoke the skill when specializations array is non-empty - let it handle errors
 - ✅ **ALWAYS** follow the workflow even if you think a step "might not be needed"
 
-**Why?** Working directories vary. The skill uses `cat` with relative paths that work from project root. Search/Glob may run from a different directory and fail to find files that exist.
+**Path Security (handled by specialization-loader skill):**
+The skill validates all paths before loading:
+- Paths must start with `bazinga/templates/specializations/`
+- No `..` components allowed (path traversal prevention)
+- No absolute paths allowed
+- No symlinks followed outside allowed directories
+- Invalid paths are rejected with error message
+
+**Why delegate to skill?** Working directories vary. The skill uses validated relative paths from project root. Search/Glob may run from a different directory and fail to find files that exist.
 
 **Anti-pattern to avoid:**
 ```

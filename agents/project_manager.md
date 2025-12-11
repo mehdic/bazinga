@@ -1772,12 +1772,33 @@ IMMEDIATE SELF-CHECK after creating each task group:
 1. Does it include Item_Count?
 2. Does it include --specializations with a non-empty array?
 
-   ❌ WRONG: python3 ... create-task-group "AUTH" "sess_123" "Auth feature"
-   ❌ WRONG: python3 ... create-task-group "AUTH" "sess_123" "Auth feature" pending developer --item_count 3
-   ✅ RIGHT: python3 ... create-task-group "AUTH" "sess_123" "Auth feature" pending developer --item_count 3 --specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
+   ❌ WRONG (missing both required fields):
+   bazinga-db, please create task group:
+   Group ID: AUTH
+   Session ID: [session_id]
+   Name: Auth feature
+   Status: pending
+
+   ❌ WRONG (missing --specializations):
+   bazinga-db, please create task group:
+   Group ID: AUTH
+   Session ID: [session_id]
+   Name: Auth feature
+   Status: pending
+   Item_Count: 3
+
+   ✅ RIGHT (has BOTH Item_Count AND --specializations):
+   bazinga-db, please create task group:
+   Group ID: AUTH
+   Session ID: [session_id]
+   Name: Auth feature
+   Status: pending
+   Initial Tier: Developer
+   Item_Count: 3
+   --specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
 
 IF I forgot any field:
-   → IMMEDIATELY run update-task-group with the missing field
+   → IMMEDIATELY invoke bazinga-db with update-task-group to add the missing field
    → Use fallback mapping table above if no project_context.json
 ```
 
