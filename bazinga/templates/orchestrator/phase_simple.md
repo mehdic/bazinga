@@ -111,11 +111,46 @@ Prior agents documented their decision-making for this task:
 
 ---
 
-### PART A: Build Base Prompt (internal)
+### PART A: Build Base Prompt (internal, DO NOT OUTPUT)
 
-Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
+**🔴 You MUST build this prompt string. Do NOT skip this step.**
 
-Store as `base_prompt`. Do not output to user.
+**Step A.1: Gather data from task_group (already in memory from PM):**
+```
+task_title = task_group["title"]
+task_requirements = task_group["requirements"]  # The actual work to do
+branch = task_group["branch"] or session_branch
+group_id = task_group["group_id"]
+initial_tier = task_group["initial_tier"]
+```
+
+**Step A.2: Build base_prompt string using this template:**
+```
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Simple
+**BRANCH:** {branch}
+
+**TASK:** {task_title}
+
+**REQUIREMENTS:**
+{task_requirements}
+
+**MANDATORY WORKFLOW:**
+1. Implement the complete solution
+2. Write unit tests for new code
+3. Run lint check (must pass)
+4. Run build check (must pass)
+5. Commit to branch: {branch}
+6. Report status: READY_FOR_QA or BLOCKED
+
+**OUTPUT FORMAT:**
+Use standard Developer response format with STATUS, FILES, TESTS, COVERAGE sections.
+```
+
+**Step A.3: Store as `base_prompt` variable. DO NOT output to user.**
 
 ---
 
@@ -207,13 +242,90 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 3. END this message (wait for skill response)
 
 **Turn 2 (after skill response):**
-1. Read the skill's response
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
-3. Call `Task()` with the extracted block prepended to base_prompt
+1. Read the skill's response (internally - DO NOT echo to user)
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` → store as `spec_block`
+3. Build `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
+4. **🔴 IMMEDIATELY output capsule and call `Task()` in THIS message**
+
+**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+
+After extracting the specialization block (silently), you MUST:
+1. Output ONLY the spawn summary capsule (not the spec block)
+2. **Call Task() in THIS SAME MESSAGE**
+3. DO NOT end the message without a Task() call
+
+**WRONG (Bug Pattern - echoing spec block):**
+```
+[SPECIALIZATION_BLOCK_START]
+...
+[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
+
+📝 **Developer Prompt** | Group: main | Model: haiku
+
+[MESSAGE ENDS - NO TASK() CALL]  ← BUG! Workflow hangs
+```
+
+**CORRECT (silent extraction, capsule only):**
+```
+🔧 Specializations loaded (3 templates) | React/TypeScript Frontend Developer
+
+📝 **Developer Prompt** | Group: main | Model: haiku
+   Task: Implement delivery list page
+   Specializations: ✓ loaded
+
+Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement delivery list page", prompt=FULL_PROMPT)
+```
+
+**🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
+
+The `prompt` parameter in Task() MUST be the **concatenation** of:
+1. **spec_block** - The specialization content from the skill (HOW to code)
+2. **base_prompt** - The task assignment from PM built in PART A (WHAT to code)
+
+**Example of FULL_PROMPT (what you pass to Task):**
+```
+## SPECIALIZATION GUIDANCE (Advisory)
+You are a React/TypeScript Frontend Developer specialized in Next.js 14...
+[patterns, anti-patterns from spec_block]
+
+---
+
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** abc123
+**GROUP:** main
+**MODE:** Simple
+**BRANCH:** feature/delivery-app
+
+**REQUIREMENTS:**
+Implement the delivery request list page with the following:
+- Display all delivery requests in a table
+- Add filtering by status (pending, in_progress, completed)
+- Include pagination (20 items per page)
+
+**MANDATORY WORKFLOW:**
+1. Run codebase-analysis skill
+2. Implement the solution
+3. Write unit tests
+4. Run lint + build
+5. Commit and report READY_FOR_QA
+```
+
+**WRONG (spec_block only - missing task assignment):**
+```
+prompt="## SPECIALIZATION GUIDANCE\nYou are a React/TypeScript..."
+```
+↑ Developer knows HOW to code but NOT WHAT to build!
+
+**CORRECT (both parts combined):**
+```
+prompt=spec_block + "\n\n---\n\n" + base_prompt
+```
+↑ Developer knows BOTH the patterns AND the requirements!
 
 **SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START`? Does it contain `Skill(command: "specialization-loader")`?
 
-**SELF-CHECK (Turn 2):** Did I extract the specialization block? Does this message contain `Task()`?
+**SELF-CHECK (Turn 2):** Did I extract the specialization block? Does this message contain `Task()`? Does the prompt include BOTH spec_block AND base_prompt (with the actual requirements)?
 
 ---
 

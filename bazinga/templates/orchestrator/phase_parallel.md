@@ -194,11 +194,47 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
 
 ---
 
-### PART A: Build Base Prompts (internal, all groups)
+### PART A: Build Base Prompts (internal, all groups, DO NOT OUTPUT)
 
-For EACH group: Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode=Parallel, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
+**🔴 You MUST build a prompt string for EACH group. Do NOT skip this step.**
 
-Store as `base_prompts[group_id]`. Do not output to user.
+**For EACH group (A, B, C, D):**
+
+**Step A.1: Gather data from task_groups[group_id]:**
+```
+task_title = task_groups[group_id]["title"]
+task_requirements = task_groups[group_id]["requirements"]  # The actual work to do
+branch = task_groups[group_id]["branch"] or session_branch
+initial_tier = task_groups[group_id]["initial_tier"]
+```
+
+**Step A.2: Build base_prompt string using this template:**
+```
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Parallel
+**BRANCH:** {branch}
+
+**TASK:** {task_title}
+
+**REQUIREMENTS:**
+{task_requirements}
+
+**MANDATORY WORKFLOW:**
+1. Implement the complete solution
+2. Write unit tests for new code
+3. Run lint check (must pass)
+4. Run build check (must pass)
+5. Commit to branch: {branch}
+6. Report status: READY_FOR_QA or BLOCKED
+
+**OUTPUT FORMAT:**
+Use standard Developer response format with STATUS, FILES, TESTS, COVERAGE sections.
+```
+
+**Step A.3: Store as `base_prompts[group_id]`. DO NOT output to user.**
 
 ---
 
@@ -296,13 +332,92 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 3. END this message (wait for all skill responses)
 
 **Turn 2 (after skill responses):**
-1. Read each skill response
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
-3. Call ALL `Task()` spawns with the extracted blocks prepended to base_prompts
+1. Read each skill response (internally - DO NOT echo to user)
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group → store as `spec_blocks[group_id]`
+3. Build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each group
+4. **🔴 IMMEDIATELY output capsule and call ALL `Task()` spawns in THIS message**
 
-**SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START` for EACH group? Does it contain `Skill(command: "specialization-loader")` for EACH group?
+**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
 
-**SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group?
+After extracting ALL specialization blocks (silently), you MUST:
+1. Output ONLY the spawn summary capsule (not the spec blocks)
+2. **Call Task() for EACH group in THIS SAME MESSAGE**
+3. DO NOT end the message without Task() calls
+
+**WRONG (Bug Pattern - echoing spec blocks):**
+```
+[SPECIALIZATION_BLOCK_START]
+...
+[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
+
+📝 Spawning 4 developers...
+
+[MESSAGE ENDS - NO TASK() CALLS]  ← BUG! Workflow hangs
+```
+
+**CORRECT (silent extraction, capsule only):**
+```
+🔧 Specializations loaded: A (3 templates), B (3 templates), C (3 templates)
+
+📝 Spawning 3 developers in parallel:
+• Group A: Developer | Initialize Delivery App Structure | Specializations: ✓
+• Group B: Developer | Delivery Request List & Detail | Specializations: ✓
+• Group C: Developer | Order Tracking Dashboard | Specializations: ✓
+
+Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize Delivery App Structure", prompt=FULL_PROMPT_A)
+Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery Request List & Detail", prompt=FULL_PROMPT_B)
+Task(subagent_type="general-purpose", model="haiku", description="Developer C: Order Tracking Dashboard", prompt=FULL_PROMPT_C)
+```
+
+**🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
+
+Each group's `prompt` parameter MUST be the **concatenation** of:
+1. **spec_block** - The specialization content from the skill (HOW to code)
+2. **base_prompt_X** - That group's task assignment from PM built in PART A (WHAT to code)
+
+**Example of FULL_PROMPT_A (what you pass to Task for group A):**
+```
+## SPECIALIZATION GUIDANCE (Advisory)
+You are a React/TypeScript Frontend Developer specialized in Next.js 14...
+[patterns, anti-patterns from spec_block]
+
+---
+
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** abc123
+**GROUP:** A (R2-INIT)
+**MODE:** Parallel
+**BRANCH:** feature/delivery-app
+
+**REQUIREMENTS:**
+Initialize the delivery app structure:
+- Set up Next.js 14 project with App Router
+- Configure TypeScript, ESLint, Prettier
+- Create base layout and navigation components
+
+**MANDATORY WORKFLOW:**
+1. Run codebase-analysis skill
+2. Implement the solution
+3. Write unit tests
+4. Run lint + build
+5. Commit and report READY_FOR_QA
+```
+
+**WRONG (spec_block only - missing task assignment):**
+```
+prompt="## SPECIALIZATION GUIDANCE\nYou are a React/TypeScript..."
+```
+↑ Developer knows HOW to code but NOT WHAT to build!
+
+**CORRECT (both parts combined for each group):**
+```
+prompt_A = spec_block + "\n\n---\n\n" + base_prompt_A
+prompt_B = spec_block + "\n\n---\n\n" + base_prompt_B
+```
+↑ Each developer knows BOTH the patterns AND their specific requirements!
+
+**SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group? Does EACH prompt include BOTH spec_block AND that group's base_prompt (with the actual requirements)?
 
 **Count your Task() calls:** Should match number of groups (max 4).
 
