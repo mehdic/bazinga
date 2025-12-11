@@ -249,21 +249,16 @@ Metadata:
 - Identity: {short identity summary}
 
 ---
-**ORCHESTRATOR: CONTINUE TO TURN 2 NOW**
+**ORCHESTRATOR: SPECIALIZATION BLOCK READY**
 
-The specialization block above is ready. You MUST immediately:
-1. Extract content between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
-2. Combine with base_prompt: `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
-3. Call `Task()` to spawn the agent with the FULL_PROMPT
-
-🔴 DO NOT wait for user input. DO NOT end your message without calling Task().
-🔴 This is Turn 2 of the TWO-TURN SPAWN SEQUENCE. You MUST call Task() NOW.
+Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
+Continue to Turn 2 when ALL needed specialization blocks are collected.
 ```
 
 **🔴 YOUR JOB IS DONE AFTER THIS OUTPUT:**
 - ❌ Do NOT spawn agents yourself or call Task()
 - ❌ Do NOT figure out "what to do next"
-- ✅ The continuation instruction tells the ORCHESTRATOR what to do - not you
+- ✅ The orchestrator decides when to proceed to Turn 2 (after ALL blocks ready)
 - ✅ If multiple groups share the same specialization, compose once - orchestrator handles the rest
 
 ---
@@ -402,15 +397,10 @@ Metadata:
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
 
 ---
-**ORCHESTRATOR: CONTINUE TO TURN 2 NOW**
+**ORCHESTRATOR: SPECIALIZATION BLOCK READY**
 
-The specialization block above is ready. You MUST immediately:
-1. Extract content between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
-2. Combine with base_prompt: `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
-3. Call `Task()` to spawn the agent with the FULL_PROMPT
-
-🔴 DO NOT wait for user input. DO NOT end your message without calling Task().
-🔴 This is Turn 2 of the TWO-TURN SPAWN SEQUENCE. You MUST call Task() NOW.
+Extract and store the block between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END].
+Continue to Turn 2 when ALL needed specialization blocks are collected.
 ```
 
 **Note:** The skill outputs NOTHING before `[SPECIALIZATION_BLOCK_START]`. No preamble, no explanation, no "I'll compose..." - just the block directly.
@@ -438,4 +428,4 @@ The specialization block above is ready. You MUST immediately:
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
 6. Block returned in expected format
-7. **Continuation instruction included at end** (critical for orchestrator to continue)
+7. **"BLOCK READY" signal included at end** (orchestrator collects all blocks before Turn 2)
