@@ -26,6 +26,23 @@ You are the specialization-loader skill. You compose technology-specific identit
 
 ---
 
+## 🔴 CRITICAL: ONE GROUP PER INVOCATION
+
+**YOU MUST ONLY PROCESS THE SINGLE GROUP PROVIDED IN THE CONTEXT BLOCK.**
+
+- ✅ Parse the ONE `[SPEC_CTX_START]...[SPEC_CTX_END]` block you received
+- ✅ Process ONLY that single group_id
+- ✅ Return ONE specialization block for that ONE group
+- ❌ **DO NOT** try to compose for "all groups" or "multiple groups"
+- ❌ **DO NOT** look at conversation history for other groups
+- ❌ **DO NOT** say "I'll compose for all 4 groups" - you only handle ONE
+
+**If you were invoked for group "R2-QR", you output for "R2-QR" ONLY.**
+
+The orchestrator will invoke you separately for each group in parallel mode.
+
+---
+
 ## Your Task
 
 ### Step 1: Parse Input Context
@@ -229,13 +246,21 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-outpu
 
 Return the composed specialization block as your response. The orchestrator will prepend this to the agent spawn prompt.
 
-**Output format:**
+**🔴 OUTPUT RULES - KEEP IT MINIMAL:**
+- ❌ **DO NOT** say "I'll compose the specialization blocks..." or similar preamble
+- ❌ **DO NOT** narrate what you're doing ("Let me read the templates...")
+- ❌ **DO NOT** explain your process or reasoning
+- ✅ **JUST OUTPUT** the block + metadata + continuation instruction directly
+- ✅ Start your response with `[SPECIALIZATION_BLOCK_START]` immediately
+
+**Output format (output EXACTLY this, nothing else before it):**
 ```
 [SPECIALIZATION_BLOCK_START]
 {The composed markdown block}
 [SPECIALIZATION_BLOCK_END]
 
 Metadata:
+- Group: {group_id}
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
@@ -382,6 +407,7 @@ public Optional<User> findById(Long id) {
 [SPECIALIZATION_BLOCK_END]
 
 Metadata:
+- Group: AUTH
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
@@ -397,6 +423,8 @@ The specialization block above is ready. You MUST immediately:
 🔴 DO NOT wait for user input. DO NOT end your message without calling Task().
 🔴 This is Turn 2 of the TWO-TURN SPAWN SEQUENCE. You MUST call Task() NOW.
 ```
+
+**Note:** The skill outputs NOTHING before `[SPECIALIZATION_BLOCK_START]`. No preamble, no explanation, no "I'll compose..." - just the block directly.
 
 ---
 
