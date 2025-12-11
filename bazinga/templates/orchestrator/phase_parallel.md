@@ -389,13 +389,16 @@ If ALL groups need the SAME specialization (same template paths):
 
 **🔴 AFTER SKILL RETURNS (CRITICAL - THIS IS WHERE YOU WERE STOPPING):**
 
-If you called Skill() fewer times than you have groups (optimization), after receiving the skill response(s):
-1. You have N spec_blocks (where N ≤ number of groups)
+After receiving ALL skill response(s), **IMMEDIATELY call Task() for ALL groups**:
+1. You have N spec_blocks (where N = number of Skill() calls you made)
 2. Map each group to its spec_block (groups with same paths share the same block)
 3. **IMMEDIATELY call Task() for ALL groups** - don't stop to think, don't wait
-4. Each Task() gets: shared_spec_block + that group's unique base_prompt
+4. Each Task() gets: its_spec_block + that group's unique base_prompt
 
-**Example:** 4 groups, 1 skill call (all same specialization) → After skill returns, call 4 Task()s using the ONE block.
+**Examples:**
+- 4 groups, 1 skill call (all same spec) → 4 Task()s using the ONE shared block
+- 4 groups, 4 skill calls (all different) → 4 Task()s, each with its own block
+- 4 groups, 2 skill calls (partial overlap) → 4 Task()s, mapping groups to their blocks
 
 **Turn 1 (this message):**
 
