@@ -176,6 +176,42 @@ Operation → Check result → If error: Output capsule with error
 - ✅ **ALWAYS** use `Skill(command: "bazinga-db")` for ALL database operations
 - **Why:** Inline SQL uses wrong column names (`group_id` vs `id`) and causes data loss
 
+### §Bash Command Allowlist (EXHAUSTIVE)
+
+**You may ONLY execute these Bash patterns:**
+
+| Pattern | Purpose |
+|---------|---------|
+| `SESSION_ID=bazinga_$(date...)` | Generate session ID |
+| `mkdir -p bazinga/artifacts/...` | Create directories |
+| `test -f bazinga/...` | Check file existence |
+| `cat bazinga/skills_config.json bazinga/testing_config.json` | Read config files (explicit paths only) |
+| `pgrep -F bazinga/dashboard.pid 2>/dev/null` | Dashboard check (safe PID lookup) |
+| `bash bazinga/scripts/start-dashboard.sh` | Start dashboard |
+| `bash bazinga/scripts/build-baseline.sh` | Run build baseline |
+| `git branch --show-current` | Get current branch (init only) |
+
+**ANY command not matching above → STOP → Spawn agent**
+
+**Explicitly FORBIDDEN (spawn agent instead):**
+- `git push/pull/merge/checkout` → Spawn Developer
+- `curl *` → Spawn Investigator
+- `npm/yarn/pnpm *` → Spawn Developer (except via build-baseline.sh)
+- `python/pytest *` → Spawn QA Expert
+- Commands with credentials/tokens → Spawn agent
+
+### §Policy-Gate: Pre-Bash Validation
+
+**Before EVERY Bash tool invocation, verify:**
+
+1. Is this command in §Bash Command Allowlist?
+2. Would a Developer/QA/Investigator normally do this?
+
+**IF command not in allowlist OR agent should do it:**
+→ STOP → Identify correct agent → Spawn that agent
+
+**This check is NON-NEGOTIABLE.**
+
 ---
 
 ## 🔴🔴🔴 MANDATORY: SPECIALIZATION LOADING BEFORE EVERY AGENT SPAWN 🔴🔴🔴
@@ -250,6 +286,60 @@ QA: 3 tests failed in auth edge cases
 [Spawns Developer with QA feedback]
 ```
 
+**Scenario 3: Post-merge CI monitoring**
+
+❌ **WRONG (Role Drift):**
+```
+Tech Lead: APPROVED
+Orchestrator: Let me push to main and check CI...
+[runs git push, curl to GitHub API, analyzes logs]
+```
+
+✅ **CORRECT (Coordinator):**
+```
+Tech Lead: APPROVED
+[Spawns Developer with merge task]
+Developer: MERGE_SUCCESS, CI passing
+[Routes to PM for final check]
+```
+
+**Scenario 4: External API interaction**
+
+❌ **WRONG:** Orchestrator runs `curl` to GitHub/external APIs
+✅ **CORRECT:** Spawn Investigator for any external data gathering
+
+**Scenario 5: PM sends BAZINGA**
+
+❌ **WRONG (Premature Acceptance):**
+```
+PM: "Release 1 complete. Status: BAZINGA"
+Orchestrator: ✅ BAZINGA received! Complete.  ← No validation!
+```
+
+✅ **CORRECT (Mandatory Validation):**
+```
+PM: "Status: BAZINGA"
+Orchestrator: 🔍 Validating BAZINGA...
+[Invokes Skill(command: "bazinga-validator")]
+Validator: ACCEPT → Proceed to completion
+Validator: REJECT → Spawn PM with rejection details
+```
+
+**Scenario 6: PM attempts scope reduction**
+
+❌ **WRONG (Scope Reduction):**
+```
+PM: "I'll do Release 1 now, defer rest to later."  ← FORBIDDEN
+PM: "Can we reduce scope?"  ← FORBIDDEN
+```
+
+✅ **CORRECT (Complete Full Scope):**
+```
+PM: "User requested 69 tasks - planning for FULL scope"
+PM: [Creates groups for ALL 69 tasks]
+PM: "Status: BAZINGA" [only after 100% completion]
+```
+
 ### Mandatory Workflow Chain
 
 ```
@@ -273,8 +363,8 @@ PM Response: BAZINGA → END
 **FIRST: Start dashboard if not running (applies to ALL paths):**
 
 ```bash
-# Check if dashboard is running
-if [ -f bazinga/dashboard.pid ] && kill -0 $(cat bazinga/dashboard.pid) 2>/dev/null; then
+# Check if dashboard is running (safe PID check)
+if [ -f bazinga/dashboard.pid ] && pgrep -F bazinga/dashboard.pid >/dev/null 2>&1; then
     echo "Dashboard already running"
 else
     # Start dashboard in background
@@ -525,9 +615,23 @@ Both in the SAME message. If you don't call `Task()`, you didn't spawn anything.
    Session ID: $SESSION_ID
    Mode: simple
    Requirements: [User's requirements from input]
+   Initial_Branch: [result of git branch --show-current]
+   Original_Scope: {
+     "raw_request": "[exact user request text verbatim]",
+     "scope_type": "[file|feature|task_list|description]",
+     "scope_reference": "[file path if scope_type=file, otherwise null]",
+     "estimated_items": [count if determinable from file/list, null otherwise]
+   }
    ```
 
+   **Scope Type Detection:**
+   - `file` - User references a file (e.g., "implement tasks8.md")
+   - `task_list` - User provides numbered/bulleted list
+   - `feature` - User requests a feature (e.g., "add authentication")
+   - `description` - General description
+
    **Note:** Mode is initially set to "simple" as a default. The PM will analyze requirements and may update this to "parallel" if multiple independent tasks are detected.
+   **Note:** Original_Scope is MANDATORY for validator scope checking. The validator uses this to verify PM's completion claims.
 
    Then invoke:
    ```
@@ -655,24 +759,23 @@ Both in the SAME message. If you don't call `Task()`, you didn't spawn anything.
 
 6. **Run build baseline check:**
 
-   **Note:** Run build check silently. No user output needed unless build fails. If build fails, output: `❌ Build failed | {error_type} | Cannot proceed - fix required`
+   **Note:** Run build check silently. No user output needed unless build fails.
 
    ```bash
-   # Detect project language (check for package.json, go.mod, pom.xml, requirements.txt, Gemfile, etc.)
-   # Run appropriate build command based on detected language:
-   #   - JS/TS: npm run build || tsc --noEmit && npm run build
-   #   - Go: go build ./...
-   #   - Java: mvn compile || gradle compileJava
-   #   - Python: python -m compileall . && mypy .
-   #   - Ruby: bundle exec rubocop --parallel
-
-   # Save results to bazinga/artifacts/{SESSION_ID}/build_baseline.log
-   # and bazinga/artifacts/{SESSION_ID}/build_baseline_status.txt
+   bash bazinga/scripts/build-baseline.sh "$SESSION_ID"
    ```
 
-   Display result (only if errors):
-   - If errors: "⚠️ Build baseline | Existing errors detected | Will track new errors introduced by changes"
-   - (If successful or unknown: silent, no output)
+   The wrapper script:
+   - Auto-detects project language (package.json, go.mod, etc.)
+   - Runs appropriate build command
+   - Saves results to `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
+   - Returns exit code: 0=success, 1=error
+
+   **Check result:**
+   - If exit code 0: Silent (no output)
+   - If exit code 1: `⚠️ Build baseline | Existing errors detected | Will track new errors`
+
+   **⚠️ DO NOT run inline npm/go/python commands** - use the wrapper script per §Bash Command Allowlist.
 
    **AFTER build baseline check: IMMEDIATELY continue to step 7 (Load template guides). Do NOT stop.**
 
@@ -1510,6 +1613,40 @@ IF group.review_attempts > 3:
 ## Completion
 
 When PM sends BAZINGA:
+
+### 🚨 MANDATORY BAZINGA VALIDATION (NON-NEGOTIABLE)
+
+**Step 0: Log PM BAZINGA message for validator access**
+```
+bazinga-db, log PM BAZINGA message:
+Session ID: [session_id]
+Message: [PM's full BAZINGA response text including Completion Summary]
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**⚠️ This is MANDATORY so validator can access PM's completion claims.**
+
+**Step 1: IMMEDIATELY invoke validator (before ANY completion output)**
+```
+Skill(command: "bazinga-validator")
+```
+
+**Step 2: Wait for validator verdict**
+- IF ACCEPT → Proceed to shutdown protocol below
+- IF REJECT → Spawn PM with validator's failure details (do NOT proceed to shutdown)
+
+**⚠️ CRITICAL: You MUST NOT:**
+- ❌ Accept BAZINGA without invoking validator
+- ❌ Output completion messages before validator returns
+- ❌ Trust PM's completion claims without independent verification
+
+**The validator checks:**
+1. Original scope vs completed scope
+2. All task groups marked complete
+3. Test evidence exists and passes
+4. No deferred items without user approval
+
+---
 
 ## 🚨 MANDATORY SHUTDOWN PROTOCOL - NO SKIPPING ALLOWED
 

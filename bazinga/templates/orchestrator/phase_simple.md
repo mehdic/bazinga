@@ -1,5 +1,7 @@
 ## Phase 2A: Simple Mode Execution
 
+**Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
+
 ### Step 2A.1: Spawn Single Developer
 
 **User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
@@ -66,10 +68,14 @@ Priority: 🔴 critical, 🟠 high, 🟡 medium, ⚪ low
 **🔴 Reasoning Context Query (AFTER context packages, for workflow handoffs):**
 
 Query previous agent reasoning for this group (provides WHY context):
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --limit 5
 ```
+bazinga-db, please get reasoning:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Limit: 5
+```
+Then invoke: `Skill(command: "bazinga-db")`
 
 **Reasoning Context Routing Rules:**
 | Query Result | Action |
@@ -423,15 +429,15 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 **🔴 Implementation Reasoning Query (BEFORE building prompt):**
 
 Query reasoning from all implementation agents (developer, SSE, RE):
-```bash
-# Query each agent type separately (CLI doesn't support comma-separated)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --agent_type developer --limit 2
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --agent_type senior_software_engineer --limit 2
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --agent_type requirements_engineer --limit 1
 ```
+bazinga-db, please get reasoning:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: developer
+Limit: 2
+```
+Then invoke: `Skill(command: "bazinga-db")` for each agent type (developer, senior_software_engineer, requirements_engineer).
 **Merge results:** Combine all returned entries, sort by timestamp, take most recent 5 total.
 
 **Implementation Reasoning Prompt Section** (include when reasoning found):
@@ -693,11 +699,24 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 | Status | Action |
 |--------|--------|
-| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2A.8 (PM check) |
+| `MERGE_SUCCESS` | Update group + progress (see below) → Step 2A.8 (PM check) |
 | `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
 | *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason → Tech Lead assesses |
+
+**MERGE_SUCCESS Progress Tracking:**
+1. Update task_group: status="completed", merge_status="merged"
+2. Query completed progress from task_groups using bazinga-db skill:
+   ```
+   bazinga-db, please get task groups:
+
+   Session ID: [session_id]
+   Status: completed
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+   Sum item_count from the returned JSON to get completed items.
+3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 
 **Escalation (from template):** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 

@@ -440,7 +440,19 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 ## Completion Messages
 
-### Group Complete
+### Group Complete (with Progress Tracking)
+```
+✅ Group {id} complete | {summary} | Progress: {completed}/{total} ({percentage}%) | → {next_step}
+```
+
+**Examples:**
+```
+✅ Group A complete | JWT auth | Progress: 5/69 (7%) | → QA review
+✅ Group B complete | Database schema | Progress: 12/69 (17%) | → QA review
+✅ Group Z complete | Final cleanup | Progress: 69/69 (100%) | → PM check
+```
+
+### Group Approved
 ```
 ✅ Group {id} approved | {quality_summary} | Complete ({completed}/{total} groups)
 ```

@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -536,11 +536,207 @@ def init_database(db_path: str) -> None:
                 current_version = 8
                 print("✓ Migration to v8 complete (agent reasoning capture)")
 
+        # Migration from v8 to v9: Add event logging and scope tracking
+        if current_version == 8:
+            print("🔄 Migrating schema from v8 to v9...")
+
+            # Check if tables exist (for fresh databases, skip ALTER)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orchestration_logs'")
+            logs_exists = cursor.fetchone() is not None
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+            sessions_exists = cursor.fetchone() is not None
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'")
+            task_groups_exists = cursor.fetchone() is not None
+
+            if not logs_exists and not sessions_exists:
+                print("   ⊘ Base tables don't exist yet - will be created with full schema below")
+                print("✓ Migration to v9 complete (fresh database, skipped)")
+                current_version = 9
+            else:
+                # CRITICAL: Recreate orchestration_logs to update CHECK constraint
+                # Old schema has CHECK(log_type IN ('interaction', 'reasoning'))
+                # New schema needs CHECK(log_type IN ('interaction', 'reasoning', 'event'))
+                # SQLite doesn't support ALTER TABLE to modify CHECK constraints
+                #
+                # SAFETY: Wrap in transaction to prevent data loss on error
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    if logs_exists:
+                        print("   - Recreating orchestration_logs to update CHECK constraint...")
+
+                        # Get column info to handle variable schemas
+                        # IMPORTANT: Use ordered list (by cid) to ensure SELECT/INSERT column alignment
+                        cursor.execute("PRAGMA table_info(orchestration_logs)")
+                        col_info = cursor.fetchall()
+                        # Sort by cid (column 0) to ensure deterministic order
+                        col_info_sorted = sorted(col_info, key=lambda x: x[0])
+                        col_names = [row[1] for row in col_info_sorted]  # Ordered list, not set
+
+                        # Backup existing data with columns in consistent order
+                        col_list = ', '.join(col_names)
+                        cursor.execute(f"SELECT {col_list} FROM orchestration_logs")
+                        logs_data = cursor.fetchall()
+                        print(f"   - Backed up {len(logs_data)} orchestration log entries")
+
+                        # Drop indexes first (they reference the table)
+                        cursor.execute("DROP INDEX IF EXISTS idx_logs_session")
+                        cursor.execute("DROP INDEX IF EXISTS idx_logs_agent_type")
+                        cursor.execute("DROP INDEX IF EXISTS idx_logs_reasoning")
+                        cursor.execute("DROP INDEX IF EXISTS idx_logs_events")
+
+                        # Drop old table
+                        cursor.execute("DROP TABLE orchestration_logs")
+
+                        # Create new table with updated CHECK constraint (includes 'event')
+                        cursor.execute("""
+                            CREATE TABLE orchestration_logs (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                session_id TEXT NOT NULL,
+                                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                iteration INTEGER,
+                                agent_type TEXT NOT NULL,
+                                agent_id TEXT,
+                                content TEXT NOT NULL,
+                                log_type TEXT DEFAULT 'interaction'
+                                    CHECK(log_type IN ('interaction', 'reasoning', 'event')),
+                                reasoning_phase TEXT
+                                    CHECK(reasoning_phase IS NULL OR reasoning_phase IN (
+                                        'understanding', 'approach', 'decisions', 'risks',
+                                        'blockers', 'pivot', 'completion'
+                                    )),
+                                confidence_level TEXT
+                                    CHECK(confidence_level IS NULL OR confidence_level IN ('high', 'medium', 'low')),
+                                references_json TEXT,
+                                redacted INTEGER DEFAULT 0 CHECK(redacted IN (0, 1)),
+                                group_id TEXT,
+                                event_subtype TEXT,
+                                event_payload TEXT,
+                                FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                            )
+                        """)
+                        print("   ✓ Created orchestration_logs with updated CHECK constraint")
+
+                        # Restore data - map old columns to new schema
+                        if logs_data:
+                            # Build insert for columns that exist in both old and new
+                            new_cols = {'id', 'session_id', 'timestamp', 'iteration', 'agent_type',
+                                       'agent_id', 'content', 'log_type', 'reasoning_phase',
+                                       'confidence_level', 'references_json', 'redacted', 'group_id',
+                                       'event_subtype', 'event_payload'}
+                            common_cols = [c for c in col_names if c in new_cols]
+                            col_indices = {name: idx for idx, name in enumerate(col_names)}
+
+                            placeholders = ', '.join(['?' for _ in common_cols])
+                            insert_cols = ', '.join(common_cols)
+
+                            for row in logs_data:
+                                values = [row[col_indices[c]] for c in common_cols]
+                                cursor.execute(f"""
+                                    INSERT INTO orchestration_logs ({insert_cols})
+                                    VALUES ({placeholders})
+                                """, values)
+                            print(f"   ✓ Restored {len(logs_data)} orchestration log entries")
+
+                        # Recreate indexes
+                        cursor.execute("""
+                            CREATE INDEX idx_logs_session
+                            ON orchestration_logs(session_id, timestamp DESC)
+                        """)
+                        cursor.execute("""
+                            CREATE INDEX idx_logs_agent_type
+                            ON orchestration_logs(session_id, agent_type)
+                        """)
+                        cursor.execute("""
+                            CREATE INDEX idx_logs_reasoning
+                            ON orchestration_logs(session_id, log_type, reasoning_phase)
+                            WHERE log_type = 'reasoning'
+                        """)
+                        print("   ✓ Recreated indexes")
+
+                    # Commit the transaction for table recreation
+                    cursor.execute("COMMIT")
+                except Exception as e:
+                    cursor.execute("ROLLBACK")
+                    print(f"   ❌ Migration failed, rolled back: {e}")
+                    raise
+
+                # Add metadata column to sessions (for original_scope)
+                if sessions_exists:
+                    try:
+                        cursor.execute("""
+                            ALTER TABLE sessions
+                            ADD COLUMN metadata TEXT
+                        """)
+                        print("   ✓ Added sessions.metadata")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ sessions.metadata already exists")
+                        else:
+                            raise
+
+                # Add item_count column to task_groups
+                if task_groups_exists:
+                    try:
+                        cursor.execute("""
+                            ALTER TABLE task_groups
+                            ADD COLUMN item_count INTEGER DEFAULT 1
+                        """)
+                        print("   ✓ Added task_groups.item_count")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.item_count already exists")
+                        else:
+                            raise
+
+                # Create index for event queries
+                try:
+                    cursor.execute("""
+                        CREATE INDEX idx_logs_events
+                        ON orchestration_logs(session_id, log_type, event_subtype)
+                        WHERE log_type = 'event'
+                    """)
+                    print("   ✓ Created idx_logs_events index")
+                except sqlite3.OperationalError as e:
+                    if "already exists" in str(e).lower():
+                        print("   ⊘ idx_logs_events index already exists")
+                    else:
+                        raise
+
+                # Commit and checkpoint
+                conn.commit()
+                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                if checkpoint_result:
+                    busy, log_frames, checkpointed = checkpoint_result
+                    if busy:
+                        for retry in range(3):
+                            time.sleep(0.5 * (retry + 1))
+                            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                            if checkpoint_result and not checkpoint_result[0]:
+                                print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                break
+                        else:
+                            print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+
+                # Post-commit integrity verification
+                post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                if post_integrity != "ok":
+                    print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+
+                # Refresh query planner statistics
+                cursor.execute("ANALYZE orchestration_logs;")
+                cursor.execute("ANALYZE sessions;")
+                cursor.execute("ANALYZE task_groups;")
+                print("   ✓ WAL checkpoint completed")
+
+                current_version = 9
+                print("✓ Migration to v9 complete (event logging and scope tracking)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Agent reasoning capture"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Event logging and scope tracking"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -549,6 +745,7 @@ def init_database(db_path: str) -> None:
     print("\nCreating/verifying BAZINGA database schema...")
 
     # Sessions table
+    # Extended in v9 to support metadata (JSON) for original_scope tracking
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
@@ -558,6 +755,7 @@ def init_database(db_path: str) -> None:
             original_requirements TEXT,
             status TEXT CHECK(status IN ('active', 'completed', 'failed')) DEFAULT 'active',
             initial_branch TEXT DEFAULT 'main',
+            metadata TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -565,6 +763,7 @@ def init_database(db_path: str) -> None:
 
     # Orchestration logs table (replaces orchestration-log.md)
     # Extended in v8 to support agent reasoning capture
+    # Extended in v9 to support event logging (pm_bazinga, scope_change, validator_verdict)
     # CHECK constraints enforce valid enumeration values at database layer
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orchestration_logs (
@@ -576,7 +775,7 @@ def init_database(db_path: str) -> None:
             agent_id TEXT,
             content TEXT NOT NULL,
             log_type TEXT DEFAULT 'interaction'
-                CHECK(log_type IN ('interaction', 'reasoning')),
+                CHECK(log_type IN ('interaction', 'reasoning', 'event')),
             reasoning_phase TEXT
                 CHECK(reasoning_phase IS NULL OR reasoning_phase IN (
                     'understanding', 'approach', 'decisions', 'risks',
@@ -587,6 +786,8 @@ def init_database(db_path: str) -> None:
             references_json TEXT,
             redacted INTEGER DEFAULT 0 CHECK(redacted IN (0, 1)),
             group_id TEXT,
+            event_subtype TEXT,
+            event_payload TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
@@ -607,6 +808,11 @@ def init_database(db_path: str) -> None:
         CREATE INDEX IF NOT EXISTS idx_logs_group_reasoning
         ON orchestration_logs(session_id, group_id, log_type)
         WHERE log_type = 'reasoning'
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_logs_events
+        ON orchestration_logs(session_id, log_type, event_subtype)
+        WHERE log_type = 'event'
     """)
     print("✓ Created orchestration_logs table with indexes")
 
@@ -629,6 +835,7 @@ def init_database(db_path: str) -> None:
 
     # Task groups table (normalized from pm_state.json)
     # PRIMARY KEY: Composite (id, session_id) allows same group ID across sessions
+    # Extended in v9 to support item_count for progress tracking
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT NOT NULL,
@@ -647,6 +854,7 @@ def init_database(db_path: str) -> None:
             initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
             context_references TEXT,
             specializations TEXT,
+            item_count INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),
