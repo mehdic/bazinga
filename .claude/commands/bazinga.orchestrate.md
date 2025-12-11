@@ -1488,10 +1488,22 @@ ELSE IF PM chose "parallel":
 - ❌ **DO NOT** search for templates with `Search()` or `Glob()` - the skill handles path resolution
 - ❌ **DO NOT** conclude "no templates exist" based on search results
 - ❌ **DO NOT** skip specialization loading if you can't find template files yourself
+- ❌ **DO NOT** try to "pre-verify" or "quickly check" before invoking the skill - this is role drift
 - ✅ **ALWAYS** trust the specializations array from DB or fallback derivation
-- ✅ **ALWAYS** pass paths to the specialization-loader skill - it will handle errors gracefully
+- ✅ **ALWAYS** invoke the skill when specializations array is non-empty - let it handle errors
+- ✅ **ALWAYS** follow the workflow even if you think a step "might not be needed"
 
 **Why?** Working directories vary. The skill uses `cat` with relative paths that work from project root. Search/Glob may run from a different directory and fail to find files that exist.
+
+**Anti-pattern to avoid:**
+```
+❌ "Let me quickly verify if templates exist before invoking the skill..."
+   → This is YOU doing the skill's job. Role drift.
+   → The skill exists precisely to handle this. Trust the architecture.
+
+✅ "Specializations array is non-empty. Invoking specialization-loader skill."
+   → Follow the workflow. The skill will report errors if files don't exist.
+```
 
 ### Process (at agent spawn)
 
