@@ -111,11 +111,46 @@ Prior agents documented their decision-making for this task:
 
 ---
 
-### PART A: Build Base Prompt (internal)
+### PART A: Build Base Prompt (internal, DO NOT OUTPUT)
 
-Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
+**🔴 You MUST build this prompt string. Do NOT skip this step.**
 
-Store as `base_prompt`. Do not output to user.
+**Step A.1: Gather data from task_group (already in memory from PM):**
+```
+task_title = task_group["title"]
+task_requirements = task_group["requirements"]  # The actual work to do
+branch = task_group["branch"] or session_branch
+group_id = task_group["group_id"]
+initial_tier = task_group["initial_tier"]
+```
+
+**Step A.2: Build base_prompt string using this template:**
+```
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Simple
+**BRANCH:** {branch}
+
+**TASK:** {task_title}
+
+**REQUIREMENTS:**
+{task_requirements}
+
+**MANDATORY WORKFLOW:**
+1. Implement the complete solution
+2. Write unit tests for new code
+3. Run lint check (must pass)
+4. Run build check (must pass)
+5. Commit to branch: {branch}
+6. Report status: READY_FOR_QA or BLOCKED
+
+**OUTPUT FORMAT:**
+Use standard Developer response format with STATUS, FILES, TESTS, COVERAGE sections.
+```
+
+**Step A.3: Store as `base_prompt` variable. DO NOT output to user.**
 
 ---
 
@@ -207,38 +242,38 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 3. END this message (wait for skill response)
 
 **Turn 2 (after skill response):**
-1. Read the skill's response
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
-3. **🔴 IMMEDIATELY call `Task()` in THIS message** - do NOT stop after extracting block!
+1. Read the skill's response (internally - DO NOT echo to user)
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` → store as `spec_block`
+3. Build `FULL_PROMPT = spec_block + "\n\n---\n\n" + base_prompt`
+4. **🔴 IMMEDIATELY output capsule and call `Task()` in THIS message**
 
 **🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
 
-After you receive and output the specialization block, you MUST:
-1. Output the spawn summary capsule
+After extracting the specialization block (silently), you MUST:
+1. Output ONLY the spawn summary capsule (not the spec block)
 2. **Call Task() in THIS SAME MESSAGE**
 3. DO NOT end the message without a Task() call
 
-**WRONG (Bug Pattern):**
+**WRONG (Bug Pattern - echoing spec block):**
 ```
 [SPECIALIZATION_BLOCK_START]
 ...
-[SPECIALIZATION_BLOCK_END]
+[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
 
-Metadata: ...
+📝 **Developer Prompt** | Group: main | Model: haiku
 
 [MESSAGE ENDS - NO TASK() CALL]  ← BUG! Workflow hangs
 ```
 
-**CORRECT:**
+**CORRECT (silent extraction, capsule only):**
 ```
-[SPECIALIZATION_BLOCK_START]
-...
-[SPECIALIZATION_BLOCK_END]
+🔧 Specializations loaded (3 templates) | React/TypeScript Frontend Developer
 
 📝 **Developer Prompt** | Group: main | Model: haiku
-   Task: Implement feature X
+   Task: Implement delivery list page
+   Specializations: ✓ loaded
 
-Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement feature X", prompt=FULL_PROMPT)
+Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement delivery list page", prompt=FULL_PROMPT)
 ```
 
 **🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**

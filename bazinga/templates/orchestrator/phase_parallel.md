@@ -194,11 +194,47 @@ Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routin
 
 ---
 
-### PART A: Build Base Prompts (internal, all groups)
+### PART A: Build Base Prompts (internal, all groups, DO NOT OUTPUT)
 
-For EACH group: Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode=Parallel, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
+**🔴 You MUST build a prompt string for EACH group. Do NOT skip this step.**
 
-Store as `base_prompts[group_id]`. Do not output to user.
+**For EACH group (A, B, C, D):**
+
+**Step A.1: Gather data from task_groups[group_id]:**
+```
+task_title = task_groups[group_id]["title"]
+task_requirements = task_groups[group_id]["requirements"]  # The actual work to do
+branch = task_groups[group_id]["branch"] or session_branch
+initial_tier = task_groups[group_id]["initial_tier"]
+```
+
+**Step A.2: Build base_prompt string using this template:**
+```
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Parallel
+**BRANCH:** {branch}
+
+**TASK:** {task_title}
+
+**REQUIREMENTS:**
+{task_requirements}
+
+**MANDATORY WORKFLOW:**
+1. Implement the complete solution
+2. Write unit tests for new code
+3. Run lint check (must pass)
+4. Run build check (must pass)
+5. Commit to branch: {branch}
+6. Report status: READY_FOR_QA or BLOCKED
+
+**OUTPUT FORMAT:**
+Use standard Developer response format with STATUS, FILES, TESTS, COVERAGE sections.
+```
+
+**Step A.3: Store as `base_prompts[group_id]`. DO NOT output to user.**
 
 ---
 
@@ -296,42 +332,41 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 3. END this message (wait for all skill responses)
 
 **Turn 2 (after skill responses):**
-1. Read each skill response
-2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
-3. **🔴 IMMEDIATELY call ALL `Task()` spawns in THIS message** - do NOT stop after extracting blocks!
+1. Read each skill response (internally - DO NOT echo to user)
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group → store as `spec_blocks[group_id]`
+3. Build `FULL_PROMPT_X = spec_blocks[X] + "\n\n---\n\n" + base_prompts[X]` for each group
+4. **🔴 IMMEDIATELY output capsule and call ALL `Task()` spawns in THIS message**
 
 **🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
 
-After you receive and output the specialization block(s), you MUST:
-1. Output the spawn summary capsule
+After extracting ALL specialization blocks (silently), you MUST:
+1. Output ONLY the spawn summary capsule (not the spec blocks)
 2. **Call Task() for EACH group in THIS SAME MESSAGE**
 3. DO NOT end the message without Task() calls
 
-**WRONG (Bug Pattern):**
+**WRONG (Bug Pattern - echoing spec blocks):**
 ```
 [SPECIALIZATION_BLOCK_START]
 ...
-[SPECIALIZATION_BLOCK_END]
+[SPECIALIZATION_BLOCK_END]  ← WRONG! Don't echo this to user
 
-Metadata: ...
+📝 Spawning 4 developers...
 
 [MESSAGE ENDS - NO TASK() CALLS]  ← BUG! Workflow hangs
 ```
 
-**CORRECT:**
+**CORRECT (silent extraction, capsule only):**
 ```
-[SPECIALIZATION_BLOCK_START]
-...
-[SPECIALIZATION_BLOCK_END]
+🔧 Specializations loaded: A (3 templates), B (3 templates), C (3 templates)
 
-📝 Spawning 4 developers in parallel:
-• R2-INIT: Developer | Initialize Delivery App Structure
-• R2-LIST: Developer | Delivery Request List & Detail
-...
+📝 Spawning 3 developers in parallel:
+• Group A: Developer | Initialize Delivery App Structure | Specializations: ✓
+• Group B: Developer | Delivery Request List & Detail | Specializations: ✓
+• Group C: Developer | Order Tracking Dashboard | Specializations: ✓
 
-Task(subagent_type="general-purpose", model="haiku", description="Developer R2-INIT: Initialize Delivery App Structure", prompt=FULL_PROMPT_A)
-Task(subagent_type="general-purpose", model="haiku", description="Developer R2-LIST: Delivery Request List & Detail", prompt=FULL_PROMPT_B)
-...
+Task(subagent_type="general-purpose", model="haiku", description="Developer A: Initialize Delivery App Structure", prompt=FULL_PROMPT_A)
+Task(subagent_type="general-purpose", model="haiku", description="Developer B: Delivery Request List & Detail", prompt=FULL_PROMPT_B)
+Task(subagent_type="general-purpose", model="haiku", description="Developer C: Order Tracking Dashboard", prompt=FULL_PROMPT_C)
 ```
 
 **🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
