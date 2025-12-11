@@ -298,9 +298,41 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 **Turn 2 (after skill responses):**
 1. Read each skill response
 2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
-3. Call ALL `Task()` spawns with the extracted blocks prepended to base_prompts
+3. **🔴 IMMEDIATELY call ALL `Task()` spawns in THIS message** - do NOT stop after extracting blocks!
 
-**SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START` for EACH group? Does it contain `Skill(command: "specialization-loader")` for EACH group?
+**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+
+After you receive and output the specialization block(s), you MUST:
+1. Output the spawn summary capsule
+2. **Call Task() for EACH group in THIS SAME MESSAGE**
+3. DO NOT end the message without Task() calls
+
+**WRONG (Bug Pattern):**
+```
+[SPECIALIZATION_BLOCK_START]
+...
+[SPECIALIZATION_BLOCK_END]
+
+Metadata: ...
+
+[MESSAGE ENDS - NO TASK() CALLS]  ← BUG! Workflow hangs
+```
+
+**CORRECT:**
+```
+[SPECIALIZATION_BLOCK_START]
+...
+[SPECIALIZATION_BLOCK_END]
+
+📝 Spawning 4 developers in parallel:
+• R2-INIT: Developer | Initialize Delivery App Structure
+• R2-LIST: Developer | Delivery Request List & Detail
+...
+
+Task(subagent_type="general-purpose", model="haiku", description="Developer R2-INIT: Initialize Delivery App Structure", prompt={spec_block + base_prompt_A})
+Task(subagent_type="general-purpose", model="haiku", description="Developer R2-LIST: Delivery Request List & Detail", prompt={spec_block + base_prompt_B})
+...
+```
 
 **SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group?
 

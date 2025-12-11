@@ -209,7 +209,37 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 **Turn 2 (after skill response):**
 1. Read the skill's response
 2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
-3. Call `Task()` with the extracted block prepended to base_prompt
+3. **🔴 IMMEDIATELY call `Task()` in THIS message** - do NOT stop after extracting block!
+
+**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+
+After you receive and output the specialization block, you MUST:
+1. Output the spawn summary capsule
+2. **Call Task() in THIS SAME MESSAGE**
+3. DO NOT end the message without a Task() call
+
+**WRONG (Bug Pattern):**
+```
+[SPECIALIZATION_BLOCK_START]
+...
+[SPECIALIZATION_BLOCK_END]
+
+Metadata: ...
+
+[MESSAGE ENDS - NO TASK() CALL]  ← BUG! Workflow hangs
+```
+
+**CORRECT:**
+```
+[SPECIALIZATION_BLOCK_START]
+...
+[SPECIALIZATION_BLOCK_END]
+
+📝 **Developer Prompt** | Group: main | Model: haiku
+   Task: Implement feature X
+
+Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement feature X", prompt={spec_block + base_prompt})
+```
 
 **SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START`? Does it contain `Skill(command: "specialization-loader")`?
 
