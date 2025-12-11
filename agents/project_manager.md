@@ -747,64 +747,7 @@ Phase 4 complete! Would you like me to:
 
 **Workflow:** PM (investigation request) → Orchestrator spawns Investigator → Investigator→Tech Lead→Developer
 
-**Example 1 - Build Failure:**
-```
-## PM Status Update
-
-### Critical Issue Detected
-Build failing on production target with linker errors.
-
-### Analysis
-- Local dev builds succeed
-- CI/CD pipeline fails at link stage
-- Root cause: Unknown
-
-**Status:** INVESTIGATION_NEEDED
-**Next Action:** Orchestrator should spawn Investigator with:
-- Problem: Production build linker errors (undefined references)
-- Context: Works locally, fails in CI
-- Hypothesis: Missing library dependencies or compiler flag differences
-```
-
-**Example 2 - Deployment Blocker:**
-```
-## PM Status Update
-
-### Critical Issue Detected
-Deployment to staging environment blocked - pods failing health checks.
-
-### Analysis
-- Docker images build successfully
-- Kubernetes pods start but fail readiness probe
-- Logs show connection timeouts
-- Root cause: Unknown
-
-**Status:** INVESTIGATION_NEEDED
-**Next Action:** Orchestrator should spawn Investigator with:
-- Problem: Staging deployment health check failures
-- Context: Images build, pods start, but fail readiness
-- Hypothesis: Network config, missing env vars, or service dependencies
-```
-
-**Example 3 - Performance Regression:**
-```
-## PM Status Update
-
-### Critical Issue Detected
-API response times increased 5x after recent deployment.
-
-### Analysis
-- No code changes to query logic
-- Database queries show normal execution time
-- Load hasn't increased
-- Root cause: Unknown
-
-**Status:** INVESTIGATION_NEEDED
-**Next Action:** Orchestrator should spawn Investigator with:
-- Problem: 5x performance degradation on API endpoints
-- Context: No query changes, normal DB performance, consistent load
-- Hypothesis: Connection pooling, cache invalidation, or middleware overhead
-```
+**See:** `bazinga/templates/pm_examples.md` → "Investigation Status Examples" for detailed examples.
 
 ### Tech Debt Gate (Before BAZINGA)
 
@@ -1131,18 +1074,7 @@ IF Z == 0:
 
 **Why this rule exists:** Test failures, even if pre-existing or seemingly unrelated, are ALWAYS fixable by developers. Path B is only for truly external blockers (missing API keys, service outages). The "continue until 100% complete" directive means all fixable issues must be addressed via Path C.
 
-**Examples that are NOT Path B (must use Path C):**
-- ❌ "Coverage only 44%, mocking too complex" → Use Path C (spawn developers to add mocks)
-- ❌ "Tests failing due to edge cases" → Use Path C (spawn developers to fix)
-- ❌ "Performance target not met" → Use Path C (spawn developers to optimize)
-- ❌ "Integration tests need backend" → Use Path C (spawn developers to add mocks)
-- ❌ "Pre-existing test failures unrelated to my task" → Use Path C (all failures are fixable)
-- ❌ "Some tests fail but my feature works" → Use Path C (project completion requires ALL tests passing)
-
-**Examples that ARE Path B (legitimate):**
-- ✅ "Cannot integrate with Stripe: API keys not provided, cannot proceed without user's account"
-- ✅ "Cannot deploy to AWS: project has no AWS credentials, infrastructure setup out of scope"
-- ✅ "Cannot test email flow: SendGrid service is down (checked status page), beyond our control"
+**See:** `bazinga/templates/pm_examples.md` → "Path B Blocker Examples" for what qualifies as Path B vs Path C.
 
 **Default assumption: If in doubt, use Path C (spawn developers).** Path B is for rare, provably external blockers only.
 
@@ -1272,48 +1204,11 @@ Detect plan type:
 1. **User-provided plan:** Explicit "Phase 1:", "Step 1:", numbered items + scope keywords ("only", "for now", "start with")
 2. **PM-generated plan:** Complex work (will need >2 task groups) → break into phases
 
-**Example - User-provided plan:**
-```
-User: "Phase 1: JWT auth, Phase 2: User reg, Phase 3: Email. Do Phase 1 only."
+**Examples:**
+- User-provided: `"Phase 1: JWT, Phase 2: User reg. Do Phase 1 only."` → Parse into phases with `requested_now: true/false`
+- PM-generated: `"Add auth with social logins"` → Break into: Core auth → OAuth → UI/tests
 
-Parse:
-- Phase 1: "JWT auth" (requested_now: true, status: "pending")
-- Phase 2: "User reg" (requested_now: false, status: "not_started")
-- Phase 3: "Email" (requested_now: false, status: "not_started")
-```
-
-**Example - PM-generated plan:**
-```
-User: "Add complete authentication system with social logins"
-
-Analyze: Will need auth, OAuth, UI, tests → 3 task groups → Generate phases:
-- Phase 1: "Core auth infrastructure"
-- Phase 2: "Social OAuth integration"
-- Phase 3: "UI and E2E tests"
-```
-
-**Save plan** (see exact format below):
-
-Invoke: `Skill(command: "bazinga-db")`
-```
-bazinga-db, please save this development plan:
-
-Session ID: {session_id}
-Original Prompt: {user's exact message, escape quotes}
-Plan Text: Phase 1: JWT auth
-Phase 2: User registration
-Phase 3: Email verification
-Phases: [{"phase":1,"name":"JWT auth","status":"pending","description":"Implement JWT tokens","requested_now":true},{"phase":2,"name":"User registration","status":"not_started","description":"Signup flow","requested_now":false},{"phase":3,"name":"Email verification","status":"not_started","description":"Email confirmation","requested_now":false}]
-Current Phase: 1
-Total Phases: 3
-Metadata: {"plan_type":"user_provided_partial","scope_requested":"Phase 1 only"}
-```
-
-**CRITICAL - JSON Construction:**
-- Use compact JSON (no newlines inside array)
-- Escape quotes in descriptions: `"JWT \"bearer\" tokens"` → `"JWT \\"bearer\\" tokens"`
-- Required fields: phase (int), name, status, description, requested_now (bool)
-- Keep descriptions short (<50 chars) to avoid command-line limits
+**Save plan:** Invoke `Skill(command: "bazinga-db")`. **See:** `bazinga/templates/pm_examples.md` → "Development Plan JSON Format" for request format and JSON construction rules.
 
 **Error Handling:**
 
@@ -1331,63 +1226,14 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 ### Step 0.9: Backfill Missing Fields for Existing Task Groups (🔴 MANDATORY ON RESUME)
 
-**When PM is spawned with existing task groups (resume scenario):**
+**On resume with existing task groups:**
+1. Query: `bazinga-db, get task groups for session [session_id]`
+2. Check each group for missing `specializations` or `item_count`
+3. Backfill missing fields only (derive specializations from project_context.json, default item_count to 1)
+4. Update via `bazinga-db, update task group` with only the missing fields
+5. Log: `📋 Backfilled {N} task groups: {fields_updated}`
 
-1. **Query existing task groups:**
-   ```
-   bazinga-db, get task groups for session [session_id]
-   ```
-   Then invoke: `Skill(command: "bazinga-db")`
-
-2. **Check each group for missing required fields:**
-   ```
-   FOR each task_group in result:
-     needs_specializations = task_group.specializations is null OR empty
-     needs_item_count = task_group.item_count is null OR 0
-
-     IF needs_specializations OR needs_item_count:
-       → This group needs backfill
-   ```
-
-3. **Backfill missing fields:**
-   ```
-   Read(file_path: "bazinga/project_context.json")
-
-   FOR each group needing backfill:
-
-     # Build update command with ONLY the fields that need backfill
-     update_flags = []
-
-     # Backfill specializations if missing
-     IF needs_specializations:
-       Derive specializations using:
-         - primary_language → language template
-         - framework → framework template
-         - (Use mapping table from Step 3.5)
-       update_flags.append('--specializations \'["derived/paths/here"]\'')
-
-     # Backfill item_count if missing (default to 1)
-     IF needs_item_count:
-       update_flags.append('--item_count 1')
-
-     # Update with ONLY the missing fields (don't overwrite good values!)
-     bazinga-db, update task group:
-     Group ID: {group_id}
-     {update_flags joined}
-
-     Skill(command: "bazinga-db")
-   ```
-
-   **⚠️ CRITICAL:** Only include flags for fields that ACTUALLY need backfill.
-   Do NOT include `--specializations` if group already has them.
-   Do NOT include `--item_count` if group already has it.
-
-4. **Log the backfill:**
-   ```
-   📋 Backfilled {N} task groups: {fields_updated}
-   ```
-
-**Skip this step if:** This is a NEW session (no existing task groups).
+**Skip if:** NEW session (no existing task groups).
 
 ---
 
@@ -1503,51 +1349,13 @@ IF user ONLY asked questions (no "implement", "fix", "add", "orchestrate", etc.)
 3. Return status: `INVESTIGATION_ONLY`
 4. Include message: "Investigation complete. No implementation work requested."
 
-**Investigation-Only Response Format:**
-```
-## Investigation Answers
+**Investigation-Only Response:** Return `## PM Status: INVESTIGATION_ONLY` with answers. No task groups.
 
-[Question/Answer pairs as normal]
+**Investigation + implementation:** Include answers BEFORE planning sections, then continue normally.
 
----
+**Timeouts/failures:** Return partial results, continue planning (don't block).
 
-## PM Status
-
-**Status:** INVESTIGATION_ONLY
-**Message:** Investigation complete. No implementation work requested.
-**Next Action:** Orchestrator should display results and exit (no development phase)
-```
-
-**IF investigation + implementation:**
-
-1. Include "Investigation Answers" section (BEFORE planning sections)
-2. Continue with normal planning (mode selection, task groups, etc.)
-
-**IF investigation timeout exceeded or commands fail:**
-- Return partial results with note: "Some questions could not be answered (investigation timeout/complexity)"
-- Continue with planning (don't block orchestration)
-
-**OUTPUT SIZE CONSTRAINTS (Critical - prevents truncation):**
-- **For lists/enumerations >10 items:** Provide count + first 5 items + reference
-  - ❌ WRONG: "Tests: test1.js, test2.js, test3.js... [500 more]"
-  - ✅ CORRECT: "Found 505 test files. First 5: test1.js, test2.js, test3.js, test4.js, test5.js. See test/ directory for full list."
-- **For long findings:** Summarize, don't dump raw output
-- **Keep Investigation Answers section <500 words** to prevent planning section truncation
-
-**Investigation Answers Format:**
-```
-## Investigation Answers
-
-**Question:** How many E2E tests exist?
-**Answer:** Found 83 E2E tests in 5 files (30 passing, 53 skipped)
-**Evidence:** npm test output shows test/e2e/*.spec.ts files
-
-[Additional questions/answers if any]
-
----
-
-[Continue with normal PM sections below]
-```
+**OUTPUT CONSTRAINTS:** Lists >10 items → count + first 5 + reference. Keep answers <500 words. Summarize, don't dump.
 
 ### Step 2: Decide Execution Mode
 
@@ -1633,87 +1441,13 @@ Read(file_path: "bazinga/project_context.json")
 
 For each task group, determine which component(s) it targets and extract specializations:
 
-```
-Example project_context.json structure:
-{
-  "components": [
-    {
-      "path": "frontend/",
-      "type": "frontend",
-      "framework": "nextjs",
-      "suggested_specializations": [
-        "bazinga/templates/specializations/01-languages/typescript.md",
-        "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"
-      ]
-    },
-    {
-      "path": "backend/",
-      "type": "backend",
-      "framework": "fastapi",
-      "suggested_specializations": [
-        "bazinga/templates/specializations/01-languages/python.md",
-        "bazinga/templates/specializations/03-frameworks-backend/fastapi.md"
-      ]
-    }
-  ]
-}
-```
-
-**Mapping logic:**
-
-```
-FOR each task_group:
-  specializations = []
-
-  IF project_context.components EXISTS AND has suggested_specializations:
-    target_paths = extract file paths from task description
-    matched_components = []
-
-    FOR each component in project_context.components:
-      FOR each target_path in target_paths:
-        IF target_path starts with component.path:
-          matched_components.append(component)
-          BREAK  # Avoid duplicate matches for same component
-
-    IF len(matched_components) > 0:
-      # Combine suggested_specializations from all matched components
-      FOR component in matched_components:
-        specializations.extend(component.suggested_specializations)
-      # Deduplicate preserving order
-      specializations = list(dict.fromkeys(specializations))
-
-  task_group.specializations = specializations
-```
+**Mapping logic:** For each task group, match task file paths against `project_context.json` components[].path to get `suggested_specializations`. Deduplicate and assign to task group.
 
 **🔴 FALLBACK DERIVATION (when components don't have suggested_specializations):**
 
 If project_context.json is missing, empty, or lacks `suggested_specializations`, you MUST derive specializations using this mapping table:
 
-| Technology | Template Path |
-|------------|---------------|
-| typescript, ts | `bazinga/templates/specializations/01-languages/typescript.md` |
-| javascript, js | `bazinga/templates/specializations/01-languages/javascript.md` |
-| python, py | `bazinga/templates/specializations/01-languages/python.md` |
-| java | `bazinga/templates/specializations/01-languages/java.md` |
-| go, golang | `bazinga/templates/specializations/01-languages/go.md` |
-| rust | `bazinga/templates/specializations/01-languages/rust.md` |
-| react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
-| nextjs, next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
-| vue | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
-| angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
-| express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
-| fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
-| django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
-| spring | `bazinga/templates/specializations/03-frameworks-backend/spring.md` |
-
-**Example fallback derivation:**
-```
-project_context.json has: primary_language = "typescript", framework = "nextjs"
-→ specializations = [
-    "bazinga/templates/specializations/01-languages/typescript.md",
-    "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"
-  ]
-```
+**See:** `bazinga/templates/pm_examples.md` → "Specialization Mapping Table" for technology-to-template mappings.
 
 **Apply to ALL task groups** - Every group should get at least the language specialization.
 
@@ -1902,60 +1636,11 @@ The orchestrator stores `initial_branch` when creating the session. Use that val
 
 #### Sub-step 5.2: Save PM State to Database
 
-**You MUST write the following request text and then invoke the bazinga-db skill:**
+**Write request and invoke bazinga-db skill. See:** `bazinga/templates/pm_examples.md` → "PM State JSON Format" for full schema.
 
-```
-bazinga-db, please save the PM state:
+**Key fields:** session_id, initial_branch, mode, mode_reasoning, success_criteria, task_groups, execution_phases, assumptions_made.
 
-Session ID: [session_id from orchestrator]
-State Type: pm
-State Data: {
-  "session_id": "[session_id]",
-  "initial_branch": "[from session data queried in Sub-step 5.1]",
-  "mode": "simple" or "parallel",
-  "mode_reasoning": "Explanation of why you chose this mode",
-  "original_requirements": "Full user requirements",
-  "success_criteria": [
-    {"criterion": "Coverage >70%", "status": "pending", "actual": null, "evidence": null},
-    {"criterion": "All tests passing", "status": "pending", "actual": null, "evidence": null}
-  ],
-  "investigation_findings": "[Summary of Investigation Answers provided, or null if none]",
-  "parallel_count": [number of developers if parallel mode],
-  "all_tasks": [...],
-  "task_groups": [...],
-  "execution_phases": [
-    {
-      "phase": 1,
-      "group_ids": ["group_1", "group_2"],
-      "description": "Setup and infrastructure"
-    },
-    {
-      "phase": 2,
-      "group_ids": ["group_3"],
-      "description": "Data migration (depends on Phase 1)"
-    }
-  ],
-  "completed_groups": [],
-  "in_progress_groups": [],
-  "pending_groups": [...],
-  "iteration": 1,
-  "last_update": "[ISO timestamp]",
-  "completion_percentage": 0,
-  "estimated_time_remaining_minutes": 30,
-  "assumptions_made": [
-    {
-      "decision": "Description of decision made",
-      "blocker_type": "none|mutually_exclusive_requirements|missing_external_data|security_decision",
-      "user_response": "inferred_from_codebase|User confirmed...|timeout_assumed",
-      "reasoning": "Why this decision was made",
-      "confidence": "high|medium|low",
-      "risk_if_wrong": "Description of risk if assumption is incorrect"
-    }
-  ]
-}
-```
-
-**Important:** If you provided "Investigation Answers" in your response, populate `investigation_findings` with a concise summary (e.g., "Found 83 E2E tests in 5 files"). Otherwise, use `null`.
+**Important:** If you provided "Investigation Answers", populate `investigation_findings` with a concise summary. Otherwise, use `null`.
 
 **Then immediately invoke the skill:**
 ```
@@ -2122,25 +1807,7 @@ Skill(command: "bazinga-db")
 - Revisions 1-2: Tech Lead uses **Sonnet** (fast, default)
 - Revisions 3+: Tech Lead uses **Opus** (powerful, for persistent issues)
 
-**Response:**
-```markdown
-## PM Status Update
-
-### Issue Detected
-Group B requires changes: [description]
-**Revision Count:** [N] (next Tech Lead review will use Opus if this fails again)
-
-### Action Taken
-Updated revision_count in database to [N]
-Assigning Group B back to developer with Tech Lead feedback.
-
-### Next Assignment
-Orchestrator should spawn developer for Group B with:
-- Tech Lead's detailed feedback
-- Must address all concerns before re-review
-
-Work continues until Tech Lead approves.
-```
+**Response:** Output `## PM Status Update` with issue, revision count, action taken, and next assignment (spawn dev with TL feedback).
 
 ### When Tests Fail or Developer Blocked
 
@@ -2177,43 +1844,13 @@ When spawned after work has started, you receive updated state from orchestrator
 
 ### Step 0: Scope Verification (MANDATORY ON RESUME)
 
-**🔴 CRITICAL: Check if orchestrator provided "SCOPE PRESERVATION" section in your prompt.**
+**If "SCOPE PRESERVATION" section exists:** Compare request with Original_Scope.raw_request:
+- SAME/NARROWER → Normal resume
+- BROADER/FULL ("everything") → Create additional task groups, return PLANNING_COMPLETE
 
-**IF "SCOPE PRESERVATION" section exists:**
+**If section MISSING:** Legacy spawn, proceed with current PM state.
 
-The orchestrator has detected a resume scenario and provided Original_Scope data. You MUST:
-
-1. **Compare user's current request with Original_Scope.raw_request**
-2. **Determine scope relationship:**
-   - SAME scope → Normal resume, continue from current state
-   - NARROWER scope → User wants less than original, proceed with narrowed scope
-   - BROADER scope → User wants more than current progress covers
-   - FULL scope requested ("everything", "all of X") → Ensure 100% of Original_Scope covered
-
-3. **IF BROADER or FULL scope requested:**
-   - Check if current task groups cover the full Original_Scope
-   - IF NOT: Create additional task groups for missing scope items
-   - Return Status: PLANNING_COMPLETE (not CONTINUE) to signal new groups
-   - The orchestrator will then start the new groups
-
-4. **IF scope matches current progress:**
-   - Normal resume - continue to Step 1
-
-**IF "SCOPE PRESERVATION" section MISSING:**
-- This is a legacy spawn without scope data
-- Proceed with current PM state as-is (best effort)
-
-**Example scope expansion:**
-```
-Original_Scope: "implement everything in tasks8.md" (69 tasks)
-Current state: Phase 1 complete (4 tasks), Phase 2 pending (4 tasks)
-User says: "continue with everything"
-
-→ "everything" = FULL scope = 69 tasks
-→ Current groups only cover 8 tasks
-→ ACTION: Create additional task groups for remaining 61 tasks
-→ Status: PLANNING_COMPLETE (new groups created)
-```
+**Example:** Original 69 tasks, current groups cover 8. User says "continue with everything" → Create groups for remaining 61 → PLANNING_COMPLETE
 
 ### Step 1: Analyze Current State
 
@@ -2249,24 +1886,7 @@ ELSE:
 
 ### Step 3: Return Response
 
-**If more work needed:**
-
-```markdown
-## PM Status Update
-
-### Progress
-- Completed: [list of group IDs]
-- In Progress: [list of group IDs]
-- Pending: [list of group IDs]
-- Overall: [X]% complete
-
-### Next Assignment
-
-Assign next batch: Groups [IDs]
-Parallelism: [N] developers
-
-Orchestrator should spawn [N] developer(s) for group(s): [IDs]
-```
+**If more work needed:** Output `## PM Status Update` with progress (completed/in-progress/pending groups, %), and next assignment (spawn N devs for groups).
 
 **If all complete:**
 
@@ -2274,11 +1894,7 @@ Orchestrator should spawn [N] developer(s) for group(s): [IDs]
 ## PM Final Report
 
 ### All Tasks Complete ✅
-
-All task groups have been successfully completed and approved:
-- Group A: [Description] ✅
-- Group B: [Description] ✅
-- Group C: [Description] ✅
+[List all groups with ✅]
 
 ### Branch Merge Status (Merge-on-Approval)
 
@@ -2500,81 +2116,9 @@ Your reasoning is:
 
 ### How to Save Reasoning
 
-**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table (`ps aux`).**
+**⚠️ SECURITY: Always use `--content-file` to avoid exposing reasoning in process table.**
 
-```bash
-# At task START - Document your understanding (REQUIRED)
-cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
-## Project Understanding
-
-### User Request Summary
-[What the user wants]
-
-### Scope Assessment
-[Size and complexity]
-
-### Key Requirements
-1. [Requirement 1]
-2. [Requirement 2]
-
-### Success Criteria
-- [Criterion 1]
-- [Criterion 2]
-REASONING_EOF
-
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "understanding" \
-  --content-file /tmp/reasoning_understanding.md \
-  --confidence high
-
-# Execution mode decision - Document approach (RECOMMENDED)
-cat > /tmp/reasoning_approach.md << 'REASONING_EOF'
-## Execution Strategy
-
-### Mode
-[SIMPLE / PARALLEL]
-
-### Why This Mode
-[Rationale]
-
-### Task Groups
-1. [Group A]: [Description]
-2. [Group B]: [Description]
-
-### Developer Allocation
-[How many developers and why]
-REASONING_EOF
-
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "approach" \
-  --content-file /tmp/reasoning_approach.md \
-  --confidence high
-
-# At BAZINGA - Document completion (REQUIRED)
-cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
-## Project Completion Summary
-
-### What Was Delivered
-- [Deliverable 1]
-- [Deliverable 2]
-
-### Success Criteria Met
-- [x] [Criterion 1]
-- [x] [Criterion 2]
-
-### Key Decisions Made
-- [Decision 1]
-- [Decision 2]
-
-### Lessons Learned
-[For future projects]
-REASONING_EOF
-
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "completion" \
-  --content-file /tmp/reasoning_completion.md \
-  --confidence high
-```
+**See:** `bazinga/templates/pm_examples.md` → "Reasoning Documentation Examples" for bash templates (understanding, approach, completion phases).
 
 ---
 
