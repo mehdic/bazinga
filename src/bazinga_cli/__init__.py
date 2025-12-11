@@ -189,22 +189,37 @@ class BazingaSetup:
                         if script_file.suffix != script_extension:
                             continue  # Skip scripts of the other type
 
-                    dest = scripts_dir / script_file.name
-                    shutil.copy2(script_file, dest)
+                    try:
+                        # SECURITY: Validate filename doesn't contain path traversal
+                        safe_filename = PathValidator.validate_filename(script_file.name)
+                        dest = scripts_dir / safe_filename
 
-                    # Make shell scripts executable on Unix-like systems
-                    if script_file.suffix == ".sh" and os.name != 'nt':
-                        dest.chmod(0o755)
+                        # SECURITY: Ensure destination is within scripts_dir
+                        PathValidator.ensure_within_directory(dest, scripts_dir)
 
-                    console.print(f"  ✓ Copied {script_file.name}")
-                    copied_count += 1
+                        shutil.copy2(script_file, dest)
+
+                        # Make shell scripts executable on Unix-like systems
+                        if script_file.suffix == ".sh" and os.name != 'nt':
+                            dest.chmod(0o755)
+
+                        console.print(f"  ✓ Copied {safe_filename}")
+                        copied_count += 1
+                    except SecurityError as e:
+                        console.print(f"[red]✗ Skipping unsafe script {script_file.name}: {e}[/red]")
+                        continue
 
             # Also copy README if it exists
             readme_file = source_scripts / "README.md"
             if readme_file.exists():
-                dest = scripts_dir / "README.md"
-                shutil.copy2(readme_file, dest)
-                console.print(f"  ✓ Copied README.md")
+                try:
+                    safe_filename = PathValidator.validate_filename("README.md")
+                    dest = scripts_dir / safe_filename
+                    PathValidator.ensure_within_directory(dest, scripts_dir)
+                    shutil.copy2(readme_file, dest)
+                    console.print(f"  ✓ Copied README.md")
+                except SecurityError as e:
+                    console.print(f"[red]✗ Skipping unsafe README: {e}[/red]")
 
         return copied_count > 0
 

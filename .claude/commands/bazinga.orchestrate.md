@@ -1536,7 +1536,17 @@ IF specializations still empty:
     Skip specialization loading, continue to spawn
 ```
 
-**Template mapping:** See `bazinga/templates/orchestrator/spawn_with_specializations.md` for full mapping table.
+**Template mapping (fallback derivation):**
+
+| Technology | Template Path |
+|------------|---------------|
+| typescript | `bazinga/templates/specializations/01-languages/typescript.md` |
+| python | `bazinga/templates/specializations/01-languages/python.md` |
+| javascript | `bazinga/templates/specializations/01-languages/javascript.md` |
+| react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
+| nextjs | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
+| fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
 
 **Step 4: Invoke specialization-loader skill**
 
