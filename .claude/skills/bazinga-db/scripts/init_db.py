@@ -631,7 +631,13 @@ def init_database(db_path: str) -> None:
                             insert_cols = ', '.join(common_cols)
 
                             for row in logs_data:
-                                values = [row[col_indices[c]] for c in common_cols]
+                                values = []
+                                for c in common_cols:
+                                    val = row[col_indices[c]]
+                                    # Coalesce NULL log_type to 'interaction' (v8 ALTER TABLE didn't backfill existing rows)
+                                    if c == 'log_type' and val is None:
+                                        val = 'interaction'
+                                    values.append(val)
                                 cursor.execute(f"""
                                     INSERT INTO orchestration_logs ({insert_cols})
                                     VALUES ({placeholders})

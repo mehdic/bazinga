@@ -966,12 +966,26 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
     # Query GitHub API for latest release
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
     try:
-        req = urllib.request.Request(
-            api_url,
-            headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "bazinga-cli"}
-        )
+        headers = {"Accept": "application/vnd.github.v3+json", "User-Agent": "bazinga-cli"}
+        # Use GITHUB_TOKEN if available for higher rate limits (5000/hr vs 60/hr)
+        github_token = os.environ.get("GITHUB_TOKEN")
+        if github_token:
+            headers["Authorization"] = f"token {github_token}"
+        req = urllib.request.Request(api_url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as response:
             releases = json.loads(response.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            # Check X-RateLimit-Remaining header to confirm rate limit
+            rate_remaining = e.headers.get("X-RateLimit-Remaining", "")
+            if rate_remaining == "0":
+                console.print("  [dim]GitHub API rate limit exceeded[/dim]")
+                console.print("  [dim]Tip: Set GITHUB_TOKEN env var for higher rate limits[/dim]")
+            else:
+                console.print(f"  [dim]Could not check for releases: HTTP 403 Forbidden[/dim]")
+        else:
+            console.print(f"  [dim]Could not check for releases: HTTP {e.code} {e.reason}[/dim]")
+        return False
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
         console.print(f"  [dim]Could not check for releases: {e}[/dim]")
         return False
