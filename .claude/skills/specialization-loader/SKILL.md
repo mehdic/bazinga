@@ -229,7 +229,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-outpu
 
 Return the composed specialization block as your response. The orchestrator will prepend this to the agent spawn prompt.
 
-**Output format:**
+**🔴 OUTPUT RULES - KEEP IT MINIMAL:**
 - ❌ **DO NOT** say "I'll compose the specialization blocks..." or similar preamble
 - ❌ **DO NOT** narrate what you're doing ("Let me read the templates...")
 - ❌ **DO NOT** explain your process or reasoning
