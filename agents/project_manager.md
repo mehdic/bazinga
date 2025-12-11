@@ -1329,7 +1329,7 @@ IF JSON construction fails:
 
 Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
-### Step 0.9: Backfill Specializations for Existing Task Groups (🔴 MANDATORY ON RESUME)
+### Step 0.9: Backfill Missing Fields for Existing Task Groups (🔴 MANDATORY ON RESUME)
 
 **When PM is spawned with existing task groups (resume scenario):**
 
@@ -1339,26 +1339,37 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
    ```
    Then invoke: `Skill(command: "bazinga-db")`
 
-2. **Check each group for null/empty specializations:**
+2. **Check each group for missing required fields:**
    ```
    FOR each task_group in result:
-     IF task_group.specializations is null OR empty:
+     needs_specializations = task_group.specializations is null OR empty
+     needs_item_count = task_group.item_count is null OR 0
+
+     IF needs_specializations OR needs_item_count:
        → This group needs backfill
    ```
 
-3. **Backfill using fallback derivation:**
+3. **Backfill missing fields:**
    ```
    Read(file_path: "bazinga/project_context.json")
 
    FOR each group needing backfill:
-     Derive specializations using:
-       - primary_language → language template
-       - framework → framework template
-       - (Use mapping table from Step 3.5)
+
+     # Backfill specializations if missing
+     IF needs_specializations:
+       Derive specializations using:
+         - primary_language → language template
+         - framework → framework template
+         - (Use mapping table from Step 3.5)
+
+     # Backfill item_count if missing (default to 1)
+     IF needs_item_count:
+       item_count = 1  # Default: assume single task unless known otherwise
 
      Update the task group:
      bazinga-db, update task group:
      Group ID: {group_id}
+     --item_count {item_count}
      --specializations '["derived/paths/here"]'
 
      Skill(command: "bazinga-db")
@@ -1366,7 +1377,7 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 4. **Log the backfill:**
    ```
-   📋 Backfilled specializations for {N} task groups
+   📋 Backfilled {N} task groups: {fields_updated}
    ```
 
 **Skip this step if:** This is a NEW session (no existing task groups).
@@ -1713,9 +1724,11 @@ When creating task groups, include the specializations field:
 - **Specializations:** ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]
 ```
 
-**Step 3.5.4: Store Specializations via bazinga-db**
+**Step 3.5.4: Store Task Groups via bazinga-db (CANONICAL TEMPLATE)**
 
-When invoking `create-task-group`, include the `--specializations` flag:
+**🔴 THIS IS THE ONLY TEMPLATE FOR CREATING TASK GROUPS.** Sub-step 5.3 is verification only.
+
+When invoking `create-task-group`, include ALL required fields:
 
 ```
 bazinga-db, please create task group:
@@ -1726,28 +1739,32 @@ Name: Implement Login UI
 Status: pending
 Complexity: 5
 Initial Tier: Developer
+Item_Count: [number of discrete tasks/items in this group]
 --specializations '["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]'
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
 
-**No specialization limit:** Assign as many specializations as the task requires. The orchestrator validates paths exist before including in agent prompts.
+**Required fields:**
+- `Item_Count` - Number of discrete tasks (used for progress tracking)
+- `--specializations` - Technology-specific guidance paths (NEVER empty)
 
 **🔴 MANDATORY VALIDATION GATE (BLOCKER):**
 
-**This step BLOCKS proceeding to Step 3.6. You MUST verify specializations before continuing.**
+**This step BLOCKS proceeding to Step 3.6. You MUST verify ALL fields before continuing.**
 
 ```
 IMMEDIATE SELF-CHECK after creating each task group:
 
-1. Look at the create-task-group command I just ran
+1. Does it include Item_Count?
 2. Does it include --specializations with a non-empty array?
 
    ❌ WRONG: python3 ... create-task-group "AUTH" "sess_123" "Auth feature"
-   ✅ RIGHT: python3 ... create-task-group "AUTH" "sess_123" "Auth feature" pending developer --specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
+   ❌ WRONG: python3 ... create-task-group "AUTH" "sess_123" "Auth feature" pending developer --item_count 3
+   ✅ RIGHT: python3 ... create-task-group "AUTH" "sess_123" "Auth feature" pending developer --item_count 3 --specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
 
-IF I forgot --specializations:
-   → IMMEDIATELY run update-task-group with --specializations
+IF I forgot any field:
+   → IMMEDIATELY run update-task-group with the missing field
    → Use fallback mapping table above if no project_context.json
 ```
 
@@ -1913,43 +1930,30 @@ Skill(command: "bazinga-db")
 
 **Wait for the skill to complete and return a response.** You should see confirmation that the PM state was saved. If you see an error, retry the invocation.
 
-#### Sub-step 5.3: Create Task Groups in Database
+#### Sub-step 5.3: Verify Task Groups Were Persisted
 
-**For EACH task group you created, you MUST invoke bazinga-db to store it in the task_groups table.**
+**🔴 DO NOT CREATE TASK GROUPS HERE.** Task groups are created in **Step 3.5.4** using the canonical template.
 
-For each task group, write this request and invoke:
+This step is VERIFICATION ONLY. Confirm that:
 
+1. **All task groups were created in Step 3.5.4** with the canonical template
+2. **Each group has ALL required fields:**
+   - `Item_Count` (number > 0)
+   - `--specializations` (non-empty array)
+
+**If any groups are missing or incomplete:**
 ```
-bazinga-db, please create task group:
-
-Group ID: [group_id like "A", "B", "batch_1", etc.]
-Session ID: [session_id]
-Name: [human readable task name]
-Status: pending
-Complexity: [1-10]
-Initial Tier: [Developer | Senior Software Engineer]
-Item_Count: [number of discrete tasks/items in this group]
+→ Go back to Step 3.5.4 and create/update them using the CANONICAL TEMPLATE
+→ DO NOT use an abbreviated template here
 ```
-
-**⚠️ Item_Count is MANDATORY for progress tracking:**
-- Count the number of discrete tasks/items in each group
-- If group has sub-tasks, sum them
-- Used for progress capsules: `Progress: {completed}/{total}`
-- Validator uses this to verify scope completion
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**Repeat this for EVERY task group.** If you created 3 task groups, you must invoke bazinga-db 3 times (once for each group).
 
 #### Verification Checkpoint
 
 **Before proceeding to Step 6, verify:**
 - ✅ You captured the initial branch
 - ✅ You invoked bazinga-db to save PM state (1 time)
-- ✅ You invoked bazinga-db to create task groups (N times, where N = number of task groups)
+- ✅ You created task groups in Step 3.5.4 (N times, where N = number of task groups)
+- ✅ Each group has Item_Count AND --specializations
 - ✅ Each invocation returned a success response
 
 **If any of these are missing, you MUST go back and complete them now.**
