@@ -4,7 +4,7 @@
 **Context:** Fix specializations, context packages, and reasoning to be properly included in developer prompts
 **Decision:** Template-based instruction approach (no DB enforcement)
 **Status:** Reviewed
-**Reviewed by:** OpenAI GPT-5
+**Reviewed by:** External LLM review (ultrathink process)
 
 ---
 
