@@ -18,6 +18,20 @@ Whether it helps you ship better software is something you'll have to judge for 
 
 ---
 
+## Core Philosophy: Agentic Context Engineering
+
+BAZINGA is strictly architected on the principles of **Agentic Context Engineering (ACE)**, solving the "infinite context fallacy" where larger context windows lead to signal dilution and reasoning drift.
+
+Instead of treating memory as a simple chat log, BAZINGA implements a **Tiered Memory Model** (Working Context, Sessions, Memory, Artifacts) inspired by research from Google's ADK and Anthropic.
+
+- **Context as a Compiled View:** Every agent prompt is dynamically compiled from the database, projecting only the minimal, relevant slice of history needed for the specific task.
+- **State Offloading:** Heavy research and file contents are offloaded to **Context Packages** (Artifacts), preventing token bloat. Agents receive pointers to this data and must actively "read" it, keeping the working context clean.
+- **Reasoning Capture:** We separate *what* happened (Interaction Logs) from *why* it happened (Reasoning Logs), allowing agents to evolve strategies without carrying the full weight of execution history.
+
+For a detailed breakdown of the theory and our implementation, see the [Agentic Context Engineering Reference](docs/reference/agentic_context_engineering.md).
+
+---
+
 ## See It In Action
 
 ```bash
