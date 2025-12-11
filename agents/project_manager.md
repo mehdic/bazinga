@@ -1329,7 +1329,7 @@ IF JSON construction fails:
 
 Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
-### Step 0.9: Backfill Specializations for Existing Task Groups (🔴 MANDATORY ON RESUME)
+### Step 0.9: Backfill Missing Fields for Existing Task Groups (🔴 MANDATORY ON RESUME)
 
 **When PM is spawned with existing task groups (resume scenario):**
 
@@ -1339,34 +1339,52 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
    ```
    Then invoke: `Skill(command: "bazinga-db")`
 
-2. **Check each group for null/empty specializations:**
+2. **Check each group for missing required fields:**
    ```
    FOR each task_group in result:
-     IF task_group.specializations is null OR empty:
+     needs_specializations = task_group.specializations is null OR empty
+     needs_item_count = task_group.item_count is null OR 0
+
+     IF needs_specializations OR needs_item_count:
        → This group needs backfill
    ```
 
-3. **Backfill using fallback derivation:**
+3. **Backfill missing fields:**
    ```
    Read(file_path: "bazinga/project_context.json")
 
    FOR each group needing backfill:
-     Derive specializations using:
-       - primary_language → language template
-       - framework → framework template
-       - (Use mapping table from Step 3.5)
 
-     Update the task group:
+     # Build update command with ONLY the fields that need backfill
+     update_flags = []
+
+     # Backfill specializations if missing
+     IF needs_specializations:
+       Derive specializations using:
+         - primary_language → language template
+         - framework → framework template
+         - (Use mapping table from Step 3.5)
+       update_flags.append('--specializations \'["derived/paths/here"]\'')
+
+     # Backfill item_count if missing (default to 1)
+     IF needs_item_count:
+       update_flags.append('--item_count 1')
+
+     # Update with ONLY the missing fields (don't overwrite good values!)
      bazinga-db, update task group:
      Group ID: {group_id}
-     --specializations '["derived/paths/here"]'
+     {update_flags joined}
 
      Skill(command: "bazinga-db")
    ```
 
+   **⚠️ CRITICAL:** Only include flags for fields that ACTUALLY need backfill.
+   Do NOT include `--specializations` if group already has them.
+   Do NOT include `--item_count` if group already has it.
+
 4. **Log the backfill:**
    ```
-   📋 Backfilled specializations for {N} task groups
+   📋 Backfilled {N} task groups: {fields_updated}
    ```
 
 **Skip this step if:** This is a NEW session (no existing task groups).
@@ -1593,11 +1611,13 @@ For test fixing (e.g., "Fix 695 E2E tests"):
 - ❌ "Establish baseline for 695 tests" → Too large, use batching
 - ❌ Multiple "then" statements → Too many sequential steps
 
-### Step 3.5: Assign Specializations per Task Group (🔴 MANDATORY)
+### Step 3.5: Assign Specializations per Task Group (🔴 MANDATORY - BLOCKER)
 
 **Purpose:** Provide technology-specific patterns to agents based on which component(s) each task group targets.
 
-**🔴 THIS STEP IS MANDATORY** - You MUST assign specializations to EVERY task group. Skipping this step causes agents to spawn without technology-specific guidance, degrading code quality.
+**🔴 THIS STEP IS MANDATORY AND BLOCKS PROCEEDING** - You MUST assign specializations to EVERY task group. Skipping this step causes agents to spawn without technology-specific guidance, degrading code quality.
+
+**⚠️ CANNOT SKIP THIS STEP** - If `project_context.json` doesn't exist, you MUST use the fallback mapping table below. There is NO valid reason to create task groups without specializations.
 
 **Step 3.5.1: Read Project Context (from Tech Stack Scout)**
 
@@ -1711,9 +1731,11 @@ When creating task groups, include the specializations field:
 - **Specializations:** ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]
 ```
 
-**Step 3.5.4: Store Specializations via bazinga-db**
+**Step 3.5.4: Store Task Groups via bazinga-db (CANONICAL TEMPLATE)**
 
-When invoking `create-task-group`, include the `--specializations` flag:
+**🔴 THIS IS THE ONLY TEMPLATE FOR CREATING TASK GROUPS.** Sub-step 5.3 is verification only.
+
+When invoking `create-task-group`, include ALL required fields:
 
 ```
 bazinga-db, please create task group:
@@ -1724,26 +1746,77 @@ Name: Implement Login UI
 Status: pending
 Complexity: 5
 Initial Tier: Developer
+Item_Count: [number of discrete tasks/items in this group]
 --specializations '["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]'
 ```
 
 Then invoke: `Skill(command: "bazinga-db")`
 
-**No specialization limit:** Assign as many specializations as the task requires. The orchestrator validates paths exist before including in agent prompts.
+**Repeat this for EVERY task group.** If you created 3 task groups, you must invoke bazinga-db 3 times (once for each group).
 
-**🔴 SELF-CHECK BEFORE PROCEEDING:**
+**Required fields:**
+- `Item_Count` - Number of discrete tasks (used for progress tracking)
+  - Count the number of discrete tasks/items in each group
+  - If group has sub-tasks, sum them
+  - Used for progress capsules: `Progress: {completed}/{total}`
+  - Validator uses this to verify scope completion
+- `--specializations` - Technology-specific guidance paths (NEVER empty)
+
+**🔴 MANDATORY VALIDATION GATE (BLOCKER):**
+
+**This step BLOCKS proceeding to Step 3.6. You MUST verify ALL fields before continuing.**
+
 ```
-FOR each task_group created:
-  ✓ Did I pass --specializations flag to create-task-group?
-  ✓ Is the specializations array non-empty?
-  ✓ Did I use the fallback mapping if project_context.json was missing?
+IMMEDIATE SELF-CHECK after creating each task group:
 
-IF any task group has empty specializations:
-  → Go back and derive using the fallback mapping table above
-  → Update the task group with bazinga-db update-task-group --specializations
+1. Does it include Item_Count?
+2. Does it include --specializations with a non-empty array?
+
+   ❌ WRONG (missing both required fields):
+   bazinga-db, please create task group:
+   Group ID: AUTH
+   Session ID: [session_id]
+   Name: Auth feature
+   Status: pending
+
+   ❌ WRONG (missing --specializations):
+   bazinga-db, please create task group:
+   Group ID: AUTH
+   Session ID: [session_id]
+   Name: Auth feature
+   Status: pending
+   Item_Count: 3
+
+   ✅ RIGHT (has BOTH Item_Count AND --specializations):
+   bazinga-db, please create task group:
+   Group ID: AUTH
+   Session ID: [session_id]
+   Name: Auth feature
+   Status: pending
+   Initial Tier: Developer
+   Item_Count: 3
+   --specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
+
+IF I forgot any field:
+   → IMMEDIATELY invoke bazinga-db with update-task-group to add the missing field
+   → Use fallback mapping table above if no project_context.json
 ```
 
-**⚠️ DO NOT proceed to Step 3.6 until ALL task groups have specializations.**
+**🔴 FALLBACK DERIVATION IS MANDATORY** - If you don't have `project_context.json`:
+```
+EVERY task group MUST get specializations from the fallback table.
+If the project uses TypeScript + React:
+  → ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/react.md"]
+If unsure about stack, use JUST the language template.
+NEVER leave specializations empty.
+```
+
+**❌ THIS WILL CAUSE FAILURE:**
+- Creating task groups without --specializations flag
+- Leaving specializations as null or empty array
+- Skipping Step 3.5 "because project_context.json doesn't exist"
+
+**⚠️ DO NOT proceed to Step 3.6 until ALL task groups have non-empty specializations.**
 
 ---
 
@@ -1891,43 +1964,30 @@ Skill(command: "bazinga-db")
 
 **Wait for the skill to complete and return a response.** You should see confirmation that the PM state was saved. If you see an error, retry the invocation.
 
-#### Sub-step 5.3: Create Task Groups in Database
+#### Sub-step 5.3: Verify Task Groups Were Persisted
 
-**For EACH task group you created, you MUST invoke bazinga-db to store it in the task_groups table.**
+**🔴 DO NOT CREATE TASK GROUPS HERE.** Task groups are created in **Step 3.5.4** using the canonical template.
 
-For each task group, write this request and invoke:
+This step is VERIFICATION ONLY. Confirm that:
 
+1. **All task groups were created in Step 3.5.4** with the canonical template
+2. **Each group has ALL required fields:**
+   - `Item_Count` (number > 0)
+   - `--specializations` (non-empty array)
+
+**If any groups are missing or incomplete:**
 ```
-bazinga-db, please create task group:
-
-Group ID: [group_id like "A", "B", "batch_1", etc.]
-Session ID: [session_id]
-Name: [human readable task name]
-Status: pending
-Complexity: [1-10]
-Initial Tier: [Developer | Senior Software Engineer]
-Item_Count: [number of discrete tasks/items in this group]
+→ Go back to Step 3.5.4 and create/update them using the CANONICAL TEMPLATE
+→ DO NOT use an abbreviated template here
 ```
-
-**⚠️ Item_Count is MANDATORY for progress tracking:**
-- Count the number of discrete tasks/items in each group
-- If group has sub-tasks, sum them
-- Used for progress capsules: `Progress: {completed}/{total}`
-- Validator uses this to verify scope completion
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db")
-```
-
-**Repeat this for EVERY task group.** If you created 3 task groups, you must invoke bazinga-db 3 times (once for each group).
 
 #### Verification Checkpoint
 
 **Before proceeding to Step 6, verify:**
 - ✅ You captured the initial branch
 - ✅ You invoked bazinga-db to save PM state (1 time)
-- ✅ You invoked bazinga-db to create task groups (N times, where N = number of task groups)
+- ✅ You created task groups in Step 3.5.4 (N times, where N = number of task groups)
+- ✅ Each group has Item_Count AND --specializations
 - ✅ Each invocation returned a success response
 
 **If any of these are missing, you MUST go back and complete them now.**
@@ -2115,12 +2175,53 @@ Work continues until Tech Lead approves.
 
 When spawned after work has started, you receive updated state from orchestrator.
 
+### Step 0: Scope Verification (MANDATORY ON RESUME)
+
+**🔴 CRITICAL: Check if orchestrator provided "SCOPE PRESERVATION" section in your prompt.**
+
+**IF "SCOPE PRESERVATION" section exists:**
+
+The orchestrator has detected a resume scenario and provided Original_Scope data. You MUST:
+
+1. **Compare user's current request with Original_Scope.raw_request**
+2. **Determine scope relationship:**
+   - SAME scope → Normal resume, continue from current state
+   - NARROWER scope → User wants less than original, proceed with narrowed scope
+   - BROADER scope → User wants more than current progress covers
+   - FULL scope requested ("everything", "all of X") → Ensure 100% of Original_Scope covered
+
+3. **IF BROADER or FULL scope requested:**
+   - Check if current task groups cover the full Original_Scope
+   - IF NOT: Create additional task groups for missing scope items
+   - Return Status: PLANNING_COMPLETE (not CONTINUE) to signal new groups
+   - The orchestrator will then start the new groups
+
+4. **IF scope matches current progress:**
+   - Normal resume - continue to Step 1
+
+**IF "SCOPE PRESERVATION" section MISSING:**
+- This is a legacy spawn without scope data
+- Proceed with current PM state as-is (best effort)
+
+**Example scope expansion:**
+```
+Original_Scope: "implement everything in tasks8.md" (69 tasks)
+Current state: Phase 1 complete (4 tasks), Phase 2 pending (4 tasks)
+User says: "continue with everything"
+
+→ "everything" = FULL scope = 69 tasks
+→ Current groups only cover 8 tasks
+→ ACTION: Create additional task groups for remaining 61 tasks
+→ Status: PLANNING_COMPLETE (new groups created)
+```
+
 ### Step 1: Analyze Current State
 
 Read provided context:
 - Updated PM state from database
 - Completion updates (which groups approved/failed)
 - Current group statuses
+- Original_Scope (if provided) - compare with current progress
 
 **If development plan exists:** Query plan status and update completed phases via bazinga-db `update-plan-progress` when phases complete. Keep plan synchronized with actual progress.
 
