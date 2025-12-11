@@ -4,7 +4,7 @@
 
 **One request → Multiple AI developers working simultaneously → Done 3x faster.**
 
-BAZINGA coordinates teams of AI agents to build software in parallel, aiming for one-shot execution when possible. While traditional AI coding assistants work sequentially, BAZINGA analyzes your request, breaks it into independent tasks, and spawns multiple developers to work simultaneously—just like a real dev team.
+BAZINGA coordinates teams of AI agents to build software in parallel, aiming for one-shot execution when possible—powered by [Agentic Context Engineering](#core-philosophy-agentic-context-engineering). While traditional AI coding assistants work sequentially, BAZINGA analyzes your request, breaks it into independent tasks, and spawns multiple developers to work simultaneously—just like a real dev team.
 
 ---
 
