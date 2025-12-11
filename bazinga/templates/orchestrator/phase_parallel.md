@@ -206,7 +206,30 @@ Store as `base_prompts[group_id]`. Do not output to user.
 
 **Check `bazinga/skills_config.json` once:** Is `specializations.enabled == true` AND agent_type in `enabled_agents`?
 
-**IF YES (specializations enabled for this agent type):** For EACH group, your message MUST contain this sequence:
+**IF YES (specializations enabled for this agent type):**
+
+**Step B.1: Get specializations per group (with fallback derivation)**
+```
+FOR each group_id in groups:
+    specializations = task_groups[group_id]["specializations"]  # May be null/empty
+
+    IF specializations is null OR empty:
+        # FALLBACK: Derive from project_context.json (read once, reuse)
+        IF project_context not loaded:
+            Read(file_path: "bazinga/project_context.json")
+
+        IF components exists with suggested_specializations:
+            specializations = merge all component.suggested_specializations
+        ELSE IF suggested_specializations exists (session-wide):
+            specializations = suggested_specializations
+        ELSE IF primary_language or framework exists:
+            specializations = map_to_template_paths(primary_language, framework)
+            # See spawn_with_specializations.md for mapping table
+
+    group_specializations[group_id] = specializations  # May still be empty
+```
+
+**Step B.2: For EACH group with non-empty specializations**, output context and invoke skill:
 
 ```
 🔧 Loading specializations for Group {group_id} ({agent_type})...
@@ -216,7 +239,7 @@ Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {agent_type}
 Model: {MODEL_CONFIG[task_groups[group_id].initial_tier]}
-Specialization Paths: {task_groups[group_id].specializations as JSON array}
+Specialization Paths: {group_specializations[group_id] as JSON array}
 [SPEC_CTX_END]
 ```
 
