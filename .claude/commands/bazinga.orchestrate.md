@@ -573,8 +573,10 @@ Display:
 **🔴 CRITICAL - COMPLETE ALL STEPS IN SAME TURN (NO USER WAIT):**
 1. Log PM interaction to database
 2. Parse PM status (CONTINUE/BAZINGA/etc)
-3. Spawn agent or proceed to completion - **all within this turn**
-4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Task() tool NOW
+3. Start spawn sequence or proceed to completion - **all within this turn**
+4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Skill() or Task() tool NOW
+   - **If specializations ENABLED:** Call `Skill(command: "specialization-loader")` in this turn (Task() follows in Turn 2)
+   - **If specializations DISABLED:** Call `Task()` directly in this turn
 5. Multi-step sequences (DB query → spawn) are expected within the same turn
 
 ---

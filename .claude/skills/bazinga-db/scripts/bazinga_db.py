@@ -2226,6 +2226,7 @@ BAZINGA Database Client - Available Commands:
 
 SESSION OPERATIONS:
   create-session <id> <mode> <requirements>   Create new session (mode: simple|parallel)
+  get-session <id>                            Get session details by ID
   list-sessions [limit]                       List recent sessions (default: 10)
   update-session-status <id> <status>         Update session status
 
@@ -2411,6 +2412,16 @@ def main():
             result = db.create_session(session_id, mode, requirements, initial_branch, metadata)
             # Output verification data as JSON
             print(json.dumps(result, indent=2))
+        elif cmd == 'get-session':
+            if len(cmd_args) < 1:
+                print(json.dumps({"success": False, "error": "get-session requires <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session = db.get_session(cmd_args[0])
+            if session:
+                print(json.dumps(session, indent=2))
+            else:
+                print(json.dumps({"success": False, "error": f"Session not found: {cmd_args[0]}"}, indent=2), file=sys.stderr)
+                sys.exit(1)
         elif cmd == 'list-sessions':
             limit = int(cmd_args[0]) if len(cmd_args) > 0 else 10
             sessions = db.list_sessions(limit)

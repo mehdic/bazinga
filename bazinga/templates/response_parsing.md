@@ -420,7 +420,7 @@ When PM sends BAZINGA, extract the Completion Summary section:
 2. Deferred_Items is empty `[]`
 3. Completion_Percentage == 100%
 
-**Exception:** If user approved scope reduction (logged via `log-scope-change`), validate against `approved_scope` instead.
+**Exception:** If user approved scope reduction (logged via `save-event <session_id> scope_change '<payload>'`), validate against `approved_scope` instead.
 
 **If validation fails:**
 - DO NOT accept BAZINGA
