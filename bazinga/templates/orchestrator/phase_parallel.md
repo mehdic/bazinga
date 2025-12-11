@@ -263,14 +263,25 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initia
 
 ---
 
-### SELF-CHECK (Read This Before Sending)
+### TWO-TURN SPAWN SEQUENCE (Parallel Mode)
 
-Before you send your message, verify:
-- **If specializations enabled:** Does your message contain `[SPEC_CTX_START` for EACH group? Does it contain `Skill(command: "specialization-loader")` calls (one per group)?
-- **If your message has Task() calls but NO Skill() calls:** You skipped specializations. Add them NOW.
-- **Count your Task() calls:** Should match number of groups (max 4).
+**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from each Skill()'s response.
 
-**All Skill() calls must complete BEFORE any Task() calls. Same message, sequenced.**
+**Turn 1 (this message):**
+1. For EACH group, output the `[SPEC_CTX_START group=X]...[SPEC_CTX_END]` block
+2. Call `Skill(command: "specialization-loader")` for EACH group (all in this message)
+3. END this message (wait for all skill responses)
+
+**Turn 2 (after skill responses):**
+1. Read each skill response
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
+3. Call ALL `Task()` spawns with the extracted blocks prepended to base_prompts
+
+**SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START` for EACH group? Does it contain `Skill(command: "specialization-loader")` for EACH group?
+
+**SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group?
+
+**Count your Task() calls:** Should match number of groups (max 4).
 
 ---
 

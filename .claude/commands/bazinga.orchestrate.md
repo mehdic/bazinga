@@ -1212,11 +1212,15 @@ Before continuing to Step 1.3a, verify:
 - **END orchestration** (no development work needed)
 
 **IF status is missing or unclear:**
-- Apply fallback: Scan response for patterns:
-  - Contains "continue", "proceed", "Phase N", "pending groups" → treat as CONTINUE
-  - Contains task groups or mode decision → treat as PLANNING_COMPLETE
-  - Contains questions/clarifications → treat as NEEDS_CLARIFICATION
-- **IMMEDIATELY jump to appropriate phase. Do NOT stop.**
+- **DO NOT GUESS** - Status codes must be explicit in PM response
+- Scan for EXPLICIT status markers only:
+  - Explicit "Status: CONTINUE" or "CONTINUE" on its own line → treat as CONTINUE
+  - Explicit "Status: PLANNING_COMPLETE" or "PLANNING_COMPLETE" → treat as PLANNING_COMPLETE
+  - Explicit "Status: NEEDS_CLARIFICATION" or question blocks → treat as NEEDS_CLARIFICATION
+- **Generic phrases like "proceed", "continue with", "Phase N" are NOT status codes**
+- If truly ambiguous: Output `⚠️ PM status unclear | Cannot determine next action | Respawning PM for explicit status`
+- Then respawn PM with: "Your previous response lacked an explicit status code. Please respond with one of: PLANNING_COMPLETE, CONTINUE, BAZINGA, NEEDS_CLARIFICATION"
+- **IMMEDIATELY jump to appropriate phase after status determined. Do NOT stop.**
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
@@ -1539,14 +1543,14 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 **🚨 TEMPLATE VERIFICATION CHECKPOINT:**
 After calling Read, verify you have the template content visible in your context:
 - ✅ Can you see "SPAWN DEVELOPER (ATOMIC SEQUENCE)"?
-- ✅ Can you see "Load Specializations → Then Spawn (FUSED ACTION)"?
+- ✅ Can you see "TWO-TURN SPAWN SEQUENCE"?
 - ✅ Can you see `Skill(command: "specialization-loader")`?
 
 **IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
 
-**Execute the ATOMIC SEQUENCE as defined in the template.**
+**Execute the TWO-TURN SPAWN SEQUENCE as defined in the template.**
 
-**⚠️ WARNING: The template uses FUSED ACTION pattern - Skill() and Task() are ONE action. If you spawn Task() without first calling Skill() in the same message, specializations will NOT be loaded.**
+**⚠️ WARNING: Skill() and Task() are in SEPARATE messages. Turn 1: Call Skill(). Turn 2: Extract block, call Task(). If you try to put both in one message, Task() won't have the specialization block yet.**
 
 ---
 
@@ -1565,14 +1569,14 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 **🚨 TEMPLATE VERIFICATION CHECKPOINT:**
 After calling Read, verify you have the template content visible in your context:
 - ✅ Can you see "SPAWN DEVELOPERS - PARALLEL (ATOMIC SEQUENCE PER GROUP)"?
-- ✅ Can you see "Load Specializations → Then Spawn (FUSED ACTION PER GROUP)"?
+- ✅ Can you see "TWO-TURN SPAWN SEQUENCE (Parallel Mode)"?
 - ✅ Can you see `Skill(command: "specialization-loader")` for each group?
 
 **IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
 
-**Execute the ATOMIC SEQUENCE PER GROUP as defined in the template.**
+**Execute the TWO-TURN SPAWN SEQUENCE as defined in the template.**
 
-**⚠️ WARNING: The template uses FUSED ACTION pattern - all Skill() calls must complete BEFORE any Task() calls, in the same message. If you spawn Task() without first calling Skill() for each group, specializations will NOT be loaded.**
+**⚠️ WARNING: Skill() and Task() are in SEPARATE messages. Turn 1: Call all Skill() for each group. Turn 2: Extract all blocks, call all Task(). If you try to put both in one message, Task() won't have the specialization blocks yet.**
 
 ---
 

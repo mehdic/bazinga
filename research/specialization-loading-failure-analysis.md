@@ -2,8 +2,8 @@
 
 **Date:** 2025-12-11
 **Context:** User reports specializations not loading even after template Read succeeds
-**Decision:** Shift from prose enforcement to DB-backed procedural enforcement
-**Status:** Reviewed - Awaiting user approval
+**Decision:** Two-turn spawn sequence (Skill in Turn 1, Task in Turn 2)
+**Status:** Implemented
 **Reviewed by:** OpenAI GPT-5
 
 ---
@@ -545,80 +545,82 @@ Before Task():
 
 ---
 
-## IMPLEMENTED Solution: Fused Atomic Action Pattern
+## IMPLEMENTED Solution: Two-Turn Spawn Sequence
 
-**Note:** While the external review recommended DB-backed enforcement, we implemented a simpler **fused atomic action** pattern first. DB enforcement remains a potential future enhancement if this approach proves insufficient.
+**Note:** The initial "fused atomic action" approach (Skill() and Task() in same message) was **impossible** because Task() needs the specialization block from Skill()'s response, which only arrives in the next turn.
 
-### Why Fused Action Instead of DB Enforcement
+### Why Two-Turn Sequence
 
-1. **Simpler implementation** - No bazinga-db changes needed
-2. **Same-message guarantee** - Skill() and Task() must be in same message
-3. **Removes skip path** - No numbered steps to skip (Step 1, 2, 3, 4)
-4. **Template-based** - Orchestrator copies/fills a template, not interprets instructions
+1. **Physical constraint** - Task() needs output from Skill(), which arrives in next turn
+2. **Cannot be same message** - Skill() response isn't available until message completes
+3. **Clear separation** - Turn 1: gather data, Turn 2: use data
+4. **Self-check per turn** - Each turn has its own verification
 
 ### Implemented Spawn Sequence (Phase Templates)
 
 ```markdown
 ## SPAWN DEVELOPER (ATOMIC SEQUENCE)
 
-**To spawn a developer, you MUST produce this EXACT output sequence in your message.**
+**To spawn a developer, you MUST produce this EXACT output sequence.**
 
-**There is no Task() without the Skill() first. They are ONE action, not separate steps.**
+### TWO-TURN SPAWN SEQUENCE
 
-### PART B: Load Specializations → Then Spawn (FUSED ACTION)
+**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs
+the specialization_block from Skill()'s response.
 
-**Check skills_config.json:** Is specializations.enabled == true AND agent_type in enabled_agents?
-
-**IF YES:** Your message MUST contain this exact sequence:
-1. Output SPEC_CTX block
+**Turn 1 (this message):**
+1. Output the [SPEC_CTX_START]...[SPEC_CTX_END] block
 2. Call Skill(command: "specialization-loader")
-3. Extract specialization block from response
-4. Output capsule and call Task()
+3. END this message (wait for skill response)
 
-**SELF-CHECK:** If your message has Task() but NO Skill(), you skipped specializations.
+**Turn 2 (after skill response):**
+1. Read the skill's response
+2. Extract content between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
+3. Call Task() with the extracted block prepended to base_prompt
+
+**SELF-CHECK (Turn 1):** Does this message contain [SPEC_CTX_START? Does it contain Skill()?
+**SELF-CHECK (Turn 2):** Did I extract the specialization block? Does this message contain Task()?
 ```
 
-### Key Differences from DB Enforcement
+### Key Change from Original Approach
 
-| Aspect | DB Enforcement (Proposed) | Fused Action (Implemented) |
-|--------|--------------------------|---------------------------|
-| Verification | Query DB before Task() | Self-check in same message |
-| Caching | DB stores blocks | No caching (fresh each spawn) |
-| Complexity | Requires bazinga-db changes | No infrastructure changes |
-| Enforcement | Procedural (query result) | Structural (template pattern) |
+| Aspect | Fused Action (Original) | Two-Turn Sequence (Implemented) |
+|--------|------------------------|--------------------------------|
+| Message count | 1 message | 2 messages |
+| Tool dependency | Impossible (Task needs Skill output) | Resolved (Task in Turn 2 has Skill output) |
+| Self-check | One check | Per-turn checks |
+| Skip path | Template in same message | Skill must complete before Task possible |
 
-### Future Enhancement: Add DB Caching
+### Additional Fixes in This Commit
 
-If fused action proves insufficient, we can layer DB enforcement on top:
-1. Before Skill(), query DB for cached specialization
-2. If cache hit, use cached block
-3. If cache miss, invoke Skill(), save to DB
-4. Proceed to Task()
+1. **Over-broad CONTINUE fallback** - Restricted to explicit status codes only
+2. **Incomplete Task() invocations** - Added missing `subagent_type` and `description` parameters
+3. **Verification checkpoints** - Updated to reflect two-turn pattern
 
 ### Success Criteria (Implemented)
 
-1. **Primary:** Every Task() spawn in same message as Skill() call (fused action)
-2. **Secondary:** Self-check in template catches Task() without Skill()
+1. **Primary:** Skill() in Turn 1, Task() in Turn 2 (physical separation)
+2. **Secondary:** Per-turn self-checks catch missing actions
 3. **Tertiary:** Single capsule line confirms status (loaded/failed/disabled)
-4. **Template-based:** Orchestrator follows exact output template, not interprets prose
+4. **Explicit status codes** - No guessing from generic phrases
 
 ---
 
 ## Implementation Complete
 
 **Commits:**
-1. `7ce0f46` - fix: rewrite spawn sequences as fused atomic actions
-2. (this commit) - fix: address validation issues in phase templates
+1. `7ce0f46` - fix: rewrite spawn sequences as fused atomic actions (initial, flawed)
+2. (this commit) - fix: correct impossible tool dependency with 2-turn sequence
 
 **Files Modified:**
-- `bazinga/templates/orchestrator/phase_simple.md` - Fused atomic sequence
-- `bazinga/templates/orchestrator/phase_parallel.md` - Fused atomic sequence per group
-- `agents/orchestrator.md` - Updated verification checkpoints
+- `bazinga/templates/orchestrator/phase_simple.md` - Two-turn spawn sequence
+- `bazinga/templates/orchestrator/phase_parallel.md` - Two-turn spawn sequence per group
+- `agents/orchestrator.md` - Updated verification checkpoints, fixed CONTINUE fallback
 
 ---
 
 ## Status
 
-**Status:** Implemented (Fused Atomic Action pattern)
+**Status:** Implemented (Two-Turn Spawn Sequence)
 
-**Confidence:** Medium - Removes skip path, but still relies on Claude following the fused pattern. If this proves insufficient, DB enforcement can be layered on top.
+**Confidence:** Medium-High - Physical separation (Skill in Turn 1, Task in Turn 2) means Task() literally cannot execute without Skill() completing first. The data dependency is structural, not prompt-based.

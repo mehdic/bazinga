@@ -173,13 +173,23 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 
 ---
 
-### SELF-CHECK (Read This Before Sending)
+### TWO-TURN SPAWN SEQUENCE
 
-Before you send your message, verify:
-- **If specializations enabled:** Does your message contain `[SPEC_CTX_START`? Does it contain `Skill(command: "specialization-loader")`?
-- **If your message has Task() but NO Skill():** You skipped specializations. Add them NOW.
+**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from Skill()'s response.
 
-**The Skill() and Task() must be in the SAME message. Do not split them across turns.**
+**Turn 1 (this message):**
+1. Output the `[SPEC_CTX_START]...[SPEC_CTX_END]` block
+2. Call `Skill(command: "specialization-loader")`
+3. END this message (wait for skill response)
+
+**Turn 2 (after skill response):**
+1. Read the skill's response
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
+3. Call `Task()` with the extracted block prepended to base_prompt
+
+**SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START`? Does it contain `Skill(command: "specialization-loader")`?
+
+**SELF-CHECK (Turn 2):** Did I extract the specialization block? Does this message contain `Task()`?
 
 ---
 
@@ -264,7 +274,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 
 **IF Developer reports ESCALATE_SENIOR:**
 - Build SSE prompt with: original task, developer's attempt, reason for escalation
-- **Spawn SSE (fused):** Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
+- **Spawn SSE (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={spec_block + base})`
 
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
 
@@ -295,11 +305,11 @@ Before moving to the next group or ending your message, verify:
    ```
    Invoke: `Skill(command: "bazinga-db")`
 
-**Spawn Developer (fused):** Output `[SPEC_CTX_START group={group_id} agent=developer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["developer"], prompt={spec_block + base})`
+**Spawn Developer (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=developer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt={spec_block + base})`
 
 **IF revision count >= 1 (Developer failed once):**
 - Escalate to SSE. Build prompt with: original task, developer's attempt, failure details
-- **Spawn SSE (fused):** Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
+- **Spawn SSE (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={spec_block + base})`
 
 **IF Senior Software Engineer also fails (revision count >= 2 after Senior Eng):**
 - Spawn Tech Lead for architectural guidance
@@ -399,14 +409,14 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 3. Include QA feedback and failed tests
 4. Track revision count in database (increment by 1)
 
-**Spawn Developer (fused):** Output `[SPEC_CTX_START group={group_id} agent=developer]...` → `Skill(command: "specialization-loader")` → extract block → `Task(model=MODEL_CONFIG["developer"], prompt={spec_block + base})`
+**Spawn Developer (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=developer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: QA fixes", prompt={spec_block + base})`
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
 - Escalate to SSE with QA's challenge level findings
-- **Spawn SSE (fused):** Output `[SPEC_CTX_START...]` → `Skill(command: "specialization-loader")` → extract → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
+- **Spawn SSE (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: QA escalation", prompt={spec_block + base})`
 
 **IF QA reports ESCALATE_SENIOR explicitly:**
-- **Spawn SSE (fused):** Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")` → extract → `Task(model=MODEL_CONFIG["senior_software_engineer"], prompt={spec_block + base})`
+- **Spawn SSE (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: QA escalation", prompt={spec_block + base})`
 
 **🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
 - ALWAYS spawn Senior Software Engineer for fixes (never regular Developer)
@@ -613,6 +623,7 @@ Your Task:
 ```
 Task(
   subagent_type: "general-purpose",
+  model: MODEL_CONFIG["tech_lead"],
   description: "Tech Lead validation of investigation",
   prompt: [Tech Lead prompt built above]
 )
