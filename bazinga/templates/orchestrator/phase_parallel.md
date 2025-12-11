@@ -1,5 +1,7 @@
 ## Phase 2B: Parallel Mode Execution
 
+**Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
+
 **🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
@@ -174,10 +176,14 @@ Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that g
 **🔴 Reasoning Context Query (PER GROUP, AFTER context packages):**
 
 For each group, query prior agent reasoning:
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --limit 5
 ```
+bazinga-db, please get reasoning:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Limit: 5
+```
+Then invoke: `Skill(command: "bazinga-db")`
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
 **Build Base Prompt PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
@@ -325,11 +331,24 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 | Status | Action |
 |--------|--------|
-| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2B.7b |
+| `MERGE_SUCCESS` | Update group + progress (see below) → Step 2B.7b |
 | `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
 | *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason |
+
+**MERGE_SUCCESS Progress Tracking:**
+1. Update task_group: status="completed", merge_status="merged"
+2. Query completed progress from task_groups using bazinga-db skill:
+   ```
+   bazinga-db, please get task groups:
+
+   Session ID: [session_id]
+   Status: completed
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+   Sum item_count from the returned JSON to get completed items.
+3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 
 **Escalation:** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 

@@ -35,11 +35,19 @@ You are a Developer performing a merge task.
 2. Pull latest: `git pull origin {initial_branch}`
 3. Merge feature branch: `git merge {feature_branch} --no-edit`
 4. IF merge conflicts: Abort with `git merge --abort` → Report MERGE_CONFLICT
-5. IF merge succeeds: Run tests
-6. IF tests pass: Push with `git push origin {initial_branch}` → Report MERGE_SUCCESS
-7. IF tests fail (BEFORE pushing): Reset with `git reset --hard ORIG_HEAD` → Report MERGE_TEST_FAILURE
+5. IF merge succeeds: Run tests locally
+6. IF tests pass: Push with `git push origin {initial_branch}`
+7. **Monitor CI status (poll every 60 seconds, up to 5 minutes):**
+   - Use `gh run list --branch {initial_branch} --limit 1` to get latest run
+   - Use `gh run view <run_id>` to check status
+   - Poll every 60 seconds until: completed, failed, or 5-minute timeout
+8. IF CI passes (or no CI configured): Report MERGE_SUCCESS
+9. IF CI fails with errors RELATED to our changes: Report MERGE_TEST_FAILURE
+10. IF CI has PRE-EXISTING failures (unrelated to our changes): Report MERGE_SUCCESS with note in summary
+11. IF tests fail locally (BEFORE pushing): Reset with `git reset --hard ORIG_HEAD` → Report MERGE_TEST_FAILURE
 
-**⚠️ CRITICAL:** Never push before tests pass. `ORIG_HEAD` is a Git reference that automatically points to the commit that was HEAD before the merge operation started, making the reset safe and explicit (it undoes the merge cleanly).
+**⚠️ CRITICAL:** Never push before local tests pass. `ORIG_HEAD` undoes the merge cleanly.
+**⚠️ CI POLLING:** You MUST poll CI status - do not just push and report success without checking.
 
 **Response Format:**
 Report one of:
