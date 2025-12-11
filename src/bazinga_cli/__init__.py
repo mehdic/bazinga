@@ -165,37 +165,61 @@ class BazingaSetup:
         scripts_dir = target_dir / "bazinga" / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
 
-        source_scripts = self.source_dir / "scripts"
-        if not source_scripts.exists():
-            return False
-
         # Determine which extension to copy based on script type
         script_extension = ".sh" if script_type == "sh" else ".ps1"
 
         copied_count = 0
-        for script_file in source_scripts.glob("*"):
-            if script_file.is_file():
-                # Skip non-script files (README, etc.) or wrong script type
-                if script_file.suffix in [".sh", ".ps1"]:
-                    if script_file.suffix != script_extension:
-                        continue  # Skip scripts of the other type
 
-                dest = scripts_dir / script_file.name
-                shutil.copy2(script_file, dest)
+        # Copy from both source locations:
+        # 1. source_dir/scripts (main scripts folder)
+        # 2. source_dir/bazinga/scripts (bazinga-specific scripts like build-baseline.sh)
+        source_locations = [
+            self.source_dir / "scripts",
+            self.source_dir / "bazinga" / "scripts",
+        ]
 
-                # Make shell scripts executable on Unix-like systems
-                if script_file.suffix == ".sh" and os.name != 'nt':
-                    dest.chmod(0o755)
+        for source_scripts in source_locations:
+            if not source_scripts.exists():
+                continue
 
-                console.print(f"  ✓ Copied {script_file.name}")
-                copied_count += 1
+            for script_file in source_scripts.glob("*"):
+                if script_file.is_file():
+                    # Skip non-script files (README, etc.) or wrong script type
+                    if script_file.suffix in [".sh", ".ps1"]:
+                        if script_file.suffix != script_extension:
+                            continue  # Skip scripts of the other type
 
-        # Also copy README if it exists
-        readme_file = source_scripts / "README.md"
-        if readme_file.exists():
-            dest = scripts_dir / "README.md"
-            shutil.copy2(readme_file, dest)
-            console.print(f"  ✓ Copied README.md")
+                    try:
+                        # SECURITY: Validate filename doesn't contain path traversal
+                        safe_filename = PathValidator.validate_filename(script_file.name)
+                        dest = scripts_dir / safe_filename
+
+                        # SECURITY: Ensure destination is within scripts_dir
+                        PathValidator.ensure_within_directory(dest, scripts_dir)
+
+                        shutil.copy2(script_file, dest)
+
+                        # Make shell scripts executable on Unix-like systems
+                        if script_file.suffix == ".sh" and os.name != 'nt':
+                            dest.chmod(0o755)
+
+                        console.print(f"  ✓ Copied {safe_filename}")
+                        copied_count += 1
+                    except SecurityError as e:
+                        console.print(f"[red]✗ Skipping unsafe script {script_file.name}: {e}[/red]")
+                        continue
+
+            # Also copy README if it exists
+            readme_file = source_scripts / "README.md"
+            if readme_file.exists():
+                try:
+                    safe_filename = PathValidator.validate_filename("README.md")
+                    dest = scripts_dir / safe_filename
+                    PathValidator.ensure_within_directory(dest, scripts_dir)
+                    shutil.copy2(readme_file, dest)
+                    console.print(f"  ✓ Copied README.md")
+                except SecurityError as e:
+                    console.print(f"[red]✗ Skipping unsafe README: {e}[/red]")
 
         return copied_count > 0
 

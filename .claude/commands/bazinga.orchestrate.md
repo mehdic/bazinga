@@ -1501,12 +1501,52 @@ bazinga-db, get task groups for session [session_id]
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Step 3: Extract and validate specializations**
+**Step 3: Extract specializations (with fallback derivation)**
 ```
 specializations = task_group["specializations"]  # JSON array or null
+
 IF specializations is null OR empty:
+    # FALLBACK: Derive from project_context.json
+    Read(file_path: "bazinga/project_context.json")
+
+    IF file exists:
+        specializations = []
+
+        # Try components.suggested_specializations first
+        IF project_context.components exists:
+            FOR component in components:
+                IF component.suggested_specializations:
+                    specializations.extend(component.suggested_specializations)
+
+        # Try session-wide suggested_specializations
+        IF empty AND project_context.suggested_specializations exists:
+            specializations = project_context.suggested_specializations
+
+        # Last resort: map primary_language + framework
+        IF empty:
+            IF project_context.primary_language:
+                specializations.append(map_to_template(primary_language))
+            IF project_context.framework:
+                FOR fw in parse_comma_separated(framework):
+                    specializations.append(map_to_template(fw))
+
+        specializations = deduplicate(specializations)
+
+IF specializations still empty:
     Skip specialization loading, continue to spawn
 ```
+
+**Template mapping (fallback derivation):**
+
+| Technology | Template Path |
+|------------|---------------|
+| typescript | `bazinga/templates/specializations/01-languages/typescript.md` |
+| python | `bazinga/templates/specializations/01-languages/python.md` |
+| javascript | `bazinga/templates/specializations/01-languages/javascript.md` |
+| react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
+| nextjs | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
+| fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
 
 **Step 4: Invoke specialization-loader skill**
 
@@ -1557,9 +1597,10 @@ The composed block goes at the TOP of the agent prompt, before the task descript
 |----------|--------|
 | specializations.enabled = false | Skip entirely |
 | Agent type not in enabled_agents | Skip entirely |
-| No specializations in DB (null/empty) | Skip entirely (graceful degradation) |
+| No specializations in DB (null/empty) | **Derive from project_context.json** (Step 3 fallback) |
+| Derivation returns empty | Skip (no specializations available) |
 | Skill invocation fails | Log warning, spawn without specialization |
-| project_context.json missing | Skill handles (conservative defaults) |
+| project_context.json missing | Skip (no source for derivation) |
 
 ### Token Budget (per-model)
 

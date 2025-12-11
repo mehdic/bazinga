@@ -63,6 +63,7 @@ packages = ["src/bazinga_cli"]
 [tool.hatch.build.targets.wheel.shared-data]
 "agents" = "share/bazinga_cli/agents"
 "scripts" = "share/bazinga_cli/scripts"
+"bazinga/scripts" = "share/bazinga_cli/bazinga/scripts"
 ".claude/commands" = "share/bazinga_cli/.claude/commands"
 ".claude/templates" = "share/bazinga_cli/.claude/templates"
 "config" = "share/bazinga_cli/config"

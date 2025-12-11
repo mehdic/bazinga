@@ -123,7 +123,31 @@ Store as `base_prompt`. Do not output to user.
 
 **Check `bazinga/skills_config.json`:** Is `specializations.enabled == true` AND `agent_type` in `enabled_agents`?
 
-**IF YES (specializations enabled):** Your message MUST contain this exact sequence:
+**IF YES (specializations enabled):**
+
+**Step B.1: Get specializations (with fallback derivation)**
+```
+specializations = task_group["specializations"]  # May be null/empty
+
+IF specializations is null OR empty:
+    # FALLBACK: Derive from project_context.json
+    Read(file_path: "bazinga/project_context.json")
+
+    IF components exists with suggested_specializations:
+        specializations = merge all component.suggested_specializations
+    ELSE IF suggested_specializations exists (session-wide):
+        specializations = suggested_specializations
+    ELSE IF primary_language or framework exists:
+        specializations = map_to_template_paths(primary_language, framework)
+        # See spawn_with_specializations.md for mapping table
+
+IF specializations still empty:
+    → Skip to "IF NO (specializations disabled)" section below
+```
+
+**Step B.2: Output context and invoke skill**
+
+Your message MUST contain this exact sequence:
 
 ```
 🔧 Loading specializations for {agent_type}...
@@ -133,7 +157,7 @@ Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {agent_type}
 Model: {MODEL_CONFIG[initial_tier]}
-Specialization Paths: {task_group.specializations as JSON array}
+Specialization Paths: {specializations as JSON array}
 [SPEC_CTX_END]
 ```
 
