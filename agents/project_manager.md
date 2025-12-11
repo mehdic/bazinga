@@ -1355,25 +1355,32 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
    FOR each group needing backfill:
 
+     # Build update command with ONLY the fields that need backfill
+     update_flags = []
+
      # Backfill specializations if missing
      IF needs_specializations:
        Derive specializations using:
          - primary_language → language template
          - framework → framework template
          - (Use mapping table from Step 3.5)
+       update_flags.append('--specializations \'["derived/paths/here"]\'')
 
      # Backfill item_count if missing (default to 1)
      IF needs_item_count:
-       item_count = 1  # Default: assume single task unless known otherwise
+       update_flags.append('--item_count 1')
 
-     Update the task group:
+     # Update with ONLY the missing fields (don't overwrite good values!)
      bazinga-db, update task group:
      Group ID: {group_id}
-     --item_count {item_count}
-     --specializations '["derived/paths/here"]'
+     {update_flags joined}
 
      Skill(command: "bazinga-db")
    ```
+
+   **⚠️ CRITICAL:** Only include flags for fields that ACTUALLY need backfill.
+   Do NOT include `--specializations` if group already has them.
+   Do NOT include `--item_count` if group already has it.
 
 4. **Log the backfill:**
    ```
@@ -1745,8 +1752,14 @@ Item_Count: [number of discrete tasks/items in this group]
 
 Then invoke: `Skill(command: "bazinga-db")`
 
+**Repeat this for EVERY task group.** If you created 3 task groups, you must invoke bazinga-db 3 times (once for each group).
+
 **Required fields:**
 - `Item_Count` - Number of discrete tasks (used for progress tracking)
+  - Count the number of discrete tasks/items in each group
+  - If group has sub-tasks, sum them
+  - Used for progress capsules: `Progress: {completed}/{total}`
+  - Validator uses this to verify scope completion
 - `--specializations` - Technology-specific guidance paths (NEVER empty)
 
 **🔴 MANDATORY VALIDATION GATE (BLOCKER):**
