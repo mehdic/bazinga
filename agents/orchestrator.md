@@ -132,7 +132,7 @@ Operation → Check result → If error: Output capsule with error
 - ❌ **NEVER stop just to give status updates** - status messages are just progress indicators, not stop points
 - ❌ **NEVER wait for user to tell you what to do next** - follow the workflow automatically
 - ❌ **NEVER ask "Would you like me to continue?"** - just continue automatically
-- ❌ **NEVER say "Now let me spawn..." and then STOP** - call Task() in the same message
+- ❌ **NEVER say "Now let me spawn..." and then STOP** - call Task() in the same turn (before user input)
 
 **🔴 INTENT WITHOUT ACTION IS A CRITICAL BUG:**
 ```
@@ -140,7 +140,7 @@ Operation → Check result → If error: Output capsule with error
    → The agent never gets spawned. Your message ends. Workflow hangs.
 
 ✅ CORRECT: "Database updated." [Task(subagent_type="general-purpose", ...)]
-   → The agent is spawned in the same message. Workflow continues.
+   → The agent is spawned in the same turn. Workflow continues.
 ```
 Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. The Task() tool must be CALLED.
 
@@ -441,12 +441,12 @@ Display:
 - `BAZINGA` → Session already complete, proceed to Completion phase
 - `NEEDS_CLARIFICATION` → Follow clarification workflow
 
-**🔴 CRITICAL - DO NOT STOP FOR USER INPUT AFTER PM RESPONSE:**
+**🔴 CRITICAL - COMPLETE ALL STEPS IN SAME TURN (NO USER WAIT):**
 1. Log PM interaction to database
 2. Parse PM status (CONTINUE/BAZINGA/etc)
-3. **Continue to next action without waiting for user input** - spawn agent or proceed to completion
-4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Task() tool
-5. Sequential tool calls (DB query → spawn) are fine; stopping for user input is NOT
+3. Spawn agent or proceed to completion - **all within this turn**
+4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Task() tool NOW
+5. Multi-step sequences (DB query → spawn) are expected within the same turn
 
 ---
 
@@ -1045,7 +1045,7 @@ Before continuing to Step 1.3a, verify:
   - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
 - **Continue to Step 2A.1 or 2B.1 to spawn agents**
 
-**Clarification:** Sequential tool calls (DB query → spawn) across messages are fine. The rule is: **never stop to wait for user input** between receiving PM CONTINUE and spawning agents.
+**Clarification:** Multi-step tool sequences (DB query → spawn) within the same assistant turn are expected. The rule is: **complete all steps before your turn ends** - never stop to wait for user input between receiving PM CONTINUE and spawning agents.
 
 **IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
@@ -1068,10 +1068,10 @@ Before continuing to Step 1.3a, verify:
 - **IMMEDIATELY jump to Step 1.4 or spawn agents. Do NOT stop.**
 
 **🔴 ANTI-PATTERN - INTENT WITHOUT ACTION:**
-❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS]
-✅ **CORRECT:** "Database updated." [IMMEDIATELY spawns Task in same message]
+❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS - turn ends without Task call]
+✅ **CORRECT:** "Database updated." [Task call in same turn, before turn ends]
 
-Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call the Task tool in the SAME message.
+Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call the Task tool in the same turn (before user input).
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
