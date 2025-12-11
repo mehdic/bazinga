@@ -767,8 +767,18 @@ class BazingaDB:
 
     # ==================== SESSION OPERATIONS ====================
 
-    def create_session(self, session_id: str, mode: str, requirements: str) -> Dict[str, Any]:
-        """Create a new session with validation."""
+    def create_session(self, session_id: str, mode: str, requirements: str,
+                       initial_branch: Optional[str] = None,
+                       metadata: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new session with validation.
+
+        Args:
+            session_id: Unique session identifier
+            mode: 'simple' or 'parallel'
+            requirements: Original user requirements
+            initial_branch: Git branch name (defaults to 'main')
+            metadata: JSON string containing original_scope and other extensible data
+        """
         # Validate inputs
         if not session_id or not session_id.strip():
             raise ValueError("session_id cannot be empty")
@@ -777,17 +787,21 @@ class BazingaDB:
         if not requirements or not requirements.strip():
             raise ValueError("requirements cannot be empty")
 
+        # Default initial_branch to 'main' if not provided
+        if initial_branch is None:
+            initial_branch = 'main'
+
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
-                INSERT INTO sessions (session_id, mode, original_requirements, status)
-                VALUES (?, ?, ?, 'active')
-            """, (session_id, mode, requirements))
+                INSERT INTO sessions (session_id, mode, original_requirements, status, initial_branch, metadata)
+                VALUES (?, ?, ?, 'active', ?, ?)
+            """, (session_id, mode, requirements, initial_branch, metadata))
             conn.commit()
 
             # Verify the insert by reading it back
             verify = conn.execute("""
-                SELECT session_id, mode, status, start_time, created_at
+                SELECT session_id, mode, status, start_time, created_at, initial_branch, metadata
                 FROM sessions WHERE session_id = ?
             """, (session_id,)).fetchone()
 
@@ -800,7 +814,9 @@ class BazingaDB:
                 'mode': verify['mode'],
                 'status': verify['status'],
                 'start_time': verify['start_time'],
-                'created_at': verify['created_at']
+                'created_at': verify['created_at'],
+                'initial_branch': verify['initial_branch'],
+                'metadata': verify['metadata']
             }
 
             self._print_success(f"✓ Session created: {session_id}")
@@ -991,6 +1007,111 @@ class BazingaDB:
 
         return "\n".join(output)
 
+    # ==================== EVENT OPERATIONS (v9) ====================
+
+    def save_event(self, session_id: str, event_subtype: str, payload: str,
+                   _retry_count: int = 0) -> Dict[str, Any]:
+        """Save an event to orchestration_logs with log_type='event'.
+
+        Used for: pm_bazinga, scope_change, validator_verdict events.
+
+        Args:
+            session_id: The session ID
+            event_subtype: Type of event (pm_bazinga, scope_change, validator_verdict)
+            payload: JSON string payload
+            _retry_count: Internal retry counter
+
+        Returns:
+            Dict with success status and event_id
+        """
+        if _retry_count > 1:
+            self._print_error(f"Max retries exceeded for save_event")
+            return {"success": False, "error": "Max retries exceeded"}
+
+        # Validate inputs
+        if not session_id or not session_id.strip():
+            raise ValueError("session_id cannot be empty")
+        if not event_subtype or not event_subtype.strip():
+            raise ValueError("event_subtype cannot be empty")
+
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.execute("""
+                INSERT INTO orchestration_logs
+                (session_id, agent_type, content, log_type, event_subtype, event_payload)
+                VALUES (?, 'system', ?, 'event', ?, ?)
+            """, (session_id, f"Event: {event_subtype}", event_subtype, payload))
+            event_id = cursor.lastrowid
+            conn.commit()
+
+            result = {
+                'success': True,
+                'event_id': event_id,
+                'session_id': session_id,
+                'event_subtype': event_subtype
+            }
+
+            self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
+            return result
+
+        except sqlite3.DatabaseError as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            if self._is_corruption_error(e):
+                if self._recover_from_corruption():
+                    return self.save_event(session_id, event_subtype, payload,
+                                          _retry_count=_retry_count + 1)
+            self._print_error(f"Failed to save {event_subtype} event: {str(e)}")
+            return {"success": False, "error": f"Database error: {str(e)}"}
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            self._print_error(f"Failed to save {event_subtype} event: {str(e)}")
+            return {"success": False, "error": str(e)}
+        finally:
+            if conn:
+                conn.close()
+
+    def get_events(self, session_id: str, event_subtype: Optional[str] = None,
+                   limit: int = 50) -> List[Dict]:
+        """Get events from orchestration_logs where log_type='event'.
+
+        Args:
+            session_id: The session ID
+            event_subtype: Optional filter by event type (pm_bazinga, scope_change, etc.)
+            limit: Maximum number of events to return
+
+        Returns:
+            List of event dictionaries with id, event_subtype, event_payload, timestamp
+        """
+        conn = self._get_connection()
+
+        query = """
+            SELECT id, session_id, timestamp, event_subtype, event_payload
+            FROM orchestration_logs
+            WHERE session_id = ? AND log_type = 'event'
+        """
+        params = [session_id]
+
+        if event_subtype:
+            query += " AND event_subtype = ?"
+            params.append(event_subtype)
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
     # ==================== STATE OPERATIONS ====================
 
     def save_state(self, session_id: str, state_type: str, state_data: Dict) -> None:
@@ -1019,15 +1140,17 @@ class BazingaDB:
 
     def create_task_group(self, group_id: str, session_id: str, name: str,
                          status: str = 'pending', assigned_to: Optional[str] = None,
-                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
+                         specializations: Optional[List[str]] = None,
+                         item_count: Optional[int] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to/specializations are updated -
+        already exists, only name/status/assigned_to/specializations/item_count are updated -
         preserving revision_count, last_review_status, and created_at.
 
         Args:
             specializations: List of specialization file paths for this group
+            item_count: Number of discrete tasks/items in this group (for progress tracking)
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1055,21 +1178,29 @@ class BazingaDB:
                             "error": f"Invalid specialization path: {error_msg}"
                         }
 
+            # Validate item_count if provided
+            if item_count is not None and (not isinstance(item_count, int) or item_count < 1):
+                return {
+                    "success": False,
+                    "error": "item_count must be a positive integer"
+                }
+
             conn = self._get_connection()
             # Serialize specializations to JSON (preserve [] vs None distinction)
             specs_json = json.dumps(specializations) if specializations is not None else None
             # Use ON CONFLICT for true upsert - preserves existing metadata
             # COALESCE for status: INSERT uses 'pending' default, UPDATE preserves existing if None passed
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations)
-                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?)
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count)
+                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1))
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
                     status = COALESCE(excluded.status, task_groups.status),
                     assigned_to = COALESCE(excluded.assigned_to, task_groups.assigned_to),
                     specializations = COALESCE(excluded.specializations, task_groups.specializations),
+                    item_count = COALESCE(excluded.item_count, task_groups.item_count),
                     updated_at = CURRENT_TIMESTAMP
-            """, (group_id, session_id, name, status, assigned_to, specs_json))
+            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count))
             conn.commit()
 
             # Fetch and return the saved record
@@ -2095,6 +2226,7 @@ BAZINGA Database Client - Available Commands:
 
 SESSION OPERATIONS:
   create-session <id> <mode> <requirements>   Create new session (mode: simple|parallel)
+  get-session <id>                            Get session details by ID
   list-sessions [limit]                       List recent sessions (default: 10)
   update-session-status <id> <status>         Update session status
 
@@ -2256,9 +2388,40 @@ def main():
 
     try:
         if cmd == 'create-session':
-            result = db.create_session(cmd_args[0], cmd_args[1], cmd_args[2])
+            # create-session <session_id> <mode> <requirements> [--initial_branch X] [--metadata JSON]
+            if len(cmd_args) < 3:
+                print("Error: create-session requires at least 3 args: <session_id> <mode> <requirements>", file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            mode = cmd_args[1]
+            requirements = cmd_args[2]
+            initial_branch = None
+            metadata = None
+            # Parse optional flags
+            i = 3
+            while i < len(cmd_args):
+                if cmd_args[i] == '--initial_branch' and i + 1 < len(cmd_args):
+                    initial_branch = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--metadata' and i + 1 < len(cmd_args):
+                    metadata = cmd_args[i + 1]
+                    i += 2
+                else:
+                    print(f"Error: Unknown flag or missing value: {cmd_args[i]}", file=sys.stderr)
+                    sys.exit(1)
+            result = db.create_session(session_id, mode, requirements, initial_branch, metadata)
             # Output verification data as JSON
             print(json.dumps(result, indent=2))
+        elif cmd == 'get-session':
+            if len(cmd_args) < 1:
+                print(json.dumps({"success": False, "error": "get-session requires <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session = db.get_session(cmd_args[0])
+            if session:
+                print(json.dumps(session, indent=2))
+            else:
+                print(json.dumps({"success": False, "error": f"Session not found: {cmd_args[0]}"}, indent=2), file=sys.stderr)
+                sys.exit(1)
         elif cmd == 'list-sessions':
             limit = int(cmd_args[0]) if len(cmd_args) > 0 else 10
             sessions = db.list_sessions(limit)
@@ -2313,8 +2476,9 @@ def main():
             status = cmd_args[1]
             db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
-            # Parse --specializations flag first, then extract positional args
+            # Parse --specializations and --item_count flags first, then extract positional args
             specializations = None
+            item_count = None
             positional_args = []
             i = 0
             while i < len(cmd_args):
@@ -2329,6 +2493,16 @@ def main():
                             sys.exit(1)
                     except json.JSONDecodeError as e:
                         print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                    i += 2  # Skip flag and value
+                elif cmd_args[i] == '--item_count' and i + 1 < len(cmd_args):
+                    try:
+                        item_count = int(cmd_args[i + 1])
+                        if item_count < 1:
+                            print(json.dumps({"success": False, "error": "--item_count must be a positive integer"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                    except ValueError:
+                        print(json.dumps({"success": False, "error": "--item_count must be a valid integer"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                     i += 2  # Skip flag and value
                 else:
@@ -2348,7 +2522,7 @@ def main():
             # Default to None so upsert preserves existing status; INSERT defaults to 'pending'
             status = positional_args[3] if len(positional_args) > 3 else None
             assigned_to = positional_args[4] if len(positional_args) > 4 else None
-            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations)
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             # Validate minimum args
@@ -2359,7 +2533,7 @@ def main():
             session_id = cmd_args[1]
             kwargs = {}
             # Allowlist of valid flags
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations"}
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 # Validate flag is in allowlist
@@ -2370,9 +2544,13 @@ def main():
                     print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2), file=sys.stderr)
                     sys.exit(1)
                 value = cmd_args[i + 1]
-                # Convert revision_count to int if present
-                if key == 'revision_count':
-                    value = int(value)
+                # Convert revision_count and item_count to int if present
+                if key == 'revision_count' or key == 'item_count':
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
                 # Convert auto_create to bool
                 elif key == 'auto_create':
                     value = value.lower() in ('true', '1', 'yes')
@@ -2685,6 +2863,60 @@ def main():
             else:
                 print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
                 sys.exit(1)
+        elif cmd == 'save-event':
+            # save-event <session_id> <event_subtype> <payload>
+            if len(cmd_args) < 3:
+                print("Error: save-event requires 3 args: <session_id> <event_subtype> <payload>", file=sys.stderr)
+                print("  event_subtype: pm_bazinga, scope_change, validator_verdict", file=sys.stderr)
+                print("  payload: JSON string", file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            event_subtype = cmd_args[1]
+            payload = cmd_args[2]
+            result = db.save_event(session_id, event_subtype, payload)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-events':
+            # get-events <session_id> [event_subtype] [limit]
+            # Also supports: get-events <session_id> [event_subtype] --limit N
+            if len(cmd_args) < 1:
+                print("Error: get-events requires at least 1 arg: <session_id> [event_subtype] [limit]", file=sys.stderr)
+                print("  Examples:", file=sys.stderr)
+                print("    get-events sess_123                    # all events, limit 50", file=sys.stderr)
+                print("    get-events sess_123 pm_bazinga         # filter by subtype", file=sys.stderr)
+                print("    get-events sess_123 pm_bazinga 1       # with limit", file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            event_subtype = None
+            limit = 50
+
+            # Parse remaining args, handling --limit flag
+            i = 1
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg == '--limit' and i + 1 < len(cmd_args):
+                    try:
+                        limit = int(cmd_args[i + 1])
+                    except ValueError:
+                        print(f"Error: --limit requires integer, got '{cmd_args[i + 1]}'", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg.startswith('--'):
+                    print(f"Error: Unknown flag '{arg}'", file=sys.stderr)
+                    sys.exit(1)
+                elif event_subtype is None:
+                    event_subtype = arg
+                    i += 1
+                else:
+                    # Positional limit
+                    try:
+                        limit = int(arg)
+                    except ValueError:
+                        print(f"Error: Invalid limit '{arg}' - must be integer", file=sys.stderr)
+                        sys.exit(1)
+                    i += 1
+
+            result = db.get_events(session_id, event_subtype, limit)
+            print(json.dumps(result, indent=2))
         elif cmd == 'help':
             print_help()
             sys.exit(0)

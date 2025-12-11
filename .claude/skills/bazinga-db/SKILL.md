@@ -96,6 +96,8 @@ Extract from the calling agent's request:
 - "save reasoning" / "document reasoning" / "log reasoning" → save-reasoning
 - "get reasoning" / "query reasoning" → get-reasoning
 - "reasoning timeline" / "reasoning history" → reasoning-timeline
+- "save event" / "log event" → save-event
+- "get events" / "query events" → get-events
 
 **Required parameters:**
 - session_id (almost always required)
@@ -134,8 +136,24 @@ Returns JSON array of recent sessions (default 10, ordered by created_at DESC).
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-session \
   "<session_id>" \
   "<mode>" \
-  "<requirements>"
+  "<requirements>" \
+  [--initial_branch "<branch_name>"] \
+  [--metadata '<json_object>']
 ```
+
+**Parameters:**
+- `initial_branch`: Git branch at session start (for merge operations)
+- `metadata`: JSON object with session metadata. Example for scope tracking:
+  ```json
+  {
+    "original_scope": {
+      "raw_request": "implement tasks8.md",
+      "scope_type": "file|feature|task_list|description",
+      "scope_reference": "docs/tasks8.md",
+      "estimated_items": 69
+    }
+  }
+  ```
 
 **IMPORTANT:** This command will auto-initialize the database if it doesn't exist. No separate initialization needed!
 
@@ -162,11 +180,13 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state \
 **Create task group:**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-task-group \
-  "<group_id>" "<session_id>" "<name>" [status] [assigned_to] [--specializations '<json_array>']
+  "<group_id>" "<session_id>" "<name>" [status] [assigned_to] \
+  [--specializations '<json_array>'] [--item_count N]
 ```
 
 Parameters:
 - `specializations`: JSON array of specialization file paths (e.g., `'["bazinga/templates/specializations/01-languages/typescript.md"]'`)
+- `item_count`: Number of discrete tasks/items in this group (used for progress tracking)
 
 **Update task group:**
 ```bash
@@ -185,6 +205,39 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups 
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-session-status \
   "<session_id>" "<status>"
 ```
+
+### Event Logging (Generic Events)
+
+**Save event (for role drift prevention, scope tracking, etc.):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "<session_id>" "<event_subtype>" "<payload>"
+```
+
+**Parameters:**
+- `event_subtype`: Type of event (e.g., `scope_change`, `role_violation`, `escalation`, `approval`)
+- `payload`: JSON string with event data
+
+**Examples:**
+```bash
+# Log user-approved scope change
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "scope_change" '{"original": 69, "approved": 45, "reason": "user approved reduction"}'
+
+# Log role violation detection
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "role_violation" '{"agent": "orchestrator", "violation": "attempted implementation"}'
+```
+
+**Get events (filter by session and optionally by subtype):**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "<session_id>" [event_subtype] [limit]
+```
+
+Arguments are positional: `<session_id>` required, `[event_subtype]` optional, `[limit]` optional (default 50).
+
+Returns JSON array of matching events.
 
 **Dashboard snapshot:**
 ```bash

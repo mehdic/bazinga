@@ -1,5 +1,7 @@
 ## Phase 2B: Parallel Mode Execution
 
+**Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
+
 **🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
@@ -174,64 +176,114 @@ Then invoke: `Skill(command: "bazinga-db")`. Include returned packages in that g
 **🔴 Reasoning Context Query (PER GROUP, AFTER context packages):**
 
 For each group, query prior agent reasoning:
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning \
-  "{session_id}" --group_id "{group_id}" --limit 5
 ```
+bazinga-db, please get reasoning:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Limit: 5
+```
+Then invoke: `Skill(command: "bazinga-db")`
 Include returned reasoning in prompt (see Simple Mode §Reasoning Context Routing Rules for format). Query errors are non-blocking (proceed without reasoning if query fails).
 
-**Build Base Prompt PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+## SPAWN DEVELOPERS - PARALLEL (ATOMIC SEQUENCE PER GROUP)
 
-**Show Prompt Summaries (PER GROUP):** Output structured summary for each group (NOT full prompts):
-```text
-📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
+**To spawn developers in parallel, you MUST produce specializations THEN spawns for EACH group.**
 
-   **Task:** {task_title}
-   {task_description_2_3_sentences}
+**There is no Task() without the Skill() first. They are ONE action per group.**
 
-   **Requirements:**
-   • {requirement_1}
-   • {requirement_2}
+---
 
-   **Branch:** {group_branch}
-   **Config:** Context: {context_pkg_count} pkgs | Specs: {specs_status} | Specializations: {specializations_status} | Skills: {skills_list}
+### PART A: Build Base Prompts (internal, all groups)
+
+For EACH group: Read agent file + `bazinga/templates/prompt_building.md`. Include: Agent, Group, Mode=Parallel, Session, Branch, Skills/Testing, Task from PM, Context Packages (if any), Reasoning Context (if any).
+
+Store as `base_prompts[group_id]`. Do not output to user.
+
+---
+
+### PART B: Load Specializations → Then Spawn (FUSED ACTION PER GROUP)
+
+**Check `bazinga/skills_config.json` once:** Is `specializations.enabled == true` AND agent_type in `enabled_agents`?
+
+**IF YES (specializations enabled for this agent type):** For EACH group, your message MUST contain this sequence:
+
 ```
+🔧 Loading specializations for Group {group_id} ({agent_type})...
 
-**🔴 Spawn ALL with Specializations (MAX 4 groups) - SEQUENTIAL PER AGENT (INLINE EXECUTABLE):**
-
-**⚠️ ISOLATION RULE:** Complete context→skill→spawn for EACH agent BEFORE starting the next. Do NOT interleave contexts.
-
-**FOR EACH group (A, B, C, D - MAX 4):**
-
-```
-# GROUP [A/B/C/D] - repeat for each group:
-
-Step 1: Output specialization context (skill reads from conversation):
 [SPEC_CTX_START group={group_id} agent={agent_type}]
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {agent_type}
-Model: {model}
-Specialization Paths: {task_group.specializations as JSON array}
-[SPEC_CTX_END group={group_id}]
-
-Step 2: IMMEDIATELY invoke skill (no other output between context and this):
-Skill(command: "specialization-loader")
-
-Step 3: Extract block from skill response between [SPECIALIZATION_BLOCK_START] and [SPECIALIZATION_BLOCK_END]
-
-Step 4: Prepend block to base_prompt:
-full_prompt = specialization_block + "\n\n---\n\n" + base_prompt
-
-Step 5: Spawn agent (replace group_letter with A, B, C, or D):
-Task(subagent_type="general-purpose", model=models[group_letter], description="Dev {group_letter}: {task[:90]}", prompt=full_prompt)
-
-# THEN move to next group...
+Model: {MODEL_CONFIG[task_groups[group_id].initial_tier]}
+Specialization Paths: {task_groups[group_id].specializations as JSON array}
+[SPEC_CTX_END]
 ```
 
-**🔴 CRITICAL:** Always include `subagent_type="general-purpose"` - without it, agents spawn with 0 tool uses.
+Then IMMEDIATELY call:
+```
+Skill(command: "specialization-loader")
+```
 
-**🔴 DO NOT spawn >4** (breaks system).
+Then extract block from response. Store as `specialization_blocks[group_id]`.
+
+**Repeat for EACH group (A, B, C, D - MAX 4) before spawning any Task.**
+
+**After ALL specializations loaded, output summary and spawn ALL:**
+```
+🔧 Specializations loaded: A ({N} templates), B ({N} templates), C ({N} templates)
+
+📝 Spawning {count} developers in parallel:
+• Group A: {task_groups["A"].initial_tier} | {task_groups["A"].title}
+• Group B: {task_groups["B"].initial_tier} | {task_groups["B"].title}
+...
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["A"].initial_tier], description=f"{task_groups['A'].initial_tier} A: {task_groups['A'].title[:90]}", prompt={spec_block_A + base_A})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initial_tier], description=f"{task_groups['B'].initial_tier} B: {task_groups['B'].title[:90]}", prompt={spec_block_B + base_B})
+...
+```
+
+**IF any group's skill fails:** Use base_prompt for that group, note in summary:
+```
+🔧 Specializations: A (loaded), B (⚠️ failed), C (loaded)
+```
+
+**IF NO (specializations disabled or agent not in enabled_agents):** Skip all Skill() calls, spawn directly:
+```
+📝 Spawning {count} developers in parallel | Specializations: disabled
+• Group A: {task_groups["A"].initial_tier} | {task_groups["A"].title}
+...
+
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["A"].initial_tier], description=f"{task_groups['A'].initial_tier} A: {task_groups['A'].title[:90]}", prompt={base_A})
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_groups["B"].initial_tier], description=f"{task_groups['B'].initial_tier} B: {task_groups['B'].title[:90]}", prompt={base_B})
+...
+```
+
+**🔴 MAX 4 groups.** If >4, spawn first 4, defer rest.
+
+---
+
+### TWO-TURN SPAWN SEQUENCE (Parallel Mode)
+
+**IMPORTANT:** Skill() and Task() CANNOT be in the same message because Task() needs the specialization_block from each Skill()'s response.
+
+**Turn 1 (this message):**
+1. For EACH group, output the `[SPEC_CTX_START group=X]...[SPEC_CTX_END]` block
+2. Call `Skill(command: "specialization-loader")` for EACH group (all in this message)
+3. END this message (wait for all skill responses)
+
+**Turn 2 (after skill responses):**
+1. Read each skill response
+2. Extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` for each group
+3. Call ALL `Task()` spawns with the extracted blocks prepended to base_prompts
+
+**SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START` for EACH group? Does it contain `Skill(command: "specialization-loader")` for EACH group?
+
+**SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group?
+
+**Count your Task() calls:** Should match number of groups (max 4).
+
+---
 
 **AFTER receiving ALL developer responses:**
 
@@ -325,11 +377,24 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 | Status | Action |
 |--------|--------|
-| `MERGE_SUCCESS` | Update group: status="completed", merge_status="merged" → Step 2B.7b |
+| `MERGE_SUCCESS` | Update group + progress (see below) → Step 2B.7b |
 | `MERGE_CONFLICT` | Spawn Developer with conflict context → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_TEST_FAILURE` | Spawn Developer with test failures → Retry: Dev→QA→TL→Dev(merge) |
 | `MERGE_BLOCKED` | Spawn Tech Lead to assess blockage |
 | *(Unknown status)* | Route to Tech Lead with "UNKNOWN_STATUS" reason |
+
+**MERGE_SUCCESS Progress Tracking:**
+1. Update task_group: status="completed", merge_status="merged"
+2. Query completed progress from task_groups using bazinga-db skill:
+   ```
+   bazinga-db, please get task groups:
+
+   Session ID: [session_id]
+   Status: completed
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+   Sum item_count from the returned JSON to get completed items.
+3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 
 **Escalation:** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 
