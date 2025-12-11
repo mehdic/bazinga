@@ -236,7 +236,7 @@ IF blocker is fixable:
 **Step 1: Query PM's BAZINGA message from database**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" "pm_bazinga" --limit 1
+  "[session_id]" "pm_bazinga" 1
 ```
 This returns the PM's BAZINGA message logged by orchestrator.
 
@@ -252,7 +252,7 @@ Parse the event_payload JSON for:
 **Step 3: Check for user-approved scope change**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" "scope_change" --limit 1
+  "[session_id]" "scope_change" 1
 ```
 
 **IF scope_change event exists:**

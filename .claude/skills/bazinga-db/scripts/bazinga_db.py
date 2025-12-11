@@ -2862,12 +2862,44 @@ def main():
             print(json.dumps(result, indent=2))
         elif cmd == 'get-events':
             # get-events <session_id> [event_subtype] [limit]
+            # Also supports: get-events <session_id> [event_subtype] --limit N
             if len(cmd_args) < 1:
                 print("Error: get-events requires at least 1 arg: <session_id> [event_subtype] [limit]", file=sys.stderr)
+                print("  Examples:", file=sys.stderr)
+                print("    get-events sess_123                    # all events, limit 50", file=sys.stderr)
+                print("    get-events sess_123 pm_bazinga         # filter by subtype", file=sys.stderr)
+                print("    get-events sess_123 pm_bazinga 1       # with limit", file=sys.stderr)
                 sys.exit(1)
             session_id = cmd_args[0]
-            event_subtype = cmd_args[1] if len(cmd_args) > 1 else None
-            limit = int(cmd_args[2]) if len(cmd_args) > 2 else 50
+            event_subtype = None
+            limit = 50
+
+            # Parse remaining args, handling --limit flag
+            i = 1
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg == '--limit' and i + 1 < len(cmd_args):
+                    try:
+                        limit = int(cmd_args[i + 1])
+                    except ValueError:
+                        print(f"Error: --limit requires integer, got '{cmd_args[i + 1]}'", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg.startswith('--'):
+                    print(f"Error: Unknown flag '{arg}'", file=sys.stderr)
+                    sys.exit(1)
+                elif event_subtype is None:
+                    event_subtype = arg
+                    i += 1
+                else:
+                    # Positional limit
+                    try:
+                        limit = int(arg)
+                    except ValueError:
+                        print(f"Error: Invalid limit '{arg}' - must be integer", file=sys.stderr)
+                        sys.exit(1)
+                    i += 1
+
             result = db.get_events(session_id, event_subtype, limit)
             print(json.dumps(result, indent=2))
         elif cmd == 'help':
