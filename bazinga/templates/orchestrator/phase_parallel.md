@@ -469,6 +469,10 @@ Task(subagent_type="general-purpose", model="haiku", description="Developer D: S
 **🔴 KEY: Even with ONE shared spec_block, you MUST call Task() for EACH group.**
 Each FULL_PROMPT_X = shared_spec_block + base_prompt_X (different tasks, same specialization)
 
+**🔴🔴🔴 CRITICAL - TURN 2 MUST CALL TASK() 🔴🔴🔴**
+
+Turn 2 is NOT complete until you call Task() for ALL groups. DO NOT end your message without calling Task().
+
 **🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
 
 Each group's `prompt` parameter MUST be the **concatenation** of:
