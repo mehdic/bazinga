@@ -404,29 +404,54 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 
 ---
 
-## 🔴 CRITICAL: Config File Sync Requirement
+## 🔴 CRITICAL: Bazinga CLI Installer - What Gets Installed
 
-**When adding new bazinga config files (JSON), you MUST update TWO places:**
+**When adding ANY new files to the bazinga repo, you MUST understand how the installer works and verify your files will be installed to client projects.**
 
-### Files That Must Stay In Sync
+### How the Installer Works
 
-1. **`pyproject.toml`** - `[tool.hatch.build.targets.wheel.force-include]` section
-2. **`src/bazinga_cli/__init__.py`** - `BazingaSetup.ALLOWED_CONFIG_FILES` list
+The bazinga CLI (`bazinga install` / `bazinga update`) copies files from two mechanisms:
 
-### Why This Matters
+1. **`pyproject.toml` shared-data** - Directories copied wholesale during pip install
+2. **`src/bazinga_cli/__init__.py`** - Python code that copies files during `bazinga install`
 
-- `force-include` controls what gets packaged in the wheel
-- `ALLOWED_CONFIG_FILES` controls what gets copied during `bazinga install`
-- If they're out of sync: files get packaged but never installed, or vice versa
+### Directory Installation Matrix
 
-### Checklist When Adding New Config Files
+| Source Directory | Destination on Client | Mechanism | Auto-includes new files? |
+|------------------|----------------------|-----------|--------------------------|
+| `agents/*.md` | `.claude/agents/` | `copy_agents()` | ✅ Yes |
+| `scripts/*.sh` | `bazinga/scripts/` | `copy_scripts()` | ✅ Yes |
+| `bazinga/scripts/*.sh` | `bazinga/scripts/` | `copy_scripts()` | ✅ Yes |
+| `.claude/commands/` | `.claude/commands/` | `copy_commands()` | ✅ Yes |
+| `.claude/skills/` | `.claude/skills/` | `copy_skills()` | ✅ Yes |
+| `.claude/templates/` | `.claude/templates/` | shared-data | ✅ Yes |
+| `bazinga/templates/` | `bazinga/templates/` | force-include | ✅ Yes |
+| `dashboard-v2/` | `bazinga/dashboard-v2/` | shared-data | ✅ Yes |
+| `bazinga/*.json` (configs) | `bazinga/` | force-include + `ALLOWED_CONFIG_FILES` | ❌ **NO - Manual** |
 
+### When to Check Installation
+
+**ALWAYS verify installation when:**
+- Adding files to a NEW directory not listed above
+- Adding new JSON config files to `bazinga/`
+- Creating new top-level directories
+
+### Checklist by File Type
+
+#### New files in EXISTING directories (agents, scripts, skills, commands, templates)
+```bash
+# ✅ Nothing to do - automatically included
+# Just add the file and it will be installed
+```
+
+#### New JSON config file in `bazinga/`
 ```bash
 # 1. Add file to bazinga/ directory
-# 2. Add to pyproject.toml force-include:
+
+# 2. Add to pyproject.toml [tool.hatch.build.targets.wheel.force-include]:
 "bazinga/new_config.json" = "bazinga_cli/bazinga/new_config.json"
 
-# 3. Add to ALLOWED_CONFIG_FILES in __init__.py:
+# 3. Add to ALLOWED_CONFIG_FILES in src/bazinga_cli/__init__.py:
 ALLOWED_CONFIG_FILES = [
     "model_selection.json",
     "challenge_levels.json",
@@ -434,13 +459,58 @@ ALLOWED_CONFIG_FILES = [
     "new_config.json",  # <-- ADD HERE
 ]
 
-# 4. Run the sync test to verify:
+# 4. Run sync test:
 python -m pytest tests/test_config_sync.py -v
 ```
 
-### Automated Verification
+#### New directory entirely
+```bash
+# 1. Add to pyproject.toml [tool.hatch.build.targets.wheel.shared-data]:
+"new_dir" = "share/bazinga_cli/new_dir"
 
-The `tests/test_config_sync.py` test will fail if these lists are out of sync.
+# 2. Add copy function in src/bazinga_cli/__init__.py (follow copy_agents pattern)
+
+# 3. Call the copy function in install() and update() commands
+```
+
+### How to Verify Installation
+
+**Before claiming files will be installed, CHECK:**
+
+```bash
+# 1. Check pyproject.toml shared-data section
+grep -A 20 "shared-data" pyproject.toml
+
+# 2. Check pyproject.toml force-include section
+grep -A 10 "force-include" pyproject.toml
+
+# 3. Check copy functions in CLI
+grep -n "def copy_" src/bazinga_cli/__init__.py
+
+# 4. For a specific file, trace its path:
+#    - Is parent directory in shared-data? → Auto-installed
+#    - Is it in force-include? → Packaged in wheel
+#    - Is there a copy_X function for it? → Copied during install
+#    - None of the above? → NOT INSTALLED
+```
+
+### Common Mistakes
+
+| Mistake | Symptom | Fix |
+|---------|---------|-----|
+| New directory not in shared-data | Files exist in repo but not on client | Add to pyproject.toml shared-data |
+| New JSON not in ALLOWED_CONFIG_FILES | Config packaged but not copied | Add to both pyproject.toml AND __init__.py |
+| File in wrong source directory | Script not found after install | Check `copy_scripts()` source_locations list |
+
+### Why This Matters
+
+If a file isn't properly configured for installation:
+- It exists in the git repo ✅
+- It works in dev mode ✅
+- **It does NOT exist on client projects after `bazinga install`** ❌
+- Users get "file not found" errors with no obvious cause
+
+**Always trace the installation path before saying "yes, it will be installed."**
 
 ---
 
