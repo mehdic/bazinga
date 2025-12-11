@@ -575,6 +575,11 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
+**🔴 Context Packages Per Group:** When spawning QA or Tech Lead for a group:
+1. Query context packages with that group's `group_id` (e.g., "A", "B", "C")
+2. Include in that group's base_prompt (same pattern as Developer)
+3. Each group may have different context packages based on its history
+
 ### Step 2B.7a: Spawn Developer for Merge (Parallel Mode - Per Group)
 
 **🔴 CRITICAL: In Parallel Mode, after Tech Lead approval, spawn Developer (merge) BEFORE phase continuation check**
