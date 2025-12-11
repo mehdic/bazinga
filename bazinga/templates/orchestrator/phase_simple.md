@@ -238,12 +238,59 @@ Metadata: ...
 📝 **Developer Prompt** | Group: main | Model: haiku
    Task: Implement feature X
 
-Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement feature X", prompt={spec_block + base_prompt})
+Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement feature X", prompt=FULL_PROMPT)
 ```
+
+**🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
+
+The `prompt` parameter in Task() MUST be the **concatenation** of:
+1. **spec_block** - The specialization content from the skill (HOW to code)
+2. **base_prompt** - The task assignment from PM built in PART A (WHAT to code)
+
+**Example of FULL_PROMPT (what you pass to Task):**
+```
+## SPECIALIZATION GUIDANCE (Advisory)
+You are a React/TypeScript Frontend Developer specialized in Next.js 14...
+[patterns, anti-patterns from spec_block]
+
+---
+
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** abc123
+**GROUP:** main
+**MODE:** Simple
+**BRANCH:** feature/delivery-app
+
+**REQUIREMENTS:**
+Implement the delivery request list page with the following:
+- Display all delivery requests in a table
+- Add filtering by status (pending, in_progress, completed)
+- Include pagination (20 items per page)
+
+**MANDATORY WORKFLOW:**
+1. Run codebase-analysis skill
+2. Implement the solution
+3. Write unit tests
+4. Run lint + build
+5. Commit and report READY_FOR_QA
+```
+
+**WRONG (spec_block only - missing task assignment):**
+```
+prompt="## SPECIALIZATION GUIDANCE\nYou are a React/TypeScript..."
+```
+↑ Developer knows HOW to code but NOT WHAT to build!
+
+**CORRECT (both parts combined):**
+```
+prompt=spec_block + "\n\n---\n\n" + base_prompt
+```
+↑ Developer knows BOTH the patterns AND the requirements!
 
 **SELF-CHECK (Turn 1):** Does this message contain `[SPEC_CTX_START`? Does it contain `Skill(command: "specialization-loader")`?
 
-**SELF-CHECK (Turn 2):** Did I extract the specialization block? Does this message contain `Task()`?
+**SELF-CHECK (Turn 2):** Did I extract the specialization block? Does this message contain `Task()`? Does the prompt include BOTH spec_block AND base_prompt (with the actual requirements)?
 
 ---
 

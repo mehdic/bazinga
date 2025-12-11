@@ -329,12 +329,60 @@ Metadata: ...
 • R2-LIST: Developer | Delivery Request List & Detail
 ...
 
-Task(subagent_type="general-purpose", model="haiku", description="Developer R2-INIT: Initialize Delivery App Structure", prompt={spec_block + base_prompt_A})
-Task(subagent_type="general-purpose", model="haiku", description="Developer R2-LIST: Delivery Request List & Detail", prompt={spec_block + base_prompt_B})
+Task(subagent_type="general-purpose", model="haiku", description="Developer R2-INIT: Initialize Delivery App Structure", prompt=FULL_PROMPT_A)
+Task(subagent_type="general-purpose", model="haiku", description="Developer R2-LIST: Delivery Request List & Detail", prompt=FULL_PROMPT_B)
 ...
 ```
 
-**SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group?
+**🔴🔴🔴 CRITICAL - FULL_PROMPT MUST COMBINE BOTH PARTS 🔴🔴🔴**
+
+Each group's `prompt` parameter MUST be the **concatenation** of:
+1. **spec_block** - The specialization content from the skill (HOW to code)
+2. **base_prompt_X** - That group's task assignment from PM built in PART A (WHAT to code)
+
+**Example of FULL_PROMPT_A (what you pass to Task for group A):**
+```
+## SPECIALIZATION GUIDANCE (Advisory)
+You are a React/TypeScript Frontend Developer specialized in Next.js 14...
+[patterns, anti-patterns from spec_block]
+
+---
+
+You are a Developer in a Claude Code Multi-Agent Dev Team.
+
+**SESSION:** abc123
+**GROUP:** A (R2-INIT)
+**MODE:** Parallel
+**BRANCH:** feature/delivery-app
+
+**REQUIREMENTS:**
+Initialize the delivery app structure:
+- Set up Next.js 14 project with App Router
+- Configure TypeScript, ESLint, Prettier
+- Create base layout and navigation components
+
+**MANDATORY WORKFLOW:**
+1. Run codebase-analysis skill
+2. Implement the solution
+3. Write unit tests
+4. Run lint + build
+5. Commit and report READY_FOR_QA
+```
+
+**WRONG (spec_block only - missing task assignment):**
+```
+prompt="## SPECIALIZATION GUIDANCE\nYou are a React/TypeScript..."
+```
+↑ Developer knows HOW to code but NOT WHAT to build!
+
+**CORRECT (both parts combined for each group):**
+```
+prompt_A = spec_block + "\n\n---\n\n" + base_prompt_A
+prompt_B = spec_block + "\n\n---\n\n" + base_prompt_B
+```
+↑ Each developer knows BOTH the patterns AND their specific requirements!
+
+**SELF-CHECK (Turn 2):** Did I extract ALL specialization blocks? Does this message contain `Task()` for EACH group? Does EACH prompt include BOTH spec_block AND that group's base_prompt (with the actual requirements)?
 
 **Count your Task() calls:** Should match number of groups (max 4).
 
