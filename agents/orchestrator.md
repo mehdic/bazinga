@@ -575,7 +575,7 @@ Display:
 
 | PM Status | Action |
 |-----------|--------|
-| `CONTINUE` | **IMMEDIATELY spawn agents** for pending groups. Call `Task()` in THIS message. |
+| `CONTINUE` | **IMMEDIATELY start spawn sequence** for pending groups. If specializations enabled: Turn 1 calls Skill(), Turn 2 calls Task(). |
 | `BAZINGA` | Session is complete → Jump to Completion phase, invoke validator |
 | `PLANNING_COMPLETE` | New work added → Jump to Step 1.4, then Phase 2 |
 | `NEEDS_CLARIFICATION` | Surface question to user |
@@ -585,14 +585,14 @@ Display:
 In resume scenarios, the most common bug is:
 - PM responds with CONTINUE
 - Orchestrator says "Now let me spawn the developer..."
-- Orchestrator ends message WITHOUT calling `Task()`
+- Orchestrator ends message WITHOUT calling any tool
 - Workflow hangs
 
-**RULE:** When PM says CONTINUE, your response MUST contain:
-1. Status capsule (text output)
-2. The actual `Task()` call (tool invocation)
+**RULE:** When PM says CONTINUE, you MUST start the spawn sequence IMMEDIATELY:
+- **If specializations DISABLED:** Call `Task()` in THIS message
+- **If specializations ENABLED:** Call `Skill(command: "specialization-loader")` in THIS message, then call `Task()` in the NEXT message after receiving skill output
 
-Both in the SAME message. If you don't call `Task()`, you didn't spawn anything.
+The key is: SOME tool call must happen NOW. Don't just write text describing what you will do.
 
 ---
 
@@ -1194,9 +1194,12 @@ Before continuing to Step 1.3a, verify:
 
 **The orchestrator stopping bug happens when you:**
 - Say "Now let me spawn..." or "I will spawn..." (intent)
-- But DON'T call `Task()` in the same message (no action)
+- But DON'T call any tool in the same message (no action)
 
-**RULE:** If you write "spawn", "route", "invoke", "call" → the actual tool call MUST appear in the SAME message. Saying you will do something is NOT doing it.
+**RULE:** If you write "spawn", "route", "invoke", "call" → you MUST call SOME tool in the SAME message:
+- For spawns with specializations: Call `Skill(command: "specialization-loader")` in Turn 1, then `Task()` in Turn 2
+- For spawns without specializations: Call `Task()` directly
+- Saying you will do something is NOT doing it. The tool call must happen NOW.
 
 ---
 
@@ -1209,9 +1212,10 @@ Before continuing to Step 1.3a, verify:
 - Query task groups: `Skill(command: "bazinga-db")` → get all task groups for session
 - Identify groups with status "pending" or "in_progress"
 - **Read the appropriate phase template** (`phase_simple.md` or `phase_parallel.md`)
-- **🔴 FOLLOW THE MANDATORY SPAWN SEQUENCE** - This includes SPAWN STEP 2 (specialization loading). Do NOT skip specializations!
-- **IMMEDIATELY spawn agents** using the full sequence (Steps 1-4 in phase template)
-- **🔴 You MUST call Task() in THIS message** - do NOT just say "let me spawn"
+- **🔴 FOLLOW THE TWO-TURN SPAWN SEQUENCE** - This includes specialization loading. Do NOT skip specializations!
+- **If specializations ENABLED:** Turn 1: Call `Skill(command: "specialization-loader")`. Turn 2: Extract block, call `Task()`.
+- **If specializations DISABLED:** Call `Task()` directly in THIS message.
+- **🔴 You MUST call SOME tool in THIS message** - either Skill() or Task(). Do NOT just say "let me spawn"
 
 **IF status = BAZINGA:**
 - PM declares the work is complete (edge case: resumed session was already finished)
