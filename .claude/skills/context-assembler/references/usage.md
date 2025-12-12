@@ -1,7 +1,7 @@
 # Context-Assembler Usage Guide
 
-**Version**: 0.1.0
-**Status**: Reference documentation for Phase 1
+**Version**: 1.0.0
+**Status**: Production Ready (Phase 3 Complete)
 
 ## Overview
 
@@ -18,7 +18,9 @@ Skill(command: "context-assembler")
 
 The skill reads the current session/group context from bazinga-db and outputs a structured markdown block.
 
-## Output Format
+## Output Format Examples
+
+### Example 1: Developer Context with Error Pattern
 
 ```markdown
 ## Context for developer
@@ -26,26 +28,46 @@ The skill reads the current session/group context from bazinga-db and outputs a 
 ### Relevant Packages (3/7)
 
 **[HIGH]** research/auth-patterns.md
-> Summary: JWT authentication patterns for React Native apps
+> JWT authentication patterns for React Native apps
 
 **[MEDIUM]** research/api-design.md
-> Summary: REST API design guidelines for mobile clients
+> REST API design guidelines for mobile clients
 
 **[MEDIUM]** findings/codebase-analysis.md
-> Summary: Existing authentication code in src/auth/
+> Existing authentication code in src/auth/
 
 ### Error Patterns (1 match)
 
-⚠️ **Known Issue**: "Cannot find module '@/utils'"
+:warning: **Known Issue**: "Cannot find module '@/utils'"
 > **Solution**: Check tsconfig.json paths configuration - ensure baseUrl is set correctly
 > **Confidence**: 0.8 (seen 3 times)
 
-📦 +4 more packages available (re-invoke with higher limit for details)
+:package: +4 more packages available (re-invoke with higher limit for details)
+```
+
+### Example 2: Empty Context (New Session)
+
+```markdown
+## Context for qa_expert
+
+### Relevant Packages (0/0)
+
+No context packages found for this session/group. The agent will proceed with task and specialization context only.
+```
+
+### Example 3: Fallback Mode (Database Error)
+
+```markdown
+## Context for tech_lead
+
+:warning: Context assembly encountered an error. Proceeding with minimal context.
+
+**Fallback Mode**: Task and specialization context only. Context packages unavailable.
 ```
 
 ## Heuristic Relevance Ranking
 
-Packages are ranked using weighted scoring:
+Packages are ranked using weighted scoring when FTS5 is unavailable:
 
 | Factor | Weight | Description |
 |--------|--------|-------------|
@@ -57,6 +79,11 @@ Packages are ranked using weighted scoring:
 **Scoring formula:**
 ```
 score = (priority_weight * 4) + (same_group * 2) + (agent_match * 1.5) + (recency_factor)
+
+Where:
+- same_group = 1 if package.group_id == request.group_id, else 0
+- agent_match = 1 if agent_type in package.consumers, else 0
+- recency_factor = 1 / (days_since_created + 1)
 ```
 
 ## Token Budget Allocation
@@ -81,7 +108,7 @@ Different agent types receive different context budgets:
 
 **Zone indicator in output:**
 ```
-🔶 Token budget: Soft Warning (70%) - using summaries
+Token budget: Soft Warning (70%) - using summaries
 ```
 
 ## Retrieval Limits
@@ -113,7 +140,7 @@ Configurable per agent type in `bazinga/skills_config.json`:
 1. Context-assembler queries error_patterns table
 2. Matches current context against stored signatures
 3. If confidence > 0.7, injects solution hint
-4. Agent receives: "⚠️ Known Issue: ... Solution: ..."
+4. Agent receives: ":warning: Known Issue: ... Solution: ..."
 
 ### Confidence Adjustment
 - Each successful match: +0.1 (max 1.0)
@@ -203,7 +230,8 @@ The skill uses these tables (created in Phase 2):
 
 | Table | Purpose |
 |-------|---------|
-| `context_packages` | Research files, findings, artifacts |
+| `context_packages` | Research files, findings, artifacts with priority/summary |
+| `context_package_consumers` | Per-agent consumption tracking |
 | `error_patterns` | Captured error signatures with solutions |
 | `strategies` | Successful approaches from completions |
 | `consumption_scope` | Per-iteration package consumption tracking |
@@ -217,9 +245,29 @@ The skill uses these tables (created in Phase 2):
 | Error recurrence | <10% | `error_patterns.occurrences` |
 | Prompt sizes | <80% | Token estimation logs |
 
+## Priority Values
+
+Packages can have one of four priority levels:
+
+- **critical** - Must always be included (errors, blockers)
+- **high** - Include if budget allows (research findings)
+- **medium** - Default for most packages
+- **low** - Include only if ample budget
+
 ## Related Documentation
 
 - **Specification**: `specs/1-context-engineering/spec.md`
 - **Data Model**: `specs/1-context-engineering/data-model.md`
 - **Technical Plan**: `specs/1-context-engineering/plan.md`
 - **Quickstart**: `specs/1-context-engineering/quickstart.md`
+
+## Version History
+
+- v1.0.0 (2025-12-12): Initial production release (Phase 3 complete)
+  - Full heuristic relevance ranking
+  - Package retrieval via bazinga-db
+  - Output formatting with priority indicators
+  - Empty packages handling
+  - FTS5 availability check with fallback
+  - Graceful degradation on failures
+- v0.1.0 (2025-12-12): Phase 1 placeholder with directory structure

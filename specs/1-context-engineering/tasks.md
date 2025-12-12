@@ -59,21 +59,21 @@
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Create `SKILL.md` with skill definition at `.claude/skills/context-assembler/SKILL.md`
-- [ ] T011 [US1] Implement heuristic relevance ranking logic in SKILL.md instructions:
+- [x] T010 [US1] Create `SKILL.md` with skill definition at `.claude/skills/context-assembler/SKILL.md`
+- [x] T011 [US1] Implement heuristic relevance ranking logic in SKILL.md instructions:
   - Priority weight (critical > high > medium > low)
   - Same-group boost
   - Agent-type relevance
   - Recency
-- [ ] T012 [US1] Implement package retrieval via bazinga-db skill queries
-- [ ] T013 [US1] Add output formatting per quickstart.md specification:
+- [x] T012 [US1] Implement package retrieval via bazinga-db skill queries
+- [x] T013 [US1] Add output formatting per quickstart.md specification:
   - `## Context for {agent_type}` header
   - `### Relevant Packages ({count}/{available})` section
   - Priority indicators `[HIGH]`, `[MEDIUM]`, `[LOW]`
   - Overflow indicator `📦 +{N} more packages available`
-- [ ] T014 [US1] Handle empty packages case ("No context packages found" message)
-- [ ] T015 [US1] Implement FTS5 availability check and heuristic fallback (FR-009)
-- [ ] T016 [US1] Add graceful degradation on skill failure - return minimal context, log warning (FR-010)
+- [x] T014 [US1] Handle empty packages case ("No context packages found" message)
+- [x] T015 [US1] Implement FTS5 availability check and heuristic fallback (FR-009)
+- [x] T016 [US1] Add graceful degradation on skill failure - return minimal context, log warning (FR-010)
 
 **Checkpoint**: Context-assembler skill functional with basic ranking and output formatting
 
