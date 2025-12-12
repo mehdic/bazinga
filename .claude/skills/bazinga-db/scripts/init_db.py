@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -738,11 +738,156 @@ def init_database(db_path: str) -> None:
                 current_version = 9
                 print("✓ Migration to v9 complete (event logging and scope tracking)")
 
+        # Migration from v9 to v10: Context Engineering System tables
+        if current_version == 9:
+            print("🔄 Migrating schema from v9 to v10...")
+
+            # Create error_patterns table for learning from failed-then-succeeded agents
+            try:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS error_patterns (
+                        pattern_hash TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL,
+                        signature_json TEXT NOT NULL,
+                        solution TEXT NOT NULL,
+                        confidence REAL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
+                        occurrences INTEGER DEFAULT 1 CHECK(occurrences >= 1),
+                        lang TEXT,
+                        last_seen TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        ttl_days INTEGER DEFAULT 90 CHECK(ttl_days > 0)
+                    )
+                """)
+                print("   ✓ Created error_patterns table")
+            except sqlite3.OperationalError as e:
+                if "already exists" in str(e).lower():
+                    print("   ⊘ error_patterns table already exists")
+                else:
+                    raise
+
+            # Create indexes for error_patterns
+            try:
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_patterns_project
+                    ON error_patterns(project_id, lang)
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_patterns_ttl
+                    ON error_patterns(last_seen, ttl_days)
+                """)
+                print("   ✓ Created error_patterns indexes")
+            except sqlite3.OperationalError as e:
+                if "already exists" in str(e).lower():
+                    print("   ⊘ error_patterns indexes already exist")
+                else:
+                    raise
+
+            # Create strategies table for successful approaches
+            try:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS strategies (
+                        strategy_id TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL,
+                        topic TEXT NOT NULL,
+                        insight TEXT NOT NULL,
+                        helpfulness INTEGER DEFAULT 0 CHECK(helpfulness >= 0),
+                        lang TEXT,
+                        framework TEXT,
+                        last_seen TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                """)
+                print("   ✓ Created strategies table")
+            except sqlite3.OperationalError as e:
+                if "already exists" in str(e).lower():
+                    print("   ⊘ strategies table already exists")
+                else:
+                    raise
+
+            # Create indexes for strategies
+            try:
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_strategies_project
+                    ON strategies(project_id, framework)
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_strategies_topic
+                    ON strategies(topic)
+                """)
+                print("   ✓ Created strategies indexes")
+            except sqlite3.OperationalError as e:
+                if "already exists" in str(e).lower():
+                    print("   ⊘ strategies indexes already exist")
+                else:
+                    raise
+
+            # Create consumption_scope table for iteration-aware package tracking
+            try:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS consumption_scope (
+                        scope_id TEXT PRIMARY KEY,
+                        session_id TEXT NOT NULL,
+                        group_id TEXT NOT NULL,
+                        agent_type TEXT NOT NULL,
+                        iteration INTEGER NOT NULL CHECK(iteration >= 0),
+                        package_id INTEGER NOT NULL,
+                        consumed_at TEXT NOT NULL,
+                        FOREIGN KEY (package_id) REFERENCES context_packages(id) ON DELETE CASCADE
+                    )
+                """)
+                print("   ✓ Created consumption_scope table")
+            except sqlite3.OperationalError as e:
+                if "already exists" in str(e).lower():
+                    print("   ⊘ consumption_scope table already exists")
+                else:
+                    raise
+
+            # Create indexes for consumption_scope
+            try:
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_consumption_session
+                    ON consumption_scope(session_id, group_id, agent_type)
+                """)
+                cursor.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_consumption_unique
+                    ON consumption_scope(session_id, group_id, agent_type, iteration, package_id)
+                """)
+                print("   ✓ Created consumption_scope indexes")
+            except sqlite3.OperationalError as e:
+                if "already exists" in str(e).lower():
+                    print("   ⊘ consumption_scope indexes already exist")
+                else:
+                    raise
+
+            # Commit and checkpoint
+            conn.commit()
+            checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+            if checkpoint_result:
+                busy, log_frames, checkpointed = checkpoint_result
+                if busy:
+                    for retry in range(3):
+                        time.sleep(0.5 * (retry + 1))
+                        checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                        if checkpoint_result and not checkpoint_result[0]:
+                            print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                            break
+                    else:
+                        print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+
+            # Refresh query planner statistics
+            cursor.execute("ANALYZE error_patterns;")
+            cursor.execute("ANALYZE strategies;")
+            cursor.execute("ANALYZE consumption_scope;")
+            print("   ✓ WAL checkpoint completed")
+
+            current_version = 10
+            print("✓ Migration to v10 complete (context engineering system tables)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Event logging and scope tracking"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Context engineering system tables"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -1007,6 +1152,60 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpc_agent ON context_package_consumers(agent_type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpc_pending ON context_package_consumers(consumed_at) WHERE consumed_at IS NULL")
     print("✓ Created context_package_consumers table with indexes")
+
+    # Error patterns table (for context engineering - learning from failed-then-succeeded agents)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS error_patterns (
+            pattern_hash TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            signature_json TEXT NOT NULL,
+            solution TEXT NOT NULL,
+            confidence REAL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
+            occurrences INTEGER DEFAULT 1 CHECK(occurrences >= 1),
+            lang TEXT,
+            last_seen TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            ttl_days INTEGER DEFAULT 90 CHECK(ttl_days > 0)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_patterns_project ON error_patterns(project_id, lang)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_patterns_ttl ON error_patterns(last_seen, ttl_days)")
+    print("✓ Created error_patterns table with indexes")
+
+    # Strategies table (for context engineering - successful approaches from completions)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS strategies (
+            strategy_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            topic TEXT NOT NULL,
+            insight TEXT NOT NULL,
+            helpfulness INTEGER DEFAULT 0 CHECK(helpfulness >= 0),
+            lang TEXT,
+            framework TEXT,
+            last_seen TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_strategies_project ON strategies(project_id, framework)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_strategies_topic ON strategies(topic)")
+    print("✓ Created strategies table with indexes")
+
+    # Consumption scope table (for context engineering - iteration-aware package tracking)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS consumption_scope (
+            scope_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            agent_type TEXT NOT NULL,
+            iteration INTEGER NOT NULL CHECK(iteration >= 0),
+            package_id INTEGER NOT NULL,
+            consumed_at TEXT NOT NULL,
+            FOREIGN KEY (package_id) REFERENCES context_packages(id) ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_consumption_session ON consumption_scope(session_id, group_id, agent_type)")
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_consumption_unique ON consumption_scope(session_id, group_id, agent_type, iteration, package_id)")
+    print("✓ Created consumption_scope table with indexes")
 
     # Record schema version for new databases
     current_version = get_schema_version(cursor)
