@@ -62,8 +62,10 @@
     "enable_fts5": false,
     "retrieval_limits": {
       "developer": 3,
+      "senior_software_engineer": 5,
       "qa_expert": 5,
-      "tech_lead": 5
+      "tech_lead": 5,
+      "investigator": 5
     },
     "redaction_mode": "pattern_only",
     "token_safety_margin": 0.15

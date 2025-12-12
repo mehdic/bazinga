@@ -122,34 +122,34 @@
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Implement error signature extraction logic:
+- [X] T024 [US3] Implement error signature extraction logic:
   - Error type extraction
   - Message pattern normalization
   - Context hints extraction
   - Stack pattern extraction
-- [ ] T025 [US3] Implement secret redaction before storage (FR-011):
+- [X] T025 [US3] Implement secret redaction before storage (FR-011):
   - Regex patterns for common secrets (API keys, passwords, tokens)
   - Entropy detection for high-entropy strings
   - Configurable via `redaction_mode` setting
-- [ ] T026 [US3] Implement pattern_hash generation (SHA256 of normalized signature)
-- [ ] T027 [US3] Add error pattern capture to fail-then-succeed flow:
+- [X] T026 [US3] Implement pattern_hash generation (SHA256 of normalized signature)
+- [X] T027 [US3] Add error pattern capture to fail-then-succeed flow:
   - Initial confidence 0.5
   - Store via bazinga-db skill
-- [ ] T028 [US3] Implement error pattern matching query:
+- [X] T028 [US3] Implement error pattern matching query:
   - Project isolation (project_id)
   - Language filtering (optional)
   - Confidence threshold (> 0.7 for injection)
-- [ ] T029 [US3] Add error pattern section to context output:
+- [X] T029 [US3] Add error pattern section to context output:
   - `### Error Patterns ({count} matches)` header
   - Warning icon `⚠️ **Known Issue**: {message}`
   - Solution hint with confidence
-- [ ] T030 [US3] Implement confidence adjustment rules:
+- [X] T030 [US3] Implement confidence adjustment rules:
   - Successful match: +0.1 (max 1.0)
   - False positive report: -0.2 (min 0.1)
   - Below 0.3: Don't inject, observe only
-- [ ] T031 [US3] Implement TTL-based cleanup query (patterns older than `ttl_days`)
+- [X] T031 [US3] Implement TTL-based cleanup query (patterns older than `ttl_days`)
 
-**Checkpoint**: Error pattern capture, matching, and injection working end-to-end
+**Checkpoint**: Error pattern capture, matching, and injection working end-to-end ✅
 
 ---
 
@@ -163,23 +163,24 @@
 
 ### Implementation for User Story 4
 
-- [ ] T032 [US4] Add retrieval_limits schema to skills_config.json:
+- [X] T032 [US4] Add retrieval_limits schema to skills_config.json:
   ```json
   "context_engineering": {
     "retrieval_limits": {
       "developer": 3,
       "senior_software_engineer": 5,
       "qa_expert": 5,
-      "tech_lead": 5
+      "tech_lead": 5,
+      "investigator": 5
     }
   }
   ```
-- [ ] T033 [US4] Implement config reading in SKILL.md instructions
-- [ ] T034 [US4] Apply limit during package retrieval (LIMIT clause)
-- [ ] T035 [US4] Default fallback when agent type not in config (default: 3)
-- [ ] T036 [US4] Update overflow indicator calculation to use dynamic limit
+- [X] T033 [US4] Implement config reading in SKILL.md instructions
+- [X] T034 [US4] Apply limit during package retrieval (LIMIT clause)
+- [X] T035 [US4] Default fallback when agent type not in config (default: 3)
+- [X] T036 [US4] Update overflow indicator calculation to use dynamic limit
 
-**Checkpoint**: Configurable retrieval limits working for all agent types
+**Checkpoint**: Configurable retrieval limits working for all agent types ✅
 
 ---
 

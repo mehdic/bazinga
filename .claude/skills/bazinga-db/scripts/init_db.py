@@ -904,11 +904,11 @@ def init_database(db_path: str) -> None:
             if post_integrity != "ok":
                 print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
 
-            # Refresh query planner statistics
+            # Refresh query planner statistics for newly created tables
             cursor.execute("ANALYZE error_patterns;")
             cursor.execute("ANALYZE strategies;")
             cursor.execute("ANALYZE consumption_scope;")
-            cursor.execute("ANALYZE context_packages;")
+            # context_packages is analyzed later after CREATE TABLE IF NOT EXISTS
             print("   ✓ WAL checkpoint completed")
 
             current_version = 10
