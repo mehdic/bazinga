@@ -227,7 +227,7 @@ When invoked, you must:
 - Use imperative language ("Analyze code for...", "Extract text from...")
 - Call existing scripts rather than implementing logic inline
 - Include concrete examples with actual input/output
-- Keep focused (150-250 lines is ideal, max 5,000 words)
+- Keep focused (under 500 lines for optimal performance, max 5,000 words)
 - Use clear section headers
 - Use `{baseDir}` for paths, never hardcode absolute paths
 - Reference external files rather than embedding everything
@@ -712,15 +712,26 @@ skill-name/
 
 ### SKILL.md Length Guidelines
 
+**Official guidance from [Claude Code Docs](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices):**
+
+> "Keep SKILL.md body under **500 lines** for optimal performance."
+
+This is a **soft guideline**, not a hard requirement. There is no mandatory length limit.
+
 | Lines | Assessment | Action |
 |-------|------------|--------|
-| <100 | Too brief | Add examples and details |
-| 100-150 | Good | Optimal length |
-| 150-250 | Acceptable | Consider moving content to references/ |
-| 250-500 | Verbose | Must move content to references/ |
-| >500 | Too long | Context overflow risk - refactor required |
+| <100 | Brief | May need more examples/details for complex skills |
+| 100-300 | Good | Well-balanced for most skills |
+| 300-500 | Acceptable | Consider progressive disclosure if approaching 500 |
+| >500 | Soft limit | Split content into separate files for optimal performance |
 
-**Maximum:** Keep under 5,000 words to avoid context overflow.
+**Key principles:**
+- Use **progressive disclosure** - SKILL.md acts as overview/table of contents
+- Create supporting files (`reference.md`, `examples.md`) for detailed content
+- Claude loads supporting files only when needed, maintaining token efficiency
+- No hard limit exists; focus on organization over arbitrary line counts
+
+**Maximum:** Keep under 5,000 words to avoid context overflow (model limit, not skill-specific).
 
 ### Directory Organization
 
@@ -1175,7 +1186,7 @@ Before committing a new skill:
 - [ ] "Your Task" workflow with concrete steps
 - [ ] Example invocation scenarios
 - [ ] Script paths use full path from skill root
-- [ ] Under 250 lines (ideally 100-150)
+- [ ] Under 500 lines for optimal performance (100-300 is typical)
 - [ ] Under 5,000 words total
 
 ### Testing
