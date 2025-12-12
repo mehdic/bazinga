@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.1.0
+version: 1.2.0
 allowed-tools: [Bash, Read]
 ---
 
@@ -43,17 +43,21 @@ If `session_id` or `agent_type` are missing, check recent conversation context o
 **Step 2a: Load retrieval limit for this agent type:**
 
 ```bash
-# Extract retrieval limit for the specific agent type (defaults to 3 if not configured)
+# Extract retrieval limit for the specific agent type
 AGENT_TYPE="developer"  # Replace with actual agent_type
+
+# Pass AGENT_TYPE via command-line argument (not string interpolation)
 LIMIT=$(cat bazinga/skills_config.json 2>/dev/null | python3 -c "
 import sys, json
+agent = sys.argv[1] if len(sys.argv) > 1 else 'developer'
+defaults = {'developer': 3, 'qa_expert': 5, 'tech_lead': 5}
 try:
     c = json.load(sys.stdin).get('context_engineering', {})
     limits = c.get('retrieval_limits', {})
-    print(limits.get('$AGENT_TYPE', 3))
+    print(limits.get(agent, defaults.get(agent, 3)))
 except:
-    print(3)
-" 2>/dev/null || echo 3)
+    print(defaults.get(agent, 3))
+" "$AGENT_TYPE" 2>/dev/null || echo 3)
 echo "Retrieval limit for $AGENT_TYPE: $LIMIT"
 ```
 
@@ -106,16 +110,22 @@ If this command fails or returns empty `packages`, proceed to Step 3b.
 
 ### Step 3b: Heuristic Fallback (Query Failed or FTS5 Unavailable)
 
-**First, fetch raw context packages from database:**
+**First, fetch raw context packages with consumer data:**
 
 ```bash
-# Fetch all packages for this session (with optional group filter)
+# Fetch packages with LEFT JOIN to get consumer info for agent_relevance calculation
 SESSION_ID="bazinga_20250212_143530"
 GROUP_ID="group_a"  # or empty string for session-wide
+AGENT_TYPE="developer"
 
-# Query raw packages - use parameterized approach via bazinga-db
+# Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
-  "SELECT id, file_path, priority, summary, group_id, created_at FROM context_packages WHERE session_id = '$SESSION_ID'"
+  "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
+          GROUP_CONCAT(cpc.agent_type) as consumers
+   FROM context_packages cp
+   LEFT JOIN context_package_consumers cpc ON cp.id = cpc.package_id
+   WHERE cp.session_id = '$SESSION_ID'
+   GROUP BY cp.id"
 ```
 
 **Then apply heuristic ranking:**
@@ -133,11 +143,11 @@ score = (priority_weight * 4) + (same_group_boost * 2) + (agent_relevance * 1.5)
 
 Where:
 - same_group_boost = 1 if package.group_id == request.group_id, else 0
-- agent_relevance = 1 if agent_type appears in package consumers, else 0
+- agent_relevance = 1 if AGENT_TYPE appears in package.consumers (from JOIN), else 0
 - recency_factor = 1 / (days_since_created + 1)
 ```
 
-Sort packages by score DESC, take top N based on retrieval_limit.
+Sort packages by score DESC, then by `created_at DESC` (tie-breaker), take top N.
 Calculate: `overflow_count = max(0, total_packages - limit)`
 
 ### Step 4: Query Error Patterns (Optional)

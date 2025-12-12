@@ -1,6 +1,6 @@
 # Context-Assembler Usage Guide
 
-**Version**: 1.0.0
+**Version**: 1.2.0
 **Status**: Production Ready (Phase 3 Complete)
 
 ## Overview
@@ -263,6 +263,16 @@ Packages can have one of four priority levels:
 
 ## Version History
 
+- v1.2.0 (2025-12-12): Bug fixes and improvements
+  - Fixed agent_relevance calculation by adding LEFT JOIN to context_package_consumers
+  - Fixed AGENT_TYPE variable passing to Python via sys.argv (not string interpolation)
+  - Added per-agent default limits in Python fallback
+  - Added deterministic tie-breaker (created_at DESC) for equal scores
+  - Added note about system-generated session_ids in SQL queries
+- v1.1.0 (2025-12-12): Critical fixes
+  - Fixed query syntax for bazinga-db commands
+  - Added Security Notes section
+  - Clarified group_id handling (use empty string for session-wide)
 - v1.0.0 (2025-12-12): Initial production release (Phase 3 complete)
   - Full heuristic relevance ranking
   - Package retrieval via bazinga-db
