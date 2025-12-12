@@ -104,6 +104,7 @@
 - [x] T022 [US2] Implement truncation behavior for Conservative/Wrap-up zones
 - [x] T023 [US2] Add token budget allocation per agent type (from plan.md):
   - Developer: Task 50%, Specialization 20%, Context 20%, Errors 10%
+  - Senior Software Engineer: Task 40%, Specialization 20%, Context 25%, Errors 15%
   - QA Expert: Task 40%, Specialization 15%, Context 30%, Errors 15%
   - Tech Lead: Task 30%, Specialization 15%, Context 40%, Errors 15%
 
@@ -167,6 +168,7 @@
   "context_engineering": {
     "retrieval_limits": {
       "developer": 3,
+      "senior_software_engineer": 5,
       "qa_expert": 5,
       "tech_lead": 5
     }

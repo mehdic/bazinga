@@ -24,8 +24,9 @@ As an orchestrator, I need a dedicated skill that assembles relevant context for
 **Acceptance Scenarios**:
 
 1. **Given** an active orchestration session with 5 context packages, **When** context-assembler is invoked for a Developer, **Then** it returns top 3 packages ranked by relevance with "+2 more available" indicator
-2. **Given** a model token limit of 100k, **When** assembling context that would exceed 85k, **Then** it truncates least-relevant items and applies 15% safety margin
-3. **Given** no context packages exist for a group, **When** context-assembler is invoked, **Then** it returns empty block with "No context packages found" message
+2. **Given** an active orchestration session with 5 context packages, **When** context-assembler is invoked for a Senior Software Engineer (escalation), **Then** it returns top 5 packages with more context and error patterns
+3. **Given** a model token limit of 100k, **When** assembling context that would exceed 85k, **Then** it truncates least-relevant items and applies 15% safety margin
+4. **Given** no context packages exist for a group, **When** context-assembler is invoked, **Then** it returns empty block with "No context packages found" message
 
 ---
 
@@ -47,9 +48,9 @@ As a system operator, I need token budget enforcement with graduated zones so th
 
 ### User Story 3 - Error Pattern Capture (Priority: P3)
 
-As a developer agent, I need access to previously-solved error patterns so that I don't waste iterations re-solving known problems.
+As a developer or senior software engineer agent, I need access to previously-solved error patterns so that I don't waste iterations re-solving known problems.
 
-**Why this priority**: Repeated errors across sessions waste significant time. Capturing solutions enables learning.
+**Why this priority**: Repeated errors across sessions waste significant time. Capturing solutions enables learning. SSE particularly benefits as it handles escalations from failed developer attempts.
 
 **Independent Test**: Create an error, solve it, verify pattern captured, then trigger similar error and verify solution hint is provided.
 
@@ -65,15 +66,16 @@ As a developer agent, I need access to previously-solved error patterns so that 
 
 As a project maintainer, I need per-agent-type retrieval limits so that different agent roles receive appropriately sized context.
 
-**Why this priority**: QA and Tech Lead need more context than Developers. One-size-fits-all limits are suboptimal.
+**Why this priority**: QA, Tech Lead, and SSE need more context than Developers. One-size-fits-all limits are suboptimal.
 
-**Independent Test**: Configure different limits for Developer (3) vs QA (5), invoke context-assembler for each, verify correct counts.
+**Independent Test**: Configure different limits for Developer (3) vs SSE (5) vs QA (5), invoke context-assembler for each, verify correct counts.
 
 **Acceptance Scenarios**:
 
 1. **Given** config sets Developer retrieval limit to 3, **When** 10 packages exist, **Then** Developer receives 3 packages plus overflow indicator
-2. **Given** config sets QA retrieval limit to 5, **When** 10 packages exist, **Then** QA receives 5 packages plus overflow indicator
-3. **Given** no config exists for agent type, **When** context-assembler is invoked, **Then** default limit of 3 is used
+2. **Given** config sets SSE retrieval limit to 5, **When** 10 packages exist (escalation scenario), **Then** SSE receives 5 packages plus overflow indicator
+3. **Given** config sets QA retrieval limit to 5, **When** 10 packages exist, **Then** QA receives 5 packages plus overflow indicator
+4. **Given** no config exists for agent type, **When** context-assembler is invoked, **Then** default limit of 3 is used
 
 ---
 
@@ -92,13 +94,13 @@ As a project maintainer, I need per-agent-type retrieval limits so that differen
 
 ### Functional Requirements
 
-- **FR-001**: System MUST provide a `context-assembler` skill that accepts session_id, group_id, agent_type, and model as inputs
+- **FR-001**: System MUST provide a `context-assembler` skill that accepts session_id, group_id, agent_type (developer/senior_software_engineer/qa_expert/tech_lead), and model as inputs
 - **FR-002**: System MUST rank context packages by priority level, same-group match, agent-type relevance, and recency
 - **FR-003**: System MUST enforce per-agent token budgets with model-aware tokenization
 - **FR-004**: System MUST apply graduated token zones (Normal/Warning/Conservative/Wrap-up/Emergency)
-- **FR-005**: System MUST capture error patterns when agents fail then succeed on retry
-- **FR-006**: System MUST inject relevant error pattern solutions into agent context
-- **FR-007**: System MUST support configurable retrieval limits per agent type
+- **FR-005**: System MUST capture error patterns when agents (developer or SSE) fail then succeed on retry
+- **FR-006**: System MUST inject relevant error pattern solutions into agent context (especially for SSE handling escalations)
+- **FR-007**: System MUST support configurable retrieval limits per agent type (developer: 3, SSE: 5, qa_expert: 5, tech_lead: 5)
 - **FR-008**: System MUST show overflow indicator when more packages exist than retrieved
 - **FR-009**: System MUST handle FTS5 unavailability with heuristic fallback ranking
 - **FR-010**: System MUST never block execution on context-assembler failure (graceful degradation)

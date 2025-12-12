@@ -94,7 +94,7 @@ See: [data-model.md](./data-model.md)
 ```
 session_id: str      # Current orchestration session
 group_id: str        # Task group being processed
-agent_type: str      # developer/qa_expert/tech_lead
+agent_type: str      # developer/senior_software_engineer/qa_expert/tech_lead
 model: str           # haiku/sonnet/opus (for token budgeting)
 ```
 
@@ -116,14 +116,18 @@ model: str           # haiku/sonnet/opus (for token budgeting)
 | Agent | Task | Specialization | Context Pkgs | Errors | Total |
 |-------|------|----------------|--------------|--------|-------|
 | Developer | 50% | 20% | 20% | 10% | 100% |
+| Senior Software Engineer | 40% | 20% | 25% | 15% | 100% |
 | QA Expert | 40% | 15% | 30% | 15% | 100% |
 | Tech Lead | 30% | 15% | 40% | 15% | 100% |
+
+**Note:** SSE handles escalations from failed developer attempts, so it receives more context and error budget.
 
 ### Retrieval Limits (Configurable)
 
 | Agent Type | Default Limit | Override via |
 |------------|---------------|--------------|
 | developer | 3 | `skills_config.json` |
+| senior_software_engineer | 5 | `skills_config.json` |
 | qa_expert | 5 | `skills_config.json` |
 | tech_lead | 5 | `skills_config.json` |
 
