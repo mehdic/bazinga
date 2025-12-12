@@ -244,16 +244,21 @@ Metadata:
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
+
+[ORCHESTRATOR_CONTINUE]
+Skill output complete. You are STILL the orchestrator.
+Your Turn 2 action: Extract block above → Call Task() for each group NOW.
+DO NOT STOP. Your workflow is NOT complete until Task() is called.
+[/ORCHESTRATOR_CONTINUE]
 SPECBLOCK
 ```
 
 **🔴 RULES:**
-- ✅ Call `Bash` tool with the heredoc above as your ONLY action
 - ✅ Replace `{...}` placeholders with actual values
-- ❌ Do NOT output any text before or after the Bash call
+- ❌ Do NOT output text BEFORE or AFTER the Bash call
 - ❌ Do NOT say "I'll compose..." or narrate your process
 
-**After the Bash call completes, your job is done.** The orchestrator extracts the block from the Bash output and continues to Task().
+**After the Bash call completes, return to orchestrator workflow (Turn 2).** The skill is a helper. You are the orchestrator. Continue your workflow.
 
 ---
 
@@ -373,10 +378,16 @@ Metadata:
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
+
+[ORCHESTRATOR_CONTINUE]
+Skill output complete. You are STILL the orchestrator.
+Your Turn 2 action: Extract block above → Call Task() for each group NOW.
+DO NOT STOP. Your workflow is NOT complete until Task() is called.
+[/ORCHESTRATOR_CONTINUE]
 SPECBLOCK
 ```
 
-**Note:** The skill calls Bash with NO text output before or after. The Bash heredoc IS the entire output.
+**Note:** No text before or after Bash. The `[ORCHESTRATOR_CONTINUE]` block inside the heredoc reminds you to continue.
 
 ---
 
@@ -401,4 +412,4 @@ SPECBLOCK
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
 6. **Block returned via Bash heredoc** (NOT direct text output)
-7. **No text output before/after Bash call** (turn stays alive for orchestrator)
+7. **[ORCHESTRATOR_CONTINUE] block included in heredoc** (continuation trigger for orchestrator)

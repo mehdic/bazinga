@@ -296,9 +296,22 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 
 **Turn 2 (after skill response):**
 
+**🔴 CONTINUATION TRIGGER: When you see `[ORCHESTRATOR_CONTINUE]`, IMMEDIATELY continue below.**
+
+The skill output ends with:
+```
+[ORCHESTRATOR_CONTINUE]
+Skill output complete. You are STILL the orchestrator.
+Your Turn 2 action: Extract block above → Call Task() for each group NOW.
+DO NOT STOP. Your workflow is NOT complete until Task() is called.
+[/ORCHESTRATOR_CONTINUE]
+```
+
+**YOU ARE THE ORCHESTRATOR. The skill was a helper. CONTINUE YOUR WORKFLOW NOW.**
+
 **🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
 
-The skill just output a specialization block. You MUST process it SILENTLY:
+The skill output a specialization block via Bash heredoc. Process it SILENTLY:
 
 1. **INTERNALLY** extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
 2. **INTERNALLY** store as `spec_block` variable
