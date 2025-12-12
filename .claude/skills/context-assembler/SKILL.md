@@ -87,23 +87,19 @@ Sort packages by score DESC, take top N based on retrieval_limit.
 
 ### Step 4: Query Error Patterns (Optional)
 
-If error patterns might be relevant (e.g., agent previously failed):
+If error patterns might be relevant (e.g., agent previously failed), query them via bazinga-db:
 
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query <<'SQL'
-SELECT pattern_hash, signature_json, solution, confidence, occurrences
-FROM error_patterns
-WHERE project_id = (SELECT COALESCE(
-    (SELECT json_extract(metadata, '$.project_id') FROM sessions WHERE session_id = '<session_id>'),
-    'default'
-))
-AND confidence > 0.7
-ORDER BY confidence DESC, occurrences DESC
-LIMIT 3
-SQL
+# Get the project_id from session metadata (or use 'default')
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query "SELECT COALESCE(json_extract(metadata, '$.project_id'), 'default') as project_id FROM sessions WHERE session_id = '<session_id>'"
+
+# Then query error patterns for that project with confidence > 0.7
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query "SELECT pattern_hash, signature_json, solution, confidence, occurrences FROM error_patterns WHERE project_id = '<project_id>' AND confidence > 0.7 ORDER BY confidence DESC, occurrences DESC LIMIT 3"
 ```
 
-Only include patterns with confidence > 0.7.
+If no session or project_id found, use 'default' as the project identifier.
+
+Only include patterns with confidence > 0.7 in the output.
 
 ### Step 5: Format Output
 
