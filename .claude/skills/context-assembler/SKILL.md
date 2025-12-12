@@ -63,7 +63,7 @@ except:
 echo "Retrieval limit for $AGENT_TYPE: $LIMIT"
 ```
 
-Default limits: developer=3, senior_software_engineer=5, qa_expert=5, tech_lead=5
+Default limits: developer=3, senior_software_engineer=5, qa_expert=5, tech_lead=5, investigator=5
 
 **Step 2b: Check FTS5 availability:**
 

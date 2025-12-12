@@ -2205,6 +2205,301 @@ class BazingaDB:
             'agent_type': agent_type,
         }
 
+    # ==================== ERROR PATTERN OPERATIONS ====================
+    # Phase 5: User Story 3 - Error Pattern Capture (T024-T031)
+    # See: specs/1-context-engineering/data-model.md for schema
+
+    def _extract_error_signature(self, error_type: str, error_message: str,
+                                  context_hints: List[str] = None,
+                                  stack_pattern: List[str] = None) -> Dict[str, Any]:
+        """T024: Extract structured error signature from error details.
+
+        Creates a normalized signature that can be used for matching similar errors.
+
+        Args:
+            error_type: Error class/type (e.g., "ModuleNotFoundError", "TypeError")
+            error_message: Full error message text
+            context_hints: List of contextual hints (e.g., ["import statement", "tsconfig"])
+            stack_pattern: Simplified stack trace patterns (e.g., ["file.py:123"])
+
+        Returns:
+            Dict with structured signature fields
+        """
+        import re
+
+        # Normalize error message - remove variable parts (paths, line numbers, specific values)
+        message_pattern = error_message
+        # Remove absolute paths (Unix)
+        message_pattern = re.sub(r'/[^\s]+/', '.../', message_pattern)
+        # Remove absolute paths (Windows) - use raw string for replacement to avoid escape issues
+        message_pattern = re.sub(r'[A-Z]:\\[^\s]+\\', r'...\\', message_pattern)
+        # Remove line numbers
+        message_pattern = re.sub(r'line \d+', 'line N', message_pattern)
+        # Remove specific variable names/values but keep structure
+        message_pattern = re.sub(r"'[^']{1,50}'", "'...'", message_pattern)
+        message_pattern = re.sub(r'"[^"]{1,50}"', '"..."', message_pattern)
+
+        return {
+            "error_type": error_type.strip() if error_type else "Unknown",
+            "message_pattern": message_pattern.strip()[:500],  # Limit length
+            "context_hints": context_hints or [],
+            "stack_pattern": stack_pattern or []
+        }
+
+    def _generate_pattern_hash(self, signature: Dict[str, Any]) -> str:
+        """T026: Generate SHA256 hash of normalized error signature.
+
+        The hash uniquely identifies an error pattern for deduplication.
+        """
+        import hashlib
+
+        # Create deterministic string representation
+        # Sort keys and normalize for consistent hashing
+        hash_input = (
+            f"{signature.get('error_type', '')}:"
+            f"{signature.get('message_pattern', '')}:"
+            f"{','.join(sorted(signature.get('context_hints', [])))}"
+        )
+
+        return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+
+    def save_error_pattern(self, project_id: str, error_type: str, error_message: str,
+                          solution: str, lang: str = None,
+                          context_hints: List[str] = None,
+                          stack_pattern: List[str] = None) -> Dict[str, Any]:
+        """T024-T027: Save an error pattern from a fail-then-succeed flow.
+
+        Captures error signature, redacts secrets, generates hash, and stores.
+        If pattern already exists, updates occurrences and last_seen.
+
+        Args:
+            project_id: Project identifier for isolation
+            error_type: Error class/type (e.g., "ModuleNotFoundError")
+            error_message: Full error message text
+            solution: How the error was resolved
+            lang: Programming language (optional)
+            context_hints: Contextual hints for matching
+            stack_pattern: Simplified stack trace patterns
+
+        Returns:
+            Dict with pattern_hash and operation result
+        """
+        # T024: Extract signature
+        signature = self._extract_error_signature(
+            error_type, error_message, context_hints, stack_pattern
+        )
+
+        # T025: Redact secrets from signature and solution
+        signature_json = json.dumps(signature)
+        signature_json, sig_redacted = scan_and_redact(signature_json)
+        solution, sol_redacted = scan_and_redact(solution)
+
+        # T026: Generate pattern hash
+        pattern_hash = self._generate_pattern_hash(json.loads(signature_json))
+
+        conn = self._get_connection()
+        try:
+            # Check if pattern already exists
+            existing = conn.execute("""
+                SELECT occurrences, confidence FROM error_patterns
+                WHERE pattern_hash = ? AND project_id = ?
+            """, (pattern_hash, project_id)).fetchone()
+
+            if existing:
+                # Update existing pattern
+                new_occurrences = existing['occurrences'] + 1
+                conn.execute("""
+                    UPDATE error_patterns
+                    SET occurrences = ?,
+                        last_seen = datetime('now'),
+                        solution = CASE WHEN length(?) > length(solution) THEN ? ELSE solution END
+                    WHERE pattern_hash = ? AND project_id = ?
+                """, (new_occurrences, solution, solution, pattern_hash, project_id))
+                conn.commit()
+
+                self._print_success(f"✓ Updated error pattern (occurrences: {new_occurrences})")
+                return {
+                    "success": True,
+                    "pattern_hash": pattern_hash,
+                    "operation": "updated",
+                    "occurrences": new_occurrences,
+                    "redacted": sig_redacted or sol_redacted
+                }
+            else:
+                # Insert new pattern with initial confidence 0.5
+                conn.execute("""
+                    INSERT INTO error_patterns
+                    (pattern_hash, project_id, signature_json, solution, confidence,
+                     occurrences, lang, last_seen, created_at, ttl_days)
+                    VALUES (?, ?, ?, ?, 0.5, 1, ?, datetime('now'), datetime('now'), 90)
+                """, (pattern_hash, project_id, signature_json, solution, lang))
+                conn.commit()
+
+                self._print_success(f"✓ Saved new error pattern: {pattern_hash[:16]}...")
+                return {
+                    "success": True,
+                    "pattern_hash": pattern_hash,
+                    "operation": "created",
+                    "occurrences": 1,
+                    "confidence": 0.5,
+                    "redacted": sig_redacted or sol_redacted
+                }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to save error pattern: {str(e)}")
+        finally:
+            conn.close()
+
+    def get_error_patterns(self, project_id: str, lang: str = None,
+                          min_confidence: float = 0.7,
+                          limit: int = 5) -> List[Dict[str, Any]]:
+        """T028: Query matching error patterns for context injection.
+
+        Returns patterns above confidence threshold for the given project.
+
+        Args:
+            project_id: Project identifier for isolation
+            lang: Filter by programming language (optional)
+            min_confidence: Minimum confidence threshold (default: 0.7)
+            limit: Maximum patterns to return (default: 5)
+
+        Returns:
+            List of error patterns with signature, solution, confidence
+        """
+        conn = self._get_connection()
+
+        if lang:
+            rows = conn.execute("""
+                SELECT pattern_hash, signature_json, solution, confidence,
+                       occurrences, lang, last_seen
+                FROM error_patterns
+                WHERE project_id = ? AND lang = ? AND confidence >= ?
+                ORDER BY confidence DESC, occurrences DESC
+                LIMIT ?
+            """, (project_id, lang, min_confidence, limit)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT pattern_hash, signature_json, solution, confidence,
+                       occurrences, lang, last_seen
+                FROM error_patterns
+                WHERE project_id = ? AND confidence >= ?
+                ORDER BY confidence DESC, occurrences DESC
+                LIMIT ?
+            """, (project_id, min_confidence, limit)).fetchall()
+
+        conn.close()
+
+        result = []
+        for row in rows:
+            pattern = dict(row)
+            # Parse signature JSON
+            try:
+                pattern['signature'] = json.loads(pattern.pop('signature_json'))
+            except json.JSONDecodeError:
+                pattern['signature'] = {}
+            result.append(pattern)
+
+        return result
+
+    def update_error_pattern_confidence(self, pattern_hash: str, project_id: str,
+                                        success: bool) -> Dict[str, Any]:
+        """T030: Adjust confidence based on match outcome.
+
+        Rules:
+        - Successful match: +0.1 (max 1.0)
+        - False positive report: -0.2 (min 0.1)
+        - Below 0.3: Pattern still stored but not injected
+
+        Args:
+            pattern_hash: Hash of the pattern to update
+            project_id: Project identifier
+            success: True if solution helped, False if false positive
+
+        Returns:
+            Dict with updated confidence value
+        """
+        conn = self._get_connection()
+
+        try:
+            # Get current confidence
+            row = conn.execute("""
+                SELECT confidence FROM error_patterns
+                WHERE pattern_hash = ? AND project_id = ?
+            """, (pattern_hash, project_id)).fetchone()
+
+            if not row:
+                return {"success": False, "error": "Pattern not found"}
+
+            current = row['confidence']
+
+            # Apply adjustment rules
+            if success:
+                new_confidence = min(1.0, current + 0.1)
+            else:
+                new_confidence = max(0.1, current - 0.2)
+
+            conn.execute("""
+                UPDATE error_patterns
+                SET confidence = ?, last_seen = datetime('now')
+                WHERE pattern_hash = ? AND project_id = ?
+            """, (new_confidence, pattern_hash, project_id))
+            conn.commit()
+
+            self._print_success(f"✓ Updated confidence: {current:.2f} → {new_confidence:.2f}")
+            return {
+                "success": True,
+                "pattern_hash": pattern_hash,
+                "previous_confidence": current,
+                "new_confidence": new_confidence,
+                "injectable": new_confidence >= 0.3  # Below 0.3: observe only
+            }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to update confidence: {str(e)}")
+        finally:
+            conn.close()
+
+    def cleanup_expired_patterns(self, project_id: str = None) -> Dict[str, Any]:
+        """T031: Remove patterns that have exceeded their TTL.
+
+        Patterns are deleted when last_seen + ttl_days < current date.
+
+        Args:
+            project_id: Limit cleanup to specific project (optional)
+
+        Returns:
+            Dict with count of deleted patterns
+        """
+        conn = self._get_connection()
+
+        try:
+            if project_id:
+                cursor = conn.execute("""
+                    DELETE FROM error_patterns
+                    WHERE project_id = ?
+                    AND date(last_seen, '+' || ttl_days || ' days') < date('now')
+                """, (project_id,))
+            else:
+                cursor = conn.execute("""
+                    DELETE FROM error_patterns
+                    WHERE date(last_seen, '+' || ttl_days || ' days') < date('now')
+                """)
+
+            deleted_count = cursor.rowcount
+            conn.commit()
+
+            self._print_success(f"✓ Cleaned up {deleted_count} expired error patterns")
+            return {
+                "success": True,
+                "deleted_count": deleted_count,
+                "project_id": project_id
+            }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to cleanup patterns: {str(e)}")
+        finally:
+            conn.close()
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -2291,6 +2586,16 @@ REASONING CAPTURE OPERATIONS:
   check-mandatory-phases <session> <group_id> <agent_type>
                                               Check if mandatory phases (understanding, completion) are documented
                                               Returns exit code 1 if phases are missing
+
+ERROR PATTERN OPERATIONS:
+  save-error-pattern <project_id> <error_type> <error_message> <solution> [options]
+                                              Capture error pattern from fail-then-succeed flow
+                                              Options: [--lang X] [--context_hints JSON] [--stack_pattern JSON]
+  get-error-patterns <project_id> [--lang X] [--min_confidence N] [--limit N]
+                                              Query matching error patterns (default: min_confidence=0.7, limit=5)
+  update-error-confidence <pattern_hash> <project_id> <success|failure>
+                                              Adjust pattern confidence (+0.1 on success, -0.2 on failure)
+  cleanup-error-patterns [project_id]         Remove patterns that have exceeded their TTL
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -2844,6 +3149,118 @@ def main():
             # Exit with error code if mandatory phases are missing
             if not result['complete']:
                 sys.exit(1)
+        # ==================== ERROR PATTERN COMMANDS ====================
+        elif cmd == 'save-error-pattern':
+            # save-error-pattern <project_id> <error_type> <error_message> <solution> [--lang X] [--context_hints JSON] [--stack_pattern JSON]
+            if len(cmd_args) < 4:
+                print("Error: save-error-pattern requires 4 args: <project_id> <error_type> <error_message> <solution>", file=sys.stderr)
+                sys.exit(1)
+
+            project_id = cmd_args[0]
+            error_type = cmd_args[1]
+            error_message = cmd_args[2]
+            solution = cmd_args[3]
+
+            # Parse optional flags
+            lang = None
+            context_hints = None
+            stack_pattern = None
+            valid_flags = {'--lang', '--context_hints', '--stack_pattern'}
+            i = 4
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg == '--lang' and i + 1 < len(cmd_args):
+                    lang = cmd_args[i + 1]
+                    i += 2
+                elif arg == '--context_hints' and i + 1 < len(cmd_args):
+                    try:
+                        context_hints = json.loads(cmd_args[i + 1])
+                        if not isinstance(context_hints, list):
+                            raise ValueError("context_hints must be a JSON array")
+                    except json.JSONDecodeError as e:
+                        print(f"Error: Invalid JSON for --context_hints: {e}", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg == '--stack_pattern' and i + 1 < len(cmd_args):
+                    try:
+                        stack_pattern = json.loads(cmd_args[i + 1])
+                        if not isinstance(stack_pattern, list):
+                            raise ValueError("stack_pattern must be a JSON array")
+                    except json.JSONDecodeError as e:
+                        print(f"Error: Invalid JSON for --stack_pattern: {e}", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg.startswith('--'):
+                    print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                    sys.exit(1)
+                else:
+                    print(f"Error: Unexpected argument '{arg}'", file=sys.stderr)
+                    sys.exit(1)
+
+            result = db.save_error_pattern(project_id, error_type, error_message, solution,
+                                          lang=lang, context_hints=context_hints,
+                                          stack_pattern=stack_pattern)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-error-patterns':
+            # get-error-patterns <project_id> [--lang X] [--min_confidence N] [--limit N]
+            if len(cmd_args) < 1:
+                print("Error: get-error-patterns requires at least 1 arg: <project_id>", file=sys.stderr)
+                sys.exit(1)
+
+            project_id = cmd_args[0]
+            lang = None
+            min_confidence = 0.7
+            limit = 5
+            valid_flags = {'--lang', '--min_confidence', '--limit'}
+            i = 1
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg == '--lang' and i + 1 < len(cmd_args):
+                    lang = cmd_args[i + 1]
+                    i += 2
+                elif arg == '--min_confidence' and i + 1 < len(cmd_args):
+                    try:
+                        min_confidence = float(cmd_args[i + 1])
+                    except ValueError:
+                        print(f"Error: --min_confidence must be a number", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg == '--limit' and i + 1 < len(cmd_args):
+                    try:
+                        limit = int(cmd_args[i + 1])
+                    except ValueError:
+                        print(f"Error: --limit must be an integer", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif arg.startswith('--'):
+                    print(f"Error: Unknown flag '{arg}'. Valid flags: {sorted(valid_flags)}", file=sys.stderr)
+                    sys.exit(1)
+                else:
+                    print(f"Error: Unexpected argument '{arg}'", file=sys.stderr)
+                    sys.exit(1)
+
+            result = db.get_error_patterns(project_id, lang=lang, min_confidence=min_confidence, limit=limit)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'update-error-confidence':
+            # update-error-confidence <pattern_hash> <project_id> <success|failure>
+            if len(cmd_args) < 3:
+                print("Error: update-error-confidence requires 3 args: <pattern_hash> <project_id> <success|failure>", file=sys.stderr)
+                sys.exit(1)
+
+            pattern_hash = cmd_args[0]
+            project_id = cmd_args[1]
+            outcome = cmd_args[2].lower()
+            if outcome not in ('success', 'failure'):
+                print(f"Error: Outcome must be 'success' or 'failure', got '{outcome}'", file=sys.stderr)
+                sys.exit(1)
+
+            result = db.update_error_pattern_confidence(pattern_hash, project_id, success=(outcome == 'success'))
+            print(json.dumps(result, indent=2))
+        elif cmd == 'cleanup-error-patterns':
+            # cleanup-error-patterns [project_id]
+            project_id = cmd_args[0] if len(cmd_args) > 0 else None
+            result = db.cleanup_expired_patterns(project_id)
+            print(json.dumps(result, indent=2))
         elif cmd == 'query':
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)
