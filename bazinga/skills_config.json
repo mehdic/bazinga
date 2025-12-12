@@ -57,6 +57,17 @@
   "dashboard": {
     "dashboard_ai_diagram_enabled": false
   },
+  "context_engineering": {
+    "enable_context_assembler": true,
+    "enable_fts5": false,
+    "retrieval_limits": {
+      "developer": 3,
+      "qa_expert": 5,
+      "tech_lead": 5
+    },
+    "redaction_mode": "pattern_only",
+    "token_safety_margin": 0.15
+  },
   "_metadata": {
     "description": "Skills configuration for BAZINGA agents",
     "last_updated": "2025-11-25T00:00:00Z",
