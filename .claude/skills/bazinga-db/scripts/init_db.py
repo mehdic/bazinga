@@ -757,9 +757,11 @@ def init_database(db_path: str) -> None:
                     if 'priority' not in existing_cols:
                         cursor.execute("""
                             ALTER TABLE context_packages
-                            ADD COLUMN priority TEXT DEFAULT 'medium'
+                            ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'
                             CHECK(priority IN ('low', 'medium', 'high', 'critical'))
                         """)
+                        # Backfill any NULLs (safety for older SQLite versions)
+                        cursor.execute("UPDATE context_packages SET priority = 'medium' WHERE priority IS NULL")
                         print("   ✓ Added context_packages.priority")
                     else:
                         print("   ⊘ context_packages.priority already exists")
@@ -1146,7 +1148,7 @@ def init_database(db_path: str) -> None:
             package_type TEXT NOT NULL CHECK(package_type IN ('research', 'failures', 'decisions', 'handoff', 'investigation')),
             file_path TEXT NOT NULL,
             producer_agent TEXT NOT NULL,
-            priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
             summary TEXT NOT NULL,
             size_bytes INTEGER,
             version INTEGER DEFAULT 1,
