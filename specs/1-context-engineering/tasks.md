@@ -26,9 +26,9 @@
 
 **Purpose**: Project initialization and database schema setup
 
-- [ ] T001 Create skill directory structure at `.claude/skills/context-assembler/`
-- [ ] T002 [P] Add `context_engineering` section to `bazinga/skills_config.json`
-- [ ] T003 [P] Create skill reference docs at `.claude/skills/context-assembler/references/usage.md`
+- [x] T001 Create skill directory structure at `.claude/skills/context-assembler/`
+- [x] T002 [P] Add `context_engineering` section to `bazinga/skills_config.json`
+- [x] T003 [P] Create skill reference docs at `.claude/skills/context-assembler/references/usage.md`
 
 ---
 
@@ -38,12 +38,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Extend `context_packages` table with `priority` and `summary` columns via bazinga-db skill
-- [ ] T005 [P] Create `error_patterns` table with schema from data-model.md
-- [ ] T006 [P] Create `strategies` table with schema from data-model.md
-- [ ] T007 [P] Create `consumption_scope` table with schema from data-model.md
-- [ ] T008 Enable WAL mode on bazinga.db (`PRAGMA journal_mode=WAL`)
-- [ ] T009 Create indexes per data-model.md specifications
+- [x] T004 Extend `context_packages` table with `priority` and `summary` columns via bazinga-db skill
+- [x] T005 [P] Create `error_patterns` table with schema from data-model.md
+- [x] T006 [P] Create `strategies` table with schema from data-model.md
+- [x] T007 [P] Create `consumption_scope` table with schema from data-model.md
+- [x] T008 Enable WAL mode on bazinga.db (`PRAGMA journal_mode=WAL`)
+- [x] T009 Create indexes per data-model.md specifications
 
 **Checkpoint**: Database schema ready - user story implementation can now begin
 
