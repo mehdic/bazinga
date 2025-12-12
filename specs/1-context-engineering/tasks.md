@@ -89,25 +89,26 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Add tiktoken dependency documentation to skill usage.md
-- [ ] T018 [US2] Implement model-aware token estimation in SKILL.md:
+- [x] T017 [US2] Add tiktoken dependency documentation to skill usage.md
+- [x] T018 [US2] Implement model-aware token estimation in SKILL.md:
   - Model ID to tiktoken encoding mapping
   - 15% safety margin calculation
-- [ ] T019 [US2] Implement graduated zone detection logic:
+- [x] T019 [US2] Implement graduated zone detection logic:
   - Normal (0-60%): Full context
   - Soft Warning (60-75%): Prefer summaries
   - Conservative (75-85%): Minimal context
   - Wrap-up (85-95%): Complete current only
   - Emergency (95%+): Checkpoint and break
-- [ ] T020 [US2] Add zone indicator to output (`🔶 Token budget: {Zone} ({percent}%)`)
-- [ ] T021 [US2] Implement summary-preference logic for Soft Warning zone
-- [ ] T022 [US2] Implement truncation behavior for Conservative/Wrap-up zones
-- [ ] T023 [US2] Add token budget allocation per agent type (from plan.md):
+- [x] T020 [US2] Add zone indicator to output (`🔶 Token budget: {Zone} ({percent}%)`)
+- [x] T021 [US2] Implement summary-preference logic for Soft Warning zone
+- [x] T022 [US2] Implement truncation behavior for Conservative/Wrap-up zones
+- [x] T023 [US2] Add token budget allocation per agent type (from plan.md):
   - Developer: Task 50%, Specialization 20%, Context 20%, Errors 10%
+  - Senior Software Engineer: Task 40%, Specialization 20%, Context 25%, Errors 15%
   - QA Expert: Task 40%, Specialization 15%, Context 30%, Errors 15%
   - Tech Lead: Task 30%, Specialization 15%, Context 40%, Errors 15%
 
-**Checkpoint**: Token management with graduated zones working across all agent types
+**Checkpoint**: Token management with graduated zones working across all agent types ✅
 
 ---
 
@@ -167,6 +168,7 @@
   "context_engineering": {
     "retrieval_limits": {
       "developer": 3,
+      "senior_software_engineer": 5,
       "qa_expert": 5,
       "tech_lead": 5
     }
@@ -190,7 +192,52 @@
 - [ ] T039 [P] Add database lock retry logic (exponential backoff: 100ms, 200ms, 400ms)
 - [ ] T040 [P] Update bazinga-db skill to expose context engineering table operations
 - [ ] T041 Validate quickstart.md scenarios against implementation
-- [ ] T042 Add skill to orchestrator spawn workflow documentation
+- [ ] T042 Integrate context-assembler into orchestrator spawn workflow:
+
+  **Problem**: Currently orchestrator queries `bazinga-db` directly for context packages (see `phase_simple.md` lines 24-35, 604-616, 743-755). The context-assembler skill exists but is never invoked. The 2000 token cap in context-assembler (SKILL.md line 149) is a workaround because `current_tokens` is never passed.
+
+  **Solution - Part A: Token Estimation in Orchestrator**
+  1. Track `total_spawns` in orchestrator state (already exists at line 832 in orchestrator.md)
+  2. After each Task() spawn, increment: `total_spawns += 1`
+  3. Estimate tokens: `estimated_tokens = total_spawns * 15000` (avg ~15k tokens per spawn cycle)
+  4. Store in session via bazinga-db: `estimated_token_usage` field
+
+  **Solution - Part B: Replace Direct bazinga-db Calls**
+
+  Update `bazinga/templates/orchestrator/phase_simple.md`:
+  - Lines 24-35: Replace bazinga-db context query with context-assembler invocation
+  - Lines 604-616: Same for QA Expert spawn
+  - Lines 743-755: Same for Tech Lead spawn
+
+  Update `bazinga/templates/orchestrator/phase_parallel.md`:
+  - Lines 163-174: Same pattern for parallel spawns
+
+  **New Context Query Pattern** (replace existing):
+  ```
+  context-assembler, please assemble context:
+
+  Session ID: {session_id}
+  Group ID: {group_id}
+  Agent Type: {agent_type}
+  Model: {MODEL_CONFIG[agent_type]}
+  Current Tokens: {estimated_token_usage}
+  Iteration: {iteration}
+  ```
+  Then invoke: `Skill(command: "context-assembler")`
+
+  **Solution - Part C: Remove 2000 Token Cap**
+  After orchestrator passes real `current_tokens`, remove the conservative cap from SKILL.md (lines 147-151) since zone detection will work properly.
+
+  **Files to Modify**:
+  - `bazinga/templates/orchestrator/phase_simple.md` (3 locations)
+  - `bazinga/templates/orchestrator/phase_parallel.md` (1 location)
+  - `agents/orchestrator.md` (add token tracking after spawns)
+  - `.claude/skills/context-assembler/SKILL.md` (remove 2000 cap after integration)
+
+  **Validation**:
+  - Spawn 5+ agents in sequence, verify estimated_token_usage increases
+  - At spawn 6+, zone should shift from Normal to Soft_Warning (~90k estimated)
+  - Verify context-assembler returns truncated summaries in Soft_Warning zone
 - [ ] T043 Performance validation: context assembly < 500ms (SC-005)
 
 ---
