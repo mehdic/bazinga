@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.4.0
+version: 1.5.0
 allowed-tools: [Bash, Read]
 ---
 
@@ -33,7 +33,7 @@ When invoked, execute these steps in order:
 Extract from the calling request or infer from conversation:
 - `session_id`: Current orchestration session (REQUIRED)
 - `group_id`: Task group being processed (OPTIONAL - use empty string "" if not provided)
-- `agent_type`: Target agent - developer/senior_software_engineer/qa_expert/tech_lead (REQUIRED)
+- `agent_type`: Target agent - developer/senior_software_engineer/qa_expert/tech_lead/investigator (REQUIRED)
 - `model`: Model being used - haiku/sonnet/opus or full model ID (OPTIONAL, for token budgeting)
 - `current_tokens`: Current token usage in conversation (OPTIONAL, for zone detection)
 - `iteration`: Current iteration number (optional, default 0)
@@ -52,7 +52,7 @@ AGENT_TYPE="developer"  # Replace with actual agent_type
 LIMIT=$(cat bazinga/skills_config.json 2>/dev/null | python3 -c "
 import sys, json
 agent = sys.argv[1] if len(sys.argv) > 1 else 'developer'
-defaults = {'developer': 3, 'senior_software_engineer': 5, 'qa_expert': 5, 'tech_lead': 5}
+defaults = {'developer': 3, 'senior_software_engineer': 5, 'qa_expert': 5, 'tech_lead': 5, 'investigator': 5}
 try:
     c = json.load(sys.stdin).get('context_engineering', {})
     limits = c.get('retrieval_limits', {})
@@ -90,12 +90,12 @@ If FTS5 is unavailable, Step 3 may return less optimal ranking; Step 3b provides
 MODEL="sonnet"  # or "haiku", "opus", or full model ID
 CURRENT_TOKENS=0  # Current usage if known, else 0
 
-python3 -c "
+# IMPORTANT: Use eval to capture output as shell variables
+eval "$(python3 -c "
 import sys, json
 
 try:
     import tiktoken
-    enc = tiktoken.get_encoding('cl100k_base')
     HAS_TIKTOKEN = True
 except ImportError:
     HAS_TIKTOKEN = False
@@ -118,15 +118,18 @@ except:
 model = sys.argv[1] if len(sys.argv) > 1 else 'sonnet'
 current = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 
-# Normalize model name
+# Normalize model name (longest key first to avoid partial matches)
 model_key = model.lower()
-for key in MODEL_LIMITS:
+for key in sorted(MODEL_LIMITS.keys(), key=len, reverse=True):
     if key in model_key:
         model_key = key
         break
 
 limit = MODEL_LIMITS.get(model_key, 200000)
 effective_limit = int(limit * (1 - SAFETY_MARGIN))
+
+# Calculate REMAINING budget (not total)
+remaining_budget = max(0, effective_limit - current)
 usage_pct = (current / effective_limit * 100) if effective_limit > 0 else 0
 
 # Determine zone
@@ -137,15 +140,20 @@ elif usage_pct >= 85:
 elif usage_pct >= 75:
     zone = 'Conservative'
 elif usage_pct >= 60:
-    zone = 'Soft Warning'
+    zone = 'Soft_Warning'  # Underscore for shell variable safety
 else:
     zone = 'Normal'
 
+# Output as shell variable assignments (will be eval'd)
 print(f'ZONE={zone}')
 print(f'USAGE_PCT={usage_pct:.1f}')
 print(f'EFFECTIVE_LIMIT={effective_limit}')
+print(f'REMAINING_BUDGET={remaining_budget}')
 print(f'HAS_TIKTOKEN={HAS_TIKTOKEN}')
-" "$MODEL" "$CURRENT_TOKENS"
+" "$MODEL" "$CURRENT_TOKENS")"
+
+# Now $ZONE, $USAGE_PCT, $EFFECTIVE_LIMIT, $REMAINING_BUDGET, $HAS_TIKTOKEN are set
+echo "Zone: $ZONE, Usage: $USAGE_PCT%, Remaining: $REMAINING_BUDGET tokens"
 ```
 
 **Token Zone Behaviors:**
@@ -166,206 +174,270 @@ print(f'HAS_TIKTOKEN={HAS_TIKTOKEN}')
 | senior_software_engineer | 40% | 20% | 25% | 15% |
 | qa_expert | 40% | 15% | 30% | 15% |
 | tech_lead | 30% | 15% | 40% | 15% |
+| investigator | 35% | 15% | 35% | 15% |
 
-**Note:** SSE handles escalations from failed developer attempts, so it needs more context and error budget.
+**Note:** SSE and Investigator handle escalations/complex debugging, so they need more context and error budget.
 
-### Step 3: Query Context Packages
+### Step 3: Query Context Packages (Zone-Conditional)
 
-**Database Retry Logic:**
+**CRITICAL: Execute query based on zone from Step 2c**
 
-All database queries should use exponential backoff to handle SQLITE_BUSY and locked errors:
+The query behavior depends entirely on the zone. Use this conditional structure:
 
-```python
-# Retry wrapper for database operations (use in any DB query)
+```bash
+# Zone-conditional query execution
+# Variables from previous steps: $ZONE, $SESSION_ID, $GROUP_ID, $AGENT_TYPE, $LIMIT, $REMAINING_BUDGET
+
+# Initialize result variable
+QUERY_RESULT=""
+
+if [ "$ZONE" = "Emergency" ]; then
+    # Emergency zone: Skip all queries, go directly to Step 5
+    echo "ZONE=Emergency: Skipping context query, proceeding to emergency output"
+    QUERY_RESULT='{"packages":[],"total_available":0,"zone_skip":true}'
+
+elif [ "$ZONE" = "Wrap-up" ]; then
+    # Wrap-up zone: Skip context packages, minimal output only
+    echo "ZONE=Wrap-up: Skipping context packages"
+    QUERY_RESULT='{"packages":[],"total_available":0,"zone_skip":true}'
+
+elif [ "$ZONE" = "Conservative" ]; then
+    # Conservative zone: Priority fallback with LIMIT items across buckets
+    echo "ZONE=Conservative: Using priority fallback ladder"
+    QUERY_RESULT=$(python3 -c "
+import sqlite3
+import json
+import sys
 import time
+
+session_id = sys.argv[1]
+group_id = sys.argv[2]
+limit = int(sys.argv[3])
+
+def db_query_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 250, 500]):
+    '''Execute parameterized query with retry on SQLITE_BUSY.'''
+    for attempt in range(max_retries + 1):
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            rows = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return rows
+        except sqlite3.OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries:
+                time.sleep(backoff_ms[attempt] / 1000.0)
+                continue
+            return []
+    return []
+
+db_path = 'bazinga/bazinga.db'
+
+# Priority fallback: fill up to LIMIT across critical → high → medium
+priorities = ['critical', 'high', 'medium']
+collected = []
+total_available = 0
+
+for priority in priorities:
+    if len(collected) >= limit:
+        break
+    remaining = limit - len(collected)
+
+    # Count total available at this priority (parameterized - NO SQL injection)
+    count_sql = '''SELECT COUNT(*) as cnt FROM context_packages
+                   WHERE session_id = ?
+                   AND (group_id = ? OR group_id IS NULL OR ? = '')
+                   AND priority = ?'''
+    count_result = db_query_with_retry(db_path, count_sql, (session_id, group_id, group_id, priority))
+    if count_result:
+        total_available += count_result[0].get('cnt', 0)
+
+    # Fetch packages at this priority (parameterized - NO SQL injection)
+    fetch_sql = '''SELECT id, file_path, priority, summary FROM context_packages
+                   WHERE session_id = ?
+                   AND (group_id = ? OR group_id IS NULL OR ? = '')
+                   AND priority = ?
+                   ORDER BY created_at DESC LIMIT ?'''
+    packages = db_query_with_retry(db_path, fetch_sql, (session_id, group_id, group_id, priority, remaining))
+    collected.extend(packages)
+
+print(json.dumps({'packages': collected, 'total_available': total_available}))
+" "$SESSION_ID" "$GROUP_ID" "$LIMIT")
+
+else
+    # Normal or Soft_Warning zone: Standard query
+    echo "ZONE=$ZONE: Standard query with LIMIT=$LIMIT"
+    QUERY_RESULT=$(python3 -c "
 import subprocess
 import json
+import sys
+import time
+
+session_id = sys.argv[1]
+group_id = sys.argv[2]
+agent_type = sys.argv[3]
+limit = int(sys.argv[4])
 
 def db_query_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
-    """Execute bazinga-db query with exponential backoff on failures."""
     for attempt in range(max_retries + 1):
         result = subprocess.run(cmd_args, capture_output=True, text=True)
         if result.returncode == 0:
             try:
                 return json.loads(result.stdout) if result.stdout.strip() else []
             except json.JSONDecodeError:
-                return result.stdout
-
-        # Check for retryable errors
+                return []
         if 'SQLITE_BUSY' in result.stderr or 'database is locked' in result.stderr:
             if attempt < max_retries:
                 time.sleep(backoff_ms[attempt] / 1000.0)
                 continue
+        return []
+    return []
 
-        # Non-retryable error or max retries exceeded
-        return None
-    return None
+# Use bazinga-db get-context-packages (parameterized, safe)
+result = db_query_with_retry([
+    'python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet',
+    'get-context-packages', session_id, group_id, agent_type, str(limit)
+])
+
+# If result is dict with 'packages' key, use it; otherwise wrap
+if isinstance(result, dict):
+    print(json.dumps(result))
+elif isinstance(result, list):
+    print(json.dumps({'packages': result, 'total_available': len(result)}))
+else:
+    print(json.dumps({'packages': [], 'total_available': 0}))
+" "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$LIMIT")
+fi
+
+# Parse result for next steps
+echo "Query result: $QUERY_RESULT"
 ```
 
-**IMPORTANT: Zone-Aware Behavior**
+**If query fails or returns empty, proceed to Step 3b (Heuristic Fallback).**
 
-Before querying, check the zone from Step 2c:
+### Step 3c: Token Packing with Redaction (Apply AFTER Step 3b)
 
-- **Emergency zone (95%+)**: Skip directly to Step 5 with emergency output
-- **Wrap-up zone (85-95%)**: Skip context packages, return minimal output
-- **Conservative zone (75-85%)**: Query with priority fallback ladder (LIMIT=1)
-- **Soft Warning zone (60-75%)**: Normal query, but prefer summaries in output
-- **Normal zone (0-60%)**: Full context query
-
-**Standard Query (Normal/Soft Warning zones):**
-```bash
-# Use shell variables - do NOT interpolate user input directly into commands
-SESSION_ID="bazinga_20250212_143530"
-GROUP_ID="group_a"
-AGENT_TYPE="developer"
-LIMIT=3  # From Step 2a
-
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
-  "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$LIMIT"
-```
-
-**Conservative Zone Query (Priority Fallback Ladder):**
-
-In Conservative zone, try priorities in order: critical → high → medium until at least one package found:
+After Step 3 or 3b retrieves packages, apply redaction, truncation, and token packing in the correct order:
 
 ```bash
-# Conservative zone: Priority fallback ladder to prevent starvation
-SESSION_ID="bazinga_20250212_143530"
-GROUP_ID="group_a"
-AGENT_TYPE="developer"
+# Token packing with proper order: redact → truncate → estimate → pack
+# Input: $QUERY_RESULT (JSON from Step 3), $ZONE, $AGENT_TYPE, $REMAINING_BUDGET
 
-python3 -c "
-import subprocess
+PACKED_RESULT=$(python3 -c "
 import json
 import sys
+import re
 
-session_id = sys.argv[1]
-group_id = sys.argv[2]
+# Inputs from command line
+query_result = json.loads(sys.argv[1])
+zone = sys.argv[2]
 agent_type = sys.argv[3]
+remaining_budget = int(sys.argv[4])
 
-# Priority fallback ladder: critical → high → medium
-priorities = ['critical', 'high', 'medium']
+packages = query_result.get('packages', [])
+total_available = query_result.get('total_available', len(packages))
 
-for priority in priorities:
-    result = subprocess.run([
-        'python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet', 'query',
-        f\"\"\"SELECT id, file_path, priority, summary FROM context_packages
-           WHERE session_id = '{session_id}'
-           AND (group_id = '{group_id}' OR group_id IS NULL OR '{group_id}' = '')
-           AND priority = '{priority}'
-           ORDER BY created_at DESC LIMIT 1\"\"\"
-    ], capture_output=True, text=True)
+# --- Redaction Patterns (apply FIRST) ---
+REDACTION_PATTERNS = [
+    (r'(?i)(api[_-]?key|apikey|access[_-]?token|auth[_-]?token|bearer)[\"\\s:=]+[\"\\']?([a-zA-Z0-9_\\-]{20,})[\"\\']?', r'\\1=[REDACTED]'),
+    (r'(?i)(aws[_-]?(access|secret)[_-]?key[_-]?id?)[\"\\s:=]+[\"\\']?([A-Z0-9]{16,})[\"\\']?', r'\\1=[REDACTED]'),
+    (r'(?i)(password|passwd|secret|private[_-]?key)[\"\\s:=]+[\"\\']?([^\\s\"\\'\n]{8,})[\"\\']?', r'\\1=[REDACTED]'),
+    (r'(?i)(mongodb|postgres|mysql|redis|amqp)://[^\\s]+@', r'\\1://[REDACTED]@'),
+    (r'eyJ[a-zA-Z0-9_-]*\\.eyJ[a-zA-Z0-9_-]*\\.[a-zA-Z0-9_-]*', '[JWT_REDACTED]'),
+]
 
-    try:
-        packages = json.loads(result.stdout)
-        if packages and len(packages) > 0:
-            # Found a package at this priority level
-            print(json.dumps({'packages': packages, 'total_available': len(packages), 'priority_used': priority}))
-            sys.exit(0)
-    except:
-        continue
+def redact_text(text):
+    for pattern, replacement in REDACTION_PATTERNS:
+        text = re.sub(pattern, replacement, text)
+    return text
 
-# No packages found at any priority - return empty
-print(json.dumps({'packages': [], 'total_available': 0, 'priority_used': None}))
-" "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE"
-```
+# --- Truncation limits per zone ---
+SUMMARY_LIMITS = {
+    'Normal': 400,
+    'Soft_Warning': 200,
+    'Conservative': 100,
+    'Wrap-up': 60,
+    'Emergency': 0
+}
 
-This prevents Conservative zone from returning empty when no critical packages exist.
+def truncate_summary(summary, zone):
+    max_len = SUMMARY_LIMITS.get(zone, 400)
+    if len(summary) <= max_len:
+        return summary
+    truncated = summary[:max_len].rsplit(' ', 1)[0]
+    return truncated + '...'
 
-**Without group_id (session-wide):**
-```bash
-# Pass empty string for group_id to get session-wide packages
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
-  "$SESSION_ID" "" "$AGENT_TYPE" "$LIMIT"
-```
-
-**Parse the JSON response:**
-- `packages`: Array of context packages with `id`, `file_path`, `priority`, `summary`
-- `total_available`: Total packages matching criteria (for overflow calculation)
-- If `total_available` > `LIMIT`, there are more packages available
-
-If this command fails or returns empty `packages`, proceed to Step 3b.
-
-### Step 3c: Bottom-Up Token Packing (Budget Enforcement)
-
-After retrieving packages, apply token budget enforcement by packing summaries until budget is met:
-
-```python
-# Bottom-up token packing for real budget enforcement
-import json
-
-def estimate_tokens(text: str, has_tiktoken: bool = False) -> int:
-    """Estimate token count for text."""
-    if has_tiktoken:
-        try:
-            import tiktoken
-            enc = tiktoken.get_encoding('cl100k_base')
-            return len(enc.encode(text))
-        except:
-            pass
-    # Fallback: ~4 chars per token (conservative)
+# --- Token estimation ---
+def estimate_tokens(text):
+    # ~4 chars per token (conservative fallback)
     return len(text) // 4 + 1
 
-def pack_packages_to_budget(packages: list, zone: str, agent_type: str, effective_limit: int) -> list:
-    """Pack packages until context budget is met."""
+# --- Budget allocation ---
+CONTEXT_PCT = {
+    'developer': 0.20,
+    'senior_software_engineer': 0.25,
+    'qa_expert': 0.30,
+    'tech_lead': 0.40,
+    'investigator': 0.35
+}
 
-    # Budget allocation for context packages (from plan.md)
-    context_pct = {
-        'developer': 0.20,
-        'senior_software_engineer': 0.25,
-        'qa_expert': 0.30,
-        'tech_lead': 0.40
-    }
+pct = CONTEXT_PCT.get(agent_type, 0.20)
+context_budget = int(remaining_budget * pct)  # Use REMAINING, not total
 
-    # Summary truncation limits per zone
-    summary_limits = {
-        'Normal': 400,
-        'Soft Warning': 200,
-        'Conservative': 100,
-        'Wrap-up': 60,
-        'Emergency': 0
-    }
+# --- Process packages: redact → truncate → estimate → pack ---
+packed = []
+used_tokens = 0
+package_ids = []
 
-    # Calculate context budget in tokens
-    pct = context_pct.get(agent_type, 0.20)
-    context_budget = int(effective_limit * pct)
-    summary_limit = summary_limits.get(zone, 400)
+for pkg in packages:
+    raw_summary = pkg.get('summary', '')
 
-    packed = []
-    used_tokens = 0
+    # 1. REDACT first
+    redacted_summary = redact_text(raw_summary)
 
-    for pkg in packages:
-        # Truncate summary for this zone
-        summary = pkg.get('summary', '')[:summary_limit]
-        if len(pkg.get('summary', '')) > summary_limit:
-            summary = summary.rsplit(' ', 1)[0] + '...'
+    # 2. TRUNCATE second
+    truncated_summary = truncate_summary(redacted_summary, zone)
 
-        # Estimate tokens for this package (path + priority + summary + formatting)
-        pkg_text = f"**[{pkg.get('priority', 'medium').upper()}]** {pkg.get('file_path', '')}\n> {summary}"
-        pkg_tokens = estimate_tokens(pkg_text)
+    # 3. ESTIMATE tokens
+    pkg_text = f\"**[{pkg.get('priority', 'medium').upper()}]** {pkg.get('file_path', '')}\\n> {truncated_summary}\"
+    pkg_tokens = estimate_tokens(pkg_text)
 
-        # Check if adding this would exceed budget
-        if used_tokens + pkg_tokens > context_budget:
-            break  # Stop packing
+    # 4. PACK if within budget
+    if used_tokens + pkg_tokens > context_budget:
+        break
 
-        # Add package with truncated summary
-        packed.append({**pkg, 'summary': summary, 'est_tokens': pkg_tokens})
-        used_tokens += pkg_tokens
+    packed.append({
+        'id': pkg.get('id'),
+        'file_path': pkg.get('file_path'),
+        'priority': pkg.get('priority'),
+        'summary': truncated_summary,
+        'est_tokens': pkg_tokens
+    })
+    package_ids.append(pkg.get('id'))
+    used_tokens += pkg_tokens
 
-    return packed
+print(json.dumps({
+    'packages': packed,
+    'total_available': total_available,
+    'used_tokens': used_tokens,
+    'budget': context_budget,
+    'package_ids': package_ids
+}))
+" "$QUERY_RESULT" "$ZONE" "$AGENT_TYPE" "$REMAINING_BUDGET")
+
+# Extract package IDs for Step 5b consumption tracking
+PACKAGE_IDS=($(echo "$PACKED_RESULT" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin).get('package_ids', [])))"))
+
+echo "Packed result: $PACKED_RESULT"
+echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 ```
 
-**Usage:**
-```python
-# After Step 3 query
-packages = query_result.get('packages', [])
-effective_limit = EFFECTIVE_LIMIT  # From Step 2c
-
-# Apply token packing
-packed_packages = pack_packages_to_budget(packages, zone, agent_type, effective_limit)
-```
-
-This ensures context stays within the allocated budget percentage for each agent type.
+**Key improvements:**
+- Uses `REMAINING_BUDGET` (not total limit)
+- Applies redaction BEFORE truncation
+- Populates `PACKAGE_IDS` array for Step 5b
+- Includes `investigator` in budget allocation
 
 ### Step 3b: Heuristic Fallback (Query Failed or FTS5 Unavailable)
 
@@ -602,44 +674,67 @@ Note: `priority_used` comes from the fallback ladder response (critical/high/med
 
 ### Step 5b: Mark Packages as Consumed
 
+**IMPORTANT: Only run if zone is Normal or Soft_Warning (skip for Wrap-up/Emergency)**
+
 After formatting output, mark delivered packages as consumed to prevent repeated delivery:
 
 ```bash
-# Mark consumed packages via bazinga-db
-# Call this for each package that was included in the output
-SESSION_ID="bazinga_20250212_143530"
-AGENT_TYPE="developer"
-ITERATION=0  # Current iteration number
-
-# For each package_id in packed_packages:
-python3 -c "
+# Only mark consumption if packages were actually delivered
+if [ "$ZONE" != "Emergency" ] && [ "$ZONE" != "Wrap-up" ] && [ ${#PACKAGE_IDS[@]} -gt 0 ]; then
+    # Mark consumed packages using bazinga-db with retry
+    # Note: Uses context_package_consumers table (unified table)
+    python3 -c "
 import subprocess
-import json
 import sys
+import time
+import sqlite3
 
 session_id = sys.argv[1]
 agent_type = sys.argv[2]
 iteration = int(sys.argv[3])
 package_ids = sys.argv[4:]  # Remaining args are package IDs
 
-for pkg_id in package_ids:
-    # Insert consumption record (use db_query_with_retry if available)
-    subprocess.run([
-        'python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet', 'execute',
-        f\"\"\"INSERT OR IGNORE INTO consumption_scope (package_id, session_id, agent_type, iteration, consumed_at)
-           VALUES ('{pkg_id}', '{session_id}', '{agent_type}', {iteration}, datetime('now'))\"\"\"
-    ], capture_output=True)
+def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 250, 500]):
+    '''Execute SQL with retry on SQLITE_BUSY.'''
+    for attempt in range(max_retries + 1):
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries:
+                time.sleep(backoff_ms[attempt] / 1000.0)
+                continue
+            return False
+    return False
 
-print(f'Marked {len(package_ids)} packages as consumed')
+# Insert consumption records using parameterized queries (no SQL injection)
+db_path = 'bazinga/bazinga.db'
+sql = '''INSERT OR IGNORE INTO context_package_consumers
+         (package_id, agent_type, session_id, iteration, consumed_at)
+         VALUES (?, ?, ?, ?, datetime('now'))'''
+
+marked = 0
+for pkg_id in package_ids:
+    if db_execute_with_retry(db_path, sql, (pkg_id, agent_type, session_id, iteration)):
+        marked += 1
+
+print(f'Marked {marked}/{len(package_ids)} packages as consumed')
 " "$SESSION_ID" "$AGENT_TYPE" "$ITERATION" "${PACKAGE_IDS[@]}"
+else
+    echo "Skipping consumption tracking (zone=$ZONE or no packages)"
+fi
 ```
 
-**Why mark consumption?**
-- Prevents repeated delivery of same packages across iterations
-- Enables iteration-aware freshness scoring
-- Reduces token waste from redundant context
-
-**Note:** Use `INSERT OR IGNORE` to handle duplicate consumption (same package, same agent, same iteration).
+**Key improvements:**
+- Uses **parameterized queries** (no SQL injection via f-strings)
+- Uses **context_package_consumers** table (unified, not consumption_scope)
+- Includes **retry logic** for SQLITE_BUSY
+- **Skips** in Wrap-up/Emergency zones (nothing delivered)
+- Uses **sqlite3 directly** for parameterized safety
 
 ### Step 6: Handle Edge Cases
 
@@ -682,7 +777,8 @@ From `bazinga/skills_config.json`:
       "developer": 3,
       "senior_software_engineer": 5,
       "qa_expert": 5,
-      "tech_lead": 5
+      "tech_lead": 5,
+      "investigator": 5
     },
     "redaction_mode": "pattern_only",
     "token_safety_margin": 0.15
@@ -823,9 +919,11 @@ Task(
 | Table | Purpose |
 |-------|---------|
 | `context_packages` | Research files, findings, artifacts with priority/summary |
-| `context_package_consumers` | Per-agent consumption tracking |
+| `context_package_consumers` | Per-agent consumption tracking (unified table with session_id, iteration) |
 | `error_patterns` | Captured error signatures with solutions |
 | `sessions` | Session metadata including project_id |
+
+**Note:** The `context_package_consumers` table has columns: `package_id`, `agent_type`, `session_id`, `iteration`, `consumed_at`. Step 5b uses this for tracking delivery and preventing duplicate context.
 
 ---
 

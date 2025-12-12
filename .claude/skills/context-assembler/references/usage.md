@@ -1,7 +1,7 @@
 # Context-Assembler Usage Guide
 
-**Version**: 1.4.0
-**Status**: Production Ready (Phase 4.1 + 4.2 Complete - Functional Token Enforcement)
+**Version**: 1.5.0
+**Status**: Production Ready (Phase 4.3 + 4.4 Complete - Code Execution Fixes)
 
 ## Overview
 
@@ -20,17 +20,17 @@ pip install tiktoken
 
 **Model-to-Encoding Mapping:**
 
-| Model ID | Encoding | Tokens/Char |
-|----------|----------|-------------|
-| claude-opus-4-20250514 | cl100k_base | ~3.5 |
-| claude-sonnet-4-20250514 | cl100k_base | ~3.5 |
-| claude-3-5-sonnet | cl100k_base | ~3.5 |
-| claude-3-5-haiku | cl100k_base | ~3.5 |
-| haiku | cl100k_base | ~3.5 |
-| sonnet | cl100k_base | ~3.5 |
-| opus | cl100k_base | ~3.5 |
+| Model ID | Encoding | Chars/Token (approx) |
+|----------|----------|----------------------|
+| claude-opus-4-20250514 | cl100k_base | ~4 |
+| claude-sonnet-4-20250514 | cl100k_base | ~4 |
+| claude-3-5-sonnet | cl100k_base | ~4 |
+| claude-3-5-haiku | cl100k_base | ~4 |
+| haiku | cl100k_base | ~4 |
+| sonnet | cl100k_base | ~4 |
+| opus | cl100k_base | ~4 |
 
-**Note:** Claude models use similar tokenization to GPT-4. The `cl100k_base` encoding provides accurate estimates for all Claude models.
+**Note:** Claude models use similar tokenization to GPT-4. The `cl100k_base` encoding provides approximate planning estimates; verify against actual usage where possible.
 
 **Safety Margin:**
 All token estimates include a 15% safety margin (configurable via `token_safety_margin` in skills_config.json):
@@ -133,8 +133,9 @@ Different agent types receive different context budgets:
 | Senior Software Engineer | 40% | 20% | 25% | 15% | 100% |
 | QA Expert | 40% | 15% | 30% | 15% | 100% |
 | Tech Lead | 30% | 15% | 40% | 15% | 100% |
+| Investigator | 35% | 15% | 35% | 15% | 100% |
 
-**Note:** SSE handles escalations from failed developer attempts, so it receives more context and error budget than developers.
+**Note:** SSE and Investigator handle escalations/complex debugging, so they receive more context and error budget than developers.
 
 ## Graduated Token Zones
 
@@ -162,7 +163,8 @@ Configurable per agent type in `bazinga/skills_config.json`:
       "developer": 3,
       "senior_software_engineer": 5,
       "qa_expert": 5,
-      "tech_lead": 5
+      "tech_lead": 5,
+      "investigator": 5
     }
   }
 }
@@ -203,7 +205,8 @@ Full configuration in `bazinga/skills_config.json`:
       "developer": 3,
       "senior_software_engineer": 5,
       "qa_expert": 5,
-      "tech_lead": 5
+      "tech_lead": 5,
+      "investigator": 5
     },
     "redaction_mode": "pattern_only",
     "token_safety_margin": 0.15
