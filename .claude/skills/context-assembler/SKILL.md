@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.0.0
+version: 1.1.0
 allowed-tools: [Bash, Read]
 ---
 
@@ -32,40 +32,94 @@ When invoked, execute these steps in order:
 
 Extract from the calling request or infer from conversation:
 - `session_id`: Current orchestration session (REQUIRED)
-- `group_id`: Task group being processed (optional, defaults to session-wide)
+- `group_id`: Task group being processed (OPTIONAL - use empty string "" if not provided)
 - `agent_type`: Target agent - developer/qa_expert/tech_lead (REQUIRED)
 - `iteration`: Current iteration number (optional, default 0)
 
-If parameters are missing, check recent conversation context or ask the orchestrator.
+If `session_id` or `agent_type` are missing, check recent conversation context or ask the orchestrator.
 
-### Step 2: Load Configuration
+### Step 2: Load Configuration and Check FTS5
 
-Read retrieval limits from `bazinga/skills_config.json`:
+**Step 2a: Load retrieval limit for this agent type:**
 
 ```bash
-cat bazinga/skills_config.json 2>/dev/null | python3 -c "import sys,json; c=json.load(sys.stdin).get('context_engineering',{}); print(json.dumps(c))" 2>/dev/null || echo '{"retrieval_limits":{"developer":3,"qa_expert":5,"tech_lead":5}}'
+# Extract retrieval limit for the specific agent type (defaults to 3 if not configured)
+AGENT_TYPE="developer"  # Replace with actual agent_type
+LIMIT=$(cat bazinga/skills_config.json 2>/dev/null | python3 -c "
+import sys, json
+try:
+    c = json.load(sys.stdin).get('context_engineering', {})
+    limits = c.get('retrieval_limits', {})
+    print(limits.get('$AGENT_TYPE', 3))
+except:
+    print(3)
+" 2>/dev/null || echo 3)
+echo "Retrieval limit for $AGENT_TYPE: $LIMIT"
 ```
 
-Extract:
-- `retrieval_limits.{agent_type}` - Max packages for this agent (default: 3)
-- `enable_fts5` - Whether to use FTS5 (default: false)
+Default limits: developer=3, qa_expert=5, tech_lead=5
+
+**Step 2b: Check FTS5 availability:**
+
+```bash
+# Test FTS5 support by attempting to create a virtual table
+python3 -c "
+import sqlite3
+try:
+    conn = sqlite3.connect(':memory:')
+    conn.execute('CREATE VIRTUAL TABLE test USING fts5(x)')
+    print('FTS5_AVAILABLE=true')
+except:
+    print('FTS5_AVAILABLE=false')
+" 2>/dev/null || echo "FTS5_AVAILABLE=false"
+```
+
+If FTS5 is unavailable, Step 3 may return less optimal ranking; Step 3b provides heuristic fallback.
 
 ### Step 3: Query Context Packages
 
-Use bazinga-db skill to get relevant packages:
-
+**With group_id:**
 ```bash
+# Use shell variables - do NOT interpolate user input directly into commands
+SESSION_ID="bazinga_20250212_143530"
+GROUP_ID="group_a"
+AGENT_TYPE="developer"
+LIMIT=3
+
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
-  "<session_id>" "<group_id>" "<agent_type>" <limit>
+  "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$LIMIT"
 ```
 
-If this fails or returns empty, proceed to Step 3b (Heuristic Fallback).
+**Without group_id (session-wide):**
+```bash
+# Pass empty string for group_id to get session-wide packages
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
+  "$SESSION_ID" "" "$AGENT_TYPE" "$LIMIT"
+```
 
-### Step 3b: Heuristic Fallback (FTS5 Unavailable or Query Failed)
+**Parse the JSON response:**
+- `packages`: Array of context packages with `id`, `file_path`, `priority`, `summary`
+- `total_available`: Total packages matching criteria (for overflow calculation)
+- If `total_available` > `LIMIT`, there are more packages available
 
-If the database query fails or FTS5 is unavailable, use heuristic ranking on raw results:
+If this command fails or returns empty `packages`, proceed to Step 3b.
 
-**Priority Weights:**
+### Step 3b: Heuristic Fallback (Query Failed or FTS5 Unavailable)
+
+**First, fetch raw context packages from database:**
+
+```bash
+# Fetch all packages for this session (with optional group filter)
+SESSION_ID="bazinga_20250212_143530"
+GROUP_ID="group_a"  # or empty string for session-wide
+
+# Query raw packages - use parameterized approach via bazinga-db
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+  "SELECT id, file_path, priority, summary, group_id, created_at FROM context_packages WHERE session_id = '$SESSION_ID'"
+```
+
+**Then apply heuristic ranking:**
+
 | Priority | Weight |
 |----------|--------|
 | critical | 4 |
@@ -79,31 +133,44 @@ score = (priority_weight * 4) + (same_group_boost * 2) + (agent_relevance * 1.5)
 
 Where:
 - same_group_boost = 1 if package.group_id == request.group_id, else 0
-- agent_relevance = 1 if agent_type in package.consumers, else 0
+- agent_relevance = 1 if agent_type appears in package consumers, else 0
 - recency_factor = 1 / (days_since_created + 1)
 ```
 
 Sort packages by score DESC, take top N based on retrieval_limit.
+Calculate: `overflow_count = max(0, total_packages - limit)`
 
 ### Step 4: Query Error Patterns (Optional)
 
-If error patterns might be relevant (e.g., agent previously failed), query them via bazinga-db:
+If the agent previously failed or error patterns might be relevant:
 
+**Step 4a: Get project_id from session:**
 ```bash
-# Get the project_id from session metadata (or use 'default')
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query "SELECT COALESCE(json_extract(metadata, '$.project_id'), 'default') as project_id FROM sessions WHERE session_id = '<session_id>'"
+SESSION_ID="bazinga_20250212_143530"
 
-# Then query error patterns for that project with confidence > 0.7
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query "SELECT pattern_hash, signature_json, solution, confidence, occurrences FROM error_patterns WHERE project_id = '<project_id>' AND confidence > 0.7 ORDER BY confidence DESC, occurrences DESC LIMIT 3"
+# Retrieve project_id (defaults to 'default' if not set)
+PROJECT_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+  "SELECT COALESCE(json_extract(metadata, '\$.project_id'), 'default') as pid FROM sessions WHERE session_id = '$SESSION_ID'" \
+  2>/dev/null | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['pid'] if r else 'default')" 2>/dev/null || echo "default")
 ```
 
-If no session or project_id found, use 'default' as the project identifier.
+**Step 4b: Query matching error patterns:**
+```bash
+# Filter by project_id and optionally session_id for more specific matches
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+  "SELECT signature_json, solution, confidence, occurrences FROM error_patterns WHERE project_id = '$PROJECT_ID' AND confidence > 0.7 ORDER BY confidence DESC, occurrences DESC LIMIT 3"
+```
 
 Only include patterns with confidence > 0.7 in the output.
 
 ### Step 5: Format Output
 
-Format the assembled context as markdown:
+**Compute display values:**
+- `count` = number of packages returned (up to limit)
+- `available` = total_available from Step 3 response (or total from Step 3b query)
+- `overflow_count` = max(0, available - count)
+
+**Format as markdown:**
 
 ```markdown
 ## Context for {agent_type}
@@ -116,16 +183,12 @@ Format the assembled context as markdown:
 **[{PRIORITY}]** {file_path}
 > {summary}
 
-{...more packages...}
+### Error Patterns ({pattern_count} matches)
 
-### Error Patterns ({count} matches)
-
-{If error patterns exist and confidence > 0.7:}
-:warning: **Known Issue**: "{message_pattern}"
+:warning: **Known Issue**: "{error_signature}"
 > **Solution**: {solution}
 > **Confidence**: {confidence} (seen {occurrences} times)
 
-{If overflow exists:}
 :package: +{overflow_count} more packages available (re-invoke with higher limit to expand)
 ```
 
@@ -135,10 +198,12 @@ Format the assembled context as markdown:
 - `[MEDIUM]` - Priority: medium
 - `[LOW]` - Priority: low
 
+**Only show overflow indicator if overflow_count > 0.**
+
 ### Step 6: Handle Edge Cases
 
 **Empty Packages:**
-If no context packages are found, output:
+If no context packages are found (count=0, available=0):
 ```markdown
 ## Context for {agent_type}
 
@@ -149,7 +214,7 @@ No context packages found for this session/group. The agent will proceed with ta
 
 **Graceful Degradation:**
 If ANY step fails (database unavailable, query error, etc.):
-1. Log a warning (but do NOT block)
+1. Log a warning (but do NOT block execution)
 2. Return minimal context:
 ```markdown
 ## Context for {agent_type}
@@ -159,7 +224,7 @@ If ANY step fails (database unavailable, query error, etc.):
 **Fallback Mode**: Task and specialization context only. Context packages unavailable.
 ```
 
-3. The orchestrator should NEVER block on context-assembler failure
+3. **CRITICAL**: The orchestrator should NEVER block on context-assembler failure
 
 ---
 
@@ -229,15 +294,23 @@ Assemble context for developer spawn:
 :package: +4 more packages available (re-invoke with higher limit to expand)
 ```
 
-### Example 2: Empty Context
+### Example 2: Session-Wide Context (No Group)
 
 **Request:**
 ```
-Assemble context for QA spawn:
-- Session: bazinga_new_session
-- Group: group_a
-- Agent: qa_expert
+Assemble context for tech_lead spawn:
+- Session: bazinga_20250212_143530
+- Group: (none - session-wide)
+- Agent: tech_lead
 ```
+
+**Commands used:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
+  "bazinga_20250212_143530" "" "tech_lead" 5
+```
+
+### Example 3: Empty Context
 
 **Output:**
 ```markdown
@@ -248,14 +321,7 @@ Assemble context for QA spawn:
 No context packages found for this session/group. The agent will proceed with task and specialization context only.
 ```
 
-### Example 3: Error/Fallback
-
-**Request:**
-```
-Assemble context for tech_lead spawn:
-- Session: bazinga_broken_db
-- Agent: tech_lead
-```
+### Example 4: Error/Fallback
 
 **Output (if database unavailable):**
 ```markdown
@@ -268,17 +334,23 @@ Assemble context for tech_lead spawn:
 
 ---
 
-## FTS5 Detection
+## Security Notes
 
-To check if FTS5 is available in the current SQLite installation:
+**Parameter Handling:**
+- Always assign user-provided values to shell variables first
+- Use quoted variable expansion (`"$VAR"`) in commands
+- The bazinga-db CLI uses positional arguments (safer than string interpolation)
+- Avoid constructing SQL strings with raw user input
 
+**Example of safe vs unsafe:**
 ```bash
-sqlite3 :memory: "SELECT sqlite_compileoption_used('ENABLE_FTS5')" 2>/dev/null
+# SAFE: Use shell variables with quotes
+SESSION_ID="user_provided_session"
+python3 ... --quiet get-context-packages "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$LIMIT"
+
+# UNSAFE: Direct string interpolation (avoid this)
+python3 ... --quiet query "SELECT * FROM t WHERE id = 'user_input'"
 ```
-
-Returns `1` if FTS5 is available, `0` or error if not.
-
-If FTS5 is unavailable, the skill automatically falls back to heuristic ranking (Step 3b).
 
 ---
 
@@ -311,6 +383,7 @@ Task(
 | `context_packages` | Research files, findings, artifacts with priority/summary |
 | `context_package_consumers` | Per-agent consumption tracking |
 | `error_patterns` | Captured error signatures with solutions |
+| `sessions` | Session metadata including project_id |
 
 ---
 
