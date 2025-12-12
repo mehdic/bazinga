@@ -1,11 +1,48 @@
 # Context-Assembler Usage Guide
 
-**Version**: 1.2.0
-**Status**: Production Ready (Phase 3 Complete)
+**Version**: 1.3.0
+**Status**: Production Ready (Phase 4 Complete - Token Management)
 
 ## Overview
 
 The context-assembler skill provides intelligent context assembly for BAZINGA agents. It retrieves, ranks, and delivers relevant context packages while respecting token budgets and learning from error patterns.
+
+## Dependencies
+
+### tiktoken (Token Estimation)
+
+The context-assembler uses `tiktoken` for accurate, model-aware token estimation with a 15% safety margin.
+
+**Installation:**
+```bash
+pip install tiktoken
+```
+
+**Model-to-Encoding Mapping:**
+
+| Model ID | Encoding | Tokens/Char |
+|----------|----------|-------------|
+| claude-opus-4-20250514 | cl100k_base | ~3.5 |
+| claude-sonnet-4-20250514 | cl100k_base | ~3.5 |
+| claude-3-5-sonnet | cl100k_base | ~3.5 |
+| claude-3-5-haiku | cl100k_base | ~3.5 |
+| haiku | cl100k_base | ~3.5 |
+| sonnet | cl100k_base | ~3.5 |
+| opus | cl100k_base | ~3.5 |
+
+**Note:** Claude models use similar tokenization to GPT-4. The `cl100k_base` encoding provides accurate estimates for all Claude models.
+
+**Safety Margin:**
+All token estimates include a 15% safety margin (configurable via `token_safety_margin` in skills_config.json):
+```
+effective_budget = model_limit * (1 - safety_margin)
+```
+
+**Fallback Behavior:**
+If tiktoken is unavailable:
+1. Uses character-based estimation (~4 chars per token)
+2. Logs warning about reduced accuracy
+3. Continues with heuristic token counting
 
 ## Invocation
 
@@ -263,6 +300,15 @@ Packages can have one of four priority levels:
 
 ## Version History
 
+- v1.3.0 (2025-12-12): Phase 4 - Graduated Token Management
+  - Added tiktoken dependency for model-aware token estimation
+  - Implemented 5 graduated token zones (Normal, Soft Warning, Conservative, Wrap-up, Emergency)
+  - Added zone indicator to output (`🔶` for warnings, `🚨` for emergency)
+  - Implemented summary-preference logic for Soft Warning zone
+  - Implemented truncation behavior for Conservative/Wrap-up zones
+  - Added token budget allocation per agent type (Developer: 50/20/20/10, QA: 40/15/30/15, Tech Lead: 30/15/40/15)
+  - 15% safety margin applied to all token estimates
+  - Fallback to character-based estimation when tiktoken unavailable
 - v1.2.0 (2025-12-12): Bug fixes and improvements
   - Fixed agent_relevance calculation by adding LEFT JOIN to context_package_consumers
   - Fixed AGENT_TYPE variable passing to Python via sys.argv (not string interpolation)

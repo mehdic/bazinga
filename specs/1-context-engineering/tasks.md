@@ -89,25 +89,25 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Add tiktoken dependency documentation to skill usage.md
-- [ ] T018 [US2] Implement model-aware token estimation in SKILL.md:
+- [x] T017 [US2] Add tiktoken dependency documentation to skill usage.md
+- [x] T018 [US2] Implement model-aware token estimation in SKILL.md:
   - Model ID to tiktoken encoding mapping
   - 15% safety margin calculation
-- [ ] T019 [US2] Implement graduated zone detection logic:
+- [x] T019 [US2] Implement graduated zone detection logic:
   - Normal (0-60%): Full context
   - Soft Warning (60-75%): Prefer summaries
   - Conservative (75-85%): Minimal context
   - Wrap-up (85-95%): Complete current only
   - Emergency (95%+): Checkpoint and break
-- [ ] T020 [US2] Add zone indicator to output (`🔶 Token budget: {Zone} ({percent}%)`)
-- [ ] T021 [US2] Implement summary-preference logic for Soft Warning zone
-- [ ] T022 [US2] Implement truncation behavior for Conservative/Wrap-up zones
-- [ ] T023 [US2] Add token budget allocation per agent type (from plan.md):
+- [x] T020 [US2] Add zone indicator to output (`🔶 Token budget: {Zone} ({percent}%)`)
+- [x] T021 [US2] Implement summary-preference logic for Soft Warning zone
+- [x] T022 [US2] Implement truncation behavior for Conservative/Wrap-up zones
+- [x] T023 [US2] Add token budget allocation per agent type (from plan.md):
   - Developer: Task 50%, Specialization 20%, Context 20%, Errors 10%
   - QA Expert: Task 40%, Specialization 15%, Context 30%, Errors 15%
   - Tech Lead: Task 30%, Specialization 15%, Context 40%, Errors 15%
 
-**Checkpoint**: Token management with graduated zones working across all agent types
+**Checkpoint**: Token management with graduated zones working across all agent types ✅
 
 ---
 

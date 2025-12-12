@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.2.0
+version: 1.3.0
 allowed-tools: [Bash, Read]
 ---
 
@@ -34,6 +34,8 @@ Extract from the calling request or infer from conversation:
 - `session_id`: Current orchestration session (REQUIRED)
 - `group_id`: Task group being processed (OPTIONAL - use empty string "" if not provided)
 - `agent_type`: Target agent - developer/qa_expert/tech_lead (REQUIRED)
+- `model`: Model being used - haiku/sonnet/opus or full model ID (OPTIONAL, for token budgeting)
+- `current_tokens`: Current token usage in conversation (OPTIONAL, for zone detection)
 - `iteration`: Current iteration number (optional, default 0)
 
 If `session_id` or `agent_type` are missing, check recent conversation context or ask the orchestrator.
@@ -80,7 +82,94 @@ except:
 
 If FTS5 is unavailable, Step 3 may return less optimal ranking; Step 3b provides heuristic fallback.
 
+**Step 2c: Determine token zone and budget:**
+
+```bash
+# Token estimation with tiktoken (with fallback to character estimation)
+# Input: MODEL, CURRENT_TOKENS (from Step 1)
+MODEL="sonnet"  # or "haiku", "opus", or full model ID
+CURRENT_TOKENS=0  # Current usage if known, else 0
+
+python3 -c "
+import sys
+try:
+    import tiktoken
+    enc = tiktoken.get_encoding('cl100k_base')
+    HAS_TIKTOKEN = True
+except ImportError:
+    HAS_TIKTOKEN = False
+
+# Model context limits (conservative estimates)
+MODEL_LIMITS = {
+    'haiku': 200000, 'claude-3-5-haiku': 200000,
+    'sonnet': 200000, 'claude-sonnet-4-20250514': 200000, 'claude-3-5-sonnet': 200000,
+    'opus': 200000, 'claude-opus-4-20250514': 200000
+}
+
+# Safety margin from config (default 15%)
+SAFETY_MARGIN = 0.15
+model = sys.argv[1] if len(sys.argv) > 1 else 'sonnet'
+current = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+
+# Normalize model name
+model_key = model.lower()
+for key in MODEL_LIMITS:
+    if key in model_key:
+        model_key = key
+        break
+
+limit = MODEL_LIMITS.get(model_key, 200000)
+effective_limit = int(limit * (1 - SAFETY_MARGIN))
+usage_pct = (current / effective_limit * 100) if effective_limit > 0 else 0
+
+# Determine zone
+if usage_pct >= 95:
+    zone = 'Emergency'
+elif usage_pct >= 85:
+    zone = 'Wrap-up'
+elif usage_pct >= 75:
+    zone = 'Conservative'
+elif usage_pct >= 60:
+    zone = 'Soft Warning'
+else:
+    zone = 'Normal'
+
+print(f'ZONE={zone}')
+print(f'USAGE_PCT={usage_pct:.1f}')
+print(f'EFFECTIVE_LIMIT={effective_limit}')
+print(f'HAS_TIKTOKEN={HAS_TIKTOKEN}')
+" "$MODEL" "$CURRENT_TOKENS"
+```
+
+**Token Zone Behaviors:**
+
+| Zone | Usage % | Behavior |
+|------|---------|----------|
+| Normal | 0-60% | Full context with all packages |
+| Soft Warning | 60-75% | Prefer summaries over full content |
+| Conservative | 75-85% | Minimal context, critical packages only |
+| Wrap-up | 85-95% | Essential info only, no new packages |
+| Emergency | 95%+ | Return immediately, suggest checkpoint |
+
+**Token Budget Allocation by Agent Type:**
+
+| Agent | Task | Specialization | Context Pkgs | Errors |
+|-------|------|----------------|--------------|--------|
+| developer | 50% | 20% | 20% | 10% |
+| qa_expert | 40% | 15% | 30% | 15% |
+| tech_lead | 30% | 15% | 40% | 15% |
+
 ### Step 3: Query Context Packages
+
+**IMPORTANT: Zone-Aware Behavior**
+
+Before querying, check the zone from Step 2c:
+
+- **Emergency zone (95%+)**: Skip directly to Step 5 with emergency output
+- **Wrap-up zone (85-95%)**: Skip context packages, return minimal output
+- **Conservative zone (75-85%)**: Query only critical priority packages (LIMIT=1)
+- **Soft Warning zone (60-75%)**: Normal query, but prefer summaries in output
+- **Normal zone (0-60%)**: Full context query
 
 **With group_id:**
 ```bash
@@ -88,8 +177,9 @@ If FTS5 is unavailable, Step 3 may return less optimal ranking; Step 3b provides
 SESSION_ID="bazinga_20250212_143530"
 GROUP_ID="group_a"
 AGENT_TYPE="developer"
-LIMIT=3
+LIMIT=3  # Reduce to 1 in Conservative zone
 
+# In Conservative zone, filter for critical packages only
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
   "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$LIMIT"
 ```
@@ -179,9 +269,57 @@ Only include patterns with confidence > 0.7 in the output.
 - `count` = number of packages returned (up to limit)
 - `available` = total_available from Step 3 response (or total from Step 3b query)
 - `overflow_count` = max(0, available - count)
+- `zone` = current token zone from Step 2c
+- `usage_pct` = token usage percentage from Step 2c
 
-**Format as markdown:**
+**Zone-Specific Output:**
 
+**Emergency Zone (95%+):**
+```markdown
+## Context for {agent_type}
+
+🚨 **Token budget: Emergency ({usage_pct}%) - Checkpoint recommended**
+
+Context assembly skipped due to token budget constraints.
+Suggest: Complete current operation and start new session.
+```
+
+**Wrap-up Zone (85-95%):**
+```markdown
+## Context for {agent_type}
+
+🔶 **Token budget: Wrap-up ({usage_pct}%) - Completing current operation**
+
+### Essential Info Only
+
+Minimal context mode active. Focus on completing current task.
+```
+
+**Conservative Zone (75-85%):**
+```markdown
+## Context for {agent_type}
+
+🔶 **Token budget: Conservative ({usage_pct}%)**
+
+### Critical Packages Only ({count}/{available})
+
+**[CRITICAL]** {file_path}
+> {summary}
+```
+
+**Soft Warning Zone (60-75%):**
+```markdown
+## Context for {agent_type}
+
+🔶 **Token budget: Soft Warning ({usage_pct}%) - Using summaries**
+
+### Relevant Packages ({count}/{available})
+
+**[{PRIORITY}]** {file_path}
+> {summary}  ← Summaries only, no full content
+```
+
+**Normal Zone (0-60%):**
 ```markdown
 ## Context for {agent_type}
 
@@ -195,11 +333,11 @@ Only include patterns with confidence > 0.7 in the output.
 
 ### Error Patterns ({pattern_count} matches)
 
-:warning: **Known Issue**: "{error_signature}"
+⚠️ **Known Issue**: "{error_signature}"
 > **Solution**: {solution}
 > **Confidence**: {confidence} (seen {occurrences} times)
 
-:package: +{overflow_count} more packages available (re-invoke with higher limit to expand)
+📦 +{overflow_count} more packages available (re-invoke with higher limit to expand)
 ```
 
 **Priority Indicators:**
@@ -208,7 +346,12 @@ Only include patterns with confidence > 0.7 in the output.
 - `[MEDIUM]` - Priority: medium
 - `[LOW]` - Priority: low
 
-**Only show overflow indicator if overflow_count > 0.**
+**Zone Indicators:**
+- Normal zone: No indicator (full context)
+- Soft Warning/Conservative/Wrap-up: `🔶` (orange diamond)
+- Emergency: `🚨` (emergency symbol)
+
+**Only show overflow indicator if overflow_count > 0 AND zone is Normal or Soft Warning.**
 
 ### Step 6: Handle Edge Cases
 
