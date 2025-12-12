@@ -389,7 +389,7 @@ If ALL groups need the SAME specialization (same template paths):
 
 **🔴 AFTER SKILL RETURNS (CRITICAL - THIS IS WHERE YOU WERE STOPPING):**
 
-After receiving ALL skill response(s), **IMMEDIATELY call Task() for ALL groups**:
+The skill will output `SPEC_BLOCK_READY` when done. **When you see this signal, IMMEDIATELY continue:**
 1. You have N spec_blocks (where N = number of Skill() calls you made)
 2. Map each group to its spec_block (groups with same paths share the same block)
 3. **IMMEDIATELY call Task() for ALL groups** - don't stop to think, don't wait
@@ -414,9 +414,13 @@ After receiving ALL skill response(s), **IMMEDIATELY call Task() for ALL groups*
 
 **Turn 2 (after skill response):**
 
+**🔴 CONTINUATION TRIGGER: When you see `SPEC_BLOCK_READY`, IMMEDIATELY continue below.**
+
+The skill has completed and output `SPEC_BLOCK_READY`. This is your signal to continue processing.
+
 **🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
 
-The skill output a specialization block. Process it SILENTLY then spawn ALL agents:
+The skill output a specialization block via Bash heredoc. Process it SILENTLY then spawn ALL agents:
 
 **If shared specialization (ONE block for ALL groups):**
 1. **INTERNALLY** extract the ONE block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`

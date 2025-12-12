@@ -248,12 +248,19 @@ SPECBLOCK
 ```
 
 **🔴 RULES:**
-- ✅ Call `Bash` tool with the heredoc above as your ONLY action
 - ✅ Replace `{...}` placeholders with actual values
-- ❌ Do NOT output any text before or after the Bash call
+- ❌ Do NOT output text BEFORE the Bash call
 - ❌ Do NOT say "I'll compose..." or narrate your process
 
-**After the Bash call completes, your job is done.** The orchestrator extracts the block from the Bash output and continues to Task().
+**🔴 CRITICAL - AFTER BASH COMPLETES:**
+
+After the Bash heredoc finishes, you MUST output exactly this line (nothing else):
+
+```
+SPEC_BLOCK_READY
+```
+
+This continuation signal tells the orchestrator to proceed with Task() calls. Without it, the orchestrator will stop.
 
 ---
 
@@ -376,7 +383,12 @@ Metadata:
 SPECBLOCK
 ```
 
-**Note:** The skill calls Bash with NO text output before or after. The Bash heredoc IS the entire output.
+**After Bash completes, output exactly:**
+```
+SPEC_BLOCK_READY
+```
+
+**Note:** No text before Bash. Only `SPEC_BLOCK_READY` after Bash (continuation signal).
 
 ---
 
@@ -401,4 +413,4 @@ SPECBLOCK
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
 6. **Block returned via Bash heredoc** (NOT direct text output)
-7. **No text output before/after Bash call** (turn stays alive for orchestrator)
+7. **SPEC_BLOCK_READY output after Bash** (continuation signal for orchestrator)

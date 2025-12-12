@@ -296,9 +296,11 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG[task_group.initial_tier
 
 **Turn 2 (after skill response):**
 
+**🔴 CONTINUATION TRIGGER: When you see `SPEC_BLOCK_READY`, IMMEDIATELY continue below.**
+
 **🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
 
-The skill just output a specialization block. You MUST process it SILENTLY:
+The skill output `SPEC_BLOCK_READY` and a specialization block via Bash heredoc. Process it SILENTLY:
 
 1. **INTERNALLY** extract content between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`
 2. **INTERNALLY** store as `spec_block` variable
