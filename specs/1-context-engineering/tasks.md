@@ -26,9 +26,9 @@
 
 **Purpose**: Project initialization and database schema setup
 
-- [ ] T001 Create skill directory structure at `.claude/skills/context-assembler/`
-- [ ] T002 [P] Add `context_engineering` section to `bazinga/skills_config.json`
-- [ ] T003 [P] Create skill reference docs at `.claude/skills/context-assembler/references/usage.md`
+- [x] T001 Create skill directory structure at `.claude/skills/context-assembler/`
+- [x] T002 [P] Add `context_engineering` section to `bazinga/skills_config.json`
+- [x] T003 [P] Create skill reference docs at `.claude/skills/context-assembler/references/usage.md`
 
 ---
 
