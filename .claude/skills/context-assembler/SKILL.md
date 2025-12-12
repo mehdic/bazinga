@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.5.0
+version: 1.5.1
 allowed-tools: [Bash, Read]
 ---
 
@@ -310,8 +310,8 @@ else:
 " "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$LIMIT")
 fi
 
-# Parse result for next steps
-echo "Query result: $QUERY_RESULT"
+# Parse result for next steps (log count only - summaries may contain secrets before redaction)
+echo "Query returned: $(echo "$QUERY_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"packages\",[]))} packages, total_available={d.get(\"total_available\",0)}')" 2>/dev/null || echo 'parse error')"
 ```
 
 **If query fails or returns empty, proceed to Step 3b (Heuristic Fallback).**
@@ -426,10 +426,10 @@ print(json.dumps({
 }))
 " "$QUERY_RESULT" "$ZONE" "$AGENT_TYPE" "$REMAINING_BUDGET")
 
-# Extract package IDs for Step 5b consumption tracking
-PACKAGE_IDS=($(echo "$PACKED_RESULT" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin).get('package_ids', [])))"))
+# Extract package IDs for Step 5b consumption tracking (cast to strings to avoid TypeError)
+PACKAGE_IDS=($(echo "$PACKED_RESULT" | python3 -c "import sys,json; ids=json.load(sys.stdin).get('package_ids',[]); print(' '.join(str(x) for x in ids))"))
 
-echo "Packed result: $PACKED_RESULT"
+echo "Packed: $(echo "$PACKED_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"packages\",[]))} pkgs, {d.get(\"used_tokens\",0)}/{d.get(\"budget\",0)} tokens')")"
 echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 ```
 
@@ -529,7 +529,7 @@ def truncate_summary(summary: str, zone: str) -> str:
     """Truncate summary based on zone-specific limits."""
     limits = {
         'Normal': 400,
-        'Soft Warning': 200,
+        'Soft_Warning': 200,  # Underscore to match $ZONE variable
         'Conservative': 100,
         'Wrap-up': 60,
         'Emergency': 0  # No summaries in emergency
