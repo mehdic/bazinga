@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.5.2
+version: 1.5.3
 allowed-tools: [Bash, Read]
 ---
 
@@ -322,7 +322,49 @@ echo "Query returned: $(echo "$QUERY_RESULT" | python3 -c "import sys,json; d=js
 
 **If query fails or returns empty, proceed to Step 3b (Heuristic Fallback).**
 
-### Step 3c: Token Packing with Redaction (Apply AFTER Step 3b)
+### Step 3b: Heuristic Fallback (Query Failed or FTS5 Unavailable)
+
+**First, fetch raw context packages with consumer data:**
+
+```bash
+# Fetch packages with LEFT JOIN to get consumer info for agent_relevance calculation
+SESSION_ID="bazinga_20250212_143530"
+GROUP_ID="group_a"  # or empty string for session-wide
+AGENT_TYPE="developer"
+
+# Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+  "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
+          GROUP_CONCAT(cpc.agent_type) as consumers
+   FROM context_packages cp
+   LEFT JOIN context_package_consumers cpc ON cp.id = cpc.package_id
+   WHERE cp.session_id = '$SESSION_ID'
+   GROUP BY cp.id"
+```
+
+**Then apply heuristic ranking:**
+
+| Priority | Weight |
+|----------|--------|
+| critical | 4 |
+| high | 3 |
+| medium | 2 |
+| low | 1 |
+
+**Scoring Formula:**
+```
+score = (priority_weight * 4) + (same_group_boost * 2) + (agent_relevance * 1.5) + recency_factor
+
+Where:
+- same_group_boost = 1 if package.group_id == request.group_id, else 0
+- agent_relevance = 1 if AGENT_TYPE appears in package.consumers (from JOIN), else 0
+- recency_factor = 1 / (days_since_created + 1)
+```
+
+Sort packages by score DESC, then by `created_at DESC` (tie-breaker), take top N.
+Calculate: `overflow_count = max(0, total_packages - limit)`
+
+### Step 3c: Token Packing with Redaction
 
 After Step 3 or 3b retrieves packages, apply redaction, truncation, and token packing in the correct order:
 
@@ -444,48 +486,6 @@ echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 - Applies redaction BEFORE truncation
 - Populates `PACKAGE_IDS` array for Step 5b
 - Includes `investigator` in budget allocation
-
-### Step 3b: Heuristic Fallback (Query Failed or FTS5 Unavailable)
-
-**First, fetch raw context packages with consumer data:**
-
-```bash
-# Fetch packages with LEFT JOIN to get consumer info for agent_relevance calculation
-SESSION_ID="bazinga_20250212_143530"
-GROUP_ID="group_a"  # or empty string for session-wide
-AGENT_TYPE="developer"
-
-# Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
-  "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
-          GROUP_CONCAT(cpc.agent_type) as consumers
-   FROM context_packages cp
-   LEFT JOIN context_package_consumers cpc ON cp.id = cpc.package_id
-   WHERE cp.session_id = '$SESSION_ID'
-   GROUP BY cp.id"
-```
-
-**Then apply heuristic ranking:**
-
-| Priority | Weight |
-|----------|--------|
-| critical | 4 |
-| high | 3 |
-| medium | 2 |
-| low | 1 |
-
-**Scoring Formula:**
-```
-score = (priority_weight * 4) + (same_group_boost * 2) + (agent_relevance * 1.5) + recency_factor
-
-Where:
-- same_group_boost = 1 if package.group_id == request.group_id, else 0
-- agent_relevance = 1 if AGENT_TYPE appears in package.consumers (from JOIN), else 0
-- recency_factor = 1 / (days_since_created + 1)
-```
-
-Sort packages by score DESC, then by `created_at DESC` (tie-breaker), take top N.
-Calculate: `overflow_count = max(0, total_packages - limit)`
 
 ### Step 4: Query Error Patterns (Optional)
 
@@ -686,7 +686,7 @@ After formatting output, mark delivered packages as consumed to prevent repeated
 
 ```bash
 # Only mark consumption if packages were actually delivered
-if [ "$ZONE" != "Emergency" ] && [ "$ZONE" != "Wrap-up" ] && [ ${#PACKAGE_IDS[@]} -gt 0 ]; then
+if { [ "$ZONE" = "Normal" ] || [ "$ZONE" = "Soft_Warning" ]; } && [ ${#PACKAGE_IDS[@]} -gt 0 ]; then
     # Mark consumed packages using bazinga-db with retry
     # Note: Uses context_package_consumers table (unified table)
     python3 -c "
