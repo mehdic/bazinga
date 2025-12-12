@@ -742,8 +742,51 @@ def init_database(db_path: str) -> None:
         if current_version == 9:
             print("🔄 Migrating schema from v9 to v10...")
 
-            # Create error_patterns table for learning from failed-then-succeeded agents
+            # Wrap entire migration in transaction for atomicity
+            conn.commit()  # Close any implicit transaction
             try:
+                cursor.execute("BEGIN IMMEDIATE")
+
+                # T004: Extend context_packages with priority and summary columns
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='context_packages'")
+                if cursor.fetchone():
+                    # Add priority column if it doesn't exist
+                    cursor.execute("PRAGMA table_info(context_packages)")
+                    existing_cols = {row[1] for row in cursor.fetchall()}
+
+                    if 'priority' not in existing_cols:
+                        cursor.execute("""
+                            ALTER TABLE context_packages
+                            ADD COLUMN priority TEXT DEFAULT 'medium'
+                            CHECK(priority IN ('low', 'medium', 'high', 'critical'))
+                        """)
+                        print("   ✓ Added context_packages.priority")
+                    else:
+                        print("   ⊘ context_packages.priority already exists")
+
+                    if 'summary' not in existing_cols:
+                        cursor.execute("""
+                            ALTER TABLE context_packages
+                            ADD COLUMN summary TEXT
+                        """)
+                        print("   ✓ Added context_packages.summary")
+                    else:
+                        print("   ⊘ context_packages.summary already exists")
+
+                    # Create composite index for relevance ranking (per data-model.md)
+                    try:
+                        cursor.execute("""
+                            CREATE INDEX IF NOT EXISTS idx_packages_priority_ranking
+                            ON context_packages(session_id, priority, created_at DESC)
+                        """)
+                        print("   ✓ Created idx_packages_priority_ranking composite index")
+                    except sqlite3.OperationalError as e:
+                        if "already exists" in str(e).lower():
+                            print("   ⊘ idx_packages_priority_ranking already exists")
+                        else:
+                            raise
+
+                # Create error_patterns table for learning from failed-then-succeeded agents
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS error_patterns (
                         pattern_hash TEXT PRIMARY KEY,
@@ -759,14 +802,8 @@ def init_database(db_path: str) -> None:
                     )
                 """)
                 print("   ✓ Created error_patterns table")
-            except sqlite3.OperationalError as e:
-                if "already exists" in str(e).lower():
-                    print("   ⊘ error_patterns table already exists")
-                else:
-                    raise
 
-            # Create indexes for error_patterns
-            try:
+                # Create indexes for error_patterns
                 cursor.execute("""
                     CREATE INDEX IF NOT EXISTS idx_patterns_project
                     ON error_patterns(project_id, lang)
@@ -776,14 +813,8 @@ def init_database(db_path: str) -> None:
                     ON error_patterns(last_seen, ttl_days)
                 """)
                 print("   ✓ Created error_patterns indexes")
-            except sqlite3.OperationalError as e:
-                if "already exists" in str(e).lower():
-                    print("   ⊘ error_patterns indexes already exist")
-                else:
-                    raise
 
-            # Create strategies table for successful approaches
-            try:
+                # Create strategies table for successful approaches
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS strategies (
                         strategy_id TEXT PRIMARY KEY,
@@ -798,14 +829,8 @@ def init_database(db_path: str) -> None:
                     )
                 """)
                 print("   ✓ Created strategies table")
-            except sqlite3.OperationalError as e:
-                if "already exists" in str(e).lower():
-                    print("   ⊘ strategies table already exists")
-                else:
-                    raise
 
-            # Create indexes for strategies
-            try:
+                # Create indexes for strategies
                 cursor.execute("""
                     CREATE INDEX IF NOT EXISTS idx_strategies_project
                     ON strategies(project_id, framework)
@@ -815,14 +840,8 @@ def init_database(db_path: str) -> None:
                     ON strategies(topic)
                 """)
                 print("   ✓ Created strategies indexes")
-            except sqlite3.OperationalError as e:
-                if "already exists" in str(e).lower():
-                    print("   ⊘ strategies indexes already exist")
-                else:
-                    raise
 
-            # Create consumption_scope table for iteration-aware package tracking
-            try:
+                # Create consumption_scope table for iteration-aware package tracking
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS consumption_scope (
                         scope_id TEXT PRIMARY KEY,
@@ -836,14 +855,8 @@ def init_database(db_path: str) -> None:
                     )
                 """)
                 print("   ✓ Created consumption_scope table")
-            except sqlite3.OperationalError as e:
-                if "already exists" in str(e).lower():
-                    print("   ⊘ consumption_scope table already exists")
-                else:
-                    raise
 
-            # Create indexes for consumption_scope
-            try:
+                # Create indexes for consumption_scope
                 cursor.execute("""
                     CREATE INDEX IF NOT EXISTS idx_consumption_session
                     ON consumption_scope(session_id, group_id, agent_type)
@@ -853,14 +866,24 @@ def init_database(db_path: str) -> None:
                     ON consumption_scope(session_id, group_id, agent_type, iteration, package_id)
                 """)
                 print("   ✓ Created consumption_scope indexes")
-            except sqlite3.OperationalError as e:
-                if "already exists" in str(e).lower():
-                    print("   ⊘ consumption_scope indexes already exist")
-                else:
-                    raise
 
-            # Commit and checkpoint
-            conn.commit()
+                # Verify integrity before committing
+                integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                if integrity != "ok":
+                    raise sqlite3.IntegrityError(f"Migration v9→v10: Database integrity check failed: {integrity}")
+
+                conn.commit()
+                print("   ✓ Migration transaction committed")
+
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception as rollback_exc:
+                    print(f"   ! ROLLBACK failed: {rollback_exc}")
+                print(f"   ✗ v9→v10 migration failed, rolled back: {e}")
+                raise
+
+            # WAL checkpoint after successful commit
             checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
             if checkpoint_result:
                 busy, log_frames, checkpointed = checkpoint_result
@@ -872,12 +895,20 @@ def init_database(db_path: str) -> None:
                             print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
                             break
                     else:
-                        print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+                        # Log the latest checkpoint result, not the stale one
+                        final_busy = checkpoint_result[0] if checkpoint_result else busy
+                        print(f"   ⚠️ WAL checkpoint incomplete: busy={final_busy}")
+
+            # Post-commit integrity verification
+            post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+            if post_integrity != "ok":
+                print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
 
             # Refresh query planner statistics
             cursor.execute("ANALYZE error_patterns;")
             cursor.execute("ANALYZE strategies;")
             cursor.execute("ANALYZE consumption_scope;")
+            cursor.execute("ANALYZE context_packages;")
             print("   ✓ WAL checkpoint completed")
 
             current_version = 10
@@ -1134,6 +1165,8 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_priority ON context_packages(priority)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_scope ON context_packages(scope)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_created ON context_packages(created_at)")
+    # Composite index for relevance ranking queries (per data-model.md)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_packages_priority_ranking ON context_packages(session_id, priority, created_at DESC)")
     print("✓ Created context_packages table with indexes")
 
     # Context package consumers join table (for per-agent consumption tracking)
