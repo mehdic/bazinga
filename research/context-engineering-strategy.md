@@ -526,3 +526,165 @@ If `context-assembler` errors or times out:
 2. Log warning to session
 3. Never block execution - proceed with minimal context
 
+---
+
+## Gemini Review Integration (2025-12-12)
+
+**Reviewed by:** Gemini (original suggestions) + OpenAI GPT-5 (validation review)
+**Status:** Integrated
+
+### Validated Issues from Gemini
+
+| Issue | Verdict | Integration |
+|-------|---------|-------------|
+| **Retrieval Limit (LIMIT 3)** | ✅ Valid | Make configurable per agent, add overflow indicator |
+| **Consumption Logic** | ✅ Valid | Iteration-aware tracking with migration path |
+| **Path Validation** | ⚠️ Low Priority | Note in security section |
+| **Threshold Logic** | ✅ Valid | Replace hard cutoffs with graduated zones |
+| **Token Accuracy** | ✅ Critical | Model-aware tokenizer, safety margins |
+| **Secret Redaction** | ✅ Valid | Entropy + patterns, configurable allow-lists |
+| **Template Extraction** | ❌ Out of Scope | Orchestrator architecture, not context engineering |
+
+---
+
+### Additional Feedback from OpenAI Validation Review
+
+#### 1. FTS5 Availability and Fallbacks
+
+**Issue:** FTS5 virtual tables require SQLite compiled with FTS5. Many minimal environments lack it.
+
+**Resolution:**
+- Add runtime capability detection
+- Implement heuristic fallback ranking without FTS5:
+  - Compound score: priority weight + recency + same-group boost + agent-type match
+- Only enable FTS5 when detected; degrade gracefully otherwise
+
+#### 2. Model-Aware Tokenization
+
+**Issue:** Different models (haiku/sonnet/opus) tokenize differently. Single estimator drifts badly.
+
+**Resolution:**
+- Context-assembler must be model-aware
+- Per-model token calculators (tiktoken for Claude-compatible)
+- Store `estimation_error` for monitoring drift
+- Apply per-model budget caps
+
+#### 3. Iteration-Aware Consumption Migration
+
+**Issue:** Changing consumption tracking requires schema changes and backward compatibility.
+
+**Resolution:**
+- Introduce new `consumption_scope` table keyed by (session_id, group_id, agent_type, iteration)
+- Keep old field for one release (write-through)
+- Query prefers new scope when present
+- Explicit migration scripts in bazinga-db
+
+#### 4. On-Demand Context Expansion
+
+**Issue:** Plan only pushes pre-selected context. No "expand on demand" pattern.
+
+**Resolution:**
+- Inject only titles/summaries with package IDs initially
+- Provide "context-fetch" skill for agents to request full bodies
+- Reduces initial prompt size, gives agents control
+
+#### 5. Redaction Configurability
+
+**Issue:** Entropy-based detection can over-redact legitimate code/data.
+
+**Resolution:**
+- Pair entropy with contextual rules (file type, prefix heuristics)
+- Maintain allow-list (UUIDs, hashes in fixtures)
+- Per-project and per-agent configuration
+- Log sampling to tune thresholds
+
+---
+
+### Revised Token Management (Graduated Zones)
+
+Replace hard cutoffs with graduated zones:
+
+| Token Usage | Zone | Behavior |
+|-------------|------|----------|
+| 0-60% | **Normal** | Full context, all packages |
+| 60-75% | **Soft Warning** | Prefer summarized context |
+| 75-85% | **Conservative** | Minimal context, no new large operations |
+| 85-95% | **Wrap-up** | Complete current operation only |
+| 95%+ | **Emergency** | Checkpoint and break |
+
+**Key principle:** Check token budget BEFORE starting operation, not during. Add "in-progress operation" flag to prevent mid-task interruption.
+
+---
+
+### Context-Assembler MVP Specification (Updated)
+
+Based on combined reviews, MVP should be:
+
+**Inputs:**
+- session_id, group_id, agent_type, model
+
+**Ranking (No FTS5 in MVP):**
+1. Priority level (critical > high > medium > low)
+2. Same-group match boost
+3. Agent-type relevance (research→Developer, failures→QA)
+4. Recency (newer preferred)
+
+**Output:**
+- Top N summaries (configurable per agent: Developer=3, QA=5, TechLead=5)
+- Overflow indicator: "📦 +{X} more packages available"
+- Package IDs for on-demand expansion
+
+**Token Budgeting:**
+- Model-aware tokenizer
+- 15% safety margin (increased from 10%)
+- Truncate least-relevant first when over budget
+
+**Fallbacks:**
+- FTS5 unavailable → Use heuristic ranking
+- Timeout → Return empty with warning
+- Error → Inject minimal context (task + spec only)
+
+---
+
+### Updated Phase 1 Checklist
+
+**Phase 1 (Quick Wins) - Revised:**
+- [x] Visibility when no context (DONE)
+- [x] Token budget increase (DONE)
+- [ ] Create `context-assembler` skill (MVP, no FTS5)
+- [ ] Model-aware tokenization with safety margins
+- [ ] Configurable retrieval limits per agent type
+- [ ] Iteration-aware consumption with migration
+- [ ] Graduated token zones (replace hard cutoffs)
+- [ ] Enable WAL mode + centralized DB access with retries
+- [ ] Configurable secret redaction with allow-lists
+
+**Deferred to Phase 2:**
+- [ ] FTS5 relevance ranking (when available)
+- [ ] On-demand context expansion ("context-fetch" skill)
+- [ ] Error-pattern capture
+- [ ] Cross-session memory
+
+---
+
+### Feature Flags (Added per Review)
+
+Gate new features in `skills_config.json`:
+
+```json
+{
+  "context_engineering": {
+    "enable_context_assembler": true,
+    "enable_fts5": false,
+    "retrieval_limits": {
+      "developer": 3,
+      "qa_expert": 5,
+      "tech_lead": 5
+    },
+    "redaction_mode": "pattern_only",
+    "token_safety_margin": 0.15
+  }
+}
+```
+
+Start with conservative settings, expand after stabilization.
