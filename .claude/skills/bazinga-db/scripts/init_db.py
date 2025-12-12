@@ -774,31 +774,28 @@ def init_database(db_path: str) -> None:
                         print("   ⊘ context_packages.summary already exists")
 
                     # Create composite index for relevance ranking (per data-model.md)
-                    try:
-                        cursor.execute("""
-                            CREATE INDEX IF NOT EXISTS idx_packages_priority_ranking
-                            ON context_packages(session_id, priority, created_at DESC)
-                        """)
-                        print("   ✓ Created idx_packages_priority_ranking composite index")
-                    except sqlite3.OperationalError as e:
-                        if "already exists" in str(e).lower():
-                            print("   ⊘ idx_packages_priority_ranking already exists")
-                        else:
-                            raise
+                    # IF NOT EXISTS handles the case where index already exists
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_packages_priority_ranking
+                        ON context_packages(session_id, priority, created_at DESC)
+                    """)
+                    print("   ✓ Created idx_packages_priority_ranking composite index")
 
                 # Create error_patterns table for learning from failed-then-succeeded agents
+                # Uses composite primary key (pattern_hash, project_id) to allow same pattern across projects
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS error_patterns (
-                        pattern_hash TEXT PRIMARY KEY,
+                        pattern_hash TEXT NOT NULL,
                         project_id TEXT NOT NULL,
                         signature_json TEXT NOT NULL,
                         solution TEXT NOT NULL,
                         confidence REAL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
                         occurrences INTEGER DEFAULT 1 CHECK(occurrences >= 1),
                         lang TEXT,
-                        last_seen TEXT NOT NULL,
-                        created_at TEXT NOT NULL,
-                        ttl_days INTEGER DEFAULT 90 CHECK(ttl_days > 0)
+                        last_seen TEXT DEFAULT (datetime('now')),
+                        created_at TEXT DEFAULT (datetime('now')),
+                        ttl_days INTEGER DEFAULT 90 CHECK(ttl_days > 0),
+                        PRIMARY KEY (pattern_hash, project_id)
                     )
                 """)
                 print("   ✓ Created error_patterns table")
@@ -824,8 +821,8 @@ def init_database(db_path: str) -> None:
                         helpfulness INTEGER DEFAULT 0 CHECK(helpfulness >= 0),
                         lang TEXT,
                         framework TEXT,
-                        last_seen TEXT NOT NULL,
-                        created_at TEXT NOT NULL
+                        last_seen TEXT DEFAULT (datetime('now')),
+                        created_at TEXT DEFAULT (datetime('now'))
                     )
                 """)
                 print("   ✓ Created strategies table")
@@ -847,10 +844,11 @@ def init_database(db_path: str) -> None:
                         scope_id TEXT PRIMARY KEY,
                         session_id TEXT NOT NULL,
                         group_id TEXT NOT NULL,
-                        agent_type TEXT NOT NULL,
+                        agent_type TEXT NOT NULL CHECK(agent_type IN ('developer', 'qa_expert', 'tech_lead', 'senior_software_engineer', 'investigator')),
                         iteration INTEGER NOT NULL CHECK(iteration >= 0),
                         package_id INTEGER NOT NULL,
-                        consumed_at TEXT NOT NULL,
+                        consumed_at TEXT DEFAULT (datetime('now')),
+                        FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
                         FOREIGN KEY (package_id) REFERENCES context_packages(id) ON DELETE CASCADE
                     )
                 """)
@@ -1187,18 +1185,20 @@ def init_database(db_path: str) -> None:
     print("✓ Created context_package_consumers table with indexes")
 
     # Error patterns table (for context engineering - learning from failed-then-succeeded agents)
+    # Uses composite primary key (pattern_hash, project_id) to allow same pattern across projects
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS error_patterns (
-            pattern_hash TEXT PRIMARY KEY,
+            pattern_hash TEXT NOT NULL,
             project_id TEXT NOT NULL,
             signature_json TEXT NOT NULL,
             solution TEXT NOT NULL,
             confidence REAL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
             occurrences INTEGER DEFAULT 1 CHECK(occurrences >= 1),
             lang TEXT,
-            last_seen TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            ttl_days INTEGER DEFAULT 90 CHECK(ttl_days > 0)
+            last_seen TEXT DEFAULT (datetime('now')),
+            created_at TEXT DEFAULT (datetime('now')),
+            ttl_days INTEGER DEFAULT 90 CHECK(ttl_days > 0),
+            PRIMARY KEY (pattern_hash, project_id)
         )
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_patterns_project ON error_patterns(project_id, lang)")
@@ -1215,8 +1215,8 @@ def init_database(db_path: str) -> None:
             helpfulness INTEGER DEFAULT 0 CHECK(helpfulness >= 0),
             lang TEXT,
             framework TEXT,
-            last_seen TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            last_seen TEXT DEFAULT (datetime('now')),
+            created_at TEXT DEFAULT (datetime('now'))
         )
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_strategies_project ON strategies(project_id, framework)")
@@ -1229,10 +1229,11 @@ def init_database(db_path: str) -> None:
             scope_id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             group_id TEXT NOT NULL,
-            agent_type TEXT NOT NULL,
+            agent_type TEXT NOT NULL CHECK(agent_type IN ('developer', 'qa_expert', 'tech_lead', 'senior_software_engineer', 'investigator')),
             iteration INTEGER NOT NULL CHECK(iteration >= 0),
             package_id INTEGER NOT NULL,
-            consumed_at TEXT NOT NULL,
+            consumed_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
             FOREIGN KEY (package_id) REFERENCES context_packages(id) ON DELETE CASCADE
         )
     """)

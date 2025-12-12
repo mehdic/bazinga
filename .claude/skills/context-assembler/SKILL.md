@@ -72,7 +72,7 @@ model: str           # haiku/sonnet/opus (for token budgeting)
 ### Error Patterns ({count} matches)
 {relevant error hints if any}
 
-📦 +{overflow_count} more packages available (use context-fetch skill to expand)
+📦 +{overflow_count} more packages available (re-invoke with higher limit to expand)
 ```
 
 ---

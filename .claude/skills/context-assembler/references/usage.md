@@ -40,7 +40,7 @@ The skill reads the current session/group context from bazinga-db and outputs a 
 > **Solution**: Check tsconfig.json paths configuration - ensure baseUrl is set correctly
 > **Confidence**: 0.8 (seen 3 times)
 
-📦 +4 more packages available (invoke context-fetch for details)
+📦 +4 more packages available (re-invoke with higher limit for details)
 ```
 
 ## Heuristic Relevance Ranking
