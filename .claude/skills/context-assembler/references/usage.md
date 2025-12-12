@@ -1,7 +1,7 @@
 # Context-Assembler Usage Guide
 
-**Version**: 1.3.0
-**Status**: Production Ready (Phase 4 Complete - Token Management)
+**Version**: 1.4.0
+**Status**: Production Ready (Phase 4.1 + 4.2 Complete - Functional Token Enforcement)
 
 ## Overview
 
