@@ -2473,7 +2473,7 @@ class BazingaDB:
         conn = self._get_connection()
 
         try:
-            if project_id:
+            if project_id is not None:
                 cursor = conn.execute("""
                     DELETE FROM error_patterns
                     WHERE project_id = ?
