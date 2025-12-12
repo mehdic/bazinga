@@ -90,9 +90,9 @@ detected_versions = {
 
 | Model | Soft Limit | Hard Limit |
 |-------|------------|------------|
-| haiku | 600 | 900 |
-| sonnet | 1200 | 1800 |
-| opus | 1600 | 2400 |
+| haiku | 900 | 1350 |
+| sonnet | 1800 | 2700 |
+| opus | 2400 | 3600 |
 
 Default to `sonnet` limits if model not specified.
 
@@ -376,7 +376,7 @@ Your expertise includes:
 Metadata:
 - Group: AUTH
 - Templates: 3 loaded
-- Tokens: 580/600
+- Tokens: 850/900
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
 
 [ORCHESTRATOR_CONTINUE]
