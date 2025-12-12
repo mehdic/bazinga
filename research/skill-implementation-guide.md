@@ -1,8 +1,13 @@
 # Claude Code Skills: Complete Implementation Guide
 
-**Version:** 1.0.0
-**Date:** 2025-11-19
-**Source:** Mikhail Shilkov's Technical Deep-Dive + BAZINGA Implementation Experience
+**Version:** 2.0.0
+**Date:** 2025-12-12
+**Sources:**
+- Mikhail Shilkov's Technical Deep-Dive (mikhail.io)
+- Lee Han Chung's Skills Deep Dive (leehanchung.github.io)
+- Official Claude Code Documentation (code.claude.com/docs/en/skills)
+- BAZINGA Implementation Experience
+
 **Purpose:** Single source of truth for creating, updating, and invoking skills
 
 ---
@@ -10,36 +15,103 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Directory Structure](#directory-structure)
-3. [SKILL.md Format](#skillmd-format)
-4. [Skill Tool Definition](#skill-tool-definition)
-5. [Invocation Syntax](#invocation-syntax)
-6. [Runtime Behavior](#runtime-behavior)
-7. [Best Practices](#best-practices)
-8. [Common Patterns](#common-patterns)
-9. [Troubleshooting](#troubleshooting)
-10. [Examples](#examples)
+2. [Architecture](#architecture)
+3. [Directory Structure](#directory-structure)
+4. [SKILL.md Format](#skillmd-format)
+5. [Frontmatter Fields Reference](#frontmatter-fields-reference)
+6. [Skill Tool Definition](#skill-tool-definition)
+7. [Invocation Methods](#invocation-methods)
+8. [Runtime Behavior & Execution Flow](#runtime-behavior--execution-flow)
+9. [Discovery and Loading](#discovery-and-loading)
+10. [Tool Permissions](#tool-permissions)
+11. [Common Patterns](#common-patterns)
+12. [Best Practices](#best-practices)
+13. [Troubleshooting](#troubleshooting)
+14. [Examples](#examples)
+15. [Skill Creation Checklist](#skill-creation-checklist)
+16. [BAZINGA-Specific Notes](#bazinga-specific-notes)
 
 ---
 
 ## Overview
 
-**What are Skills?**
+### What Are Skills?
 
-Skills are self-contained capability packages that extend Claude's abilities with specialized knowledge, workflows, or tool integrations. They combine:
-- **Instructions** (SKILL.md) - What Claude reads when the skill is invoked
-- **Scripts** - Executable code (Python, Bash, etc.)
+Skills are **prompt-based conversation and execution context modifiers** that extend Claude's capabilities through specialized instruction injection. They are NOT executable code—they expand into detailed prompts that prepare Claude to solve specific problem types.
+
+**Key insight from Mikhail Shilkov:**
+> "Skills aren't separate processes, sub-agents, or external tools: they're injected instructions that guide Claude's behavior within the main conversation."
+
+### Key Characteristics
+
+| Characteristic | Description |
+|----------------|-------------|
+| **Model-invoked** | Claude autonomously decides when to use them (unlike slash commands which are user-invoked) |
+| **Inline execution** | Run within the main conversation, not as separate processes |
+| **On-demand loading** | Only loaded when invoked, keeping main prompt lean |
+| **Project or user-scoped** | Can be machine-wide (`~/.claude/skills/`) or project-specific (`.claude/skills/`) |
+| **Temporary modification** | Behavior only affects current interaction; conversation returns to normal after completion |
+
+### Skills vs. Other Extensions
+
+| Aspect | Skills | Slash Commands | MCP Servers |
+|--------|--------|----------------|-------------|
+| Invocation | Model decides | User types `/command` | Model calls tool |
+| Execution | Prompt expansion | Prompt expansion | External process |
+| Purpose | Guide workflows | Pre-defined prompts | New tools/resources |
+| Return | Context modification | Direct execution | Tool results |
+
+### What Skills Combine
+
+- **Instructions** (SKILL.md) - What Claude reads when invoked
+- **Scripts** - Executable code (Python, Bash, etc.) Claude can run
 - **Resources** - Templates, data files, configurations
+- **References** - Additional documentation for detailed guidance
 
-**Key Characteristics:**
-- **Model-invoked** - Claude decides when to use them (unlike slash commands which are user-invoked)
-- **Inline execution** - Run within the main conversation, not as separate processes
-- **On-demand loading** - Only loaded when invoked, keeping main prompt lean
-- **Project or user-scoped** - Can be machine-wide or project-specific
+---
+
+## Architecture
+
+### Three-Tier Information Disclosure
+
+Skills use a progressive disclosure model:
+
+1. **Frontmatter** (Tier 1) - Minimal metadata shown in skill list
+   - Name, description, location
+   - ~50-200 characters per skill
+
+2. **SKILL.md Body** (Tier 2) - Full instructions loaded on invocation
+   - Comprehensive but focused guidance
+   - ~500-5,000 words
+
+3. **Resources/References** (Tier 3) - Helper assets loaded on-demand
+   - Scripts, templates, detailed docs
+   - Any length
+
+### Meta-Tool Architecture
+
+Claude Code provides a `Skill` meta-tool that manages all individual skills. This tool:
+- Appears in Claude's tools array alongside Read, Write, Bash, etc.
+- Contains a dynamically-generated `<available_skills>` section
+- Uses natural language understanding (not algorithmic matching) for skill selection
+
+### Design Philosophy
+
+> "What makes this design clever is that it achieves on-demand prompt expansion without modifying the core system prompt. Skills are executable knowledge packages that Claude loads only when needed, extending capabilities while keeping the main prompt lean." — Mikhail Shilkov
 
 ---
 
 ## Directory Structure
+
+### Storage Locations
+
+| Location | Scope | Use Case |
+|----------|-------|----------|
+| `~/.claude/skills/` | Personal | Available across all projects |
+| `.claude/skills/` | Project | Checked into git, shared with team |
+| Plugin-bundled | Plugin | Automatically available when plugin installed |
+
+Skills load from these sources in order, with later sources able to override earlier ones.
 
 ### Standard Layout
 
@@ -50,48 +122,64 @@ Skills are self-contained capability packages that extend Claude's abilities wit
 │   ├── scripts/           # Optional: Executable scripts
 │   │   ├── main_script.py
 │   │   └── helper.sh
-│   ├── resources/         # Optional: Templates and data
+│   ├── resources/         # Optional: Templates and data (loaded into context)
 │   │   ├── template.json
 │   │   └── config.yaml
-│   └── references/        # Optional: Additional documentation
-│       └── usage.md
+│   ├── references/        # Optional: Additional documentation (loaded into context)
+│   │   └── usage.md
+│   └── assets/            # Optional: Binary files (referenced by path only)
+│       └── template.html
 ```
+
+### Directory Purposes
+
+| Directory | Purpose | Context Loaded? |
+|-----------|---------|-----------------|
+| `scripts/` | Executable code (Python, Bash) | No - executed via Bash tool |
+| `resources/` | Templates, configs, schemas | Yes - via Read tool |
+| `references/` | Detailed documentation | Yes - via Read tool |
+| `assets/` | Binary files, images | No - referenced by path only |
 
 ### Naming Conventions
 
 **Skill directory:**
 - Use kebab-case: `codebase-analysis`, `lint-check`, `api-contract-validation`
+- Lowercase letters, numbers, hyphens only
+- Maximum 64 characters
 - Be descriptive but concise
-- Avoid special characters except hyphens
 
 **SKILL.md:**
-- Must be exactly `SKILL.md` (uppercase, no variations)
+- Must be exactly `SKILL.md` (uppercase)
 - Required in every skill directory
-
-**Subfolders:**
-- `scripts/` - For executable code
-- `resources/` - For templates and data
-- `references/` - For additional documentation (not loaded by skill instance)
+- No variations allowed
 
 ---
 
 ## SKILL.md Format
 
-### Structure
+### Complete Structure
 
 ```markdown
 ---
-version: 1.0.0
 name: skill-name
-description: Brief description that tells Claude when to use this skill
+description: Brief description that tells Claude when to use this skill. Use when [trigger].
+version: 1.0.0
 author: Team/Person Name
 tags: [category1, category2]
-allowed-tools: [Bash, Read]
+allowed-tools: [Bash, Read, Write]
 ---
 
-# Skill Name
+# Skill Title
 
 You are the skill-name skill. Your role is to [describe role].
+
+## Overview
+
+[1-2 sentence purpose statement]
+
+## Prerequisites
+
+[Dependencies, requirements, setup needed]
 
 ## When to Invoke This Skill
 
@@ -101,11 +189,11 @@ You are the skill-name skill. Your role is to [describe role].
 
 ## Your Task
 
-When invoked with [parameters], you must:
+When invoked, you must:
 
 ### Step 1: [Action]
 
-[Detailed instructions]
+[Detailed instructions with code blocks]
 
 ### Step 2: [Action]
 
@@ -114,6 +202,14 @@ When invoked with [parameters], you must:
 ### Step 3: [Action]
 
 [Detailed instructions]
+
+## Output Format
+
+[Expected output structure]
+
+## Error Handling
+
+[How to handle failures]
 
 ## Example Invocation
 
@@ -124,26 +220,17 @@ When invoked with [parameters], you must:
 **For detailed documentation:** See references/usage.md
 ```
 
-### Frontmatter Fields
-
-**Required:**
-- `version`: Semantic version (e.g., `1.0.0`)
-- `name`: Identifier used to invoke the skill (must match directory name)
-- `description`: Tells Claude when to use this skill (appears in `<available_skills>`)
-
-**Optional:**
-- `author`: Who created/maintains the skill
-- `tags`: Categorization tags
-- `allowed-tools`: Tools the skill instance can use (e.g., `[Bash, Read]`)
-
 ### Content Guidelines
 
 **✅ DO:**
 - Write instructions FOR the skill instance (second person: "You are...")
+- Use imperative language ("Analyze code for...", "Extract text from...")
 - Call existing scripts rather than implementing logic inline
 - Include concrete examples with actual input/output
-- Keep it focused (150-250 lines is ideal)
+- Keep focused (150-250 lines is ideal, max 5,000 words)
 - Use clear section headers
+- Use `{baseDir}` for paths, never hardcode absolute paths
+- Reference external files rather than embedding everything
 - Provide step-by-step workflows
 
 **❌ DON'T:**
@@ -153,21 +240,81 @@ When invoked with [parameters], you must:
 - Create skills without version numbers
 - Skip "When to Invoke" section
 - Mix documentation with instructions
+- Exceed 5,000 words (context overflow risk)
+- Hardcode absolute paths
 
 **Remember:** SKILL.md is read BY the skill instance (Claude), not by humans. Write actionable instructions, not reference documentation.
 
 ---
 
+## Frontmatter Fields Reference
+
+### Required Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `name` | Identifier used to invoke the skill. Must match directory name. Lowercase letters, numbers, hyphens only. Max 64 chars. | `codebase-analysis` |
+| `description` | Brief summary that tells Claude when to invoke. Primary selection signal. Include triggers! Max 1024 chars. | `"Analyze codebase patterns. Use when reviewing architecture."` |
+
+### Optional Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `version` | Semantic version for tracking | `1.0.0` |
+| `author` | Who created/maintains the skill | `BAZINGA Team` |
+| `tags` | Categorization tags | `[analysis, security]` |
+| `allowed-tools` | Tools skill can use without asking | `[Bash, Read, Write]` |
+| `license` | License information | `MIT` |
+| `model` | Override model selection | `claude-opus-4-20250514` or `inherit` |
+| `disable-model-invocation` | Prevents automatic invocation; requires `/skill-name` | `true` |
+| `mode` | Categorizes as mode command (special UI section) | `true` |
+
+### Description Best Practices
+
+The `description` field is **critical** for discoverability. Include BOTH:
+1. What the skill does
+2. When to use it (trigger terms)
+
+**Good examples:**
+```yaml
+# ✅ Specific with trigger
+description: "Extract text from PDFs, fill forms, merge documents. Use when working with PDF files."
+
+# ✅ Clear purpose and trigger
+description: "Analyze codebase for patterns, dependencies, and architecture. Use when reviewing code structure."
+
+# ✅ Action-oriented
+description: "Run security vulnerability scans on code changes. Use before approving PRs."
+```
+
+**Bad examples:**
+```yaml
+# ❌ Too vague
+description: "Helps with documents"
+
+# ❌ No trigger
+description: "Processes files"
+
+# ❌ Too generic
+description: "For data analysis"
+```
+
+### Deprecated/Undocumented Fields
+
+⚠️ **`when_to_use`**: Appears in some codebases but is **undocumented and potentially deprecated**. Rely on detailed `description` instead.
+
+---
+
 ## Skill Tool Definition
 
-### Tool Structure
+### Tool Schema
 
 Claude Code provides a `Skill` tool with this input schema:
 
 ```typescript
 {
   "name": "Skill",
-  "description": "Execute a skill...",
+  "description": "Execute a skill within the main conversation...",
   "input_schema": {
     "type": "object",
     "properties": {
@@ -181,41 +328,70 @@ Claude Code provides a `Skill` tool with this input schema:
 }
 ```
 
-**Key Points:**
-- Parameter name is `command`, NOT `skill`
-- Only accepts skill name (no additional arguments)
-- Skill name must match the `name` field in SKILL.md frontmatter
+### Critical Points
+
+| Point | Detail |
+|-------|--------|
+| Parameter name | `command` (NOT `skill` or `name`) |
+| Parameter value | Skill name only, no arguments |
+| Skill name | Must match `name` field in SKILL.md frontmatter |
+| Namespace syntax | `namespace:skill-name` for fully qualified names |
 
 ### Available Skills Section
 
-The tool description contains an embedded `<available_skills>` section:
+The tool description contains an embedded `<available_skills>` section, dynamically generated:
 
 ```xml
 <available_skills>
 <skill>
-<name>skill-name</name>
-<description>Brief description from SKILL.md frontmatter</description>
-<location>user|project</location>
+<name>codebase-analysis</name>
+<description>Analyze codebase for patterns and architecture. Use when reviewing code.</description>
+<location>project</location>
+</skill>
+<skill>
+<name>pdf</name>
+<description>Extract text from PDF documents. Use when processing PDFs.</description>
+<location>user</location>
 </skill>
 </available_skills>
 ```
 
-Claude uses this to determine which skills exist and when to invoke them.
+Claude reads this list and uses natural language understanding to match user intent—**there is no algorithmic skill selection at the code level**.
+
+### Token Budget
+
+The available skills list is subject to a **15,000-character token budget** by default. Keep descriptions concise to avoid truncation.
 
 ---
 
-## Invocation Syntax
+## Invocation Methods
 
-### Correct Invocation
+### Automatic Invocation (Model-Invoked)
+
+Claude reads skill descriptions in the Skill tool and autonomously invokes matching skills based on user intent.
+
+**How it works:**
+1. User makes a request
+2. Claude reads available skills list
+3. Claude decides if a skill matches the intent
+4. Claude calls `Skill(command: "skill-name")`
+
+### Manual Invocation
+
+Users can explicitly invoke skills via:
+- `/skill-name` syntax
+- When `disable-model-invocation: true` is set
+
+### Correct Invocation Syntax
 
 **Simple name:**
-```
+```python
 Skill(command: "skill-name")
 ```
 
-**Fully qualified name:**
-```
-Skill(command: "namespace:skill-name")
+**Fully qualified name (with namespace):**
+```python
+Skill(command: "ms-office-suite:pdf")
 ```
 
 **Examples:**
@@ -228,32 +404,28 @@ Skill(command: "lint-check")
 
 # Invoke bazinga-db skill
 Skill(command: "bazinga-db")
-
-# Fully qualified (if namespace exists)
-Skill(command: "ms-office-suite:pdf")
 ```
 
 ### Common Mistakes
 
-**❌ WRONG:**
 ```python
-Skill(skill: "codebase-analysis")     # Wrong parameter name
-Skill(name: "lint-check")             # Wrong parameter name
-Skill("api-validation")               # Missing parameter name
-Skill(command: "lint-check", args="--strict")  # No args parameter exists
+# ❌ WRONG - Wrong parameter name
+Skill(skill: "codebase-analysis")
+Skill(name: "lint-check")
+
+# ❌ WRONG - Missing parameter name
+Skill("api-validation")
+
+# ❌ WRONG - No args parameter exists
+Skill(command: "lint-check", args="--strict")
+
+# ✅ CORRECT
+Skill(command: "codebase-analysis")
 ```
 
-**✅ CORRECT:**
-```python
-Skill(command: "codebase-analysis")   # Correct
-Skill(command: "lint-check")          # Correct
-Skill(command: "api-validation")      # Correct
-```
-
-### Detection
+### Verification
 
 To verify correct syntax in agent files:
-
 ```bash
 # Find all Skill invocations
 grep "Skill(" agents/*.md
@@ -264,20 +436,38 @@ grep "Skill(" agents/*.md
 
 ---
 
-## Runtime Behavior
+## Runtime Behavior & Execution Flow
 
-### Invocation Flow
+### Complete Invocation Flow
 
-1. **Claude decides to invoke skill** (based on description in `<available_skills>`)
-2. **Tool call:** `Skill(command: "skill-name")`
-3. **System responds with:**
+1. **User Request** - User asks something that matches a skill's purpose
+
+2. **Claude Decision** - Claude reads `<available_skills>` and decides to invoke
+
+3. **Tool Call** - Claude calls `Skill(command: "skill-name")`
+
+4. **System Response** - The system returns:
    - `tool_result` confirmation
-   - Command message: `"skill-name is running..."`
-   - Base path: `/path/to/.claude/skills/skill-name/`
-   - SKILL.md body content (without frontmatter)
-4. **Claude reads instructions** from SKILL.md body
-5. **Claude executes workflow** described in SKILL.md
-6. **Claude returns result** to caller
+   - **Message 1** (`isMeta: false`): Metadata for user transparency
+     - `<command-message>The "skill-name" skill is loading</command-message>`
+   - **Message 2** (`isMeta: true`, hidden from UI): Full skill instructions
+     - Base path: `/path/to/.claude/skills/skill-name/`
+     - SKILL.md body content (without frontmatter)
+
+5. **Execution** - Claude reads instructions and executes workflow
+
+6. **Completion** - Claude returns result; context reverts to normal
+
+### Dual-Channel Communication
+
+Skills use the `isMeta` flag for dual-channel messaging:
+
+| Channel | `isMeta` | Content | Purpose |
+|---------|----------|---------|---------|
+| User-visible | `false` | Minimal metadata (~50-200 chars) | Transparency |
+| Claude-only | `true` | Full instructions (~500-5,000 words) | Guidance |
+
+This separation prevents information overload in the UI while providing Claude with comprehensive instructions.
 
 ### Key Behaviors
 
@@ -291,79 +481,127 @@ grep "Skill(" agents/*.md
 - Can reference earlier messages
 - State maintained across skill execution
 
-**Tool availability:**
-- Skill has access to tools specified in `allowed-tools` frontmatter
-- Can call Bash, Read, Edit, etc. (if allowed)
-- Can invoke other skills if needed
+**Context modification (temporary):**
+- Pre-approved tools in `allowed-tools` active during execution
+- Model override active if specified
+- **All modifications revert after skill completes**
 
-**Output:**
+**Output patterns:**
 - Skills typically write to files (reports, artifacts)
 - Return summary to caller via text response
 - Full details saved to output file for later reading
 
 ---
 
-## Best Practices
+## Discovery and Loading
 
-### Design Principles
+### Discovery Process
 
-1. **Self-contained:** Skills should be independent modules
-2. **Script-based:** Complex logic goes in scripts, not SKILL.md
-3. **Clear interface:** Well-defined inputs/outputs
-4. **Documented:** Include usage examples
-5. **Versioned:** Use semantic versioning
-6. **Focused:** One clear purpose per skill
+Skills load from multiple sources (scanned in order):
+1. User settings: `~/.claude/skills/`
+2. Project settings: `.claude/skills/`
+3. Plugin-provided skills
+4. Built-in skills
 
-### Directory Organization
+The system **dynamically generates** the available skills list for each API request.
 
-**For simple skills:**
+### Progressive Disclosure
+
+Information reveals in stages:
+
+1. **Initial**: Show only skill name and description (minimal context)
+2. **Selection**: Load full SKILL.md after Claude/user chooses
+3. **Execution**: Load helper assets, references, scripts on-demand
+
+This prevents context bloat while maintaining discoverability.
+
+### Viewing Available Skills
+
+**Ask Claude:**
+```
+What Skills are available?
+List all available Skills
+```
+
+**Inspect filesystem:**
+```bash
+ls ~/.claude/skills/
+ls .claude/skills/
+cat .claude/skills/my-skill/SKILL.md
+```
+
+---
+
+## Tool Permissions
+
+### The `allowed-tools` Field
+
+Use `allowed-tools` to define which tools the skill can use **without user approval**:
+
+```yaml
+# File operations only
+allowed-tools: [Read, Write, Edit, Glob, Grep]
+
+# Read-only skill
+allowed-tools: [Read, Grep, Glob]
+
+# Multiple tools
+allowed-tools: [Bash, Read, Write]
+```
+
+### Advanced: Command-Scoped Permissions
+
+You can scope Bash permissions to specific commands:
+
+```yaml
+# Only git commands
+allowed-tools: "Bash(git status:*),Bash(git diff:*),Read"
+
+# Only npm commands
+allowed-tools: "Bash(npm:*),Read,Write"
+```
+
+### Security Principle
+
+**Principle of least privilege:** Only include tools your skill actually needs.
+
+```yaml
+# ✅ Good - minimal permissions for read-only skill
+allowed-tools: [Read, Grep, Glob]
+
+# ⚠️ Overpermissioned - only needs Read
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
+```
+
+### Permission Scoping
+
+Tool permissions are **scoped to skill execution only**. When the skill completes, permissions revert to normal session defaults.
+
+---
+
+## Common Patterns
+
+### Pattern 1: Script Automation
+
+**Purpose:** Offload computational tasks to Python/Bash scripts
+
+**Structure:**
 ```
 skill-name/
 ├── SKILL.md
 └── scripts/
-    └── main.py
+    ├── analyze.py
+    └── helper.sh
 ```
 
-**For complex skills:**
-```
-skill-name/
-├── SKILL.md
-├── scripts/
-│   ├── main_logic.py
-│   ├── helper.py
-│   └── validator.sh
-├── resources/
-│   ├── template.json
-│   └── config.yaml
-└── references/
-    └── usage.md        # Detailed docs for humans
-```
-
-### SKILL.md Length Guidelines
-
-| Lines | Assessment | Action |
-|-------|------------|--------|
-| <100 | Too brief | Add examples and details |
-| 100-150 | Good | Optimal length |
-| 150-250 | Acceptable | Consider moving content to references/ |
-| >250 | Too verbose | Must move content to references/ |
-
-**Comparison with BAZINGA skills:**
-- `codebase-analysis`: 88 lines ✅
-- `bazinga-db`: ~120 lines ✅
-- `lint-check`: ~110 lines ✅
-
-### Script Invocation Pattern
-
-**In SKILL.md:**
+**SKILL.md pattern:**
 ```markdown
 ### Step 1: Execute Analysis
 
 ```bash
 python3 .claude/skills/skill-name/scripts/analyze.py \
   --input "$INPUT_FILE" \
-  --output "$OUTPUT_FILE" \
-  --session "$SESSION_ID"
+  --output "$OUTPUT_FILE"
 ```
 
 ### Step 2: Read Results
@@ -371,81 +609,29 @@ python3 .claude/skills/skill-name/scripts/analyze.py \
 ```bash
 cat "$OUTPUT_FILE"
 ```
-
-### Step 3: Return Summary
-
-[Format and return findings to caller]
 ```
 
-**Benefits:**
-- Logic in scripts (testable, maintainable)
-- Instructions in SKILL.md (clear workflow)
-- Separation of concerns
+### Pattern 2: Read-Process-Write
 
-### Cross-Platform Script Invocation
+**Purpose:** File transformation and data processing
 
-For skills that use shell/PowerShell wrapper scripts (not just Python), document both options:
+**Flow:**
+1. Read source file(s)
+2. Process/transform content
+3. Write output file(s)
 
-**In SKILL.md:**
-```markdown
-## Step 1: Execute Script
+### Pattern 3: Search-Analyze-Report
 
-Use the **Bash** tool to run the pre-built script.
+**Purpose:** Codebase analysis and pattern detection
 
-**On Unix/macOS:**
-```bash
-bash .claude/skills/skill-name/scripts/script.sh
-```
+**Flow:**
+1. Search codebase (Grep, Glob)
+2. Analyze findings
+3. Generate report
 
-**On Windows (PowerShell):**
-```powershell
-pwsh .claude/skills/skill-name/scripts/script.ps1
-```
+**Examples:** `codebase-analysis`, `security-scan`
 
-> **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
-```
-
-**File Structure:**
-```
-skill-name/
-├── SKILL.md
-└── scripts/
-    ├── script.sh      # Unix/macOS version
-    └── script.ps1     # Windows version
-```
-
-**Guidelines:**
-- Both scripts must produce identical outputs
-- Use `scripts/` subdirectory (not skill root)
-- Scripts should be functionally equivalent
-- CLI installs correct version based on platform selection
-
----
-
-## Common Patterns
-
-### Pattern 1: Analysis Skill
-
-**Purpose:** Analyze codebase/data and generate report
-
-**Structure:**
-```
-skill-name/
-├── SKILL.md
-└── scripts/
-    ├── analyze.py      # Main analysis logic
-    ├── parser.py       # Parse input
-    └── reporter.py     # Format output
-```
-
-**SKILL.md workflow:**
-1. Run analysis script
-2. Read output file
-3. Return summary
-
-**Example:** `codebase-analysis`, `test-coverage`, `security-scan`
-
-### Pattern 2: Validation Skill
+### Pattern 4: Validation
 
 **Purpose:** Validate code/config and report issues
 
@@ -459,55 +645,182 @@ skill-name/
     └── rules.yaml      # Validation rules
 ```
 
-**SKILL.md workflow:**
-1. Run validation script
-2. Read validation report
-3. Return issues found
+**Examples:** `lint-check`, `api-contract-validation`
 
-**Example:** `lint-check`, `api-contract-validation`, `db-migration-check`
-
-### Pattern 3: Database Skill
+### Pattern 5: Database Operations
 
 **Purpose:** Persist/retrieve orchestration state
 
-**Structure:**
-```
-skill-name/
-├── SKILL.md
-└── scripts/
-    ├── db_ops.py       # Database operations
-    └── schema.sql      # Schema definition
-```
-
-**SKILL.md workflow:**
+**Flow:**
 1. Parse request (save/get/update)
 2. Execute database operation
 3. Return success/data
 
 **Example:** `bazinga-db`
 
-### Pattern 4: Reporting Skill
+### Pattern 6: Template-Based Generation
 
-**Purpose:** Aggregate metrics and generate dashboard
+**Purpose:** Create structured outputs from templates
 
 **Structure:**
 ```
 skill-name/
 ├── SKILL.md
-├── scripts/
-│   ├── collect.py
-│   └── visualize.py
-└── resources/
-    └── dashboard.html
+└── assets/
+    └── template.html
 ```
 
-**SKILL.md workflow:**
-1. Collect metrics
-2. Generate visualizations
-3. Write dashboard file
-4. Return summary
+### Pattern 7: Wizard-Style Workflows
 
-**Example:** `quality-dashboard`, `velocity-tracker`
+**Purpose:** Complex processes requiring user input
+
+**Flow:**
+1. Present options
+2. Gather user choices
+3. Execute based on selections
+
+### Pattern 8: Context Aggregation
+
+**Purpose:** Combining information from multiple sources
+
+**Flow:**
+1. Gather data from multiple files/APIs
+2. Synthesize findings
+3. Present unified view
+
+### Pattern 9: Iterative Refinement
+
+**Purpose:** Multiple analysis passes with increasing depth
+
+**Flow:**
+1. Initial quick scan
+2. Deeper analysis of flagged items
+3. Final detailed report
+
+---
+
+## Best Practices
+
+### Design Principles
+
+1. **Self-contained** - Skills should be independent modules
+2. **Script-based** - Complex logic goes in scripts, not SKILL.md
+3. **Clear interface** - Well-defined inputs/outputs
+4. **Documented** - Include usage examples
+5. **Versioned** - Use semantic versioning
+6. **Focused** - One clear purpose per skill ("PDF form filling" not "Document processing")
+
+### SKILL.md Length Guidelines
+
+| Lines | Assessment | Action |
+|-------|------------|--------|
+| <100 | Too brief | Add examples and details |
+| 100-150 | Good | Optimal length |
+| 150-250 | Acceptable | Consider moving content to references/ |
+| 250-500 | Verbose | Must move content to references/ |
+| >500 | Too long | Context overflow risk - refactor required |
+
+**Maximum:** Keep under 5,000 words to avoid context overflow.
+
+### Directory Organization
+
+**Simple skill:**
+```
+skill-name/
+├── SKILL.md
+└── scripts/
+    └── main.py
+```
+
+**Complex skill:**
+```
+skill-name/
+├── SKILL.md
+├── scripts/
+│   ├── main_logic.py
+│   ├── helper.py
+│   └── validator.sh
+├── resources/
+│   ├── template.json
+│   └── config.yaml
+├── references/
+│   └── usage.md        # Detailed docs
+└── assets/
+    └── report.html     # Binary/template files
+```
+
+### Script Invocation
+
+**Always use full paths from skill root:**
+```markdown
+### Step 1: Execute Script
+
+```bash
+python3 .claude/skills/skill-name/scripts/analyze.py \
+  --input "$INPUT" \
+  --output "$OUTPUT"
+```
+```
+
+**Never use relative paths:**
+```bash
+# ❌ May fail depending on CWD
+python3 scripts/analyze.py
+
+# ✅ Always works
+python3 .claude/skills/skill-name/scripts/analyze.py
+```
+
+### Cross-Platform Scripts
+
+For skills needing shell/PowerShell wrappers:
+
+```
+skill-name/
+├── SKILL.md
+└── scripts/
+    ├── script.sh       # Unix/macOS
+    └── script.ps1      # Windows
+```
+
+**In SKILL.md:**
+```markdown
+## Step 1: Execute Script
+
+**On Unix/macOS:**
+```bash
+bash .claude/skills/skill-name/scripts/script.sh
+```
+
+**On Windows (PowerShell):**
+```powershell
+pwsh .claude/skills/skill-name/scripts/script.ps1
+```
+```
+
+**Guidelines:**
+- Both scripts must produce identical outputs
+- Scripts should be functionally equivalent
+- Test on both platforms when possible
+
+### Team Sharing
+
+1. Create project skill in `.claude/skills/`
+2. Commit to git: `git add .claude/skills/`
+3. Push to repository
+4. Team members get skills after `git pull`
+
+### Version History
+
+Optionally track versions in SKILL.md:
+
+```markdown
+## Version History
+
+- v2.0.0 (2025-10-01): Breaking changes to output format
+- v1.1.0 (2025-09-15): Added validation step
+- v1.0.0 (2025-09-01): Initial release
+```
 
 ---
 
@@ -519,18 +832,25 @@ skill-name/
 - Error: "Skill 'skill-name' not found"
 - Skill not appearing in `<available_skills>`
 
-**Causes:**
-- SKILL.md missing or misnamed
-- Frontmatter `name` doesn't match directory name
-- Directory not in `.claude/skills/`
+**Causes & Solutions:**
 
-**Solution:**
+| Cause | Solution |
+|-------|----------|
+| SKILL.md missing/misnamed | Check file exists: `ls .claude/skills/skill-name/SKILL.md` |
+| Frontmatter `name` mismatch | Ensure `name:` matches directory name |
+| Wrong directory location | Must be in `.claude/skills/` or `~/.claude/skills/` |
+| Invalid YAML syntax | No tabs, correct indentation, valid structure |
+
+**Diagnostic:**
 ```bash
 # Verify structure
 ls -la .claude/skills/skill-name/SKILL.md
 
 # Check frontmatter name
 grep "^name:" .claude/skills/skill-name/SKILL.md
+
+# View debug info
+claude --debug
 ```
 
 ### Issue: Skill Invocation Fails
@@ -539,19 +859,37 @@ grep "^name:" .claude/skills/skill-name/SKILL.md
 - Tool call doesn't execute
 - No response from skill
 
-**Causes:**
-- Wrong parameter name (using `skill:` instead of `command:`)
-- Skill name typo
-- Skill already running (can't invoke twice)
+**Causes & Solutions:**
 
-**Solution:**
+| Cause | Solution |
+|-------|----------|
+| Wrong parameter name | Use `command:` not `skill:` or `name:` |
+| Skill name typo | Check spelling matches frontmatter `name` |
+| Skill already running | Can't invoke same skill twice simultaneously |
+
+**Verification:**
 ```bash
-# Verify invocation syntax
-grep "Skill(" agents/your-agent.md
+# Check invocation syntax in code
+grep "Skill(" agents/*.md
 
 # Should see: Skill(command: "...")
 # NOT: Skill(skill: "...")
 ```
+
+### Issue: Claude Doesn't Auto-Invoke
+
+**Symptoms:**
+- Claude doesn't use skill when expected
+- Must manually invoke with `/skill-name`
+
+**Causes & Solutions:**
+
+| Cause | Solution |
+|-------|----------|
+| Vague description | Add specific trigger terms: "Use when..." |
+| Too generic | Make description more specific |
+| Conflicts with other skills | Use distinct trigger terms |
+| `disable-model-invocation: true` | Remove or change to `false` |
 
 ### Issue: Script Not Found
 
@@ -559,38 +897,61 @@ grep "Skill(" agents/your-agent.md
 - Bash error: "No such file or directory"
 - Python error: "ModuleNotFoundError"
 
-**Causes:**
-- Incorrect path in SKILL.md
-- Script not executable
-- Working directory assumption wrong
+**Causes & Solutions:**
 
-**Solution:**
-```markdown
-# Always use absolute path from skill root
+| Cause | Solution |
+|-------|----------|
+| Wrong path in SKILL.md | Use full path from skill root |
+| Script not executable | `chmod +x scripts/*.py` |
+| Wrong path separator | Use Unix-style: `scripts/helper.py` not `scripts\helper.py` |
+
+**Always use:**
+```bash
+# ✅ Full path from skill root
 python3 .claude/skills/skill-name/scripts/analyze.py
 
-# NOT relative:
-python3 scripts/analyze.py  # May fail depending on CWD
+# ❌ Relative path (may fail)
+python3 scripts/analyze.py
 ```
 
 ### Issue: Skill Too Verbose
 
 **Symptoms:**
-- SKILL.md >250 lines
+- SKILL.md >500 lines
 - Takes long time to load
-- Difficult to maintain
+- Context overflow
 
 **Solution:**
 1. Move detailed documentation to `references/usage.md`
 2. Keep only actionable instructions in SKILL.md
-3. Reference the documentation file at end of SKILL.md
+3. Reference the documentation file at end
 
-**Example:**
 ```markdown
 ---
 
-**For detailed documentation:** `.claude/skills/skill-name/references/usage.md`
+**For detailed documentation:** See `.claude/skills/skill-name/references/usage.md`
 ```
+
+### Issue: Dependencies Missing
+
+**Symptoms:**
+- Import errors
+- Command not found
+
+**Solution:**
+- Document dependencies in SKILL.md Prerequisites section
+- Users must install via `pip`, `npm`, etc. in their environment
+
+### Issue: Multiple Skills Conflict
+
+**Symptoms:**
+- Wrong skill invoked
+- Unpredictable behavior
+
+**Solution:**
+- Use distinct trigger terms in descriptions
+- Avoid generic language like "for data analysis"
+- Make each skill's purpose unambiguous
 
 ---
 
@@ -603,9 +964,9 @@ python3 scripts/analyze.py  # May fail depending on CWD
 **SKILL.md:**
 ```markdown
 ---
-version: 1.0.0
 name: file-counter
-description: Count files by type and generate report
+description: Count files by type and generate statistics. Use when analyzing project composition.
+version: 1.0.0
 author: BAZINGA Team
 allowed-tools: [Bash, Read]
 ---
@@ -625,14 +986,13 @@ You are the file-counter skill. Count files by extension and report statistics.
 ### Step 1: Run Analysis
 
 ```bash
-python3 .claude/skills/file-counter/scripts/count.py \
-  --output bazinga/file_counts.json
+find . -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn > /tmp/file_counts.txt
 ```
 
 ### Step 2: Read Results
 
 ```bash
-cat bazinga/file_counts.json
+cat /tmp/file_counts.txt
 ```
 
 ### Step 3: Return Summary
@@ -645,18 +1005,18 @@ Report:
 Example: "Found 234 Python files (.py), 156 JavaScript files (.js), 89 Markdown files (.md)"
 ```
 
-### Example 2: Validation Skill
+### Example 2: Validation Skill with Tool Restrictions
 
 **Directory:** `.claude/skills/json-validator/`
 
 **SKILL.md:**
 ```markdown
 ---
-version: 1.0.0
 name: json-validator
-description: Validate JSON files against schemas
+description: Validate JSON files against schemas. Use when verifying config or API contracts.
+version: 1.0.0
 author: BAZINGA Team
-allowed-tools: [Bash, Read]
+allowed-tools: [Read, Grep, Glob]
 ---
 
 # JSON Validator Skill
@@ -671,36 +1031,168 @@ You are the json-validator skill. Validate JSON files and report errors.
 
 ## Your Task
 
-### Step 1: Run Validation
+### Step 1: Find JSON Files
 
 ```bash
-python3 .claude/skills/json-validator/scripts/validate.py \
-  --file "$TARGET_FILE" \
-  --schema "$SCHEMA_FILE" \
-  --output bazinga/validation_report.json
+# Find all JSON files in current directory
+ls *.json 2>/dev/null || echo "No JSON files in current directory"
 ```
 
-### Step 2: Check Results
+### Step 2: Validate Each File
 
-```bash
-cat bazinga/validation_report.json | jq '.errors | length'
-```
+For each JSON file:
+1. Read the file content
+2. Check for syntax errors
+3. Validate structure
 
 ### Step 3: Return Report
 
-If errors > 0:
+If errors found:
 - List each error with line number
 - Show expected vs actual format
 - Suggest fixes
 
-If errors == 0:
+If no errors:
 - Confirm validation passed
 - Report file size and structure
 ```
 
+### Example 3: Complex Multi-File Skill
+
+**Directory:** `.claude/skills/security-scan/`
+
+**Structure:**
+```
+security-scan/
+├── SKILL.md
+├── scripts/
+│   ├── scan.py
+│   └── report.py
+├── resources/
+│   └── vulnerability_patterns.yaml
+└── references/
+    └── usage.md
+```
+
+**SKILL.md:**
+```markdown
+---
+name: security-scan
+description: Run security vulnerability scans on code. Use when reviewing PRs or before deployment.
+version: 2.0.0
+author: BAZINGA Team
+allowed-tools: [Bash, Read, Write, Grep]
+tags: [security, analysis]
 ---
 
-## Reference: BAZINGA Skill Comparison
+# Security Scan Skill
+
+You are the security-scan skill. Analyze code for vulnerabilities.
+
+## Overview
+
+Detect SQL injection, XSS, hardcoded secrets, insecure dependencies.
+
+## Prerequisites
+
+- Python 3.8+
+- Optional: semgrep, bandit for enhanced scanning
+
+## When to Invoke This Skill
+
+- Before approving PRs
+- After significant code changes
+- Pre-deployment security checks
+
+## Your Task
+
+### Step 1: Execute Scan
+
+```bash
+python3 .claude/skills/security-scan/scripts/scan.py \
+  --target "$TARGET_DIR" \
+  --output bazinga/security_report.json
+```
+
+### Step 2: Read Results
+
+```bash
+cat bazinga/security_report.json
+```
+
+### Step 3: Return Summary
+
+Report:
+- Critical/High/Medium issues count
+- Top vulnerabilities with locations
+- Recommended fixes
+
+---
+
+**For detailed documentation:** See references/usage.md
+```
+
+### Example 4: Skill with Disabled Auto-Invocation
+
+```yaml
+---
+name: database-migrate
+description: Run database migrations. Manual invocation only - use /database-migrate.
+version: 1.0.0
+disable-model-invocation: true
+allowed-tools: [Bash]
+---
+
+# Database Migration Skill
+
+[Instructions...]
+```
+
+This skill won't auto-invoke; users must explicitly type `/database-migrate`.
+
+---
+
+## Skill Creation Checklist
+
+Before committing a new skill:
+
+### Structure
+- [ ] Directory in `.claude/skills/skill-name/` (or `~/.claude/skills/`)
+- [ ] SKILL.md exists with exact filename (uppercase)
+- [ ] Scripts in `scripts/` subdirectory (if applicable)
+- [ ] Resources in `resources/` (if applicable)
+- [ ] Verbose content moved to `references/` (if needed)
+
+### Frontmatter
+- [ ] `name` field present and matches directory name
+- [ ] `description` clear, concise, includes trigger terms
+- [ ] `version` field present (semantic versioning)
+- [ ] `allowed-tools` scoped to minimum needed
+- [ ] No tabs in YAML (spaces only)
+
+### Content
+- [ ] "When to Invoke" section included
+- [ ] "Your Task" workflow with concrete steps
+- [ ] Example invocation scenarios
+- [ ] Script paths use full path from skill root
+- [ ] Under 250 lines (ideally 100-150)
+- [ ] Under 5,000 words total
+
+### Testing
+- [ ] Manual invocation works: `/skill-name`
+- [ ] Auto-invocation triggers correctly
+- [ ] Scripts execute without errors
+- [ ] All tool permissions work
+- [ ] Cross-platform (if applicable)
+
+### Code Quality
+- [ ] All Skill invocations use `command` parameter
+- [ ] No hardcoded absolute paths (use `{baseDir}`)
+- [ ] Dependencies documented in Prerequisites
+
+---
+
+## BAZINGA-Specific Notes
 
 ### Well-Structured Skills in This Project
 
@@ -713,7 +1205,7 @@ If errors == 0:
 | `test-coverage` | ~140 | Good ✅ | Cross-platform support |
 | `api-contract-validation` | ~95 | Good ✅ | Well-documented |
 
-### Lessons from BAZINGA
+### Lessons Learned
 
 1. **Template vs. runtime context:**
    - Use `"template": true` flag for unprocessed templates
@@ -724,7 +1216,7 @@ If errors == 0:
    - Output files: Session-isolated (`bazinga/artifacts/{session}/skills/`)
    - Cache: Global with session-keyed names (for cross-session benefits)
 
-3. **Parameter naming:**
+3. **Parameter naming bug:**
    - Always use `command` parameter for Skill tool
    - Bug introduced when using `skill` parameter (commit c05ee0e)
    - Verify with: `grep "Skill(" agents/*.md`
@@ -744,40 +1236,11 @@ If errors == 0:
    - Dynamic MANDATORY injection by orchestrator (prevents skipping)
    - Pattern: `read(agent_file) + append(mandatory_instructions) + spawn()`
 
-### BAZINGA-Specific Implementation History
+### Related Documents
 
-For detailed implementation history, architectural decisions, and lessons learned from specific skills:
-
-**See:** `research/skills-implementation-summary.md`
-
-Contains:
-- Implementation details of security-scan, test-coverage, lint-check
-- Hybrid invocation approach rationale
-- Progressive analysis ladder
-- Dual-mode evaluation and decisions
-- Cross-platform support patterns
-- Future enhancement proposals
-
----
-
-## Skill Creation Checklist
-
-Before committing a new skill:
-
-- [ ] Directory in `.claude/skills/skill-name/`
-- [ ] SKILL.md exists with required frontmatter
-- [ ] `version` field present (semantic versioning)
-- [ ] `name` matches directory name
-- [ ] `description` clear and concise
-- [ ] "When to Invoke" section included
-- [ ] "Your Task" workflow with concrete steps
-- [ ] Example invocation scenarios
-- [ ] Scripts in `scripts/` subdirectory (if applicable)
-- [ ] SKILL.md length reasonable (<250 lines)
-- [ ] Verbose content moved to `references/` (if needed)
-- [ ] All Skill invocations use `command` parameter
-- [ ] Tested invocation from relevant agent
-- [ ] Documentation updated (this guide if needed)
+- `research/skill-fix-manual.md` - Step-by-step fixing guide for broken skills
+- `research/skills-implementation-summary.md` - BAZINGA implementation history
+- `.claude/skills/codebase-analysis/references/usage.md` - Example of references/ pattern
 
 ---
 
@@ -790,15 +1253,38 @@ Before committing a new skill:
 - Common issues identified
 
 **Version history:**
-- v1.0.0 (2025-11-19): Initial comprehensive guide based on Mikhail Shilkov's deep-dive + BAZINGA experience
+- v2.0.0 (2025-12-12): Comprehensive integration of Mikhail Shilkov, Lee Han Chung, and official Claude Code documentation
+- v1.0.0 (2025-11-19): Initial guide based on Mikhail Shilkov's deep-dive + BAZINGA experience
 
 **Maintained by:** BAZINGA Team
 
-**Related documents:**
-- `research/skill-fix-manual.md` - Step-by-step fixing guide for broken skills
-- `research/skill-parameter-verification.md` - Investigation of command vs skill parameter
-- `.claude/skills/codebase-analysis/references/usage.md` - Example of references/ pattern
+---
+
+## Quick Reference Card
+
+```
+SKILL LOCATION:      .claude/skills/skill-name/SKILL.md
+                     ~/.claude/skills/skill-name/SKILL.md
+
+INVOCATION:          Skill(command: "skill-name")
+                     NOT: Skill(skill: "...") ❌
+
+FRONTMATTER:         ---
+                     name: skill-name        (required, match directory)
+                     description: ...        (required, include triggers)
+                     version: 1.0.0          (recommended)
+                     allowed-tools: [...]    (optional, scope narrowly)
+                     ---
+
+IDEAL LENGTH:        100-250 lines, <5000 words
+
+SCRIPT PATHS:        .claude/skills/skill-name/scripts/main.py
+                     NOT: scripts/main.py ❌
+
+VERIFY SYNTAX:       grep "Skill(command" agents/*.md ✅
+                     grep "Skill(skill" agents/*.md ❌
+```
 
 ---
 
-**This is the single source of truth for skill implementation in this project. Always consult this guide before creating, updating, or invoking skills.**
+**This is the single source of truth for skill implementation. Always consult this guide before creating, updating, or invoking skills.**
