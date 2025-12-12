@@ -244,8 +244,6 @@ Metadata:
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
-SPECBLOCK
-```
 
 [ORCHESTRATOR_CONTINUE]
 Skill output complete. You are STILL the orchestrator.
@@ -380,8 +378,6 @@ Metadata:
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
-SPECBLOCK
-```
 
 [ORCHESTRATOR_CONTINUE]
 Skill output complete. You are STILL the orchestrator.
