@@ -3,8 +3,8 @@
 **Date:** 2025-12-12
 **Context:** Improving context passing to agents in BAZINGA orchestration
 **Decision:** TBD - Pending user approval
-**Status:** Proposed
-**Reviewed by:** Pending external LLM review
+**Status:** Reviewed
+**Reviewed by:** OpenAI GPT-5 (2025-12-12)
 
 ---
 
@@ -341,4 +341,188 @@ Phase 3 only if agents repeatedly solve same problems across sessions.
 
 ## Multi-LLM Review Integration
 
-*Pending external review*
+**Reviewed by:** OpenAI GPT-5 (2025-12-12)
+**Status:** Reviewed - Awaiting user approval for implementation
+
+---
+
+### Critical Issues Identified
+
+| Issue | Recommendation | Status |
+|-------|----------------|--------|
+| **Orchestrator can't do context assembly** | Create dedicated `context-assembler` skill | Pending |
+| **No semantic scoring capability** | Start with SQLite FTS5 before embeddings | Pending |
+| **Token budgets undefined** | Define per-agent allocation rules | Pending |
+| **SQLite contention in parallel mode** | Enable WAL mode, add indices | Pending |
+| **Cross-session memory scope unclear** | Partition by project_id, add TTLs | Pending |
+| **Security/PII risks** | Add redaction pipeline, trust levels | Pending |
+
+---
+
+### Consensus Points (Reviewer Agreed With Plan)
+
+1. ✅ Tiered context architecture is sound (aligns with ADK/Manus/ACE)
+2. ✅ Incremental implementation phases are correct approach
+3. ✅ Visibility for empty context packages is valuable (already done)
+4. ✅ Error pattern capture has high value
+5. ✅ File system offloading for large outputs is recommended
+
+---
+
+### Incorporated Feedback
+
+#### 1. New Skill Required: `context-assembler`
+
+**Reviewer concern:** "Orchestrator is restricted from reading arbitrary files and must not implement logic; yet the plan assumes it will compile working context."
+
+**Resolution:** Create dedicated `context-assembler` skill:
+- **Input:** session_id, group_id, agent_type, token_budget
+- **Output:** Compact markdown block with prioritized items + references
+- **Responsibilities:** Relevance ranking (FTS5), compression, ordering, redaction
+- **Constraint:** Never exceeds token budget
+
+#### 2. Start with FTS5, Not Embeddings
+
+**Reviewer concern:** "The repo has no embeddings or semantic-store skills."
+
+**Resolution:** Use SQLite FTS5 (full-text search) for Phase 1:
+- Index context package summaries and error messages
+- Rank by keyword relevance (deterministic, low-latency)
+- Add semantic embeddings in Phase 2+ only if needed
+
+#### 3. Concrete Schema for Patterns/Strategies
+
+**Reviewer concern:** "Referenced frameworks not validated in-repo."
+
+**Resolution:** Define concrete tables:
+
+```sql
+-- Error patterns table
+CREATE TABLE error_patterns (
+    pattern_hash TEXT PRIMARY KEY,
+    signature_json TEXT NOT NULL,
+    solution TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    lang TEXT,
+    confidence REAL DEFAULT 0.5,
+    occurrences INTEGER DEFAULT 1,
+    last_seen TEXT,
+    created_at TEXT,
+    ttl_days INTEGER DEFAULT 90
+);
+
+-- Strategies table
+CREATE TABLE strategies (
+    strategy_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    insight TEXT NOT NULL,
+    helpfulness INTEGER DEFAULT 0,
+    lang TEXT,
+    framework TEXT,
+    last_seen TEXT
+);
+
+-- Context index for FTS5
+CREATE VIRTUAL TABLE context_index USING fts5(
+    package_id,
+    project_id,
+    summary,
+    content='context_packages'
+);
+```
+
+#### 4. Per-Agent Token Budget Allocation
+
+**Reviewer concern:** "Token budget claims without allocation rules."
+
+**Resolution:** Define deterministic budgets:
+
+| Agent | Task | Specialization | Context Pkgs | Errors | Total |
+|-------|------|----------------|--------------|--------|-------|
+| Developer | 50% | 20% | 20% | 10% | 100% |
+| QA Expert | 40% | 15% | 30% | 15% | 100% |
+| Tech Lead | 30% | 15% | 40% | 15% | 100% |
+
+Enforced by `context-assembler` skill with preflight size checks.
+
+#### 5. SQLite WAL Mode and Indices
+
+**Reviewer concern:** "Parallel mode + new writes can introduce DB locks."
+
+**Resolution:** Enable WAL mode in bazinga-db:
+```sql
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+```
+
+Add indices:
+```sql
+CREATE INDEX idx_patterns_project ON error_patterns(project_id, lang);
+CREATE INDEX idx_strategies_project ON strategies(project_id, framework);
+```
+
+#### 6. Security and Privacy Guardrails
+
+**Reviewer concern:** "Reasoning logs and error artifacts can contain secrets/PII."
+
+**Resolution:**
+- Redaction at ingestion (scrub before storing)
+- Per-project scoping (no cross-project bleed)
+- TTLs for long-term memory (default 90 days)
+- Trust levels on injected context (human-reviewed vs auto)
+- User opt-out via `skills_config.json`
+
+---
+
+### Rejected Suggestions (With Reasoning)
+
+| Suggestion | Reason for Rejection |
+|------------|---------------------|
+| "Context Ledger artifact per group" | Adds file I/O overhead; bazinga-db already serves this purpose |
+| "Hash-based error signatures first" | Will implement semantic later; hash-only misses similar errors |
+
+---
+
+### Revised Implementation Phases
+
+**Phase 1 (Recommended - Quick Wins):**
+- [x] Visibility when no context (DONE)
+- [x] Token budget increase (DONE)
+- [ ] Create `context-assembler` skill
+- [ ] SQLite FTS5 for relevance ranking
+- [ ] Offload oversized tool outputs to artifacts/
+- [ ] Enable WAL mode + indices
+- [ ] Define retention policy (TTLs)
+
+**Phase 2 (Medium Term):**
+- [ ] Error-pattern capture (signature → solution on retry success)
+- [ ] Strategy extraction (QA/TL generates "what worked" bullet at approval)
+- [ ] Per-agent token budget enforcement via context-assembler
+
+**Phase 3 (Long Term):**
+- [ ] Semantic scoring via embeddings (if FTS5 insufficient)
+- [ ] Cross-session memory with scoping
+- [ ] Decay/aging for stale patterns
+- [ ] Provenance and trust bits on context items
+
+---
+
+### Success Metrics (Added per Review)
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Iterations per group | < 3 average | bazinga-db logs |
+| Prompt sizes | < 80% of model limit | context-assembler reports |
+| Context hits | > 50% of packages consumed | mark-consumed tracking |
+| QA failure recurrence | < 10% same error twice | error_patterns table |
+
+---
+
+### Failure Handling (Added per Review)
+
+If `context-assembler` errors or times out:
+1. Inject only: task + specialization block + reference list (no full bodies)
+2. Log warning to session
+3. Never block execution - proceed with minimal context
+
