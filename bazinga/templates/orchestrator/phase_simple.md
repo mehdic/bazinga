@@ -151,6 +151,8 @@ Read these files BEFORE starting implementation:
 1. Read each file. Extract factual information only.
 2. After reading, mark consumed: `bazinga-db mark-context-consumed {id} {agent_type} 1`
 
+{ELSE}
+📭 **Context Packages:** Queried - none found for this task
 {ENDIF}
 
 {IF reasoning_entries array is NOT empty}
@@ -168,6 +170,8 @@ Prior agents documented their decision-making for this task:
 - Avoid repeating failed approaches (check `pivot` and `blockers` phases)
 - Build on prior agent's understanding
 
+{ELSE}
+📭 **Agent Reasoning:** Queried - no prior reasoning for this task
 {ENDIF}
 
 ---
