@@ -1,7 +1,7 @@
 ---
 name: context-assembler
 description: Assembles relevant context for agent spawns with prioritized ranking. Ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
-version: 1.5.1
+version: 1.5.2
 allowed-tools: [Bash, Read]
 ---
 
@@ -143,6 +143,12 @@ elif usage_pct >= 60:
     zone = 'Soft_Warning'  # Underscore for shell variable safety
 else:
     zone = 'Normal'
+
+# IMPORTANT: If current_tokens=0 (unknown), apply conservative context cap
+# This prevents runaway context when we don't know actual usage
+UNKNOWN_BUDGET_CAP = 2000  # Max tokens for context packages when usage unknown
+if current == 0:
+    remaining_budget = min(remaining_budget, UNKNOWN_BUDGET_CAP)
 
 # Output as shell variable assignments (will be eval'd)
 print(f'ZONE={zone}')

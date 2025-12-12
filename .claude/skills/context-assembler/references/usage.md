@@ -1,7 +1,7 @@
 # Context-Assembler Usage Guide
 
-**Version**: 1.5.1
-**Status**: Production Ready (Phase 4.5 - Bug Fixes)
+**Version**: 1.5.2
+**Status**: Production Ready (Phase 4.5 - Conservative Default Budget)
 
 ## Overview
 
