@@ -389,7 +389,7 @@ If ALL groups need the SAME specialization (same template paths):
 
 **🔴 AFTER SKILL RETURNS (CRITICAL - THIS IS WHERE YOU WERE STOPPING):**
 
-The skill will output `SPEC_BLOCK_READY` when done. **When you see this signal, IMMEDIATELY continue:**
+The skill output ends with `[ORCHESTRATOR_CONTINUE]...[/ORCHESTRATOR_CONTINUE]`. This reminds you: **You are STILL the orchestrator. CONTINUE your workflow:**
 1. You have N spec_blocks (where N = number of Skill() calls you made)
 2. Map each group to its spec_block (groups with same paths share the same block)
 3. **IMMEDIATELY call Task() for ALL groups** - don't stop to think, don't wait
@@ -414,9 +414,18 @@ The skill will output `SPEC_BLOCK_READY` when done. **When you see this signal, 
 
 **Turn 2 (after skill response):**
 
-**🔴 CONTINUATION TRIGGER: When you see `SPEC_BLOCK_READY`, IMMEDIATELY continue below.**
+**🔴 CONTINUATION TRIGGER: When you see `[ORCHESTRATOR_CONTINUE]`, IMMEDIATELY continue below.**
 
-The skill has completed and output `SPEC_BLOCK_READY`. This is your signal to continue processing.
+The skill output includes:
+```
+[ORCHESTRATOR_CONTINUE]
+Skill output complete. You are STILL the orchestrator.
+Your Turn 2 action: Extract block above → Call Task() for each group NOW.
+DO NOT STOP. Your workflow is NOT complete until Task() is called.
+[/ORCHESTRATOR_CONTINUE]
+```
+
+**YOU ARE THE ORCHESTRATOR. The skill was a helper. CONTINUE YOUR WORKFLOW NOW.**
 
 **🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT THE BLOCK 🔴🔴🔴**
 

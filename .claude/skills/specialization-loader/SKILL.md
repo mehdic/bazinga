@@ -244,23 +244,21 @@ Metadata:
 - Templates: {count} loaded
 - Tokens: {actual}/{budget}
 - Identity: {short identity summary}
+
+[ORCHESTRATOR_CONTINUE]
+Skill output complete. You are STILL the orchestrator.
+Your Turn 2 action: Extract block above → Call Task() for each group NOW.
+DO NOT STOP. Your workflow is NOT complete until Task() is called.
+[/ORCHESTRATOR_CONTINUE]
 SPECBLOCK
 ```
 
 **🔴 RULES:**
 - ✅ Replace `{...}` placeholders with actual values
-- ❌ Do NOT output text BEFORE the Bash call
+- ❌ Do NOT output text BEFORE or AFTER the Bash call
 - ❌ Do NOT say "I'll compose..." or narrate your process
 
-**🔴 CRITICAL - AFTER BASH COMPLETES:**
-
-After the Bash heredoc finishes, you MUST output exactly this line (nothing else):
-
-```
-SPEC_BLOCK_READY
-```
-
-This continuation signal tells the orchestrator to proceed with Task() calls. Without it, the orchestrator will stop.
+**After the Bash call completes, return to orchestrator workflow (Turn 2).** The skill is a helper. You are the orchestrator. Continue your workflow.
 
 ---
 
@@ -380,15 +378,16 @@ Metadata:
 - Templates: 3 loaded
 - Tokens: 580/600
 - Identity: Java 8 Backend API Developer (Spring Boot 2.7)
+
+[ORCHESTRATOR_CONTINUE]
+Skill output complete. You are STILL the orchestrator.
+Your Turn 2 action: Extract block above → Call Task() for each group NOW.
+DO NOT STOP. Your workflow is NOT complete until Task() is called.
+[/ORCHESTRATOR_CONTINUE]
 SPECBLOCK
 ```
 
-**After Bash completes, output exactly:**
-```
-SPEC_BLOCK_READY
-```
-
-**Note:** No text before Bash. Only `SPEC_BLOCK_READY` after Bash (continuation signal).
+**Note:** No text before or after Bash. The `[ORCHESTRATOR_CONTINUE]` block inside the heredoc reminds you to continue.
 
 ---
 
@@ -413,4 +412,4 @@ SPEC_BLOCK_READY
 4. Advisory wrapper present (not MANDATORY)
 5. DB audit trail created
 6. **Block returned via Bash heredoc** (NOT direct text output)
-7. **SPEC_BLOCK_READY output after Bash** (continuation signal for orchestrator)
+7. **[ORCHESTRATOR_CONTINUE] block included in heredoc** (continuation trigger for orchestrator)
