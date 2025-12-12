@@ -223,6 +223,9 @@ class BazingaSetup:
 
         return copied_count > 0
 
+    # Command prefixes to exclude from CLI install/update (development-only commands)
+    EXCLUDED_COMMAND_PREFIXES = {"speckit."}
+
     def copy_commands(self, target_dir: Path) -> bool:
         """Copy commands to target .claude/commands directory."""
         commands_dir = target_dir / ".claude" / "commands"
@@ -233,6 +236,10 @@ class BazingaSetup:
             return False
 
         for cmd_file in source_commands.glob("*.md"):
+            # Skip excluded command prefixes (development-only)
+            if any(cmd_file.name.startswith(prefix) for prefix in self.EXCLUDED_COMMAND_PREFIXES):
+                console.print(f"  [dim]⏭️  Skipping {cmd_file.name} (development-only)[/dim]")
+                continue
             shutil.copy2(cmd_file, commands_dir / cmd_file.name)
             console.print(f"  ✓ Copied {cmd_file.name}")
 
