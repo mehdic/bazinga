@@ -2312,7 +2312,7 @@ class BazingaDB:
                     UPDATE error_patterns
                     SET occurrences = ?,
                         last_seen = datetime('now'),
-                        solution = CASE WHEN length(?) > length(solution) THEN ? ELSE solution END
+                        solution = CASE WHEN COALESCE(length(?), 0) > COALESCE(length(solution), 0) THEN ? ELSE solution END
                     WHERE pattern_hash = ? AND project_id = ?
                 """, (new_occurrences, solution, solution, pattern_hash, project_id))
                 conn.commit()
@@ -3177,7 +3177,7 @@ def main():
                         context_hints = json.loads(cmd_args[i + 1])
                         if not isinstance(context_hints, list):
                             raise ValueError("context_hints must be a JSON array")
-                    except json.JSONDecodeError as e:
+                    except (json.JSONDecodeError, ValueError) as e:
                         print(f"Error: Invalid JSON for --context_hints: {e}", file=sys.stderr)
                         sys.exit(1)
                     i += 2
@@ -3186,7 +3186,7 @@ def main():
                         stack_pattern = json.loads(cmd_args[i + 1])
                         if not isinstance(stack_pattern, list):
                             raise ValueError("stack_pattern must be a JSON array")
-                    except json.JSONDecodeError as e:
+                    except (json.JSONDecodeError, ValueError) as e:
                         print(f"Error: Invalid JSON for --stack_pattern: {e}", file=sys.stderr)
                         sys.exit(1)
                     i += 2
