@@ -5,6 +5,12 @@
 **Status**: Draft
 **Input**: Research document at `research/context-engineering-strategy.md`
 
+## Clarifications
+
+### Session 2025-12-12
+
+- Q: Should error patterns be sanitized/redacted before storage? → A: Yes - Apply regex patterns + entropy detection to redact secrets before storage
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Context-Assembler Skill (Priority: P1)
@@ -79,6 +85,8 @@ As a project maintainer, I need per-agent-type retrieval limits so that differen
   - Skip corrupt packages, log warning, continue with valid ones
 - What if token counting differs between estimation and actual?
   - Apply 15% safety margin to account for estimation drift
+- How are secrets in error messages handled?
+  - Apply regex patterns + entropy detection to redact before storage; configurable allow-lists for false positives
 
 ## Requirements
 
@@ -94,6 +102,7 @@ As a project maintainer, I need per-agent-type retrieval limits so that differen
 - **FR-008**: System MUST show overflow indicator when more packages exist than retrieved
 - **FR-009**: System MUST handle FTS5 unavailability with heuristic fallback ranking
 - **FR-010**: System MUST never block execution on context-assembler failure (graceful degradation)
+- **FR-011**: System MUST redact sensitive data (secrets, credentials, PII) from error patterns before storage using regex patterns and entropy detection
 
 ### Key Entities
 

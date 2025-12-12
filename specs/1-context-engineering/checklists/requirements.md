@@ -36,8 +36,8 @@
 **Notes**:
 - Spec derived from comprehensive research document with multi-LLM review
 - All success criteria are measurable with specific targets
-- Edge cases covered including database locking and fallback scenarios
-- No clarifications needed - research document already resolved ambiguities
+- Edge cases covered including database locking, fallback scenarios, and secret redaction
+- Clarify session (2025-12-12): Added FR-011 for secret redaction requirement
 
 ## Next Steps
 
