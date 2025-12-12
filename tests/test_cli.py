@@ -24,7 +24,7 @@ class TestVersionCommand:
         result = runner.invoke(app, ["version"])
 
         assert result.exit_code == 0
-        assert "0.1.3" in result.output
+        assert "1.1.0" in result.output
 
     def test_version_shows_header(self):
         """Test version command shows ASCII art header."""
