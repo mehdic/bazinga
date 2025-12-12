@@ -52,7 +52,7 @@ AGENT_TYPE="developer"  # Replace with actual agent_type
 LIMIT=$(cat bazinga/skills_config.json 2>/dev/null | python3 -c "
 import sys, json
 agent = sys.argv[1] if len(sys.argv) > 1 else 'developer'
-defaults = {'developer': 3, 'qa_expert': 5, 'tech_lead': 5}
+defaults = {'developer': 3, 'senior_software_engineer': 5, 'qa_expert': 5, 'tech_lead': 5}
 try:
     c = json.load(sys.stdin).get('context_engineering', {})
     limits = c.get('retrieval_limits', {})
@@ -63,7 +63,7 @@ except:
 echo "Retrieval limit for $AGENT_TYPE: $LIMIT"
 ```
 
-Default limits: developer=3, qa_expert=5, tech_lead=5
+Default limits: developer=3, senior_software_engineer=5, qa_expert=5, tech_lead=5
 
 **Step 2b: Check FTS5 availability:**
 
@@ -156,8 +156,11 @@ print(f'HAS_TIKTOKEN={HAS_TIKTOKEN}')
 | Agent | Task | Specialization | Context Pkgs | Errors |
 |-------|------|----------------|--------------|--------|
 | developer | 50% | 20% | 20% | 10% |
+| senior_software_engineer | 40% | 20% | 25% | 15% |
 | qa_expert | 40% | 15% | 30% | 15% |
 | tech_lead | 30% | 15% | 40% | 15% |
+
+**Note:** SSE handles escalations from failed developer attempts, so it needs more context and error budget.
 
 ### Step 3: Query Context Packages
 
@@ -392,6 +395,7 @@ From `bazinga/skills_config.json`:
     "enable_fts5": false,
     "retrieval_limits": {
       "developer": 3,
+      "senior_software_engineer": 5,
       "qa_expert": 5,
       "tech_lead": 5
     },

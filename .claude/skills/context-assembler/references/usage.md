@@ -130,8 +130,11 @@ Different agent types receive different context budgets:
 | Agent | Task | Specialization | Context Pkgs | Errors | Total |
 |-------|------|----------------|--------------|--------|-------|
 | Developer | 50% | 20% | 20% | 10% | 100% |
+| Senior Software Engineer | 40% | 20% | 25% | 15% | 100% |
 | QA Expert | 40% | 15% | 30% | 15% | 100% |
 | Tech Lead | 30% | 15% | 40% | 15% | 100% |
+
+**Note:** SSE handles escalations from failed developer attempts, so it receives more context and error budget than developers.
 
 ## Graduated Token Zones
 
@@ -157,12 +160,15 @@ Configurable per agent type in `bazinga/skills_config.json`:
   "context_engineering": {
     "retrieval_limits": {
       "developer": 3,
+      "senior_software_engineer": 5,
       "qa_expert": 5,
       "tech_lead": 5
     }
   }
 }
 ```
+
+**Note:** SSE gets more packages (5) than developer (3) since it handles escalations requiring broader context.
 
 ## Error Pattern Learning
 
@@ -195,6 +201,7 @@ Full configuration in `bazinga/skills_config.json`:
     "enable_fts5": false,
     "retrieval_limits": {
       "developer": 3,
+      "senior_software_engineer": 5,
       "qa_expert": 5,
       "tech_lead": 5
     },
