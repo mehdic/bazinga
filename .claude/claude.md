@@ -812,6 +812,70 @@ def calculate_budget(complexity: str) -> int:
 
 ---
 
+## 🧪 Integration Testing
+
+**To run the BAZINGA integration test:**
+
+When the user says "run the integration test" or "test the orchestration system", execute the following:
+
+### Quick Test Command
+
+```bash
+# 1. Clear previous test data
+rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
+
+# 2. Run orchestration with test spec
+/bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
+```
+
+### What This Tests
+
+The integration test validates the complete BAZINGA workflow:
+
+1. **Session Management** - Creates session with all required fields
+2. **Tech Stack Detection** - Spawns Tech Stack Scout, creates `project_context.json`
+3. **PM Planning** - Spawns PM (opus), analyzes requirements, creates task groups
+4. **Specializations** - Loads Python specialization template for Developer
+5. **Development** - Spawns Developer (haiku), implements calculator with tests
+6. **QA Testing** - Spawns QA Expert (sonnet), runs challenge levels 1-5
+7. **Code Review** - Spawns Tech Lead (opus), reviews code quality/security
+8. **Completion** - PM sends BAZINGA after all criteria met
+
+### Expected Results
+
+| Component | Expected |
+|-----------|----------|
+| Session status | `completed` |
+| Task groups | 1 group, status `completed` |
+| Orchestration logs | 6+ entries (PM, Developer, QA, Tech Lead, BAZINGA) |
+| Files created | `calculator.py`, `test_calculator.py`, `README.md` |
+| Tests | 51 passing |
+| Code quality | 9+/10 |
+
+### Verification Commands
+
+```bash
+# Check session status
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+
+# Get full dashboard snapshot
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot <SESSION_ID>
+
+# Run the calculator tests
+cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
+```
+
+### Test Spec Location
+
+`tests/integration/simple-calculator-spec.md`
+
+### Test Report
+
+After each run, a report is generated at:
+`tests/integration/INTEGRATION_TEST_REPORT.md`
+
+---
+
 ✅ Project context loaded successfully!
 
 📚 Research documents available in 'research/' folder
