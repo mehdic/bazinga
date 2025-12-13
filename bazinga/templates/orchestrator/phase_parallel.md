@@ -172,9 +172,13 @@ Assemble context for agent spawn:
 - Session: {session_id}
 - Group: {group_id}
 - Agent: {agent_type}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
 ```
 Then invoke: `Skill(command: "context-assembler")`
+
+**Note:** `estimated_token_usage` = `total_spawns * 15000`. If not tracked, pass 0.
 
 The skill returns ranked packages + error patterns + token zone. Include in that group's prompt.
 

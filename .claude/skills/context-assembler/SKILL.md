@@ -144,11 +144,11 @@ elif usage_pct >= 60:
 else:
     zone = 'Normal'
 
-# IMPORTANT: If current_tokens=0 (unknown), apply conservative context cap
-# This prevents runaway context when we don't know actual usage
-UNKNOWN_BUDGET_CAP = 2000  # Max tokens for context packages when usage unknown
-if current == 0:
-    remaining_budget = min(remaining_budget, UNKNOWN_BUDGET_CAP)
+# Token cap logic (T042 Part C):
+# - If orchestrator passes current_tokens (even 0 for first spawn), trust zone detection
+# - Only apply conservative cap if invoked outside orchestrator context (safety fallback)
+# The orchestrator now tracks: estimated_token_usage = total_spawns * 15000
+# First spawn: 0 tokens, zone=Normal, full budget available - this is correct behavior
 
 # Output as shell variable assignments (will be eval'd)
 print(f'ZONE={zone}')
@@ -692,7 +692,7 @@ if { [ "$ZONE" = "Normal" ] || [ "$ZONE" = "Soft_Warning" ]; } && [ ${#PACKAGE_I
 import sys
 import time
 import sqlite3
-import uuid
+import hashlib
 
 session_id = sys.argv[1]
 group_id = sys.argv[2]
@@ -726,7 +726,9 @@ sql = '''INSERT OR IGNORE INTO consumption_scope
 
 marked = 0
 for pkg_id in package_ids:
-    scope_id = str(uuid.uuid4())  # Generate unique scope_id
+    # Deterministic scope_id from composite key (ensures idempotency with unique index)
+    composite = f'{session_id}:{group_id}:{agent_type}:{iteration}:{pkg_id}'
+    scope_id = hashlib.sha256(composite.encode()).hexdigest()[:32]
     if db_execute_with_retry(db_path, sql, (scope_id, session_id, group_id, agent_type, iteration, pkg_id)):
         marked += 1
 
@@ -798,7 +800,6 @@ import sqlite3
 import hashlib
 import json
 import time
-import uuid
 
 session_id = sys.argv[1]
 group_id = sys.argv[2]

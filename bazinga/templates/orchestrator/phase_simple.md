@@ -33,6 +33,8 @@ Assemble context for agent spawn:
 - Session: {session_id}
 - Group: {group_id}
 - Agent: {agent_type}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
 ```
 
@@ -40,6 +42,8 @@ Then invoke:
 ```
 Skill(command: "context-assembler")
 ```
+
+**Note:** `estimated_token_usage` = `total_spawns * 15000` (tracked per session). If not yet tracked, pass 0.
 
 The skill returns a structured markdown block including:
 - Ranked context packages (with summaries)
@@ -629,25 +633,28 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ### SPAWN QA EXPERT (ATOMIC SEQUENCE)
 
-**🔴 Context Package Query (BEFORE building prompt):**
+**🔴 Context Assembly (BEFORE building prompt):**
 
-Query context packages for QA Expert (failures from prior iterations, investigation findings):
+Output context for context-assembler:
 ```
-bazinga-db, please get context packages:
-
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: qa_expert
-Limit: 3
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: qa_expert
+- Model: {MODEL_CONFIG["qa_expert"]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "context-assembler")`
 
-**Context Package Routing (QA):**
-| Query Result | Action |
-|--------------|--------|
-| Packages found | Include in QA prompt (failures, investigation findings) |
-| No packages | Proceed without context section |
-| Query error | Non-blocking, proceed without context |
+The skill returns ranked packages + error patterns + token zone. Include output in QA prompt.
+
+**Context Routing (QA):**
+| Result | Action |
+|--------|--------|
+| Skill returns packages | Include in QA prompt |
+| Skill returns empty | Proceed without context section |
+| Skill error | Non-blocking, proceed without context |
 
 **Build QA base_prompt:**
 
@@ -768,18 +775,21 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**🔴 Context Package Query (BEFORE building prompt):**
+**🔴 Context Assembly (BEFORE building prompt):**
 
-Query context packages for Tech Lead (research, decisions, investigation findings):
+Output context for context-assembler:
 ```
-bazinga-db, please get context packages:
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: tech_lead
+- Model: {MODEL_CONFIG["tech_lead"]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
 
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: tech_lead
-Limit: 3
-```
-Then invoke: `Skill(command: "bazinga-db")`
+The skill returns ranked packages + error patterns + token zone. Include output in TL prompt.
 
 **🔴 Implementation Reasoning Query (AFTER context packages):**
 
