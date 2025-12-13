@@ -743,7 +743,7 @@ fi
 - Uses **consumption_scope** table (per data-model.md) for iteration-aware tracking
 - Uses **parameterized queries** (no SQL injection via f-strings)
 - Includes **exponential backoff retry** (100ms, 200ms, 400ms) per FR-010
-- Generates **unique scope_id** (UUID) for each consumption record
+- Generates **deterministic scope_id** (SHA256 hash of session:group:agent:iteration:package) for idempotency
 - Includes **group_id** for proper session/group/agent/iteration tracking
 - **Skips** in Wrap-up/Emergency zones (nothing delivered)
 - Uses **sqlite3 directly** for parameterized safety

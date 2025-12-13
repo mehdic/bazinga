@@ -2523,16 +2523,24 @@ class BazingaDB:
 
         conn = self._get_connection()
         try:
-            conn.execute("""
+            cursor = conn.execute("""
                 INSERT OR IGNORE INTO consumption_scope
                 (scope_id, session_id, group_id, agent_type, iteration, package_id, consumed_at)
                 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
             """, (scope_id, session_id, group_id, agent_type, iteration, package_id))
             conn.commit()
 
-            self._print_success(f"✓ Saved consumption: {agent_type} consumed package {package_id}")
+            # Check if row was actually inserted (vs ignored as duplicate)
+            inserted = cursor.rowcount > 0
+
+            if inserted:
+                self._print_success(f"✓ Saved consumption: {agent_type} consumed package {package_id}")
+            else:
+                self._print_success(f"✓ Consumption exists: {agent_type} package {package_id} (idempotent)")
+
             return {
                 "success": True,
+                "inserted": inserted,
                 "scope_id": scope_id,
                 "session_id": session_id,
                 "group_id": group_id,
@@ -2554,11 +2562,14 @@ class BazingaDB:
             session_id: Session identifier
             group_id: Optional filter by group
             agent_type: Optional filter by agent type
-            limit: Maximum records to return (default 50)
+            limit: Maximum records to return (default 50, clamped to 1-1000)
 
         Returns:
             List of consumption records
         """
+        # Clamp limit to safe range (1-1000)
+        limit = max(1, min(limit, 1000))
+
         conn = self._get_connection()
         try:
             sql = "SELECT * FROM consumption_scope WHERE session_id = ?"
@@ -2581,6 +2592,8 @@ class BazingaDB:
 
     # ==================== STRATEGIES OPERATIONS ====================
 
+    VALID_TOPICS = {'implementation', 'architecture', 'methodology', 'general'}
+
     def save_strategy(self, project_id: str, topic: str, insight: str,
                       lang: Optional[str] = None, framework: Optional[str] = None,
                       strategy_id: Optional[str] = None) -> Dict[str, Any]:
@@ -2598,6 +2611,10 @@ class BazingaDB:
             Dict with strategy_id and success status
         """
         import hashlib
+
+        # Validate topic against allowed values
+        if topic not in self.VALID_TOPICS:
+            topic = 'general'  # Normalize invalid topics to 'general'
 
         # Generate strategy_id from content hash if not provided
         if not strategy_id:
@@ -2641,11 +2658,14 @@ class BazingaDB:
             lang: Optional filter by language
             framework: Optional filter by framework
             topic: Optional filter by topic
-            limit: Maximum strategies to return (default 5)
+            limit: Maximum strategies to return (default 5, clamped to 1-100)
 
         Returns:
             List of strategy records sorted by helpfulness
         """
+        # Clamp limit to safe range (1-100)
+        limit = max(1, min(limit, 100))
+
         conn = self._get_connection()
         try:
             sql = "SELECT * FROM strategies WHERE project_id = ?"
