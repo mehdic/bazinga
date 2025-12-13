@@ -686,10 +686,45 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
 **🔴 Context Packages & Reasoning Per Group:** When spawning QA or Tech Lead for a group:
+
+**Context Assembly (MANDATORY before QA/TL spawn):**
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {qa_expert|tech_lead}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
+
+The skill returns ranked packages + error patterns + token zone. Include output in agent prompt.
+
+**Additional steps:**
 1. Query context packages with that group's `group_id` (e.g., "A", "B", "C")
 2. Query implementation reasoning using `group_id` to ensure isolation (do NOT use global session reasoning)
 3. Include both in that group's base_prompt (same pattern as Developer)
 4. Each group may have different context packages and reasoning based on its history
+
+### Step 2B.7: Route Tech Lead Response (Per Group)
+
+**IF Tech Lead approves this group:**
+- **Trigger strategy extraction** (capture successful patterns for future context):
+  ```
+  Invoke context-assembler with STATUS=APPROVED:
+  STATUS=APPROVED context-assembler, please extract strategies:
+  - Session: {session_id}
+  - Group: {group_id}
+  - Project: {project_id}
+  - Lang: {detected_lang}
+  - Framework: {detected_framework}
+  ```
+  Then invoke: `Skill(command: "context-assembler")`
+  *Note: This is non-blocking - proceed even if extraction fails*
+- **Immediately proceed to Step 2B.7a** (Spawn Developer for merge)
+
+**IF Tech Lead requests changes:** Route back to Developer/SSE for this group (same as Step 2A.7).
 
 ### Step 2B.7a: Spawn Developer for Merge (Parallel Mode - Per Group)
 

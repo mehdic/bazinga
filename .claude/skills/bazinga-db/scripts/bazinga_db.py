@@ -2721,12 +2721,14 @@ class BazingaDB:
                 (strategy_id,)
             ).fetchone()
             new_helpfulness = row['helpfulness'] if row else 0
+            # Calculate previous from new (since we did atomic update)
+            previous_helpfulness = max(0, new_helpfulness - increment)
 
-            self._print_success(f"✓ Updated helpfulness: +{increment} → {new_helpfulness}")
+            self._print_success(f"✓ Updated helpfulness: {previous_helpfulness} → {new_helpfulness}")
             return {
                 "success": True,
                 "strategy_id": strategy_id,
-                "previous_helpfulness": row['helpfulness'],
+                "previous_helpfulness": previous_helpfulness,
                 "new_helpfulness": new_helpfulness
             }
         except Exception as e:
