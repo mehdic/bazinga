@@ -2500,6 +2500,216 @@ class BazingaDB:
         finally:
             conn.close()
 
+    # ==================== CONSUMPTION SCOPE OPERATIONS ====================
+
+    def save_consumption(self, session_id: str, group_id: str, agent_type: str,
+                         iteration: int, package_id: int) -> Dict[str, Any]:
+        """Save consumption record to consumption_scope table (T037).
+
+        Args:
+            session_id: Session identifier
+            group_id: Task group identifier
+            agent_type: Type of agent consuming the package
+            iteration: Iteration number (0-based)
+            package_id: ID of the consumed context package
+
+        Returns:
+            Dict with scope_id and success status
+        """
+        import uuid
+        scope_id = str(uuid.uuid4())
+
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO consumption_scope
+                (scope_id, session_id, group_id, agent_type, iteration, package_id, consumed_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (scope_id, session_id, group_id, agent_type, iteration, package_id))
+            conn.commit()
+
+            self._print_success(f"✓ Saved consumption: {agent_type} consumed package {package_id}")
+            return {
+                "success": True,
+                "scope_id": scope_id,
+                "session_id": session_id,
+                "group_id": group_id,
+                "agent_type": agent_type,
+                "iteration": iteration,
+                "package_id": package_id
+            }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to save consumption: {str(e)}")
+        finally:
+            conn.close()
+
+    def get_consumption(self, session_id: str, group_id: Optional[str] = None,
+                        agent_type: Optional[str] = None, limit: int = 50) -> List[Dict]:
+        """Query consumption_scope records (T037).
+
+        Args:
+            session_id: Session identifier
+            group_id: Optional filter by group
+            agent_type: Optional filter by agent type
+            limit: Maximum records to return (default 50)
+
+        Returns:
+            List of consumption records
+        """
+        conn = self._get_connection()
+        try:
+            sql = "SELECT * FROM consumption_scope WHERE session_id = ?"
+            params: List[Any] = [session_id]
+
+            if group_id:
+                sql += " AND group_id = ?"
+                params.append(group_id)
+            if agent_type:
+                sql += " AND agent_type = ?"
+                params.append(agent_type)
+
+            sql += " ORDER BY consumed_at DESC LIMIT ?"
+            params.append(limit)
+
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    # ==================== STRATEGIES OPERATIONS ====================
+
+    def save_strategy(self, project_id: str, topic: str, insight: str,
+                      lang: Optional[str] = None, framework: Optional[str] = None,
+                      strategy_id: Optional[str] = None) -> Dict[str, Any]:
+        """Save strategy to strategies table (T038).
+
+        Args:
+            project_id: Project identifier
+            topic: Category (implementation, architecture, methodology, general)
+            insight: The actual insight/approach (max 500 chars)
+            lang: Optional language context
+            framework: Optional framework context
+            strategy_id: Optional custom ID (auto-generated if not provided)
+
+        Returns:
+            Dict with strategy_id and success status
+        """
+        import hashlib
+
+        # Generate strategy_id from content hash if not provided
+        if not strategy_id:
+            content_hash = hashlib.sha256(insight.encode()).hexdigest()[:16]
+            strategy_id = f"{project_id}_{topic}_{content_hash}"
+
+        # Truncate insight to 500 chars
+        insight = insight[:500] if len(insight) > 500 else insight
+
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                INSERT INTO strategies (strategy_id, project_id, topic, insight, helpfulness, lang, framework, last_seen, created_at)
+                VALUES (?, ?, ?, ?, 1, ?, ?, datetime('now'), datetime('now'))
+                ON CONFLICT(strategy_id) DO UPDATE SET
+                    helpfulness = helpfulness + 1,
+                    last_seen = datetime('now')
+            """, (strategy_id, project_id, topic, insight, lang, framework))
+            conn.commit()
+
+            self._print_success(f"✓ Saved strategy: {topic} for {project_id}")
+            return {
+                "success": True,
+                "strategy_id": strategy_id,
+                "project_id": project_id,
+                "topic": topic
+            }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to save strategy: {str(e)}")
+        finally:
+            conn.close()
+
+    def get_strategies(self, project_id: str, lang: Optional[str] = None,
+                       framework: Optional[str] = None, topic: Optional[str] = None,
+                       limit: int = 5) -> List[Dict]:
+        """Query strategies table (T038).
+
+        Args:
+            project_id: Project identifier
+            lang: Optional filter by language
+            framework: Optional filter by framework
+            topic: Optional filter by topic
+            limit: Maximum strategies to return (default 5)
+
+        Returns:
+            List of strategy records sorted by helpfulness
+        """
+        conn = self._get_connection()
+        try:
+            sql = "SELECT * FROM strategies WHERE project_id = ?"
+            params: List[Any] = [project_id]
+
+            if lang:
+                sql += " AND (lang IS NULL OR lang = ?)"
+                params.append(lang)
+            if framework:
+                sql += " AND (framework IS NULL OR framework = ?)"
+                params.append(framework)
+            if topic:
+                sql += " AND topic = ?"
+                params.append(topic)
+
+            sql += " ORDER BY helpfulness DESC, last_seen DESC LIMIT ?"
+            params.append(limit)
+
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    def update_strategy_helpfulness(self, strategy_id: str, increment: int = 1) -> Dict[str, Any]:
+        """Increment strategy helpfulness counter (T038).
+
+        Args:
+            strategy_id: Strategy identifier
+            increment: Amount to increment (default 1)
+
+        Returns:
+            Dict with updated helpfulness value
+        """
+        conn = self._get_connection()
+        try:
+            # Get current value
+            row = conn.execute(
+                "SELECT helpfulness FROM strategies WHERE strategy_id = ?",
+                (strategy_id,)
+            ).fetchone()
+
+            if not row:
+                return {"success": False, "error": "Strategy not found"}
+
+            new_helpfulness = row['helpfulness'] + increment
+
+            conn.execute("""
+                UPDATE strategies
+                SET helpfulness = ?, last_seen = datetime('now')
+                WHERE strategy_id = ?
+            """, (new_helpfulness, strategy_id))
+            conn.commit()
+
+            self._print_success(f"✓ Updated helpfulness: {row['helpfulness']} → {new_helpfulness}")
+            return {
+                "success": True,
+                "strategy_id": strategy_id,
+                "previous_helpfulness": row['helpfulness'],
+                "new_helpfulness": new_helpfulness
+            }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to update helpfulness: {str(e)}")
+        finally:
+            conn.close()
+
     # ==================== QUERY OPERATIONS ====================
 
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
@@ -2596,6 +2806,22 @@ ERROR PATTERN OPERATIONS:
   update-error-confidence <pattern_hash> <project_id> <success|failure>
                                               Adjust pattern confidence (+0.1 on success, -0.2 on failure)
   cleanup-error-patterns [project_id]         Remove patterns that have exceeded their TTL
+
+CONSUMPTION SCOPE OPERATIONS (Context Engineering):
+  save-consumption <session> <group_id> <agent_type> <iteration> <package_id>
+                                              Save consumption record (iteration-aware tracking)
+  get-consumption <session> [--group_id X] [--agent_type Y] [--limit N]
+                                              Get consumption records (default: limit=50)
+
+STRATEGIES OPERATIONS (Context Engineering):
+  save-strategy <project_id> <topic> <insight> [options]
+                                              Save strategy from successful task completion
+                                              Options: [--lang X] [--framework Y] [--strategy_id Z]
+                                              Topics: implementation, architecture, methodology, general
+  get-strategies <project_id> [--lang X] [--framework Y] [--topic Z] [--limit N]
+                                              Get strategies sorted by helpfulness (default: limit=5)
+  update-strategy-helpfulness <strategy_id> [increment]
+                                              Increment helpfulness counter (default: +1)
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -3261,6 +3487,110 @@ def main():
             project_id = cmd_args[0] if len(cmd_args) > 0 else None
             result = db.cleanup_expired_patterns(project_id)
             print(json.dumps(result, indent=2))
+
+        # ==================== CONSUMPTION SCOPE COMMANDS ====================
+        elif cmd == 'save-consumption':
+            # save-consumption <session> <group_id> <agent_type> <iteration> <package_id>
+            if len(cmd_args) < 5:
+                print("Error: save-consumption requires: <session> <group_id> <agent_type> <iteration> <package_id>", file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            agent_type = cmd_args[2]
+            iteration = int(cmd_args[3])
+            package_id = int(cmd_args[4])
+            result = db.save_consumption(session_id, group_id, agent_type, iteration, package_id)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-consumption':
+            # get-consumption <session> [--group_id X] [--agent_type Y] [--limit N]
+            if len(cmd_args) < 1:
+                print("Error: get-consumption requires: <session>", file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            group_id = None
+            agent_type = None
+            limit = 50
+            i = 1
+            while i < len(cmd_args):
+                if cmd_args[i] == '--group_id' and i + 1 < len(cmd_args):
+                    group_id = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--agent_type' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--limit' and i + 1 < len(cmd_args):
+                    limit = int(cmd_args[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            result = db.get_consumption(session_id, group_id, agent_type, limit)
+            print(json.dumps(result, indent=2))
+
+        # ==================== STRATEGIES COMMANDS ====================
+        elif cmd == 'save-strategy':
+            # save-strategy <project_id> <topic> <insight> [--lang X] [--framework Y] [--strategy_id Z]
+            if len(cmd_args) < 3:
+                print("Error: save-strategy requires: <project_id> <topic> <insight>", file=sys.stderr)
+                sys.exit(1)
+            project_id = cmd_args[0]
+            topic = cmd_args[1]
+            insight = cmd_args[2]
+            lang = None
+            framework = None
+            strategy_id = None
+            i = 3
+            while i < len(cmd_args):
+                if cmd_args[i] == '--lang' and i + 1 < len(cmd_args):
+                    lang = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--framework' and i + 1 < len(cmd_args):
+                    framework = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--strategy_id' and i + 1 < len(cmd_args):
+                    strategy_id = cmd_args[i + 1]
+                    i += 2
+                else:
+                    i += 1
+            result = db.save_strategy(project_id, topic, insight, lang, framework, strategy_id)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-strategies':
+            # get-strategies <project_id> [--lang X] [--framework Y] [--topic Z] [--limit N]
+            if len(cmd_args) < 1:
+                print("Error: get-strategies requires: <project_id>", file=sys.stderr)
+                sys.exit(1)
+            project_id = cmd_args[0]
+            lang = None
+            framework = None
+            topic = None
+            limit = 5
+            i = 1
+            while i < len(cmd_args):
+                if cmd_args[i] == '--lang' and i + 1 < len(cmd_args):
+                    lang = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--framework' and i + 1 < len(cmd_args):
+                    framework = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--topic' and i + 1 < len(cmd_args):
+                    topic = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--limit' and i + 1 < len(cmd_args):
+                    limit = int(cmd_args[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            result = db.get_strategies(project_id, lang, framework, topic, limit)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'update-strategy-helpfulness':
+            # update-strategy-helpfulness <strategy_id> [increment]
+            if len(cmd_args) < 1:
+                print("Error: update-strategy-helpfulness requires: <strategy_id>", file=sys.stderr)
+                sys.exit(1)
+            strategy_id = cmd_args[0]
+            increment = int(cmd_args[1]) if len(cmd_args) > 1 else 1
+            result = db.update_strategy_helpfulness(strategy_id, increment)
+            print(json.dumps(result, indent=2))
+
         elif cmd == 'query':
             if not cmd_args:
                 print("Error: query command requires SQL statement", file=sys.stderr)

@@ -160,7 +160,25 @@ IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not e
 IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```
 
-**🔴 Context Package Query (PER GROUP before spawn):**
+**🔴 Context Assembly (PER GROUP before spawn):**
+
+**Check** `bazinga/skills_config.json` for `context_engineering.enable_context_assembler`.
+
+**IF context-assembler ENABLED (batch mode for parallel):**
+
+For each group, output context and invoke skill:
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {agent_type}
+- Iteration: {iteration_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
+
+The skill returns ranked packages + error patterns + token zone. Include in that group's prompt.
+
+**IF context-assembler DISABLED (fallback per group):**
 
 For each group, query context packages:
 ```

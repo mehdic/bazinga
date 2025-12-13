@@ -188,12 +188,12 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T037 [P] Add consumption tracking to `consumption_scope` table on each context delivery
-- [ ] T038 [P] Implement strategies table population (extract insights from successful tasks)
-- [ ] T039 [P] Add database lock retry logic (exponential backoff: 100ms, 200ms, 400ms)
-- [ ] T040 [P] Update bazinga-db skill to expose context engineering table operations
-- [ ] T041 Validate quickstart.md scenarios against implementation
-- [ ] T042 Integrate context-assembler into orchestrator spawn workflow:
+- [X] T037 [P] Add consumption tracking to `consumption_scope` table on each context delivery
+- [X] T038 [P] Implement strategies table population (extract insights from successful tasks)
+- [X] T039 [P] Add database lock retry logic (exponential backoff: 100ms, 200ms, 400ms)
+- [X] T040 [P] Update bazinga-db skill to expose context engineering table operations
+- [X] T041 Validate quickstart.md scenarios against implementation
+- [X] T042 Integrate context-assembler into orchestrator spawn workflow:
 
   **Problem**: Currently orchestrator queries `bazinga-db` directly for context packages (see `phase_simple.md` lines 24-35, 604-616, 743-755). The context-assembler skill exists but is never invoked. The 2000 token cap in context-assembler (SKILL.md line 149) is a workaround because `current_tokens` is never passed.
 
@@ -239,7 +239,7 @@
   - Spawn 5+ agents in sequence, verify estimated_token_usage increases
   - At spawn 6+, zone should shift from Normal to Soft_Warning (~90k estimated)
   - Verify context-assembler returns truncated summaries in Soft_Warning zone
-- [ ] T043 Performance validation: context assembly < 500ms (SC-005)
+- [X] T043 Performance validation: context assembly < 500ms (SC-005)
 
 ---
 

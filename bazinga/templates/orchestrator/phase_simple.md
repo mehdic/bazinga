@@ -21,7 +21,34 @@
 
 **🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
 
-**🔴 Context Package Query (MANDATORY before spawn):**
+**🔴 Context Assembly (MANDATORY before spawn):**
+
+**Check** `bazinga/skills_config.json` for `context_engineering.enable_context_assembler`.
+
+**IF context-assembler ENABLED:**
+
+Output context for the skill:
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {agent_type}
+- Iteration: {iteration_count}
+```
+
+Then invoke:
+```
+Skill(command: "context-assembler")
+```
+
+The skill returns a structured markdown block including:
+- Ranked context packages (with summaries)
+- Error pattern matches (if any)
+- Token zone indicator (if budget constrained)
+
+**Include the skill output in the agent prompt.**
+
+**IF context-assembler DISABLED (fallback to bazinga-db):**
 
 Query available context packages for this agent:
 ```
@@ -34,7 +61,7 @@ Limit: 3
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Context Package Routing Rules:**
+**Context Routing Rules:**
 | Query Result | Action |
 |--------------|--------|
 | Packages found (N > 0) | Validate file paths, then include Context Packages table in prompt |

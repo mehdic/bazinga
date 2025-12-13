@@ -678,30 +678,30 @@ Note: `priority_used` comes from the fallback ladder response (critical/high/med
 
 **Only show overflow indicator if overflow_count > 0 AND zone is Normal or Soft Warning.**
 
-### Step 5b: Mark Packages as Consumed
+### Step 5b: Mark Packages as Consumed (consumption_scope table)
 
 **IMPORTANT: Only run if zone is Normal or Soft_Warning (skip for Wrap-up/Emergency)**
 
-After formatting output, mark delivered packages as consumed to prevent repeated delivery:
+After formatting output, mark delivered packages as consumed in the `consumption_scope` table to prevent repeated delivery and enable iteration-aware tracking:
 
 ```bash
 # Only mark consumption if packages were actually delivered
 if { [ "$ZONE" = "Normal" ] || [ "$ZONE" = "Soft_Warning" ]; } && [ ${#PACKAGE_IDS[@]} -gt 0 ]; then
-    # Mark consumed packages using bazinga-db with retry
-    # Note: Uses context_package_consumers table (unified table)
+    # Mark consumed packages using consumption_scope table (iteration-aware tracking per data-model.md)
     python3 -c "
-import subprocess
 import sys
 import time
 import sqlite3
+import uuid
 
 session_id = sys.argv[1]
-agent_type = sys.argv[2]
-iteration = int(sys.argv[3])
-package_ids = sys.argv[4:]  # Remaining args are package IDs
+group_id = sys.argv[2]
+agent_type = sys.argv[3]
+iteration = int(sys.argv[4])
+package_ids = sys.argv[5:]  # Remaining args are package IDs
 
-def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 250, 500]):
-    '''Execute SQL with retry on SQLITE_BUSY.'''
+def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
+    '''Execute SQL with retry on SQLITE_BUSY (exponential backoff per FR-010).'''
     for attempt in range(max_retries + 1):
         try:
             conn = sqlite3.connect(db_path)
@@ -717,28 +717,32 @@ def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 
             return False
     return False
 
-# Insert consumption records using parameterized queries (no SQL injection)
+# Insert consumption records into consumption_scope table (per data-model.md)
+# Uses parameterized queries for SQL injection prevention
 db_path = 'bazinga/bazinga.db'
-sql = '''INSERT OR IGNORE INTO context_package_consumers
-         (package_id, agent_type, session_id, iteration, consumed_at)
-         VALUES (?, ?, ?, ?, datetime('now'))'''
+sql = '''INSERT OR IGNORE INTO consumption_scope
+         (scope_id, session_id, group_id, agent_type, iteration, package_id, consumed_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))'''
 
 marked = 0
 for pkg_id in package_ids:
-    if db_execute_with_retry(db_path, sql, (pkg_id, agent_type, session_id, iteration)):
+    scope_id = str(uuid.uuid4())  # Generate unique scope_id
+    if db_execute_with_retry(db_path, sql, (scope_id, session_id, group_id, agent_type, iteration, pkg_id)):
         marked += 1
 
-print(f'Marked {marked}/{len(package_ids)} packages as consumed')
-" "$SESSION_ID" "$AGENT_TYPE" "$ITERATION" "${PACKAGE_IDS[@]}"
+print(f'Marked {marked}/{len(package_ids)} packages as consumed in consumption_scope')
+" "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$ITERATION" "${PACKAGE_IDS[@]}"
 else
     echo "Skipping consumption tracking (zone=$ZONE or no packages)"
 fi
 ```
 
-**Key improvements:**
+**Key features:**
+- Uses **consumption_scope** table (per data-model.md) for iteration-aware tracking
 - Uses **parameterized queries** (no SQL injection via f-strings)
-- Uses **context_package_consumers** table (unified, not consumption_scope)
-- Includes **retry logic** for SQLITE_BUSY
+- Includes **exponential backoff retry** (100ms, 200ms, 400ms) per FR-010
+- Generates **unique scope_id** (UUID) for each consumption record
+- Includes **group_id** for proper session/group/agent/iteration tracking
 - **Skips** in Wrap-up/Emergency zones (nothing delivered)
 - Uses **sqlite3 directly** for parameterized safety
 
@@ -767,6 +771,141 @@ If ANY step fails (database unavailable, query error, etc.):
 ```
 
 3. **CRITICAL**: The orchestrator should NEVER block on context-assembler failure
+
+---
+
+## Step 7: Strategy Extraction (Success Path)
+
+**When:** Triggered after a task group completes successfully (Tech Lead APPROVED status).
+
+**Purpose:** Extract and save successful approaches to the `strategies` table for future agent guidance.
+
+### Trigger Conditions
+
+Strategy extraction should run when:
+- Tech Lead returns `APPROVED` status for a group
+- Developer completes without needing escalation
+- QA passes all tests on first attempt
+
+### Strategy Extraction Process
+
+```bash
+# Only extract strategies on successful completion
+if [ "$STATUS" = "APPROVED" ] || [ "$STATUS" = "SUCCESS" ]; then
+    python3 -c "
+import sys
+import sqlite3
+import hashlib
+import json
+import time
+import uuid
+
+session_id = sys.argv[1]
+group_id = sys.argv[2]
+project_id = sys.argv[3]
+lang = sys.argv[4] if len(sys.argv) > 4 else None
+framework = sys.argv[5] if len(sys.argv) > 5 else None
+
+def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
+    '''Execute SQL with retry on SQLITE_BUSY (exponential backoff per FR-010).'''
+    for attempt in range(max_retries + 1):
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries:
+                time.sleep(backoff_ms[attempt] / 1000.0)
+                continue
+            return False
+    return False
+
+def db_query_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
+    '''Query SQL with retry on SQLITE_BUSY.'''
+    for attempt in range(max_retries + 1):
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            results = cursor.fetchall()
+            conn.close()
+            return results
+        except sqlite3.OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries:
+                time.sleep(backoff_ms[attempt] / 1000.0)
+                continue
+            return []
+    return []
+
+db_path = 'bazinga/bazinga.db'
+
+# Query reasoning for successful completion insights
+reasoning_sql = '''
+SELECT phase, content, agent_type FROM agent_reasoning
+WHERE session_id = ? AND group_id = ? AND phase IN ('completion', 'decisions', 'approach')
+ORDER BY created_at DESC LIMIT 5
+'''
+reasoning_rows = db_query_with_retry(db_path, reasoning_sql, (session_id, group_id))
+
+# Extract insights from completion/decisions/approach phases
+for row in reasoning_rows:
+    phase, content, agent_type = row
+
+    # Generate strategy_id from content hash
+    content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
+    strategy_id = f'{group_id}_{phase}_{content_hash}'
+
+    # Determine topic from phase
+    topic_map = {'completion': 'implementation', 'decisions': 'architecture', 'approach': 'methodology'}
+    topic = topic_map.get(phase, 'general')
+
+    # Truncate insight to first 500 chars if needed
+    insight = content[:500] if len(content) > 500 else content
+
+    # Insert or update strategy
+    strategy_sql = '''
+    INSERT INTO strategies (strategy_id, project_id, topic, insight, helpfulness, lang, framework, last_seen, created_at)
+    VALUES (?, ?, ?, ?, 1, ?, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(strategy_id) DO UPDATE SET
+        helpfulness = helpfulness + 1,
+        last_seen = datetime('now')
+    '''
+    db_execute_with_retry(db_path, strategy_sql, (strategy_id, project_id, topic, insight, lang, framework))
+
+print(f'Extracted {len(reasoning_rows)} strategies from group {group_id}')
+" \"$SESSION_ID\" \"$GROUP_ID\" \"$PROJECT_ID\" \"$LANG\" \"$FRAMEWORK\"
+fi
+```
+
+### Strategy Schema Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `strategy_id` | TEXT PK | Unique identifier (group_phase_hash) |
+| `project_id` | TEXT | Project this strategy applies to |
+| `topic` | TEXT | Category: implementation, architecture, methodology |
+| `insight` | TEXT | The actual insight/approach (max 500 chars) |
+| `helpfulness` | INT | Usage counter, incremented on reuse |
+| `lang` | TEXT | Language context (python, typescript, etc.) |
+| `framework` | TEXT | Framework context (react, fastapi, etc.) |
+| `last_seen` | TEXT | Last time strategy was applied |
+| `created_at` | TEXT | When strategy was first captured |
+
+### Strategy Retrieval for Context
+
+When assembling context, strategies can be queried for relevant hints:
+
+```sql
+SELECT topic, insight FROM strategies
+WHERE project_id = ?
+  AND (lang IS NULL OR lang = ?)
+  AND (framework IS NULL OR framework = ?)
+ORDER BY helpfulness DESC, last_seen DESC
+LIMIT 3
+```
 
 ---
 
@@ -925,11 +1064,44 @@ Task(
 | Table | Purpose |
 |-------|---------|
 | `context_packages` | Research files, findings, artifacts with priority/summary |
-| `context_package_consumers` | Per-agent consumption tracking (unified table with session_id, iteration) |
+| `consumption_scope` | Iteration-aware package consumption tracking (per data-model.md) |
 | `error_patterns` | Captured error signatures with solutions |
+| `strategies` | Successful approaches extracted from completed tasks (Step 7) |
+| `agent_reasoning` | Agent reasoning phases used for strategy extraction |
 | `sessions` | Session metadata including project_id |
 
-**Note:** The `context_package_consumers` table has columns: `package_id`, `agent_type`, `session_id`, `iteration`, `consumed_at`. Step 5b uses this for tracking delivery and preventing duplicate context.
+**Note:** The `consumption_scope` table has columns: `scope_id`, `session_id`, `group_id`, `agent_type`, `iteration`, `package_id`, `consumed_at`. Step 5b uses this for tracking delivery per session/group/agent/iteration to enable fresh context on retries.
+
+**Note:** The `strategies` table is populated by Step 7 when tasks complete successfully. Strategies are queried during context assembly to provide insights from past successful implementations.
+
+---
+
+## Performance (SC-005)
+
+**Target:** Context assembly must complete in <500ms.
+
+**Estimated Performance:**
+
+| Step | Operation | Time |
+|------|-----------|------|
+| Parse input | Step 1 | <5ms |
+| Token zone detection | Step 2 | <5ms |
+| Query packages | Step 3 (indexed) | 30-50ms |
+| Token packing | Step 3c | 20-50ms |
+| Query error patterns | Step 4 (indexed) | 30-50ms |
+| Format output | Step 5 | <10ms |
+| Mark consumption | Step 5b | 20-50ms |
+| **Total** | | **~100-200ms** |
+
+**Performance Prerequisites:**
+- SQLite WAL mode enabled (concurrent reads)
+- Indexes created on `context_packages`, `error_patterns`, `consumption_scope`
+- Retry backoff (100ms, 200ms, 400ms) adds max 700ms only if database locked
+
+**If performance degrades:**
+1. Check `PRAGMA journal_mode` returns `wal`
+2. Verify indexes exist: `SELECT name FROM sqlite_master WHERE type='index'`
+3. Check for lock contention in parallel agent spawns
 
 ---
 
