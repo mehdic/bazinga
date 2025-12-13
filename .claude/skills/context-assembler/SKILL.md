@@ -855,13 +855,13 @@ reasoning_rows = db_query_with_retry(db_path, reasoning_sql, (session_id, group_
 for row in reasoning_rows:
     phase, content, agent_type = row
 
-    # Generate strategy_id from content hash
-    content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
-    strategy_id = f'{group_id}_{phase}_{content_hash}'
-
-    # Determine topic from phase
+    # Determine topic from phase (must be before strategy_id generation)
     topic_map = {'completion': 'implementation', 'decisions': 'architecture', 'approach': 'methodology'}
     topic = topic_map.get(phase, 'general')
+
+    # Generate strategy_id matching bazinga_db.py format: {project_id}_{topic}_{hash}
+    content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
+    strategy_id = f'{project_id}_{topic}_{content_hash}'
 
     # Truncate insight to first 500 chars if needed
     insight = content[:500] if len(content) > 500 else content
@@ -885,7 +885,7 @@ fi
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `strategy_id` | TEXT PK | Unique identifier (group_phase_hash) |
+| `strategy_id` | TEXT PK | Unique identifier (project_topic_hash) |
 | `project_id` | TEXT | Project this strategy applies to |
 | `topic` | TEXT | Category: implementation, architecture, methodology |
 | `insight` | TEXT | The actual insight/approach (max 500 chars) |

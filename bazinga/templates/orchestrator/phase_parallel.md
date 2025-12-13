@@ -2,6 +2,26 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
+
+**After EVERY Task() call, you MUST:**
+
+1. **Increment spawn counter:**
+   ```
+   bazinga-db, please update orchestrator state:
+
+   Session ID: {session_id}
+   State Type: orchestrator
+   State Data: {"total_spawns": {current_total_spawns + 1}}
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
+
+**This enables graduated token zones in context-assembler.** Without tracking, zone detection always defaults to "Normal" and graduated budget management won't activate.
+
+---
+
 **🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.

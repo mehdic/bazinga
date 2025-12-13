@@ -2516,8 +2516,10 @@ class BazingaDB:
         Returns:
             Dict with scope_id and success status
         """
-        import uuid
-        scope_id = str(uuid.uuid4())
+        import hashlib
+        # Deterministic scope_id for idempotency (same inputs = same ID)
+        composite = f"{session_id}:{group_id}:{agent_type}:{iteration}:{package_id}"
+        scope_id = hashlib.sha256(composite.encode()).hexdigest()[:32]
 
         conn = self._get_connection()
         try:
@@ -2672,32 +2674,35 @@ class BazingaDB:
 
         Args:
             strategy_id: Strategy identifier
-            increment: Amount to increment (default 1)
+            increment: Amount to increment (default 1, clamped to 0-100)
 
         Returns:
             Dict with updated helpfulness value
         """
+        # Validate increment (guard against negative/huge values)
+        increment = max(0, min(increment, 100))
+
         conn = self._get_connection()
         try:
-            # Get current value
+            # Atomic update (no read-modify-write race condition)
+            cursor = conn.execute("""
+                UPDATE strategies
+                SET helpfulness = MAX(0, helpfulness + ?), last_seen = datetime('now')
+                WHERE strategy_id = ?
+            """, (increment, strategy_id))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                return {"success": False, "error": "Strategy not found"}
+
+            # Get the new value for reporting
             row = conn.execute(
                 "SELECT helpfulness FROM strategies WHERE strategy_id = ?",
                 (strategy_id,)
             ).fetchone()
+            new_helpfulness = row['helpfulness'] if row else 0
 
-            if not row:
-                return {"success": False, "error": "Strategy not found"}
-
-            new_helpfulness = row['helpfulness'] + increment
-
-            conn.execute("""
-                UPDATE strategies
-                SET helpfulness = ?, last_seen = datetime('now')
-                WHERE strategy_id = ?
-            """, (new_helpfulness, strategy_id))
-            conn.commit()
-
-            self._print_success(f"✓ Updated helpfulness: {row['helpfulness']} → {new_helpfulness}")
+            self._print_success(f"✓ Updated helpfulness: +{increment} → {new_helpfulness}")
             return {
                 "success": True,
                 "strategy_id": strategy_id,

@@ -2,6 +2,28 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
+
+**After EVERY Task() call, you MUST:**
+
+1. **Increment spawn counter:**
+   ```
+   bazinga-db, please update orchestrator state:
+
+   Session ID: {session_id}
+   State Type: orchestrator
+   State Data: {"total_spawns": {current_total_spawns + 1}}
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
+
+**This enables graduated token zones in context-assembler.** Without tracking, zone detection always defaults to "Normal" and graduated budget management won't activate.
+
+**State persistence:** total_spawns is stored in session state via bazinga-db, incremented after each spawn, and passed to context-assembler for zone detection.
+
+---
+
 ### Step 2A.1: Spawn Single Developer
 
 **User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
@@ -1047,6 +1069,18 @@ Task(
 ### Step 2A.7: Route Tech Lead Response
 
 **IF Tech Lead approves:**
+- **Trigger strategy extraction** (capture successful patterns for future context):
+  ```
+  Invoke context-assembler with STATUS=APPROVED:
+  STATUS=APPROVED context-assembler, please extract strategies:
+  - Session: {session_id}
+  - Group: {group_id}
+  - Project: {project_id}
+  - Lang: {detected_lang}
+  - Framework: {detected_framework}
+  ```
+  Then invoke: `Skill(command: "context-assembler")`
+  *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2A.7a** (Spawn Developer for immediate merge)
 - Do NOT stop for user input
 - Do NOT skip merge step - branches must be merged immediately after approval
