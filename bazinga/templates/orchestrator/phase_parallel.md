@@ -712,15 +712,15 @@ The skill returns ranked packages + error patterns + token zone. Include output 
 **IF Tech Lead approves this group:**
 - **Trigger strategy extraction** (capture successful patterns for future context):
   ```
-  Invoke context-assembler with STATUS=APPROVED:
-  STATUS=APPROVED context-assembler, please extract strategies:
-  - Session: {session_id}
-  - Group: {group_id}
-  - Project: {project_id}
-  - Lang: {detected_lang}
-  - Framework: {detected_framework}
+  bazinga-db, please extract strategies:
+
+  Session ID: {session_id}
+  Group ID: {group_id}
+  Project ID: {project_id}
+  Lang: {detected_lang}
+  Framework: {detected_framework}
   ```
-  Then invoke: `Skill(command: "context-assembler")`
+  Then invoke: `Skill(command: "bazinga-db")`
   *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2B.7a** (Spawn Developer for merge)
 

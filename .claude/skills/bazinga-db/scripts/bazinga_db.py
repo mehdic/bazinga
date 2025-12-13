@@ -2666,6 +2666,11 @@ class BazingaDB:
         # Clamp limit to safe range (1-100)
         limit = max(1, min(limit, 100))
 
+        # Validate topic if provided
+        if topic and topic not in self.VALID_TOPICS:
+            self._print_error(f"Invalid topic '{topic}'. Valid: {', '.join(self.VALID_TOPICS)}")
+            return []
+
         conn = self._get_connection()
         try:
             sql = "SELECT * FROM strategies WHERE project_id = ?"
@@ -2734,6 +2739,72 @@ class BazingaDB:
         except Exception as e:
             conn.rollback()
             raise RuntimeError(f"Failed to update helpfulness: {str(e)}")
+        finally:
+            conn.close()
+
+    def extract_strategies(self, session_id: str, group_id: str, project_id: str,
+                           lang: Optional[str] = None, framework: Optional[str] = None) -> Dict[str, Any]:
+        """Extract strategies from agent_reasoning for successful task completion.
+
+        Queries completion/decisions/approach phases and saves as strategies.
+
+        Args:
+            session_id: Session identifier
+            group_id: Task group identifier
+            project_id: Project identifier for strategy scoping
+            lang: Optional language context
+            framework: Optional framework context
+
+        Returns:
+            Dict with count of extracted strategies
+        """
+        import hashlib
+
+        conn = self._get_connection()
+        try:
+            # Query reasoning for successful completion insights
+            rows = conn.execute("""
+                SELECT phase, content, agent_type FROM agent_reasoning
+                WHERE session_id = ? AND group_id = ? AND phase IN ('completion', 'decisions', 'approach')
+                ORDER BY created_at DESC LIMIT 5
+            """, (session_id, group_id)).fetchall()
+
+            extracted = 0
+            topic_map = {'completion': 'implementation', 'decisions': 'architecture', 'approach': 'methodology'}
+
+            for row in rows:
+                phase, content, agent_type = row['phase'], row['content'], row['agent_type']
+                topic = topic_map.get(phase, 'general')
+
+                # Generate strategy_id matching save_strategy format
+                content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
+                strategy_id = f"{project_id}_{topic}_{content_hash}"
+
+                # Truncate insight to 500 chars
+                insight = content[:500] if len(content) > 500 else content
+
+                # Upsert strategy (increment helpfulness if exists)
+                conn.execute("""
+                    INSERT INTO strategies (strategy_id, project_id, topic, insight, helpfulness, lang, framework, last_seen, created_at)
+                    VALUES (?, ?, ?, ?, 1, ?, ?, datetime('now'), datetime('now'))
+                    ON CONFLICT(strategy_id) DO UPDATE SET
+                        helpfulness = helpfulness + 1,
+                        last_seen = datetime('now')
+                """, (strategy_id, project_id, topic, insight, lang, framework))
+                extracted += 1
+
+            conn.commit()
+            self._print_success(f"✓ Extracted {extracted} strategies from group {group_id}")
+            return {
+                "success": True,
+                "extracted_count": extracted,
+                "session_id": session_id,
+                "group_id": group_id,
+                "project_id": project_id
+            }
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to extract strategies: {str(e)}")
         finally:
             conn.close()
 
@@ -2849,6 +2920,8 @@ STRATEGIES OPERATIONS (Context Engineering):
                                               Get strategies sorted by helpfulness (default: limit=5)
   update-strategy-helpfulness <strategy_id> [increment]
                                               Increment helpfulness counter (default: +1)
+  extract-strategies <session> <group_id> <project_id> [--lang X] [--framework Y]
+                                              Extract strategies from agent_reasoning after TL approval
 
 QUERY OPERATIONS:
   query <sql>                                 Execute custom SELECT query
@@ -3616,6 +3689,28 @@ def main():
             strategy_id = cmd_args[0]
             increment = int(cmd_args[1]) if len(cmd_args) > 1 else 1
             result = db.update_strategy_helpfulness(strategy_id, increment)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'extract-strategies':
+            # extract-strategies <session> <group_id> <project_id> [--lang X] [--framework Y]
+            if len(cmd_args) < 3:
+                print("Error: extract-strategies requires: <session> <group_id> <project_id>", file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            project_id = cmd_args[2]
+            lang = None
+            framework = None
+            i = 3
+            while i < len(cmd_args):
+                if cmd_args[i] == '--lang' and i + 1 < len(cmd_args):
+                    lang = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--framework' and i + 1 < len(cmd_args):
+                    framework = cmd_args[i + 1]
+                    i += 2
+                else:
+                    i += 1
+            result = db.extract_strategies(session_id, group_id, project_id, lang, framework)
             print(json.dumps(result, indent=2))
 
         elif cmd == 'query':

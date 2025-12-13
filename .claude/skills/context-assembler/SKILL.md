@@ -791,95 +791,25 @@ Strategy extraction should run when:
 
 ### Strategy Extraction Process
 
-```bash
-# Only extract strategies on successful completion
-if [ "$STATUS" = "APPROVED" ] || [ "$STATUS" = "SUCCESS" ]; then
-    python3 -c "
-import sys
-import sqlite3
-import hashlib
-import json
-import time
+**Note:** Strategy extraction is triggered by the orchestrator (phase_simple.md, phase_parallel.md) after Tech Lead approval using the `bazinga-db extract-strategies` command:
 
-session_id = sys.argv[1]
-group_id = sys.argv[2]
-project_id = sys.argv[3]
-lang = sys.argv[4] if len(sys.argv) > 4 else None
-framework = sys.argv[5] if len(sys.argv) > 5 else None
-
-def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
-    '''Execute SQL with retry on SQLITE_BUSY (exponential backoff per FR-010).'''
-    for attempt in range(max_retries + 1):
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            conn.commit()
-            conn.close()
-            return True
-        except sqlite3.OperationalError as e:
-            if 'database is locked' in str(e) and attempt < max_retries:
-                time.sleep(backoff_ms[attempt] / 1000.0)
-                continue
-            return False
-    return False
-
-def db_query_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
-    '''Query SQL with retry on SQLITE_BUSY.'''
-    for attempt in range(max_retries + 1):
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            results = cursor.fetchall()
-            conn.close()
-            return results
-        except sqlite3.OperationalError as e:
-            if 'database is locked' in str(e) and attempt < max_retries:
-                time.sleep(backoff_ms[attempt] / 1000.0)
-                continue
-            return []
-    return []
-
-db_path = 'bazinga/bazinga.db'
-
-# Query reasoning for successful completion insights
-reasoning_sql = '''
-SELECT phase, content, agent_type FROM agent_reasoning
-WHERE session_id = ? AND group_id = ? AND phase IN ('completion', 'decisions', 'approach')
-ORDER BY created_at DESC LIMIT 5
-'''
-reasoning_rows = db_query_with_retry(db_path, reasoning_sql, (session_id, group_id))
-
-# Extract insights from completion/decisions/approach phases
-for row in reasoning_rows:
-    phase, content, agent_type = row
-
-    # Determine topic from phase (must be before strategy_id generation)
-    topic_map = {'completion': 'implementation', 'decisions': 'architecture', 'approach': 'methodology'}
-    topic = topic_map.get(phase, 'general')
-
-    # Generate strategy_id matching bazinga_db.py format: {project_id}_{topic}_{hash}
-    content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
-    strategy_id = f'{project_id}_{topic}_{content_hash}'
-
-    # Truncate insight to first 500 chars if needed
-    insight = content[:500] if len(content) > 500 else content
-
-    # Insert or update strategy
-    strategy_sql = '''
-    INSERT INTO strategies (strategy_id, project_id, topic, insight, helpfulness, lang, framework, last_seen, created_at)
-    VALUES (?, ?, ?, ?, 1, ?, ?, datetime('now'), datetime('now'))
-    ON CONFLICT(strategy_id) DO UPDATE SET
-        helpfulness = helpfulness + 1,
-        last_seen = datetime('now')
-    '''
-    db_execute_with_retry(db_path, strategy_sql, (strategy_id, project_id, topic, insight, lang, framework))
-
-print(f'Extracted {len(reasoning_rows)} strategies from group {group_id}')
-" \"$SESSION_ID\" \"$GROUP_ID\" \"$PROJECT_ID\" \"$LANG\" \"$FRAMEWORK\"
-fi
 ```
+bazinga-db, please extract strategies:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Project ID: {project_id}
+Lang: {detected_lang}
+Framework: {detected_framework}
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**What the command does:**
+1. Queries `agent_reasoning` table for completion/decisions/approach phases
+2. Maps phases to topics: completion→implementation, decisions→architecture, approach→methodology
+3. Generates deterministic `strategy_id` = `{project_id}_{topic}_{content_hash}`
+4. Upserts to `strategies` table (increments helpfulness if exists)
+5. Returns count of extracted strategies
 
 ### Strategy Schema Reference
 
