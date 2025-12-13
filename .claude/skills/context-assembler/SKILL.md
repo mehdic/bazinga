@@ -144,11 +144,11 @@ elif usage_pct >= 60:
 else:
     zone = 'Normal'
 
-# IMPORTANT: If current_tokens=0 (unknown), apply conservative context cap
-# This prevents runaway context when we don't know actual usage
-UNKNOWN_BUDGET_CAP = 2000  # Max tokens for context packages when usage unknown
-if current == 0:
-    remaining_budget = min(remaining_budget, UNKNOWN_BUDGET_CAP)
+# Token cap logic (T042 Part C):
+# - If orchestrator passes current_tokens (even 0 for first spawn), trust zone detection
+# - Only apply conservative cap if invoked outside orchestrator context (safety fallback)
+# The orchestrator now tracks: estimated_token_usage = total_spawns * 15000
+# First spawn: 0 tokens, zone=Normal, full budget available - this is correct behavior
 
 # Output as shell variable assignments (will be eval'd)
 print(f'ZONE={zone}')
@@ -335,9 +335,9 @@ AGENT_TYPE="developer"
 # Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
   "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
-          GROUP_CONCAT(cpc.agent_type) as consumers
+          GROUP_CONCAT(cs.agent_type) as consumers
    FROM context_packages cp
-   LEFT JOIN context_package_consumers cpc ON cp.id = cpc.package_id
+   LEFT JOIN consumption_scope cs ON cp.id = cs.package_id AND cs.session_id = cp.session_id
    WHERE cp.session_id = '$SESSION_ID'
    GROUP BY cp.id"
 ```
@@ -678,30 +678,30 @@ Note: `priority_used` comes from the fallback ladder response (critical/high/med
 
 **Only show overflow indicator if overflow_count > 0 AND zone is Normal or Soft Warning.**
 
-### Step 5b: Mark Packages as Consumed
+### Step 5b: Mark Packages as Consumed (consumption_scope table)
 
 **IMPORTANT: Only run if zone is Normal or Soft_Warning (skip for Wrap-up/Emergency)**
 
-After formatting output, mark delivered packages as consumed to prevent repeated delivery:
+After formatting output, mark delivered packages as consumed in the `consumption_scope` table to prevent repeated delivery and enable iteration-aware tracking:
 
 ```bash
 # Only mark consumption if packages were actually delivered
 if { [ "$ZONE" = "Normal" ] || [ "$ZONE" = "Soft_Warning" ]; } && [ ${#PACKAGE_IDS[@]} -gt 0 ]; then
-    # Mark consumed packages using bazinga-db with retry
-    # Note: Uses context_package_consumers table (unified table)
+    # Mark consumed packages using consumption_scope table (iteration-aware tracking per data-model.md)
     python3 -c "
-import subprocess
 import sys
 import time
 import sqlite3
+import hashlib
 
 session_id = sys.argv[1]
-agent_type = sys.argv[2]
-iteration = int(sys.argv[3])
-package_ids = sys.argv[4:]  # Remaining args are package IDs
+group_id = sys.argv[2]
+agent_type = sys.argv[3]
+iteration = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].isdigit() else 0
+package_ids = sys.argv[5:] if len(sys.argv) > 5 else []  # Remaining args are package IDs
 
-def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 250, 500]):
-    '''Execute SQL with retry on SQLITE_BUSY.'''
+def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
+    '''Execute SQL with retry on SQLITE_BUSY (exponential backoff per FR-010).'''
     for attempt in range(max_retries + 1):
         try:
             conn = sqlite3.connect(db_path)
@@ -717,28 +717,34 @@ def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 
             return False
     return False
 
-# Insert consumption records using parameterized queries (no SQL injection)
+# Insert consumption records into consumption_scope table (per data-model.md)
+# Uses parameterized queries for SQL injection prevention
 db_path = 'bazinga/bazinga.db'
-sql = '''INSERT OR IGNORE INTO context_package_consumers
-         (package_id, agent_type, session_id, iteration, consumed_at)
-         VALUES (?, ?, ?, ?, datetime('now'))'''
+sql = '''INSERT OR IGNORE INTO consumption_scope
+         (scope_id, session_id, group_id, agent_type, iteration, package_id, consumed_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))'''
 
 marked = 0
 for pkg_id in package_ids:
-    if db_execute_with_retry(db_path, sql, (pkg_id, agent_type, session_id, iteration)):
+    # Deterministic scope_id from composite key (ensures idempotency with unique index)
+    composite = f'{session_id}:{group_id}:{agent_type}:{iteration}:{pkg_id}'
+    scope_id = hashlib.sha256(composite.encode()).hexdigest()[:32]
+    if db_execute_with_retry(db_path, sql, (scope_id, session_id, group_id, agent_type, iteration, pkg_id)):
         marked += 1
 
-print(f'Marked {marked}/{len(package_ids)} packages as consumed')
-" "$SESSION_ID" "$AGENT_TYPE" "$ITERATION" "${PACKAGE_IDS[@]}"
+print(f'Marked {marked}/{len(package_ids)} packages as consumed in consumption_scope')
+" "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$ITERATION" "${PACKAGE_IDS[@]}"
 else
     echo "Skipping consumption tracking (zone=$ZONE or no packages)"
 fi
 ```
 
-**Key improvements:**
+**Key features:**
+- Uses **consumption_scope** table (per data-model.md) for iteration-aware tracking
 - Uses **parameterized queries** (no SQL injection via f-strings)
-- Uses **context_package_consumers** table (unified, not consumption_scope)
-- Includes **retry logic** for SQLITE_BUSY
+- Includes **exponential backoff retry** (100ms, 200ms, 400ms) per FR-010
+- Generates **deterministic scope_id** (SHA256 hash of session:group:agent:iteration:package) for idempotency
+- Includes **group_id** for proper session/group/agent/iteration tracking
 - **Skips** in Wrap-up/Emergency zones (nothing delivered)
 - Uses **sqlite3 directly** for parameterized safety
 
@@ -767,6 +773,70 @@ If ANY step fails (database unavailable, query error, etc.):
 ```
 
 3. **CRITICAL**: The orchestrator should NEVER block on context-assembler failure
+
+---
+
+## Step 7: Strategy Extraction (Success Path)
+
+**When:** Triggered after a task group completes successfully (Tech Lead APPROVED status).
+
+**Purpose:** Extract and save successful approaches to the `strategies` table for future agent guidance.
+
+### Trigger Conditions
+
+Strategy extraction should run when:
+- Tech Lead returns `APPROVED` status for a group
+- Developer completes without needing escalation
+- QA passes all tests on first attempt
+
+### Strategy Extraction Process
+
+**Note:** Strategy extraction is triggered by the orchestrator (phase_simple.md, phase_parallel.md) after Tech Lead approval using the `bazinga-db extract-strategies` command:
+
+```
+bazinga-db, please extract strategies:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Project ID: {project_id}
+Lang: {detected_lang}
+Framework: {detected_framework}
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**What the command does:**
+1. Queries `agent_reasoning` table for completion/decisions/approach phases
+2. Maps phases to topics: completion→implementation, decisions→architecture, approach→methodology
+3. Generates deterministic `strategy_id` = `{project_id}_{topic}_{content_hash}`
+4. Upserts to `strategies` table (increments helpfulness if exists)
+5. Returns count of extracted strategies
+
+### Strategy Schema Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `strategy_id` | TEXT PK | Unique identifier (project_topic_hash) |
+| `project_id` | TEXT | Project this strategy applies to |
+| `topic` | TEXT | Category: implementation, architecture, methodology |
+| `insight` | TEXT | The actual insight/approach (max 500 chars) |
+| `helpfulness` | INT | Usage counter, incremented on reuse |
+| `lang` | TEXT | Language context (python, typescript, etc.) |
+| `framework` | TEXT | Framework context (react, fastapi, etc.) |
+| `last_seen` | TEXT | Last time strategy was applied |
+| `created_at` | TEXT | When strategy was first captured |
+
+### Strategy Retrieval for Context
+
+When assembling context, strategies can be queried for relevant hints:
+
+```sql
+SELECT topic, insight FROM strategies
+WHERE project_id = ?
+  AND (lang IS NULL OR lang = ?)
+  AND (framework IS NULL OR framework = ?)
+ORDER BY helpfulness DESC, last_seen DESC
+LIMIT 3
+```
 
 ---
 
@@ -925,11 +995,44 @@ Task(
 | Table | Purpose |
 |-------|---------|
 | `context_packages` | Research files, findings, artifacts with priority/summary |
-| `context_package_consumers` | Per-agent consumption tracking (unified table with session_id, iteration) |
+| `consumption_scope` | Iteration-aware package consumption tracking (per data-model.md) |
 | `error_patterns` | Captured error signatures with solutions |
+| `strategies` | Successful approaches extracted from completed tasks (Step 7) |
+| `agent_reasoning` | Agent reasoning phases used for strategy extraction |
 | `sessions` | Session metadata including project_id |
 
-**Note:** The `context_package_consumers` table has columns: `package_id`, `agent_type`, `session_id`, `iteration`, `consumed_at`. Step 5b uses this for tracking delivery and preventing duplicate context.
+**Note:** The `consumption_scope` table has columns: `scope_id`, `session_id`, `group_id`, `agent_type`, `iteration`, `package_id`, `consumed_at`. Step 5b uses this for tracking delivery per session/group/agent/iteration to enable fresh context on retries.
+
+**Note:** The `strategies` table is populated by Step 7 when tasks complete successfully. Strategies are queried during context assembly to provide insights from past successful implementations.
+
+---
+
+## Performance (SC-005)
+
+**Target:** Context assembly must complete in <500ms.
+
+**Estimated Performance:**
+
+| Step | Operation | Time |
+|------|-----------|------|
+| Parse input | Step 1 | <5ms |
+| Token zone detection | Step 2 | <5ms |
+| Query packages | Step 3 (indexed) | 30-50ms |
+| Token packing | Step 3c | 20-50ms |
+| Query error patterns | Step 4 (indexed) | 30-50ms |
+| Format output | Step 5 | <10ms |
+| Mark consumption | Step 5b | 20-50ms |
+| **Total** | | **~100-200ms** |
+
+**Performance Prerequisites:**
+- SQLite WAL mode enabled (concurrent reads)
+- Indexes created on `context_packages`, `error_patterns`, `consumption_scope`
+- Retry backoff (100ms, 200ms, 400ms) adds max 700ms only if database locked
+
+**If performance degrades:**
+1. Check `PRAGMA journal_mode` returns `wal`
+2. Verify indexes exist: `SELECT name FROM sqlite_master WHERE type='index'`
+3. Check for lock contention in parallel agent spawns
 
 ---
 

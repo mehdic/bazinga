@@ -2,6 +2,26 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
+
+**After EVERY Task() call, you MUST:**
+
+1. **Increment spawn counter:**
+   ```
+   bazinga-db, please update orchestrator state:
+
+   Session ID: {session_id}
+   State Type: orchestrator
+   State Data: {"total_spawns": {current_total_spawns + 1}}
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
+
+**This enables graduated token zones in context-assembler.** Without tracking, zone detection always defaults to "Normal" and graduated budget management won't activate.
+
+---
+
 **🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
@@ -160,7 +180,29 @@ IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not e
 IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```
 
-**🔴 Context Package Query (PER GROUP before spawn):**
+**🔴 Context Assembly (PER GROUP before spawn):**
+
+**Check** `bazinga/skills_config.json` for `context_engineering.enable_context_assembler`.
+
+**IF context-assembler ENABLED (batch mode for parallel):**
+
+For each group, output context and invoke skill:
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {agent_type}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
+
+**Note:** `estimated_token_usage` = `total_spawns * 15000`. If not tracked, pass 0.
+
+The skill returns ranked packages + error patterns + token zone. Include in that group's prompt.
+
+**IF context-assembler DISABLED (fallback per group):**
 
 For each group, query context packages:
 ```
@@ -644,10 +686,45 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
 **🔴 Context Packages & Reasoning Per Group:** When spawning QA or Tech Lead for a group:
+
+**Context Assembly (MANDATORY before QA/TL spawn):**
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {qa_expert|tech_lead}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
+
+The skill returns ranked packages + error patterns + token zone. Include output in agent prompt.
+
+**Additional steps:**
 1. Query context packages with that group's `group_id` (e.g., "A", "B", "C")
 2. Query implementation reasoning using `group_id` to ensure isolation (do NOT use global session reasoning)
 3. Include both in that group's base_prompt (same pattern as Developer)
 4. Each group may have different context packages and reasoning based on its history
+
+### Step 2B.7: Route Tech Lead Response (Per Group)
+
+**IF Tech Lead approves this group:**
+- **Trigger strategy extraction** (capture successful patterns for future context):
+  ```
+  bazinga-db, please extract strategies:
+
+  Session ID: {session_id}
+  Group ID: {group_id}
+  Project ID: {project_id}
+  Lang: {detected_lang}
+  Framework: {detected_framework}
+  ```
+  Then invoke: `Skill(command: "bazinga-db")`
+  *Note: This is non-blocking - proceed even if extraction fails*
+- **Immediately proceed to Step 2B.7a** (Spawn Developer for merge)
+
+**IF Tech Lead requests changes:** Route back to Developer/SSE for this group (same as Step 2A.7).
 
 ### Step 2B.7a: Spawn Developer for Merge (Parallel Mode - Per Group)
 

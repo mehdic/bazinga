@@ -165,12 +165,11 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 
 **Your ONLY allowed tools:**
 - ✅ **Task** - Spawn agents
-- ✅ **Skill** - MANDATORY: Invoke bazinga-db skill for:
-  - Database initialization (Step 2 - REQUIRED)
-  - Logging ALL agent interactions (after EVERY agent response - REQUIRED)
-  - State management (orchestrator/PM/task groups - REQUIRED)
-  - All database operations (replaces file-based logging)
-  - **IMPORTANT**: Do NOT display raw bazinga-db skill output to user (confirmations, JSON responses, etc.). Verify operation succeeded, then IMMEDIATELY continue to next workflow step. If skill invocation fails, output error capsule per §Error Handling and STOP.
+- ✅ **Skill** - MANDATORY: Invoke skills for:
+  - **bazinga-db**: Database operations (initialization, logging, state management) - REQUIRED
+  - **context-assembler**: Intelligent context assembly before agent spawns (if `context_engineering.enable_context_assembler` is true in skills_config.json)
+  - **specialization-loader**: Load agent specializations based on tech stack
+  - **IMPORTANT**: Do NOT display raw skill output to user. Verify operation succeeded, then IMMEDIATELY continue to next workflow step. If skill invocation fails, output error capsule per §Error Handling and STOP.
 - ✅ **Read** - ONLY for reading configuration files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)

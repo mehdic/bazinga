@@ -2,6 +2,28 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
+
+**After EVERY Task() call, you MUST:**
+
+1. **Increment spawn counter:**
+   ```
+   bazinga-db, please update orchestrator state:
+
+   Session ID: {session_id}
+   State Type: orchestrator
+   State Data: {"total_spawns": {current_total_spawns + 1}}
+   ```
+   Then invoke: `Skill(command: "bazinga-db")`
+
+2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
+
+**This enables graduated token zones in context-assembler.** Without tracking, zone detection always defaults to "Normal" and graduated budget management won't activate.
+
+**State persistence:** total_spawns is stored in session state via bazinga-db, incremented after each spawn, and passed to context-assembler for zone detection.
+
+---
+
 ### Step 2A.1: Spawn Single Developer
 
 **User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
@@ -21,7 +43,38 @@
 
 **🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
 
-**🔴 Context Package Query (MANDATORY before spawn):**
+**🔴 Context Assembly (MANDATORY before spawn):**
+
+**Check** `bazinga/skills_config.json` for `context_engineering.enable_context_assembler`.
+
+**IF context-assembler ENABLED:**
+
+Output context for the skill:
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {agent_type}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
+```
+
+Then invoke:
+```
+Skill(command: "context-assembler")
+```
+
+**Note:** `estimated_token_usage` = `total_spawns * 15000` (tracked per session). If not yet tracked, pass 0.
+
+The skill returns a structured markdown block including:
+- Ranked context packages (with summaries)
+- Error pattern matches (if any)
+- Token zone indicator (if budget constrained)
+
+**Include the skill output in the agent prompt.**
+
+**IF context-assembler DISABLED (fallback to bazinga-db):**
 
 Query available context packages for this agent:
 ```
@@ -34,7 +87,7 @@ Limit: 3
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
-**Context Package Routing Rules:**
+**Context Routing Rules:**
 | Query Result | Action |
 |--------------|--------|
 | Packages found (N > 0) | Validate file paths, then include Context Packages table in prompt |
@@ -602,25 +655,28 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ### SPAWN QA EXPERT (ATOMIC SEQUENCE)
 
-**🔴 Context Package Query (BEFORE building prompt):**
+**🔴 Context Assembly (BEFORE building prompt):**
 
-Query context packages for QA Expert (failures from prior iterations, investigation findings):
+Output context for context-assembler:
 ```
-bazinga-db, please get context packages:
-
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: qa_expert
-Limit: 3
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: qa_expert
+- Model: {MODEL_CONFIG["qa_expert"]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "context-assembler")`
 
-**Context Package Routing (QA):**
-| Query Result | Action |
-|--------------|--------|
-| Packages found | Include in QA prompt (failures, investigation findings) |
-| No packages | Proceed without context section |
-| Query error | Non-blocking, proceed without context |
+The skill returns ranked packages + error patterns + token zone. Include output in QA prompt.
+
+**Context Routing (QA):**
+| Result | Action |
+|--------|--------|
+| Skill returns packages | Include in QA prompt |
+| Skill returns empty | Proceed without context section |
+| Skill error | Non-blocking, proceed without context |
 
 **Build QA base_prompt:**
 
@@ -741,18 +797,21 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 
 ### 🔴 MANDATORY TECH LEAD PROMPT BUILDING
 
-**🔴 Context Package Query (BEFORE building prompt):**
+**🔴 Context Assembly (BEFORE building prompt):**
 
-Query context packages for Tech Lead (research, decisions, investigation findings):
+Output context for context-assembler:
 ```
-bazinga-db, please get context packages:
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: tech_lead
+- Model: {MODEL_CONFIG["tech_lead"]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {iteration_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
 
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: tech_lead
-Limit: 3
-```
-Then invoke: `Skill(command: "bazinga-db")`
+The skill returns ranked packages + error patterns + token zone. Include output in TL prompt.
 
 **🔴 Implementation Reasoning Query (AFTER context packages):**
 
@@ -1010,6 +1069,18 @@ Task(
 ### Step 2A.7: Route Tech Lead Response
 
 **IF Tech Lead approves:**
+- **Trigger strategy extraction** (capture successful patterns for future context):
+  ```
+  bazinga-db, please extract strategies:
+
+  Session ID: {session_id}
+  Group ID: {group_id}
+  Project ID: {project_id}
+  Lang: {detected_lang}
+  Framework: {detected_framework}
+  ```
+  Then invoke: `Skill(command: "bazinga-db")`
+  *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2A.7a** (Spawn Developer for immediate merge)
 - Do NOT stop for user input
 - Do NOT skip merge step - branches must be merged immediately after approval
