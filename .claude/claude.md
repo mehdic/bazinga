@@ -812,6 +812,86 @@ def calculate_budget(complexity: str) -> int:
 
 ---
 
+## 🧪 Integration Testing
+
+**Run the orchestrator integration test to verify the entire BAZINGA system is working correctly.**
+
+### Quick Test Command
+
+```bash
+# Run manual tests (no pytest required)
+python tests/test_orchestrator_integration.py --manual
+
+# Run with pytest (if installed)
+pytest tests/test_orchestrator_integration.py -v --tb=short
+```
+
+### What Gets Tested
+
+The integration test validates:
+
+| Category | Tests |
+|----------|-------|
+| **Database Operations** | Initialization, WAL mode, table creation (16 tables) |
+| **Session Management** | Create, list, update status |
+| **Agent Logging** | PM, Developer, QA, Tech Lead interactions |
+| **State Management** | Orchestrator state, PM state, get/save operations |
+| **Task Groups** | Create, update, get groups |
+| **Success Criteria** | Save, get, update criterion status |
+| **Context Packages** | Save, get for agent spawn |
+| **Reasoning Capture** | Understanding, completion phases, timeline |
+| **Dashboard** | Snapshot generation |
+| **Workflow Simulation** | Full simple mode + parallel mode workflows |
+| **Configuration Files** | All 3 config JSONs validated |
+| **Agent Files** | All 8 agent MD files verified |
+
+### Expected Output (All Pass)
+
+```
+================================================================================
+BAZINGA ORCHESTRATOR INTEGRATION TEST - MANUAL RUN
+================================================================================
+
+📦 Initializing test database...
+✅ Database initialized
+
+🧪 Running tests...
+
+  ✅ Session Creation
+  ✅ List Sessions
+  ✅ Log Interaction
+  ✅ Save State
+  ✅ Get State
+  ✅ Create Task Group
+  ✅ Update Task Group
+  ✅ Get Task Groups
+  ✅ Save Success Criteria
+  ✅ Get Success Criteria
+  ✅ Save Reasoning
+  ✅ Get Reasoning
+  ✅ Dashboard Snapshot
+  ✅ Update Session Status
+
+----------------------------------------
+Results: 14/14 passed
+
+🎉 ALL TESTS PASSED!
+```
+
+### When to Run This Test
+
+- **After making changes** to database schema or operations
+- **After modifying** agent definitions or workflow
+- **Before major releases** or deployments
+- **When debugging** orchestration issues
+- **To verify** a fresh installation works correctly
+
+### Test Location
+
+`tests/test_orchestrator_integration.py` - Contains both pytest classes and manual test runner
+
+---
+
 ✅ Project context loaded successfully!
 
 📚 Research documents available in 'research/' folder
