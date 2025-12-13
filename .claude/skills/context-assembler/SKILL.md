@@ -335,9 +335,9 @@ AGENT_TYPE="developer"
 # Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
   "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
-          GROUP_CONCAT(cpc.agent_type) as consumers
+          GROUP_CONCAT(cs.agent_type) as consumers
    FROM context_packages cp
-   LEFT JOIN context_package_consumers cpc ON cp.id = cpc.package_id
+   LEFT JOIN consumption_scope cs ON cp.id = cs.package_id AND cs.session_id = cp.session_id
    WHERE cp.session_id = '$SESSION_ID'
    GROUP BY cp.id"
 ```
@@ -697,8 +697,8 @@ import hashlib
 session_id = sys.argv[1]
 group_id = sys.argv[2]
 agent_type = sys.argv[3]
-iteration = int(sys.argv[4])
-package_ids = sys.argv[5:]  # Remaining args are package IDs
+iteration = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].isdigit() else 0
+package_ids = sys.argv[5:] if len(sys.argv) > 5 else []  # Remaining args are package IDs
 
 def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
     '''Execute SQL with retry on SQLITE_BUSY (exponential backoff per FR-010).'''
