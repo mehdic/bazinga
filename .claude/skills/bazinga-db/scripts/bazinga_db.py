@@ -1381,27 +1381,135 @@ class BazingaDB:
 
     # ==================== SKILL OUTPUT OPERATIONS ====================
 
-    def save_skill_output(self, session_id: str, skill_name: str, output_data: Dict) -> None:
-        """Save skill output."""
-        conn = self._get_connection()
-        conn.execute("""
-            INSERT INTO skill_outputs (session_id, skill_name, output_data)
-            VALUES (?, ?, ?)
-        """, (session_id, skill_name, json.dumps(output_data)))
-        conn.commit()
-        conn.close()
-        self._print_success(f"✓ Saved {skill_name} output")
+    def save_skill_output(self, session_id: str, skill_name: str, output_data: Dict,
+                         agent_type: Optional[str] = None, group_id: Optional[str] = None) -> int:
+        """Save skill output with auto-computed iteration.
 
-    def get_skill_output(self, session_id: str, skill_name: str) -> Optional[Dict]:
-        """Get latest skill output."""
+        Iteration is computed atomically using INSERT...SELECT to prevent race conditions.
+        Uses UNIQUE constraint with retry on IntegrityError for concurrent safety.
+        Returns the iteration number assigned.
+        """
         conn = self._get_connection()
-        row = conn.execute("""
-            SELECT output_data FROM skill_outputs
-            WHERE session_id = ? AND skill_name = ?
-            ORDER BY timestamp DESC LIMIT 1
-        """, (session_id, skill_name)).fetchone()
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                # Use BEGIN IMMEDIATE to acquire exclusive lock upfront
+                conn.execute("BEGIN IMMEDIATE")
+
+                # Atomic INSERT with computed iteration using INSERT...SELECT
+                # Build WHERE clause properly for NULL handling
+                if agent_type is None and group_id is None:
+                    where_clause = "agent_type IS NULL AND group_id IS NULL"
+                    params = (session_id, skill_name, json.dumps(output_data), session_id, skill_name)
+                elif agent_type is None:
+                    where_clause = "agent_type IS NULL AND group_id = ?"
+                    params = (session_id, skill_name, json.dumps(output_data), group_id, session_id, skill_name, group_id)
+                elif group_id is None:
+                    where_clause = "agent_type = ? AND group_id IS NULL"
+                    params = (session_id, skill_name, json.dumps(output_data), agent_type, session_id, skill_name, agent_type)
+                else:
+                    where_clause = "agent_type = ? AND group_id = ?"
+                    params = (session_id, skill_name, json.dumps(output_data), agent_type, group_id, session_id, skill_name, agent_type, group_id)
+
+                cursor = conn.execute(f"""
+                    INSERT INTO skill_outputs (session_id, skill_name, output_data, agent_type, group_id, iteration)
+                    SELECT ?, ?, ?, {'NULL' if agent_type is None else '?'}, {'NULL' if group_id is None else '?'},
+                           COALESCE((SELECT MAX(iteration) FROM skill_outputs
+                                     WHERE session_id = ? AND skill_name = ? AND {where_clause}), 0) + 1
+                """, params)
+
+                # Get the iteration that was assigned
+                next_iteration = conn.execute(f"""
+                    SELECT iteration FROM skill_outputs
+                    WHERE rowid = ?
+                """, (cursor.lastrowid,)).fetchone()['iteration']
+
+                conn.commit()
+                conn.close()
+                break  # Success, exit retry loop
+
+            except sqlite3.IntegrityError as e:
+                conn.rollback()
+                if attempt < max_retries - 1:
+                    # Retry on UNIQUE constraint violation (concurrent insert)
+                    import time
+                    time.sleep(0.01 * (attempt + 1))  # Brief backoff
+                    continue
+                else:
+                    conn.close()
+                    raise
+            except Exception as e:
+                conn.rollback()
+                conn.close()
+                raise
+
+        if agent_type:
+            self._print_success(f"✓ Saved {skill_name} output for {agent_type} (iteration {next_iteration})")
+        else:
+            self._print_success(f"✓ Saved {skill_name} output (iteration {next_iteration})")
+        return next_iteration
+
+    def get_skill_output(self, session_id: str, skill_name: str,
+                        agent_type: Optional[str] = None) -> Optional[Dict]:
+        """Get latest skill output (backward compatible).
+
+        If agent_type is provided, returns latest for that agent.
+        Otherwise returns latest across all agents.
+        """
+        conn = self._get_connection()
+
+        if agent_type:
+            row = conn.execute("""
+                SELECT output_data FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ? AND agent_type = ?
+                ORDER BY timestamp DESC LIMIT 1
+            """, (session_id, skill_name, agent_type)).fetchone()
+        else:
+            row = conn.execute("""
+                SELECT output_data FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ?
+                ORDER BY timestamp DESC LIMIT 1
+            """, (session_id, skill_name)).fetchone()
+
         conn.close()
         return json.loads(row['output_data']) if row else None
+
+    def get_skill_output_all(self, session_id: str, skill_name: str,
+                            agent_type: Optional[str] = None) -> List[Dict]:
+        """Get all skill outputs for a skill (supports multi-invocation).
+
+        Returns array of objects with iteration, agent_type, group_id, timestamp, and output_data.
+        Ordered by timestamp DESC (most recent first) for consistent access patterns.
+        """
+        conn = self._get_connection()
+
+        if agent_type:
+            # Filter by agent type, order by timestamp DESC for consistent "latest first"
+            rows = conn.execute("""
+                SELECT iteration, agent_type, group_id, timestamp, output_data
+                FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ? AND agent_type = ?
+                ORDER BY timestamp DESC
+            """, (session_id, skill_name, agent_type)).fetchall()
+        else:
+            # All outputs for skill, order by timestamp DESC
+            rows = conn.execute("""
+                SELECT iteration, agent_type, group_id, timestamp, output_data
+                FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ?
+                ORDER BY timestamp DESC
+            """, (session_id, skill_name)).fetchall()
+
+        conn.close()
+
+        return [{
+            'iteration': row['iteration'],
+            'agent_type': row['agent_type'],
+            'group_id': row['group_id'],
+            'timestamp': row['timestamp'],
+            'output_data': json.loads(row['output_data'])
+        } for row in rows]
 
     # ==================== CONFIGURATION OPERATIONS ====================
     # REMOVED: Configuration table no longer exists (2025-11-21)
@@ -2855,8 +2963,12 @@ TOKEN OPERATIONS:
   token-summary <session> [by]                Get token summary (default: by=agent_type)
 
 SKILL OUTPUT OPERATIONS:
-  save-skill-output <session> <skill> <json>  Save skill output
-  get-skill-output <session> <skill>          Get skill output
+  save-skill-output <session> <skill> <json> [--agent X] [--group Y]
+                                              Save skill output (iteration auto-computed)
+  get-skill-output <session> <skill> [--agent X]
+                                              Get latest skill output
+  get-skill-output-all <session> <skill> [--agent X]
+                                              Get all skill outputs (multi-invocation)
 
 DEVELOPMENT PLAN OPERATIONS:
   save-development-plan <session> <prompt> <plan> <phases_json> <current> <total> [metadata]
@@ -3088,14 +3200,83 @@ def main():
             result = db.get_token_summary(cmd_args[0], by)
             print(json.dumps(result, indent=2))
         elif cmd == 'save-skill-output':
-            session_id = cmd_args[0]
-            skill_name = cmd_args[1]
-            output_data = json.loads(cmd_args[2])
-            db.save_skill_output(session_id, skill_name, output_data)
+            # Parse --agent and --group flags
+            agent_type = None
+            group_id = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--group' and i + 1 < len(cmd_args):
+                    group_id = cmd_args[i + 1]
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            # Validate required arguments
+            if len(positional_args) < 3:
+                print(json.dumps({
+                    "success": False,
+                    "error": "save-skill-output requires <session_id> <skill_name> <output_json> [--agent <type>] [--group <id>]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = positional_args[0]
+            skill_name = positional_args[1]
+            try:
+                output_data = json.loads(positional_args[2])
+            except json.JSONDecodeError as e:
+                print(json.dumps({"success": False, "error": f"Invalid JSON in output_data: {e}"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            iteration = db.save_skill_output(session_id, skill_name, output_data, agent_type, group_id)
+            if not quiet:
+                print(json.dumps({"iteration": iteration}))
         elif cmd == 'get-skill-output':
-            session_id = cmd_args[0]
-            skill_name = cmd_args[1]
-            result = db.get_skill_output(session_id, skill_name)
+            # Parse --agent flag
+            agent_type = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            # Validate required arguments
+            if len(positional_args) < 2:
+                print(json.dumps({
+                    "success": False,
+                    "error": "get-skill-output requires <session_id> <skill_name> [--agent <type>]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = positional_args[0]
+            skill_name = positional_args[1]
+            result = db.get_skill_output(session_id, skill_name, agent_type)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-skill-output-all':
+            # Parse --agent flag
+            agent_type = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            # Validate required arguments
+            if len(positional_args) < 2:
+                print(json.dumps({
+                    "success": False,
+                    "error": "get-skill-output-all requires <session_id> <skill_name> [--agent <type>]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = positional_args[0]
+            skill_name = positional_args[1]
+            result = db.get_skill_output_all(session_id, skill_name, agent_type)
             print(json.dumps(result, indent=2))
         elif cmd == 'get-task-groups':
             session_id = cmd_args[0]

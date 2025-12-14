@@ -30,15 +30,38 @@ You are the specialization-loader skill. You compose technology-specific identit
 
 ### Step 1: Parse Input Context
 
-The orchestrator provides context before invoking you. Extract:
+**Primary source:** The orchestrator provides context as text before invoking you.
+
+**Fallback source:** If text parsing fails AND session_id is known, read from session-specific JSON:
+```bash
+# SECURITY: Only read from session-specific path - NEVER use wildcard for session directory
+# The session_id MUST be provided in orchestrator context text first
+if [ -n "$SESSION_ID" ]; then
+  CONTEXT_FILE="bazinga/artifacts/${SESSION_ID}/skills/spec_ctx_${GROUP_ID}_${AGENT_TYPE}.json"
+  if [ -f "$CONTEXT_FILE" ]; then
+    cat "$CONTEXT_FILE"
+  fi
+fi
+```
+
+**🔴 SECURITY:** Never use wildcard (`*`) for session directory path. This prevents cross-session data leakage.
+
+Extract from either source:
 
 ```
-Session ID: {session_id}
-Group ID: {group_id}
+Session ID: {session_id}         # REQUIRED for database save
+Group ID: {group_id}             # REQUIRED for database save
 Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
 Model: {haiku|sonnet|opus}
 Specialization Paths: {JSON array of template paths}
 Testing Mode: {full|minimal|disabled}  # Orchestrator-provided, defaults to "full" if not specified
+Context File: {path to JSON file}  # Optional, for reference
+```
+
+**🔴 CRITICAL: If session_id cannot be extracted from either source, output error and stop:**
+```
+ERROR: session_id not found in context. Cannot save skill output to database.
+Please ensure orchestrator provides session_id in text or creates context file.
 ```
 
 **Testing Mode Source Priority:**

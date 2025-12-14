@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 12
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -914,6 +914,173 @@ def init_database(db_path: str) -> None:
             current_version = 10
             print("✓ Migration to v10 complete (context engineering system tables)")
 
+        # v10 → v11: Skill outputs multi-invocation support
+        if current_version == 10:
+            print("\n--- Migrating v10 → v11 (skill outputs multi-invocation) ---")
+
+            # Check if skill_outputs table exists (may not exist in fresh DBs during sequential migration)
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='skill_outputs'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ skill_outputs table will be created with new columns")
+            else:
+                try:
+                    # Use BEGIN IMMEDIATE to acquire exclusive lock for DDL safety
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Check existing columns in skill_outputs
+                    columns = {row[1] for row in cursor.execute("PRAGMA table_info(skill_outputs)").fetchall()}
+
+                    # Add agent_type column
+                    if 'agent_type' not in columns:
+                        cursor.execute("""
+                            ALTER TABLE skill_outputs
+                            ADD COLUMN agent_type TEXT
+                        """)
+                        print("   ✓ Added skill_outputs.agent_type")
+                    else:
+                        print("   ⊘ skill_outputs.agent_type already exists")
+
+                    # Add group_id column
+                    if 'group_id' not in columns:
+                        cursor.execute("""
+                            ALTER TABLE skill_outputs
+                            ADD COLUMN group_id TEXT
+                        """)
+                        print("   ✓ Added skill_outputs.group_id")
+                    else:
+                        print("   ⊘ skill_outputs.group_id already exists")
+
+                    # Add iteration column (default 1 for existing rows)
+                    if 'iteration' not in columns:
+                        cursor.execute("""
+                            ALTER TABLE skill_outputs
+                            ADD COLUMN iteration INTEGER DEFAULT 1
+                        """)
+                        print("   ✓ Added skill_outputs.iteration")
+                    else:
+                        print("   ⊘ skill_outputs.iteration already exists")
+
+                    # Create composite index for efficient lookups
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_skill_agent_group
+                        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
+                    """)
+                    print("   ✓ Created idx_skill_agent_group composite index")
+
+                    # Verify integrity
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v10→v11: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v10→v11 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 11
+            print("✓ Migration to v11 complete (skill outputs multi-invocation)")
+
+        # v11 → v12: Add UNIQUE constraint to skill_outputs for race condition prevention
+        if current_version == 11:
+            print("\n--- Migrating v11 → v12 (skill_outputs UNIQUE constraint) ---")
+
+            # Check if skill_outputs table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='skill_outputs'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with UNIQUE constraint - skip migration
+                print("   ⊘ skill_outputs table will be created with UNIQUE constraint")
+            else:
+                try:
+                    # Use BEGIN IMMEDIATE for exclusive lock during DDL
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Check if UNIQUE index already exists
+                    existing_index = cursor.execute("""
+                        SELECT name FROM sqlite_master
+                        WHERE type='index' AND name='idx_skill_unique_iteration'
+                    """).fetchone()
+
+                    if not existing_index:
+                        # SQLite doesn't support ADD CONSTRAINT for UNIQUE on existing table
+                        # Create a UNIQUE INDEX instead (functionally equivalent)
+                        cursor.execute("""
+                            CREATE UNIQUE INDEX idx_skill_unique_iteration
+                            ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
+                        """)
+                        print("   ✓ Created UNIQUE index idx_skill_unique_iteration")
+                    else:
+                        print("   ⊘ UNIQUE index idx_skill_unique_iteration already exists")
+
+                    # Create DESC index for "latest" queries optimization
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_skill_latest
+                        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration DESC)
+                    """)
+                    print("   ✓ Created idx_skill_latest (DESC) for latest queries")
+
+                    # Verify integrity
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v11→v12: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                except sqlite3.IntegrityError as e:
+                    conn.rollback()
+                    if "UNIQUE constraint failed" in str(e):
+                        print(f"   ⚠️ UNIQUE constraint violation found - handling duplicates...")
+                        # Handle duplicate iterations by renumbering
+                        cursor.execute("BEGIN IMMEDIATE")
+                        cursor.execute("""
+                            UPDATE skill_outputs SET iteration = (
+                                SELECT COUNT(*)
+                                FROM skill_outputs s2
+                                WHERE s2.session_id = skill_outputs.session_id
+                                  AND s2.skill_name = skill_outputs.skill_name
+                                  AND COALESCE(s2.agent_type, '') = COALESCE(skill_outputs.agent_type, '')
+                                  AND COALESCE(s2.group_id, '') = COALESCE(skill_outputs.group_id, '')
+                                  AND s2.timestamp <= skill_outputs.timestamp
+                            )
+                        """)
+                        cursor.execute("""
+                            CREATE UNIQUE INDEX idx_skill_unique_iteration
+                            ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
+                        """)
+                        cursor.execute("""
+                            CREATE INDEX IF NOT EXISTS idx_skill_latest
+                            ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration DESC)
+                        """)
+                        conn.commit()
+                        print("   ✓ Fixed duplicate iterations and created UNIQUE index")
+                    else:
+                        print(f"   ✗ v11→v12 migration failed: {e}")
+                        raise
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v11→v12 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 12
+            print("✓ Migration to v12 complete (skill_outputs UNIQUE constraint)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
@@ -1068,6 +1235,8 @@ def init_database(db_path: str) -> None:
     print("✓ Created token_usage table with indexes")
 
     # Skill outputs table (replaces individual JSON files)
+    # v11: Added agent_type, group_id, iteration for multi-invocation support
+    # v12: Added UNIQUE constraint on iteration for race condition prevention
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS skill_outputs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1075,12 +1244,29 @@ def init_database(db_path: str) -> None:
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             skill_name TEXT NOT NULL,
             output_data TEXT NOT NULL,
+            agent_type TEXT,
+            group_id TEXT,
+            iteration INTEGER DEFAULT 1,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_skill_session
         ON skill_outputs(session_id, skill_name, timestamp DESC)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_skill_agent_group
+        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
+    """)
+    # v12: UNIQUE index for race condition prevention
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_unique_iteration
+        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
+    """)
+    # v12: DESC index for "latest" query optimization
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_skill_latest
+        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration DESC)
     """)
     print("✓ Created skill_outputs table with indexes")
 

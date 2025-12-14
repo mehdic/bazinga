@@ -37,6 +37,17 @@ Extract from the calling request or infer from conversation:
 - `model`: Model being used - haiku/sonnet/opus or full model ID (OPTIONAL, for token budgeting)
 - `current_tokens`: Current token usage in conversation (OPTIONAL, for zone detection)
 - `iteration`: Current iteration number (optional, default 0)
+- `include_reasoning`: Whether to include prior agent reasoning for handoff (OPTIONAL)
+  - **DEFAULT BEHAVIOR:** Automatically `true` when reasoning context is beneficial:
+    - `qa_expert`, `tech_lead`: ALWAYS (handoff recipients)
+    - `senior_software_engineer`: ALWAYS (escalation needs prior context)
+    - `investigator`: ALWAYS (debugging needs full context)
+    - `developer`: When `iteration > 0` (retry needs prior reasoning; first attempt has none)
+  - Explicitly set to `false` to disable reasoning for any agent
+- `reasoning_level`: Level of detail for reasoning retrieval (OPTIONAL)
+  - `minimal`: 400 tokens - key decisions only
+  - `medium`: 800 tokens - decisions + approach (DEFAULT)
+  - `full`: 1200 tokens - complete reasoning chain
 
 If `session_id` or `agent_type` are missing, check recent conversation context or ask the orchestrator.
 
@@ -487,6 +498,255 @@ echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 - Populates `PACKAGE_IDS` array for Step 5b
 - Includes `investigator` in budget allocation
 
+### Step 3.5: Prior Reasoning Retrieval (Automatic for Handoffs)
+
+**When to include:**
+- **AUTOMATIC** for `qa_expert` and `tech_lead` (handoff recipients in workflow)
+- **OPTIONAL** for other agents (only if `Include Reasoning: true` is explicit)
+- Can be **disabled** for any agent with `Include Reasoning: false`
+
+**Purpose:** Retrieve prior agents' reasoning to provide continuity during handoffs (Developer→QA→Tech Lead).
+
+**Reasoning Levels (Token Budgets):**
+
+| Level | Tokens | Content | Use Case |
+|-------|--------|---------|----------|
+| `minimal` | 400 | Key decisions only | Quick handoff, simple tasks |
+| `medium` | 800 | Decisions + approach (DEFAULT) | Standard handoffs |
+| `full` | 1200 | Complete reasoning chain | Complex tasks, debugging |
+
+**Priority Order:** completion > decisions > understanding (most actionable first).
+
+**Variable Setup:** Determine reasoning inclusion based on agent type, iteration, and explicit overrides:
+```bash
+# Step 3.5 Variable Setup
+# Automatic reasoning when context is beneficial
+
+AGENT_TYPE="developer"  # From Step 1
+ITERATION="${ITERATION:-0}"  # From Step 1 (default 0)
+
+# Smart default: Enable reasoning when it provides value
+# - qa_expert, tech_lead: ALWAYS (handoff recipients)
+# - senior_software_engineer, investigator: ALWAYS (escalation/debugging needs context)
+# - developer: Only on retry (iteration > 0); first attempt has no prior reasoning
+
+case "$AGENT_TYPE" in
+    qa_expert|tech_lead|senior_software_engineer|investigator)
+        INCLUDE_REASONING="true"   # Always include for these agents
+        ;;
+    developer)
+        if [ "$ITERATION" -gt 0 ]; then
+            INCLUDE_REASONING="true"   # Retry needs prior reasoning
+        else
+            INCLUDE_REASONING="false"  # First attempt has no prior context
+        fi
+        ;;
+    *)
+        INCLUDE_REASONING="false"  # Unknown agents default off
+        ;;
+esac
+
+# Check for explicit override in request (parse from Step 1)
+# "Include Reasoning: false" -> disable even for QA/TL/SSE
+# "Include Reasoning: true" -> enable even for developer first attempt
+# "Reasoning Level: full" -> set REASONING_LEVEL
+
+REASONING_LEVEL="medium"  # Default level
+# If request contains "Reasoning Level: minimal" -> REASONING_LEVEL="minimal"
+# If request contains "Reasoning Level: full" -> REASONING_LEVEL="full"
+```
+
+```bash
+# Prior reasoning retrieval with level-based token budgets
+# Variables: $SESSION_ID, $GROUP_ID, $AGENT_TYPE, $ITERATION, $INCLUDE_REASONING, $REASONING_LEVEL
+
+# FIX 1: Validate iteration is a valid number (default to 0 if invalid)
+validate_iteration() {
+    local val="$1"
+    if [[ "$val" =~ ^[0-9]+$ ]]; then
+        echo "$val"
+    else
+        echo "0"  # Default to 0 for invalid input
+    fi
+}
+
+ITERATION=$(validate_iteration "${ITERATION:-0}")
+
+# Apply smart defaults if not explicitly set
+if [ -z "$INCLUDE_REASONING" ]; then
+    case "$AGENT_TYPE" in
+        qa_expert|tech_lead|senior_software_engineer|investigator)
+            INCLUDE_REASONING="true"
+            ;;
+        developer)
+            if [ "$ITERATION" -gt 0 ]; then
+                INCLUDE_REASONING="true"
+            else
+                INCLUDE_REASONING="false"
+            fi
+            ;;
+        *)
+            INCLUDE_REASONING="false"
+            ;;
+    esac
+fi
+
+REASONING_LEVEL="${REASONING_LEVEL:-medium}"
+
+if [ "$INCLUDE_REASONING" = "true" ]; then
+    echo "Retrieving prior reasoning for handoff context (level: $REASONING_LEVEL, iteration: $ITERATION)..."
+
+    REASONING_DIGEST=$(python3 -c "
+import sys
+import json
+import subprocess
+
+session_id = sys.argv[1]
+group_id = sys.argv[2] if len(sys.argv) > 2 else ''
+reasoning_level = sys.argv[3] if len(sys.argv) > 3 else 'medium'
+target_agent = sys.argv[4] if len(sys.argv) > 4 else 'unknown'
+
+# Token budget based on reasoning level
+LEVEL_BUDGETS = {
+    'minimal': 400,
+    'medium': 800,
+    'full': 1200
+}
+max_tokens = LEVEL_BUDGETS.get(reasoning_level, 800)
+
+# FIX 2: Relevance filtering - define which agents' reasoning is relevant for each target
+# Workflow: Developer -> QA -> Tech Lead
+# Escalation: Developer -> SSE, Developer -> Investigator
+RELEVANT_AGENTS = {
+    'qa_expert': ['developer', 'senior_software_engineer'],  # QA needs dev reasoning
+    'tech_lead': ['developer', 'senior_software_engineer', 'qa_expert'],  # TL needs dev + QA
+    'senior_software_engineer': ['developer'],  # SSE needs failed dev reasoning
+    'investigator': ['developer', 'senior_software_engineer', 'qa_expert'],  # Investigator needs all
+    'developer': ['developer', 'qa_expert', 'tech_lead'],  # Dev retry needs own + feedback
+}
+relevant_agents = RELEVANT_AGENTS.get(target_agent, [])
+
+# FIX 3: Pruning limits for long retry chains
+MAX_ENTRIES_PER_AGENT = 2  # Max 2 most recent entries per agent type
+MAX_TOTAL_ENTRIES = 5  # Max 5 entries total regardless of agents
+
+# Query reasoning from database via bazinga-db
+# Priority order: completion > decisions > understanding (most actionable first)
+PRIORITY_PHASES = ['completion', 'decisions', 'understanding']
+
+try:
+    # Get all reasoning for this session/group
+    cmd = ['python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet', 'get-reasoning', session_id]
+    if group_id:
+        cmd.extend(['--group_id', group_id])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(json.dumps({'error': 'query_failed', 'entries': [], 'used_tokens': 0}))
+        sys.exit(0)
+
+    entries = json.loads(result.stdout) if result.stdout.strip() else []
+except Exception as e:
+    print(json.dumps({'error': str(e), 'entries': [], 'used_tokens': 0}))
+    sys.exit(0)
+
+if not entries:
+    print(json.dumps({'entries': [], 'used_tokens': 0, 'total_available': 0}))
+    sys.exit(0)
+
+# FIX 2: Filter to relevant agents only
+if relevant_agents:
+    entries = [e for e in entries if e.get('agent_type') in relevant_agents]
+
+# FIX 3: Prune to MAX_ENTRIES_PER_AGENT per agent (most recent first)
+# Group by agent, sort by timestamp desc, take top N per agent
+from collections import defaultdict
+agent_entries = defaultdict(list)
+for entry in entries:
+    agent_entries[entry.get('agent_type', 'unknown')].append(entry)
+
+pruned_entries = []
+for agent, agent_list in agent_entries.items():
+    # Sort by timestamp descending (most recent first)
+    agent_list.sort(key=lambda e: e.get('timestamp', ''), reverse=True)
+    # Take only MAX_ENTRIES_PER_AGENT
+    pruned_entries.extend(agent_list[:MAX_ENTRIES_PER_AGENT])
+
+entries = pruned_entries
+
+# Sort by priority phase, then by timestamp (most recent first within each phase)
+def phase_priority(entry):
+    phase = entry.get('phase', 'understanding')
+    try:
+        return PRIORITY_PHASES.index(phase)
+    except ValueError:
+        return len(PRIORITY_PHASES)  # Unknown phases last
+
+# Two-pass sort: first by timestamp DESC, then stable sort by phase priority ASC
+# This gives us most recent entries first within each phase
+entries.sort(key=lambda e: e.get('timestamp', ''), reverse=True)  # timestamp DESC
+entries.sort(key=phase_priority)  # phase priority ASC (stable sort preserves timestamp order)
+
+# FIX 3: Apply total entry limit
+entries = entries[:MAX_TOTAL_ENTRIES]
+
+# Token estimation (~4 chars per token)
+def estimate_tokens(text):
+    return len(text) // 4 + 1 if text else 0
+
+# Pack entries within budget
+packed = []
+used_tokens = 0
+
+for entry in entries:
+    content = entry.get('content', '')
+    # Format: [agent] phase: content
+    formatted = f\"[{entry.get('agent_type', 'unknown')}] {entry.get('phase', 'unknown')}: {content[:300]}\"
+    entry_tokens = estimate_tokens(formatted)
+
+    if used_tokens + entry_tokens > max_tokens:
+        break
+
+    packed.append({
+        'agent_type': entry.get('agent_type'),
+        'phase': entry.get('phase'),
+        'content': content[:300] if len(content) > 300 else content,
+        'confidence': entry.get('confidence_level'),
+        'est_tokens': entry_tokens
+    })
+    used_tokens += entry_tokens
+
+print(json.dumps({
+    'entries': packed,
+    'used_tokens': used_tokens,
+    'budget': max_tokens,
+    'level': reasoning_level,
+    'total_available': len(entries),
+    'relevant_agents': relevant_agents,
+    'pruning': {'max_per_agent': MAX_ENTRIES_PER_AGENT, 'max_total': MAX_TOTAL_ENTRIES}
+}))
+" "$SESSION_ID" "$GROUP_ID" "$REASONING_LEVEL" "$AGENT_TYPE")
+
+    echo "Reasoning digest: $(echo "$REASONING_DIGEST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"entries\",[]))} entries, {d.get(\"used_tokens\",0)}/{d.get(\"budget\",800)} tokens (level: {d.get(\"level\", \"medium\")})')" 2>/dev/null || echo 'parse error')"
+else
+    REASONING_DIGEST='{"entries":[],"used_tokens":0,"level":"none"}'
+    echo "Skipping reasoning retrieval (include_reasoning=false for $AGENT_TYPE)"
+fi
+```
+
+**Output Format for Step 5:**
+
+If reasoning entries are found, include in output:
+
+```markdown
+### Prior Agent Reasoning ({count} entries)
+
+**[developer] completion:** Successfully implemented authentication using JWT...
+**[qa_expert] decisions:** Chose to focus on edge cases for token expiration...
+```
+
+Only include if `$INCLUDE_REASONING = true` AND entries exist.
+
 ### Step 4: Query Error Patterns (Optional)
 
 If the agent previously failed or error patterns might be relevant:
@@ -655,6 +915,12 @@ Note: `priority_used` comes from the fallback ladder response (critical/high/med
 
 **[{PRIORITY}]** {file_path}
 > {summary}
+
+### Prior Agent Reasoning ({reasoning_count} entries)
+<!-- Only include if include_reasoning=true AND entries exist -->
+
+**[developer] completion:** Successfully implemented the core logic with edge case handling...
+**[qa_expert] decisions:** Focused test coverage on authentication flow boundaries...
 
 ### Error Patterns ({pattern_count} matches)
 
