@@ -478,7 +478,7 @@ echo "📁 Results saved to: $OUTPUT_FILE"
 # Save to database
 echo "💾 Saving to database..."
 DB_PATH="orchestrix/orchestrix.db"
-DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
+DB_SCRIPT="$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py"
 SKILL_OUTPUT=$(cat "$OUTPUT_FILE")
 
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \

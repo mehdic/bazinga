@@ -37,7 +37,7 @@ SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
 mkdir -p "$SKILLS_DIR"
 
 # Database paths
-DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
+DB_SCRIPT="$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py"
 DB_PATH="${COORD_DIR}/orchestrix.db"
 
 METRICS_FILE="${SKILLS_DIR}/project_metrics.json"

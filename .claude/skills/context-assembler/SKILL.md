@@ -302,7 +302,7 @@ def db_query_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
 
 # Use orchestrix-db get-context-packages (parameterized, safe)
 result = db_query_with_retry([
-    'python3', '.claude/skills/orchestrix-db/scripts/orchestrix_db.py', '--quiet',
+    'python3', f'{subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()}/.claude/skills/orchestrix-db/scripts/orchestrix_db.py', '--quiet',
     'get-context-packages', session_id, group_id, agent_type, str(limit)
 ])
 
@@ -333,7 +333,7 @@ GROUP_ID="group_a"  # or empty string for session-wide
 AGENT_TYPE="developer"
 
 # Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet query \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet query \
   "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
           GROUP_CONCAT(cs.agent_type) as consumers
    FROM context_packages cp
@@ -496,7 +496,7 @@ If the agent previously failed or error patterns might be relevant:
 SESSION_ID="orchestrix_20250212_143530"
 
 # Retrieve project_id (defaults to 'default' if not set)
-PROJECT_ID=$(python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet query \
+PROJECT_ID=$(python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet query \
   "SELECT COALESCE(json_extract(metadata, '\$.project_id'), 'default') as pid FROM sessions WHERE session_id = '$SESSION_ID'" \
   2>/dev/null | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['pid'] if r else 'default')" 2>/dev/null || echo "default")
 ```
@@ -504,7 +504,7 @@ PROJECT_ID=$(python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --qui
 **Step 4b: Query matching error patterns:**
 ```bash
 # Filter by project_id and optionally session_id for more specific matches
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet query \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet query \
   "SELECT signature_json, solution, confidence, occurrences FROM error_patterns WHERE project_id = '$PROJECT_ID' AND confidence > 0.7 ORDER BY confidence DESC, occurrences DESC LIMIT 3"
 ```
 
@@ -920,7 +920,7 @@ Assemble context for tech_lead spawn:
 
 **Commands used:**
 ```bash
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-context-packages \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet get-context-packages \
   "orchestrix_20250212_143530" "" "tech_lead" 5
 ```
 

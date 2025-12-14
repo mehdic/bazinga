@@ -235,7 +235,7 @@ IF blocker is fixable:
 
 **Step 1: Query PM's Orchestrix message from database**
 ```bash
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-events \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet get-events \
   "[session_id]" "pm_orchestrix" 1
 ```
 This returns the PM's Orchestrix message logged by orchestrator.
@@ -251,7 +251,7 @@ Parse the event_payload JSON for:
 
 **Step 3: Check for user-approved scope change**
 ```bash
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-events \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet get-events \
   "[session_id]" "scope_change" 1
 ```
 
@@ -286,7 +286,7 @@ Action: Return to PM for full scope completion.
 
 **Step 6: Log verdict to database**
 ```bash
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-event \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet save-event \
   "[session_id]" "validator_verdict" '{"verdict": "ACCEPT|REJECT", "reason": "...", "scope_check": "pass|fail"}'
 ```
 

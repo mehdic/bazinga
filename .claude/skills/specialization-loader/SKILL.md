@@ -298,7 +298,7 @@ Your expertise includes:
 Log the specialization decision for audit trail:
 
 ```bash
-python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-skill-output \
+python3 "$(git rev-parse --show-toplevel)/.claude/skills/orchestrix-db/scripts/orchestrix_db.py" --quiet save-skill-output \
   "{session_id}" "specialization-loader" '{
     "group_id": "{group_id}",
     "agent_type": "{agent_type}",
