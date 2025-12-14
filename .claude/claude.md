@@ -170,6 +170,26 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
 - `bazinga/` - State files for orchestration (created during runs)
+- `tmp/` - **GITIGNORED** - Temporary test artifacts (never commit)
+
+### ⚠️ tmp/ Directory is Gitignored
+
+The `tmp/` directory is in `.gitignore` and should **NEVER** be committed:
+
+```
+tmp/                    # All test artifacts go here
+├── simple-calculator-app/   # Integration test output
+├── ultrathink-reviews/      # LLM review temp files
+└── ...                      # Any other test artifacts
+```
+
+**Why:** Integration tests create files in `tmp/` (e.g., `tmp/simple-calculator-app/`). These are test artifacts that should not be committed to the repository.
+
+**If you accidentally staged tmp/ files:**
+```bash
+git rm -r --cached tmp/
+git status  # Verify tmp/ is untracked
+```
 
 ---
 

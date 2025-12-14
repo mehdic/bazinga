@@ -1,80 +1,94 @@
-
-!bazinga/.gitignore
-!bazinga/challenge_levels.json
-!bazinga/model_selection.json
-!bazinga/scripts/
-!bazinga/skills_config.json
-!bazinga/templates/
-!bazinga/testing_config.json
-!coordination/templates/
-# BAZINGA artifacts (session outputs - always gitignored)
-# BAZINGA state files (gitignored by default in installed projects)
-# Coordination folder (legacy - templates now in bazinga/templates/)
-# Dashboard runtime files (created during testing in dev mode)
-# IDEs
-# Installer logs
-# OS
-# PyInstaller
 # Python
-# Temporary files (ultrathink reviews, etc.)
-# Unit test / coverage reports
-# Virtual environments
+*.py[cod]
 *$py.class
-*.cover
+*.so
 *.egg
 *.egg-info/
 *.manifest
-*.py,cover
-*.py[cod]
-*.so
 *.spec
-*.swo
-*.swp
-*~
-.DS_Store
-.Python
-.cache
-.coverage
-.coverage.*
-.eggs/
-.hypothesis/
-.idea/
-.installed.cfg
-.nox/
-.pytest_cache/
-.tox/
-.venv
-.vscode/
-/bazinga.iml
-/lib/
-/lib64/
-ENV/
-MANIFEST
-Thumbs.db
 __pycache__/
-bazinga/
-bazinga/artifacts/
-bazinga/bazinga.db*
+.Python
+.eggs/
+.installed.cfg
 build/
-coordination/
-coverage.xml
-dashboard.log
-dashboard.pid
 develop-eggs/
 dist/
 downloads/
 eggs/
-env/
-htmlcov/
-nosetests.xml
+lib/
+lib64/
 parts/
-pip-delete-this-directory.txt
-pip-log.txt
-pip-wheel-metadata/
 sdist/
-share/python-wheels/
-socket.pid
-tmp/
 var/
-venv/
 wheels/
+share/python-wheels/
+pip-wheel-metadata/
+pip-log.txt
+pip-delete-this-directory.txt
+MANIFEST
+
+# Virtual environments
+.venv
+venv/
+ENV/
+env/
+.nox/
+.tox/
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
+.pytest_cache/
+.hypothesis/
+*.cover
+*.py,cover
+.cache
+
+# IDEs
+.idea/
+.vscode/
+/bazinga.iml
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Temporary files (ultrathink reviews, test artifacts)
+tmp/
+
+# Dashboard runtime files (created during testing in dev mode)
+dashboard.log
+dashboard.pid
+socket.pid
+
+# Installer logs
+
+# PyInstaller
+
+# BAZINGA state files (gitignored by default in installed projects)
+# The bazinga/ directory is ignored EXCEPT for specific tracked files
+bazinga/
+bazinga/artifacts/
+bazinga/bazinga.db*
+
+# Re-include tracked bazinga files (MUST come AFTER bazinga/ ignore)
+!bazinga/.gitignore
+!bazinga/challenge_levels.json
+!bazinga/model_selection.json
+!bazinga/skills_config.json
+!bazinga/testing_config.json
+!bazinga/scripts/
+!bazinga/scripts/**
+!bazinga/templates/
+!bazinga/templates/**
+
+# Coordination folder (legacy - templates now in bazinga/templates/)
+coordination/
+!coordination/templates/
+!coordination/templates/**

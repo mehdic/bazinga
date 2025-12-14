@@ -1782,14 +1782,12 @@ Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes s
 
 ### After PM Spawn (Phase 1)
 
-Verify PM persisted state:
-```bash
-# Check success criteria were saved
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+Verify PM persisted state via bazinga-db skill:
+```
+Skill(command: "bazinga-db") → get-success-criteria {session_id}
 # Should return non-empty array if PM saved criteria
 
-# Check task groups were created with specializations
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+Skill(command: "bazinga-db") → get-task-groups {session_id}
 # Should return task groups with specializations non-empty
 ```
 
@@ -1797,10 +1795,9 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups 
 
 ### After Specialization-Loader Invocation
 
-Verify skill logged its output:
-```bash
-# Check specialization-loader output was saved
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+Verify skill logged its output via bazinga-db skill:
+```
+Skill(command: "bazinga-db") → get-skill-output {session_id} "specialization-loader"
 # Should return: templates_after, augmented_templates, skipped_missing, testing_mode_used
 ```
 
