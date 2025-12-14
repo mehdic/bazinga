@@ -901,7 +901,16 @@ rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
 /bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 ```
 
-**🔴 IMPORTANT:** Always run the ACTUAL `/bazinga.orchestrate` command. Never manually simulate orchestration steps - the orchestrator itself must handle specialization-loader invocation, agent spawning, and workflow routing. Manual simulation would become invalid when orchestrator logic changes.
+**🔴 IMPORTANT:** Always run the ACTUAL orchestrator prompt. Never manually simulate orchestration steps - the orchestrator itself must handle specialization-loader invocation, agent spawning, and workflow routing. Manual simulation would become invalid when orchestrator logic changes.
+
+### If SlashCommand Tool Fails
+
+If `/bazinga.orchestrate` cannot be invoked via the SlashCommand tool (e.g., "Invalid tool name format" error), execute the orchestrator prompt directly:
+
+1. **Read the orchestrator prompt:** `Read: .claude/commands/bazinga.orchestrate.md`
+2. **Execute its instructions** as your own - this IS the orchestrator
+
+The slash command essentially expands to the prompt in `.claude/commands/bazinga.orchestrate.md`. Reading and executing that file is functionally identical to what the slash command does. This ensures the test always runs the actual orchestrator logic, not manual steps.
 
 ### What This Tests
 
