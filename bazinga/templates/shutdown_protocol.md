@@ -2,10 +2,74 @@
 
 **⚠️ CRITICAL**: When PM sends BAZINGA, you MUST complete ALL steps IN ORDER. This is NOT optional.
 
+---
+
+## 🔴🔴🔴 STEP 0: VALIDATOR GATE (CANNOT BE SKIPPED) 🔴🔴🔴
+
+**THIS STEP IS MANDATORY. THE SHUTDOWN PROTOCOL CANNOT PROCEED WITHOUT IT.**
+
+### 0.1: Check for Validator Verdict in Database
+
+Before ANY shutdown step, query the database for a validator verdict:
+
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "validator_verdict" 1
+```
+
+**Parse the response:**
+
+- **IF verdict event exists AND verdict = "ACCEPT":**
+  ```
+  ✅ Validator gate passed | Verdict: ACCEPT | Proceeding to shutdown
+  ```
+  → Continue to Step 1 (Get dashboard snapshot)
+
+- **IF verdict event exists AND verdict = "REJECT":**
+  ```
+  ❌ Validator gate BLOCKED | Verdict: REJECT | Cannot proceed to shutdown
+  ```
+  → This should NOT happen (PM should have been respawned)
+  → STOP immediately and respawn PM with rejection details
+
+- **IF NO verdict event exists:**
+  ```
+  🚨 VALIDATOR NOT INVOKED | Shutdown blocked | Must invoke validator first
+  ```
+  → **HARD BLOCK: DO NOT PROCEED TO STEP 1**
+  → Invoke validator immediately:
+  ```
+  Skill(command: "bazinga-validator")
+  ```
+  → After validator returns, re-check this gate
+
+### 0.2: Log Validator Gate Check
+
+After validator gate passes, log the check:
+
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "[session_id]" "validator_gate_check" '{"passed": true, "verdict": "ACCEPT", "timestamp": "[ISO timestamp]"}'
+```
+
+### 🚨 WHY THIS GATE EXISTS
+
+**Problem:** Orchestrators may skip validator invocation due to:
+- Context loss after many messages
+- Role drift (acting as PM)
+- Incorrect skill invocation syntax (`skill:` vs `command:`)
+
+**Solution:** Hard runtime check that BLOCKS shutdown until validator verdict exists.
+
+**This gate is NON-NEGOTIABLE. No exceptions. No bypasses.**
+
+---
+
 **🛑 MANDATORY CHECKLIST - Execute each step sequentially:**
 
 ```
 SHUTDOWN CHECKLIST:
+[ ] 0. ⚠️ VALIDATOR GATE - Verify validator_verdict event exists (HARD BLOCK)
 [ ] 1. Get dashboard snapshot from database
 [ ] 2. Detect anomalies (gaps between goal and actual)
 [ ] 2.5. Git cleanup - Check for uncommitted/unpushed work:

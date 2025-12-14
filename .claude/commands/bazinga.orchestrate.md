@@ -1979,6 +1979,17 @@ Skill(command: "bazinga-validator")
 3. Test evidence exists and passes
 4. No deferred items without user approval
 
+### 🔴 RUNTIME GUARD: Shutdown Protocol Has Validator Gate
+
+**The shutdown protocol (Step 0) includes a HARD VALIDATOR GATE that:**
+1. Queries database for `validator_verdict` event
+2. **BLOCKS shutdown** if no verdict exists
+3. Forces validator invocation if skipped
+
+**This is a SAFETY NET - even if you forget to invoke validator above, the shutdown protocol will catch it.**
+
+**See:** `bazinga/templates/shutdown_protocol.md` → Step 0: VALIDATOR GATE
+
 ---
 
 ## 🚨 MANDATORY SHUTDOWN PROTOCOL - NO SKIPPING ALLOWED
