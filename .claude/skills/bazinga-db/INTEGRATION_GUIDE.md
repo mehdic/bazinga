@@ -198,14 +198,8 @@ python3 /home/user/bazinga/.claude/skills/bazinga-db/scripts/bazinga_db.py \
 
 ### Verify Data Was Saved:
 ```bash
-python3 -c "
-import sqlite3
-conn = sqlite3.connect('/home/user/bazinga/bazinga/bazinga.db')
-cursor = conn.execute('SELECT COUNT(*) FROM orchestration_logs WHERE session_id = ?', ('test_session',))
-count = cursor.fetchone()[0]
-print(f'Logs saved for test_session: {count}')
-conn.close()
-"
+# Use the CLI to verify data - NEVER use inline SQL
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "test_session" 10
 ```
 
 ## Migration Path
@@ -216,13 +210,8 @@ If you want to ensure all past orchestrations are validated:
 
 1. **Check current state:**
    ```bash
-   python3 -c "
-   import sqlite3
-   conn = sqlite3.connect('/home/user/bazinga/bazinga/bazinga.db')
-   cursor = conn.execute('SELECT COUNT(*) FROM orchestration_logs')
-   print(f'Total logs: {cursor.fetchone()[0]}')
-   conn.close()
-   "
+   # Use the CLI - NEVER inline SQL
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 5
    ```
 
 2. **No logs found?** → Previous orchestrations didn't save responses properly

@@ -1,90 +1,94 @@
-/bazinga.iml
 # Python
-__pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg
+*.egg-info/
+*.manifest
+*.spec
+__pycache__/
 .Python
+.eggs/
+.installed.cfg
 build/
 develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
-/lib/
-/lib64/
+lib/
+lib64/
 parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
 share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
+pip-wheel-metadata/
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
+MANIFEST
 
 # Virtual environments
+.venv
 venv/
 ENV/
 env/
-.venv
+.nox/
+.tox/
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
+.pytest_cache/
+.hypothesis/
+*.cover
+*.py,cover
+.cache
 
 # IDEs
-.vscode/
 .idea/
-*.swp
-*.swo
-*~
+.vscode/
+/bazinga.iml
 
 # OS
 .DS_Store
 Thumbs.db
+*~
+*.swp
+*.swo
 
-# BAZINGA state files (gitignored by default in installed projects)
-bazinga/
-!bazinga/.gitignore
-!bazinga/templates/
-!bazinga/scripts/
-!bazinga/skills_config.json
-!bazinga/testing_config.json
-!bazinga/model_selection.json
-!bazinga/challenge_levels.json
-
-# BAZINGA artifacts (session outputs - always gitignored)
-bazinga/artifacts/
-bazinga/bazinga.db*
+# Temporary files (ultrathink reviews, test artifacts)
+tmp/
 
 # Dashboard runtime files (created during testing in dev mode)
 dashboard.log
 dashboard.pid
 socket.pid
 
+# Installer logs
+
+# PyInstaller
+
+# BAZINGA state files (gitignored by default in installed projects)
+# The bazinga/ directory is ignored EXCEPT for specific tracked files
+bazinga/
+bazinga/artifacts/
+bazinga/bazinga.db*
+
+# Re-include tracked bazinga files (MUST come AFTER bazinga/ ignore)
+!bazinga/.gitignore
+!bazinga/challenge_levels.json
+!bazinga/model_selection.json
+!bazinga/skills_config.json
+!bazinga/testing_config.json
+!bazinga/scripts/
+!bazinga/scripts/**
+!bazinga/templates/
+!bazinga/templates/**
+
 # Coordination folder (legacy - templates now in bazinga/templates/)
 coordination/
 !coordination/templates/
-
-# Temporary files (ultrathink reviews, etc.)
-tmp/
+!coordination/templates/**

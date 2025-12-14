@@ -1666,6 +1666,27 @@ project_context.json has: primary_language = "typescript", framework = "nextjs"
 
 **Apply to ALL task groups** - Every group should get at least the language specialization.
 
+**Step 3.5.2b: Include Role-Specific Templates (QA/Tech Lead)**
+
+**🔴 IMPORTANT:** The specialization-loader auto-augments role-specific templates for QA Expert and Tech Lead (Step 3.6 in SKILL.md), but you can also explicitly include them for clarity:
+
+| Testing Mode | Include for QA Expert | Include for Tech Lead |
+|-------------|----------------------|----------------------|
+| full | `08-testing/qa-strategies.md`, `08-testing/testing-patterns.md` | `11-domains/code-review.md` |
+| minimal | (QA bypassed - no templates needed) | `11-domains/code-review.md` |
+| disabled | (QA bypassed - no templates needed) | `11-domains/code-review.md` |
+
+**Stack-aware QA templates (if testing_mode=full):**
+
+| Detected Testing Framework | Additional QA Template |
+|---------------------------|------------------------|
+| pytest | `08-testing/testing-patterns.md` |
+| jest | `08-testing/testing-patterns.md` |
+| playwright, cypress | `08-testing/playwright-cypress.md` |
+| selenium | `08-testing/selenium.md` |
+
+**Note:** Even if you don't include these, the specialization-loader will auto-add them when spawning QA Expert (if testing_mode=full). Including them explicitly just makes the intent clearer.
+
 **Step 3.5.3: Include Specializations in Task Group Definition**
 
 When creating task groups, include the specializations field:

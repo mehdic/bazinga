@@ -375,6 +375,7 @@ Group ID: {group_id}
 Agent Type: {agent_type}
 Model: {MODEL_CONFIG[task_groups[group_id].initial_tier]}
 Specialization Paths: {group_specializations[group_id] as JSON array}
+Testing Mode: {provided by orchestrator, default "full"}
 [SPEC_CTX_END]
 ```
 

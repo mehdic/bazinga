@@ -1776,6 +1776,51 @@ Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes s
 
 ---
 
+## §DB Persistence Verification Gates
+
+**🔴 MANDATORY after each agent spawn: Verify expected DB writes occurred.**
+
+### After PM Spawn (Phase 1)
+
+Verify PM persisted state via bazinga-db skill:
+```
+Skill(command: "bazinga-db") → get-success-criteria {session_id}
+# Should return non-empty array if PM saved criteria
+
+Skill(command: "bazinga-db") → get-task-groups {session_id}
+# Should return task groups with specializations non-empty
+```
+
+**If empty:** PM didn't save state properly. Log warning and continue (non-blocking).
+
+### After Specialization-Loader Invocation
+
+Verify skill logged its output via bazinga-db skill:
+```
+Skill(command: "bazinga-db") → get-skill-output {session_id} "specialization-loader"
+# Should return: templates_after, augmented_templates, skipped_missing, testing_mode_used
+```
+
+**If empty:** Specialization-loader didn't log. Non-blocking but note in orchestrator log.
+
+**If templates_after = 0 for QA Expert and testing_mode_used = "full":**
+- This indicates the QA template augmentation failed
+- The skill_outputs will include `"augmentation_error": true`
+- Log warning: "QA Expert received 0 templates despite testing_mode=full"
+- Check skill_outputs for `skipped_missing` to identify which templates were unavailable
+
+### Verification Gate Summary
+
+| Checkpoint | Expected DB Content | Action if Missing |
+|------------|--------------------|--------------------|
+| After PM | success_criteria, task_groups | Log warning, continue |
+| After spec-loader | skill_outputs | Log warning, continue |
+| Before BAZINGA | All criteria status updated | Block if incomplete |
+
+**Note:** These are non-blocking verification gates except for BAZINGA validation. The workflow continues even if some DB writes are missing, but gaps are logged for debugging.
+
+---
+
 ## Stuck Detection
 
 Track iterations per group. If any group exceeds thresholds:

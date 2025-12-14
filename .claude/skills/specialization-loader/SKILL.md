@@ -38,7 +38,14 @@ Group ID: {group_id}
 Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
 Model: {haiku|sonnet|opus}
 Specialization Paths: {JSON array of template paths}
+Testing Mode: {full|minimal|disabled}  # Orchestrator-provided, defaults to "full" if not specified
 ```
+
+**Testing Mode Source Priority:**
+1. Use orchestrator-provided `Testing Mode` field (preferred)
+2. If not provided, default to "full"
+
+**Do NOT parse testing_config.json** - the orchestrator is the source of truth for testing_mode.
 
 ### Step 2: Read Project Context (with Fallback Detection)
 
@@ -105,6 +112,86 @@ For each template path, check frontmatter `compatible_with` array:
 
 This ensures QA agents get testing patterns, not implementation patterns.
 Tech Leads get review patterns, Investigators get debugging patterns, etc.
+
+### Step 3.6: Auto-Augment Role Defaults (Dynamic QA/TL Templates)
+
+**After filtering by compatibility, if filtered_templates is empty or missing role-specific guidance, auto-add role defaults.**
+
+**Gating conditions:**
+1. `agent_type` is in augmentation table below
+2. Template file exists at path (verified via Glob/Read)
+3. **For qa_expert only:** `testing_mode` == "full" (from orchestrator context, defaults to "full")
+   - Tech Lead and Requirements Engineer augment regardless of testing_mode ("always" condition)
+
+**Role Default Templates:**
+
+| Agent Type | Auto-Added Templates | Condition |
+|------------|---------------------|-----------|
+| qa_expert | `08-testing/qa-strategies.md`, `08-testing/testing-patterns.md` | testing_mode=full |
+| tech_lead | `11-domains/code-review.md` | always |
+| investigator | (none) | - |
+| developer | (none - uses PM-assigned) | - |
+| senior_software_engineer | (none - uses PM-assigned) | - |
+| requirements_engineer | `11-domains/research-analysis.md` | always |
+
+**Stack-Aware QA Augmentation:**
+
+If `project_context.json` exists, derive QA templates from detected testing frameworks:
+
+| Detected Testing | Additional Template |
+|------------------|---------------------|
+| pytest, unittest, nose | `08-testing/testing-patterns.md` |
+| jest, mocha, vitest | `08-testing/testing-patterns.md` |
+| junit, testng | `08-testing/testing-patterns.md` |
+| playwright, cypress | `08-testing/playwright-cypress.md` |
+| selenium | `08-testing/selenium.md` |
+| (unknown/none detected) | `08-testing/testing-patterns.md` (generic fallback) |
+
+**Implementation:**
+
+1. **Get testing_mode from orchestrator context** (defaults to "full" if not provided)
+2. **Verify each template path exists before adding:**
+   ```
+   FOR each candidate_template in role_defaults:
+     Use Glob to check if file exists at bazinga/templates/specializations/{candidate_template}
+     IF exists: add to augmented_templates
+     IF NOT exists: add to skipped_missing list, log warning
+   ```
+3. **Deduplicate:** Remove templates already in PM-assigned list
+4. **Precedence order:** PM-provided > auto-augmented; within each: language → framework → domain → role-defaults
+
+**Template Path Verification:**
+```
+# Before adding any template, verify it exists
+Glob(pattern: "bazinga/templates/specializations/08-testing/qa-strategies.md")
+# If no match, skip and record in skipped_missing
+```
+
+**Deduplicate:** Remove any duplicates after augmentation (template already in PM-assigned list).
+
+**Log augmentation in Step 7 skill_outputs:**
+```json
+{
+  "augmented_templates": ["08-testing/qa-strategies.md"],
+  "skipped_missing": [],
+  "templates_before": 1,
+  "templates_after": 3,
+  "testing_mode_used": "full"
+}
+```
+
+**Skip augmentation when:**
+- **For qa_expert:** `testing_mode` is "minimal" or "disabled" (QA bypassed)
+- **For all roles:** `specializations.enabled` is false in skills_config.json
+- **For all roles:** Template file doesn't exist (logged to skipped_missing)
+
+Note: Tech Lead and Requirements Engineer augment regardless of testing_mode.
+
+**Hard Check for QA in Full Mode:**
+If `agent_type == qa_expert` AND `testing_mode == full` AND `templates_after == 0`:
+- This is an ERROR condition
+- Log warning: "QA Expert received 0 templates in full mode"
+- Include `"augmentation_error": true` in skill_outputs
 
 ### Step 4: Read Templates with Token Tracking
 
