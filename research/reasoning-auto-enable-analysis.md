@@ -319,13 +319,21 @@ This is a **minimal effective change** that:
 
 2. **Iteration dependency** - Developer auto-enable requires correct iteration count. Added explicit documentation in orchestrator templates showing `Iteration: {revision_count + 1}`.
 
-### Potential Gaps Still Present
+### Potential Gaps - NOW FIXED
 
-1. **No runtime validation** - If iteration is passed as string "1" vs integer 1, bash comparison may fail. Current implementation uses `-gt 0` which handles strings correctly, but edge cases possible.
+1. **~~No runtime validation~~** - ✅ FIXED: Added `validate_iteration()` function that validates iteration is a valid number using regex `^[0-9]+$`, defaults to 0 if invalid.
 
-2. **Reasoning content relevance** - No filtering of reasoning content based on what's actually relevant to the next agent's task. SSE gets ALL developer reasoning even if only part is relevant.
+2. **~~Reasoning content relevance~~** - ✅ FIXED: Added `RELEVANT_AGENTS` mapping that filters reasoning to only relevant prior agents:
+   - `qa_expert` gets: developer, SSE reasoning
+   - `tech_lead` gets: developer, SSE, QA reasoning
+   - `senior_software_engineer` gets: developer reasoning only
+   - `investigator` gets: developer, SSE, QA reasoning
+   - `developer` retry gets: own prior + QA/TL feedback
 
-3. **Token budget per-agent vs per-spawn** - Current 800 tokens is per-spawn. If developer has 3 retries, that's potentially 2400 tokens of reasoning accumulated. May need pruning strategy for long retry chains.
+3. **~~Token budget for retry chains~~** - ✅ FIXED: Added pruning limits:
+   - `MAX_ENTRIES_PER_AGENT = 2` - Max 2 most recent entries per agent type
+   - `MAX_TOTAL_ENTRIES = 5` - Max 5 entries total regardless of agents
+   - Entries sorted by timestamp desc, most recent kept
 
 ### Overall Assessment
 

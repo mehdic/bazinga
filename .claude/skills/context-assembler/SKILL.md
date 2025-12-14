@@ -560,9 +560,20 @@ REASONING_LEVEL="medium"  # Default level
 # Prior reasoning retrieval with level-based token budgets
 # Variables: $SESSION_ID, $GROUP_ID, $AGENT_TYPE, $ITERATION, $INCLUDE_REASONING, $REASONING_LEVEL
 
+# FIX 1: Validate iteration is a valid number (default to 0 if invalid)
+validate_iteration() {
+    local val="$1"
+    if [[ "$val" =~ ^[0-9]+$ ]]; then
+        echo "$val"
+    else
+        echo "0"  # Default to 0 for invalid input
+    fi
+}
+
+ITERATION=$(validate_iteration "${ITERATION:-0}")
+
 # Apply smart defaults if not explicitly set
 if [ -z "$INCLUDE_REASONING" ]; then
-    ITERATION="${ITERATION:-0}"
     case "$AGENT_TYPE" in
         qa_expert|tech_lead|senior_software_engineer|investigator)
             INCLUDE_REASONING="true"
@@ -583,7 +594,7 @@ fi
 REASONING_LEVEL="${REASONING_LEVEL:-medium}"
 
 if [ "$INCLUDE_REASONING" = "true" ]; then
-    echo "Retrieving prior reasoning for handoff context (level: $REASONING_LEVEL)..."
+    echo "Retrieving prior reasoning for handoff context (level: $REASONING_LEVEL, iteration: $ITERATION)..."
 
     REASONING_DIGEST=$(python3 -c "
 import sys
@@ -593,6 +604,7 @@ import subprocess
 session_id = sys.argv[1]
 group_id = sys.argv[2] if len(sys.argv) > 2 else ''
 reasoning_level = sys.argv[3] if len(sys.argv) > 3 else 'medium'
+target_agent = sys.argv[4] if len(sys.argv) > 4 else 'unknown'
 
 # Token budget based on reasoning level
 LEVEL_BUDGETS = {
@@ -601,6 +613,22 @@ LEVEL_BUDGETS = {
     'full': 1200
 }
 max_tokens = LEVEL_BUDGETS.get(reasoning_level, 800)
+
+# FIX 2: Relevance filtering - define which agents' reasoning is relevant for each target
+# Workflow: Developer -> QA -> Tech Lead
+# Escalation: Developer -> SSE, Developer -> Investigator
+RELEVANT_AGENTS = {
+    'qa_expert': ['developer', 'senior_software_engineer'],  # QA needs dev reasoning
+    'tech_lead': ['developer', 'senior_software_engineer', 'qa_expert'],  # TL needs dev + QA
+    'senior_software_engineer': ['developer'],  # SSE needs failed dev reasoning
+    'investigator': ['developer', 'senior_software_engineer', 'qa_expert'],  # Investigator needs all
+    'developer': ['developer', 'qa_expert', 'tech_lead'],  # Dev retry needs own + feedback
+}
+relevant_agents = RELEVANT_AGENTS.get(target_agent, [])
+
+# FIX 3: Pruning limits for long retry chains
+MAX_ENTRIES_PER_AGENT = 2  # Max 2 most recent entries per agent type
+MAX_TOTAL_ENTRIES = 5  # Max 5 entries total regardless of agents
 
 # Query reasoning from database via bazinga-db
 # Priority order: completion > decisions > understanding (most actionable first)
@@ -626,6 +654,26 @@ if not entries:
     print(json.dumps({'entries': [], 'used_tokens': 0, 'total_available': 0}))
     sys.exit(0)
 
+# FIX 2: Filter to relevant agents only
+if relevant_agents:
+    entries = [e for e in entries if e.get('agent_type') in relevant_agents]
+
+# FIX 3: Prune to MAX_ENTRIES_PER_AGENT per agent (most recent first)
+# Group by agent, sort by timestamp desc, take top N per agent
+from collections import defaultdict
+agent_entries = defaultdict(list)
+for entry in entries:
+    agent_entries[entry.get('agent_type', 'unknown')].append(entry)
+
+pruned_entries = []
+for agent, agent_list in agent_entries.items():
+    # Sort by timestamp descending (most recent first)
+    agent_list.sort(key=lambda e: e.get('timestamp', ''), reverse=True)
+    # Take only MAX_ENTRIES_PER_AGENT
+    pruned_entries.extend(agent_list[:MAX_ENTRIES_PER_AGENT])
+
+entries = pruned_entries
+
 # Sort by priority phase, then by timestamp (most recent first)
 def phase_priority(entry):
     phase = entry.get('phase', 'understanding')
@@ -635,6 +683,9 @@ def phase_priority(entry):
         return len(PRIORITY_PHASES)  # Unknown phases last
 
 entries.sort(key=lambda e: (phase_priority(e), e.get('timestamp', '')), reverse=False)
+
+# FIX 3: Apply total entry limit
+entries = entries[:MAX_TOTAL_ENTRIES]
 
 # Token estimation (~4 chars per token)
 def estimate_tokens(text):
@@ -667,9 +718,11 @@ print(json.dumps({
     'used_tokens': used_tokens,
     'budget': max_tokens,
     'level': reasoning_level,
-    'total_available': len(entries)
+    'total_available': len(entries),
+    'relevant_agents': relevant_agents,
+    'pruning': {'max_per_agent': MAX_ENTRIES_PER_AGENT, 'max_total': MAX_TOTAL_ENTRIES}
 }))
-" "$SESSION_ID" "$GROUP_ID" "$REASONING_LEVEL")
+" "$SESSION_ID" "$GROUP_ID" "$REASONING_LEVEL" "$AGENT_TYPE")
 
     echo "Reasoning digest: $(echo "$REASONING_DIGEST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"entries\",[]))} entries, {d.get(\"used_tokens\",0)}/{d.get(\"budget\",800)} tokens (level: {d.get(\"level\", \"medium\")})')" 2>/dev/null || echo 'parse error')"
 else
