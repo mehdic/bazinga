@@ -1,7 +1,7 @@
-# Agentic Context Engineering: Theory & BAZINGA Implementation
+# Agentic Context Engineering: Theory & Orchestrix Implementation
 
 **Status:** Reference Documentation
-**Context:** Explaining the architectural decisions behind BAZINGA's memory and orchestration systems.
+**Context:** Explaining the architectural decisions behind Orchestrix's memory and orchestration systems.
 **Based on:** Agentic Context Engineering (Transcript Analysis)
 
 ---
@@ -10,7 +10,7 @@
 
 "Agentic Context Engineering" is the discipline of managing an AI agent's memory not as a simple chat log, but as a structured, engineered system. The core premise is that **"context is not a window, it is a compiled view."**
 
-This document outlines the theoretical frameworks (Google ADK, ACCE, Manus) that define modern agent architecture and details how the BAZINGA system implements these principles to solve the "context window fallacy"—the mistaken belief that larger context windows equal better performance.
+This document outlines the theoretical frameworks (Google ADK, ACCE, Manus) that define modern agent architecture and details how the Orchestrix system implements these principles to solve the "context window fallacy"—the mistaken belief that larger context windows equal better performance.
 
 ---
 
@@ -65,40 +65,40 @@ The transcript identifies nine principles for production-grade agents:
 
 ---
 
-## 4. BAZINGA Implementation Analysis
+## 4. Orchestrix Implementation Analysis
 
-The BAZINGA system was explicitly architected to align with these principles. Below is the mapping of theory to actual code and database structures.
+The Orchestrix system was explicitly architected to align with these principles. Below is the mapping of theory to actual code and database structures.
 
 ### Principle 1 & 2: Tiered Memory & Compiled Views
 
 **Theory:** Separate storage from the "view" presented to the LLM.
 
-**BAZINGA Implementation:** The Orchestrator does not simply read a log file. Instead, it compiles the prompt dynamically using `bazinga-db`:
+**Orchestrix Implementation:** The Orchestrator does not simply read a log file. Instead, it compiles the prompt dynamically using `orchestrix-db`:
 
-| Tier | BAZINGA Component | Implementation Details |
+| Tier | Orchestrix Component | Implementation Details |
 |------|-------------------|------------------------|
 | Working Context | Capsules & Summaries | The prompt receives only the summaries of relevant Context Packages and the last few "Capsule" status messages |
 | Sessions | `sessions` & `orchestration_logs` Tables | Structured SQL tables track every interaction (id, timestamp, agent_type) |
 | Memory | Context Packages (DB) | The `context_packages` table stores metadata (priority, summary) for research and decisions |
-| Artifacts | Context Files (.md) | Actual heavy content (e.g., 20KB research reports) is stored in `bazinga/artifacts/{SESSION_ID}/context/` |
+| Artifacts | Context Files (.md) | Actual heavy content (e.g., 20KB research reports) is stored in `orchestrix/artifacts/{SESSION_ID}/context/` |
 
 ### Principle 6: Offload Heavy State (Context Package System)
 
 **Theory:** Don't paste 50 pages of research into the prompt. Pass a pointer.
 
-**BAZINGA Implementation:** We implemented the **Context Package System** to handle this exact problem.
+**Orchestrix Implementation:** We implemented the **Context Package System** to handle this exact problem.
 
 **The Problem:** A "Research Agent" generates 20KB of analysis. Pasting this into the "Developer Agent" prompt wastes tokens and dilutes attention.
 
 **The Fix:**
 
-1. Research Agent saves content to `bazinga/artifacts/.../research-group-A.md`
+1. Research Agent saves content to `orchestrix/artifacts/.../research-group-A.md`
 2. Agent calls `save_context_package` to register the file path and a 1-sentence summary in the database
 3. Developer Agent receives only the summary and file path in its prompt
 4. **Active Retrieval:** The Developer must explicitly call the `Read` tool to access the full content if needed
 
 ```python
-# From bazinga_db.py - The "Pointer" approach
+# From orchestrix_db.py - The "Pointer" approach
 def get_context_packages(...):
     # Returns only metadata (summary + path), NOT full content
     return cursor.execute("SELECT summary, file_path, priority ...")
@@ -108,7 +108,7 @@ def get_context_packages(...):
 
 **Theory:** Prevent "crosstalk" where agents see irrelevant information from other sub-teams.
 
-**BAZINGA Implementation:** We use a **Join Table** approach for strict scoping.
+**Orchestrix Implementation:** We use a **Join Table** approach for strict scoping.
 
 **Table:** `context_package_consumers`
 
@@ -120,7 +120,7 @@ def get_context_packages(...):
 
 **Theory:** Naive text summaries ("The dev worked on auth") lose critical details. Use schemas.
 
-**BAZINGA Implementation:**
+**Orchestrix Implementation:**
 
 - **Context Packages:** Use strictly validated YAML Front Matter for metadata (Priority, Type, Consumers)
 - **Capsule Messages:** Agents communicate status using a strict format: `🔨 Group {id} | {summary} | {status} → {next_phase}`. This allows the Orchestrator to parse the state deterministically without guessing.
@@ -129,7 +129,7 @@ def get_context_packages(...):
 
 **Theory:** Agents should learn and update their strategies, not just execute.
 
-**BAZINGA Implementation:** The `orchestration_logs` table includes specific columns for **Reasoning Capture**:
+**Orchestrix Implementation:** The `orchestration_logs` table includes specific columns for **Reasoning Capture**:
 
 - `log_type='reasoning'`
 - `reasoning_phase`: Tracks where in the thought process the agent is (understanding, strategy, pivot, conclusion)

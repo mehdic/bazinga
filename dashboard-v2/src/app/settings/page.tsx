@@ -32,7 +32,7 @@ export default function SettingsPage() {
   const { isConnected } = useSocketStore();
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [bazingaAlerts, setBazingaAlerts] = useState(true);
+  const [orchestrixAlerts, setOrchestrixAlerts] = useState(true);
   const [sessionAlerts, setSessionAlerts] = useState(true);
   const [errorAlerts, setErrorAlerts] = useState(true);
 
@@ -46,12 +46,12 @@ export default function SettingsPage() {
   // Load settings from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("bazinga-notification-settings");
+      const stored = localStorage.getItem("orchestrix-notification-settings");
       if (stored) {
         try {
           const settings = JSON.parse(stored);
           setSoundEnabled(settings.soundEnabled ?? true);
-          setBazingaAlerts(settings.bazingaAlerts ?? true);
+          setOrchestrixAlerts(settings.orchestrixAlerts ?? true);
           setSessionAlerts(settings.sessionAlerts ?? true);
           setErrorAlerts(settings.errorAlerts ?? true);
         } catch (e) {
@@ -64,18 +64,18 @@ export default function SettingsPage() {
   // Save settings to localStorage
   const saveSettings = (newSettings: Partial<{
     soundEnabled: boolean;
-    bazingaAlerts: boolean;
+    orchestrixAlerts: boolean;
     sessionAlerts: boolean;
     errorAlerts: boolean;
   }>) => {
     const current = {
       soundEnabled,
-      bazingaAlerts,
+      orchestrixAlerts,
       sessionAlerts,
       errorAlerts,
       ...newSettings,
     };
-    localStorage.setItem("bazinga-notification-settings", JSON.stringify(current));
+    localStorage.setItem("orchestrix-notification-settings", JSON.stringify(current));
   };
 
   const requestNotificationPermission = async () => {
@@ -89,7 +89,7 @@ export default function SettingsPage() {
 
       if (permission === "granted") {
         // Show test notification
-        new Notification("BAZINGA Dashboard", {
+        new Notification("Orchestrix Dashboard", {
           body: "Notifications enabled! You'll be notified when sessions complete.",
           icon: "/favicon.ico",
         });
@@ -102,7 +102,7 @@ export default function SettingsPage() {
   const testNotification = () => {
     if (notificationPermission === "granted") {
       new Notification("Test Notification", {
-        body: "This is a test notification from BAZINGA Dashboard",
+        body: "This is a test notification from Orchestrix Dashboard",
         icon: "/favicon.ico",
       });
     }
@@ -224,16 +224,16 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm">BAZINGA Completion</p>
+                <p className="text-sm">Orchestrix Completion</p>
                 <p className="text-xs text-muted-foreground">
                   Alert when a session completes successfully
                 </p>
               </div>
               <Switch
-                checked={bazingaAlerts}
+                checked={orchestrixAlerts}
                 onCheckedChange={(checked) => {
-                  setBazingaAlerts(checked);
-                  saveSettings({ bazingaAlerts: checked });
+                  setOrchestrixAlerts(checked);
+                  saveSettings({ orchestrixAlerts: checked });
                 }}
               />
             </div>
@@ -364,7 +364,7 @@ export default function SettingsPage() {
             <div>
               <p className="font-medium">Database Path</p>
               <p className="text-sm text-muted-foreground font-mono">
-                ../bazinga/bazinga.db
+                ../orchestrix/orchestrix.db
               </p>
             </div>
           </div>
@@ -383,12 +383,12 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-primary" />
-              <span className="font-bold">BAZINGA Dashboard</span>
+              <span className="font-bold">Orchestrix Dashboard</span>
             </div>
             <Badge>v2.0.0</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Real-time orchestration monitoring and analytics dashboard for the BAZINGA
+            Real-time orchestration monitoring and analytics dashboard for the Orchestrix
             multi-agent development system.
           </p>
           <Separator />

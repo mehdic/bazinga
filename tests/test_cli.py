@@ -1,5 +1,5 @@
 """
-Tests for BAZINGA CLI commands.
+Tests for Orchestrix CLI commands.
 
 Tests the main CLI interface and command execution.
 """
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from bazinga_cli import app, BazingaSetup
+from orchestrix_cli import app, OrchestrixSetup
 
 
 runner = CliRunner()
@@ -31,7 +31,7 @@ class TestVersionCommand:
         result = runner.invoke(app, ["version"])
 
         assert result.exit_code == 0
-        assert "BAZINGA" in result.output
+        assert "Orchestrix" in result.output
 
 
 class TestCheckCommand:
@@ -43,8 +43,8 @@ class TestCheckCommand:
 
         # Should not crash
         assert result.exit_code == 0
-        # Check for key output elements (ASCII art contains BAZINGA)
-        assert "BAZINGA" in result.output or "Checking system" in result.output
+        # Check for key output elements (ASCII art contains Orchestrix)
+        assert "Orchestrix" in result.output or "Checking system" in result.output
 
 
 class TestInitCommand:
@@ -112,8 +112,8 @@ class TestInitCommand:
         assert result.exit_code != 0
 
 
-class TestBazingaSetup:
-    """Test BazingaSetup class."""
+class TestOrchestrixSetup:
+    """Test OrchestrixSetup class."""
 
     def test_get_agent_files_finds_agents(self, tmp_path):
         """Test get_agent_files finds agent markdown files."""
@@ -125,7 +125,7 @@ class TestBazingaSetup:
         (agents_dir / "orchestrator.md").write_text("# Orchestrator")
         (agents_dir / "developer.md").write_text("# Developer")
 
-        setup = BazingaSetup(source_dir=tmp_path)
+        setup = OrchestrixSetup(source_dir=tmp_path)
         agent_files = setup.get_agent_files()
 
         assert len(agent_files) == 2
@@ -134,7 +134,7 @@ class TestBazingaSetup:
 
     def test_get_agent_files_no_agents_directory(self, tmp_path):
         """Test get_agent_files returns empty list when no agents directory."""
-        setup = BazingaSetup(source_dir=tmp_path)
+        setup = OrchestrixSetup(source_dir=tmp_path)
         agent_files = setup.get_agent_files()
 
         assert agent_files == []
@@ -153,10 +153,10 @@ class TestBazingaSetup:
         target_dir = tmp_path / "target"
         target_dir.mkdir()
 
-        setup = BazingaSetup(source_dir=source_dir)
+        setup = OrchestrixSetup(source_dir=source_dir)
 
         # Should copy safely
-        with patch('bazinga_cli.console.print') as mock_print:
+        with patch('orchestrix_cli.console.print') as mock_print:
             result = setup.copy_agents(target_dir)
 
             assert result is True
@@ -176,7 +176,7 @@ class TestBazingaSetup:
         target_dir = tmp_path / "target"
         target_dir.mkdir()
 
-        setup = BazingaSetup(source_dir=source_dir)
+        setup = OrchestrixSetup(source_dir=source_dir)
 
         # Even if we manually try to construct a bad path, should be caught
         # The validate_filename call in copy_agents will prevent this
@@ -212,7 +212,7 @@ class TestSecurityIntegration:
 
         for safe_name in safe_names:
             # Just test that validation passes (don't actually create)
-            from bazinga_cli.security import PathValidator, SecurityError
+            from orchestrix_cli.security import PathValidator, SecurityError
 
             try:
                 result = PathValidator.validate_project_name(safe_name)

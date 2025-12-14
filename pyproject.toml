@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bazinga-cli"
-version = "1.1.0"
-description = "BAZINGA CLI - A sophisticated multi-agent orchestration system for Claude Code"
+name = "orchestrix-cli"
+version = "3.0.0"
+description = "Orchestrix CLI - A sophisticated multi-agent orchestration system for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -40,32 +40,32 @@ dev = [
 # Note: Dashboard v2 uses Next.js (npm), not Python packages
 
 [project.urls]
-Homepage = "https://github.com/mehdic/bazinga"
-Repository = "https://github.com/mehdic/bazinga"
-Documentation = "https://github.com/mehdic/bazinga#readme"
-Issues = "https://github.com/mehdic/bazinga/issues"
+Homepage = "https://github.com/mehdic/orchestrix"
+Repository = "https://github.com/mehdic/orchestrix"
+Documentation = "https://github.com/mehdic/orchestrix#readme"
+Issues = "https://github.com/mehdic/orchestrix/issues"
 
 [project.scripts]
-bazinga = "bazinga_cli:main"
+orchestrix = "orchestrix_cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bazinga_cli"]
+packages = ["src/orchestrix_cli"]
 
-# Force-include bazinga config files as package data
+# Force-include orchestrix config files as package data
 # These are gitignored (for runtime state) but needed for distribution
 # CLI checks package directory first, then falls back to shared-data
 [tool.hatch.build.targets.wheel.force-include]
-"bazinga/model_selection.json" = "bazinga_cli/bazinga/model_selection.json"
-"bazinga/challenge_levels.json" = "bazinga_cli/bazinga/challenge_levels.json"
-"bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
-"bazinga/templates" = "bazinga_cli/bazinga/templates"
+"orchestrix/model_selection.json" = "orchestrix_cli/orchestrix/model_selection.json"
+"orchestrix/challenge_levels.json" = "orchestrix_cli/orchestrix/challenge_levels.json"
+"orchestrix/skills_config.json" = "orchestrix_cli/orchestrix/skills_config.json"
+"orchestrix/templates" = "orchestrix_cli/orchestrix/templates"
 
 [tool.hatch.build.targets.wheel.shared-data]
-"agents" = "share/bazinga_cli/agents"
-"scripts" = "share/bazinga_cli/scripts"
-"bazinga/scripts" = "share/bazinga_cli/bazinga/scripts"
-".claude/commands" = "share/bazinga_cli/.claude/commands"
-".claude/templates" = "share/bazinga_cli/.claude/templates"
-"config" = "share/bazinga_cli/config"
-".claude/skills" = "share/bazinga_cli/.claude/skills"
-"dashboard-v2" = "share/bazinga_cli/dashboard-v2"
+"agents" = "share/orchestrix_cli/agents"
+"scripts" = "share/orchestrix_cli/scripts"
+"orchestrix/scripts" = "share/orchestrix_cli/orchestrix/scripts"
+".claude/commands" = "share/orchestrix_cli/.claude/commands"
+".claude/templates" = "share/orchestrix_cli/.claude/templates"
+"config" = "share/orchestrix_cli/config"
+".claude/skills" = "share/orchestrix_cli/.claude/skills"
+"dashboard-v2" = "share/orchestrix_cli/dashboard-v2"

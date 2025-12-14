@@ -1,6 +1,6 @@
 # Security Fixes and Improvements
 
-This document describes the security vulnerabilities that were fixed and improvements made to BAZINGA CLI.
+This document describes the security vulnerabilities that were fixed and improvements made to Orchestrix CLI.
 
 ## 🔴 Critical Security Fixes
 
@@ -9,9 +9,9 @@ This document describes the security vulnerabilities that were fixed and improve
 **Problem**: Unsafe subprocess execution could allow arbitrary command execution.
 
 **Locations Fixed**:
-- `src/bazinga_cli/__init__.py:413-428` (init script execution)
-- `src/bazinga_cli/__init__.py:450-493` (PowerShell script execution)
-- `src/bazinga_cli/__init__.py:644-654` (tool installation)
+- `src/orchestrix_cli/__init__.py:413-428` (init script execution)
+- `src/orchestrix_cli/__init__.py:450-493` (PowerShell script execution)
+- `src/orchestrix_cli/__init__.py:644-654` (tool installation)
 
 **Before (Vulnerable)**:
 ```python
@@ -51,7 +51,7 @@ SafeSubprocess.run(
 **Problem**: File operations lacked path validation, allowing files to be written outside intended directories.
 
 **Locations Fixed**:
-- `src/bazinga_cli/__init__.py:77-102` (agent file copying)
+- `src/orchestrix_cli/__init__.py:77-102` (agent file copying)
 - All file operations now validated
 
 **Before (Vulnerable)**:
@@ -86,7 +86,7 @@ for agent_file in agent_files:
 **Problem**: User inputs not validated before use, allowing malicious project names.
 
 **Location Fixed**:
-- `src/bazinga_cli/__init__.py:776-785` (project name validation)
+- `src/orchestrix_cli/__init__.py:776-785` (project name validation)
 
 **Before (Vulnerable)**:
 ```python
@@ -113,7 +113,7 @@ target_dir = Path.cwd() / safe_name
 
 ## 🆕 New Security Module
 
-### `src/bazinga_cli/security.py`
+### `src/orchestrix_cli/security.py`
 
 Provides security utilities:
 
@@ -164,7 +164,7 @@ pip install -r requirements-dev.txt
 pytest
 
 # Run with coverage
-pytest --cov=src/bazinga_cli --cov-report=html
+pytest --cov=src/orchestrix_cli --cov-report=html
 
 # Run specific test file
 pytest tests/test_security.py -v
@@ -270,7 +270,7 @@ subprocess.run(["command", "arg"], cwd=some_dir)
 
 **After**:
 ```python
-from bazinga_cli.security import SafeSubprocess
+from orchestrix_cli.security import SafeSubprocess
 
 SafeSubprocess.run(
     ["command", "arg"],
@@ -283,16 +283,16 @@ SafeSubprocess.run(
 
 **Before**:
 ```python
-state = json.load(open("bazinga/state.json"))
+state = json.load(open("orchestrix/state.json"))
 state["key"] = "value"
-json.dump(state, open("bazinga/state.json", "w"))
+json.dump(state, open("orchestrix/state.json", "w"))
 ```
 
 **After**:
 ```python
-from bazinga_cli.state_manager import StateManager
+from orchestrix_cli.state_manager import StateManager
 
-manager = StateManager("bazinga")
+manager = StateManager("orchestrix")
 with manager.lock_state("state.json") as state:
     state["key"] = "value"
     # Automatically written atomically
@@ -308,7 +308,7 @@ shutil.copy(src, dest)
 
 **After**:
 ```python
-from bazinga_cli.security import PathValidator
+from orchestrix_cli.security import PathValidator
 
 safe_filename = PathValidator.validate_filename(filename)
 dest = target_dir / safe_filename
@@ -325,7 +325,7 @@ After applying these fixes, verify:
 - [x] All tests pass: `pytest` ✅ 39/39 passing
 - [x] Security tests pass: `pytest tests/test_security.py` ✅ 25/25 passing
 - [x] CLI tests pass: `pytest tests/test_cli.py` ✅ 14/14 passing
-- [x] Coverage: `pytest --cov=src/bazinga_cli` ✅ 57% overall, 95% security.py
+- [x] Coverage: `pytest --cov=src/orchestrix_cli` ✅ 57% overall, 95% security.py
 - [x] No command injection possible ✅ SafeSubprocess whitelisting
 - [x] No path traversal possible ✅ PathValidator enforcement
 - [x] Input validation working ✅ Project name validation
@@ -358,7 +358,7 @@ These fixes address the critical security issues. For production deployment, als
 
 ## 📞 Reporting Security Issues
 
-If you discover a security vulnerability in BAZINGA, please email the maintainers directly rather than opening a public issue.
+If you discover a security vulnerability in Orchestrix, please email the maintainers directly rather than opening a public issue.
 
 ---
 

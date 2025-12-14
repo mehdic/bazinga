@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Performance comparison: Database vs File-based storage for BAZINGA.
+Performance comparison: Database vs File-based storage for Orchestrix.
 Measures read/write performance and concurrent access safety.
 """
 
@@ -13,14 +13,14 @@ from pathlib import Path
 
 # Add database script to path
 sys.path.insert(0, str(Path(__file__).parent / '.claude' / 'skills' / 'bazinga-db' / 'scripts'))
-from bazinga_db import BazingaDB
+from orchestrix_db import OrchestrixDB
 
-DB_PATH = Path(__file__).parent / 'coordination' / 'bazinga.db'
+DB_PATH = Path(__file__).parent / 'coordination' / 'orchestrix.db'
 TEST_SESSION = f"perf_test_{int(time.time())}"
 
 def benchmark_database_writes(num_writes=100):
     """Benchmark database write performance."""
-    db = BazingaDB(str(DB_PATH))
+    db = OrchestrixDB(str(DB_PATH))
     db.create_session(TEST_SESSION, 'parallel', 'Performance test')
 
     start = time.time()
@@ -39,7 +39,7 @@ def benchmark_database_writes(num_writes=100):
 
 def benchmark_database_reads(num_reads=100):
     """Benchmark database read performance."""
-    db = BazingaDB(str(DB_PATH))
+    db = OrchestrixDB(str(DB_PATH))
 
     start = time.time()
     for i in range(num_reads):
@@ -121,7 +121,7 @@ def benchmark_file_reads(num_reads=100):
 def main():
     """Run performance comparison."""
     print("="*60)
-    print("⚡ BAZINGA Performance Comparison")
+    print("⚡ Orchestrix Performance Comparison")
     print("="*60)
     print("Comparing database vs file-based storage performance")
     print()

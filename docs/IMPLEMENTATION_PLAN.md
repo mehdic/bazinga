@@ -1,8 +1,8 @@
-# BAZINGA 2.0 - "Lite by Default" Implementation Plan
+# Orchestrix 2.0 - "Lite by Default" Implementation Plan
 
 ## Executive Summary
 
-Transform BAZINGA from "everything enabled" to "lite by default, advanced opt-in" while keeping all existing functionality intact.
+Transform Orchestrix from "everything enabled" to "lite by default, advanced opt-in" while keeping all existing functionality intact.
 
 **Core Principle:** Simple defaults + progressive disclosure = better UX
 
@@ -22,7 +22,7 @@ Transform BAZINGA from "everything enabled" to "lite by default, advanced opt-in
 
 ## 🔧 Phase 2: Default Configuration Changes
 
-### 2.1 CLI Changes (`src/bazinga_cli/__init__.py`)
+### 2.1 CLI Changes (`src/orchestrix_cli/__init__.py`)
 
 **Current behavior:**
 ```python
@@ -82,7 +82,7 @@ elif profile == "custom":
 
 ```bash
 # NEW: Create lite profile by default
-cat > bazinga/skills_config.json << 'EOF'
+cat > orchestrix/skills_config.json << 'EOF'
 {
   "_metadata": {
     "profile": "lite",
@@ -117,7 +117,7 @@ EOF
 
 ---
 
-### 2.3 Testing Config (`bazinga/testing_config.json`)
+### 2.3 Testing Config (`orchestrix/testing_config.json`)
 
 **Current:** Created by init script
 
@@ -146,11 +146,11 @@ EOF
 # Check if required tool is installed
 if ! command -v [tool] &> /dev/null; then
     # Load profile
-    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
+    PROFILE=$(jq -r '._metadata.profile // "lite"' orchestrix/skills_config.json 2>/dev/null || echo "lite")
 
     if [ "$PROFILE" = "lite" ]; then
         # Lite mode: Warn but don't fail
-        cat > bazinga/[output].json << EOF
+        cat > orchestrix/[output].json << EOF
 {
   "status": "skipped",
   "reason": "[tool] not installed",
@@ -162,7 +162,7 @@ EOF
         exit 0
     else
         # Advanced mode: User explicitly enabled, so fail
-        cat > bazinga/[output].json << EOF
+        cat > orchestrix/[output].json << EOF
 {
   "status": "error",
   "reason": "[tool] required but not installed",
@@ -326,7 +326,7 @@ No changes to qa_expert.md needed - it's template-driven.
 
 ### 5.1 Update Existing Commands
 
-**File:** `.claude/commands/bazinga.configure-skills.md`
+**File:** `.claude/commands/orchestrix.configure-skills.md`
 
 **Current:** Lists all skills equally
 
@@ -362,7 +362,7 @@ Update skills list:
 
 ### 5.2 Create New Command (Optional)
 
-**File:** `.claude/commands/bazinga.configure-profile.md` (NEW)
+**File:** `.claude/commands/orchestrix.configure-profile.md` (NEW)
 
 ```markdown
 ---
@@ -372,11 +372,11 @@ description: Switch between lite and advanced profiles
 
 # Profile Configuration
 
-Change your BAZINGA configuration profile.
+Change your Orchestrix configuration profile.
 
 ## Current Profile
 
-[Read from bazinga/skills_config.json -> _metadata.profile]
+[Read from orchestrix/skills_config.json -> _metadata.profile]
 
 ## Available Profiles
 
@@ -396,13 +396,13 @@ Change your BAZINGA configuration profile.
 
 ### 3. Custom
 - **Speed:** Your choice
-- **Skills:** Pick individual skills via /bazinga.configure-skills
-- **Testing:** Choose mode via /bazinga.configure-testing
+- **Skills:** Pick individual skills via /orchestrix.configure-skills
+- **Testing:** Choose mode via /orchestrix.configure-testing
 - **Best for:** Specific needs
 
 ## Select Profile
 
-[Instructions for updating bazinga/skills_config.json and testing_config.json]
+[Instructions for updating orchestrix/skills_config.json and testing_config.json]
 
 ## Apply Profile
 
@@ -496,7 +496,7 @@ Update navigation:
 ### 7.1 Manual Testing Checklist
 
 **Lite Profile (Default):**
-- [ ] `bazinga init test-lite`
+- [ ] `orchestrix init test-lite`
 - [ ] Verify skills_config.json has profile="lite"
 - [ ] Verify only 3 skills enabled
 - [ ] Run orchestration with missing tools (should warn, not fail)
@@ -504,7 +504,7 @@ Update navigation:
 - [ ] Verify security/lint/coverage run
 
 **Advanced Profile:**
-- [ ] `bazinga init test-advanced --profile advanced`
+- [ ] `orchestrix init test-advanced --profile advanced`
 - [ ] Verify all 10 skills enabled
 - [ ] Verify full testing mode
 - [ ] Verify QA Expert spawns
@@ -586,7 +586,7 @@ def test_graceful_degradation():
 ## ⚠️ Breaking Changes
 
 **NONE!** This is purely additive:
-- Existing `bazinga init` commands still work
+- Existing `orchestrix init` commands still work
 - Existing flags (--testing, etc.) still work
 - Just changes the defaults for new users
 - Advanced users can use `--profile advanced` to get old behavior
@@ -596,7 +596,7 @@ def test_graceful_degradation():
 ## 🎯 Success Metrics
 
 After implementation:
-1. **New user experience:** Can run `bazinga init my-project` with zero config
+1. **New user experience:** Can run `orchestrix init my-project` with zero config
 2. **Missing tools:** Warns but continues (doesn't break)
 3. **Advanced users:** Can opt-in to full features easily
 4. **Documentation:** Clear path from beginner → advanced
@@ -609,7 +609,7 @@ After implementation:
 1. **CLI flag naming:** Should `--profile advanced` be `--advanced`? (More concise)
 2. **Skill auto-install:** Should lite mode offer to install missing tools? (Could be annoying)
 3. **Migration:** Should we auto-migrate existing projects to lite? (Probably not - leave them as-is)
-4. **Profile switching:** Should we create `/bazinga.configure-profile` or keep it in `/bazinga.configure-skills`?
+4. **Profile switching:** Should we create `/orchestrix.configure-profile` or keep it in `/orchestrix.configure-skills`?
 
 ---
 
@@ -622,7 +622,7 @@ Ready to implement? Start with:
 vim scripts/init-orchestration.sh
 
 # 2. Add CLI profile flag
-vim src/bazinga_cli/__init__.py
+vim src/orchestrix_cli/__init__.py
 
 # 3. Add graceful degradation to core skills
 vim .claude/skills/security-scan/scan.sh

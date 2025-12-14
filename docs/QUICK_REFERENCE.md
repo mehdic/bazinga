@@ -1,6 +1,6 @@
-# BAZINGA Quick Reference
+# Orchestrix Quick Reference
 
-Quick command reference for BAZINGA orchestration.
+Quick command reference for Orchestrix orchestration.
 
 ---
 
@@ -8,13 +8,13 @@ Quick command reference for BAZINGA orchestration.
 
 ```bash
 # One-time use (no installation)
-uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
+uvx --from git+https://github.com/mehdic/orchestrix.git orchestrix init my-project
 
 # Install as tool
-uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
+uv tool install orchestrix-cli --from git+https://github.com/mehdic/orchestrix.git
 
 # Or with pip
-pip install git+https://github.com/mehdic/bazinga.git
+pip install git+https://github.com/mehdic/orchestrix.git
 ```
 
 ---
@@ -23,18 +23,18 @@ pip install git+https://github.com/mehdic/bazinga.git
 
 ```bash
 # Create new project
-bazinga init my-project
+orchestrix init my-project
 
 # Initialize in current directory
-bazinga init --here
+orchestrix init --here
 # or simply:
-bazinga init
+orchestrix init
 
 # With advanced profile
-bazinga init my-project --profile advanced
+orchestrix init my-project --profile advanced
 
 # Custom configuration
-bazinga init my-project --testing full --skills all
+orchestrix init my-project --testing full --skills all
 ```
 
 ---
@@ -44,7 +44,7 @@ bazinga init my-project --testing full --skills all
 ### 1. Start Orchestration
 
 ```bash
-/bazinga.orchestrate implement user authentication with JWT
+/orchestrix.orchestrate implement user authentication with JWT
 # (or: @orchestrator implement user authentication with JWT)
 ```
 
@@ -57,12 +57,12 @@ PM: Analyzes request → Spawns N developers (1-4) → Parallel implementation
                                                     ↓
                          Tech Lead reviews all work
                                                     ↓
-                         PM confirms → BAZINGA!
+                         PM confirms → Orchestrix!
 ```
 
 ### 3. Check Status
 
-Project state is tracked in `bazinga/*.json` files:
+Project state is tracked in `orchestrix/*.json` files:
 - `pm_state.json` - Task groups, progress, iteration count
 - `group_status.json` - Per-task status, revision counts
 - `orchestrator_state.json` - Active agents, routing state
@@ -74,10 +74,10 @@ Project state is tracked in `bazinga/*.json` files:
 ### Single Feature (Simple)
 
 ```bash
-/bazinga.orchestrate fix password reset bug
+/orchestrix.orchestrate fix password reset bug
 ```
 
-**Flow:** PM → 1 Developer → Tech Lead → BAZINGA
+**Flow:** PM → 1 Developer → Tech Lead → Orchestrix
 **Time:** ~5-10 minutes
 
 ---
@@ -85,10 +85,10 @@ Project state is tracked in `bazinga/*.json` files:
 ### Multiple Features (Parallel)
 
 ```bash
-/bazinga.orchestrate implement JWT auth, user registration, and password reset
+/orchestrix.orchestrate implement JWT auth, user registration, and password reset
 ```
 
-**Flow:** PM → 3 Developers (parallel) → Tech Lead → BAZINGA
+**Flow:** PM → 3 Developers (parallel) → Tech Lead → Orchestrix
 **Time:** ~15-20 minutes (vs 45-60 sequential)
 
 ---
@@ -96,10 +96,10 @@ Project state is tracked in `bazinga/*.json` files:
 ### Large Project
 
 ```bash
-/bazinga.orchestrate build blog platform with posts, comments, tags, and search
+/orchestrix.orchestrate build blog platform with posts, comments, tags, and search
 ```
 
-**Flow:** PM → 4 Developers (parallel, 2 phases) → Tech Lead → BAZINGA
+**Flow:** PM → 4 Developers (parallel, 2 phases) → Tech Lead → Orchestrix
 **Time:** ~30-40 minutes
 
 ---
@@ -109,7 +109,7 @@ Project state is tracked in `bazinga/*.json` files:
 ### Configure Skills
 
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 ```
 
 **Quick inputs:**
@@ -123,7 +123,7 @@ Project state is tracked in `bazinga/*.json` files:
 ### Configure Testing
 
 ```bash
-/bazinga.configure-testing
+/orchestrix.configure-testing
 ```
 
 **Options:**
@@ -144,10 +144,10 @@ Project state is tracked in `bazinga/*.json` files:
 **Switch profiles:**
 ```bash
 # During init
-bazinga init --profile advanced
+orchestrix init --profile advanced
 
 # Existing project
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > Type: "advanced"
 ```
 
@@ -265,7 +265,7 @@ User → Orchestrator → PM
                 If issues: Tech Lead → Developer (iteration)
                 If approved: Tech Lead → PM
                       ↓
-                PM confirms → BAZINGA!
+                PM confirms → Orchestrix!
 ```
 
 **With QA Expert (full mode):**
@@ -277,7 +277,7 @@ Developers → QA Expert → Tech Lead → PM
 
 ## Model Escalation
 
-BAZINGA automatically escalates to more powerful models when stuck:
+Orchestrix automatically escalates to more powerful models when stuck:
 
 | Revision | Model | Use Case |
 |----------|-------|----------|
@@ -297,7 +297,7 @@ your-project/
 │   ├── commands/              # Slash commands
 │   ├── scripts/               # Utility scripts
 │   └── skills/                # 10 Skills (analysis tools)
-├── bazinga/              # State files (auto-generated)
+├── orchestrix/              # State files (auto-generated)
 │   ├── pm_state.json         # PM planning
 │   ├── group_status.json     # Task status
 │   ├── orchestrator_state.json # Routing state
@@ -310,7 +310,7 @@ your-project/
 └── .git/                      # Git repository
 ```
 
-**Note:** All `bazinga/*.json` files are gitignored except `skills_config.json` and `testing_config.json`.
+**Note:** All `orchestrix/*.json` files are gitignored except `skills_config.json` and `testing_config.json`.
 
 ---
 
@@ -319,7 +319,7 @@ your-project/
 ### Example 1: Authentication System
 
 ```bash
-/bazinga.orchestrate implement authentication with JWT tokens, refresh tokens, and password reset
+/orchestrix.orchestrate implement authentication with JWT tokens, refresh tokens, and password reset
 ```
 
 **PM Decision:** 3 independent tasks → 3 developers in parallel
@@ -336,7 +336,7 @@ your-project/
 ### Example 2: Bug Fix
 
 ```bash
-/bazinga.orchestrate fix bug where users can't upload files larger than 10MB
+/orchestrix.orchestrate fix bug where users can't upload files larger than 10MB
 ```
 
 **PM Decision:** 1 task → 1 developer
@@ -350,7 +350,7 @@ your-project/
 ### Example 3: Refactoring
 
 ```bash
-/bazinga.orchestrate refactor database layer to use repository pattern
+/orchestrix.orchestrate refactor database layer to use repository pattern
 ```
 
 **PM Decision:** High file overlap → 1 developer (parallel risky)
@@ -365,7 +365,7 @@ your-project/
 
 ### Typical Speedups (Parallel Mode)
 
-| Task Type | Sequential | BAZINGA | Speedup |
+| Task Type | Sequential | Orchestrix | Speedup |
 |-----------|-----------|---------|---------|
 | 2 independent features | 40 min | 15 min | 2.7x faster |
 | 3 independent features | 60 min | 20 min | 3x faster |
@@ -384,7 +384,7 @@ your-project/
 
 **Check testing mode:**
 ```bash
-/bazinga.configure-testing
+/orchestrix.configure-testing
 > Select: "minimal"
 ```
 
@@ -392,7 +392,7 @@ your-project/
 
 **Check skills config:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 ```
 
 ### Tool Missing Warning
@@ -419,7 +419,7 @@ PM may have detected:
 - High file overlap
 - Complexity makes parallel risky
 
-Check PM's reasoning in `bazinga/pm_state.json`.
+Check PM's reasoning in `orchestrix/pm_state.json`.
 
 ---
 
@@ -427,7 +427,7 @@ Check PM's reasoning in `bazinga/pm_state.json`.
 
 ```bash
 # Initialize
-bazinga init [PROJECT_NAME] [OPTIONS]
+orchestrix init [PROJECT_NAME] [OPTIONS]
 
 Options:
   --here                  Initialize in current directory
@@ -437,7 +437,7 @@ Options:
   --help                  Show help
 
 # Update existing project
-bazinga update
+orchestrix update
 ```
 
 ---
@@ -466,7 +466,7 @@ bazinga update
 - **Documentation:** [docs/DOCS_INDEX.md](DOCS_INDEX.md)
 - **Advanced Features:** [docs/ADVANCED.md](ADVANCED.md)
 - **Examples:** [examples/EXAMPLES.md](../examples/EXAMPLES.md)
-- **Issues:** https://github.com/mehdic/bazinga/issues
+- **Issues:** https://github.com/mehdic/orchestrix/issues
 
 ---
 

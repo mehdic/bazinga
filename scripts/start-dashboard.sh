@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #
-# BAZINGA Dashboard v2 Startup Script
+# Orchestrix Dashboard v2 Startup Script
 # ====================================
 # This script runs in the background to:
 # 1. Check for pre-built standalone server (preferred)
@@ -16,25 +16,25 @@ set -e
 # Derive paths from script location for robustness
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Detect if script is in bazinga/scripts/ (installed) or scripts/ (development)
+# Detect if script is in orchestrix/scripts/ (installed) or scripts/ (development)
 PARENT_DIR="$(basename "$(dirname "$SCRIPT_DIR")")"
-if [ "$PARENT_DIR" = "bazinga" ]; then
-    # Installed layout: PROJECT_ROOT/bazinga/scripts/start-dashboard.sh
-    # Dashboard at: PROJECT_ROOT/bazinga/dashboard-v2
+if [ "$PARENT_DIR" = "orchestrix" ]; then
+    # Installed layout: PROJECT_ROOT/orchestrix/scripts/start-dashboard.sh
+    # Dashboard at: PROJECT_ROOT/orchestrix/dashboard-v2
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-    BAZINGA_DIR="$PROJECT_ROOT/bazinga"
-    DASHBOARD_DIR="$BAZINGA_DIR/dashboard-v2"
+    Orchestrix_DIR="$PROJECT_ROOT/bazinga"
+    DASHBOARD_DIR="$Orchestrix_DIR/dashboard-v2"
 else
     # Development layout: PROJECT_ROOT/scripts/start-dashboard.sh
-    # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside bazinga/)
+    # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside orchestrix/)
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-    BAZINGA_DIR="$PROJECT_ROOT/bazinga"
+    Orchestrix_DIR="$PROJECT_ROOT/bazinga"
     DASHBOARD_DIR="$PROJECT_ROOT/dashboard-v2"
 fi
 
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
-DASHBOARD_PID_FILE="$BAZINGA_DIR/dashboard.pid"
-DASHBOARD_LOG="$BAZINGA_DIR/dashboard.log"
+DASHBOARD_PID_FILE="$Orchestrix_DIR/dashboard.pid"
+DASHBOARD_LOG="$Orchestrix_DIR/dashboard.log"
 USE_STANDALONE="false"
 
 # Helper functions: log() writes to file only, msg() writes to both stdout and file
@@ -115,7 +115,7 @@ wait_for_server() {
     kill -0 "$pid" 2>/dev/null
 }
 
-msg "🖥️  BAZINGA Dashboard v2 Startup"
+msg "🖥️  Orchestrix Dashboard v2 Startup"
 log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
 # Support strict mode for CI that requires dashboard
@@ -125,7 +125,7 @@ STRICT="${DASHBOARD_STRICT:-0}"
 # Dashboard is an experimental feature - gracefully skip if not installed
 if [ ! -d "$DASHBOARD_DIR" ]; then
     msg "⏭️  Dashboard not installed, skipping startup"
-    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
     msg "   To install: bazinga setup-dashboard"
     [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
@@ -133,7 +133,7 @@ fi
 # Check if Node.js is available (required for dashboard)
 if ! command -v node >/dev/null 2>&1; then
     msg "⚠️  Node.js not found, cannot start dashboard"
-    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
     msg "   To enable: install Node.js and run 'bazinga setup-dashboard'"
     [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
@@ -143,7 +143,7 @@ NODE_VERSION=$(node --version 2>/dev/null | sed 's/^v//')
 NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
 if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ] 2>/dev/null; then
     msg "⚠️  Node.js 18+ required for dashboard (found v$NODE_VERSION)"
-    msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+    msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
     msg "   To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'"
     [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
@@ -256,7 +256,7 @@ if [ "$USE_STANDALONE" != "true" ]; then
     # Check if npm is available (only needed for dev mode)
     if ! command -v npm >/dev/null 2>&1; then
         msg "⚠️  npm not found, cannot start dashboard in dev mode"
-        msg "   (Dashboard is optional - no impact on BAZINGA functionality)"
+        msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
         msg "   To enable: install npm, or download a pre-built dashboard package"
         [ "$STRICT" = "1" ] && exit 1 || exit 0
     fi
@@ -284,7 +284,7 @@ fi
 # Auto-detect DATABASE_URL if not set
 if [ -z "$DATABASE_URL" ]; then
     # Look for database in project root bazinga folder
-    DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
+    DB_PATH="$PROJECT_ROOT/orchestrix/orchestrix.db"
     if [ -f "$DB_PATH" ]; then
         export DATABASE_URL="$DB_PATH"
         log "Auto-detected DATABASE_URL=$(redact_db_url "$DATABASE_URL")"
@@ -317,7 +317,7 @@ if [ "$USE_STANDALONE" = "true" ]; then
         SOCKET_NODE_PATH="$DASHBOARD_DIR/node_modules"
         NODE_PATH="${SOCKET_NODE_PATH}${NODE_PATH:+:$NODE_PATH}" DATABASE_URL="$DATABASE_URL" SOCKET_PORT="$SOCKET_PORT" node "$SOCKET_SERVER" >> "$DASHBOARD_LOG" 2>&1 &
         SOCKET_PID=$!
-        echo "$SOCKET_PID" > "$BAZINGA_DIR/socket.pid"
+        echo "$SOCKET_PID" > "$Orchestrix_DIR/socket.pid"
         log "Socket.io server started (PID: $SOCKET_PID) on port $SOCKET_PORT"
     else
         log "Note: Real-time updates limited (socket-server.js not found)"

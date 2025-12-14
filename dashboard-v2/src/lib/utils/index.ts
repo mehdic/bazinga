@@ -71,7 +71,7 @@ export function getStatusColor(status: string): string {
       return "text-green-500";
     case "completed":
     case "success":
-    case "bazinga":
+    case "orchestrix":
     case "pass":
     case "approved":
       return "text-blue-500";
@@ -95,7 +95,7 @@ export function getStatusBadgeVariant(status: string): "default" | "secondary" |
       return "default";
     case "completed":
     case "success":
-    case "bazinga":
+    case "orchestrix":
       return "secondary";
     case "failed":
     case "error":

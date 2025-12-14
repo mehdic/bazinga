@@ -1,4 +1,4 @@
-# BAZINGA Dashboard v2 Startup Script (PowerShell)
+# Orchestrix Dashboard v2 Startup Script (PowerShell)
 # ================================================
 # This script runs in the background to:
 # 1. Check for pre-built standalone server (preferred)
@@ -12,19 +12,19 @@ $ErrorActionPreference = "Continue"
 # Derive paths from script location for robustness
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Detect if script is in bazinga/scripts/ (installed) or scripts/ (development)
+# Detect if script is in orchestrix/scripts/ (installed) or scripts/ (development)
 $PARENT_DIR = Split-Path -Leaf (Split-Path -Parent $SCRIPT_DIR)
-if ($PARENT_DIR -eq "bazinga") {
-    # Installed layout: PROJECT_ROOT/bazinga/scripts/start-dashboard.ps1
-    # Dashboard at: PROJECT_ROOT/bazinga/dashboard-v2
+if ($PARENT_DIR -eq "orchestrix") {
+    # Installed layout: PROJECT_ROOT/orchestrix/scripts/start-dashboard.ps1
+    # Dashboard at: PROJECT_ROOT/orchestrix/dashboard-v2
     $PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $SCRIPT_DIR)
-    $BAZINGA_DIR = Join-Path $PROJECT_ROOT "bazinga"
-    $DASHBOARD_DIR = Join-Path $BAZINGA_DIR "dashboard-v2"
+    $Orchestrix_DIR = Join-Path $PROJECT_ROOT "orchestrix"
+    $DASHBOARD_DIR = Join-Path $Orchestrix_DIR "dashboard-v2"
 } else {
     # Development layout: PROJECT_ROOT/scripts/start-dashboard.ps1
-    # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside bazinga/)
+    # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside orchestrix/)
     $PROJECT_ROOT = Split-Path -Parent $SCRIPT_DIR
-    $BAZINGA_DIR = Join-Path $PROJECT_ROOT "bazinga"
+    $Orchestrix_DIR = Join-Path $PROJECT_ROOT "orchestrix"
     $DASHBOARD_DIR = Join-Path $PROJECT_ROOT "dashboard-v2"
 }
 
@@ -32,7 +32,7 @@ if ($PARENT_DIR -eq "bazinga") {
 if ($env:DASHBOARD_PORT) { $DASHBOARD_PORT = $env:DASHBOARD_PORT } else { $DASHBOARD_PORT = "3000" }
 $USE_STANDALONE = $false
 
-# Determine log/pid file location - use BAZINGA_DIR if writable, else TEMP
+# Determine log/pid file location - use Orchestrix_DIR if writable, else TEMP
 function Test-DirectoryWritable {
     param([string]$Path)
     try {
@@ -46,11 +46,11 @@ function Test-DirectoryWritable {
     }
 }
 
-if (Test-DirectoryWritable $BAZINGA_DIR) {
-    $DASHBOARD_PID_FILE = Join-Path $BAZINGA_DIR "dashboard.pid"
-    $DASHBOARD_LOG = Join-Path $BAZINGA_DIR "dashboard.log"
+if (Test-DirectoryWritable $Orchestrix_DIR) {
+    $DASHBOARD_PID_FILE = Join-Path $Orchestrix_DIR "dashboard.pid"
+    $DASHBOARD_LOG = Join-Path $Orchestrix_DIR "dashboard.log"
 } else {
-    # Fallback to TEMP directory if BAZINGA_DIR is not writable
+    # Fallback to TEMP directory if Orchestrix_DIR is not writable
     $DASHBOARD_PID_FILE = Join-Path $env:TEMP "bazinga-dashboard.pid"
     $DASHBOARD_LOG = Join-Path $env:TEMP "bazinga-dashboard.log"
 }
@@ -61,7 +61,7 @@ function Write-Log {
     Add-Content -Path $DASHBOARD_LOG -Value "$timestamp : $Message"
 }
 
-Write-Log "BAZINGA Dashboard v2 Startup (PowerShell)"
+Write-Log "Orchestrix Dashboard v2 Startup (PowerShell)"
 Write-Log "Starting dashboard startup process..."
 Write-Log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 
@@ -70,7 +70,7 @@ Write-Log "Script dir: $SCRIPT_DIR, Project root: $PROJECT_ROOT"
 if (-not (Test-Path $DASHBOARD_DIR)) {
     Write-Log "Dashboard not installed, skipping startup"
     Write-Host "Dashboard not installed, skipping startup" -ForegroundColor Yellow
-    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
     Write-Host "  To install: bazinga setup-dashboard" -ForegroundColor DarkGray
     # Respect DASHBOARD_STRICT for CI that requires dashboard
     if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
@@ -80,7 +80,7 @@ if (-not (Test-Path $DASHBOARD_DIR)) {
 if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
     Write-Log "Node.js not found, cannot start dashboard"
     Write-Host "Node.js not found, cannot start dashboard" -ForegroundColor Yellow
-    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
     Write-Host "  To enable: install Node.js and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
     # Respect DASHBOARD_STRICT for CI that requires dashboard
     if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
@@ -97,7 +97,7 @@ if ($nodeVersion -match '^\d+') {
 if (-not $majorVersion -or $majorVersion -lt 18) {
     Write-Log "Node.js 18+ required (found v$nodeVersion), skipping dashboard"
     Write-Host "Node.js 18+ required for dashboard (found v$nodeVersion)" -ForegroundColor Yellow
-    Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+    Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
     Write-Host "  To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
     # Respect DASHBOARD_STRICT for CI that requires dashboard
     if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
@@ -171,7 +171,7 @@ if (Test-Path $STANDALONE_SERVER) {
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Log "npm not found, cannot start dashboard in dev mode"
         Write-Host "npm not found, cannot start dashboard in dev mode" -ForegroundColor Yellow
-        Write-Host "  (Dashboard is optional - no impact on BAZINGA functionality)" -ForegroundColor DarkGray
+        Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
         Write-Host "  To enable: install Node.js with npm, or download a pre-built dashboard package" -ForegroundColor DarkGray
         # Respect DASHBOARD_STRICT for CI that requires dashboard
         if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
@@ -205,10 +205,10 @@ if (Test-Path $STANDALONE_SERVER) {
 
 # Auto-detect DATABASE_URL if not set
 if (-not $env:DATABASE_URL) {
-    $DB_PATH = Join-Path (Join-Path $PROJECT_ROOT "bazinga") "bazinga.db"
+    $DB_PATH = Join-Path (Join-Path $PROJECT_ROOT "orchestrix") "orchestrix.db"
     if (Test-Path $DB_PATH) {
         $env:DATABASE_URL = $DB_PATH
-        Write-Log "Auto-detected DATABASE_URL=[local bazinga.db]"
+        Write-Log "Auto-detected DATABASE_URL=[local orchestrix.db]"
     } else {
         Write-Log "WARNING - Could not find database at expected location"
         Write-Log "Set DATABASE_URL environment variable if dashboard fails to load data"

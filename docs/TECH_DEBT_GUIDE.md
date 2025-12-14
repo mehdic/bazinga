@@ -196,7 +196,7 @@ Tech Lead will review tech debt items and may:
 - Adjust severity levels
 - Suggest alternative approaches
 
-### PM Gate (Before BAZINGA)
+### PM Gate (Before Orchestrix)
 
 PM will check tech debt before completion:
 - **Blocking items:** Must fix or get explicit user approval

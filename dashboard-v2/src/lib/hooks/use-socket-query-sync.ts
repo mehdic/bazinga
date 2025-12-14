@@ -106,7 +106,7 @@ export function useSocketQuerySync() {
           break;
 
         case "session:completed":
-        case "bazinga":
+        case "orchestrix":
           // Session finished - refresh everything
           pending.globalQueries = true;
           pending.sessionDetails.add(event.sessionId);

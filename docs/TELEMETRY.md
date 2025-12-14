@@ -1,12 +1,12 @@
-# BAZINGA Anonymous Telemetry
+# Orchestrix Anonymous Telemetry
 
-BAZINGA CLI includes anonymous telemetry to help track installation and upgrade statistics.
+Orchestrix CLI includes anonymous telemetry to help track installation and upgrade statistics.
 
 ## What is Tracked?
 
 The telemetry system sends minimal, anonymous data when users:
-- Install BAZINGA (`bazinga init`)
-- Upgrade BAZINGA (`bazinga update`)
+- Install Orchestrix (`orchestrix init`)
+- Upgrade Orchestrix (`orchestrix update`)
 
 **Data sent:**
 ```json
@@ -23,7 +23,7 @@ The telemetry system sends minimal, anonymous data when users:
 ✅ **What we collect:**
 - A random UUID (generated on first use)
 - Command name (`init` or `update`)
-- BAZINGA version
+- Orchestrix version
 - Timestamp
 
 ❌ **What we DON'T collect:**
@@ -37,7 +37,7 @@ The telemetry system sends minimal, anonymous data when users:
 
 ## How It Works
 
-1. **First Installation:** When a user runs `bazinga init`, a UUID is generated and stored locally in `~/.bazinga/telemetry_id.json`
+1. **First Installation:** When a user runs `orchestrix init`, a UUID is generated and stored locally in `~/.orchestrix/telemetry_id.json`
 2. **Subsequent Uses:** The same UUID is used for all future tracking
 3. **HTTP Request:** A POST request is sent to your tracking endpoint
 4. **Non-Blocking:** Runs in a background thread with 2s timeout
@@ -139,7 +139,7 @@ def track():
 
     posthog.capture(
         distinct_id=data['uuid'],
-        event=f"bazinga_{data['command']}",
+        event=f"orchestrix_{data['command']}",
         properties={
             'version': data['version'],
             'timestamp': data['timestamp']
@@ -153,7 +153,7 @@ def track():
 
 ### Method 1: Edit the Source Code
 
-Edit `src/bazinga_cli/telemetry.py` and update the `DEFAULT_ENDPOINT`:
+Edit `src/orchestrix_cli/telemetry.py` and update the `DEFAULT_ENDPOINT`:
 
 ```python
 DEFAULT_ENDPOINT = "https://your-domain.com/api/track"
@@ -167,7 +167,7 @@ You could modify the code to support:
 import os
 
 DEFAULT_ENDPOINT = os.getenv(
-    "BAZINGA_TELEMETRY_URL",
+    "Orchestrix_TELEMETRY_URL",
     "https://your-domain.com/api/track"
 )
 ```
@@ -218,7 +218,7 @@ def track():
     return {"status": "ok"}, 200
 ```
 
-Then update the endpoint to `http://localhost:5000/track` and run `bazinga init`.
+Then update the endpoint to `http://localhost:5000/track` and run `orchestrix init`.
 
 ## Disabling Telemetry (Future Enhancement)
 
@@ -226,10 +226,10 @@ Currently, telemetry is always enabled but fails silently if the endpoint is unr
 
 To add opt-out support, you could:
 
-1. Check for an environment variable: `BAZINGA_TELEMETRY=0`
-2. Check for a config file: `~/.bazinga/config.json` with `{"telemetry": false}`
-3. Add a CLI flag: `bazinga init --no-telemetry`
+1. Check for an environment variable: `Orchestrix_TELEMETRY=0`
+2. Check for a config file: `~/.orchestrix/config.json` with `{"telemetry": false}`
+3. Add a CLI flag: `orchestrix init --no-telemetry`
 
 ## Questions?
 
-If you have questions about the telemetry implementation, please open an issue on the BAZINGA GitHub repository.
+If you have questions about the telemetry implementation, please open an issue on the Orchestrix GitHub repository.

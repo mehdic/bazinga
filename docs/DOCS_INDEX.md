@@ -1,10 +1,10 @@
-# BAZINGA - Claude Code Multi-Agent Dev Team - Documentation Index
+# Orchestrix - Claude Code Multi-Agent Dev Team - Documentation Index
 
-> **Repository:** https://github.com/mehdic/bazinga
+> **Repository:** https://github.com/mehdic/orchestrix
 
-This directory contains comprehensive documentation for BAZINGA (Claude Code Multi-Agent Dev Team), organized to help you find what you need quickly.
+This directory contains comprehensive documentation for Orchestrix (Claude Code Multi-Agent Dev Team), organized to help you find what you need quickly.
 
-**💡 Key Concept:** BAZINGA has two modes:
+**💡 Key Concept:** Orchestrix has two modes:
 - **Lite** (default) - 3 core skills, fast iteration, perfect for most work
 - **Advanced** - All 10 skills, comprehensive analysis, for production-critical code
 
@@ -12,11 +12,11 @@ This directory contains comprehensive documentation for BAZINGA (Claude Code Mul
 
 ## 🚀 For New Users - Start Here
 
-If you're new to BAZINGA, start with these four documents:
+If you're new to Orchestrix, start with these four documents:
 
 ### 1. **[../README.md](../README.md)** - Project Overview
 **Length**: ~200 lines | **Time to read**: 10 minutes
-- What is BAZINGA?
+- What is Orchestrix?
 - Quick start overview
 - Key concepts at a glance
 
@@ -41,7 +41,7 @@ If you're new to BAZINGA, start with these four documents:
 - 3 Core Skills (lite profile) vs 7 Advanced Skills
 - Configuration presets: lite (default), advanced, custom
 - Language support (Python, JavaScript, Go, Java, Ruby)
-- `/bazinga.configure-skills` command tutorial
+- `/orchestrix.configure-skills` command tutorial
 
 **Perfect for**: Understanding what quality checks run during your workflows.
 
@@ -59,7 +59,7 @@ If you're new to BAZINGA, start with these four documents:
 
 ## 🏗️ Core Concepts - Deep Technical Dives
 
-Once familiar with basics, these documents explain how BAZINGA works:
+Once familiar with basics, these documents explain how Orchestrix works:
 
 ### 5. **[ADVANCED.md](ADVANCED.md)** - Advanced Features & Production Use
 **Length**: ~900 lines | **Time to read**: 25-30 minutes
@@ -126,7 +126,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 - Implementation Details (revision tracking, model parameters)
 - Best Practices (for developers, PMs, tech leads)
 
-**Read this for**: Understanding how BAZINGA automatically picks Sonnet vs Opus based on revision count.
+**Read this for**: Understanding how Orchestrix automatically picks Sonnet vs Opus based on revision count.
 
 **Key insight**: After 3 revisions, escalate to Opus for deeper analysis. This saves money and time vs staying with fast reviews.
 
@@ -198,7 +198,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ## 📚 Original Documentation - Historical Reference
 
-Located in **`historical-dev-docs/`** - These are historical records of BAZINGA's development. They're preserved for reference but not actively maintained.
+Located in **`historical-dev-docs/`** - These are historical records of Orchestrix's development. They're preserved for reference but not actively maintained.
 
 ### Original Architecture Documents
 
@@ -264,7 +264,7 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 |----------|-----------|
 | "What's the quick command reference?" | [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → All commands and workflows |
 | "When should I use advanced mode?" | [ADVANCED.md](ADVANCED.md) → When to Use Advanced Mode |
-| "How do I configure Skills?" | [SKILLS.md](SKILLS.md) → Quick Start section + `/bazinga.configure-skills` |
+| "How do I configure Skills?" | [SKILLS.md](SKILLS.md) → Quick Start section + `/orchestrix.configure-skills` |
 | "What are the core vs advanced Skills?" | [SKILLS.md](SKILLS.md) → Available Skills section (lite vs advanced) |
 | "How does model escalation work?" | [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → How It Works section |
 | "What does the PM track?" | [PM_METRICS.md](PM_METRICS.md) → Velocity Tracker section |

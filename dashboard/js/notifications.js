@@ -23,8 +23,8 @@ class NotificationManager {
         if (this.notificationPermission === 'granted') {
             const notification = new Notification(title, {
                 body,
-                icon: '/assets/bazinga-icon.png',
-                badge: '/assets/bazinga-badge.png',
+                icon: '/assets/orchestrix-icon.png',
+                badge: '/assets/orchestrix-badge.png',
                 ...options
             });
 

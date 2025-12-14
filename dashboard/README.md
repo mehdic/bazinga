@@ -1,4 +1,4 @@
-# BAZINGA Dashboard
+# Orchestrix Dashboard
 
 Real-time orchestration monitoring dashboard with WebSocket updates.
 
@@ -10,10 +10,10 @@ The dashboard and its dependencies are automatically installed when you run:
 
 ```bash
 # Initial setup (installs dashboard dependencies automatically)
-bazinga init --here
+orchestrix init --here
 
 # Or update existing installation (updates dashboard dependencies)
-bazinga update
+orchestrix update
 ```
 
 The dashboard server then starts automatically when you initialize orchestration:
@@ -28,7 +28,7 @@ If you need to install or reinstall dependencies manually:
 
 ```bash
 # Option 1: Use CLI command (with confirmation)
-bazinga setup-dashboard
+orchestrix setup-dashboard
 
 # Option 2: Install directly with pip
 cd dashboard
@@ -57,7 +57,7 @@ Server runs on: **http://localhost:53124**
 
 ### Enable AI Diagram Feature
 
-Edit `bazinga/skills_config.json`:
+Edit `orchestrix/skills_config.json`:
 
 ```json
 {
@@ -102,10 +102,10 @@ Or manually:
 
 ```bash
 # Stop
-kill $(cat bazinga/dashboard.pid)
+kill $(cat orchestrix/dashboard.pid)
 
 # View logs
-tail -f bazinga/dashboard.log
+tail -f orchestrix/dashboard.log
 ```
 
 ## Documentation

@@ -1,7 +1,7 @@
 #!/bin/bash
 # parse-speckit-tasks.sh
 # Utility script to parse spec-kit tasks.md format and extract useful information
-# for BAZINGA orchestration system
+# for Orchestrix orchestration system
 #
 # Usage:
 #   bash .claude/scripts/parse-speckit-tasks.sh <tasks.md path>
@@ -192,7 +192,7 @@ EOF
 print_section "ANALYSIS COMPLETE"
 
 echo ""
-print_color "$BLUE" "💡 Tip: Use this information to plan BAZINGA orchestration groups"
+print_color "$BLUE" "💡 Tip: Use this information to plan Orchestrix orchestration groups"
 echo ""
 
 # Exit with success if all tasks complete, otherwise exit code indicates pending tasks

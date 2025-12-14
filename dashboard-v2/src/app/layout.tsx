@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/header";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
-  title: "BAZINGA Dashboard",
+  title: "Orchestrix Dashboard",
   description: "Real-time orchestration monitoring and analytics",
 };
 

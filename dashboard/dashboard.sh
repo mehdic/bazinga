@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# BAZINGA Dashboard Management Script
+# Orchestrix Dashboard Management Script
 #
 # Usage:
 #   ./dashboard.sh start    - Start the dashboard server
@@ -14,9 +14,9 @@ set -e
 DASHBOARD_PORT="${DASHBOARD_PORT:-53124}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BAZINGA_DIR="$PROJECT_ROOT/bazinga"
-DASHBOARD_PID_FILE="$BAZINGA_DIR/dashboard-v1.pid"
-DASHBOARD_LOG_FILE="$BAZINGA_DIR/dashboard-v1.log"
+Orchestrix_DIR="$PROJECT_ROOT/orchestrix"
+DASHBOARD_PID_FILE="$Orchestrix_DIR/dashboard-v1.pid"
+DASHBOARD_LOG_FILE="$Orchestrix_DIR/dashboard-v1.log"
 
 # Colors
 RED='\033[0;31m'
@@ -55,7 +55,7 @@ is_running() {
 
 # Start dashboard
 start_dashboard() {
-    print_info "Starting BAZINGA Dashboard..."
+    print_info "Starting Orchestrix Dashboard..."
 
     # Check if already running
     if is_running; then
@@ -107,7 +107,7 @@ start_dashboard() {
 
 # Stop dashboard
 stop_dashboard() {
-    print_info "Stopping BAZINGA Dashboard..."
+    print_info "Stopping Orchestrix Dashboard..."
 
     if ! is_running; then
         print_warning "Dashboard is not running"
@@ -200,7 +200,7 @@ case "${1:-}" in
         show_logs
         ;;
     *)
-        echo "BAZINGA Dashboard Management"
+        echo "Orchestrix Dashboard Management"
         echo ""
         echo "Usage: $0 {start|stop|restart|status|logs}"
         echo ""

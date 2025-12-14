@@ -1,8 +1,8 @@
 # Project Context
 
-> **Repository:** https://github.com/mehdic/bazinga
+> **Repository:** https://github.com/mehdic/orchestrix
 
-This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration system for complex development tasks.
+This project uses Orchestrix (Claude Code Multi-Agent Dev Team) orchestration system for complex development tasks.
 
 ---
 
@@ -76,8 +76,8 @@ You are a **COORDINATOR**, not an implementer. You route messages between specia
 
 **✅ ALLOWED ACTIONS:**
 - ✅ Spawn agents using Task tool
-- ✅ Write to logs and state files (bazinga/ folder only)
-- ✅ Read state files from bazinga/ folder
+- ✅ Write to logs and state files (orchestrix/ folder only)
+- ✅ Read state files from orchestrix/ folder
 - ✅ Output status messages to user
 - ✅ Route information between agents
 
@@ -114,7 +114,7 @@ Orchestrator: 🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agen
 Developer complete → MUST go to QA Expert
 QA pass → MUST go to Tech Lead
 Tech Lead approve → MUST go to PM
-PM decides → Next assignment OR BAZINGA
+PM decides → Next assignment OR Orchestrix
 ```
 
 **NEVER skip steps. NEVER directly instruct agents.**
@@ -169,7 +169,7 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, techlead, developer)
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
-- `bazinga/` - State files for orchestration (created during runs)
+- `orchestrix/` - State files for orchestration (created during runs)
 
 ---
 
@@ -178,7 +178,7 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 **These files MUST be kept IDENTICAL:**
 
 1. **agents/orchestrator.md** - The agent definition (Task tool invocation)
-2. **.claude/commands/bazinga.orchestrate.md** - The slash command version
+2. **.claude/commands/orchestrix.orchestrate.md** - The slash command version
 
 ### ✅ REQUIRED SYNC PROCEDURE
 
@@ -186,23 +186,23 @@ After making ANY changes to either file, copy to the other:
 
 ```bash
 # When updating orchestrator, copy to both locations:
-cp agents/orchestrator.md .claude/commands/bazinga.orchestrate.md
+cp agents/orchestrator.md .claude/commands/orchestrix.orchestrate.md
 
 # OR if you edited the command file:
-cp .claude/commands/bazinga.orchestrate.md agents/orchestrator.md
+cp .claude/commands/orchestrix.orchestrate.md agents/orchestrator.md
 ```
 
 ### Verify Synchronization
 
 ```bash
 # Verify files are identical (should output: "Files are identical")
-diff -q agents/orchestrator.md .claude/commands/bazinga.orchestrate.md && echo "✓ Files are identical"
+diff -q agents/orchestrator.md .claude/commands/orchestrix.orchestrate.md && echo "✓ Files are identical"
 ```
 
 ### Why Both Files Must Be Identical
 
 - **Same orchestration logic** - Both use identical workflow and state management
-- **Same database operations** - Both invoke bazinga-db skill identically at same points
+- **Same database operations** - Both invoke orchestrix-db skill identically at same points
 - **Same agent coordination** - Both spawn PM, developers, QA, tech lead identically
 - **Same state persistence** - Both have mandatory database persistence checkpoints
 - **NO differences** - Files are now completely identical (no header variations)
@@ -220,8 +220,8 @@ diff -q agents/orchestrator.md .claude/commands/bazinga.orchestrate.md && echo "
 ## Key Principles
 
 1. **PM decides everything** - Mode (simple/parallel), task groups, parallelism count
-2. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-3. **Database = memory** - All state stored in SQLite database (bazinga/bazinga.db) via bazinga-db skill
+2. **PM sends Orchestrix** - Only PM can signal completion (not tech lead)
+3. **Database = memory** - All state stored in SQLite database (orchestrix/orchestrix.db) via orchestrix-db skill
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
 
@@ -231,7 +231,7 @@ diff -q agents/orchestrator.md .claude/commands/bazinga.orchestrate.md && echo "
 
 **When creating or editing ANY skill SKILL.md file, you MUST follow this guide:**
 
-📋 **MANDATORY REFERENCE:** `/home/user/bazinga/research/skill-fix-manual.md`
+📋 **MANDATORY REFERENCE:** `/home/user/orchestrix/research/skill-fix-manual.md`
 
 ### Key Requirements
 
@@ -248,7 +248,7 @@ diff -q agents/orchestrator.md .claude/commands/bazinga.orchestrate.md && echo "
 
 ```bash
 # ALWAYS read the manual first
-Read: /home/user/bazinga/research/skill-fix-manual.md
+Read: /home/user/orchestrix/research/skill-fix-manual.md
 ```
 
 This manual provides:

@@ -1,8 +1,8 @@
-# BAZINGA Advanced Features
+# Orchestrix Advanced Features
 
 This guide covers advanced features for power users and production-critical projects.
 
-**TL;DR:** BAZINGA defaults to "lite" mode for fast iteration. Use "advanced" mode when you need comprehensive analysis, full QA workflow, or production-critical guarantees.
+**TL;DR:** Orchestrix defaults to "lite" mode for fast iteration. Use "advanced" mode when you need comprehensive analysis, full QA workflow, or production-critical guarantees.
 
 ---
 
@@ -19,7 +19,7 @@ This guide covers advanced features for power users and production-critical proj
 
 ## Profiles Overview
 
-BAZINGA has three configuration profiles:
+Orchestrix has three configuration profiles:
 
 | Profile | Skills Active | Testing Mode | Use Case |
 |---------|---------------|--------------|----------|
@@ -31,14 +31,14 @@ BAZINGA has three configuration profiles:
 
 ```bash
 # Initialize with advanced profile
-bazinga init my-project --profile advanced
+orchestrix init my-project --profile advanced
 
 # Configure existing project
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > Type: "advanced"
 
 # Testing mode
-/bazinga.configure-testing
+/orchestrix.configure-testing
 > Select: "full"
 ```
 
@@ -46,7 +46,7 @@ bazinga init my-project --profile advanced
 
 ## Advanced Skills
 
-Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA includes 7 advanced skills for comprehensive analysis.
+Beyond the 3 core skills (security-scan, lint-check, test-coverage), Orchestrix includes 7 advanced skills for comprehensive analysis.
 
 ### Developer Skills
 
@@ -55,7 +55,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** Before Developer starts coding (invoked by PM).
 
-**Output:** `bazinga/codebase_analysis.json`
+**Output:** `orchestrix/codebase_analysis.json`
 
 **Example output:**
 ```json
@@ -87,7 +87,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** After Developer writes code, before writing tests.
 
-**Output:** `bazinga/test_patterns.json`
+**Output:** `orchestrix/test_patterns.json`
 
 **Example output:**
 ```json
@@ -119,7 +119,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** After Developer modifies API endpoints.
 
-**Output:** `bazinga/api_contract_validation.json`
+**Output:** `orchestrix/api_contract_validation.json`
 
 **Example output:**
 ```json
@@ -159,7 +159,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** After Developer creates/modifies migrations.
 
-**Output:** `bazinga/db_migration_check.json`
+**Output:** `orchestrix/db_migration_check.json`
 
 **Example output:**
 ```json
@@ -197,7 +197,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** In QA Expert phase (full testing mode only).
 
-**Output:** `bazinga/pattern_mining.json`
+**Output:** `orchestrix/pattern_mining.json`
 
 **Example output:**
 ```json
@@ -235,7 +235,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** In QA Expert phase (full testing mode only), after all tests complete.
 
-**Output:** `bazinga/quality_dashboard.json`
+**Output:** `orchestrix/quality_dashboard.json`
 
 **Example output:**
 ```json
@@ -287,7 +287,7 @@ Beyond the 3 core skills (security-scan, lint-check, test-coverage), BAZINGA inc
 
 **When it runs:** Throughout orchestration lifecycle (PM phases).
 
-**Output:** `bazinga/velocity_metrics.json`
+**Output:** `orchestrix/velocity_metrics.json`
 
 **Example output:**
 ```json
@@ -344,11 +344,11 @@ Full testing mode enables the QA Expert agent and comprehensive test requirement
 ### Enabling Full Mode
 
 ```bash
-/bazinga.configure-testing
+/orchestrix.configure-testing
 > Select: "full"
 ```
 
-**Configuration saved to:** `bazinga/testing_config.json`
+**Configuration saved to:** `orchestrix/testing_config.json`
 
 ```json
 {
@@ -392,7 +392,7 @@ When full mode is enabled:
    - Quality dashboard (unified metrics)
 4. **QA Expert reports to Tech Lead** → Final approval decision
 5. **Tech Lead decides:**
-   - APPROVED → PM declares BAZINGA
+   - APPROVED → PM declares Orchestrix
    - CHANGES_REQUESTED → Route back to developers
 
 ### Test Types
@@ -421,7 +421,7 @@ When full mode is enabled:
 Interactive configuration:
 
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 ```
 
 **Menu:**
@@ -451,7 +451,7 @@ Interactive configuration:
 Interactive configuration:
 
 ```bash
-/bazinga.configure-testing
+/orchestrix.configure-testing
 ```
 
 **Options:**
@@ -463,13 +463,13 @@ Interactive configuration:
 
 ```bash
 # Initialize with advanced profile
-bazinga init my-project --profile advanced
+orchestrix init my-project --profile advanced
 
 # Custom configuration
-bazinga init my-project --testing full --skills all
+orchestrix init my-project --testing full --skills all
 
 # Lite profile (default)
-bazinga init my-project --profile lite
+orchestrix init my-project --profile lite
 ```
 
 ---
@@ -591,8 +591,8 @@ sudo yum install jq       # RHEL/CentOS
 ### CI/CD Pipeline (Advanced Profile)
 
 ```yaml
-# .github/workflows/bazinga.yml
-name: BAZINGA Full QA
+# .github/workflows/orchestrix.yml
+name: Orchestrix Full QA
 
 on:
   pull_request:
@@ -604,13 +604,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install BAZINGA
+      - name: Install Orchestrix
         run: |
-          pip install git+https://github.com/mehdic/bazinga.git
+          pip install git+https://github.com/mehdic/orchestrix.git
 
-      - name: Initialize BAZINGA (Advanced)
+      - name: Initialize Orchestrix (Advanced)
         run: |
-          bazinga init --here --profile advanced
+          orchestrix init --here --profile advanced
 
       - name: Run Orchestration
         run: |
@@ -625,7 +625,7 @@ jobs:
 #!/bin/bash
 # Run lite profile checks before commit
 
-bazinga init --here --profile lite
+orchestrix init --here --profile lite
 # Run security-scan, lint-check, test-coverage
 # Exit 1 if any issues found
 ```
@@ -637,13 +637,13 @@ bazinga init --here --profile lite
 ### Common Issues
 
 **Q: Advanced skills not running**
-A: Check skills_config.json profile. Run `/bazinga.configure-skills` to verify.
+A: Check skills_config.json profile. Run `/orchestrix.configure-skills` to verify.
 
 **Q: Skill failed with module import error**
 A: Advanced profile requires all dependencies. Check error message for missing modules.
 
 **Q: QA Expert not appearing**
-A: Enable full testing mode with `/bazinga.configure-testing` → select "full".
+A: Enable full testing mode with `/orchestrix.configure-testing` → select "full".
 
 **Q: Pattern miner is slow (>60s)**
 A: Large git history. Consider using lite mode or exclude pattern-miner (disable skill #9).

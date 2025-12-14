@@ -25,7 +25,7 @@ def get_project_root() -> Path:
 
 def test_allowed_config_files_matches_pyproject():
     """
-    Verify that BazingaSetup.ALLOWED_CONFIG_FILES matches the config files
+    Verify that OrchestrixSetup.ALLOWED_CONFIG_FILES matches the config files
     in pyproject.toml's force-include section (excluding templates).
 
     This test catches the case where someone adds a new config file to
@@ -33,7 +33,7 @@ def test_allowed_config_files_matches_pyproject():
     Supports any file type (JSON, YAML, etc.) - not just .json files.
     """
     # Import here to avoid circular imports during test collection
-    from bazinga_cli import BazingaSetup
+    from orchestrix_cli import OrchestrixSetup
 
     project_root = get_project_root()
     pyproject_path = project_root / "pyproject.toml"
@@ -52,25 +52,25 @@ def test_allowed_config_files_matches_pyproject():
     )
 
     # Extract config files from force-include keys (excluding templates directory)
-    # Format: "bazinga/model_selection.json" = "bazinga_cli/bazinga/model_selection.json"
+    # Format: "orchestrix/model_selection.json" = "orchestrix_cli/orchestrix/model_selection.json"
     # Templates are handled separately by copy_templates(), not ALLOWED_CONFIG_FILES
     pyproject_configs = set()
     for src_path in force_include.keys():
-        if src_path.startswith("bazinga/") and "templates" not in src_path:
+        if src_path.startswith("orchestrix/") and "templates" not in src_path:
             # Extract just the filename
             filename = Path(src_path).name
             pyproject_configs.add(filename)
 
-    # Get ALLOWED_CONFIG_FILES from BazingaSetup
-    allowed_configs = set(BazingaSetup.ALLOWED_CONFIG_FILES)
+    # Get ALLOWED_CONFIG_FILES from OrchestrixSetup
+    allowed_configs = set(OrchestrixSetup.ALLOWED_CONFIG_FILES)
 
     # Check for files in pyproject but not in ALLOWED_CONFIG_FILES
     missing_from_allowlist = pyproject_configs - allowed_configs
     if missing_from_allowlist:
         pytest.fail(
             f"Config files in pyproject.toml force-include but missing from "
-            f"BazingaSetup.ALLOWED_CONFIG_FILES: {missing_from_allowlist}\n"
-            f"Add these to ALLOWED_CONFIG_FILES in src/bazinga_cli/__init__.py"
+            f"OrchestrixSetup.ALLOWED_CONFIG_FILES: {missing_from_allowlist}\n"
+            f"Add these to ALLOWED_CONFIG_FILES in src/orchestrix_cli/__init__.py"
         )
 
     # Check for files in ALLOWED_CONFIG_FILES but not in pyproject
@@ -86,20 +86,20 @@ def test_allowed_config_files_matches_pyproject():
 def test_config_files_exist_in_source():
     """
     Verify that all ALLOWED_CONFIG_FILES actually exist in the source
-    bazinga/ directory.
+    orchestrix/ directory.
     """
-    from bazinga_cli import BazingaSetup
+    from orchestrix_cli import OrchestrixSetup
 
     project_root = get_project_root()
-    bazinga_dir = project_root / "bazinga"
+    orchestrix_dir = project_root / "orchestrix"
 
     missing_files = []
-    for filename in BazingaSetup.ALLOWED_CONFIG_FILES:
-        if not (bazinga_dir / filename).exists():
+    for filename in OrchestrixSetup.ALLOWED_CONFIG_FILES:
+        if not (orchestrix_dir / filename).exists():
             missing_files.append(filename)
 
     if missing_files:
         pytest.fail(
             f"Config files in ALLOWED_CONFIG_FILES but missing from "
-            f"bazinga/ directory: {missing_files}"
+            f"orchestrix/ directory: {missing_files}"
         )

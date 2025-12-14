@@ -193,7 +193,7 @@ export function StateMachine({ logs, taskGroups, sessionStatus }: StateMachinePr
         </div>
         {sessionStatus === "completed" && (
           <Badge variant="secondary" className="bg-green-500/10 text-green-500">
-            BAZINGA Complete
+            Orchestrix Complete
           </Badge>
         )}
       </div>

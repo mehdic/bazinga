@@ -1,6 +1,6 @@
-# BAZINGA Skills: Granular Analysis Configuration
+# Orchestrix Skills: Granular Analysis Configuration
 
-BAZINGA uses **Claude Code Skills** to provide agents with specialized analysis tools. This document explains what each Skill does, when to use it, and how to configure which ones run during orchestration.
+Orchestrix uses **Claude Code Skills** to provide agents with specialized analysis tools. This document explains what each Skill does, when to use it, and how to configure which ones run during orchestration.
 
 ## Table of Contents
 
@@ -22,10 +22,10 @@ Skills are automated analysis tools that agents invoke to validate code quality,
 **Key Points:**
 - Skills run automatically during agent workflows
 - Each Skill focuses on a specific problem
-- Results are saved to `bazinga/` for agent access
+- Results are saved to `orchestrix/` for agent access
 - Skills can be enabled or disabled based on your workflow
 
-**💡 Profiles:** BAZINGA has two main modes:
+**💡 Profiles:** Orchestrix has two main modes:
 - **Lite** (default) - 3 core skills, fast iteration (~1-2 min overhead)
 - **Advanced** - All 10 skills, comprehensive analysis (~3-5 min overhead)
 
@@ -50,18 +50,18 @@ Skills are automated analysis tools that agents invoke to validate code quality,
 
 ## Quick Start
 
-### Using /bazinga.configure-skills Command
+### Using /orchestrix.configure-skills Command
 
 Open the interactive configuration menu:
 
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 ```
 
 This displays all 11 Skills grouped by agent with current status:
 
 ```
-🎯 BAZINGA Skills Configuration
+🎯 Orchestrix Skills Configuration
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 🔧 Developer Agent                                          │
@@ -118,25 +118,25 @@ Examples:
 
 **For rapid iteration (1-2 min overhead):**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > lite
 ```
 
 **For critical features (3-5 min overhead):**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > advanced
 ```
 
 **Custom: Enable pattern analysis and quality dashboard:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > 2 9 10
 ```
 
 **Custom: Disable security scanning for trusted code:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > disable 6
 ```
 
@@ -153,7 +153,7 @@ These three Skills are enabled by default in lite mode and run automatically:
 - **What it does**: Runs language-specific linters to find style violations, complexity issues, and anti-patterns
 - **Time**: 5-10 seconds
 - **When to use**: On every code review (enabled by default)
-- **Output**: `bazinga/lint_results.json`
+- **Output**: `orchestrix/lint_results.json`
 
 **Example output:**
 ```json
@@ -185,7 +185,7 @@ These three Skills are enabled by default in lite mode and run automatically:
   - **Basic** (revision < 2): Fast scan, high/medium severity only
   - **Advanced** (revision >= 2): Comprehensive scan, all severities
 - **When to use**: Before approving any code (enabled by default)
-- **Output**: `bazinga/security_scan.json`
+- **Output**: `orchestrix/security_scan.json`
 
 **Example output (basic mode):**
 ```json
@@ -220,7 +220,7 @@ These three Skills are enabled by default in lite mode and run automatically:
 - **What it does**: Measures line and branch coverage, identifies untested code
 - **Time**: 10-20 seconds
 - **When to use**: After developers add/fix tests (enabled by default)
-- **Output**: `bazinga/coverage_report.json`
+- **Output**: `orchestrix/coverage_report.json`
 
 **Example output:**
 ```json
@@ -260,7 +260,7 @@ These Skills are disabled by default but provide deeper analysis. Enable them fo
 - **What it does**: Finds similar features, reusable utilities, and architectural patterns
 - **Time**: 15-30 seconds
 - **When to use**: At start of complex features to understand existing solutions
-- **Output**: `bazinga/codebase_patterns.json`
+- **Output**: `orchestrix/codebase_patterns.json`
 
 **Problem it solves:**
 ```
@@ -300,7 +300,7 @@ Result: Duplicated code, inconsistent patterns, extra bugs
 - **What it does**: Extracts test framework, fixtures, naming conventions, helper utilities
 - **Time**: 15-30 seconds
 - **When to use**: Before writing new tests
-- **Output**: `bazinga/test_patterns.json`
+- **Output**: `orchestrix/test_patterns.json`
 
 **Problem it solves:**
 ```
@@ -332,7 +332,7 @@ Result: Tests are harder to maintain, patterns not consistent
 - **What it does**: Compares OpenAPI specs, detects breaking changes (removed endpoints, changed types)
 - **Time**: 10-20 seconds
 - **When to use**: Before deploying API changes
-- **Output**: `bazinga/contract_diff.json`
+- **Output**: `orchestrix/contract_diff.json`
 
 **Problem it solves:**
 ```
@@ -375,7 +375,7 @@ Result: Angry users, production incident, expensive fix
 - **What it does**: Detects dangerous operations (locks, rewrites) and suggests safe alternatives
 - **Time**: 10-20 seconds
 - **When to use**: Before deploying migrations
-- **Output**: `bazinga/migration_analysis.json`
+- **Output**: `orchestrix/migration_analysis.json`
 
 **Problem it solves:**
 ```
@@ -425,7 +425,7 @@ Safe alternative: Add column without lock, then backfill
 - **What it does**: Mines historical data to identify recurring patterns, predict effort, detect risks
 - **Time**: 15-20 seconds
 - **When to use**: For retrospectives and historical learning
-- **Output**: `bazinga/pattern_insights.json`
+- **Output**: `orchestrix/pattern_insights.json`
 
 **Problem it solves:**
 ```
@@ -470,8 +470,8 @@ Next estimate: 10 hours → Set expectation correctly
 - **Problem**: No single view of project health - security good, coverage bad, velocity declining
 - **What it does**: Aggregates all quality metrics (security, coverage, lint, velocity) into one health score
 - **Time**: 10-15 seconds
-- **When to use**: Before major decisions, before BAZINGA, weekly reviews
-- **Output**: `bazinga/quality_dashboard.json`
+- **When to use**: Before major decisions, before Orchestrix, weekly reviews
+- **Output**: `orchestrix/quality_dashboard.json`
 
 **Problem it solves:**
 ```
@@ -534,7 +534,7 @@ Clear signal: Fix coverage before shipping
 
 **Example:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > lite
 ```
 
@@ -565,7 +565,7 @@ Clear signal: Fix coverage before shipping
 
 **Example:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > advanced
 ```
 
@@ -594,21 +594,21 @@ Clear signal: Fix coverage before shipping
 
 **For API-heavy work:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > 1 4 6 7 8 11
 # Enable: lint, api-contract-validation, security, lint, coverage, velocity
 ```
 
 **For database work:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > 1 5 6 7 8 11
 # Enable: lint, db-migration-check, security, lint, coverage, velocity
 ```
 
 **For rapid iteration with coverage focus:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > 1 8 11
 # Enable: lint (dev), test-coverage, velocity
 # Fast: skip all advanced analysis
@@ -616,7 +616,7 @@ Clear signal: Fix coverage before shipping
 
 **For learning/knowledge building:**
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > 2 3 9 10
 # Enable: codebase-analysis, test-pattern-analysis, pattern-miner, quality-dashboard
 # Skip: lint, security, coverage (focus on patterns and insights)
@@ -705,7 +705,7 @@ Clear signal: Fix coverage before shipping
 
 ### Skills Configuration File
 
-Configuration is persisted in `bazinga/skills_config.json`:
+Configuration is persisted in `orchestrix/skills_config.json`:
 
 ```json
 {
@@ -729,12 +729,12 @@ Configuration is persisted in `bazinga/skills_config.json`:
     "velocity-tracker": "mandatory"
   },
   "_metadata": {
-    "description": "Skills configuration for BAZINGA agents",
+    "description": "Skills configuration for Orchestrix agents",
     "last_updated": "2025-01-08T14:30:00Z",
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent",
       "DISABLED: Skill will not be invoked",
-      "Use /bazinga.configure-skills to modify this configuration interactively"
+      "Use /orchestrix.configure-skills to modify this configuration interactively"
     ]
   }
 }
@@ -823,9 +823,9 @@ Tech Lead receives code for review
 
 ### Persistence Across Sessions
 
-- Configuration is **automatically saved** to `bazinga/skills_config.json`
-- Configuration **persists across all BAZINGA sessions**
-- Use `/bazinga.configure-skills` anytime to adjust
+- Configuration is **automatically saved** to `orchestrix/skills_config.json`
+- Configuration **persists across all Orchestrix sessions**
+- Use `/orchestrix.configure-skills` anytime to adjust
 - Configuration is **tracked in git** (safe to commit)
 
 ---
@@ -933,7 +933,7 @@ Time: 1 minute (skip basic checks)
 
 **Cause:** Required tool not installed or misconfigured
 
-**Solution:** BAZINGA CLI automatically detects and offers to install missing tools:
+**Solution:** Orchestrix CLI automatically detects and offers to install missing tools:
 ```bash
 # During init or first use
 bazinga check
@@ -947,10 +947,10 @@ bazinga check
 **Solution:**
 ```bash
 # Verify configuration exists
-cat bazinga/skills_config.json
+cat orchestrix/skills_config.json
 
 # Reset to defaults
-/bazinga.configure-skills
+/orchestrix.configure-skills
 > defaults
 
 # Re-run orchestration
@@ -961,7 +961,7 @@ cat bazinga/skills_config.json
 **Enable different configurations:**
 
 1. Run with Fast configuration
-2. Note results in `bazinga/` files
+2. Note results in `orchestrix/` files
 3. Change to Advanced configuration
 4. Run again and compare
 
@@ -971,7 +971,7 @@ This helps you decide what Skills are worth the time for your workflow.
 
 ## Next Steps
 
-- **Quick start**: Run `/bazinga.configure-skills` and select a preset
+- **Quick start**: Run `/orchestrix.configure-skills` and select a preset
 - **Learn more**: See agent documentation (`agents/developer.md`, `agents/techlead.md`, etc.)
 - **Integration**: See how orchestrator uses Skills in `agents/orchestrator.md`
 - **Examples**: See `examples/EXAMPLES.md` for real workflow examples
@@ -980,7 +980,7 @@ This helps you decide what Skills are worth the time for your workflow.
 
 ## Development Status
 
-**⚠️ Note:** BAZINGA Skills are currently under active development. While the Skills listed in this document are functional and tested, we are continuously improving:
+**⚠️ Note:** Orchestrix Skills are currently under active development. While the Skills listed in this document are functional and tested, we are continuously improving:
 
 - Detection accuracy and coverage
 - Performance and execution speed

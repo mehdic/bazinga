@@ -1,8 +1,8 @@
 # Project Context
 
-> **Repository:** https://github.com/mehdic/bazinga
+> **Repository:** https://github.com/mehdic/orchestrix
 
-This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration system for complex development tasks.
+This project uses Orchestrix (Claude Code Multi-Agent Dev Team) orchestration system for complex development tasks.
 
 ---
 
@@ -76,8 +76,8 @@ You are a **COORDINATOR**, not an implementer. You route messages between specia
 
 **✅ ALLOWED ACTIONS:**
 - ✅ Spawn agents using Task tool
-- ✅ Write to logs and state files (bazinga/ folder only)
-- ✅ Read state files from bazinga/ folder
+- ✅ Write to logs and state files (orchestrix/ folder only)
+- ✅ Read state files from orchestrix/ folder
 - ✅ Output status messages to user
 - ✅ Route information between agents
 
@@ -114,7 +114,7 @@ Orchestrator: 🔄 **ORCHESTRATOR ROLE CHECK**: I am a coordinator. I spawn agen
 Developer complete → MUST go to QA Expert
 QA pass → MUST go to Tech Lead
 Tech Lead approve → MUST go to PM
-PM decides → Next assignment OR BAZINGA
+PM decides → Next assignment OR Orchestrix
 ```
 
 **NEVER skip steps. NEVER directly instruct agents.**
@@ -169,7 +169,7 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, techlead, developer)
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
-- `bazinga/` - State files for orchestration (created during runs)
+- `orchestrix/` - State files for orchestration (created during runs)
 - `tmp/` - **GITIGNORED** - Temporary test artifacts (never commit)
 
 ### ⚠️ tmp/ Directory is Gitignored
@@ -197,12 +197,12 @@ git status  # Verify tmp/ is untracked
 
 **When working with dashboard scripts or any path-sensitive code, understand these two layouts:**
 
-### Dev Mode (Running from bazinga repo)
+### Dev Mode (Running from orchestrix repo)
 
 ```
-/home/user/bazinga/              <- REPO_ROOT (could be any name)
+/home/user/orchestrix/              <- REPO_ROOT (could be any name)
 ├── .claude/                     <- Claude-related files
-├── bazinga/                     <- Config files (NOT the installed bazinga folder)
+├── orchestrix/                     <- Config files (NOT the installed orchestrix folder)
 │   ├── challenge_levels.json
 │   ├── model_selection.json
 │   └── skills_config.json
@@ -218,37 +218,37 @@ git status  # Verify tmp/ is untracked
 
 **Key paths in dev mode:**
 - `DASHBOARD_DIR = REPO_ROOT/dashboard-v2`
-- `BAZINGA_DIR = REPO_ROOT/bazinga` (config only)
+- `Orchestrix_DIR = REPO_ROOT/orchestrix` (config only)
 
-### Installed Mode (Client project after `bazinga install`)
+### Installed Mode (Client project after `orchestrix install`)
 
 ```
 /home/user/my-project/           <- PROJECT_ROOT
-├── bazinga/                     <- Everything installed here
+├── orchestrix/                     <- Everything installed here
 │   ├── challenge_levels.json
 │   ├── model_selection.json
 │   ├── skills_config.json
-│   ├── dashboard-v2/            <- Dashboard INSIDE bazinga/
+│   ├── dashboard-v2/            <- Dashboard INSIDE orchestrix/
 │   │   └── scripts/
 │   │       ├── start-standalone.sh
 │   │       └── start-standalone.ps1
-│   └── scripts/                 <- Scripts INSIDE bazinga/
+│   └── scripts/                 <- Scripts INSIDE orchestrix/
 │       ├── start-dashboard.sh
 │       └── start-dashboard.ps1
-└── .claude/                     <- Claude files at project root (NOT in bazinga/)
+└── .claude/                     <- Claude files at project root (NOT in orchestrix/)
 ```
 
 **Key paths in installed mode:**
-- `DASHBOARD_DIR = PROJECT_ROOT/bazinga/dashboard-v2`
-- `BAZINGA_DIR = PROJECT_ROOT/bazinga`
+- `DASHBOARD_DIR = PROJECT_ROOT/orchestrix/dashboard-v2`
+- `Orchestrix_DIR = PROJECT_ROOT/orchestrix`
 
 ### Detection Logic
 
-Scripts detect mode by checking if their parent directory is named "bazinga":
-- Parent is "bazinga" → **Installed mode** → Dashboard at `BAZINGA_DIR/dashboard-v2`
-- Parent is NOT "bazinga" → **Dev mode** → Dashboard at `PROJECT_ROOT/dashboard-v2`
+Scripts detect mode by checking if their parent directory is named "orchestrix":
+- Parent is "orchestrix" → **Installed mode** → Dashboard at `Orchestrix_DIR/dashboard-v2`
+- Parent is NOT "orchestrix" → **Dev mode** → Dashboard at `PROJECT_ROOT/dashboard-v2`
 
-**⚠️ Edge case:** If the bazinga repo itself is cloned as a folder named "bazinga", it will be detected as "installed" mode, but paths still work correctly because both modes resolve to the same location.
+**⚠️ Edge case:** If the orchestrix repo itself is cloned as a folder named "orchestrix", it will be detected as "installed" mode, but paths still work correctly because both modes resolve to the same location.
 
 ---
 
@@ -256,7 +256,7 @@ Scripts detect mode by checking if their parent directory is named "bazinga":
 
 **Single Source of Truth:**
 - **agents/orchestrator.md** - The ONLY file you should edit for orchestration logic
-- **.claude/commands/bazinga.orchestrate.md** - AUTO-GENERATED (DO NOT EDIT DIRECTLY)
+- **.claude/commands/orchestrix.orchestrate.md** - AUTO-GENERATED (DO NOT EDIT DIRECTLY)
 
 ### ✅ CORRECT WORKFLOW
 
@@ -267,7 +267,7 @@ Scripts detect mode by checking if their parent directory is named "bazinga":
 3. **Pre-commit hook** automatically:
    - Detects changes to `agents/orchestrator.md`
    - Runs `scripts/build-slash-commands.sh`
-   - Rebuilds `.claude/commands/bazinga.orchestrate.md`
+   - Rebuilds `.claude/commands/orchestrix.orchestrate.md`
    - Stages the generated file
 
 **Manual rebuild (if needed):**
@@ -286,7 +286,7 @@ This installs the pre-commit hook that enables automatic rebuilding. Without thi
 
 ### ❌ DO NOT EDIT DIRECTLY
 
-**NEVER edit** `.claude/commands/bazinga.orchestrate.md` directly - your changes will be overwritten by the next commit!
+**NEVER edit** `.claude/commands/orchestrix.orchestrate.md` directly - your changes will be overwritten by the next commit!
 
 ### Why This Pattern?
 
@@ -296,7 +296,7 @@ This installs the pre-commit hook that enables automatic rebuilding. Without thi
 - `agents/orchestrator.md` - Source of truth for orchestration logic
 - Build script - Generates slash command from agent source
 - Pre-commit hook - Automatically rebuilds on changes
-- `.claude/commands/bazinga.orchestrate.md` - Generated file that runs inline
+- `.claude/commands/orchestrix.orchestrate.md` - Generated file that runs inline
 
 This ensures:
 - ✅ Single source of truth (no manual synchronization)
@@ -311,15 +311,15 @@ This ensures:
 ## Key Principles
 
 1. **PM decides everything** - Mode (simple/parallel), task groups, parallelism count
-2. **PM sends BAZINGA** - Only PM can signal completion (not tech lead)
-3. **Database = memory** - All state stored in SQLite database (bazinga/bazinga.db) via bazinga-db skill
+2. **PM sends Orchestrix** - Only PM can signal completion (not tech lead)
+3. **Database = memory** - All state stored in SQLite database (orchestrix/orchestrix.db) via orchestrix-db skill
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
 6. **Surgical edits only** - Agent files near size limits. Changes must be: surgical (precise), compact (minimal lines), clear (no vague paths). No "when needed" logic. Explicit decision rules only.
 
 ---
 
-## 🔴 CRITICAL: NEVER Use Inline SQL - ALWAYS Use bazinga-db Skill
+## 🔴 CRITICAL: NEVER Use Inline SQL - ALWAYS Use orchestrix-db Skill
 
 **This rule is MANDATORY, NON-NEGOTIABLE, and must ALWAYS be implemented and verified.**
 
@@ -327,7 +327,7 @@ This ensures:
 
 ```python
 # ❌ NEVER write inline SQL like this:
-python3 -c "import sqlite3; conn = sqlite3.connect('bazinga/bazinga.db'); ..."
+python3 -c "import sqlite3; conn = sqlite3.connect('orchestrix/orchestrix.db'); ..."
 
 # ❌ NEVER use raw SQL queries:
 cursor.execute("SELECT * FROM sessions WHERE ...")
@@ -335,21 +335,21 @@ cursor.execute("UPDATE task_groups SET status = ...")
 cursor.execute("INSERT INTO reasoning_log ...")
 
 # ❌ NEVER access the database file directly:
-sqlite3 bazinga/bazinga.db "SELECT ..."
+sqlite3 orchestrix/orchestrix.db "SELECT ..."
 ```
 
-### ✅ ALWAYS Use bazinga-db Skill
+### ✅ ALWAYS Use orchestrix-db Skill
 
 ```python
-# ✅ CORRECT: Use the bazinga-db skill for ALL database operations
-Skill(command: "bazinga-db") → list-sessions
-Skill(command: "bazinga-db") → get-task-groups {session_id}
-Skill(command: "bazinga-db") → save-reasoning {session_id} {agent_type} {phase} {content}
-Skill(command: "bazinga-db") → update-task-group {session_id} {group_id} {status}
+# ✅ CORRECT: Use the orchestrix-db skill for ALL database operations
+Skill(command: "orchestrix-db") → list-sessions
+Skill(command: "orchestrix-db") → get-task-groups {session_id}
+Skill(command: "orchestrix-db") → save-reasoning {session_id} {agent_type} {phase} {content}
+Skill(command: "orchestrix-db") → update-task-group {session_id} {group_id} {status}
 
 # ✅ CORRECT: Or use the CLI script (for verification commands in docs)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet list-sessions 1
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-success-criteria "{session_id}"
 ```
 
 ### Why This Rule Exists
@@ -365,10 +365,10 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 **When reviewing code or agent prompts, CHECK:**
 - No `sqlite3` imports or commands
 - No raw SQL strings (SELECT, INSERT, UPDATE, DELETE)
-- No direct `bazinga/bazinga.db` file access
-- All DB operations use `Skill(command: "bazinga-db")` or the CLI script
+- No direct `orchestrix/orchestrix.db` file access
+- All DB operations use `Skill(command: "orchestrix-db")` or the CLI script
 
-**If you see inline SQL:** STOP and refactor to use the bazinga-db skill immediately.
+**If you see inline SQL:** STOP and refactor to use the orchestrix-db skill immediately.
 
 ---
 
@@ -376,23 +376,23 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 
 | Term | What it actually is |
 |------|---------------------|
-| **bazinga CLI** | The `bazinga install` / `bazinga init` commands (pip package) |
-| **bazinga-db skill** | What agents invoke to store/retrieve data |
+| **orchestrix CLI** | The `orchestrix install` / `orchestrix init` commands (pip package) |
+| **orchestrix-db skill** | What agents invoke to store/retrieve data |
 
 ---
 
-## 🔴 CRITICAL: BAZINGA Configuration Files
+## 🔴 CRITICAL: Orchestrix Configuration Files
 
-The `bazinga/` folder contains three JSON configuration files that control agent behavior. **These are the authoritative sources**.
+The `orchestrix/` folder contains three JSON configuration files that control agent behavior. **These are the authoritative sources**.
 
 ### Source of Truth
 
 ```
-bazinga/*.json files = AUTHORITATIVE SOURCE
+orchestrix/*.json files = AUTHORITATIVE SOURCE
 Agent frontmatter model: field = Documentation only (NOT read by orchestrator)
 ```
 
-The orchestrator reads `bazinga/model_selection.json` at session start and caches the values. There is no DB layer for config - JSON files are the single source of truth.
+The orchestrator reads `orchestrix/model_selection.json` at session start and caches the values. There is no DB layer for config - JSON files are the single source of truth.
 
 ### 1. `model_selection.json` - Agent Model Assignment
 
@@ -408,7 +408,7 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 | project_manager | opus | **Always Opus** - strategic planning, final quality gate |
 | investigator | opus | Complex debugging and root cause analysis |
 | requirements_engineer | opus | Complex requirements analysis, codebase discovery |
-| validator | sonnet | Independent BAZINGA verification |
+| validator | sonnet | Independent Orchestrix verification |
 | orchestrator | sonnet | Coordination and routing |
 
 **Key sections:**
@@ -418,7 +418,7 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 
 **To change an agent's model:**
 ```bash
-# Edit bazinga/model_selection.json
+# Edit orchestrix/model_selection.json
 # Update the agents.<agent_name>.model field
 # New sessions will use the updated model
 ```
@@ -446,7 +446,7 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 }
 ```
 
-**Configure via:** `/bazinga.configure-skills` slash command
+**Configure via:** `/orchestrix.configure-skills` slash command
 
 ### 3. `challenge_levels.json` - QA Test Progression
 
@@ -466,7 +466,7 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 ### Modifying Configuration
 
 **To change agent models or skills:**
-1. Edit the relevant JSON file in `bazinga/`
+1. Edit the relevant JSON file in `orchestrix/`
 2. Changes take effect on new orchestration sessions
 3. Running sessions use cached config from session start
 
@@ -477,36 +477,36 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 
 ---
 
-## 🔴 CRITICAL: Bazinga CLI Installer - What Gets Installed
+## 🔴 CRITICAL: Orchestrix CLI Installer - What Gets Installed
 
-**When adding ANY new files to the bazinga repo, you MUST understand how the installer works and verify your files will be installed to client projects.**
+**When adding ANY new files to the orchestrix repo, you MUST understand how the installer works and verify your files will be installed to client projects.**
 
 ### How the Installer Works
 
-The bazinga CLI (`bazinga install` / `bazinga update`) copies files from two mechanisms:
+The orchestrix CLI (`orchestrix install` / `orchestrix update`) copies files from two mechanisms:
 
 1. **`pyproject.toml` shared-data** - Directories copied wholesale during pip install
-2. **`src/bazinga_cli/__init__.py`** - Python code that copies files during `bazinga install`
+2. **`src/orchestrix_cli/__init__.py`** - Python code that copies files during `orchestrix install`
 
 ### Directory Installation Matrix
 
 | Source Directory | Destination on Client | Mechanism | Auto-includes new files? |
 |------------------|----------------------|-----------|--------------------------|
 | `agents/*.md` | `.claude/agents/` | `copy_agents()` | ✅ Yes |
-| `scripts/*.sh` | `bazinga/scripts/` | `copy_scripts()` | ✅ Yes |
-| `bazinga/scripts/*.sh` | `bazinga/scripts/` | `copy_scripts()` | ✅ Yes |
+| `scripts/*.sh` | `orchestrix/scripts/` | `copy_scripts()` | ✅ Yes |
+| `orchestrix/scripts/*.sh` | `orchestrix/scripts/` | `copy_scripts()` | ✅ Yes |
 | `.claude/commands/` | `.claude/commands/` | `copy_commands()` | ✅ Yes |
 | `.claude/skills/` | `.claude/skills/` | `copy_skills()` | ✅ Yes |
 | `.claude/templates/` | `.claude/templates/` | shared-data | ✅ Yes |
-| `bazinga/templates/` | `bazinga/templates/` | force-include | ✅ Yes |
-| `dashboard-v2/` | `bazinga/dashboard-v2/` | shared-data | ✅ Yes |
-| `bazinga/*.json` (configs) | `bazinga/` | force-include + `ALLOWED_CONFIG_FILES` | ❌ **NO - Manual** |
+| `orchestrix/templates/` | `orchestrix/templates/` | force-include | ✅ Yes |
+| `dashboard-v2/` | `orchestrix/dashboard-v2/` | shared-data | ✅ Yes |
+| `orchestrix/*.json` (configs) | `orchestrix/` | force-include + `ALLOWED_CONFIG_FILES` | ❌ **NO - Manual** |
 
 ### When to Check Installation
 
 **ALWAYS verify installation when:**
 - Adding files to a NEW directory not listed above
-- Adding new JSON config files to `bazinga/`
+- Adding new JSON config files to `orchestrix/`
 - Creating new top-level directories
 
 ### Checklist by File Type
@@ -517,14 +517,14 @@ The bazinga CLI (`bazinga install` / `bazinga update`) copies files from two mec
 # Just add the file and it will be installed
 ```
 
-#### New JSON config file in `bazinga/`
+#### New JSON config file in `orchestrix/`
 ```bash
-# 1. Add file to bazinga/ directory
+# 1. Add file to orchestrix/ directory
 
 # 2. Add to pyproject.toml [tool.hatch.build.targets.wheel.force-include]:
-"bazinga/new_config.json" = "bazinga_cli/bazinga/new_config.json"
+"orchestrix/new_config.json" = "orchestrix_cli/orchestrix/new_config.json"
 
-# 3. Add to ALLOWED_CONFIG_FILES in src/bazinga_cli/__init__.py:
+# 3. Add to ALLOWED_CONFIG_FILES in src/orchestrix_cli/__init__.py:
 ALLOWED_CONFIG_FILES = [
     "model_selection.json",
     "challenge_levels.json",
@@ -539,9 +539,9 @@ python -m pytest tests/test_config_sync.py -v
 #### New directory entirely
 ```bash
 # 1. Add to pyproject.toml [tool.hatch.build.targets.wheel.shared-data]:
-"new_dir" = "share/bazinga_cli/new_dir"
+"new_dir" = "share/orchestrix_cli/new_dir"
 
-# 2. Add copy function in src/bazinga_cli/__init__.py (follow copy_agents pattern)
+# 2. Add copy function in src/orchestrix_cli/__init__.py (follow copy_agents pattern)
 
 # 3. Call the copy function in install() and update() commands
 ```
@@ -558,7 +558,7 @@ grep -A 20 "shared-data" pyproject.toml
 grep -A 10 "force-include" pyproject.toml
 
 # 3. Check copy functions in CLI
-grep -n "def copy_" src/bazinga_cli/__init__.py
+grep -n "def copy_" src/orchestrix_cli/__init__.py
 
 # 4. For a specific file, trace its path:
 #    - Is parent directory in shared-data? → Auto-installed
@@ -580,7 +580,7 @@ grep -n "def copy_" src/bazinga_cli/__init__.py
 If a file isn't properly configured for installation:
 - It exists in the git repo ✅
 - It works in dev mode ✅
-- **It does NOT exist on client projects after `bazinga install`** ❌
+- **It does NOT exist on client projects after `orchestrix install`** ❌
 - Users get "file not found" errors with no obvious cause
 
 **Always trace the installation path before saying "yes, it will be installed."**
@@ -593,7 +593,7 @@ If a file isn't properly configured for installation:
 
 ### 📚 Comprehensive Skill Reference (Primary)
 
-**MANDATORY REFERENCE:** `/home/user/bazinga/research/skill-implementation-guide.md`
+**MANDATORY REFERENCE:** `/home/user/orchestrix/research/skill-implementation-guide.md`
 
 **Use this guide for:**
 - ✅ Creating new skills (complete guide with examples)
@@ -608,7 +608,7 @@ If a file isn't properly configured for installation:
 
 ### 🔧 Fixing Broken Skills (Secondary)
 
-**REFERENCE:** `/home/user/bazinga/research/skill-fix-manual.md`
+**REFERENCE:** `/home/user/orchestrix/research/skill-fix-manual.md`
 
 **Use this guide for:**
 - ✅ Step-by-step process to fix existing broken skills
@@ -617,10 +617,10 @@ If a file isn't properly configured for installation:
 
 ### 📖 Implementation History (Context)
 
-**REFERENCE:** `/home/user/bazinga/research/skills-implementation-summary.md`
+**REFERENCE:** `/home/user/orchestrix/research/skills-implementation-summary.md`
 
 **Use this for:**
-- Understanding BAZINGA-specific skill patterns
+- Understanding Orchestrix-specific skill patterns
 - Dual-mode implementation (basic/advanced)
 - Hybrid invocation approach
 - Historical context and decisions
@@ -630,7 +630,7 @@ If a file isn't properly configured for installation:
 **Creating skills:**
 ```bash
 # 1. Read comprehensive guide
-Read: /home/user/bazinga/research/skill-implementation-guide.md
+Read: /home/user/orchestrix/research/skill-implementation-guide.md
 
 # 2. Follow SKILL.md format with required frontmatter
 # 3. Keep instructions focused (<250 lines)
@@ -887,7 +887,7 @@ def calculate_budget(complexity: str) -> int:
 
 ## 🧪 Integration Testing
 
-**To run the BAZINGA integration test:**
+**To run the Orchestrix integration test:**
 
 When the user says "run the integration test" or "test the orchestration system", execute the following:
 
@@ -895,26 +895,26 @@ When the user says "run the integration test" or "test the orchestration system"
 
 ```bash
 # 1. Clear previous test data
-rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
+rm -rf tmp/simple-calculator-app orchestrix/orchestrix.db orchestrix/project_context.json
 
 # 2. Run orchestration with test spec
-/bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
+/orchestrix.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 ```
 
 **🔴 IMPORTANT:** Always run the ACTUAL orchestrator prompt. Never manually simulate orchestration steps - the orchestrator itself must handle specialization-loader invocation, agent spawning, and workflow routing. Manual simulation would become invalid when orchestrator logic changes.
 
 ### If SlashCommand Tool Fails
 
-If `/bazinga.orchestrate` cannot be invoked via the SlashCommand tool (e.g., "Invalid tool name format" error), execute the orchestrator prompt directly:
+If `/orchestrix.orchestrate` cannot be invoked via the SlashCommand tool (e.g., "Invalid tool name format" error), execute the orchestrator prompt directly:
 
-1. **Read the orchestrator prompt:** `Read: .claude/commands/bazinga.orchestrate.md`
+1. **Read the orchestrator prompt:** `Read: .claude/commands/orchestrix.orchestrate.md`
 2. **Execute its instructions** as your own - this IS the orchestrator
 
-The slash command essentially expands to the prompt in `.claude/commands/bazinga.orchestrate.md`. Reading and executing that file is functionally identical to what the slash command does. This ensures the test always runs the actual orchestrator logic, not manual steps.
+The slash command essentially expands to the prompt in `.claude/commands/orchestrix.orchestrate.md`. Reading and executing that file is functionally identical to what the slash command does. This ensures the test always runs the actual orchestrator logic, not manual steps.
 
 ### What This Tests
 
-The integration test validates the complete BAZINGA workflow:
+The integration test validates the complete Orchestrix workflow:
 
 1. **Session Management** - Creates session with all required fields
 2. **Tech Stack Detection** - Spawns Tech Stack Scout, creates `project_context.json`
@@ -923,7 +923,7 @@ The integration test validates the complete BAZINGA workflow:
 5. **Development** - Spawns Developer (haiku) WITH composed specialization block
 6. **QA Testing** - Spawns QA Expert (sonnet) WITH composed specialization block
 7. **Code Review** - Spawns Tech Lead (opus) WITH composed specialization block
-8. **Completion** - PM sends BAZINGA after all criteria met
+8. **Completion** - PM sends Orchestrix after all criteria met
 
 ### Expected Results
 
@@ -931,7 +931,7 @@ The integration test validates the complete BAZINGA workflow:
 |-----------|----------|
 | Session status | `completed` |
 | Task groups | 1 group, status `completed` |
-| Orchestration logs | 6+ entries (PM, Developer, QA, Tech Lead, BAZINGA) |
+| Orchestration logs | 6+ entries (PM, Developer, QA, Tech Lead, Orchestrix) |
 | Files created | `calculator.py`, `test_calculator.py`, `README.md` |
 | Tests | 51 passing |
 | Code quality | 9+/10 |
@@ -940,10 +940,10 @@ The integration test validates the complete BAZINGA workflow:
 
 ```bash
 # Check session status
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet list-sessions 1
 
 # Get full dashboard snapshot
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot <SESSION_ID>
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet dashboard-snapshot <SESSION_ID>
 
 # Run the calculator tests
 cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
@@ -965,18 +965,18 @@ After each run, a report is generated at:
 #### Step 1: Session Status Check
 ```bash
 # Verify session was created and completed
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet list-sessions 1
 ```
 
 **Expected output:**
 - `status: "completed"`
 - `mode: "simple"`
-- Valid `session_id` starting with `bazinga_`
+- Valid `session_id` starting with `orchestrix_`
 
 #### Step 2: Task Groups Check
 ```bash
 # Replace <SESSION_ID> with actual session ID from Step 1
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "<SESSION_ID>"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-task-groups "<SESSION_ID>"
 ```
 
 **Expected output:**
@@ -986,7 +986,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups 
 
 #### Step 3: Success Criteria Check
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "<SESSION_ID>"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-success-criteria "<SESSION_ID>"
 ```
 
 **Expected output:**
@@ -996,7 +996,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 #### Step 4: Reasoning Storage Check (CRITICAL)
 ```bash
 # Get all reasoning entries
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning "<SESSION_ID>"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-reasoning "<SESSION_ID>"
 ```
 
 **Expected output:**
@@ -1009,7 +1009,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning "<
 # Check each agent documented required phases
 for agent in project_manager developer qa_expert tech_lead; do
   echo "--- $agent ---"
-  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases "<SESSION_ID>" "CALC" "$agent"
+  python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet check-mandatory-phases "<SESSION_ID>" "CALC" "$agent"
 done
 ```
 
@@ -1019,7 +1019,7 @@ done
 
 #### Step 6: Reasoning Timeline (Human-Readable)
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline "<SESSION_ID>" --format markdown
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet reasoning-timeline "<SESSION_ID>" --format markdown
 ```
 
 **Expected output:**
@@ -1029,7 +1029,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeli
 
 #### Step 7: Full Dashboard Snapshot
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "<SESSION_ID>"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet dashboard-snapshot "<SESSION_ID>"
 ```
 
 **Expected output:**
@@ -1057,7 +1057,7 @@ cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=shor
 
 #### Step 10: Specialization Loader Invocation Check (CRITICAL)
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "<SESSION_ID>" "specialization-loader"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-skill-output "<SESSION_ID>" "specialization-loader"
 ```
 
 **Expected output:**
@@ -1102,7 +1102,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 ### ❌ WRONG (What was done in failed tests)
 ```python
 # Just reading the raw template file
-Read: bazinga/templates/specializations/01-languages/python.md
+Read: orchestrix/templates/specializations/01-languages/python.md
 # Then spawning Developer...
 ```
 

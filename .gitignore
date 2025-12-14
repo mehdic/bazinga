@@ -72,23 +72,23 @@ socket.pid
 # PyInstaller
 
 # BAZINGA state files (gitignored by default in installed projects)
-# The bazinga/ directory is ignored EXCEPT for specific tracked files
-bazinga/
-bazinga/artifacts/
-bazinga/bazinga.db*
+# The orchestrix/ directory is ignored EXCEPT for specific tracked files
+orchestrix/
+orchestrix/artifacts/
+orchestrix/orchestrix.db*
 
-# Re-include tracked bazinga files (MUST come AFTER bazinga/ ignore)
-!bazinga/.gitignore
-!bazinga/challenge_levels.json
-!bazinga/model_selection.json
-!bazinga/skills_config.json
-!bazinga/testing_config.json
-!bazinga/scripts/
-!bazinga/scripts/**
-!bazinga/templates/
-!bazinga/templates/**
+# Re-include tracked bazinga files (MUST come AFTER orchestrix/ ignore)
+!orchestrix/.gitignore
+!orchestrix/challenge_levels.json
+!orchestrix/model_selection.json
+!orchestrix/skills_config.json
+!orchestrix/testing_config.json
+!orchestrix/scripts/
+!orchestrix/scripts/**
+!orchestrix/templates/
+!orchestrix/templates/**
 
-# Coordination folder (legacy - templates now in bazinga/templates/)
+# Coordination folder (legacy - templates now in orchestrix/templates/)
 coordination/
 !coordination/templates/
 !coordination/templates/**

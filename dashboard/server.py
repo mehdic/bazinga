@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BAZINGA Dashboard Server
+Orchestrix Dashboard Server
 ========================
 Lightweight WebSocket server for real-time orchestration monitoring.
 Queries database for real-time state and logs.
@@ -19,9 +19,9 @@ from flask_sock import Sock
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Import BazingaDB for database operations
+# Import OrchestrixDB for database operations
 sys.path.insert(0, str(Path(__file__).parent.parent / '.claude' / 'skills' / 'bazinga-db' / 'scripts'))
-from bazinga_db import BazingaDB
+from orchestrix_db import OrchestrixDB
 
 app = Flask(__name__, static_folder='.')
 sock = Sock(app)
@@ -31,11 +31,11 @@ clients = []
 
 # Base paths
 BASE_DIR = Path(__file__).parent.parent
-BAZINGA_DIR = BASE_DIR / 'bazinga'
+Orchestrix_DIR = BASE_DIR / 'orchestrix'
 DOCS_DIR = BASE_DIR / 'docs'
-ARCHIVE_DIR = BAZINGA_DIR / 'archive'
-CONFIG_DIR = BAZINGA_DIR
-DB_PATH = BAZINGA_DIR / 'bazinga.db'
+ARCHIVE_DIR = Orchestrix_DIR / 'archive'
+CONFIG_DIR = Orchestrix_DIR
+DB_PATH = Orchestrix_DIR / 'orchestrix.db'
 
 # Initialize database connection
 db = None
@@ -59,7 +59,7 @@ class CoordinationWatcher(FileSystemEventHandler):
 
         # Only care about database file changes (including WAL files)
         filename = Path(event.src_path).name
-        if not (filename == 'bazinga.db' or filename.startswith('bazinga.db-')):
+        if not (filename == 'orchestrix.db' or filename.startswith('orchestrix.db-')):
             print(f"⏭️  Skipping non-database file: {filename}")
             return
 
@@ -329,7 +329,7 @@ def generate_ai_diagram():
         client = Anthropic(api_key=api_key)
 
         # Build prompt
-        prompt = f"""You are visualizing a BAZINGA orchestration workflow.
+        prompt = f"""You are visualizing a Orchestrix orchestration workflow.
 
 Current state:
 {json.dumps(data, indent=2)}
@@ -906,15 +906,15 @@ def websocket(ws):
 
 def start_file_watcher():
     """Start watching database file for changes."""
-    if not BAZINGA_DIR.exists():
-        print(f"⚠️  Coordination folder not found: {BAZINGA_DIR}")
+    if not Orchestrix_DIR.exists():
+        print(f"⚠️  Coordination folder not found: {Orchestrix_DIR}")
         print("   Dashboard will start, but won't receive updates.")
         return
 
     print(f"\n{'='*60}")
     print(f"🔍 Setting up database watcher...")
     print(f"{'='*60}")
-    print(f"📁 Watching directory: {BAZINGA_DIR.absolute()}")
+    print(f"📁 Watching directory: {Orchestrix_DIR.absolute()}")
     print(f"📊 Database file: {DB_PATH.name}")
 
     if DB_PATH.exists():
@@ -924,7 +924,7 @@ def start_file_watcher():
 
     event_handler = CoordinationWatcher()
     observer = Observer()
-    observer.schedule(event_handler, str(BAZINGA_DIR), recursive=False)
+    observer.schedule(event_handler, str(Orchestrix_DIR), recursive=False)
     observer.start()
     print(f"✅ Database watcher started successfully")
     print(f"{'='*60}\n")
@@ -937,18 +937,18 @@ def main():
     port = int(os.environ.get('DASHBOARD_PORT', 53124))
 
     print("=" * 60)
-    print("🚀 BAZINGA Orchestration Dashboard")
+    print("🚀 Orchestrix Orchestration Dashboard")
     print("=" * 60)
     print(f"📡 Server: http://localhost:{port}")
     print(f"🌐 Dashboard: http://localhost:{port}/")
-    print(f"📁 Coordination: {BAZINGA_DIR}")
+    print(f"📁 Coordination: {Orchestrix_DIR}")
     print(f"🗄️  Database: {DB_PATH}")
     print("=" * 60)
 
     # Initialize database connection
     if DB_PATH.exists():
         try:
-            db = BazingaDB(str(DB_PATH))
+            db = OrchestrixDB(str(DB_PATH))
             print(f"✅ Database connection established")
         except Exception as e:
             print(f"⚠️  Failed to connect to database: {e}")

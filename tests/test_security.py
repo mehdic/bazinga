@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from bazinga_cli.security import (
+from orchestrix_cli.security import (
     PathValidator,
     SafeSubprocess,
     SecurityError,

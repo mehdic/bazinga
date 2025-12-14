@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test concurrent database access for BAZINGA orchestration.
+Test concurrent database access for Orchestrix orchestration.
 Simulates multiple agents writing to database while dashboard reads.
 """
 
@@ -12,14 +12,14 @@ from pathlib import Path
 
 # Add database script to path
 sys.path.insert(0, str(Path(__file__).parent / '.claude' / 'skills' / 'bazinga-db' / 'scripts'))
-from bazinga_db import BazingaDB
+from orchestrix_db import OrchestrixDB
 
-DB_PATH = Path(__file__).parent / 'coordination' / 'bazinga.db'
+DB_PATH = Path(__file__).parent / 'coordination' / 'orchestrix.db'
 TEST_SESSION = f"test_concurrent_{int(time.time())}"
 
 def writer_thread(thread_id, iterations=10):
     """Simulate an agent writing to database."""
-    db = BazingaDB(str(DB_PATH))
+    db = OrchestrixDB(str(DB_PATH))
 
     for i in range(iterations):
         try:
@@ -46,7 +46,7 @@ def writer_thread(thread_id, iterations=10):
 
 def reader_thread(thread_id, iterations=20):
     """Simulate dashboard reading from database."""
-    db = BazingaDB(str(DB_PATH))
+    db = OrchestrixDB(str(DB_PATH))
 
     for i in range(iterations):
         try:
@@ -71,14 +71,14 @@ def reader_thread(thread_id, iterations=20):
 def main():
     """Run concurrent access test."""
     print("="*60)
-    print("🧪 BAZINGA Concurrent Database Access Test")
+    print("🧪 Orchestrix Concurrent Database Access Test")
     print("="*60)
     print(f"Database: {DB_PATH}")
     print(f"Test session: {TEST_SESSION}")
     print()
 
     # Create test session
-    db = BazingaDB(str(DB_PATH))
+    db = OrchestrixDB(str(DB_PATH))
     db.create_session(TEST_SESSION, 'parallel', 'Concurrent access test')
     print(f"✅ Created test session")
 

@@ -71,7 +71,7 @@ Tech Lead
 PM
   ↓ Tracks completion
   ↓ If more work → Spawns more Developers
-  ↓ If all complete → BAZINGA (project done)
+  ↓ If all complete → Orchestrix (project done)
 ```
 
 ### Your Possible Paths
@@ -122,7 +122,7 @@ You are the TESTING SPECIALIST. You are CONDITIONALLY in the workflow - only whe
 
 **Activation Trigger**: If Orchestrator mentions "SPEC-KIT INTEGRATION ACTIVE" and provides a feature directory
 
-**REQUIRED:** Read full workflow instructions from: `bazinga/templates/qa_speckit.md`
+**REQUIRED:** Read full workflow instructions from: `orchestrix/templates/qa_speckit.md`
 
 ### Quick Reference (Fallback if template unavailable)
 
@@ -145,17 +145,17 @@ You are the TESTING SPECIALIST. You are CONDITIONALLY in the workflow - only whe
    - Mines historical data for recurring test failures
    - Predicts failure-prone areas based on past patterns
    - Adjusts testing focus using historical insights
-   - Results: `bazinga/pattern_insights.json`
+   - Results: `orchestrix/pattern_insights.json`
 
 2. **quality-dashboard** - Unified project health dashboard (10-15s)
    - Aggregates all quality metrics (security, coverage, lint, velocity)
    - Provides overall health score (0-100) with trend analysis
    - Detects quality anomalies and regression risks
-   - Results: `bazinga/quality_dashboard.json`
+   - Results: `orchestrix/quality_dashboard.json`
 
 ### When to Invoke
 
-The Orchestrator will include invocation instructions in your spawn prompt based on how Skills are configured in `bazinga/skills_config.json`:
+The Orchestrator will include invocation instructions in your spawn prompt based on how Skills are configured in `orchestrix/skills_config.json`:
 - **MANDATORY**: You MUST invoke (included in ⚡ ADVANCED SKILLS ACTIVE section)
 - **OPTIONAL**: You CAN invoke if needed (included in ⚡ OPTIONAL SKILLS AVAILABLE section)
 - **DISABLED**: Not available
@@ -169,7 +169,7 @@ Skill(command: "pattern-miner")
 - Need historical context on test patterns
 - Complex test suite with unknown hotspots
 
-Read results: `cat bazinga/pattern_insights.json`
+Read results: `cat orchestrix/pattern_insights.json`
 
 **STEP 2: Invoke quality-dashboard (if MANDATORY or useful)**
 ```
@@ -180,7 +180,7 @@ Skill(command: "quality-dashboard")
 - User requests quality metrics
 - Complex project with multiple quality dimensions
 
-Read results: `cat bazinga/quality_dashboard.json`
+Read results: `cat orchestrix/quality_dashboard.json`
 
 **STEP 3: Use insights to prioritize testing**
 - Focus on modules with historical failures
@@ -243,7 +243,7 @@ IF present, read listed files BEFORE testing:
 | investigation | Root cause analysis | Understand what was fixed |
 | failures | Prior iteration failures | Verify same issues don't recur |
 
-**After reading each package:** Mark as consumed via `bazinga-db mark-context-consumed {package_id} qa_expert 1` to prevent re-routing.
+**After reading each package:** Mark as consumed via `orchestrix-db mark-context-consumed {package_id} qa_expert 1` to prevent re-routing.
 
 **IF no context packages:** Proceed to Step 1.
 
@@ -988,7 +988,7 @@ After fixes, QA will retest.
 # Write artifact file (unique per group to avoid collisions)
 # Note: artifacts directory already created in Step 1
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md",
+  file_path: "orchestrix/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md",
   content: """
 # QA Test Failures
 
@@ -1040,7 +1040,7 @@ Write(
 
 **After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
 ```
-**Artifact:** bazinga/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md
+**Artifact:** orchestrix/artifacts/{SESSION_ID}/qa_failures_group_{GROUP_ID}.md
 ```
 
 ---
@@ -1423,18 +1423,18 @@ After fixes, QA will retest.
 **When tests FAIL, register a context package so the next developer iteration has failure details:**
 
 ```
-bazinga-db, please save context package:
+orchestrix-db, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
 Package Type: failures
-File Path: bazinga/artifacts/{SESSION_ID}/failures_{GROUP_ID}_iter{N}.md
+File Path: orchestrix/artifacts/{SESSION_ID}/failures_{GROUP_ID}_iter{N}.md
 Producer Agent: qa_expert
 Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {N} test failures: {brief list of failing tests}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "orchestrix-db")`
 
 **Write the failures file first** with: test name, error message, expected vs actual, file locations. Then register.
 
@@ -1444,7 +1444,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 ## 🧠 Reasoning Documentation (MANDATORY)
 
-**CRITICAL**: You MUST document your reasoning via the bazinga-db skill. This is NOT optional.
+**CRITICAL**: You MUST document your reasoning via the orchestrix-db skill. This is NOT optional.
 
 ### Why This Matters
 
@@ -1492,7 +1492,7 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [Claim 2]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence high
@@ -1514,7 +1514,7 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 [Pass to Tech Lead / Return to Developer / Escalate]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high

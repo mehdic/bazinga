@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Install git hooks for BAZINGA development
+# Install git hooks for Orchestrix development
 # Run this after cloning the repository
 #
 
@@ -9,7 +9,7 @@ set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "🔧 Installing git hooks for BAZINGA development..."
+echo "🔧 Installing git hooks for Orchestrix development..."
 
 # Install pre-commit hook
 if [ -f scripts/git-hooks/pre-commit ]; then

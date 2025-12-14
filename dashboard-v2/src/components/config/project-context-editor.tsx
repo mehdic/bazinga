@@ -46,7 +46,7 @@ const DEFAULT_MODEL_CONFIG: ModelConfig[] = [
   { agent_role: "tech_lead", model: "opus", rationale: "Architectural decisions - non-negotiable" },
   { agent_role: "project_manager", model: "opus", rationale: "Strategic planning - non-negotiable" },
   { agent_role: "investigator", model: "opus", rationale: "Root cause analysis" },
-  { agent_role: "validator", model: "sonnet", rationale: "BAZINGA verification" },
+  { agent_role: "validator", model: "sonnet", rationale: "Orchestrix verification" },
 ];
 
 function ModelConfigEditor({
@@ -221,8 +221,8 @@ export function ProjectContextEditor({ sessionId }: ProjectContextEditorProps) {
 
   // Load config from localStorage
   useEffect(() => {
-    const storedModels = localStorage.getItem("bazinga-model-config");
-    const storedSkills = localStorage.getItem("bazinga-skills-config");
+    const storedModels = localStorage.getItem("orchestrix-model-config");
+    const storedSkills = localStorage.getItem("orchestrix-skills-config");
 
     if (storedModels) {
       try {
@@ -237,8 +237,8 @@ export function ProjectContextEditor({ sessionId }: ProjectContextEditorProps) {
   }, []);
 
   const handleSave = () => {
-    localStorage.setItem("bazinga-model-config", JSON.stringify(modelConfig));
-    localStorage.setItem("bazinga-skills-config", skillsConfig);
+    localStorage.setItem("orchestrix-model-config", JSON.stringify(modelConfig));
+    localStorage.setItem("orchestrix-skills-config", skillsConfig);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -257,7 +257,7 @@ export function ProjectContextEditor({ sessionId }: ProjectContextEditorProps) {
             Project Configuration
           </CardTitle>
           <CardDescription>
-            Configure model assignments and skill settings for BAZINGA orchestration
+            Configure model assignments and skill settings for Orchestrix orchestration
           </CardDescription>
         </CardHeader>
         <CardContent>

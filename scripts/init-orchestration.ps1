@@ -1,4 +1,4 @@
-# BAZINGA Orchestration Initialization Script (PowerShell)
+# Orchestrix Orchestration Initialization Script (PowerShell)
 #
 # This script creates the required folder structure and state files
 # for orchestration. Safe to run multiple times (idempotent).
@@ -8,10 +8,10 @@
 $ErrorActionPreference = "Stop"
 
 # Generate session ID with timestamp
-$SESSION_ID = "bazinga_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+$SESSION_ID = "orchestrix_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
 $TIMESTAMP = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
-Write-Host "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..." -ForegroundColor Cyan
+Write-Host "🔄 Initializing Orchestrix Claude Code Multi-Agent Development Team..." -ForegroundColor Cyan
 Write-Host "📅 Session ID: $SESSION_ID" -ForegroundColor Cyan
 
 # Ensure all required directories exist (New-Item -Force is idempotent - safe to run multiple times)
@@ -104,7 +104,7 @@ if (-not (Test-Path "bazinga\skills_config.json")) {
     "velocity-tracker": "mandatory"
   },
   "_metadata": {
-    "description": "Skills configuration for BAZINGA agents",
+    "description": "Skills configuration for Orchestrix agents",
     "last_updated": "$TIMESTAMP",
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent",
@@ -142,7 +142,7 @@ foreach ($msg_file in $MESSAGE_FILES) {
 if (-not (Test-Path "docs\orchestration-log.md")) {
     Write-Host "📝 Creating orchestration log..." -ForegroundColor Yellow
     @"
-# BAZINGA Orchestration Log
+# Orchestrix Orchestration Log
 
 **Session:** $SESSION_ID
 **Started:** $TIMESTAMP

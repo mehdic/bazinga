@@ -12,7 +12,7 @@ export type SocketEvent =
   | { type: "agent:completed"; sessionId: string; agentType: string; statusCode: string }
   | { type: "log:added"; sessionId: string; logId: number; agentType: string; content: string }
   | { type: "group:updated"; sessionId: string; groupId: string; status: string }
-  | { type: "bazinga"; sessionId: string };
+  | { type: "orchestrix"; sessionId: string };
 
 // Notification type for UI
 export interface Notification {
@@ -118,16 +118,16 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           });
           break;
 
-        case "bazinga":
+        case "orchestrix":
           addNotification({
             type: "success",
-            title: "BAZINGA!",
+            title: "Orchestrix!",
             message: `Session ${event.sessionId.slice(-8)} completed successfully!`,
             sessionId: event.sessionId,
           });
           // Could trigger browser notification here
           if (typeof window !== "undefined" && Notification.permission === "granted") {
-            new Notification("BAZINGA!", {
+            new Notification("Orchestrix!", {
               body: `Session completed successfully`,
               icon: "/favicon.ico",
             });

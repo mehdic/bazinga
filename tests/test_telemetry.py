@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test script to demonstrate BAZINGA telemetry functionality.
+Simple test script to demonstrate Orchestrix telemetry functionality.
 
 This script shows:
 1. UUID generation and persistence
@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 import importlib.util
 spec = importlib.util.spec_from_file_location(
     "telemetry",
-    Path(__file__).parent / "src" / "bazinga_cli" / "telemetry.py"
+    Path(__file__).parent / "src" / "orchestrix_cli" / "telemetry.py"
 )
 telemetry_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(telemetry_module)
@@ -28,7 +28,7 @@ AnonymousTelemetry = telemetry_module.AnonymousTelemetry
 
 def main():
     print("=" * 60)
-    print("BAZINGA Anonymous Telemetry Test")
+    print("Orchestrix Anonymous Telemetry Test")
     print("=" * 60)
 
     # Create telemetry instance with test directory

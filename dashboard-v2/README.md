@@ -1,12 +1,12 @@
-# BAZINGA Dashboard v2.0
+# Orchestrix Dashboard v2.0
 
 > ⚠️ **EXPERIMENTAL**: This dashboard is under initial development and is not yet reliable.
-> It provides reporting/monitoring only - skipping it has **no impact** on BAZINGA's core
+> It provides reporting/monitoring only - skipping it has **no impact** on Orchestrix's core
 > multi-agent orchestration functionality.
 >
-> - **Not installed by default** - opt-in with: `bazinga init my-project --dashboard`
-> - **Install later:** `bazinga setup-dashboard`
-> - **Update:** `bazinga update --dashboard`
+> - **Not installed by default** - opt-in with: `orchestrix init my-project --dashboard`
+> - **Install later:** `orchestrix setup-dashboard`
+> - **Update:** `orchestrix update --dashboard`
 
 Modern, real-time orchestration monitoring dashboard built with Next.js 14.
 
@@ -34,7 +34,7 @@ Modern, real-time orchestration monitoring dashboard built with Next.js 14.
 ### Prerequisites
 
 - Node.js 18+
-- Existing `bazinga/bazinga.db` database
+- Existing `orchestrix/orchestrix.db` database
 
 ### Installation
 
@@ -86,7 +86,7 @@ dashboard-v2/
 
 ## Database
 
-The dashboard connects to the existing `bazinga/bazinga.db` SQLite database in read-only mode. It visualizes data from:
+The dashboard connects to the existing `orchestrix/orchestrix.db` SQLite database in read-only mode. It visualizes data from:
 
 - `sessions` - Orchestration sessions
 - `orchestration_logs` - Agent activity logs
@@ -100,7 +100,7 @@ The dashboard connects to the existing `bazinga/bazinga.db` SQLite database in r
 Environment variables (optional):
 
 ```env
-DATABASE_URL=../bazinga/bazinga.db
+DATABASE_URL=../orchestrix/orchestrix.db
 ```
 
 ## Development

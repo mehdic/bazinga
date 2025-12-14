@@ -1,16 +1,16 @@
-# BAZINGA - Parallel AI Development Teams for Claude Code
+# Orchestrix - Parallel AI Development Teams for Claude Code
 
-> **Repository:** https://github.com/mehdic/bazinga
+> **Repository:** https://github.com/mehdic/orchestrix
 
 **One request → Multiple AI developers working simultaneously → Done 3x faster.**
 
-BAZINGA coordinates teams of AI agents to build software in parallel, aiming for one-shot execution when possible—powered by [Agentic Context Engineering](#core-philosophy-agentic-context-engineering). While traditional AI coding assistants work sequentially, BAZINGA analyzes your request, breaks it into independent tasks, and spawns multiple developers to work simultaneously—just like a real dev team.
+Orchestrix coordinates teams of AI agents to build software in parallel, aiming for one-shot execution when possible—powered by [Agentic Context Engineering](#core-philosophy-agentic-context-engineering). While traditional AI coding assistants work sequentially, Orchestrix analyzes your request, breaks it into independent tasks, and spawns multiple developers to work simultaneously—just like a real dev team.
 
 ---
 
 ## What Makes This Different
 
-This isn't a collection of agents you invoke one by one. BAZINGA is a complete development framework where a Project Manager analyzes your request, decides the optimal approach, and coordinates the entire workflow autonomously.
+This isn't a collection of agents you invoke one by one. Orchestrix is a complete development framework where a Project Manager analyzes your request, decides the optimal approach, and coordinates the entire workflow autonomously.
 
 The framework adapts to each task: it determines parallelism based on task independence, escalates to more powerful models when problems persist, and enforces quality gates automatically. You describe what you need; the system handles the how.
 
@@ -20,9 +20,9 @@ Whether it helps you ship better software is something you'll have to judge for 
 
 ## Core Philosophy: Agentic Context Engineering
 
-BAZINGA is strictly architected on the principles of **Agentic Context Engineering (ACE)**, solving the "infinite context fallacy" where larger context windows lead to signal dilution and reasoning drift.
+Orchestrix is strictly architected on the principles of **Agentic Context Engineering (ACE)**, solving the "infinite context fallacy" where larger context windows lead to signal dilution and reasoning drift.
 
-Instead of treating memory as a simple chat log, BAZINGA implements a **Tiered Memory Model** (Working Context, Sessions, Memory, Artifacts) inspired by research from Google's ADK and Anthropic.
+Instead of treating memory as a simple chat log, Orchestrix implements a **Tiered Memory Model** (Working Context, Sessions, Memory, Artifacts) inspired by research from Google's ADK and Anthropic.
 
 - **Context as a Compiled View:** Every agent prompt is dynamically compiled from the database, projecting only the minimal, relevant slice of history needed for the specific task.
 - **State Offloading:** Heavy research and file contents are offloaded to **Context Packages** (Artifacts), preventing token bloat. Agents receive pointers to this data and must actively "read" it, keeping the working context clean.
@@ -33,10 +33,10 @@ Instead of treating memory as a simple chat log, BAZINGA implements a **Tiered M
 ![The Context Window Fallacy](docs/reference/TheContextWindowsFlallacy.png)
 *The "Infinite Context" Fallacy vs. the Compiled View Architecture—why bigger context windows don't equal better performance.*
 
-### BAZINGA's Implementation
+### Orchestrix's Implementation
 
-![The BAZINGA Playbook](docs/reference/TheBazingaPlaybook.png)
-*How BAZINGA implements the 9 scaling principles: tiered memory, state offloading, schema-driven summarization, and sub-agent isolation.*
+![The Orchestrix Playbook](docs/reference/TheOrchestrixPlaybook.png)
+*How Orchestrix implements the 9 scaling principles: tiered memory, state offloading, schema-driven summarization, and sub-agent isolation.*
 
 For a detailed breakdown of the theory and our implementation, see the [Agentic Context Engineering Reference](docs/reference/agentic_context_engineering.md).
 
@@ -45,7 +45,7 @@ For a detailed breakdown of the theory and our implementation, see the [Agentic 
 ## See It In Action
 
 ```bash
-/bazinga.orchestrate implement JWT authentication, user registration, and password reset
+/orchestrix.orchestrate implement JWT authentication, user registration, and password reset
 # (or: @orchestrator implement JWT authentication, user registration, and password reset)
 ```
 
@@ -66,7 +66,7 @@ PM: "Spawning 3 developers in parallel"
 │ ✓ Code review       │ ✓ Code review       │ ✓ Code review       │
 └─────────────────────┴─────────────────────┴─────────────────────┘
 
-PM: "BAZINGA! All features complete in 18 minutes"
+PM: "Orchestrix! All features complete in 18 minutes"
     (Sequential would've taken 60 minutes)
 ```
 
@@ -78,19 +78,19 @@ PM: "BAZINGA! All features complete in 18 minutes"
 
 ```bash
 # Option 1: Create new project
-uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
+uvx --from git+https://github.com/mehdic/orchestrix.git orchestrix init my-project
 cd my-project
-/bazinga.orchestrate implement user authentication with JWT
+/orchestrix.orchestrate implement user authentication with JWT
 
 # Option 2: Initialize in current directory
 cd your-existing-project
-uvx --from git+https://github.com/mehdic/bazinga.git bazinga init --here
-/bazinga.orchestrate implement user authentication with JWT
+uvx --from git+https://github.com/mehdic/orchestrix.git orchestrix init --here
+/orchestrix.orchestrate implement user authentication with JWT
 
-# Note: You can also use @orchestrator instead of /bazinga.orchestrate if you prefer
+# Note: You can also use @orchestrator instead of /orchestrix.orchestrate if you prefer
 ```
 
-That's it. No configuration needed. BAZINGA automatically:
+That's it. No configuration needed. Orchestrix automatically:
 - ✅ Analyzes task complexity and independence
 - ✅ Spawns 1-4 developers based on parallelization opportunities
 - ✅ Runs security scans, lint checks, and test coverage
@@ -102,7 +102,7 @@ That's it. No configuration needed. BAZINGA automatically:
 For complex or ambiguous requests, use the enhanced orchestration command:
 
 ```bash
-/bazinga.orchestrate-advanced "improve our authentication system"
+/orchestrix.orchestrate-advanced "improve our authentication system"
 ```
 
 **What it does:**
@@ -119,7 +119,7 @@ This adds 2-4 minutes upfront but provides better decisions, fewer revisions, an
 
 ### The Team
 
-BAZINGA coordinates 7 specialized AI agents:
+Orchestrix coordinates 7 specialized AI agents:
 
 1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
 2. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
@@ -165,7 +165,7 @@ Tech Lead reviews → Classifies problem complexity
         ↓
         Tech Lead validates findings
     ↓
-PM confirms → BAZINGA!
+PM confirms → Orchestrix!
 ```
 
 ### Adaptive Parallelism
@@ -206,7 +206,7 @@ Every feature automatically gets:
 - **Checks:** Line coverage, branch coverage, untested code paths
 - **Target:** 80% coverage by default
 
-**Missing tools?** No problem. BAZINGA gracefully degrades—warns you but continues working.
+**Missing tools?** No problem. Orchestrix gracefully degrades—warns you but continues working.
 
 ---
 
@@ -259,7 +259,7 @@ Multi-hypothesis problems with unclear root cause → Spawn Investigator agent:
 
 ## Intelligent Model Escalation
 
-Stuck on a hard problem? BAZINGA automatically escalates to more powerful models:
+Stuck on a hard problem? Orchestrix automatically escalates to more powerful models:
 
 ```
 Revision 1-2: Claude Sonnet (fast, handles 90% of reviews)
@@ -307,40 +307,40 @@ Automated tool installation during setup (optional).
 ### Single Feature (Simple Mode)
 
 ```bash
-/bazinga.orchestrate fix bug where users can't reset password
+/orchestrix.orchestrate fix bug where users can't reset password
 ```
 
-**Flow:** PM → 1 Developer → Tech Lead → BAZINGA
+**Flow:** PM → 1 Developer → Tech Lead → Orchestrix
 **Time:** ~5-10 minutes
 
 ### Multiple Features (Parallel Mode)
 
 ```bash
-/bazinga.orchestrate implement REST API with auth, user management, and admin endpoints
+/orchestrix.orchestrate implement REST API with auth, user management, and admin endpoints
 ```
 
-**Flow:** PM → 3 Developers (parallel) → Tech Lead reviews all → BAZINGA
+**Flow:** PM → 3 Developers (parallel) → Tech Lead reviews all → Orchestrix
 **Time:** ~15-20 minutes (vs 45-60 sequential)
 
 ### Large Project
 
 ```bash
-/bazinga.orchestrate build a blog platform with posts, comments, tags, and search
+/orchestrix.orchestrate build a blog platform with posts, comments, tags, and search
 ```
 
-**Flow:** PM → 4 Developers (parallel, 2 phases) → QA tests → Tech Lead → BAZINGA
+**Flow:** PM → 4 Developers (parallel, 2 phases) → QA tests → Tech Lead → Orchestrix
 **Time:** ~30-40 minutes (vs 2+ hours sequential)
 
 ---
 
 ## Configuration
 
-BAZINGA works out of the box with sensible defaults. Want more control?
+Orchestrix works out of the box with sensible defaults. Want more control?
 
 ### Testing Modes
 
 ```bash
-/bazinga.configure-testing
+/orchestrix.configure-testing
 ```
 
 - **Minimal** (default) - Lint + unit tests, fast iteration (30-40% faster)
@@ -350,7 +350,7 @@ BAZINGA works out of the box with sensible defaults. Want more control?
 ### Advanced Skills
 
 ```bash
-/bazinga.configure-skills
+/orchestrix.configure-skills
 ```
 
 **Core Skills** (always active):
@@ -371,19 +371,19 @@ BAZINGA works out of the box with sensible defaults. Want more control?
 
 ```bash
 # Default (lite profile)
-bazinga init my-project       # Create new project directory
-bazinga init --here           # Initialize in current directory
-bazinga init                  # Same as --here (defaults to current directory)
+orchestrix init my-project       # Create new project directory
+orchestrix init --here           # Initialize in current directory
+orchestrix init                  # Same as --here (defaults to current directory)
 
 # Advanced profile (all features enabled)
-bazinga init my-project --profile advanced
-bazinga init --here --profile advanced
+orchestrix init my-project --profile advanced
+orchestrix init --here --profile advanced
 
 # Custom configuration
-bazinga init my-project --testing full --skills all
+orchestrix init my-project --testing full --skills all
 
 # Update existing project
-bazinga update
+orchestrix update
 ```
 
 ---
@@ -401,9 +401,9 @@ bazinga update
 
 ---
 
-## Real Problems BAZINGA Solves
+## Real Problems Orchestrix Solves
 
-### Before BAZINGA
+### Before Orchestrix
 
 **Manual coordination:**
 ```
@@ -418,10 +418,10 @@ You: "wait, did dev finish? let me check state files..."
 
 **Result:** You're the project manager. Lots of context switching.
 
-### After BAZINGA
+### After Orchestrix
 
 ```
-You: "/bazinga.orchestrate implement auth, user management, and admin dashboard"
+You: "/orchestrix.orchestrate implement auth, user management, and admin dashboard"
 # (or: @orchestrator implement auth, user management, and admin dashboard)
 ```
 
@@ -434,19 +434,19 @@ You: "/bazinga.orchestrate implement auth, user management, and admin dashboard"
 ### Option 1: One-time Use (No Installation)
 
 ```bash
-uvx --from git+https://github.com/mehdic/bazinga.git bazinga init my-project
+uvx --from git+https://github.com/mehdic/orchestrix.git orchestrix init my-project
 ```
 
 ### Option 2: Install as Tool
 
 ```bash
 # Using uv (recommended)
-uv tool install bazinga-cli --from git+https://github.com/mehdic/bazinga.git
-bazinga init my-project
+uv tool install orchestrix-cli --from git+https://github.com/mehdic/orchestrix.git
+orchestrix init my-project
 
 # Using pip
-pip install git+https://github.com/mehdic/bazinga.git
-bazinga init my-project
+pip install git+https://github.com/mehdic/orchestrix.git
+orchestrix init my-project
 ```
 
 ### System Requirements
@@ -482,10 +482,10 @@ bazinga init my-project
 ### Common Issues
 
 **Q: Workflow seems slow**
-A: Check testing mode (`/bazinga.configure-testing`). Use minimal mode for faster iteration.
+A: Check testing mode (`/orchestrix.configure-testing`). Use minimal mode for faster iteration.
 
 **Q: Skills not running**
-A: Check if tools are installed. BAZINGA will warn if tools are missing. Install with:
+A: Check if tools are installed. Orchestrix will warn if tools are missing. Install with:
 ```bash
 # Python
 pip install bandit ruff pytest-cov
@@ -498,13 +498,13 @@ go install github.com/securego/gosec/v2/cmd/gosec@latest
 ```
 
 **Q: Want to disable a specific skill**
-A: Run `/bazinga.configure-skills` and deselect skills you don't want.
+A: Run `/orchestrix.configure-skills` and deselect skills you don't want.
 
 **Q: Tasks not running in parallel**
 A: PM may have detected dependencies or high file overlap. Check PM's reasoning in output.
 
 **Q: Build failing**
-A: Check `bazinga/build_baseline.log`. BAZINGA tracks baseline vs. final build status.
+A: Check `orchestrix/build_baseline.log`. Orchestrix tracks baseline vs. final build status.
 
 ---
 
@@ -517,7 +517,7 @@ your-project/
 │   ├── commands/              # Slash commands
 │   ├── scripts/               # Utility scripts
 │   └── skills/                # Analysis tools (Skills)
-├── bazinga/
+├── orchestrix/
 │   ├── skills_config.json    # Agent skills configuration (git-tracked)
 │   ├── pm_state.json         # PM planning and progress (auto-generated)
 │   ├── group_status.json     # Individual task status (auto-generated)
@@ -536,7 +536,7 @@ your-project/
 
 **Typical speedups with parallel mode:**
 
-| Task Type | Sequential | BAZINGA Parallel | Speedup |
+| Task Type | Sequential | Orchestrix Parallel | Speedup |
 |-----------|-----------|------------------|---------|
 | 2 independent features | 40 min | 15 min | 2.7x faster |
 | 3 independent features | 60 min | 20 min | 3x faster |
@@ -586,12 +586,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 **Experimental (early development):**
 - ⚠️ Real-time Dashboard - Visual monitoring interface for orchestration sessions
   - Under active initial development and not yet reliable
-  - Provides reporting/monitoring only - no impact on BAZINGA core functionality
+  - Provides reporting/monitoring only - no impact on Orchestrix core functionality
   - Not installed by default; opt-in with `--dashboard`:
     ```bash
-    bazinga init my-project --dashboard   # new project
-    bazinga init --here --dashboard       # existing directory
-    bazinga setup-dashboard               # install later
+    orchestrix init my-project --dashboard   # new project
+    orchestrix init --here --dashboard       # existing directory
+    orchestrix setup-dashboard               # install later
     ```
 
 ---
@@ -600,7 +600,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 1. **Check documentation:** [docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)
 2. **Review examples:** [examples/EXAMPLES.md](examples/EXAMPLES.md)
-3. **Search issues:** https://github.com/mehdic/bazinga/issues
+3. **Search issues:** https://github.com/mehdic/orchestrix/issues
 4. **Open new issue:** Include version, language, and logs
 
 ---
@@ -636,7 +636,7 @@ Special thanks to:
 - 📚 **[Examples](examples/EXAMPLES.md)** - See real usage patterns
 - ⚙️ **[Advanced Features](docs/ADVANCED.md)** - Unlock more power
 - 🏗️ **[Architecture](docs/ARCHITECTURE.md)** - How it works under the hood
-- 🐛 **[Issues](https://github.com/mehdic/bazinga/issues)** - Report bugs or request features
+- 🐛 **[Issues](https://github.com/mehdic/orchestrix/issues)** - Report bugs or request features
 
 ---
 

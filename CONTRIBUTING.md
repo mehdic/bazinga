@@ -1,6 +1,6 @@
-# Contributing to BAZINGA
+# Contributing to Orchestrix
 
-Thank you for your interest in contributing to BAZINGA! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to Orchestrix! This document provides guidelines for contributing to the project.
 
 ---
 
@@ -14,7 +14,7 @@ After cloning the repository, you **must** install git hooks to enable automatic
 
 This installs the pre-commit hook that automatically rebuilds slash commands when you modify agent source files.
 
-**⚠️ Without this step:** Your commits won't automatically sync `agents/orchestrator.md` with `.claude/commands/bazinga.orchestrate.md`, causing inconsistencies.
+**⚠️ Without this step:** Your commits won't automatically sync `agents/orchestrator.md` with `.claude/commands/orchestrix.orchestrate.md`, causing inconsistencies.
 
 ---
 
@@ -31,12 +31,12 @@ The **single source of truth** for orchestration logic is:
 agents/orchestrator.md
 ```
 
-**DO NOT directly edit** `.claude/commands/bazinga.orchestrate.md` - it is auto-generated!
+**DO NOT directly edit** `.claude/commands/orchestrix.orchestrate.md` - it is auto-generated!
 
 #### How it Works
 
 1. **Edit only** `agents/orchestrator.md` when modifying orchestration logic
-2. The **pre-commit hook** automatically rebuilds `.claude/commands/bazinga.orchestrate.md`
+2. The **pre-commit hook** automatically rebuilds `.claude/commands/orchestrix.orchestrate.md`
 3. The generated slash command runs the orchestrator **inline** (not as a spawned agent)
 4. This ensures real-time visibility of orchestration progress
 
@@ -45,7 +45,7 @@ agents/orchestrator.md
 The build script `scripts/build-slash-commands.sh`:
 - Reads `agents/orchestrator.md`
 - Extracts frontmatter (name, description)
-- Generates `.claude/commands/bazinga.orchestrate.md`
+- Generates `.claude/commands/orchestrix.orchestrate.md`
 - Preserves inline execution (not Task() spawning)
 
 To manually rebuild (if needed):
@@ -58,7 +58,7 @@ To manually rebuild (if needed):
 A git pre-commit hook at `.git/hooks/pre-commit`:
 - Detects changes to `agents/orchestrator.md`
 - Automatically runs the build script
-- Stages the generated `.claude/commands/bazinga.orchestrate.md`
+- Stages the generated `.claude/commands/orchestrix.orchestrate.md`
 
 This ensures the slash command always stays in sync with the source agent file.
 
@@ -100,7 +100,7 @@ This ensures the slash command always stays in sync with the source agent file.
 ## Project Structure
 
 ```
-bazinga/
+orchestrix/
 ├── agents/                          # Agent definitions (source of truth)
 │   ├── orchestrator.md             # Orchestration logic (DO NOT EDIT slash command directly!)
 │   ├── project_manager.md
@@ -110,8 +110,8 @@ bazinga/
 │   └── investigator.md
 ├── .claude/
 │   ├── commands/                    # Slash commands (generated)
-│   │   ├── bazinga.orchestrate.md  # Auto-generated from agents/orchestrator.md
-│   │   └── bazinga.orchestrate-advanced.md
+│   │   ├── orchestrix.orchestrate.md  # Auto-generated from agents/orchestrator.md
+│   │   └── orchestrix.orchestrate-advanced.md
 │   └── skills/                      # Quality and analysis skills
 ├── scripts/
 │   └── build-slash-commands.sh     # Generates slash commands from agents
@@ -123,7 +123,7 @@ bazinga/
 
 ## Questions?
 
-Open an issue or discussion on GitHub: https://github.com/mehdic/bazinga
+Open an issue or discussion on GitHub: https://github.com/mehdic/orchestrix
 
 ---
 

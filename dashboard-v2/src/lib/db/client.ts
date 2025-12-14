@@ -102,13 +102,13 @@ function resolveDatabasePath(): string {
     throw new Error(
       "DATABASE_URL environment variable is required in production.\n" +
         "Set it in your deployment configuration or .env.local file.\n" +
-        "Example: DATABASE_URL=/path/to/bazinga/bazinga.db\n\n" +
+        "Example: DATABASE_URL=/path/to/orchestrix/orchestrix.db\n\n" +
         "If using the start-dashboard.sh script, it will auto-detect the path."
     );
   }
 
   // Development fallback: look for database relative to project
-  return path.resolve(process.cwd(), "..", "bazinga", "bazinga.db");
+  return path.resolve(process.cwd(), "..", "orchestrix", "orchestrix.db");
 }
 
 function getDatabase(): DatabaseInstance | null {

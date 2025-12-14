@@ -1,6 +1,6 @@
 # Model Escalation Strategy
 
-> How BAZINGA automatically escalates to more powerful models when code reviews get stuck
+> How Orchestrix automatically escalates to more powerful models when code reviews get stuck
 
 ## The Problem: Why Revisions Persist
 
@@ -24,7 +24,7 @@ The cost of staying with Sonnet 4.5 becomes higher than escalating: more revisio
 
 ## The Solution: Automatic Model Escalation
 
-BAZINGA solves this with **intelligent model escalation**: automatically switching to a more powerful (and thorough) model when revisions persist.
+Orchestrix solves this with **intelligent model escalation**: automatically switching to a more powerful (and thorough) model when revisions persist.
 
 **The Strategy:**
 
@@ -50,11 +50,11 @@ Without escalation, you'd have revisions 4, 5, 6... Before realizing the archite
 
 ## How It Works: Step-by-Step
 
-BAZINGA's model escalation is fully automated. Here's the technical flow:
+Orchestrix's model escalation is fully automated. Here's the technical flow:
 
 ### Step 1: PM Tracks Revisions
 
-Every time the Tech Lead requests changes, the Project Manager updates the revision count in `bazinga/group_status.json`:
+Every time the Tech Lead requests changes, the Project Manager updates the revision count in `orchestrix/group_status.json`:
 
 ```json
 {
@@ -115,7 +115,7 @@ This reframes the review from "find nitpicks" to "find root causes."
 
 ## Progressive Analysis: Basic vs Advanced
 
-BAZINGA's Skills also escalate alongside model escalation:
+Orchestrix's Skills also escalate alongside model escalation:
 
 | Revision Count | Security Scan Mode | Tech Lead Model | Speed | Depth |
 |---|---|---|---|---|
@@ -281,7 +281,7 @@ Result: Approved with confidence in security design
 
 ### Revision Tracking
 
-The PM tracks revisions in `bazinga/group_status.json`:
+The PM tracks revisions in `orchestrix/group_status.json`:
 
 ```json
 {
@@ -396,7 +396,7 @@ A: That's rare but possible. By revision 3, Opus usually identifies the root cau
 
 **Q: Can I disable automatic escalation?**
 
-A: Not recommended, but you could. Configure BAZINGA to keep revision_count unchanged in group_status.json. However, this defeats the purpose of the system.
+A: Not recommended, but you could. Configure Orchestrix to keep revision_count unchanged in group_status.json. However, this defeats the purpose of the system.
 
 **Q: How does this affect cost per feature?**
 
@@ -411,7 +411,7 @@ A: Use `/configure-skills advanced` for maximum analysis on critical work. Or se
 
 ## Summary
 
-BAZINGA's automatic model escalation:
+Orchestrix's automatic model escalation:
 
 ✅ **Saves money** - Fewer revisions, faster completion
 ✅ **Ensures quality** - Architectural issues caught early

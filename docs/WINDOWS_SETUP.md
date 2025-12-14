@@ -1,6 +1,6 @@
-# BAZINGA Dashboard: Windows Setup Guide
+# Orchestrix Dashboard: Windows Setup Guide
 
-This guide covers installing and running the BAZINGA Dashboard on Windows.
+This guide covers installing and running the Orchestrix Dashboard on Windows.
 
 ## Prerequisites
 
@@ -22,18 +22,18 @@ This guide covers installing and running the BAZINGA Dashboard on Windows.
 
 ### Method 1: Pre-built Package (Recommended)
 
-The `bazinga install` command automatically downloads the Windows pre-built package:
+The `orchestrix install` command automatically downloads the Windows pre-built package:
 
 ```powershell
 # Run in your project directory
-bazinga install
+orchestrix install
 ```
 
 This downloads `bazinga-dashboard-windows-x64.tar.gz` and extracts it automatically.
 
 ### Method 2: Manual Download
 
-1. Download from [GitHub Releases](https://github.com/mehdic/bazinga/releases):
+1. Download from [GitHub Releases](https://github.com/mehdic/orchestrix/releases):
    - Look for `bazinga-dashboard-windows-x64.tar.gz`
 
 2. Extract the archive:
@@ -82,7 +82,7 @@ Or if using the standalone script:
 |----------|---------|-------------|
 | `DASHBOARD_PORT` | 3000 | HTTP port for dashboard |
 | `SOCKET_PORT` | 3001 | WebSocket port for real-time updates |
-| `DATABASE_URL` | Auto-detected | Path to bazinga.db |
+| `DATABASE_URL` | Auto-detected | Path to orchestrix.db |
 
 Example:
 ```powershell
@@ -140,7 +140,7 @@ The database path may not be detected.
 
 **Solution:**
 ```powershell
-$env:DATABASE_URL = "C:\path\to\your\project\bazinga\bazinga.db"
+$env:DATABASE_URL = "C:\path\to\your\project\bazinga\orchestrix.db"
 .\bazinga\scripts\start-dashboard.ps1
 ```
 
@@ -168,12 +168,12 @@ Old Windows versions may not have `tar` built-in.
 After starting the dashboard:
 
 1. Open browser to `http://localhost:3000`
-2. You should see the BAZINGA Dashboard
+2. You should see the Orchestrix Dashboard
 3. Check the log file: `bazinga\dashboard.log`
 
 ## Getting Help
 
-- **GitHub Issues**: [github.com/mehdic/bazinga/issues](https://github.com/mehdic/bazinga/issues)
+- **GitHub Issues**: [github.com/mehdic/orchestrix/issues](https://github.com/mehdic/orchestrix/issues)
 - **Documentation**: [docs/](../docs/)
 
 ## Version Compatibility

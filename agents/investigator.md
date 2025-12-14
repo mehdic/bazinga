@@ -111,7 +111,7 @@ STEP 3: Return Action with Status Code
 
 ### Skills Available to You
 
-The Orchestrator will provide you with skills based on `bazinga/skills_config.json`:
+The Orchestrator will provide you with skills based on `orchestrix/skills_config.json`:
 - **MANDATORY**: You MUST use these skills (⚡ ADVANCED SKILLS ACTIVE)
 - **OPTIONAL**: You CAN use if investigation needs them (⚡ OPTIONAL SKILLS AVAILABLE)
 - **DISABLED**: Not available
@@ -173,12 +173,12 @@ You have full access to:
 After each hypothesis test:
 
 ```bash
-# Use bazinga-db skill to log iteration progress
+# Use orchestrix-db skill to log iteration progress
 ```
 
-**Request to bazinga-db skill:**
+**Request to orchestrix-db skill:**
 ```
-bazinga-db, please log this investigator iteration:
+orchestrix-db, please log this investigator iteration:
 
 Session ID: [current_session_id]
 Agent Type: investigator
@@ -196,7 +196,7 @@ Agent ID: investigator_[group_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 **This logging is NOT optional - it enables:**
@@ -209,9 +209,9 @@ Skill(command: "bazinga-db")
 
 After each major decision:
 
-**Request to bazinga-db skill:**
+**Request to orchestrix-db skill:**
 ```
-bazinga-db, please update task group investigation status:
+orchestrix-db, please update task group investigation status:
 
 Group ID: [group_id]
 Investigation Iteration: [current iteration number]
@@ -221,7 +221,7 @@ Last Activity: [brief description]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 ## 📋 ACTION TYPES (Response Formats)
@@ -260,7 +260,7 @@ Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log investigation completion:
+orchestrix-db, please log investigation completion:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -275,7 +275,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "orchestrix-db")
 
 ---
 **STATUS:** ROOT_CAUSE_FOUND
@@ -325,7 +325,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log diagnostic request:
+orchestrix-db, please log diagnostic request:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -338,7 +338,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "orchestrix-db")
 
 ---
 **STATUS:** NEED_DEVELOPER_DIAGNOSTIC
@@ -380,7 +380,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log hypothesis elimination:
+orchestrix-db, please log hypothesis elimination:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -394,7 +394,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "orchestrix-db")
 
 ---
 **STATUS:** HYPOTHESIS_ELIMINATED
@@ -427,7 +427,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log analysis need:
+orchestrix-db, please log analysis need:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -440,7 +440,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "orchestrix-db")
 
 ---
 **STATUS:** NEED_MORE_ANALYSIS
@@ -474,7 +474,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log investigation blocked:
+orchestrix-db, please log investigation blocked:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -488,7 +488,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "orchestrix-db")
 
 ---
 **STATUS:** BLOCKED
@@ -521,7 +521,7 @@ Then invoke: Skill(command: "bazinga-db")
 
 **LOG TO DATABASE:**
 ```
-bazinga-db, please log initial analysis:
+orchestrix-db, please log initial analysis:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -583,7 +583,7 @@ Then:
 
 **LOG ITERATION START:**
 ```
-bazinga-db, please log iteration start:
+orchestrix-db, please log iteration start:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -624,7 +624,7 @@ Agent ID: investigator_[group_id]
 
 **LOG ITERATION RESULT:**
 ```
-bazinga-db, please log iteration result:
+orchestrix-db, please log iteration result:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -691,7 +691,7 @@ Agent ID: investigator_[group_id]
 
 **LOG ROOT CAUSE FINDING:**
 ```
-bazinga-db, please log root cause found:
+orchestrix-db, please log root cause found:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -711,12 +711,12 @@ Agent ID: investigator_[group_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 **UPDATE TASK GROUP STATUS:**
 ```
-bazinga-db, please update task group:
+orchestrix-db, please update task group:
 
 Group ID: [group_id]
 Status: root_cause_identified
@@ -726,7 +726,7 @@ Investigation Result: "root_cause_found"
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 ### Phase 4: Report to Tech Lead
@@ -773,7 +773,7 @@ Skill(command: "bazinga-db")
 # Write artifact file
 # Note: artifacts directory already created at workflow start
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md",
+  file_path: "orchestrix/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md",
   content: """
 # Investigation Report - Group {GROUP_ID}
 
@@ -831,7 +831,7 @@ Write(
 
 **After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
 ```
-**Artifact:** bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+**Artifact:** orchestrix/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
 ```
 
 ### 🔴 MANDATORY: Register Context Package
@@ -839,25 +839,25 @@ Write(
 **After writing your investigation artifact, register it so developers receive your findings:**
 
 ```
-bazinga-db, please save context package:
+orchestrix-db, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
 Package Type: investigation
-File Path: bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+File Path: orchestrix/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
 Producer Agent: investigator
 Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {1-sentence: Root cause + recommended fix}
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "orchestrix-db")`
 
 **Include in your response:**
 ```markdown
 ## Context Package Created
 
-**File:** bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
+**File:** orchestrix/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md
 **Type:** investigation
 **Priority:** high
 **Consumers:** ["developer", "senior_software_engineer"]
@@ -889,7 +889,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 **For each limit scenario, MUST log to database:**
 
 ```
-bazinga-db, please log investigation conclusion:
+orchestrix-db, please log investigation conclusion:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -930,7 +930,7 @@ elapsed = time.time() - start
 logger.info(f"Query returned {len(results)} rows in {elapsed}s")
 ```
 
-**LOG ITERATION 1 START** (invoke bazinga-db)
+**LOG ITERATION 1 START** (invoke orchestrix-db)
 
 WAIT FOR RESULTS...
 
@@ -939,7 +939,7 @@ Results: "Query returned 50,000 rows in 0.3 seconds"
 Analysis: Query is fast! Data volume NOT the issue.
 Confidence: 0% - Hypothesis ELIMINATED
 
-**LOG ITERATION 1 RESULT** (invoke bazinga-db)
+**LOG ITERATION 1 RESULT** (invoke orchestrix-db)
 
 **ITERATION 2:**
 
@@ -963,7 +963,7 @@ serialize_time = time.time() - serialize_start
 logger.info(f"Serialization took {serialize_time}s for {len(results)} rows")
 ```
 
-**LOG ITERATION 2 START** (invoke bazinga-db)
+**LOG ITERATION 2 START** (invoke orchestrix-db)
 
 WAIT FOR RESULTS...
 
@@ -972,7 +972,7 @@ Results: "Serialization took 28.5 seconds for 50,000 rows"
 Analysis: FOUND IT! Serializing 50k rows is taking 28.5s
 Confidence: 95% - ROOT CAUSE FOUND
 
-**LOG ROOT CAUSE FOUND** (invoke bazinga-db)
+**LOG ROOT CAUSE FOUND** (invoke orchestrix-db)
 
 **ROOT CAUSE:** Endpoint returns entire dataset without pagination. 50k rows serialize slowly.
 
@@ -1012,7 +1012,7 @@ Confidence: 95% - ROOT CAUSE FOUND
 - Quantify confidence levels
 - Admit uncertainty when appropriate
 
-**With Database (via bazinga-db skill):**
+**With Database (via orchestrix-db skill):**
 - Log EVERY iteration (start and result)
 - Log final outcome (root cause found/incomplete/blocked)
 - Update task group status at major milestones
@@ -1065,7 +1065,7 @@ Let's solve this systematically! 🔍
 
 ## 🧠 Reasoning Documentation (MANDATORY)
 
-**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the bazinga-db skill.
+**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the orchestrix-db skill.
 
 ### Why This Matters
 
@@ -1113,7 +1113,7 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [First test approach]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence medium
@@ -1140,7 +1140,7 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 - [H2]: [Why ruled out]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high

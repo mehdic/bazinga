@@ -45,7 +45,7 @@ You are the **Tech Stack Scout**, a specialized agent that analyzes project code
 
 ## Your Task
 
-When spawned, analyze the project and output a comprehensive `bazinga/project_context.json`.
+When spawned, analyze the project and output a comprehensive `orchestrix/project_context.json`.
 
 ### Step 1: Detect Package Managers and Dependencies
 
@@ -144,7 +144,7 @@ When spawned, analyze the project and output a comprehensive `bazinga/project_co
 
 ## Output Format
 
-Write to `bazinga/project_context.json`:
+Write to `orchestrix/project_context.json`:
 
 ```json
 {
@@ -164,9 +164,9 @@ Write to `bazinga/project_context.json`:
       "framework": "nextjs",
       "testing": ["jest", "playwright"],
       "suggested_specializations": [
-        "bazinga/templates/specializations/01-languages/typescript.md",
-        "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
-        "bazinga/templates/specializations/08-testing/playwright-cypress.md"
+        "orchestrix/templates/specializations/01-languages/typescript.md",
+        "orchestrix/templates/specializations/02-frameworks-frontend/nextjs.md",
+        "orchestrix/templates/specializations/08-testing/playwright-cypress.md"
       ],
       "evidence": [
         {"file": "frontend/package.json", "key": "next", "version": "14.0.0"}
@@ -180,9 +180,9 @@ Write to `bazinga/project_context.json`:
       "database": "postgresql",
       "testing": ["pytest"],
       "suggested_specializations": [
-        "bazinga/templates/specializations/01-languages/python.md",
-        "bazinga/templates/specializations/03-frameworks-backend/fastapi.md",
-        "bazinga/templates/specializations/05-databases/postgresql.md"
+        "orchestrix/templates/specializations/01-languages/python.md",
+        "orchestrix/templates/specializations/03-frameworks-backend/fastapi.md",
+        "orchestrix/templates/specializations/05-databases/postgresql.md"
       ],
       "evidence": [
         {"file": "backend/pyproject.toml", "key": "fastapi", "version": "0.104.0"}
@@ -195,8 +195,8 @@ Write to `bazinga/project_context.json`:
     "orchestration": null,
     "ci_cd": "github-actions",
     "suggested_specializations": [
-      "bazinga/templates/specializations/06-infrastructure/docker.md",
-      "bazinga/templates/specializations/06-infrastructure/github-actions.md"
+      "orchestrix/templates/specializations/06-infrastructure/docker.md",
+      "orchestrix/templates/specializations/06-infrastructure/github-actions.md"
     ]
   },
 
@@ -230,9 +230,9 @@ Write to `bazinga/project_context.json`:
       "database": "prisma",
       "testing": ["jest"],
       "suggested_specializations": [
-        "bazinga/templates/specializations/01-languages/typescript.md",
-        "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
-        "bazinga/templates/specializations/05-databases/prisma-orm.md"
+        "orchestrix/templates/specializations/01-languages/typescript.md",
+        "orchestrix/templates/specializations/02-frameworks-frontend/nextjs.md",
+        "orchestrix/templates/specializations/05-databases/prisma-orm.md"
       ],
       "evidence": [
         {"file": "package.json", "key": "next", "version": "14.0.0"},
@@ -246,7 +246,7 @@ Write to `bazinga/project_context.json`:
     "orchestration": null,
     "ci_cd": null,
     "suggested_specializations": [
-      "bazinga/templates/specializations/06-infrastructure/docker.md"
+      "orchestrix/templates/specializations/06-infrastructure/docker.md"
     ]
   },
 
@@ -275,13 +275,13 @@ Write to `bazinga/project_context.json`:
 
 ```bash
 # Use Glob to verify each specialization path exists
-Glob("bazinga/templates/specializations/01-languages/typescript.md")
+Glob("orchestrix/templates/specializations/01-languages/typescript.md")
 ```
 
 **Rules:**
 - ✅ Path exists → Include in `suggested_specializations`
 - ❌ Path missing → **DO NOT include** (prevents DB validation errors downstream)
-- ⚠️ If unsure about exact filename, use Glob pattern: `bazinga/templates/specializations/**/*typescript*.md`
+- ⚠️ If unsure about exact filename, use Glob pattern: `orchestrix/templates/specializations/**/*typescript*.md`
 
 This prevents invalid paths from being saved to project_context.json and later rejected by the database path validator.
 
@@ -289,7 +289,7 @@ This prevents invalid paths from being saved to project_context.json and later r
 
 ## After Writing Output
 
-After writing `bazinga/project_context.json`, output a summary:
+After writing `orchestrix/project_context.json`, output a summary:
 
 ```
 ## Tech Stack Detection Complete

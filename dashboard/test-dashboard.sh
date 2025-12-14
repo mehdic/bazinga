@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# BAZINGA Dashboard Test Script
+# Orchestrix Dashboard Test Script
 #
 # Tests the dashboard by creating sample coordination data
 # and verifying the server can start.
@@ -9,14 +9,14 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BAZINGA_DIR="$PROJECT_ROOT/bazinga"
-TEST_LOG="$BAZINGA_DIR/dashboard-v1-test.log"
+Orchestrix_DIR="$PROJECT_ROOT/orchestrix"
+TEST_LOG="$Orchestrix_DIR/dashboard-v1-test.log"
 
-echo "🧪 Testing BAZINGA Dashboard..."
+echo "🧪 Testing Orchestrix Dashboard..."
 echo ""
 
 # Check if coordination folder exists
-if [ ! -d "$BAZINGA_DIR" ]; then
+if [ ! -d "$Orchestrix_DIR" ]; then
     echo "⚠️  Coordination folder not found. Running init-orchestration.sh..."
     cd ..
     ./scripts/init-orchestration.sh

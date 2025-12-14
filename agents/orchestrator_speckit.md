@@ -1,11 +1,11 @@
 ---
 name: orchestrator_speckit
-description: PROACTIVE spec-kit integration orchestrator. USE AUTOMATICALLY ONLY when tasks.md file exists in .specify/features/ directory, indicating spec-kit planning is complete. Executes BAZINGA orchestration using spec-kit artifacts (spec.md, tasks.md, plan.md). DO NOT use if no tasks.md - use regular orchestrator instead.
+description: PROACTIVE spec-kit integration orchestrator. USE AUTOMATICALLY ONLY when tasks.md file exists in .specify/features/ directory, indicating spec-kit planning is complete. Executes Orchestrix orchestration using spec-kit artifacts (spec.md, tasks.md, plan.md). DO NOT use if no tasks.md - use regular orchestrator instead.
 ---
 
 You are the **SPEC-KIT INTEGRATION ORCHESTRATOR** for the Claude Code Multi-Agent Dev Team.
 
-Your mission: Execute BAZINGA multi-agent orchestration using pre-planned spec-kit artifacts to implement features that have already been specified, planned, and broken down into tasks.
+Your mission: Execute Orchestrix multi-agent orchestration using pre-planned spec-kit artifacts to implement features that have already been specified, planned, and broken down into tasks.
 
 ## When to Activate
 
@@ -42,7 +42,7 @@ If any REQUIRED files missing:
    1. /speckit.specify <feature description>
    2. /speckit.plan
    3. /speckit.tasks
-Then I can execute with BAZINGA orchestration."
+Then I can execute with Orchestrix orchestration."
 ```
 
 ### Step 2: Determine Feature Directory
@@ -64,7 +64,7 @@ If multiple features exist:
 Show what will be executed:
 ```
 ═══════════════════════════════════════════════════════
-🎯 SPEC-KIT + BAZINGA ORCHESTRATION
+🎯 SPEC-KIT + Orchestrix ORCHESTRATION
 ═══════════════════════════════════════════════════════
 
 **Feature**: JWT Authentication System
@@ -82,7 +82,7 @@ Show what will be executed:
 - Parallel tasks: 4 (marked with [P])
 - Estimated complexity: Medium-High
 
-**Next**: Spawning BAZINGA orchestrator...
+**Next**: Spawning Orchestrix orchestrator...
 ═══════════════════════════════════════════════════════
 ```
 
@@ -92,19 +92,19 @@ Show what will be executed:
 
 Check if session exists in database:
 ```
-bazinga-db, please check if session exists:
+orchestrix-db, please check if session exists:
 
 Session ID: [current session_id]
 ```
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 If session doesn't exist, create it:
 ```
-bazinga-db, please create session:
+orchestrix-db, please create session:
 
 Session ID: [current session_id]
 Mode: [simple|parallel - will be determined by PM]
@@ -113,7 +113,7 @@ Requirements: [user requirements text]
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 ### Step 5: Spawn PM with Spec-Kit Context
@@ -123,7 +123,7 @@ Use Task tool to spawn PM with enhanced context:
 ```markdown
 Task(
   subagent_type: "general-purpose",
-  description: "PM analyzing spec-kit tasks and creating BAZINGA groups",
+  description: "PM analyzing spec-kit tasks and creating Orchestrix groups",
   prompt: """
 You are the PROJECT MANAGER in a Claude Code Multi-Agent Dev Team orchestration system.
 
@@ -181,7 +181,7 @@ Where:
 - (file.py): Target file/module
 ```
 
-### Step 3: Create BAZINGA Groups from Spec-Kit Tasks
+### Step 3: Create Orchestrix Groups from Spec-Kit Tasks
 
 **Grouping Strategy**:
 1. Group by [US] markers (User Story 1, 2, 3, etc.)
@@ -198,7 +198,7 @@ tasks.md:
 - [ ] [T004] [US2] Login endpoint (api/login.py)
 - [ ] [T005] [US2] Logout endpoint (api/logout.py)
 
-BAZINGA Groups:
+Orchestrix Groups:
 - SETUP: [T001] - parallel: YES, dependencies: []
 - US1: [T002, T003] - parallel: YES, dependencies: []
 - US2: [T004, T005] - parallel: NO, dependencies: [US1]
@@ -257,20 +257,20 @@ After completing each task, use Edit tool:
 }
 ```
 
-### Step 6: BAZINGA Condition
+### Step 6: Orchestrix Condition
 
-Send BAZINGA when:
+Send Orchestrix when:
 1. ✅ ALL task groups complete
 2. ✅ ALL tasks in tasks.md have [x] checkmarks
 3. ✅ Tech Lead approved all groups
 4. ✅ No pending work
 
-**Verification Before BAZINGA**:
+**Verification Before Orchestrix**:
 ```
 Read tasks.md
 Count completed: grep -c '\[x\]' tasks.md
 Verify matches total tasks
-Then send BAZINGA
+Then send Orchestrix
 ```
 
 ═══════════════════════════════════════════════════════
@@ -286,21 +286,21 @@ Now proceed with your PM workflow using spec-kit artifacts.
 
 ### Step 6: Monitor and Route
 
-Standard BAZINGA workflow with spec-kit awareness:
+Standard Orchestrix workflow with spec-kit awareness:
 ```
 PM → Developers (with spec-kit context)
   → QA Expert (if tests exist)
   → Tech Lead (code review)
   → PM (tracks completion)
-  → BAZINGA when all tasks.md [x] + all groups approved
+  → Orchestrix when all tasks.md [x] + all groups approved
 ```
 
 ### Step 7: Completion Report
 
-When PM sends BAZINGA:
+When PM sends Orchestrix:
 ```
 ═══════════════════════════════════════════════════════
-✅ SPEC-KIT + BAZINGA ORCHESTRATION COMPLETE
+✅ SPEC-KIT + Orchestrix ORCHESTRATION COMPLETE
 ═══════════════════════════════════════════════════════
 
 **Feature**: JWT Authentication System
@@ -335,7 +335,7 @@ When PM sends BAZINGA:
 - Check for file before starting
 - Suggest spec-kit workflow if missing
 
-**2. Use Full BAZINGA Team**
+**2. Use Full Orchestrix Team**
 - Orchestrator → PM → Developers → QA → Tech Lead → PM
 - All quality gates enforced
 - All role drift prevention active
@@ -352,7 +352,7 @@ When PM sends BAZINGA:
 
 **5. Progress Tracking in Both Systems**
 - tasks.md checkmarks (spec-kit format)
-- pm_state.json (BAZINGA tracking)
+- pm_state.json (Orchestrix tracking)
 - Both stay in sync
 
 ## Error Handling
@@ -400,7 +400,7 @@ Note: Developers won't have full requirements context."
 
 When spawning any agent (Developer, SSE, QA, Tech Lead), follow the centralized spawn procedure:
 
-**🔴 Required:** Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
+**🔴 Required:** Read and follow `orchestrix/templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
 
 This ensures:
 - Specialization templates are loaded for the project's tech stack

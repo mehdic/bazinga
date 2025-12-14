@@ -1,8 +1,8 @@
-# BAZINGA - Claude Code Multi-Agent Dev Team - Usage Examples
+# Orchestrix - Claude Code Multi-Agent Dev Team - Usage Examples
 
-> **Repository:** https://github.com/mehdic/bazinga
+> **Repository:** https://github.com/mehdic/orchestrix
 
-This document provides practical examples of using BAZINGA (Claude Code Multi-Agent Dev Team).
+This document provides practical examples of using Orchestrix (Claude Code Multi-Agent Dev Team).
 
 ## Quick Start Examples
 
@@ -10,7 +10,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-/bazinga.orchestrate implement JWT authentication with token generation and validation
+/orchestrix.orchestrate implement JWT authentication with token generation and validation
 ```
 (or: `@orchestrator implement JWT authentication with token generation and validation`)
 
@@ -108,7 +108,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
    All task groups successfully completed:
    - Group Main: JWT Authentication ✅
 
-   ### BAZINGA
+   ### Orchestrix
 
    Project complete! All requirements met.
 
@@ -123,7 +123,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-/bazinga.orchestrate refactor the error handling in the authentication middleware for better clarity
+/orchestrix.orchestrate refactor the error handling in the authentication middleware for better clarity
 ```
 
 **What Happens:**
@@ -180,7 +180,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 4. **PM completes**:
    ```
-   ### BAZINGA
+   ### Orchestrix
 
    **Status:** COMPLETE
    ```
@@ -193,7 +193,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-/bazinga.orchestrate implement three features: JWT authentication, user registration, and password reset
+/orchestrix.orchestrate implement three features: JWT authentication, user registration, and password reset
 ```
 
 **What Happens:**
@@ -274,7 +274,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
    - Group B: User Registration ✅
    - Group C: Password Reset ✅
 
-   ### BAZINGA
+   ### Orchestrix
 
    **Status:** COMPLETE
    ```
@@ -287,7 +287,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
 
 **User Request:**
 ```
-/bazinga.orchestrate implement rate limiting on the authentication endpoint
+/orchestrix.orchestrate implement rate limiting on the authentication endpoint
 ```
 
 **What Happens:**
@@ -342,7 +342,7 @@ This document provides practical examples of using BAZINGA (Claude Code Multi-Ag
    **Next Step:** Orchestrator, please forward to Tech Lead
    ```
 
-5. **Tech Lead reviews and approves**, PM sends BAZINGA.
+5. **Tech Lead reviews and approves**, PM sends Orchestrix.
 
 **Result:** Automatic failure detection, developer fix, retest, and approval.
 
@@ -427,7 +427,7 @@ Orchestrator should spawn developer for group A with QA feedback.
 **Next Action:** Orchestrator should spawn developer for group A
 ```
 
-PM continues autonomously until BAZINGA.
+PM continues autonomously until Orchestrix.
 
 ---
 
@@ -447,7 +447,7 @@ PM continues autonomously until BAZINGA.
 - `READY_FOR_REVIEW`: Developer has no tests, skip to Tech Lead
 - `PASS/FAIL`: QA test results
 - `APPROVED/CHANGES_REQUESTED`: Tech Lead review results
-- `BAZINGA`: Project 100% complete
+- `Orchestrix`: Project 100% complete
 
 ### When to Intervene
 
@@ -470,7 +470,7 @@ PM continues autonomously until BAZINGA.
 You can guide PM by being specific:
 
 ```
-/bazinga.orchestrate implement these as separate task groups:
+/orchestrix.orchestrate implement these as separate task groups:
 1. JWT authentication (auth.py)
 2. User registration (users.py)
 3. Password reset (password_reset.py)
@@ -483,7 +483,7 @@ PM will respect your guidance while applying its decision logic.
 ### Forcing Simple Mode
 
 ```
-/bazinga.orchestrate implement JWT auth (please use simple sequential mode)
+/orchestrix.orchestrate implement JWT auth (please use simple sequential mode)
 ```
 
 PM will likely honor this request.
@@ -491,7 +491,7 @@ PM will likely honor this request.
 ### Requesting More Tests
 
 ```
-/bazinga.orchestrate implement JWT auth with comprehensive integration, contract, and E2E tests
+/orchestrix.orchestrate implement JWT auth with comprehensive integration, contract, and E2E tests
 ```
 
 Developer will create all test types, ensuring QA involvement.
@@ -514,7 +514,7 @@ If missing, orchestrator has role drift. Remind it of its role.
 If PM asks "Should I continue?", PM has lost autonomy. Remind it:
 - PM is fully autonomous
 - Never ask user questions
-- Continue until BAZINGA
+- Continue until Orchestrix
 
 ### Check Routing
 

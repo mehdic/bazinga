@@ -34,14 +34,14 @@ function resolveDbPath(): string {
 
   // Candidate paths for different runtime scenarios
   const candidates = [
-    // Running from dashboard-v2 root (dev): cwd = dashboard-v2, db at ../bazinga/bazinga.db
-    path.resolve(process.cwd(), "..", "bazinga", "bazinga.db"),
-    // Running from dist/socket-server.js (prod): __dirname = dist, db at ../bazinga/bazinga.db
-    path.resolve(__dirname, "..", "bazinga", "bazinga.db"),
+    // Running from dashboard-v2 root (dev): cwd = dashboard-v2, db at ../orchestrix/orchestrix.db
+    path.resolve(process.cwd(), "..", "orchestrix", "orchestrix.db"),
+    // Running from dist/socket-server.js (prod): __dirname = dist, db at ../orchestrix/orchestrix.db
+    path.resolve(__dirname, "..", "orchestrix", "orchestrix.db"),
     // Running from src/lib/socket (ts-node dev): __dirname = src/lib/socket
-    path.resolve(__dirname, "..", "..", "..", "..", "bazinga", "bazinga.db"),
+    path.resolve(__dirname, "..", "..", "..", "..", "orchestrix", "orchestrix.db"),
     // Extra fallback: two levels up from dist
-    path.resolve(__dirname, "..", "..", "bazinga", "bazinga.db"),
+    path.resolve(__dirname, "..", "..", "orchestrix", "orchestrix.db"),
   ];
 
   // Find first existing path
@@ -69,7 +69,7 @@ export type SocketEvent =
   | { type: "agent:completed"; sessionId: string; agentType: string; statusCode: string }
   | { type: "log:added"; sessionId: string; logId: number; agentType: string; content: string }
   | { type: "group:updated"; sessionId: string; groupId: string; status: string }
-  | { type: "bazinga"; sessionId: string };
+  | { type: "orchestrix"; sessionId: string };
 
 // Create HTTP server for Socket.io
 const httpServer = createServer();
@@ -229,10 +229,10 @@ function pollDatabase() {
         timestamp: log.timestamp,
       });
 
-      // Check for BAZINGA
-      if (log.content.includes("BAZINGA")) {
+      // Check for Orchestrix
+      if (log.content.includes("Orchestrix")) {
         io.emit("event", {
-          type: "bazinga",
+          type: "orchestrix",
           sessionId: log.session_id,
         } as SocketEvent);
       }

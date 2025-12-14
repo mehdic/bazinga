@@ -37,7 +37,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
         <Zap className="h-6 w-6 text-primary" />
-        <span className="text-xl font-bold">BAZINGA</span>
+        <span className="text-xl font-bold">Orchestrix</span>
         <Badge variant="secondary" className="ml-auto">
           v2.0
         </Badge>

@@ -1,4 +1,4 @@
-# Install git hooks for BAZINGA development (PowerShell)
+# Install git hooks for Orchestrix development (PowerShell)
 # Run this after cloning the repository
 #
 # Usage: .\scripts\install-hooks.ps1
@@ -11,7 +11,7 @@ $REPO_ROOT = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $REPO_ROOT
 try {
 
-Write-Host "🔧 Installing git hooks for BAZINGA development..."
+Write-Host "🔧 Installing git hooks for Orchestrix development..."
 
 # Verify we're in a git repository
 if (-not (Test-Path ".git")) {

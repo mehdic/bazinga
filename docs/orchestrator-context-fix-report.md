@@ -18,7 +18,7 @@ This violated the principle that the orchestrator should ONLY spawn agents and r
 ### Three-Layer Context System
 
 1. **PM-Generated Project Context** (Layer 1)
-   - PM creates `bazinga/project_context.json` at session start
+   - PM creates `orchestrix/project_context.json` at session start
    - Contains project type, language, patterns, conventions, utilities
    - Available to all developers instantly
 
@@ -42,7 +42,7 @@ This violated the principle that the orchestrator should ONLY spawn agents and r
 
 ### 2. Project Manager Agent (agents/project_manager.md)
 - **Added**: Phase 4.5 "Generate Project Context"
-- **Creates**: `bazinga/project_context.json` with:
+- **Creates**: `orchestrix/project_context.json` with:
   - Project type and primary language
   - Architectural patterns
   - Conventions and standards
@@ -123,17 +123,17 @@ No action required. The system automatically:
 
 When receiving tasks from PM:
 1. **Simple tasks** (bug fixes): Just code
-2. **Medium tasks** (new endpoints): Check `bazinga/project_context.json`
+2. **Medium tasks** (new endpoints): Check `orchestrix/project_context.json`
 3. **Complex tasks** (new features): Use codebase-analysis skill
 
 Example workflow:
 ```bash
 # Check PM's project context
-cat bazinga/project_context.json
+cat orchestrix/project_context.json
 
 # For complex tasks, run analysis
 Skill(command: "codebase-analysis")
-cat bazinga/codebase_analysis.json
+cat orchestrix/codebase_analysis.json
 ```
 
 ## Benefits Achieved
@@ -172,7 +172,7 @@ Modified:
 - agents/orchestrator.md (removed code analysis sections)
 - agents/project_manager.md (added context generation)
 - agents/developer.md (added context awareness)
-- .claude/commands/bazinga.orchestrate.md (auto-rebuilt)
+- .claude/commands/orchestrix.orchestrate.md (auto-rebuilt)
 
 Created:
 - .claude/skills/codebase-analysis/SKILL.md
@@ -188,7 +188,7 @@ Created:
 ## Verification Steps
 
 To verify the implementation:
-1. Run: `python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py --task "test" --session "test" --cache-enabled --output bazinga/test.json`
+1. Run: `python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py --task "test" --session "test" --cache-enabled --output orchestrix/test.json`
 2. Check: `agents/orchestrator.md` no longer contains "Step 2A.0" or "Step 2B.0"
 3. Verify: PM agent has "Phase 4.5: Generate Project Context"
 4. Confirm: Developer agent has "Project Context Awareness" section

@@ -2,7 +2,7 @@
 
 ## Overview
 
-BAZINGA PM combines **Tier 1** (velocity tracking), **Tier 2** (predictive analytics), and **Tier 3** (advanced insights) for intelligent, proactive project management. This document covers the metrics system that transforms PM from a reactive firefighter into a proactive manager.
+Orchestrix PM combines **Tier 1** (velocity tracking), **Tier 2** (predictive analytics), and **Tier 3** (advanced insights) for intelligent, proactive project management. This document covers the metrics system that transforms PM from a reactive firefighter into a proactive manager.
 
 ---
 
@@ -128,7 +128,7 @@ Example Timeline:
 - Hours 13-20: Task finally complete (5x original estimate)
 ```
 
-### How BAZINGA Detects Stuck Tasks
+### How Orchestrix Detects Stuck Tasks
 
 PM monitors three signals:
 
@@ -201,7 +201,7 @@ Developer: (10 min) → Tests pass, feature complete
 
 ### Velocity Tracker Metrics
 
-Every run, BAZINGA tracks these metrics in `bazinga/project_metrics.json`:
+Every run, Orchestrix tracks these metrics in `orchestrix/project_metrics.json`:
 
 ```json
 {
@@ -388,7 +388,7 @@ Developer-2 (2 tasks, 6 story points):
 
 #### 4. Quality Gate Enforcement
 
-Mandatory checks before BAZINGA (configurable):
+Mandatory checks before Orchestrix (configurable):
 
 ```
 Security Gate:   0 critical vulnerabilities
@@ -400,14 +400,14 @@ Tech Debt Gate:  0 blocking items
 **Real Example:**
 
 ```
-🚦 QUALITY GATES CHECK (Before BAZINGA)
+🚦 QUALITY GATES CHECK (Before Orchestrix)
 
 Security Gate:       ✓ PASS (0 critical issues)
 Coverage Gate:       ✓ PASS (86% coverage, target 70%)
 Lint Gate:           ✓ PASS (3 issues, target <5)
 Tech Debt Gate:      ✗ FAIL (1 blocking item)
 
-🚫 BAZINGA BLOCKED
+🚫 Orchestrix BLOCKED
 
 Blocking Tech Debt:
 TD-001: "Password reset email template hardcoded to prod"
@@ -416,7 +416,7 @@ TD-001: "Password reset email template hardcoded to prod"
 - Fix time: 5 minutes
 
 Action: Developer, please fix TD-001 password reset email template.
-Then we can send BAZINGA.
+Then we can send Orchestrix.
 ```
 
 **Why quality gates matter:** They enforce standards and prevent shipping preventable bugs.
@@ -427,7 +427,7 @@ Then we can send BAZINGA.
 
 ### The Power of Historical Data
 
-After 5 runs, BAZINGA knows:
+After 5 runs, Orchestrix knows:
 
 ```
 Run 1 Data:
@@ -595,7 +595,7 @@ Final Metrics:
 - Quality: Excellent
 - Team efficiency: 1.0x (spot on)
 
-PM sends BAZINGA and includes summary:
+PM sends Orchestrix and includes summary:
 "JWT authentication complete ahead of adjusted estimate.
 Parallel execution worked well. Token validation edge cases
 caught early by good test coverage. Add 1.5x multiplier to
@@ -619,7 +619,7 @@ This demonstrates the full power of metrics:
 | **Progress** | Completion % | ✓ Continuous | Stuck >90% | Check 99% rule |
 | **Stuck Tasks** | Cycle time vs estimate | ✓ Every 30 min | >2x estimate | Escalate to Tech Lead |
 | **Team Health** | Efficiency ratio | ✓ Per task | >1.5x (overworked) | Redistribute work |
-| **Quality** | Coverage, security, lint | ✓ Per task | Fails gate threshold | Block BAZINGA |
+| **Quality** | Coverage, security, lint | ✓ Per task | Fails gate threshold | Block Orchestrix |
 | **Risk** | Risk score | ✓ Per task group | >10 (high) | Offer support |
 | **Future Accuracy** | Historical multipliers | ✓ Per run | Pattern detected | Update estimates |
 

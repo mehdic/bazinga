@@ -1,6 +1,6 @@
-# BAZINGA - Claude Code Multi-Agent Dev Team - Architecture
+# Orchestrix - Claude Code Multi-Agent Dev Team - Architecture
 
-> **Repository:** https://github.com/mehdic/bazinga
+> **Repository:** https://github.com/mehdic/orchestrix
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@
 
 ## System Overview
 
-BAZINGA (Claude Code Multi-Agent Dev Team) is a hierarchical, stateless agent coordination framework designed for Claude Code. It implements adaptive parallelism, conditional workflow routing, and comprehensive role drift prevention.
+Orchestrix (Claude Code Multi-Agent Dev Team) is a hierarchical, stateless agent coordination framework designed for Claude Code. It implements adaptive parallelism, conditional workflow routing, and comprehensive role drift prevention.
 
 ### Core Principles
 
@@ -23,7 +23,7 @@ BAZINGA (Claude Code Multi-Agent Dev Team) is a hierarchical, stateless agent co
 2. **Explicit Routing**: Agents tell orchestrator where to route (no implicit decisions)
 3. **Conditional Workflows**: Routing adapts based on context (tests vs no tests)
 4. **Role Enforcement**: Multiple layers prevent agents from drifting from their roles
-5. **Single Source of Truth**: Only PM decides project completion (BAZINGA)
+5. **Single Source of Truth**: Only PM decides project completion (Orchestrix)
 
 ### System Architecture Diagram
 
@@ -46,7 +46,7 @@ BAZINGA (Claude Code Multi-Agent Dev Team) is a hierarchical, stateless agent co
 │  • Creates task groups                                       │
 │  • Decides simple vs parallel mode (1-4 developers)         │
 │  • Tracks progress                                           │
-│  • Sends BAZINGA when 100% complete                         │
+│  • Sends Orchestrix when 100% complete                         │
 │  • Tool restrictions: Read state files only, no Edit        │
 └────────────────────────┬────────────────────────────────────┘
                          ↓ (spawns Developer(s))
@@ -83,7 +83,7 @@ BAZINGA (Claude Code Multi-Agent Dev Team) is a hierarchical, stateless agent co
            │     PROJECT MANAGER          │
            │  • Tracks completion         │
            │  • Spawns more devs OR       │
-           │  • Sends BAZINGA             │
+           │  • Sends Orchestrix             │
            └──────────────────────────────┘
 ```
 
@@ -150,12 +150,12 @@ Tech Lead status: CHANGES_REQUESTED
 - Decide execution mode (simple vs parallel)
 - Decide parallelism (1-4 developers)
 - Track progress across all groups
-- Send BAZINGA when 100% complete
+- Send Orchestrix when 100% complete
 - Never ask user questions (full autonomy)
 
 **Tool Usage**:
-- Read: ONLY bazinga/*.json state files
-- Write: ONLY bazinga/*.json state files
+- Read: ONLY orchestrix/*.json state files
+- Write: ONLY orchestrix/*.json state files
 - Glob/Grep: Understanding codebase structure only
 - Bash: Analysis only, never run tests
 - FORBIDDEN: Edit, NotebookEdit
@@ -212,7 +212,7 @@ def decide_execution_mode(features, file_overlap, dependencies):
 ```
 IF all_task_groups_approved:
     UPDATE state → completed
-    OUTPUT: BAZINGA
+    OUTPUT: Orchestrix
     WORKFLOW ENDS
 
 ELSE IF some_complete AND more_pending:
@@ -423,7 +423,7 @@ ELSE IF architectural_validation_needed:
     Next Step: Orchestrator, please forward to Developer to proceed with approach
 ```
 
-**⚠️ CRITICAL**: Tech Lead NEVER sends BAZINGA. Only approves individual task groups. PM decides project completion.
+**⚠️ CRITICAL**: Tech Lead NEVER sends Orchestrix. Only approves individual task groups. PM decides project completion.
 
 ## Workflow Patterns
 
@@ -440,7 +440,7 @@ QA runs tests → PASS → Routes to Tech Lead
    ↓
 Tech Lead reviews → APPROVED → Routes to PM
    ↓
-PM: Task complete, no more tasks → BAZINGA
+PM: Task complete, no more tasks → Orchestrix
 ```
 
 ### Pattern 2: Simple Mode without Tests
@@ -454,7 +454,7 @@ Developer implements (refactoring, no tests) → READY_FOR_REVIEW → Routes to 
    ↓
 Tech Lead reviews → APPROVED → Routes to PM
    ↓
-PM: Task complete, no more tasks → BAZINGA
+PM: Task complete, no more tasks → Orchestrix
 ```
 
 ### Pattern 3: Parallel Mode with Tests
@@ -480,7 +480,7 @@ Tech Lead reviews A            Tech Lead reviews B
               ↓
          [Group C workflow]
               ↓
-         PM: All 3 groups complete → BAZINGA
+         PM: All 3 groups complete → Orchestrix
 ```
 
 ### Pattern 4: Failure Recovery with Tests
@@ -607,7 +607,7 @@ after long conversations - you remain a COORDINATOR ONLY.
 Developer complete → MUST go to QA (if tests) or Tech Lead (no tests)
 QA pass → MUST go to Tech Lead
 Tech Lead approve → MUST go to PM
-PM decides → Next assignment OR BAZINGA
+PM decides → Next assignment OR Orchestrix
 
 **NEVER skip steps. NEVER directly instruct agents.**
 ```
@@ -622,7 +622,7 @@ PM decides → Next assignment OR BAZINGA
 
 **Purpose**: PM's planning and progress tracking
 
-**Location**: `bazinga/pm_state.json`
+**Location**: `orchestrix/pm_state.json`
 
 **Schema**:
 ```json
@@ -645,7 +645,7 @@ PM decides → Next assignment OR BAZINGA
 
 **Purpose**: Individual task group detailed status
 
-**Location**: `bazinga/group_status.json`
+**Location**: `orchestrix/group_status.json`
 
 **Schema**:
 ```json
@@ -672,7 +672,7 @@ PM decides → Next assignment OR BAZINGA
 
 **Purpose**: Orchestrator's routing and spawn history
 
-**Location**: `bazinga/orchestrator_state.json`
+**Location**: `orchestrix/orchestrator_state.json`
 
 **Schema**:
 ```json
@@ -702,7 +702,7 @@ PM decides → Next assignment OR BAZINGA
 **Purpose**: Idempotent setup of coordination environment
 
 **Features**:
-- Creates `bazinga/` folder structure
+- Creates `orchestrix/` folder structure
 - Initializes all state JSON files
 - Generates unique session IDs with timestamps
 - Creates `.gitignore` to exclude state files
@@ -717,7 +717,7 @@ PM decides → Next assignment OR BAZINGA
 ```
 🔄 Initializing Claude Code Multi-Agent Dev Team orchestration system...
 📅 Session ID: session_20250107_120000
-📁 Creating bazinga/ folder structure...
+📁 Creating orchestrix/ folder structure...
 📝 Creating pm_state.json...
 📝 Creating group_status.json...
 📝 Creating orchestrator_state.json...
@@ -795,7 +795,7 @@ This prevents orchestrator from having to "remember" or "decide" routing.
 **Work Complete:**
 ```
 **Status:** COMPLETE
-**BAZINGA**
+**Orchestrix**
 ```
 
 ## Tool Restrictions
@@ -807,8 +807,8 @@ Tool restrictions prevent agents from doing work outside their role.
 ### PM Tool Restrictions
 
 **ALLOWED**:
-- Read `bazinga/*.json` (state files)
-- Write `bazinga/*.json` (state files)
+- Read `orchestrix/*.json` (state files)
+- Write `orchestrix/*.json` (state files)
 - Glob/Grep (understanding codebase structure)
 - Bash (analysis only, e.g., `ls` to check structure)
 
@@ -954,7 +954,7 @@ def decide_next_action(state):
     )
 
     if all_complete:
-        return "BAZINGA"
+        return "Orchestrix"
 
     pending = state["pending_groups"]
     if pending:

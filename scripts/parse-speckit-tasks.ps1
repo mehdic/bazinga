@@ -1,6 +1,6 @@
 # parse-speckit-tasks.ps1
 # Utility script to parse spec-kit tasks.md format and extract useful information
-# for BAZINGA orchestration system
+# for Orchestrix orchestration system
 #
 # Usage:
 #   pwsh .claude/scripts/parse-speckit-tasks.ps1 <tasks.md path>
@@ -188,7 +188,7 @@ $jsonOutput | ConvertTo-Json -Depth 5
 Write-Section "ANALYSIS COMPLETE"
 
 Write-Host ""
-Write-ColorOutput "Blue" "💡 Tip: Use this information to plan BAZINGA orchestration groups"
+Write-ColorOutput "Blue" "💡 Tip: Use this information to plan Orchestrix orchestration groups"
 Write-Host ""
 
 # Exit with success if all tasks complete, otherwise exit code indicates pending tasks

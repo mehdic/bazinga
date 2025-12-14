@@ -1,1 +1,1 @@
-"""BAZINGA CLI test suite."""
+"""Orchestrix CLI test suite."""

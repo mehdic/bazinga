@@ -103,8 +103,8 @@ const SessionNav = (function() {
      * Format session ID for display
      */
     function formatSessionId(sessionId) {
-        // Remove 'bazinga_' prefix if present
-        const cleaned = sessionId.replace('bazinga_', '');
+        // Remove 'orchestrix_' prefix if present
+        const cleaned = sessionId.replace('orchestrix_', '');
 
         // If it's a timestamp format (YYYYMMDD_HHMMSS), format it nicely
         const timestampMatch = cleaned.match(/^(\d{8})_(\d{6})$/);

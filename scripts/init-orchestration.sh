@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# BAZINGA Orchestration Initialization Script
+# Orchestrix Orchestration Initialization Script
 #
 # This script creates the required folder structure and state files
 # for orchestration. Safe to run multiple times (idempotent).
@@ -19,23 +19,23 @@ if [ "$1" = "--new" ]; then
 fi
 
 # Ensure all required directories exist (mkdir -p is idempotent - safe to run multiple times)
-echo "🔄 Initializing BAZINGA Claude Code Multi-Agent Development Team..."
-mkdir -p bazinga/messages
-mkdir -p bazinga/reports
+echo "🔄 Initializing Orchestrix Claude Code Multi-Agent Development Team..."
+mkdir -p orchestrix/messages
+mkdir -p orchestrix/reports
 mkdir -p docs
 
 # Check if this is an existing session or new session
 if [ "$FORCE_NEW" = true ]; then
     # Force new session - archive old one first
-    if [ -f "bazinga/orchestrator_state.json" ]; then
-        OLD_SESSION=$(python3 -c "import json; print(json.load(open('bazinga/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
+    if [ -f "orchestrix/orchestrator_state.json" ]; then
+        OLD_SESSION=$(python3 -c "import json; print(json.load(open('orchestrix/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
         echo "🗂️  Archiving old session: $OLD_SESSION"
-        ARCHIVE_DIR="bazinga/archive/$OLD_SESSION"
+        ARCHIVE_DIR="orchestrix/archive/$OLD_SESSION"
         mkdir -p "$ARCHIVE_DIR"
 
         # Archive coordination state files
-        mv bazinga/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
-        mv bazinga/messages/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+        mv orchestrix/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
+        mv orchestrix/messages/*.json "$ARCHIVE_DIR/" 2>/dev/null || true
 
         # Archive old log file
         if [ -f "docs/orchestration-log.md" ]; then
@@ -43,30 +43,30 @@ if [ "$FORCE_NEW" = true ]; then
             echo "   Archived old log file"
         fi
     fi
-    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+    SESSION_ID="orchestrix_$(date +%Y%m%d_%H%M%S)"
     echo "📅 Starting new session: $SESSION_ID"
-elif [ -f "bazinga/orchestrator_state.json" ]; then
+elif [ -f "orchestrix/orchestrator_state.json" ]; then
     # Existing session - read the session ID from existing file
-    SESSION_ID=$(python3 -c "import json; print(json.load(open('bazinga/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
+    SESSION_ID=$(python3 -c "import json; print(json.load(open('orchestrix/orchestrator_state.json')).get('session_id', 'unknown'))" 2>/dev/null || echo "unknown")
     if [ "$SESSION_ID" = "unknown" ]; then
         # File exists but no session_id, generate one
-        SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+        SESSION_ID="orchestrix_$(date +%Y%m%d_%H%M%S)"
         echo "📅 Creating new session ID: $SESSION_ID"
     else
         echo "📂 Resuming existing session: $SESSION_ID"
     fi
 else
     # New session - generate fresh session ID
-    SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+    SESSION_ID="orchestrix_$(date +%Y%m%d_%H%M%S)"
     echo "📅 Creating new session: $SESSION_ID"
 fi
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Initialize pm_state.json
-if [ ! -f "bazinga/pm_state.json" ]; then
+if [ ! -f "orchestrix/pm_state.json" ]; then
     echo "📝 Creating pm_state.json..."
-    cat > bazinga/pm_state.json <<EOF
+    cat > orchestrix/pm_state.json <<EOF
 {
   "session_id": "$SESSION_ID",
   "mode": null,
@@ -84,9 +84,9 @@ else
 fi
 
 # Initialize group_status.json
-if [ ! -f "bazinga/group_status.json" ]; then
+if [ ! -f "orchestrix/group_status.json" ]; then
     echo "📝 Creating group_status.json..."
-    cat > bazinga/group_status.json <<EOF
+    cat > orchestrix/group_status.json <<EOF
 {
   "_comment": "Tracks per-group status including revision counts for opus escalation",
   "_format": {
@@ -103,9 +103,9 @@ else
 fi
 
 # Initialize orchestrator_state.json
-if [ ! -f "bazinga/orchestrator_state.json" ]; then
+if [ ! -f "orchestrix/orchestrator_state.json" ]; then
     echo "📝 Creating orchestrator_state.json..."
-    cat > bazinga/orchestrator_state.json <<EOF
+    cat > orchestrix/orchestrator_state.json <<EOF
 {
   "session_id": "$SESSION_ID",
   "current_phase": "initialization",
@@ -134,9 +134,9 @@ else
 fi
 
 # Initialize skills_config.json (Lite Profile by default)
-if [ ! -f "bazinga/skills_config.json" ]; then
+if [ ! -f "orchestrix/skills_config.json" ]; then
     echo "📝 Creating skills_config.json (lite profile)..."
-    cat > bazinga/skills_config.json <<EOF
+    cat > orchestrix/skills_config.json <<EOF
 {
   "_metadata": {
     "profile": "lite",
@@ -191,9 +191,9 @@ else
 fi
 
 # Initialize testing_config.json
-if [ ! -f "bazinga/testing_config.json" ]; then
+if [ ! -f "orchestrix/testing_config.json" ]; then
     echo "📝 Creating testing_config.json..."
-    cat > bazinga/testing_config.json <<EOF
+    cat > orchestrix/testing_config.json <<EOF
 {
   "_testing_framework": {
     "enabled": true,
@@ -224,7 +224,7 @@ if [ ! -f "bazinga/testing_config.json" ]; then
   },
 
   "_metadata": {
-    "description": "Testing framework configuration for BAZINGA",
+    "description": "Testing framework configuration for Orchestrix",
     "created": "$TIMESTAMP",
     "last_updated": "$TIMESTAMP",
     "version": "1.0",
@@ -235,7 +235,7 @@ if [ ! -f "bazinga/testing_config.json" ]; then
     },
     "notes": [
       "Use /bazinga.configure-testing to modify this configuration interactively",
-      "Mode 'minimal' is the default - balances speed and quality (current BAZINGA default)",
+      "Mode 'minimal' is the default - balances speed and quality (current Orchestrix default)",
       "Mode 'full' enables complete QA workflow for production-critical code",
       "Mode 'disabled' is for rapid prototyping only (lint checks still run)"
     ]
@@ -248,9 +248,9 @@ fi
 
 # Initialize message files
 MESSAGE_FILES=(
-    "bazinga/messages/dev_to_qa.json"
-    "bazinga/messages/qa_to_techlead.json"
-    "bazinga/messages/techlead_to_dev.json"
+    "orchestrix/messages/dev_to_qa.json"
+    "orchestrix/messages/qa_to_techlead.json"
+    "orchestrix/messages/techlead_to_dev.json"
 )
 
 for msg_file in "${MESSAGE_FILES[@]}"; do
@@ -270,7 +270,7 @@ done
 if [ ! -f "docs/orchestration-log.md" ]; then
     echo "📝 Creating orchestration log..."
     cat > docs/orchestration-log.md <<EOF
-# BAZINGA Orchestration Log
+# Orchestrix Orchestration Log
 
 **Session:** $SESSION_ID
 **Started:** $TIMESTAMP
@@ -286,7 +286,7 @@ fi
 
 # Update sessions history
 echo "📝 Updating sessions history..."
-SESSIONS_HISTORY="bazinga/sessions_history.json"
+SESSIONS_HISTORY="orchestrix/sessions_history.json"
 
 # Initialize history file if it doesn't exist
 if [ ! -f "$SESSIONS_HISTORY" ]; then
@@ -341,9 +341,9 @@ else:
 PYTHON_SCRIPT
 
 # Create .gitignore for coordination folder if it doesn't exist
-if [ ! -f "bazinga/.gitignore" ]; then
-    echo "📝 Creating bazinga/.gitignore..."
-    cat > bazinga/.gitignore <<EOF
+if [ ! -f "orchestrix/.gitignore" ]; then
+    echo "📝 Creating orchestrix/.gitignore..."
+    cat > orchestrix/.gitignore <<EOF
 # Coordination state files are temporary and should not be committed
 *.json
 
@@ -359,16 +359,16 @@ reports/
 !.gitignore
 EOF
 else
-    echo "✓ bazinga/.gitignore already exists"
+    echo "✓ orchestrix/.gitignore already exists"
 fi
 
 # Initialize database
 echo ""
-echo "🗄️  Initializing BAZINGA database..."
-DB_PATH="bazinga/bazinga.db"
-DB_INIT_SCRIPT=".claude/skills/bazinga-db/scripts/init_db.py"
-DB_CLI_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
-DB_MIGRATION_SCRIPT=".claude/skills/bazinga-db/scripts/migrate_task_groups_schema.py"
+echo "🗄️  Initializing Orchestrix database..."
+DB_PATH="orchestrix/orchestrix.db"
+DB_INIT_SCRIPT=".claude/skills/orchestrix-db/scripts/init_db.py"
+DB_CLI_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
+DB_MIGRATION_SCRIPT=".claude/skills/orchestrix-db/scripts/migrate_task_groups_schema.py"
 
 if [ -f "$DB_PATH" ]; then
     echo "✓ Database already exists"
@@ -436,35 +436,35 @@ else
 fi
 
 # Copy templates to bazinga folder if not present
-if [ ! -d "bazinga/templates" ]; then
+if [ ! -d "orchestrix/templates" ]; then
     echo ""
-    echo "📝 Copying templates to bazinga/templates..."
+    echo "📝 Copying templates to orchestrix/templates..."
 
-    # Check both bazinga/templates and coordination/templates in source
-    if [ -d "bazinga/templates" ]; then
-        echo "✓ Templates already exist in bazinga/templates"
+    # Check both orchestrix/templates and coordination/templates in source
+    if [ -d "orchestrix/templates" ]; then
+        echo "✓ Templates already exist in orchestrix/templates"
     elif [ -d "coordination/templates" ]; then
-        mkdir -p bazinga/templates
-        cp coordination/templates/*.md bazinga/templates/ 2>/dev/null
+        mkdir -p orchestrix/templates
+        cp coordination/templates/*.md orchestrix/templates/ 2>/dev/null
         if [ $? -eq 0 ]; then
             echo "✅ Templates copied from coordination/templates"
         else
             echo "⚠️  Warning: Could not copy templates"
         fi
     else
-        echo "⚠️  Warning: No templates found (looking for bazinga/templates or coordination/templates)"
+        echo "⚠️  Warning: No templates found (looking for orchestrix/templates or coordination/templates)"
         echo "   Templates will be used from bazinga CLI installation"
     fi
 else
-    echo "✓ bazinga/templates already exists"
+    echo "✓ orchestrix/templates already exists"
 fi
 
 echo ""
 echo "✅ Initialization complete!"
 echo ""
 echo "📊 Created structure:"
-echo "   bazinga/"
-echo "   ├── bazinga.db            (SQLite database - primary storage)"
+echo "   orchestrix/"
+echo "   ├── orchestrix.db            (SQLite database - primary storage)"
 echo "   ├── pm_state.json"
 echo "   ├── group_status.json"
 echo "   ├── orchestrator_state.json"
@@ -480,13 +480,13 @@ echo "   └── orchestration-log.md"
 echo ""
 echo "🚀 Ready for orchestration!"
 echo "📊 Session ID: $SESSION_ID"
-echo "🗄️  Database: bazinga/bazinga.db"
+echo "🗄️  Database: orchestrix/orchestrix.db"
 echo ""
 
 # Check if dashboard server is running and start if needed
 echo "🖥️  Checking dashboard v2 server status..."
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
-DASHBOARD_PID_FILE="bazinga/dashboard.pid"
+DASHBOARD_PID_FILE="orchestrix/dashboard.pid"
 
 # Check if server is already running
 if [ -f "$DASHBOARD_PID_FILE" ] && kill -0 $(cat "$DASHBOARD_PID_FILE") 2>/dev/null; then
@@ -497,15 +497,15 @@ else
     if lsof -Pi :$DASHBOARD_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo "⚠️  Port $DASHBOARD_PORT is already in use by another process"
         echo "   Dashboard server not started. You can manually start it with:"
-        echo "   cd bazinga/dashboard-v2 && npm run dev"
+        echo "   cd orchestrix/dashboard-v2 && npm run dev"
     else
         # Launch dashboard startup script in background
         # This script handles dependency installation and server startup asynchronously
         echo "🚀 Starting dashboard v2 server (background process)..."
-        bash bazinga/scripts/start-dashboard.sh &
+        bash orchestrix/scripts/start-dashboard.sh &
         echo "   Dashboard will be available at http://localhost:$DASHBOARD_PORT"
         echo "   (Installation may take a moment if dependencies need to be installed)"
-        echo "   View logs: tail -f bazinga/dashboard.log"
+        echo "   View logs: tail -f orchestrix/dashboard.log"
     fi
 fi
 echo ""
