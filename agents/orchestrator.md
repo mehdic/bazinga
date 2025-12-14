@@ -1808,7 +1808,9 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 
 **If templates_loaded = 0 for QA Expert and testing_mode=full:**
 - This indicates the QA template augmentation failed
+- The skill_outputs will include `"augmentation_error": true`
 - Log warning: "QA Expert received 0 templates despite testing_mode=full"
+- Check skill_outputs for `skipped_missing` to identify which templates were unavailable
 
 ### Verification Gate Summary
 
