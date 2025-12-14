@@ -901,17 +901,28 @@ rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
 /bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 ```
 
+**🔴 IMPORTANT:** Always run the ACTUAL orchestrator prompt. Never manually simulate orchestration steps - the orchestrator itself must handle specialization-loader invocation, agent spawning, and workflow routing. Manual simulation would become invalid when orchestrator logic changes.
+
+### If SlashCommand Tool Fails
+
+If `/bazinga.orchestrate` cannot be invoked via the SlashCommand tool (e.g., "Invalid tool name format" error), execute the orchestrator prompt directly:
+
+1. **Read the orchestrator prompt:** `Read: .claude/commands/bazinga.orchestrate.md`
+2. **Execute its instructions** as your own - this IS the orchestrator
+
+The slash command essentially expands to the prompt in `.claude/commands/bazinga.orchestrate.md`. Reading and executing that file is functionally identical to what the slash command does. This ensures the test always runs the actual orchestrator logic, not manual steps.
+
 ### What This Tests
 
 The integration test validates the complete BAZINGA workflow:
 
 1. **Session Management** - Creates session with all required fields
 2. **Tech Stack Detection** - Spawns Tech Stack Scout, creates `project_context.json`
-3. **PM Planning** - Spawns PM (opus), analyzes requirements, creates task groups
-4. **Specializations** - Loads Python specialization template for Developer
-5. **Development** - Spawns Developer (haiku), implements calculator with tests
-6. **QA Testing** - Spawns QA Expert (sonnet), runs challenge levels 1-5
-7. **Code Review** - Spawns Tech Lead (opus), reviews code quality/security
+3. **PM Planning** - Spawns PM (opus), analyzes requirements, creates task groups with specialization paths
+4. **🔴 Specialization Building** - Orchestrator invokes `specialization-loader` skill to compose identity blocks
+5. **Development** - Spawns Developer (haiku) WITH composed specialization block
+6. **QA Testing** - Spawns QA Expert (sonnet) WITH composed specialization block
+7. **Code Review** - Spawns Tech Lead (opus) WITH composed specialization block
 8. **Completion** - PM sends BAZINGA after all criteria met
 
 ### Expected Results
@@ -946,6 +957,184 @@ cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
 
 After each run, a report is generated at:
 `tests/integration/INTEGRATION_TEST_REPORT.md`
+
+### 🔴 MANDATORY: Post-Integration Test Verification
+
+**After EVERY integration test run, execute these verification commands to ensure all components are working correctly.**
+
+#### Step 1: Session Status Check
+```bash
+# Verify session was created and completed
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+```
+
+**Expected output:**
+- `status: "completed"`
+- `mode: "simple"`
+- Valid `session_id` starting with `bazinga_`
+
+#### Step 2: Task Groups Check
+```bash
+# Replace <SESSION_ID> with actual session ID from Step 1
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "<SESSION_ID>"
+```
+
+**Expected output:**
+- At least 1 task group (typically `CALC`)
+- `status: "completed"`
+- `assigned_to` populated (e.g., `developer_1`)
+
+#### Step 3: Success Criteria Check
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "<SESSION_ID>"
+```
+
+**Expected output:**
+- 7 success criteria entries
+- All marked as met/verified
+
+#### Step 4: Reasoning Storage Check (CRITICAL)
+```bash
+# Get all reasoning entries
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning "<SESSION_ID>"
+```
+
+**Expected output:**
+- 8 reasoning entries (2 per agent × 4 agents)
+- Agents: `project_manager`, `developer`, `qa_expert`, `tech_lead`
+- Phases: `understanding` and `completion` for each
+
+#### Step 5: Mandatory Phases Validation
+```bash
+# Check each agent documented required phases
+for agent in project_manager developer qa_expert tech_lead; do
+  echo "--- $agent ---"
+  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases "<SESSION_ID>" "CALC" "$agent"
+done
+```
+
+**Expected output:**
+- All agents should show `"all_documented": true`
+- Exit code 0 for all agents
+
+#### Step 6: Reasoning Timeline (Human-Readable)
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline "<SESSION_ID>" --format markdown
+```
+
+**Expected output:**
+- Chronological view of all agent reasoning
+- Timestamps, phases, confidence levels
+- Content should be meaningful (not empty)
+
+#### Step 7: Full Dashboard Snapshot
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "<SESSION_ID>"
+```
+
+**Expected output:**
+- Complete JSON with session, task_groups, success_criteria, reasoning_logs
+- All sections populated
+
+#### Step 8: Files Created Check
+```bash
+ls -la tmp/simple-calculator-app/
+```
+
+**Expected files:**
+- `calculator.py` - Calculator implementation
+- `test_calculator.py` - Unit tests
+- `README.md` - Documentation
+
+#### Step 9: Tests Pass Check
+```bash
+cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=short
+```
+
+**Expected output:**
+- 70+ tests passed
+- No failures
+
+#### Step 10: Specialization Loader Invocation Check (CRITICAL)
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "<SESSION_ID>" "specialization-loader"
+```
+
+**Expected output:**
+- At least 3 entries (one per agent: developer, qa_expert, tech_lead)
+- Each entry should have:
+  - `templates_used` array (non-empty)
+  - `token_count` within budget
+  - `composed_identity` string
+
+**If empty:** Specialization-loader was NOT invoked - this is a critical failure!
+
+### Verification Summary Table
+
+| Check | Command | Pass Criteria |
+|-------|---------|---------------|
+| Session | `list-sessions 1` | status=completed |
+| Task Groups | `get-task-groups` | 1+ groups, all completed |
+| Success Criteria | `get-success-criteria` | 7 criteria |
+| Reasoning Entries | `get-reasoning` | 8 entries (2 per agent) |
+| Mandatory Phases | `check-mandatory-phases` | all_documented=true for all |
+| **Specialization** | `get-skill-output ... specialization-loader` | **3+ entries with composed_identity** |
+| Files | `ls tmp/simple-calculator-app/` | 3 files |
+| Tests | `pytest test_calculator.py` | All pass |
+
+### Known Issues to Check
+
+1. **Missing Reasoning** - If `get-reasoning` returns empty, agents didn't save their reasoning. Check agent prompts include reasoning requirements.
+
+2. **Incomplete Phases** - If `check-mandatory-phases` fails, agent skipped `understanding` or `completion` phase documentation.
+
+3. **🔴 Specialization Not Built** - If `get-skill-output ... specialization-loader` returns empty:
+   - Orchestrator skipped the skill invocation
+   - Agents received raw template text instead of composed blocks
+   - **FIX:** Follow Manual Orchestration Workflow above - invoke skill before EACH agent spawn
+
+---
+
+## 🔴 MANDATORY: Specialization Loader Invocation
+
+**Before spawning Developer, QA Expert, or Tech Lead, the orchestrator MUST invoke the specialization-loader skill.**
+
+### ❌ WRONG (What was done in failed tests)
+```python
+# Just reading the raw template file
+Read: bazinga/templates/specializations/01-languages/python.md
+# Then spawning Developer...
+```
+
+### ✅ CORRECT
+```python
+# Invoke the specialization-loader skill
+Skill(command: "specialization-loader")
+
+# The skill will:
+# 1. Read project_context.json
+# 2. Load appropriate templates
+# 3. Compose identity block with token budgeting
+# 4. Apply version guards
+# 5. Return composed block via Bash heredoc
+
+# THEN spawn Developer with the composed block
+```
+
+### Why This Matters
+
+The `specialization-loader` skill:
+- Composes technology-specific identity (e.g., "You are a Python 3.11 Developer")
+- Applies version guards (Python 3.11 patterns, not 2.7)
+- Respects per-model token budgets (haiku=900, sonnet=1800, opus=2400)
+- Auto-augments QA/Tech Lead with role-specific templates
+- Logs to database for audit trail
+
+Without it:
+- Agents get raw template text instead of composed guidance
+- No version-specific filtering
+- No token budget enforcement
+- No identity composition
 
 ---
 
