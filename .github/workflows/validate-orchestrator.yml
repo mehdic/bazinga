@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'agents/orchestrator.md'
-      - '.claude/commands/bazinga.orchestrate.md'
+      - '.claude/commands/orchestrix.orchestrate.md'
       - 'scripts/validate-orchestrator-references.sh'
   push:
     branches:
@@ -12,7 +12,7 @@ on:
       - 'claude/**'
     paths:
       - 'agents/orchestrator.md'
-      - '.claude/commands/bazinga.orchestrate.md'
+      - '.claude/commands/orchestrix.orchestrate.md'
       - 'scripts/validate-orchestrator-references.sh'
 
 jobs:

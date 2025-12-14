@@ -50,7 +50,7 @@ nosetests.xml
 # IDEs
 .idea/
 .vscode/
-/bazinga.iml
+/orchestrix.iml
 
 # OS
 .DS_Store
@@ -71,13 +71,13 @@ socket.pid
 
 # PyInstaller
 
-# BAZINGA state files (gitignored by default in installed projects)
+# Orchestrix state files (gitignored by default in installed projects)
 # The orchestrix/ directory is ignored EXCEPT for specific tracked files
 orchestrix/
 orchestrix/artifacts/
 orchestrix/orchestrix.db*
 
-# Re-include tracked bazinga files (MUST come AFTER orchestrix/ ignore)
+# Re-include tracked orchestrix files (MUST come AFTER orchestrix/ ignore)
 !orchestrix/.gitignore
 !orchestrix/challenge_levels.json
 !orchestrix/model_selection.json

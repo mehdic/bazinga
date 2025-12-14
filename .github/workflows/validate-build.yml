@@ -4,14 +4,14 @@ on:
   pull_request:
     paths:
       - 'agents/orchestrator.md'
-      - '.claude/commands/bazinga.orchestrate.md'
+      - '.claude/commands/orchestrix.orchestrate.md'
       - 'scripts/build-slash-commands.sh'
   push:
     branches:
       - main
     paths:
       - 'agents/orchestrator.md'
-      - '.claude/commands/bazinga.orchestrate.md'
+      - '.claude/commands/orchestrix.orchestrate.md'
       - 'scripts/build-slash-commands.sh'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
         run: |
           echo "📋 Checking if generated files match committed versions..."
 
-          if ! git diff --exit-code .claude/commands/bazinga.orchestrate.md; then
+          if ! git diff --exit-code .claude/commands/orchestrix.orchestrate.md; then
             echo ""
             echo "❌ ERROR: Generated file differs from committed version"
             echo ""
@@ -56,10 +56,10 @@ jobs:
 
           # Run build twice and ensure output is identical
           ./scripts/build-slash-commands.sh > /dev/null
-          cp .claude/commands/bazinga.orchestrate.md /tmp/first-build.md
+          cp .claude/commands/orchestrix.orchestrate.md /tmp/first-build.md
 
           ./scripts/build-slash-commands.sh > /dev/null
-          cp .claude/commands/bazinga.orchestrate.md /tmp/second-build.md
+          cp .claude/commands/orchestrix.orchestrate.md /tmp/second-build.md
 
           if ! diff -q /tmp/first-build.md /tmp/second-build.md; then
             echo "❌ ERROR: Build script is not idempotent"
