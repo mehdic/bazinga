@@ -901,17 +901,76 @@ rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
 /bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 ```
 
+### 🔴 Manual Orchestration Workflow (When Slash Command Unavailable)
+
+**If `/bazinga.orchestrate` cannot be invoked, follow this EXACT workflow:**
+
+#### Phase 1: Initialize Session
+```bash
+SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
+mkdir -p tmp/simple-calculator-app
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-session "$SESSION_ID" "simple" "Integration test"
+```
+
+#### Phase 2: Spawn PM for Planning
+```python
+Task(subagent_type: "general-purpose", model: "opus", prompt: "You are PM...")
+# PM creates task groups with specialization paths
+```
+
+#### Phase 3: Before EACH Agent Spawn - Invoke Specialization Loader
+```python
+# 🔴 MANDATORY: Before spawning Developer, QA, or Tech Lead
+# Provide context BEFORE invoking skill:
+"""
+Session ID: {session_id}
+Group ID: CALC
+Agent Type: developer
+Model: haiku
+Specialization Paths: ["bazinga/templates/specializations/01-languages/python.md"]
+Testing Mode: full
+"""
+
+# Then invoke the skill:
+Skill(command: "specialization-loader")
+
+# Skill returns composed block via Bash heredoc
+# Extract [SPECIALIZATION_BLOCK_START]...[SPECIALIZATION_BLOCK_END]
+```
+
+#### Phase 4: Spawn Agent WITH Composed Block
+```python
+# Include the composed specialization block in agent prompt
+Task(subagent_type: "general-purpose", model: "haiku", prompt: """
+You are a Developer agent.
+
+{PASTE COMPOSED SPECIALIZATION BLOCK HERE}
+
+Your task: Implement the calculator...
+""")
+```
+
+#### Phase 5: Repeat for Each Agent
+- Developer → invoke specialization-loader → spawn with block
+- QA Expert → invoke specialization-loader → spawn with block
+- Tech Lead → invoke specialization-loader → spawn with block
+
+#### Phase 6: PM Sends BAZINGA
+```python
+Task(subagent_type: "general-purpose", model: "opus", prompt: "You are PM. Verify all criteria and send BAZINGA...")
+```
+
 ### What This Tests
 
 The integration test validates the complete BAZINGA workflow:
 
 1. **Session Management** - Creates session with all required fields
 2. **Tech Stack Detection** - Spawns Tech Stack Scout, creates `project_context.json`
-3. **PM Planning** - Spawns PM (opus), analyzes requirements, creates task groups
-4. **Specializations** - Loads Python specialization template for Developer
-5. **Development** - Spawns Developer (haiku), implements calculator with tests
-6. **QA Testing** - Spawns QA Expert (sonnet), runs challenge levels 1-5
-7. **Code Review** - Spawns Tech Lead (opus), reviews code quality/security
+3. **PM Planning** - Spawns PM (opus), analyzes requirements, creates task groups with specialization paths
+4. **🔴 Specialization Building** - Invokes `specialization-loader` skill to compose identity blocks
+5. **Development** - Spawns Developer (haiku) WITH composed specialization block
+6. **QA Testing** - Spawns QA Expert (sonnet) WITH composed specialization block
+7. **Code Review** - Spawns Tech Lead (opus) WITH composed specialization block
 8. **Completion** - PM sends BAZINGA after all criteria met
 
 ### Expected Results
@@ -1044,6 +1103,20 @@ cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=shor
 - 70+ tests passed
 - No failures
 
+#### Step 10: Specialization Loader Invocation Check (CRITICAL)
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "<SESSION_ID>" "specialization-loader"
+```
+
+**Expected output:**
+- At least 3 entries (one per agent: developer, qa_expert, tech_lead)
+- Each entry should have:
+  - `templates_used` array (non-empty)
+  - `token_count` within budget
+  - `composed_identity` string
+
+**If empty:** Specialization-loader was NOT invoked - this is a critical failure!
+
 ### Verification Summary Table
 
 | Check | Command | Pass Criteria |
@@ -1053,6 +1126,7 @@ cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=shor
 | Success Criteria | `get-success-criteria` | 7 criteria |
 | Reasoning Entries | `get-reasoning` | 8 entries (2 per agent) |
 | Mandatory Phases | `check-mandatory-phases` | all_documented=true for all |
+| **Specialization** | `get-skill-output ... specialization-loader` | **3+ entries with composed_identity** |
 | Files | `ls tmp/simple-calculator-app/` | 3 files |
 | Tests | `pytest test_calculator.py` | All pass |
 
@@ -1062,7 +1136,10 @@ cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=shor
 
 2. **Incomplete Phases** - If `check-mandatory-phases` fails, agent skipped `understanding` or `completion` phase documentation.
 
-3. **Specialization Not Built** - The orchestrator should invoke `specialization-loader` skill before spawning agents. If not, agents get raw templates instead of composed identity blocks.
+3. **🔴 Specialization Not Built** - If `get-skill-output ... specialization-loader` returns empty:
+   - Orchestrator skipped the skill invocation
+   - Agents received raw template text instead of composed blocks
+   - **FIX:** Follow Manual Orchestration Workflow above - invoke skill before EACH agent spawn
 
 ---
 
