@@ -30,15 +30,33 @@ You are the specialization-loader skill. You compose technology-specific identit
 
 ### Step 1: Parse Input Context
 
-The orchestrator provides context before invoking you. Extract:
+**Primary source:** The orchestrator provides context as text before invoking you.
+
+**Fallback source:** If text parsing fails, read from JSON context file:
+```bash
+# Try reading JSON context file (orchestrator creates this)
+CONTEXT_FILE=$(ls bazinga/artifacts/*/skills/spec_ctx_*.json 2>/dev/null | tail -1)
+if [ -n "$CONTEXT_FILE" ]; then
+  cat "$CONTEXT_FILE"
+fi
+```
+
+Extract from either source:
 
 ```
-Session ID: {session_id}
-Group ID: {group_id}
+Session ID: {session_id}         # REQUIRED for database save
+Group ID: {group_id}             # REQUIRED for database save
 Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
 Model: {haiku|sonnet|opus}
 Specialization Paths: {JSON array of template paths}
 Testing Mode: {full|minimal|disabled}  # Orchestrator-provided, defaults to "full" if not specified
+Context File: {path to JSON file}  # Optional, for reference
+```
+
+**🔴 CRITICAL: If session_id cannot be extracted from either source, output error and stop:**
+```
+ERROR: session_id not found in context. Cannot save skill output to database.
+Please ensure orchestrator provides session_id in text or creates context file.
 ```
 
 **Testing Mode Source Priority:**

@@ -1117,12 +1117,54 @@ Build PM prompt by reading `agents/project_manager.md` and including:
 
 See `agents/project_manager.md` for full PM agent definition.
 
+**🔴 MANDATORY PM UNDERSTANDING CAPTURE:**
+
+Include this instruction at the START of PM's spawn prompt (before any analysis):
+
+```markdown
+## MANDATORY FIRST ACTION
+
+Before ANY analysis, save your understanding of this request:
+
+1. Create understanding file:
+   ```bash
+   cat > /tmp/pm_understanding.md << 'UNDERSTANDING_EOF'
+   ## PM Understanding Phase
+
+   ### Raw Request Summary
+   {Summarize the user's request in 2-3 sentences}
+
+   ### Scope Assessment
+   - Type: {file|feature|bug|refactor|research}
+   - Complexity: {low|medium|high}
+   - Estimated task groups: {1-N}
+
+   ### Key Requirements
+   - {Requirement 1}
+   - {Requirement 2}
+   ...
+
+   ### Initial Constraints
+   - {Any constraints identified}
+   UNDERSTANDING_EOF
+   ```
+
+2. Save to database:
+   ```bash
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+     "{session_id}" "global" "project_manager" "understanding" \
+     --content-file /tmp/pm_understanding.md --confidence high
+   ```
+
+**Do NOT proceed with planning until understanding is saved.**
+```
+
 **Spawn:**
 ```
 Task(
   subagent_type: "general-purpose",
   description: "PM analyzing requirements and deciding execution mode",
-  prompt: [Full PM prompt from agents/project_manager.md with session_id context]
+  prompt: [Full PM prompt from agents/project_manager.md with session_id context AND mandatory understanding capture above]
 )
 ```
 
@@ -1628,23 +1670,39 @@ IF specializations still empty:
 
 **Step 4: Invoke specialization-loader skill**
 
-**🔴 CRITICAL: TWO SEPARATE ACTIONS** (the Skill tool reads context from conversation, not parameters)
+**🔴 CRITICAL: THREE ACTIONS** (structured context + skill invocation + verification)
 
-**Action 4a: Output context as text FIRST (not in tool call):**
+**Action 4a: Create structured context file (REQUIRED):**
+```bash
+mkdir -p bazinga/artifacts/{session_id}/skills
+cat > bazinga/artifacts/{session_id}/skills/spec_ctx_{group_id}_{agent_type}.json << 'CTX_EOF'
+{
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "agent_type": "{developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}",
+  "model": "{model from model_selection.json}",
+  "testing_mode": "full",
+  "specialization_paths": {JSON array from step 3}
+}
+CTX_EOF
+```
+
+**Action 4b: Output context as text AND invoke skill:**
 ```text
 Session ID: {session_id}
 Group ID: {group_id}
 Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
 Model: {model from model_selection.json}
 Specialization Paths: {JSON array from step 3}
+Context File: bazinga/artifacts/{session_id}/skills/spec_ctx_{group_id}_{agent_type}.json
 ```
 
-**Action 4b: THEN invoke the skill:**
+Then invoke:
 ```
 Skill(command: "specialization-loader")
 ```
 
-The skill reads the context you output above and returns the composed block.
+The skill reads context from conversation text AND can fallback to the JSON file.
 
 **Step 5: Extract composed block**
 
@@ -1656,6 +1714,34 @@ The skill returns a composed block between markers:
 ```
 
 Extract the block content.
+
+**Step 5.5: Verify skill output saved (REQUIRED)**
+
+After extracting the block, verify the skill saved its output to the database:
+
+```bash
+# Check if skill output was saved
+SKILL_OUTPUT=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet \
+  get-skill-output "{session_id}" "specialization-loader" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print([x for x in d if x.get('agent_type')=='{agent_type}'])" 2>/dev/null)
+
+if [ -z "$SKILL_OUTPUT" ] || [ "$SKILL_OUTPUT" = "[]" ]; then
+  echo "⚠️ WARNING: Skill output not saved to database. Saving fallback..."
+  # Orchestrator saves minimal record as fallback
+  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-output \
+    "{session_id}" "specialization-loader" '{
+      "group_id": "{group_id}",
+      "agent_type": "{agent_type}",
+      "model": "{model}",
+      "templates_used": ["fallback-orchestrator-save"],
+      "token_count": 0,
+      "composed_identity": "Fallback: skill did not save output",
+      "fallback": true
+    }'
+fi
+```
+
+**🔴 This verification is MANDATORY.** Silent failures in skill persistence will be caught and remediated.
 
 **Step 6: Prepend to agent prompt**
 

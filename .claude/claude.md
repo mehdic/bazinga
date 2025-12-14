@@ -1003,18 +1003,24 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning "<
 - 8 reasoning entries (2 per agent × 4 agents)
 - Agents: `project_manager`, `developer`, `qa_expert`, `tech_lead`
 - Phases: `understanding` and `completion` for each
+- **Note:** PM's `understanding` phase uses `group_id="global"` (session-level reasoning)
 
 #### Step 5: Mandatory Phases Validation
 ```bash
 # Check each agent documented required phases
-for agent in project_manager developer qa_expert tech_lead; do
+# Note: PM understanding is at session-level (group_id="global"), not task-group level
+for agent in developer qa_expert tech_lead; do
   echo "--- $agent ---"
   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases "<SESSION_ID>" "CALC" "$agent"
 done
+
+# Check PM separately with global scope
+echo "--- project_manager (global) ---"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases "<SESSION_ID>" "global" "project_manager"
 ```
 
 **Expected output:**
-- All agents should show `"all_documented": true`
+- All agents should show `"complete": true`
 - Exit code 0 for all agents
 
 #### Step 6: Reasoning Timeline (Human-Readable)
