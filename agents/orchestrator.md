@@ -1776,6 +1776,52 @@ Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes s
 
 ---
 
+## §DB Persistence Verification Gates
+
+**🔴 MANDATORY after each agent spawn: Verify expected DB writes occurred.**
+
+### After PM Spawn (Phase 1)
+
+Verify PM persisted state:
+```bash
+# Check success criteria were saved
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+# Should return non-empty array if PM saved criteria
+
+# Check task groups were created with specializations
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+# Should return task groups with specializations non-empty
+```
+
+**If empty:** PM didn't save state properly. Log warning and continue (non-blocking).
+
+### After Specialization-Loader Invocation
+
+Verify skill logged its output:
+```bash
+# Check specialization-loader output was saved
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+# Should return templates_used, token_count, augmented_templates
+```
+
+**If empty:** Specialization-loader didn't log. Non-blocking but note in orchestrator log.
+
+**If templates_loaded = 0 for QA Expert and testing_mode=full:**
+- This indicates the QA template augmentation failed
+- Log warning: "QA Expert received 0 templates despite testing_mode=full"
+
+### Verification Gate Summary
+
+| Checkpoint | Expected DB Content | Action if Missing |
+|------------|--------------------|--------------------|
+| After PM | success_criteria, task_groups | Log warning, continue |
+| After spec-loader | skill_outputs | Log warning, continue |
+| Before BAZINGA | All criteria status updated | Block if incomplete |
+
+**Note:** These are non-blocking verification gates except for BAZINGA validation. The workflow continues even if some DB writes are missing, but gaps are logged for debugging.
+
+---
+
 ## Stuck Detection
 
 Track iterations per group. If any group exceeds thresholds:

@@ -106,6 +106,59 @@ For each template path, check frontmatter `compatible_with` array:
 This ensures QA agents get testing patterns, not implementation patterns.
 Tech Leads get review patterns, Investigators get debugging patterns, etc.
 
+### Step 3.6: Auto-Augment Role Defaults (Dynamic QA/TL Templates)
+
+**After filtering by compatibility, if filtered_templates is empty or missing role-specific guidance, auto-add role defaults.**
+
+**Gating conditions (ALL must be true to augment):**
+1. `agent_type` is in augmentation table below
+2. `testing_mode` == "full" (read from `bazinga/testing_config.json`, default to "full" if missing)
+3. Template file exists at path
+
+**Role Default Templates:**
+
+| Agent Type | Auto-Added Templates | Condition |
+|------------|---------------------|-----------|
+| qa_expert | `08-testing/qa-strategies.md`, `08-testing/testing-patterns.md` | testing_mode=full |
+| tech_lead | `11-domains/code-review.md` | always |
+| investigator | (none) | - |
+| developer | (none - uses PM-assigned) | - |
+| senior_software_engineer | (none - uses PM-assigned) | - |
+| requirements_engineer | `11-domains/research-analysis.md` | always |
+
+**Stack-Aware QA Augmentation:**
+
+If `project_context.json` exists, derive QA templates from detected testing frameworks:
+
+| Detected Testing | Additional Template |
+|------------------|---------------------|
+| pytest | `08-testing/testing-patterns.md` |
+| jest | `08-testing/testing-patterns.md` |
+| playwright, cypress | `08-testing/playwright-cypress.md` |
+| selenium | `08-testing/selenium.md` |
+
+**Implementation:**
+```bash
+# 1. Check testing_mode (default to "full" if config missing)
+TESTING_MODE=$(cat bazinga/testing_config.json 2>/dev/null | grep -o '"mode"[^,]*' | cut -d'"' -f4)
+TESTING_MODE=${TESTING_MODE:-full}
+
+# 2. If qa_expert and testing_mode=full, add QA defaults
+if [ "$AGENT_TYPE" = "qa_expert" ] && [ "$TESTING_MODE" = "full" ]; then
+  # Add qa-strategies.md if not already in list
+  # Add testing-patterns.md if not already in list
+fi
+```
+
+**Deduplicate:** Remove any duplicates after augmentation (template already in PM-assigned list).
+
+**Log augmentation:** Include in Step 7 skill_outputs: `"augmented_templates": ["08-testing/qa-strategies.md"]`
+
+**Skip augmentation when:**
+- `testing_mode` is "minimal" or "disabled" (QA bypassed)
+- `specializations.enabled` is false in skills_config.json
+- Template file doesn't exist
+
 ### Step 4: Read Templates with Token Tracking
 
 For each path in specialization_paths (filtered by compatibility, sorted by priority):

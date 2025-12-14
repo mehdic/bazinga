@@ -53,11 +53,81 @@ This is a **simple mode** task - single developer should handle implementation.
 
 ## Post-Orchestration Verification
 After BAZINGA completion, verify:
-1. All expected files exist in `tmp/simple-calculator-app/`
-2. DB tables populated:
-   - `sessions` - New session created
-   - `orchestration_logs` - Entries for each agent spawn
-   - `task_groups` - Task group for calculator implementation
-   - `token_usage` - Token tracking per agent
-   - `decisions` - PM and Tech Lead decisions logged
-3. Tests pass when run: `pytest tmp/simple-calculator-app/test_calculator.py`
+
+### 1. File Verification
+All expected files exist in `tmp/simple-calculator-app/`:
+- [ ] `calculator.py` - Main calculator module
+- [ ] `test_calculator.py` - Pytest tests (50+ tests expected)
+- [ ] `README.md` - Documentation
+
+### 2. Core DB Tables
+- [ ] `sessions` - New session with status "completed"
+- [ ] `orchestration_logs` - Entries for PM, Developer, QA, Tech Lead, BAZINGA
+- [ ] `task_groups` - Task group CALC with status "completed"
+
+### 3. Context Engineering Verification (NEW)
+
+**QA Specialization Templates:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+```
+- [ ] QA Expert should receive > 0 templates (not 0)
+- [ ] If testing_mode=full, expect: `08-testing/qa-strategies.md` or `08-testing/testing-patterns.md`
+- [ ] `augmented_templates` field should be populated for qa_expert spawn
+
+**Success Criteria:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+```
+- [ ] Should return 7-11 criteria (matching acceptance criteria above)
+- [ ] All criteria should have status "met" at BAZINGA time
+
+**Skill Outputs:**
+```bash
+sqlite3 bazinga/bazinga.db "SELECT * FROM skill_outputs WHERE session_id='{session_id}';"
+```
+- [ ] At least 1 entry for specialization-loader
+- [ ] Contains templates_used, token_count fields
+
+**Reasoning Logs (Optional - agents may not always log):**
+```bash
+sqlite3 bazinga/bazinga.db "SELECT agent_type, reasoning_phase FROM orchestration_logs WHERE session_id='{session_id}' AND reasoning_phase IS NOT NULL;"
+```
+- [ ] Developer: `understanding`, `completion` phases
+- [ ] QA Expert: `understanding`, `completion` phases
+- [ ] Tech Lead: `understanding`, `completion` phases
+
+### 4. Test Execution
+```bash
+cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
+```
+- [ ] All tests pass (50+ tests expected)
+- [ ] 100% pass rate
+
+### 5. Known Issues to Watch
+
+| Issue | Expected | Workaround |
+|-------|----------|------------|
+| QA Expert 0 templates | Should get qa-strategies.md via auto-augment | Fixed in specialization-loader Step 3.6 |
+| Empty skill_outputs | Should have specialization-loader entry | Non-blocking, logged for debugging |
+| Empty reasoning_log | Should have understanding+completion | Non-blocking, agents may skip |
+| Empty success_criteria | PM should persist criteria | Check PM state JSON instead |
+
+## Verification Commands (Quick Reference)
+
+```bash
+# Check session status
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+
+# Full dashboard snapshot
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "{session_id}"
+
+# QA template verification
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+
+# Success criteria
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+
+# Run tests
+cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
+```
