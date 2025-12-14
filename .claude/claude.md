@@ -1083,7 +1083,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 | Task Groups | `get-task-groups` | 1+ groups, all completed |
 | Success Criteria | `get-success-criteria` | 7 criteria |
 | Reasoning Entries | `get-reasoning` | 8 entries (2 per agent) |
-| Mandatory Phases | `check-mandatory-phases` | all_documented=true for all |
+| Mandatory Phases | `check-mandatory-phases` | complete=true for all |
 | **Specialization** | `get-skill-output ... specialization-loader` | **3+ entries with composed_identity** |
 | Files | `ls tmp/simple-calculator-app/` | 3 files |
 | Tests | `pytest test_calculator.py` | All pass |

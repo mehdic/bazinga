@@ -1172,9 +1172,12 @@ Include this instruction at the START of PM's spawn prompt (before any analysis)
 
 Before ANY analysis, save your understanding of this request:
 
-1. Create understanding file:
+1. Create session-specific understanding file:
    ```bash
-   cat > /tmp/pm_understanding.md << 'UNDERSTANDING_EOF'
+   # Ensure artifacts directory exists
+   mkdir -p bazinga/artifacts/{session_id}
+
+   cat > bazinga/artifacts/{session_id}/pm_understanding.md << 'UNDERSTANDING_EOF'
    ## PM Understanding Phase
 
    ### Raw Request Summary
@@ -1199,7 +1202,7 @@ Before ANY analysis, save your understanding of this request:
    ```bash
    python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
      "{session_id}" "global" "project_manager" "understanding" \
-     --content-file /tmp/pm_understanding.md --confidence high
+     --content-file bazinga/artifacts/{session_id}/pm_understanding.md --confidence high
    ```
 
 **Do NOT proceed with planning until understanding is saved.**
@@ -1766,12 +1769,12 @@ Extract the block content.
 After extracting the block, verify the skill saved its output to the database:
 
 ```bash
-# Check if skill output was saved
-SKILL_OUTPUT=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet \
-  get-skill-output "{session_id}" "specialization-loader" 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print([x for x in d if x.get('agent_type')=='{agent_type}'])" 2>/dev/null)
+# Check if skill output was saved using get-skill-output-all (returns array)
+SKILL_COUNT=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet \
+  get-skill-output-all "{session_id}" "specialization-loader" --agent "{agent_type}" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d, list) else 0)" 2>/dev/null)
 
-if [ -z "$SKILL_OUTPUT" ] || [ "$SKILL_OUTPUT" = "[]" ]; then
+if [ -z "$SKILL_COUNT" ] || [ "$SKILL_COUNT" = "0" ]; then
   echo "⚠️ WARNING: Skill output not saved to database. Saving fallback..."
   # Orchestrator saves minimal record as fallback
   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-output \
@@ -1783,7 +1786,7 @@ if [ -z "$SKILL_OUTPUT" ] || [ "$SKILL_OUTPUT" = "[]" ]; then
       "token_count": 0,
       "composed_identity": "Fallback: skill did not save output",
       "fallback": true
-    }'
+    }' --agent "{agent_type}" --group "{group_id}"
 fi
 ```
 

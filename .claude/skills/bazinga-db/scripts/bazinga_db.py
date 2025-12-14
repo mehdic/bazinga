@@ -1385,26 +1385,64 @@ class BazingaDB:
                          agent_type: Optional[str] = None, group_id: Optional[str] = None) -> int:
         """Save skill output with auto-computed iteration.
 
-        Iteration is computed atomically server-side to prevent race conditions.
+        Iteration is computed atomically using INSERT...SELECT to prevent race conditions.
+        Uses UNIQUE constraint with retry on IntegrityError for concurrent safety.
         Returns the iteration number assigned.
         """
         conn = self._get_connection()
+        max_retries = 3
 
-        # Compute iteration atomically: max(iteration) + 1 for same (session, skill, agent, group)
-        # This is done in a single transaction to prevent race conditions
-        row = conn.execute("""
-            SELECT COALESCE(MAX(iteration), 0) as max_iter FROM skill_outputs
-            WHERE session_id = ? AND skill_name = ? AND agent_type IS ? AND group_id IS ?
-        """, (session_id, skill_name, agent_type, group_id)).fetchone()
+        for attempt in range(max_retries):
+            try:
+                # Use BEGIN IMMEDIATE to acquire exclusive lock upfront
+                conn.execute("BEGIN IMMEDIATE")
 
-        next_iteration = (row['max_iter'] if row else 0) + 1
+                # Atomic INSERT with computed iteration using INSERT...SELECT
+                # Build WHERE clause properly for NULL handling
+                if agent_type is None and group_id is None:
+                    where_clause = "agent_type IS NULL AND group_id IS NULL"
+                    params = (session_id, skill_name, json.dumps(output_data), session_id, skill_name)
+                elif agent_type is None:
+                    where_clause = "agent_type IS NULL AND group_id = ?"
+                    params = (session_id, skill_name, json.dumps(output_data), group_id, session_id, skill_name, group_id)
+                elif group_id is None:
+                    where_clause = "agent_type = ? AND group_id IS NULL"
+                    params = (session_id, skill_name, json.dumps(output_data), agent_type, session_id, skill_name, agent_type)
+                else:
+                    where_clause = "agent_type = ? AND group_id = ?"
+                    params = (session_id, skill_name, json.dumps(output_data), agent_type, group_id, session_id, skill_name, agent_type, group_id)
 
-        conn.execute("""
-            INSERT INTO skill_outputs (session_id, skill_name, output_data, agent_type, group_id, iteration)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (session_id, skill_name, json.dumps(output_data), agent_type, group_id, next_iteration))
-        conn.commit()
-        conn.close()
+                cursor = conn.execute(f"""
+                    INSERT INTO skill_outputs (session_id, skill_name, output_data, agent_type, group_id, iteration)
+                    SELECT ?, ?, ?, {'NULL' if agent_type is None else '?'}, {'NULL' if group_id is None else '?'},
+                           COALESCE((SELECT MAX(iteration) FROM skill_outputs
+                                     WHERE session_id = ? AND skill_name = ? AND {where_clause}), 0) + 1
+                """, params)
+
+                # Get the iteration that was assigned
+                next_iteration = conn.execute(f"""
+                    SELECT iteration FROM skill_outputs
+                    WHERE rowid = ?
+                """, (cursor.lastrowid,)).fetchone()['iteration']
+
+                conn.commit()
+                conn.close()
+                break  # Success, exit retry loop
+
+            except sqlite3.IntegrityError as e:
+                conn.rollback()
+                if attempt < max_retries - 1:
+                    # Retry on UNIQUE constraint violation (concurrent insert)
+                    import time
+                    time.sleep(0.01 * (attempt + 1))  # Brief backoff
+                    continue
+                else:
+                    conn.close()
+                    raise
+            except Exception as e:
+                conn.rollback()
+                conn.close()
+                raise
 
         if agent_type:
             self._print_success(f"✓ Saved {skill_name} output for {agent_type} (iteration {next_iteration})")
@@ -1442,22 +1480,25 @@ class BazingaDB:
         """Get all skill outputs for a skill (supports multi-invocation).
 
         Returns array of objects with iteration, agent_type, group_id, timestamp, and output_data.
+        Ordered by timestamp DESC (most recent first) for consistent access patterns.
         """
         conn = self._get_connection()
 
         if agent_type:
+            # Filter by agent type, order by timestamp DESC for consistent "latest first"
             rows = conn.execute("""
                 SELECT iteration, agent_type, group_id, timestamp, output_data
                 FROM skill_outputs
                 WHERE session_id = ? AND skill_name = ? AND agent_type = ?
-                ORDER BY iteration ASC
+                ORDER BY timestamp DESC
             """, (session_id, skill_name, agent_type)).fetchall()
         else:
+            # All outputs for skill, order by timestamp DESC
             rows = conn.execute("""
                 SELECT iteration, agent_type, group_id, timestamp, output_data
                 FROM skill_outputs
                 WHERE session_id = ? AND skill_name = ?
-                ORDER BY timestamp ASC
+                ORDER BY timestamp DESC
             """, (session_id, skill_name)).fetchall()
 
         conn.close()
@@ -3174,11 +3215,23 @@ def main():
                 else:
                     positional_args.append(cmd_args[i])
                     i += 1
+            # Validate required arguments
+            if len(positional_args) < 3:
+                print(json.dumps({
+                    "success": False,
+                    "error": "save-skill-output requires <session_id> <skill_name> <output_json> [--agent <type>] [--group <id>]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
             session_id = positional_args[0]
             skill_name = positional_args[1]
-            output_data = json.loads(positional_args[2])
+            try:
+                output_data = json.loads(positional_args[2])
+            except json.JSONDecodeError as e:
+                print(json.dumps({"success": False, "error": f"Invalid JSON in output_data: {e}"}, indent=2), file=sys.stderr)
+                sys.exit(1)
             iteration = db.save_skill_output(session_id, skill_name, output_data, agent_type, group_id)
-            print(json.dumps({"iteration": iteration}))
+            if not quiet:
+                print(json.dumps({"iteration": iteration}))
         elif cmd == 'get-skill-output':
             # Parse --agent flag
             agent_type = None
@@ -3191,6 +3244,13 @@ def main():
                 else:
                     positional_args.append(cmd_args[i])
                     i += 1
+            # Validate required arguments
+            if len(positional_args) < 2:
+                print(json.dumps({
+                    "success": False,
+                    "error": "get-skill-output requires <session_id> <skill_name> [--agent <type>]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
             session_id = positional_args[0]
             skill_name = positional_args[1]
             result = db.get_skill_output(session_id, skill_name, agent_type)
@@ -3207,6 +3267,13 @@ def main():
                 else:
                     positional_args.append(cmd_args[i])
                     i += 1
+            # Validate required arguments
+            if len(positional_args) < 2:
+                print(json.dumps({
+                    "success": False,
+                    "error": "get-skill-output-all requires <session_id> <skill_name> [--agent <type>]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
             session_id = positional_args[0]
             skill_name = positional_args[1]
             result = db.get_skill_output_all(session_id, skill_name, agent_type)

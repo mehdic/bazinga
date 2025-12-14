@@ -674,7 +674,7 @@ for agent, agent_list in agent_entries.items():
 
 entries = pruned_entries
 
-# Sort by priority phase, then by timestamp (most recent first)
+# Sort by priority phase, then by timestamp (most recent first within each phase)
 def phase_priority(entry):
     phase = entry.get('phase', 'understanding')
     try:
@@ -682,7 +682,10 @@ def phase_priority(entry):
     except ValueError:
         return len(PRIORITY_PHASES)  # Unknown phases last
 
-entries.sort(key=lambda e: (phase_priority(e), e.get('timestamp', '')), reverse=False)
+# Two-pass sort: first by timestamp DESC, then stable sort by phase priority ASC
+# This gives us most recent entries first within each phase
+entries.sort(key=lambda e: e.get('timestamp', ''), reverse=True)  # timestamp DESC
+entries.sort(key=phase_priority)  # phase priority ASC (stable sort preserves timestamp order)
 
 # FIX 3: Apply total entry limit
 entries = entries[:MAX_TOTAL_ENTRIES]

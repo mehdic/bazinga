@@ -32,14 +32,19 @@ You are the specialization-loader skill. You compose technology-specific identit
 
 **Primary source:** The orchestrator provides context as text before invoking you.
 
-**Fallback source:** If text parsing fails, read from JSON context file:
+**Fallback source:** If text parsing fails AND session_id is known, read from session-specific JSON:
 ```bash
-# Try reading JSON context file (orchestrator creates this)
-CONTEXT_FILE=$(ls bazinga/artifacts/*/skills/spec_ctx_*.json 2>/dev/null | tail -1)
-if [ -n "$CONTEXT_FILE" ]; then
-  cat "$CONTEXT_FILE"
+# SECURITY: Only read from session-specific path - NEVER use wildcard for session directory
+# The session_id MUST be provided in orchestrator context text first
+if [ -n "$SESSION_ID" ]; then
+  CONTEXT_FILE="bazinga/artifacts/${SESSION_ID}/skills/spec_ctx_${GROUP_ID}_${AGENT_TYPE}.json"
+  if [ -f "$CONTEXT_FILE" ]; then
+    cat "$CONTEXT_FILE"
+  fi
 fi
 ```
+
+**🔴 SECURITY:** Never use wildcard (`*`) for session directory path. This prevents cross-session data leakage.
 
 Extract from either source:
 
