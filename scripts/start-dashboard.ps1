@@ -51,8 +51,8 @@ if (Test-DirectoryWritable $Orchestrix_DIR) {
     $DASHBOARD_LOG = Join-Path $Orchestrix_DIR "dashboard.log"
 } else {
     # Fallback to TEMP directory if Orchestrix_DIR is not writable
-    $DASHBOARD_PID_FILE = Join-Path $env:TEMP "bazinga-dashboard.pid"
-    $DASHBOARD_LOG = Join-Path $env:TEMP "bazinga-dashboard.log"
+    $DASHBOARD_PID_FILE = Join-Path $env:TEMP "orchestrix-dashboard.pid"
+    $DASHBOARD_LOG = Join-Path $env:TEMP "orchestrix-dashboard.log"
 }
 
 function Write-Log {
@@ -71,7 +71,7 @@ if (-not (Test-Path $DASHBOARD_DIR)) {
     Write-Log "Dashboard not installed, skipping startup"
     Write-Host "Dashboard not installed, skipping startup" -ForegroundColor Yellow
     Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
-    Write-Host "  To install: bazinga setup-dashboard" -ForegroundColor DarkGray
+    Write-Host "  To install: orchestrix setup-dashboard" -ForegroundColor DarkGray
     # Respect DASHBOARD_STRICT for CI that requires dashboard
     if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
@@ -81,7 +81,7 @@ if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
     Write-Log "Node.js not found, cannot start dashboard"
     Write-Host "Node.js not found, cannot start dashboard" -ForegroundColor Yellow
     Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
-    Write-Host "  To enable: install Node.js and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
+    Write-Host "  To enable: install Node.js and run 'orchestrix setup-dashboard'" -ForegroundColor DarkGray
     # Respect DASHBOARD_STRICT for CI that requires dashboard
     if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }
@@ -98,7 +98,7 @@ if (-not $majorVersion -or $majorVersion -lt 18) {
     Write-Log "Node.js 18+ required (found v$nodeVersion), skipping dashboard"
     Write-Host "Node.js 18+ required for dashboard (found v$nodeVersion)" -ForegroundColor Yellow
     Write-Host "  (Dashboard is optional - no impact on Orchestrix functionality)" -ForegroundColor DarkGray
-    Write-Host "  To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'" -ForegroundColor DarkGray
+    Write-Host "  To enable: upgrade Node.js to 18+ and run 'orchestrix setup-dashboard'" -ForegroundColor DarkGray
     # Respect DASHBOARD_STRICT for CI that requires dashboard
     if ($env:DASHBOARD_STRICT -eq '1') { exit 1 } else { exit 0 }
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Pre-commit hook for BAZINGA development
+# Pre-commit hook for Orchestrix development
 #
 # Handles:
 # 1. Orchestrator agent → slash command rebuilding
@@ -34,7 +34,7 @@ if echo "$STAGED_FILES" | grep -q "^agents/orchestrator\.md$"; then
     fi
 
     # Stage the generated file
-    git add .claude/commands/bazinga.orchestrate.md
+    git add .claude/commands/orchestrix.orchestrate.md
 
     echo "   ✅ Slash command rebuilt and staged"
 fi

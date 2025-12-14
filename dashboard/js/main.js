@@ -13,7 +13,7 @@ const Dashboard = (function() {
     async function init() {
         if (isInitialized) return;
 
-        console.log('🚀 Initializing BAZINGA Dashboard...');
+        console.log('🚀 Initializing Orchestrix Dashboard...');
 
         try {
             // Initialize Mermaid

@@ -10,7 +10,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$COORD_DIR = "bazinga"
+$COORD_DIR = "orchestrix"
 $PM_STATE = Join-Path $COORD_DIR "pm_state.json"
 $METRICS_FILE = Join-Path $COORD_DIR "project_metrics.json"
 $HISTORICAL_FILE = Join-Path $COORD_DIR "historical_metrics.json"

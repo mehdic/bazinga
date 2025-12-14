@@ -21,7 +21,7 @@ else {
 }
 
 # Check config file sync (pyproject.toml vs ALLOWED_CONFIG_FILES)
-if ((Test-Path "pyproject.toml") -and (Test-Path "src\bazinga_cli\__init__.py")) {
+if ((Test-Path "pyproject.toml") -and (Test-Path "src\orchestrix_cli\__init__.py")) {
     # Quick sync check using Python (with tomllib/tomli fallback for Python 3.9/3.10)
     # Cross-platform Python detection (handles py -3 launcher on Windows)
     $pythonCmd = $null
@@ -54,10 +54,10 @@ except ImportError:
 with open("pyproject.toml", "rb") as f:
     pyproject = tomllib.load(f)
 force_include = pyproject.get("tool", {}).get("hatch", {}).get("build", {}).get("targets", {}).get("wheel", {}).get("force-include", {})
-pyproject_configs = {Path(k).name for k in force_include.keys() if k.startswith("bazinga/") and "templates" not in k}
+pyproject_configs = {Path(k).name for k in force_include.keys() if k.startswith("orchestrix/") and "templates" not in k}
 
 # Get ALLOWED_CONFIG_FILES from __init__.py
-init_content = Path("src/bazinga_cli/__init__.py").read_text()
+init_content = Path("src/orchestrix_cli/__init__.py").read_text()
 match = re.search(r"ALLOWED_CONFIG_FILES\s*=\s*\[(.*?)\]", init_content, re.DOTALL)
 if match:
     allowed_configs = set(re.findall(r"['\"]([^'\"]+)['\"]", match.group(1)))
@@ -83,11 +83,11 @@ if pyproject_configs != allowed_configs:
 }
 
 # Setup GitHub token for PR automation (if env var is set)
-$tokenFile = Join-Path $HOME ".bazinga-github-token"
+$tokenFile = Join-Path $HOME ".orchestrix-github-token"
 if (-not (Test-Path $tokenFile)) {
-    if ($env:BAZINGA_GITHUB_TOKEN) {
+    if ($env:Orchestrix_GITHUB_TOKEN) {
         # Create token file from environment variable
-        $env:BAZINGA_GITHUB_TOKEN | Out-File -FilePath $tokenFile -Encoding ASCII -NoNewline
+        $env:Orchestrix_GITHUB_TOKEN | Out-File -FilePath $tokenFile -Encoding ASCII -NoNewline
         # Set permissions (Unix only)
         if (Get-Command "chmod" -ErrorAction SilentlyContinue) {
             & chmod 600 $tokenFile
@@ -97,7 +97,7 @@ if (-not (Test-Path $tokenFile)) {
     else {
         Write-Host ""
         Write-Host "⚠️  GitHub PR automation not configured" -ForegroundColor Yellow
-        Write-Host "   Set BAZINGA_GITHUB_TOKEN env var or create ~/.bazinga-github-token"
+        Write-Host "   Set Orchestrix_GITHUB_TOKEN env var or create ~/.orchestrix-github-token"
     }
 }
 

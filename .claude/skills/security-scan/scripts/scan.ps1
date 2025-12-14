@@ -58,29 +58,29 @@ switch ($MODE) {
                     if (-not $?) {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Failed to install bandit"
-                        '{"results":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"results":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         break
                     }
                 }
 
                 $TOOL_USED = "bandit"
                 Write-Host "  Running bandit (high/medium severity)..." -ForegroundColor Gray
-                bandit -r . -f json -o bazinga\security_scan_raw.json -ll 2>$null
+                bandit -r . -f json -o orchestrix\security_scan_raw.json -ll 2>$null
                 if (-not $?) {
                     $SCAN_STATUS = "partial"
                     $SCAN_ERROR = "Bandit scan failed or had errors"
-                    '{"results":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    '{"results":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 }
             }
 
             "javascript" {
                 $TOOL_USED = "npm-audit"
                 Write-Host "  Running npm audit (high severity)..." -ForegroundColor Gray
-                npm audit --audit-level=high --json > bazinga\security_scan_raw.json 2>$null
+                npm audit --audit-level=high --json > orchestrix\security_scan_raw.json 2>$null
                 if (-not $?) {
                     $SCAN_STATUS = "partial"
                     $SCAN_ERROR = "npm audit failed (possibly network issue)"
-                    '{"vulnerabilities":{}}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    '{"vulnerabilities":{}}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 }
             }
 
@@ -92,7 +92,7 @@ switch ($MODE) {
                     if (-not $?) {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Failed to install gosec"
-                        '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         break
                     }
                     $env:PATH = "$env:PATH;$(go env GOPATH)\bin"
@@ -101,11 +101,11 @@ switch ($MODE) {
                 if ($SCAN_STATUS -ne "error") {
                     $TOOL_USED = "gosec"
                     Write-Host "  Running gosec (high severity)..." -ForegroundColor Gray
-                    gosec -severity high -fmt json -out bazinga\security_scan_raw.json .\... 2>$null
+                    gosec -severity high -fmt json -out orchestrix\security_scan_raw.json .\... 2>$null
                     if (-not $?) {
                         $SCAN_STATUS = "partial"
                         $SCAN_ERROR = "gosec scan failed"
-                        '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                     }
                 }
             }
@@ -118,18 +118,18 @@ switch ($MODE) {
                     if (-not $?) {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Failed to install brakeman"
-                        '{"warnings":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"warnings":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         break
                     }
                 }
 
                 $TOOL_USED = "brakeman"
                 Write-Host "  Running brakeman (high severity)..." -ForegroundColor Gray
-                brakeman -f json -o bazinga\security_scan_raw.json --severity-level 1 2>$null
+                brakeman -f json -o orchestrix\security_scan_raw.json --severity-level 1 2>$null
                 if (-not $?) {
                     $SCAN_STATUS = "partial"
                     $SCAN_ERROR = "brakeman scan failed"
-                    '{"warnings":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    '{"warnings":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 }
             }
 
@@ -147,14 +147,14 @@ switch ($MODE) {
 
                         # Check if SpotBugs report exists
                         if (Test-Path "target\spotbugsXml.xml") {
-                            '{"tool":"spotbugs","source":"target/spotbugsXml.xml"}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                            '{"tool":"spotbugs","source":"target/spotbugsXml.xml"}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         } else {
-                            '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                            '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         }
                     } else {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Maven not found for Java project"
-                        '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                     }
                 } elseif ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts")) {
                     $TOOL_USED = "spotbugs-gradle"
@@ -170,19 +170,19 @@ switch ($MODE) {
 
                         # Check for Gradle SpotBugs report
                         if (Test-Path "build\reports\spotbugs\main.xml") {
-                            '{"tool":"spotbugs","source":"build/reports/spotbugs/main.xml"}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                            '{"tool":"spotbugs","source":"build/reports/spotbugs/main.xml"}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         } else {
-                            '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                            '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         }
                     } else {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Gradle not found for Java project"
-                        '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                     }
                 } else {
                     $SCAN_STATUS = "error"
                     $SCAN_ERROR = "No Maven or Gradle build file found for Java project"
-                    '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 }
             }
 
@@ -190,7 +190,7 @@ switch ($MODE) {
                 Write-Host "❌ Unknown language. Cannot run security scan." -ForegroundColor Red
                 $SCAN_STATUS = "error"
                 $SCAN_ERROR = "Unknown or unsupported language"
-                '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
             }
         }
 
@@ -211,7 +211,7 @@ switch ($MODE) {
                     if (-not $?) {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Failed to install bandit"
-                        '{"results":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"results":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         break
                     }
                 }
@@ -230,33 +230,33 @@ switch ($MODE) {
                 if ($SCAN_STATUS -ne "error") {
                     # Run bandit (all severities)
                     Write-Host "  Running bandit (all severities)..." -ForegroundColor Gray
-                    bandit -r . -f json -o bazinga\bandit_full.json 2>$null
+                    bandit -r . -f json -o orchestrix\bandit_full.json 2>$null
                     if (-not $?) {
                         $SCAN_STATUS = "partial"
                         $SCAN_ERROR = if ($SCAN_ERROR) { "$SCAN_ERROR; Bandit scan failed" } else { "Bandit scan failed" }
-                        '{"results":[]}' | Out-File -FilePath "bazinga\bandit_full.json" -Encoding UTF8
+                        '{"results":[]}' | Out-File -FilePath "orchestrix\bandit_full.json" -Encoding UTF8
                     }
 
                     # Run semgrep if available
                     if (Test-CommandExists "semgrep") {
                         Write-Host "  Running semgrep (security patterns)..." -ForegroundColor Gray
-                        semgrep --config=auto --json -o bazinga\semgrep.json 2>$null
+                        semgrep --config=auto --json -o orchestrix\semgrep.json 2>$null
                         if (-not $?) {
                             $SCAN_STATUS = "partial"
                             $SCAN_ERROR = if ($SCAN_ERROR) { "$SCAN_ERROR; Semgrep scan failed" } else { "Semgrep scan failed" }
-                            '{"results":[]}' | Out-File -FilePath "bazinga\semgrep.json" -Encoding UTF8
+                            '{"results":[]}' | Out-File -FilePath "orchestrix\semgrep.json" -Encoding UTF8
                         }
                     } else {
-                        '{"results":[]}' | Out-File -FilePath "bazinga\semgrep.json" -Encoding UTF8
+                        '{"results":[]}' | Out-File -FilePath "orchestrix\semgrep.json" -Encoding UTF8
                     }
 
                     # Combine results (PowerShell JSON merge)
-                    $banditData = Get-Content "bazinga\bandit_full.json" -Raw | ConvertFrom-Json
-                    $semgrepData = Get-Content "bazinga\semgrep.json" -Raw | ConvertFrom-Json
+                    $banditData = Get-Content "orchestrix\bandit_full.json" -Raw | ConvertFrom-Json
+                    $semgrepData = Get-Content "orchestrix\semgrep.json" -Raw | ConvertFrom-Json
                     @{
                         bandit = $banditData
                         semgrep = $semgrepData
-                    } | ConvertTo-Json -Depth 10 | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    } | ConvertTo-Json -Depth 10 | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 }
             }
 
@@ -265,11 +265,11 @@ switch ($MODE) {
 
                 # Full npm audit
                 Write-Host "  Running npm audit (all severabilities)..." -ForegroundColor Gray
-                npm audit --json > bazinga\npm_audit.json 2>$null
+                npm audit --json > orchestrix\npm_audit.json 2>$null
                 if (-not $?) {
                     $SCAN_STATUS = "partial"
                     $SCAN_ERROR = "npm audit failed (possibly network issue)"
-                    '{"vulnerabilities":{}}' | Out-File -FilePath "bazinga\npm_audit.json" -Encoding UTF8
+                    '{"vulnerabilities":{}}' | Out-File -FilePath "orchestrix\npm_audit.json" -Encoding UTF8
                 }
 
                 # Try eslint with security plugin if available
@@ -277,22 +277,22 @@ switch ($MODE) {
                 if ($?) {
                     $TOOL_USED = "npm-audit+eslint-security"
                     Write-Host "  Running eslint security plugin..." -ForegroundColor Gray
-                    npx eslint . --plugin security --format json > bazinga\eslint_security.json 2>$null
+                    npx eslint . --plugin security --format json > orchestrix\eslint_security.json 2>$null
                     if (-not $?) {
                         $SCAN_STATUS = "partial"
                         $SCAN_ERROR = if ($SCAN_ERROR) { "$SCAN_ERROR; eslint-security scan failed" } else { "eslint-security scan failed" }
-                        '[]' | Out-File -FilePath "bazinga\eslint_security.json" -Encoding UTF8
+                        '[]' | Out-File -FilePath "orchestrix\eslint_security.json" -Encoding UTF8
                     }
 
                     # Combine results
-                    $npmData = Get-Content "bazinga\npm_audit.json" -Raw | ConvertFrom-Json
-                    $eslintData = Get-Content "bazinga\eslint_security.json" -Raw | ConvertFrom-Json
+                    $npmData = Get-Content "orchestrix\npm_audit.json" -Raw | ConvertFrom-Json
+                    $eslintData = Get-Content "orchestrix\eslint_security.json" -Raw | ConvertFrom-Json
                     @{
                         npm_audit = $npmData
                         eslint = $eslintData
-                    } | ConvertTo-Json -Depth 10 | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    } | ConvertTo-Json -Depth 10 | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 } else {
-                    Copy-Item "bazinga\npm_audit.json" "bazinga\security_scan_raw.json"
+                    Copy-Item "orchestrix\npm_audit.json" "orchestrix\security_scan_raw.json"
                 }
             }
 
@@ -306,7 +306,7 @@ switch ($MODE) {
                     if (-not $?) {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Failed to install gosec"
-                        '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         break
                     }
                     $env:PATH = "$env:PATH;$(go env GOPATH)\bin"
@@ -314,11 +314,11 @@ switch ($MODE) {
 
                 if ($SCAN_STATUS -ne "error") {
                     Write-Host "  Running gosec (all severities)..." -ForegroundColor Gray
-                    gosec -fmt json -out bazinga\security_scan_raw.json .\... 2>$null
+                    gosec -fmt json -out orchestrix\security_scan_raw.json .\... 2>$null
                     if (-not $?) {
                         $SCAN_STATUS = "partial"
                         $SCAN_ERROR = "gosec scan failed"
-                        '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                     }
                 }
             }
@@ -333,17 +333,17 @@ switch ($MODE) {
                     if (-not $?) {
                         $SCAN_STATUS = "error"
                         $SCAN_ERROR = "Failed to install brakeman"
-                        '{"warnings":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                        '{"warnings":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                         break
                     }
                 }
 
                 Write-Host "  Running brakeman (all findings)..." -ForegroundColor Gray
-                brakeman -f json -o bazinga\security_scan_raw.json 2>$null
+                brakeman -f json -o orchestrix\security_scan_raw.json 2>$null
                 if (-not $?) {
                     $SCAN_STATUS = "partial"
                     $SCAN_ERROR = "brakeman scan failed"
-                    '{"warnings":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                    '{"warnings":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
                 }
             }
 
@@ -398,23 +398,23 @@ switch ($MODE) {
                 # Run semgrep if available
                 if (Test-CommandExists "semgrep") {
                     Write-Host "  Running semgrep for Java..." -ForegroundColor Gray
-                    semgrep --config=auto --json -o bazinga\semgrep_java.json 2>$null
+                    semgrep --config=auto --json -o orchestrix\semgrep_java.json 2>$null
                     if (-not $?) {
                         $SCAN_STATUS = "partial"
                         $SCAN_ERROR = if ($SCAN_ERROR) { "$SCAN_ERROR; Semgrep scan failed" } else { "Semgrep scan failed" }
-                        '{"results":[]}' | Out-File -FilePath "bazinga\semgrep_java.json" -Encoding UTF8
+                        '{"results":[]}' | Out-File -FilePath "orchestrix\semgrep_java.json" -Encoding UTF8
                     }
                 }
 
                 # Consolidate Java results
-                '{"tool":"spotbugs+owasp+semgrep","status":"see_build_reports"}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                '{"tool":"spotbugs+owasp+semgrep","status":"see_build_reports"}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
             }
 
             default {
                 Write-Host "❌ Unknown language. Cannot run security scan." -ForegroundColor Red
                 $SCAN_STATUS = "error"
                 $SCAN_ERROR = "Unknown or unsupported language"
-                '{"issues":[]}' | Out-File -FilePath "bazinga\security_scan_raw.json" -Encoding UTF8
+                '{"issues":[]}' | Out-File -FilePath "orchestrix\security_scan_raw.json" -Encoding UTF8
             }
         }
 
@@ -431,7 +431,7 @@ switch ($MODE) {
 $TIMESTAMP = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 # Read raw results and add metadata
-$rawData = Get-Content "bazinga\security_scan_raw.json" -Raw | ConvertFrom-Json
+$rawData = Get-Content "orchestrix\security_scan_raw.json" -Raw | ConvertFrom-Json
 
 # Create final report with metadata and status
 $finalReport = @{
@@ -448,19 +448,19 @@ $rawData.PSObject.Properties | ForEach-Object {
     $finalReport[$_.Name] = $_.Value
 }
 
-$finalReport | ConvertTo-Json -Depth 10 | Out-File -FilePath "bazinga\security_scan.json" -Encoding UTF8
+$finalReport | ConvertTo-Json -Depth 10 | Out-File -FilePath "orchestrix\security_scan.json" -Encoding UTF8
 
 # Clean up intermediate files
-Remove-Item "bazinga\bandit_full.json" -ErrorAction SilentlyContinue
-Remove-Item "bazinga\semgrep.json" -ErrorAction SilentlyContinue
-Remove-Item "bazinga\npm_audit.json" -ErrorAction SilentlyContinue
-Remove-Item "bazinga\eslint_security.json" -ErrorAction SilentlyContinue
-Remove-Item "bazinga\security_scan_raw.json" -ErrorAction SilentlyContinue
-Remove-Item "bazinga\semgrep_java.json" -ErrorAction SilentlyContinue
+Remove-Item "orchestrix\bandit_full.json" -ErrorAction SilentlyContinue
+Remove-Item "orchestrix\semgrep.json" -ErrorAction SilentlyContinue
+Remove-Item "orchestrix\npm_audit.json" -ErrorAction SilentlyContinue
+Remove-Item "orchestrix\eslint_security.json" -ErrorAction SilentlyContinue
+Remove-Item "orchestrix\security_scan_raw.json" -ErrorAction SilentlyContinue
+Remove-Item "orchestrix\semgrep_java.json" -ErrorAction SilentlyContinue
 
 # Report status
 Write-Host "📊 Scan mode: $MODE | Language: $LANG | Status: $SCAN_STATUS" -ForegroundColor Cyan
 if ($SCAN_STATUS -ne "success") {
     Write-Host "⚠️  WARNING: $SCAN_ERROR" -ForegroundColor Yellow
 }
-Write-Host "📁 Results saved to: bazinga\security_scan.json" -ForegroundColor Cyan
+Write-Host "📁 Results saved to: orchestrix\security_scan.json" -ForegroundColor Cyan

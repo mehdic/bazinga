@@ -14,13 +14,13 @@ try {
 Write-Host "🔨 Building slash commands from agent sources..."
 
 # -----------------------------------------------------------------------------
-# 1. Build bazinga.orchestrate.md from agents/orchestrator.md
+# 1. Build orchestrix.orchestrate.md from agents/orchestrator.md
 # -----------------------------------------------------------------------------
 
-Write-Host "  → Building .claude\commands\bazinga.orchestrate.md"
+Write-Host "  → Building .claude\commands\orchestrix.orchestrate.md"
 
 $SOURCE_FILE = "agents\orchestrator.md"
-$TARGET_FILE = ".claude\commands\bazinga.orchestrate.md"
+$TARGET_FILE = ".claude\commands\orchestrix.orchestrate.md"
 
 # Validate source file exists
 if (-not (Test-Path $SOURCE_FILE)) {
@@ -144,7 +144,7 @@ Write-Host "  ✅ Validation passed ($LINE_COUNT lines)" -ForegroundColor Green
 # Move to final location
 Move-Item -Path $TEMP_FILE -Destination $TARGET_FILE -Force
 
-Write-Host "  ✅ bazinga.orchestrate.md built successfully" -ForegroundColor Green
+Write-Host "  ✅ orchestrix.orchestrate.md built successfully" -ForegroundColor Green
 
 # -----------------------------------------------------------------------------
 # Summary
@@ -154,7 +154,7 @@ Write-Host ""
 Write-Host "✅ Slash commands built successfully!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Generated files:"
-Write-Host "  - .claude\commands\bazinga.orchestrate.md (from agents\orchestrator.md)"
+Write-Host "  - .claude\commands\orchestrix.orchestrate.md (from agents\orchestrator.md)"
 Write-Host ""
 Write-Host "Note: orchestrate-advanced uses embedded prompts and doesn't need building"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 # Directories
-$COORD_DIR = "bazinga"
+$COORD_DIR = "orchestrix"
 $SECURITY_FILE = "$COORD_DIR/security_scan.json"
 $COVERAGE_FILE = "$COORD_DIR/coverage_report.json"
 $LINT_FILE = "$COORD_DIR/lint_results.json"
@@ -334,4 +334,4 @@ if ($RECOMMENDATIONS.Count -gt 0) {
 }
 
 Write-Host ""
-Write-Host "📄 Full dashboard: bazinga/quality_dashboard.json"
+Write-Host "📄 Full dashboard: orchestrix/quality_dashboard.json"

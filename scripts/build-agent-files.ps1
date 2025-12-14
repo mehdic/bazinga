@@ -77,7 +77,7 @@ if ($Check) {
     Write-Host ""
 
     # Create temp directory for generated files
-    $TEMP_DIR = Join-Path ([System.IO.Path]::GetTempPath()) "bazinga-build-$(Get-Date -Format 'yyyyMMddHHmmss')"
+    $TEMP_DIR = Join-Path ([System.IO.Path]::GetTempPath()) "orchestrix-build-$(Get-Date -Format 'yyyyMMddHHmmss')"
     New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null
 
     try {
