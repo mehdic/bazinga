@@ -319,6 +319,59 @@ This ensures:
 
 ---
 
+## 🔴 CRITICAL: NEVER Use Inline SQL - ALWAYS Use bazinga-db Skill
+
+**This rule is MANDATORY, NON-NEGOTIABLE, and must ALWAYS be implemented and verified.**
+
+### ❌ ABSOLUTELY FORBIDDEN
+
+```python
+# ❌ NEVER write inline SQL like this:
+python3 -c "import sqlite3; conn = sqlite3.connect('bazinga/bazinga.db'); ..."
+
+# ❌ NEVER use raw SQL queries:
+cursor.execute("SELECT * FROM sessions WHERE ...")
+cursor.execute("UPDATE task_groups SET status = ...")
+cursor.execute("INSERT INTO reasoning_log ...")
+
+# ❌ NEVER access the database file directly:
+sqlite3 bazinga/bazinga.db "SELECT ..."
+```
+
+### ✅ ALWAYS Use bazinga-db Skill
+
+```python
+# ✅ CORRECT: Use the bazinga-db skill for ALL database operations
+Skill(command: "bazinga-db") → list-sessions
+Skill(command: "bazinga-db") → get-task-groups {session_id}
+Skill(command: "bazinga-db") → save-reasoning {session_id} {agent_type} {phase} {content}
+Skill(command: "bazinga-db") → update-task-group {session_id} {group_id} {status}
+
+# ✅ CORRECT: Or use the CLI script (for verification commands in docs)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+```
+
+### Why This Rule Exists
+
+1. **Schema consistency** - Inline SQL uses wrong column names (`group_id` vs `id`) causing data loss
+2. **Validation** - The skill validates inputs before writing to DB
+3. **Audit trail** - All operations through skill are logged
+4. **Migration safety** - Schema changes only need to update the skill, not scattered SQL
+5. **Error handling** - Skill has proper error handling, inline SQL fails silently
+
+### Verification
+
+**When reviewing code or agent prompts, CHECK:**
+- No `sqlite3` imports or commands
+- No raw SQL strings (SELECT, INSERT, UPDATE, DELETE)
+- No direct `bazinga/bazinga.db` file access
+- All DB operations use `Skill(command: "bazinga-db")` or the CLI script
+
+**If you see inline SQL:** STOP and refactor to use the bazinga-db skill immediately.
+
+---
+
 ## 📖 Terminology
 
 | Term | What it actually is |
