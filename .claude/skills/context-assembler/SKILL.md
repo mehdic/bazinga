@@ -37,7 +37,14 @@ Extract from the calling request or infer from conversation:
 - `model`: Model being used - haiku/sonnet/opus or full model ID (OPTIONAL, for token budgeting)
 - `current_tokens`: Current token usage in conversation (OPTIONAL, for zone detection)
 - `iteration`: Current iteration number (optional, default 0)
-- `include_reasoning`: Whether to include prior agent reasoning for handoff (OPTIONAL, default false)
+- `include_reasoning`: Whether to include prior agent reasoning for handoff (OPTIONAL)
+  - **DEFAULT BEHAVIOR:** Automatically `true` for `qa_expert` and `tech_lead` (handoff recipients)
+  - Explicitly set to `false` to disable reasoning for any agent
+  - For `developer`, `senior_software_engineer`, `investigator`: defaults to `false` (first in workflow)
+- `reasoning_level`: Level of detail for reasoning retrieval (OPTIONAL)
+  - `minimal`: 400 tokens - key decisions only
+  - `medium`: 800 tokens - decisions + approach (DEFAULT)
+  - `full`: 1200 tokens - complete reasoning chain
 
 If `session_id` or `agent_type` are missing, check recent conversation context or ask the orchestrator.
 
@@ -488,30 +495,67 @@ echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 - Populates `PACKAGE_IDS` array for Step 5b
 - Includes `investigator` in budget allocation
 
-### Step 3.5: Prior Reasoning Retrieval (Optional)
+### Step 3.5: Prior Reasoning Retrieval (Automatic for Handoffs)
 
-**When to include:** If the request includes `Include Reasoning: true` OR the orchestrator explicitly requests prior agent reasoning for handoff continuity.
+**When to include:**
+- **AUTOMATIC** for `qa_expert` and `tech_lead` (handoff recipients in workflow)
+- **OPTIONAL** for other agents (only if `Include Reasoning: true` is explicit)
+- Can be **disabled** for any agent with `Include Reasoning: false`
 
-**Purpose:** Retrieve prior agents' reasoning to provide continuity during handoffs (e.g., Developer→QA→Tech Lead).
+**Purpose:** Retrieve prior agents' reasoning to provide continuity during handoffs (Developer→QA→Tech Lead).
 
-**Token Budget:** 1200 tokens max for reasoning digest.
+**Reasoning Levels (Token Budgets):**
+
+| Level | Tokens | Content | Use Case |
+|-------|--------|---------|----------|
+| `minimal` | 400 | Key decisions only | Quick handoff, simple tasks |
+| `medium` | 800 | Decisions + approach (DEFAULT) | Standard handoffs |
+| `full` | 1200 | Complete reasoning chain | Complex tasks, debugging |
 
 **Priority Order:** completion > decisions > understanding (most actionable first).
 
-**Variable Setup:** Set `INCLUDE_REASONING` from the request text parsed in Step 1:
+**Variable Setup:** Determine reasoning inclusion based on agent type and explicit overrides:
 ```bash
-# Set from Step 1 parsing (look for "Include Reasoning: true" in request)
-INCLUDE_REASONING="false"  # default
-# If request contains "Include Reasoning: true", set to "true"
+# Step 3.5 Variable Setup
+# Automatic reasoning for handoff recipients (qa_expert, tech_lead)
+# Check for explicit override in request text
+
+AGENT_TYPE="developer"  # From Step 1
+
+# Default based on agent type
+if [ "$AGENT_TYPE" = "qa_expert" ] || [ "$AGENT_TYPE" = "tech_lead" ]; then
+    INCLUDE_REASONING="true"   # Auto-enable for handoff recipients
+else
+    INCLUDE_REASONING="false"  # Disabled for workflow initiators
+fi
+
+# Check for explicit override in request (parse from Step 1)
+# "Include Reasoning: false" -> disable even for QA/TL
+# "Include Reasoning: true" -> enable even for developer
+# "Reasoning Level: full" -> set REASONING_LEVEL
+
+REASONING_LEVEL="medium"  # Default level
+# If request contains "Reasoning Level: minimal" -> REASONING_LEVEL="minimal"
+# If request contains "Reasoning Level: full" -> REASONING_LEVEL="full"
 ```
 
 ```bash
-# Prior reasoning retrieval
-# Variables: $SESSION_ID, $GROUP_ID, $INCLUDE_REASONING (true/false)
-INCLUDE_REASONING="${INCLUDE_REASONING:-false}"
+# Prior reasoning retrieval with level-based token budgets
+# Variables: $SESSION_ID, $GROUP_ID, $AGENT_TYPE, $INCLUDE_REASONING, $REASONING_LEVEL
+
+# Apply agent-type defaults if not explicitly set
+if [ -z "$INCLUDE_REASONING" ]; then
+    if [ "$AGENT_TYPE" = "qa_expert" ] || [ "$AGENT_TYPE" = "tech_lead" ]; then
+        INCLUDE_REASONING="true"
+    else
+        INCLUDE_REASONING="false"
+    fi
+fi
+
+REASONING_LEVEL="${REASONING_LEVEL:-medium}"
 
 if [ "$INCLUDE_REASONING" = "true" ]; then
-    echo "Retrieving prior reasoning for handoff context..."
+    echo "Retrieving prior reasoning for handoff context (level: $REASONING_LEVEL)..."
 
     REASONING_DIGEST=$(python3 -c "
 import sys
@@ -520,7 +564,15 @@ import subprocess
 
 session_id = sys.argv[1]
 group_id = sys.argv[2] if len(sys.argv) > 2 else ''
-max_tokens = 1200  # Fixed budget for reasoning
+reasoning_level = sys.argv[3] if len(sys.argv) > 3 else 'medium'
+
+# Token budget based on reasoning level
+LEVEL_BUDGETS = {
+    'minimal': 400,
+    'medium': 800,
+    'full': 1200
+}
+max_tokens = LEVEL_BUDGETS.get(reasoning_level, 800)
 
 # Query reasoning from database via bazinga-db
 # Priority order: completion > decisions > understanding (most actionable first)
@@ -586,14 +638,15 @@ print(json.dumps({
     'entries': packed,
     'used_tokens': used_tokens,
     'budget': max_tokens,
+    'level': reasoning_level,
     'total_available': len(entries)
 }))
-" "$SESSION_ID" "$GROUP_ID")
+" "$SESSION_ID" "$GROUP_ID" "$REASONING_LEVEL")
 
-    echo "Reasoning digest: $(echo "$REASONING_DIGEST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"entries\",[]))} entries, {d.get(\"used_tokens\",0)}/{d.get(\"budget\",1200)} tokens')" 2>/dev/null || echo 'parse error')"
+    echo "Reasoning digest: $(echo "$REASONING_DIGEST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"entries\",[]))} entries, {d.get(\"used_tokens\",0)}/{d.get(\"budget\",800)} tokens (level: {d.get(\"level\", \"medium\")})')" 2>/dev/null || echo 'parse error')"
 else
-    REASONING_DIGEST='{"entries":[],"used_tokens":0}'
-    echo "Skipping reasoning retrieval (include_reasoning=false)"
+    REASONING_DIGEST='{"entries":[],"used_tokens":0,"level":"none"}'
+    echo "Skipping reasoning retrieval (include_reasoning=false for $AGENT_TYPE)"
 fi
 ```
 

@@ -697,11 +697,15 @@ Assemble context for agent spawn:
 - Model: {MODEL_CONFIG[agent_type]}
 - Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
-- Include Reasoning: true
 ```
 Then invoke: `Skill(command: "context-assembler")`
 
-**Note:** `Include Reasoning: true` enables retrieval of prior agent reasoning for handoff continuity (Developer→QA→TL).
+**Note:** Reasoning is **automatically included** for `qa_expert` and `tech_lead` at medium level (800 tokens). Prior agent reasoning provides handoff continuity (Developer→QA→TL).
+
+**Optional overrides:**
+- `Reasoning Level: full` - 1200 tokens for complex tasks/reviews
+- `Reasoning Level: minimal` - 400 tokens for simple tasks
+- `Include Reasoning: false` - Disable reasoning (not recommended)
 
 The skill returns ranked packages + error patterns + **prior reasoning** + token zone. Include all in agent prompt.
 

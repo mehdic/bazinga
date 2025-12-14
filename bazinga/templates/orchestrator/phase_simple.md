@@ -667,11 +667,15 @@ Assemble context for agent spawn:
 - Model: {MODEL_CONFIG["qa_expert"]}
 - Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
-- Include Reasoning: true
 ```
 Then invoke: `Skill(command: "context-assembler")`
 
-**Note:** `Include Reasoning: true` enables retrieval of prior Developer reasoning for handoff continuity.
+**Note:** Reasoning is **automatically included** for `qa_expert` at medium level (800 tokens). Prior Developer reasoning provides handoff continuity.
+
+**Optional overrides:**
+- `Reasoning Level: full` - 1200 tokens for complex tasks
+- `Reasoning Level: minimal` - 400 tokens for simple tasks
+- `Include Reasoning: false` - Disable reasoning (not recommended)
 
 The skill returns ranked packages + error patterns + token zone. Include output in QA prompt.
 
@@ -812,11 +816,15 @@ Assemble context for agent spawn:
 - Model: {MODEL_CONFIG["tech_lead"]}
 - Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
-- Include Reasoning: true
 ```
 Then invoke: `Skill(command: "context-assembler")`
 
-**Note:** `Include Reasoning: true` enables retrieval of Developer and QA reasoning for review continuity.
+**Note:** Reasoning is **automatically included** for `tech_lead` at medium level (800 tokens). Prior Developer and QA reasoning provides review continuity.
+
+**Optional overrides:**
+- `Reasoning Level: full` - 1200 tokens for complex reviews
+- `Reasoning Level: minimal` - 400 tokens for simple reviews
+- `Include Reasoning: false` - Disable reasoning (not recommended)
 
 The skill returns ranked packages + error patterns + **prior agent reasoning** + token zone. Include all in TL prompt.
 
