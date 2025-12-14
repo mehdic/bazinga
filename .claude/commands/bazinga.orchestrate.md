@@ -190,6 +190,37 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 - ✅ **ALWAYS** use `Skill(command: "bazinga-db")` for ALL database operations
 - **Why:** Inline SQL uses wrong column names (`group_id` vs `id`) and causes data loss
 
+### 🔴 PRE-TASK VALIDATION (MANDATORY RUNTIME GUARD)
+
+**Before ANY `Task()` call to spawn an agent, VERIFY both skills were invoked:**
+
+| Skill | Required For | Check |
+|-------|--------------|-------|
+| **context-assembler** | QA, Tech Lead, SSE, Investigator, Developer retries | `## Context for {agent}` in output OR explicitly disabled in skills_config |
+| **specialization-loader** | ALL agents | `[SPECIALIZATION_BLOCK_START]` in output |
+
+**Validation Logic:**
+```
+IF about to call Task():
+  1. Check: Did I invoke context-assembler in this turn?
+     - YES: Continue
+     - NO + enable_context_assembler=true: STOP, invoke it first
+     - NO + enable_context_assembler=false: Continue (disabled)
+
+  2. Check: Did I invoke specialization-loader in this turn?
+     - YES and got valid block: Continue
+     - YES but no block: Proceed with fallback (non-blocking)
+     - NO: STOP, invoke it first
+
+  3. Check: Does my prompt include BOTH outputs?
+     - YES: Call Task()
+     - NO: Build prompt with {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+
+**If EITHER skill was skipped:** STOP. Re-invoke the missing skill(s). Do NOT call Task() until both are complete.
+
+**Why this matters:** Without context-assembler, agents don't receive prior reasoning (handoff breaks). Without specialization-loader, agents don't receive tech-specific guidance.
+
 ### §Bash Command Allowlist (EXHAUSTIVE)
 
 **You may ONLY execute these Bash patterns:**

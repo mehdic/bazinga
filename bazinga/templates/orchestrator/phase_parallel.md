@@ -686,9 +686,15 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
-**🔴 Context Packages & Reasoning Per Group:** When spawning QA or Tech Lead for a group:
+**🔴 PRE-SPAWN CHECKLIST (QA/TL Per Group) - BOTH SKILLS REQUIRED**
 
-**Context Assembly (MANDATORY before QA/TL spawn):**
+When spawning QA or Tech Lead for a group, invoke BOTH skills:
+
+**TURN 1: Invoke Both Skills**
+
+**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
+
+IF context-assembler ENABLED:
 ```
 Assemble context for agent spawn:
 - Session: {session_id}
@@ -699,21 +705,57 @@ Assemble context for agent spawn:
 - Iteration: {iteration_count}
 ```
 Then invoke: `Skill(command: "context-assembler")`
+→ Capture output as `{CONTEXT_BLOCK}`
 
 **Note:** Reasoning is **automatically included** for `qa_expert` and `tech_lead` at medium level (800 tokens). Prior agent reasoning provides handoff continuity (Developer→QA→TL).
 
-**Optional overrides:**
-- `Reasoning Level: full` - 1200 tokens for complex tasks/reviews
-- `Reasoning Level: minimal` - 400 tokens for simple tasks
-- `Include Reasoning: false` - Disable reasoning (not recommended)
+IF context-assembler DISABLED or returns empty:
+→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
 
-The skill returns ranked packages + error patterns + **prior reasoning** + token zone. Include all in agent prompt.
+**B. Specialization Loading:**
+```
+[SPEC_CTX_START group={group_id} agent={agent_type}]
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Model: {MODEL_CONFIG[agent_type]}
+Specialization Paths: {specializations from PM or project_context.json}
+Testing Mode: {testing_mode}
+[SPEC_CTX_END]
+```
+Then invoke: `Skill(command: "specialization-loader")`
+→ Capture output as `{SPEC_BLOCK}`
 
-**Additional context (if skill reasoning is empty):**
-1. Query context packages with that group's `group_id` (e.g., "A", "B", "C")
-2. Query implementation reasoning manually only if context-assembler returned empty despite prior agents completing
-3. Include both in that group's base_prompt (same pattern as Developer)
-4. Each group may have different context packages and reasoning based on its history
+**✅ TURN 1 SELF-CHECK:**
+- [ ] Context-assembler invoked (or explicitly disabled)?
+- [ ] Specialization-loader invoked?
+- [ ] Both returned valid output?
+
+END TURN 1 (wait for skill responses)
+
+---
+
+**TURN 2: Compose & Spawn**
+
+**C. Compose Prompt:**
+```
+prompt =
+  {CONTEXT_BLOCK}  // Prior reasoning + packages
+  +
+  {SPEC_BLOCK}     // Tech identity
+  +
+  base_prompt      // Role + task details
+```
+
+**D. Spawn Agent:**
+```
+Task(subagent_type="general-purpose", model={model}, prompt={prompt})
+```
+
+**✅ TURN 2 SELF-CHECK:**
+- [ ] CONTEXT_BLOCK present (or fallback used)?
+- [ ] SPEC_BLOCK present?
+- [ ] Task() called?
 
 ### Step 2B.7: Route Tech Lead Response (Per Group)
 
