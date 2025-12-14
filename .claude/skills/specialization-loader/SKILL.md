@@ -117,10 +117,11 @@ Tech Leads get review patterns, Investigators get debugging patterns, etc.
 
 **After filtering by compatibility, if filtered_templates is empty or missing role-specific guidance, auto-add role defaults.**
 
-**Gating conditions (ALL must be true to augment):**
+**Gating conditions:**
 1. `agent_type` is in augmentation table below
-2. `testing_mode` == "full" (from orchestrator context, defaults to "full" if not provided)
-3. Template file exists at path (verified via Glob/Read)
+2. Template file exists at path (verified via Glob/Read)
+3. **For qa_expert only:** `testing_mode` == "full" (from orchestrator context, defaults to "full")
+   - Tech Lead and Requirements Engineer augment regardless of testing_mode ("always" condition)
 
 **Role Default Templates:**
 
@@ -178,9 +179,11 @@ Glob(pattern: "bazinga/templates/specializations/08-testing/qa-strategies.md")
 ```
 
 **Skip augmentation when:**
-- `testing_mode` is "minimal" or "disabled" (QA bypassed)
-- `specializations.enabled` is false in skills_config.json
-- Template file doesn't exist (logged to skipped_missing)
+- **For qa_expert:** `testing_mode` is "minimal" or "disabled" (QA bypassed)
+- **For all roles:** `specializations.enabled` is false in skills_config.json
+- **For all roles:** Template file doesn't exist (logged to skipped_missing)
+
+Note: Tech Lead and Requirements Engineer augment regardless of testing_mode.
 
 **Hard Check for QA in Full Mode:**
 If `agent_type == qa_expert` AND `testing_mode == full` AND `templates_after == 0`:

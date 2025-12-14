@@ -146,10 +146,10 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 
 **Skill Outputs:**
 ```bash
-sqlite3 bazinga/bazinga.db "SELECT * FROM skill_outputs WHERE session_id='{session_id}';"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
 ```
 - [ ] At least 1 entry for specialization-loader
-- [ ] Contains templates_used, token_count fields
+- [ ] Contains fields: `templates_after`, `augmented_templates`, `skipped_missing`, `testing_mode_used`
 
 **Reasoning Logs (MANDATORY when run correctly):**
 ```bash

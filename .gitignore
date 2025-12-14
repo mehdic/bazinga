@@ -1,90 +1,80 @@
-/bazinga.iml
+
+!bazinga/.gitignore
+!bazinga/challenge_levels.json
+!bazinga/model_selection.json
+!bazinga/scripts/
+!bazinga/skills_config.json
+!bazinga/templates/
+!bazinga/testing_config.json
+!coordination/templates/
+# BAZINGA artifacts (session outputs - always gitignored)
+# BAZINGA state files (gitignored by default in installed projects)
+# Coordination folder (legacy - templates now in bazinga/templates/)
+# Dashboard runtime files (created during testing in dev mode)
+# IDEs
+# Installer logs
+# OS
+# PyInstaller
 # Python
-__pycache__/
-*.py[cod]
+# Temporary files (ultrathink reviews, etc.)
+# Unit test / coverage reports
+# Virtual environments
 *$py.class
+*.cover
+*.egg
+*.egg-info/
+*.manifest
+*.py,cover
+*.py[cod]
 *.so
+*.spec
+*.swo
+*.swp
+*~
+.DS_Store
 .Python
+.cache
+.coverage
+.coverage.*
+.eggs/
+.hypothesis/
+.idea/
+.installed.cfg
+.nox/
+.pytest_cache/
+.tox/
+.venv
+.vscode/
+/bazinga.iml
+/lib/
+/lib64/
+ENV/
+MANIFEST
+Thumbs.db
+__pycache__/
+bazinga/
+bazinga/artifacts/
+bazinga/bazinga.db*
 build/
+coordination/
+coverage.xml
+dashboard.log
+dashboard.pid
 develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
-/lib/
-/lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Virtual environments
-venv/
-ENV/
 env/
-.venv
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# BAZINGA state files (gitignored by default in installed projects)
-bazinga/
-!bazinga/.gitignore
-!bazinga/templates/
-!bazinga/scripts/
-!bazinga/skills_config.json
-!bazinga/testing_config.json
-!bazinga/model_selection.json
-!bazinga/challenge_levels.json
-
-# BAZINGA artifacts (session outputs - always gitignored)
-bazinga/artifacts/
-bazinga/bazinga.db*
-
-# Dashboard runtime files (created during testing in dev mode)
-dashboard.log
-dashboard.pid
+htmlcov/
+nosetests.xml
+parts/
+pip-delete-this-directory.txt
+pip-log.txt
+pip-wheel-metadata/
+sdist/
+share/python-wheels/
 socket.pid
-
-# Coordination folder (legacy - templates now in bazinga/templates/)
-coordination/
-!coordination/templates/
-
-# Temporary files (ultrathink reviews, etc.)
 tmp/
+var/
+venv/
+wheels/

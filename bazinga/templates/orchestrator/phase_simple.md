@@ -303,7 +303,7 @@ Group ID: {group_id}
 Agent Type: {agent_type}
 Model: {MODEL_CONFIG[initial_tier]}
 Specialization Paths: {specializations as JSON array}
-Testing Mode: {testing_mode from testing_config.json, default "full"}
+Testing Mode: {provided by orchestrator, default "full"}
 [SPEC_CTX_END]
 ```
 

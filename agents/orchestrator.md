@@ -1801,12 +1801,12 @@ Verify skill logged its output:
 ```bash
 # Check specialization-loader output was saved
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
-# Should return templates_used, token_count, augmented_templates
+# Should return: templates_after, augmented_templates, skipped_missing, testing_mode_used
 ```
 
 **If empty:** Specialization-loader didn't log. Non-blocking but note in orchestrator log.
 
-**If templates_loaded = 0 for QA Expert and testing_mode=full:**
+**If templates_after = 0 for QA Expert and testing_mode_used = "full":**
 - This indicates the QA template augmentation failed
 - The skill_outputs will include `"augmentation_error": true`
 - Log warning: "QA Expert received 0 templates despite testing_mode=full"

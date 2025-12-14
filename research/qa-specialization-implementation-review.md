@@ -154,14 +154,15 @@ TESTING_MODE=${TESTING_MODE:-full}  # Defaults to "full" if not found
 
 This means QA templates WILL be auto-augmented in typical scenarios.
 
-### Check 4: Syntax correctness of bash snippet
+### Check 4: Testing mode source
 
-The bash snippet in Step 3.6:
-```bash
-TESTING_MODE=$(cat bazinga/testing_config.json 2>/dev/null | grep -o '"mode"[^,]*' | cut -d'"' -f4)
+**UPDATED:** The implementation now receives `testing_mode` from orchestrator context instead of parsing `testing_config.json`. This is more reliable:
+
+```
+Testing Mode: {provided by orchestrator, default "full"}
 ```
 
-This is fragile - relies on specific JSON formatting. Better to use `jq` if available.
+The skill no longer parses JSON files for testing_mode - the orchestrator is the source of truth.
 
 ---
 
