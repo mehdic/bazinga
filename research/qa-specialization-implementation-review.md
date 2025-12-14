@@ -23,7 +23,7 @@ role-specific guidance, auto-add role defaults.
 
 Gating conditions (ALL must be true to augment):
 1. agent_type is in augmentation table
-2. testing_mode == "full" (from bazinga/testing_config.json, default "full")
+2. testing_mode == "full" (provided by orchestrator context, default "full")
 3. Template file exists at path
 
 Role Default Templates:

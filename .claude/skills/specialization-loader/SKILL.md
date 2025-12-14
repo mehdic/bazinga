@@ -140,10 +140,12 @@ If `project_context.json` exists, derive QA templates from detected testing fram
 
 | Detected Testing | Additional Template |
 |------------------|---------------------|
-| pytest | `08-testing/testing-patterns.md` |
-| jest | `08-testing/testing-patterns.md` |
+| pytest, unittest, nose | `08-testing/testing-patterns.md` |
+| jest, mocha, vitest | `08-testing/testing-patterns.md` |
+| junit, testng | `08-testing/testing-patterns.md` |
 | playwright, cypress | `08-testing/playwright-cypress.md` |
 | selenium | `08-testing/selenium.md` |
+| (unknown/none detected) | `08-testing/testing-patterns.md` (generic fallback) |
 
 **Implementation:**
 

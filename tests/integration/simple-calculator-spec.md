@@ -119,7 +119,7 @@ After BAZINGA completion, verify:
 ### 1. File Verification
 All expected files exist in `tmp/simple-calculator-app/`:
 - [ ] `calculator.py` - Main calculator module
-- [ ] `test_calculator.py` - Pytest tests (50+ tests expected)
+- [ ] `test_calculator.py` - Pytest tests with comprehensive coverage
 - [ ] `README.md` - Documentation
 
 ### 2. Core DB Tables
@@ -129,9 +129,16 @@ All expected files exist in `tmp/simple-calculator-app/`:
 
 ### 3. Context Engineering Verification (NEW)
 
+**First, get the session ID:**
+```bash
+# Get most recent session ID
+SESSION_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 | grep -o 'bazinga_[0-9_]*')
+echo "Session: $SESSION_ID"
+```
+
 **QA Specialization Templates:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
 ```
 - [ ] QA Expert should receive > 0 templates (not 0)
 - [ ] If testing_mode=full, expect: `08-testing/qa-strategies.md` or `08-testing/testing-patterns.md`
@@ -139,21 +146,21 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 
 **Success Criteria:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "$SESSION_ID"
 ```
 - [ ] Should return 7-11 criteria (matching acceptance criteria above)
 - [ ] All criteria should have status "met" at BAZINGA time
 
 **Skill Outputs:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
 ```
 - [ ] At least 1 entry for specialization-loader
 - [ ] Contains fields: `templates_after`, `augmented_templates`, `skipped_missing`, `testing_mode_used`
 
 **Reasoning Logs (MANDATORY when run correctly):**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "{session_id}" 20
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "$SESSION_ID" 20
 ```
 - [ ] Developer: `understanding`, `completion` phases logged
 - [ ] QA Expert: `understanding`, `completion` phases logged
@@ -165,8 +172,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "{se
 ```bash
 cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
 ```
-- [ ] All tests pass (50+ tests expected)
-- [ ] 100% pass rate
+- [ ] All tests pass (0 failures)
+- [ ] Comprehensive coverage of all requirements (operations, memory, history, error handling)
 
 ### 5. Known Issues and Diagnostics
 
@@ -190,17 +197,20 @@ Simplified prompts (without full agent definitions) will skip mandatory workflow
 ## Verification Commands (Quick Reference)
 
 ```bash
+# Get session ID first
+SESSION_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 | grep -o 'bazinga_[0-9_]*')
+
 # Check session status
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
 
 # Full dashboard snapshot
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "{session_id}"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "$SESSION_ID"
 
 # QA template verification
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "{session_id}" "specialization-loader"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
 
 # Success criteria
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "{session_id}"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "$SESSION_ID"
 
 # Run tests
 cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
