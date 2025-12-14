@@ -38,9 +38,12 @@ Extract from the calling request or infer from conversation:
 - `current_tokens`: Current token usage in conversation (OPTIONAL, for zone detection)
 - `iteration`: Current iteration number (optional, default 0)
 - `include_reasoning`: Whether to include prior agent reasoning for handoff (OPTIONAL)
-  - **DEFAULT BEHAVIOR:** Automatically `true` for `qa_expert` and `tech_lead` (handoff recipients)
+  - **DEFAULT BEHAVIOR:** Automatically `true` when reasoning context is beneficial:
+    - `qa_expert`, `tech_lead`: ALWAYS (handoff recipients)
+    - `senior_software_engineer`: ALWAYS (escalation needs prior context)
+    - `investigator`: ALWAYS (debugging needs full context)
+    - `developer`: When `iteration > 0` (retry needs prior reasoning; first attempt has none)
   - Explicitly set to `false` to disable reasoning for any agent
-  - For `developer`, `senior_software_engineer`, `investigator`: defaults to `false` (first in workflow)
 - `reasoning_level`: Level of detail for reasoning retrieval (OPTIONAL)
   - `minimal`: 400 tokens - key decisions only
   - `medium`: 800 tokens - decisions + approach (DEFAULT)
@@ -514,24 +517,38 @@ echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 
 **Priority Order:** completion > decisions > understanding (most actionable first).
 
-**Variable Setup:** Determine reasoning inclusion based on agent type and explicit overrides:
+**Variable Setup:** Determine reasoning inclusion based on agent type, iteration, and explicit overrides:
 ```bash
 # Step 3.5 Variable Setup
-# Automatic reasoning for handoff recipients (qa_expert, tech_lead)
-# Check for explicit override in request text
+# Automatic reasoning when context is beneficial
 
 AGENT_TYPE="developer"  # From Step 1
+ITERATION="${ITERATION:-0}"  # From Step 1 (default 0)
 
-# Default based on agent type
-if [ "$AGENT_TYPE" = "qa_expert" ] || [ "$AGENT_TYPE" = "tech_lead" ]; then
-    INCLUDE_REASONING="true"   # Auto-enable for handoff recipients
-else
-    INCLUDE_REASONING="false"  # Disabled for workflow initiators
-fi
+# Smart default: Enable reasoning when it provides value
+# - qa_expert, tech_lead: ALWAYS (handoff recipients)
+# - senior_software_engineer, investigator: ALWAYS (escalation/debugging needs context)
+# - developer: Only on retry (iteration > 0); first attempt has no prior reasoning
+
+case "$AGENT_TYPE" in
+    qa_expert|tech_lead|senior_software_engineer|investigator)
+        INCLUDE_REASONING="true"   # Always include for these agents
+        ;;
+    developer)
+        if [ "$ITERATION" -gt 0 ]; then
+            INCLUDE_REASONING="true"   # Retry needs prior reasoning
+        else
+            INCLUDE_REASONING="false"  # First attempt has no prior context
+        fi
+        ;;
+    *)
+        INCLUDE_REASONING="false"  # Unknown agents default off
+        ;;
+esac
 
 # Check for explicit override in request (parse from Step 1)
-# "Include Reasoning: false" -> disable even for QA/TL
-# "Include Reasoning: true" -> enable even for developer
+# "Include Reasoning: false" -> disable even for QA/TL/SSE
+# "Include Reasoning: true" -> enable even for developer first attempt
 # "Reasoning Level: full" -> set REASONING_LEVEL
 
 REASONING_LEVEL="medium"  # Default level
@@ -541,15 +558,26 @@ REASONING_LEVEL="medium"  # Default level
 
 ```bash
 # Prior reasoning retrieval with level-based token budgets
-# Variables: $SESSION_ID, $GROUP_ID, $AGENT_TYPE, $INCLUDE_REASONING, $REASONING_LEVEL
+# Variables: $SESSION_ID, $GROUP_ID, $AGENT_TYPE, $ITERATION, $INCLUDE_REASONING, $REASONING_LEVEL
 
-# Apply agent-type defaults if not explicitly set
+# Apply smart defaults if not explicitly set
 if [ -z "$INCLUDE_REASONING" ]; then
-    if [ "$AGENT_TYPE" = "qa_expert" ] || [ "$AGENT_TYPE" = "tech_lead" ]; then
-        INCLUDE_REASONING="true"
-    else
-        INCLUDE_REASONING="false"
-    fi
+    ITERATION="${ITERATION:-0}"
+    case "$AGENT_TYPE" in
+        qa_expert|tech_lead|senior_software_engineer|investigator)
+            INCLUDE_REASONING="true"
+            ;;
+        developer)
+            if [ "$ITERATION" -gt 0 ]; then
+                INCLUDE_REASONING="true"
+            else
+                INCLUDE_REASONING="false"
+            fi
+            ;;
+        *)
+            INCLUDE_REASONING="false"
+            ;;
+    esac
 fi
 
 REASONING_LEVEL="${REASONING_LEVEL:-medium}"

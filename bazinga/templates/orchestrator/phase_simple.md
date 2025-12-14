@@ -564,14 +564,19 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 
 **IF Developer reports BLOCKED:**
 - **Do NOT stop for user input**
+- **Context Assembly (BEFORE building prompt):** Invoke context-assembler with `Agent: investigator`
+- **Note:** Reasoning is **automatically included** for Investigator (debugging agent needs full context). Investigator receives Developer's reasoning at medium level (800 tokens).
 - **Immediately spawn Investigator** to diagnose and resolve the blocker:
   * Extract blocker description and evidence from Developer response
+  * Include context-assembler output (packages + Developer reasoning)
   * Spawn Investigator with blocker resolution request
   * After Investigator provides solution, spawn Developer again with resolution
   * Continue workflow automatically
 
 **IF Developer reports ESCALATE_SENIOR:**
-- Build SSE prompt with: original task, developer's attempt, reason for escalation
+- **Context Assembly (BEFORE building prompt):** Invoke context-assembler with `Agent: senior_software_engineer`
+- **Note:** Reasoning is **automatically included** for SSE (escalation agent needs full context of what Developer tried). SSE receives Developer's reasoning at medium level (800 tokens).
+- Build SSE prompt with: original task, developer's attempt, reason for escalation, context-assembler output
 - **Spawn SSE (2-turn):** Turn 1: Output `[SPEC_CTX_START group={group_id} agent=senior_software_engineer]...` → `Skill(command: "specialization-loader")`. Turn 2: Extract block → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={spec_block + base})`
 
 **🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
@@ -586,11 +591,14 @@ Before moving to the next group or ending your message, verify:
 
 **IF Developer reports INCOMPLETE (partial work done):**
 - **IMMEDIATELY spawn new developer Task** (do NOT just write a message and stop)
+- **Context Assembly (BEFORE building prompt):** Invoke context-assembler with `Agent: developer`, `Iteration: {revision_count + 1}`
+- **Note:** Reasoning is **automatically included** for developer retries (iteration > 0). Developer receives their own prior reasoning at medium level (800 tokens).
 
 **Build new developer prompt:**
 1. Read `agents/developer.md` for full agent definition
 2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config)
-3. Include in prompt:
+3. Include context-assembler output (packages + prior reasoning)
+4. Include in prompt:
    - Summary of work completed so far
    - Specific gaps/issues that remain (extract from developer response)
    - User's completion requirements (e.g., "ALL tests passing", "0 failures")
