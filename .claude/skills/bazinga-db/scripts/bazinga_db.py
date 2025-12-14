@@ -1381,27 +1381,94 @@ class BazingaDB:
 
     # ==================== SKILL OUTPUT OPERATIONS ====================
 
-    def save_skill_output(self, session_id: str, skill_name: str, output_data: Dict) -> None:
-        """Save skill output."""
+    def save_skill_output(self, session_id: str, skill_name: str, output_data: Dict,
+                         agent_type: Optional[str] = None, group_id: Optional[str] = None) -> int:
+        """Save skill output with auto-computed iteration.
+
+        Iteration is computed atomically server-side to prevent race conditions.
+        Returns the iteration number assigned.
+        """
         conn = self._get_connection()
+
+        # Compute iteration atomically: max(iteration) + 1 for same (session, skill, agent, group)
+        # This is done in a single transaction to prevent race conditions
+        row = conn.execute("""
+            SELECT COALESCE(MAX(iteration), 0) as max_iter FROM skill_outputs
+            WHERE session_id = ? AND skill_name = ? AND agent_type IS ? AND group_id IS ?
+        """, (session_id, skill_name, agent_type, group_id)).fetchone()
+
+        next_iteration = (row['max_iter'] if row else 0) + 1
+
         conn.execute("""
-            INSERT INTO skill_outputs (session_id, skill_name, output_data)
-            VALUES (?, ?, ?)
-        """, (session_id, skill_name, json.dumps(output_data)))
+            INSERT INTO skill_outputs (session_id, skill_name, output_data, agent_type, group_id, iteration)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (session_id, skill_name, json.dumps(output_data), agent_type, group_id, next_iteration))
         conn.commit()
         conn.close()
-        self._print_success(f"✓ Saved {skill_name} output")
 
-    def get_skill_output(self, session_id: str, skill_name: str) -> Optional[Dict]:
-        """Get latest skill output."""
+        if agent_type:
+            self._print_success(f"✓ Saved {skill_name} output for {agent_type} (iteration {next_iteration})")
+        else:
+            self._print_success(f"✓ Saved {skill_name} output (iteration {next_iteration})")
+        return next_iteration
+
+    def get_skill_output(self, session_id: str, skill_name: str,
+                        agent_type: Optional[str] = None) -> Optional[Dict]:
+        """Get latest skill output (backward compatible).
+
+        If agent_type is provided, returns latest for that agent.
+        Otherwise returns latest across all agents.
+        """
         conn = self._get_connection()
-        row = conn.execute("""
-            SELECT output_data FROM skill_outputs
-            WHERE session_id = ? AND skill_name = ?
-            ORDER BY timestamp DESC LIMIT 1
-        """, (session_id, skill_name)).fetchone()
+
+        if agent_type:
+            row = conn.execute("""
+                SELECT output_data FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ? AND agent_type = ?
+                ORDER BY timestamp DESC LIMIT 1
+            """, (session_id, skill_name, agent_type)).fetchone()
+        else:
+            row = conn.execute("""
+                SELECT output_data FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ?
+                ORDER BY timestamp DESC LIMIT 1
+            """, (session_id, skill_name)).fetchone()
+
         conn.close()
         return json.loads(row['output_data']) if row else None
+
+    def get_skill_output_all(self, session_id: str, skill_name: str,
+                            agent_type: Optional[str] = None) -> List[Dict]:
+        """Get all skill outputs for a skill (supports multi-invocation).
+
+        Returns array of objects with iteration, agent_type, group_id, timestamp, and output_data.
+        """
+        conn = self._get_connection()
+
+        if agent_type:
+            rows = conn.execute("""
+                SELECT iteration, agent_type, group_id, timestamp, output_data
+                FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ? AND agent_type = ?
+                ORDER BY iteration ASC
+            """, (session_id, skill_name, agent_type)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT iteration, agent_type, group_id, timestamp, output_data
+                FROM skill_outputs
+                WHERE session_id = ? AND skill_name = ?
+                ORDER BY timestamp ASC
+            """, (session_id, skill_name)).fetchall()
+
+        conn.close()
+
+        return [{
+            'iteration': row['iteration'],
+            'agent_type': row['agent_type'],
+            'group_id': row['group_id'],
+            'timestamp': row['timestamp'],
+            'output_data': json.loads(row['output_data'])
+        } for row in rows]
 
     # ==================== CONFIGURATION OPERATIONS ====================
     # REMOVED: Configuration table no longer exists (2025-11-21)
@@ -2855,8 +2922,12 @@ TOKEN OPERATIONS:
   token-summary <session> [by]                Get token summary (default: by=agent_type)
 
 SKILL OUTPUT OPERATIONS:
-  save-skill-output <session> <skill> <json>  Save skill output
-  get-skill-output <session> <skill>          Get skill output
+  save-skill-output <session> <skill> <json> [--agent X] [--group Y]
+                                              Save skill output (iteration auto-computed)
+  get-skill-output <session> <skill> [--agent X]
+                                              Get latest skill output
+  get-skill-output-all <session> <skill> [--agent X]
+                                              Get all skill outputs (multi-invocation)
 
 DEVELOPMENT PLAN OPERATIONS:
   save-development-plan <session> <prompt> <plan> <phases_json> <current> <total> [metadata]
@@ -3088,14 +3159,57 @@ def main():
             result = db.get_token_summary(cmd_args[0], by)
             print(json.dumps(result, indent=2))
         elif cmd == 'save-skill-output':
-            session_id = cmd_args[0]
-            skill_name = cmd_args[1]
-            output_data = json.loads(cmd_args[2])
-            db.save_skill_output(session_id, skill_name, output_data)
+            # Parse --agent and --group flags
+            agent_type = None
+            group_id = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--group' and i + 1 < len(cmd_args):
+                    group_id = cmd_args[i + 1]
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            session_id = positional_args[0]
+            skill_name = positional_args[1]
+            output_data = json.loads(positional_args[2])
+            iteration = db.save_skill_output(session_id, skill_name, output_data, agent_type, group_id)
+            print(json.dumps({"iteration": iteration}))
         elif cmd == 'get-skill-output':
-            session_id = cmd_args[0]
-            skill_name = cmd_args[1]
-            result = db.get_skill_output(session_id, skill_name)
+            # Parse --agent flag
+            agent_type = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            session_id = positional_args[0]
+            skill_name = positional_args[1]
+            result = db.get_skill_output(session_id, skill_name, agent_type)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'get-skill-output-all':
+            # Parse --agent flag
+            agent_type = None
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            session_id = positional_args[0]
+            skill_name = positional_args[1]
+            result = db.get_skill_output_all(session_id, skill_name, agent_type)
             print(json.dumps(result, indent=2))
         elif cmd == 'get-task-groups':
             session_id = cmd_args[0]

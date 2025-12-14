@@ -667,8 +667,11 @@ Assemble context for agent spawn:
 - Model: {MODEL_CONFIG["qa_expert"]}
 - Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
+- Include Reasoning: true
 ```
 Then invoke: `Skill(command: "context-assembler")`
+
+**Note:** `Include Reasoning: true` enables retrieval of prior Developer reasoning for handoff continuity.
 
 The skill returns ranked packages + error patterns + token zone. Include output in QA prompt.
 
@@ -809,12 +812,17 @@ Assemble context for agent spawn:
 - Model: {MODEL_CONFIG["tech_lead"]}
 - Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
+- Include Reasoning: true
 ```
 Then invoke: `Skill(command: "context-assembler")`
 
-The skill returns ranked packages + error patterns + token zone. Include output in TL prompt.
+**Note:** `Include Reasoning: true` enables retrieval of Developer and QA reasoning for review continuity.
 
-**🔴 Implementation Reasoning Query (AFTER context packages):**
+The skill returns ranked packages + error patterns + **prior agent reasoning** + token zone. Include all in TL prompt.
+
+**🔴 Implementation Reasoning Query (AFTER context packages) - OPTIONAL:**
+
+**Note:** If context-assembler returned reasoning entries, you can skip this separate query. Only query manually if context-assembler returned empty reasoning despite prior agents completing.
 
 Query reasoning from all implementation agents (developer, SSE, RE):
 ```

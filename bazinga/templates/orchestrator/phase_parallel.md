@@ -697,14 +697,17 @@ Assemble context for agent spawn:
 - Model: {MODEL_CONFIG[agent_type]}
 - Current Tokens: {estimated_token_usage}
 - Iteration: {iteration_count}
+- Include Reasoning: true
 ```
 Then invoke: `Skill(command: "context-assembler")`
 
-The skill returns ranked packages + error patterns + token zone. Include output in agent prompt.
+**Note:** `Include Reasoning: true` enables retrieval of prior agent reasoning for handoff continuity (Developer→QA→TL).
 
-**Additional steps:**
+The skill returns ranked packages + error patterns + **prior reasoning** + token zone. Include all in agent prompt.
+
+**Additional context (if skill reasoning is empty):**
 1. Query context packages with that group's `group_id` (e.g., "A", "B", "C")
-2. Query implementation reasoning using `group_id` to ensure isolation (do NOT use global session reasoning)
+2. Query implementation reasoning manually only if context-assembler returned empty despite prior agents completing
 3. Include both in that group's base_prompt (same pattern as Developer)
 4. Each group may have different context packages and reasoning based on its history
 

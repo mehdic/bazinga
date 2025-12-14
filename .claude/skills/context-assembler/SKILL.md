@@ -37,6 +37,7 @@ Extract from the calling request or infer from conversation:
 - `model`: Model being used - haiku/sonnet/opus or full model ID (OPTIONAL, for token budgeting)
 - `current_tokens`: Current token usage in conversation (OPTIONAL, for zone detection)
 - `iteration`: Current iteration number (optional, default 0)
+- `include_reasoning`: Whether to include prior agent reasoning for handoff (OPTIONAL, default false)
 
 If `session_id` or `agent_type` are missing, check recent conversation context or ask the orchestrator.
 
@@ -487,6 +488,128 @@ echo "Package IDs to mark consumed: ${PACKAGE_IDS[*]}"
 - Populates `PACKAGE_IDS` array for Step 5b
 - Includes `investigator` in budget allocation
 
+### Step 3.5: Prior Reasoning Retrieval (Optional)
+
+**When to include:** If the request includes `Include Reasoning: true` OR the orchestrator explicitly requests prior agent reasoning for handoff continuity.
+
+**Purpose:** Retrieve prior agents' reasoning to provide continuity during handoffs (e.g., Developer→QA→Tech Lead).
+
+**Token Budget:** 1200 tokens max for reasoning digest.
+
+**Priority Order:** completion > decisions > understanding (most actionable first).
+
+**Variable Setup:** Set `INCLUDE_REASONING` from the request text parsed in Step 1:
+```bash
+# Set from Step 1 parsing (look for "Include Reasoning: true" in request)
+INCLUDE_REASONING="false"  # default
+# If request contains "Include Reasoning: true", set to "true"
+```
+
+```bash
+# Prior reasoning retrieval
+# Variables: $SESSION_ID, $GROUP_ID, $INCLUDE_REASONING (true/false)
+INCLUDE_REASONING="${INCLUDE_REASONING:-false}"
+
+if [ "$INCLUDE_REASONING" = "true" ]; then
+    echo "Retrieving prior reasoning for handoff context..."
+
+    REASONING_DIGEST=$(python3 -c "
+import sys
+import json
+import subprocess
+
+session_id = sys.argv[1]
+group_id = sys.argv[2] if len(sys.argv) > 2 else ''
+max_tokens = 1200  # Fixed budget for reasoning
+
+# Query reasoning from database via bazinga-db
+# Priority order: completion > decisions > understanding (most actionable first)
+PRIORITY_PHASES = ['completion', 'decisions', 'understanding']
+
+try:
+    # Get all reasoning for this session/group
+    cmd = ['python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet', 'get-reasoning', session_id]
+    if group_id:
+        cmd.extend(['--group_id', group_id])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(json.dumps({'error': 'query_failed', 'entries': [], 'used_tokens': 0}))
+        sys.exit(0)
+
+    entries = json.loads(result.stdout) if result.stdout.strip() else []
+except Exception as e:
+    print(json.dumps({'error': str(e), 'entries': [], 'used_tokens': 0}))
+    sys.exit(0)
+
+if not entries:
+    print(json.dumps({'entries': [], 'used_tokens': 0, 'total_available': 0}))
+    sys.exit(0)
+
+# Sort by priority phase, then by timestamp (most recent first)
+def phase_priority(entry):
+    phase = entry.get('phase', 'understanding')
+    try:
+        return PRIORITY_PHASES.index(phase)
+    except ValueError:
+        return len(PRIORITY_PHASES)  # Unknown phases last
+
+entries.sort(key=lambda e: (phase_priority(e), e.get('timestamp', '')), reverse=False)
+
+# Token estimation (~4 chars per token)
+def estimate_tokens(text):
+    return len(text) // 4 + 1 if text else 0
+
+# Pack entries within budget
+packed = []
+used_tokens = 0
+
+for entry in entries:
+    content = entry.get('content', '')
+    # Format: [agent] phase: content
+    formatted = f\"[{entry.get('agent_type', 'unknown')}] {entry.get('phase', 'unknown')}: {content[:300]}\"
+    entry_tokens = estimate_tokens(formatted)
+
+    if used_tokens + entry_tokens > max_tokens:
+        break
+
+    packed.append({
+        'agent_type': entry.get('agent_type'),
+        'phase': entry.get('phase'),
+        'content': content[:300] if len(content) > 300 else content,
+        'confidence': entry.get('confidence_level'),
+        'est_tokens': entry_tokens
+    })
+    used_tokens += entry_tokens
+
+print(json.dumps({
+    'entries': packed,
+    'used_tokens': used_tokens,
+    'budget': max_tokens,
+    'total_available': len(entries)
+}))
+" "$SESSION_ID" "$GROUP_ID")
+
+    echo "Reasoning digest: $(echo "$REASONING_DIGEST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d.get(\"entries\",[]))} entries, {d.get(\"used_tokens\",0)}/{d.get(\"budget\",1200)} tokens')" 2>/dev/null || echo 'parse error')"
+else
+    REASONING_DIGEST='{"entries":[],"used_tokens":0}'
+    echo "Skipping reasoning retrieval (include_reasoning=false)"
+fi
+```
+
+**Output Format for Step 5:**
+
+If reasoning entries are found, include in output:
+
+```markdown
+### Prior Agent Reasoning ({count} entries)
+
+**[developer] completion:** Successfully implemented authentication using JWT...
+**[qa_expert] decisions:** Chose to focus on edge cases for token expiration...
+```
+
+Only include if `$INCLUDE_REASONING = true` AND entries exist.
+
 ### Step 4: Query Error Patterns (Optional)
 
 If the agent previously failed or error patterns might be relevant:
@@ -655,6 +778,12 @@ Note: `priority_used` comes from the fallback ladder response (critical/high/med
 
 **[{PRIORITY}]** {file_path}
 > {summary}
+
+### Prior Agent Reasoning ({reasoning_count} entries)
+<!-- Only include if include_reasoning=true AND entries exist -->
+
+**[developer] completion:** Successfully implemented the core logic with edge case handling...
+**[qa_expert] decisions:** Focused test coverage on authentication flow boundaries...
 
 ### Error Patterns ({pattern_count} matches)
 

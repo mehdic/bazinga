@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -914,6 +914,79 @@ def init_database(db_path: str) -> None:
             current_version = 10
             print("✓ Migration to v10 complete (context engineering system tables)")
 
+        # v10 → v11: Skill outputs multi-invocation support
+        if current_version == 10:
+            print("\n--- Migrating v10 → v11 (skill outputs multi-invocation) ---")
+
+            # Check if skill_outputs table exists (may not exist in fresh DBs during sequential migration)
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='skill_outputs'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ skill_outputs table will be created with new columns")
+            else:
+                try:
+                    # Check existing columns in skill_outputs
+                    columns = {row[1] for row in cursor.execute("PRAGMA table_info(skill_outputs)").fetchall()}
+
+                    # Add agent_type column
+                    if 'agent_type' not in columns:
+                        cursor.execute("""
+                            ALTER TABLE skill_outputs
+                            ADD COLUMN agent_type TEXT
+                        """)
+                        print("   ✓ Added skill_outputs.agent_type")
+                    else:
+                        print("   ⊘ skill_outputs.agent_type already exists")
+
+                    # Add group_id column
+                    if 'group_id' not in columns:
+                        cursor.execute("""
+                            ALTER TABLE skill_outputs
+                            ADD COLUMN group_id TEXT
+                        """)
+                        print("   ✓ Added skill_outputs.group_id")
+                    else:
+                        print("   ⊘ skill_outputs.group_id already exists")
+
+                    # Add iteration column (default 1 for existing rows)
+                    if 'iteration' not in columns:
+                        cursor.execute("""
+                            ALTER TABLE skill_outputs
+                            ADD COLUMN iteration INTEGER DEFAULT 1
+                        """)
+                        print("   ✓ Added skill_outputs.iteration")
+                    else:
+                        print("   ⊘ skill_outputs.iteration already exists")
+
+                    # Create composite index for efficient lookups
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_skill_agent_group
+                        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
+                    """)
+                    print("   ✓ Created idx_skill_agent_group composite index")
+
+                    # Verify integrity
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v10→v11: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v10→v11 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 11
+            print("✓ Migration to v11 complete (skill outputs multi-invocation)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
@@ -1068,6 +1141,7 @@ def init_database(db_path: str) -> None:
     print("✓ Created token_usage table with indexes")
 
     # Skill outputs table (replaces individual JSON files)
+    # v11: Added agent_type, group_id, iteration for multi-invocation support
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS skill_outputs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1075,12 +1149,19 @@ def init_database(db_path: str) -> None:
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             skill_name TEXT NOT NULL,
             output_data TEXT NOT NULL,
+            agent_type TEXT,
+            group_id TEXT,
+            iteration INTEGER DEFAULT 1,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_skill_session
         ON skill_outputs(session_id, skill_name, timestamp DESC)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_skill_agent_group
+        ON skill_outputs(session_id, skill_name, agent_type, group_id, iteration)
     """)
     print("✓ Created skill_outputs table with indexes")
 
