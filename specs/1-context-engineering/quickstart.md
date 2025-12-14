@@ -5,7 +5,7 @@
 
 ## Overview
 
-The Context Engineering System provides intelligent context assembly for BAZINGA agents. This guide shows how to use the `context-assembler` skill and integrate with the orchestration workflow.
+The Context Engineering System provides intelligent context assembly for Orchestrix agents. This guide shows how to use the `context-assembler` skill and integrate with the orchestration workflow.
 
 ## Basic Usage
 
@@ -18,7 +18,7 @@ From the orchestrator, before spawning an agent:
 Skill(command: "context-assembler")
 ```
 
-The skill reads the current session/group context from bazinga-db and outputs a structured markdown block.
+The skill reads the current session/group context from orchestrix-db and outputs a structured markdown block.
 
 ### Skill Output Format
 
@@ -191,7 +191,7 @@ If SQLite lacks FTS5 extension:
 
 Before deployment:
 
-- [ ] `bazinga/bazinga.db` has new tables (run migration)
+- [ ] `orchestrix/orchestrix.db` has new tables (run migration)
 - [ ] `skills_config.json` has `context_engineering` section
 - [ ] WAL mode enabled: `PRAGMA journal_mode=WAL;`
 - [ ] Test with FTS5 unavailable (fallback mode)

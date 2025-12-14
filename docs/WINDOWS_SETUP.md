@@ -29,24 +29,24 @@ The `orchestrix install` command automatically downloads the Windows pre-built p
 orchestrix install
 ```
 
-This downloads `bazinga-dashboard-windows-x64.tar.gz` and extracts it automatically.
+This downloads `orchestrix-dashboard-windows-x64.tar.gz` and extracts it automatically.
 
 ### Method 2: Manual Download
 
 1. Download from [GitHub Releases](https://github.com/mehdic/orchestrix/releases):
-   - Look for `bazinga-dashboard-windows-x64.tar.gz`
+   - Look for `orchestrix-dashboard-windows-x64.tar.gz`
 
 2. Extract the archive:
    ```powershell
    # Using built-in tar (Windows 10 1803+)
-   tar -xzf bazinga-dashboard-windows-x64.tar.gz
+   tar -xzf orchestrix-dashboard-windows-x64.tar.gz
 
    # Or use 7-Zip or WinRAR (Windows Explorer cannot extract .tar.gz natively)
    ```
 
 3. Move to your project:
    ```powershell
-   Move-Item dashboard-v2 .\bazinga\dashboard-v2
+   Move-Item dashboard-v2 .\orchestrix\dashboard-v2
    ```
 
 ### Method 3: Build from Source
@@ -54,7 +54,7 @@ This downloads `bazinga-dashboard-windows-x64.tar.gz` and extracts it automatica
 If you need to build from source (e.g., for development):
 
 ```powershell
-cd bazinga\dashboard-v2
+cd orchestrix\dashboard-v2
 npm install
 npm run build
 ```
@@ -67,13 +67,13 @@ npm run build
 
 ```powershell
 # From your project root
-.\bazinga\scripts\start-dashboard.ps1
+.\orchestrix\scripts\start-dashboard.ps1
 ```
 
 Or if using the standalone script:
 
 ```powershell
-.\bazinga\dashboard-v2\scripts\start-standalone.ps1
+.\orchestrix\dashboard-v2\scripts\start-standalone.ps1
 ```
 
 ### Environment Variables
@@ -87,7 +87,7 @@ Or if using the standalone script:
 Example:
 ```powershell
 $env:DASHBOARD_PORT = "8080"
-.\bazinga\scripts\start-dashboard.ps1
+.\orchestrix\scripts\start-dashboard.ps1
 ```
 
 ## Troubleshooting
@@ -131,7 +131,7 @@ Get-Process -Id <PID>
 
 # Or use a different port
 $env:DASHBOARD_PORT = "3001"
-.\bazinga\scripts\start-dashboard.ps1
+.\orchestrix\scripts\start-dashboard.ps1
 ```
 
 ### Dashboard shows no data
@@ -140,8 +140,8 @@ The database path may not be detected.
 
 **Solution:**
 ```powershell
-$env:DATABASE_URL = "C:\path\to\your\project\bazinga\orchestrix.db"
-.\bazinga\scripts\start-dashboard.ps1
+$env:DATABASE_URL = "C:\path\to\your\project\orchestrix\orchestrix.db"
+.\orchestrix\scripts\start-dashboard.ps1
 ```
 
 ### Tarball extraction fails
@@ -169,7 +169,7 @@ After starting the dashboard:
 
 1. Open browser to `http://localhost:3000`
 2. You should see the Orchestrix Dashboard
-3. Check the log file: `bazinga\dashboard.log`
+3. Check the log file: `orchestrix\dashboard.log`
 
 ## Getting Help
 

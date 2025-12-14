@@ -15,20 +15,20 @@ from typing import Dict, Any, List, Optional
 class TechDebtManager:
     """Manages technical debt tracking."""
 
-    def __init__(self, bazinga_dir: str = "bazinga"):
+    def __init__(self, orchestrix_dir: str = "orchestrix"):
         """
         Initialize tech debt manager.
 
         Args:
-            bazinga_dir: Directory containing coordination files
+            orchestrix_dir: Directory containing coordination files
         """
-        self.bazinga_dir = Path(bazinga_dir)
-        self.debt_file = self.bazinga_dir / "tech_debt.json"
-        self._ensure_bazinga_dir()
+        self.orchestrix_dir = Path(orchestrix_dir)
+        self.debt_file = self.orchestrix_dir / "tech_debt.json"
+        self._ensure_orchestrix_dir()
 
-    def _ensure_bazinga_dir(self):
+    def _ensure_orchestrix_dir(self):
         """Create coordination directory if it doesn't exist."""
-        self.bazinga_dir.mkdir(exist_ok=True)
+        self.orchestrix_dir.mkdir(exist_ok=True)
 
     def _load_debt(self) -> Dict[str, Any]:
         """Load existing tech debt or create new structure."""

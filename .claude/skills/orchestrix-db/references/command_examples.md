@@ -22,7 +22,7 @@ $DB_PATH = orchestrix/orchestrix.db
 ### Create New Session
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH create-session \
-  "bazinga_20250112_143022" \
+  "orchestrix_20250112_143022" \
   "parallel" \
   "Add user authentication feature with OAuth2"
 ```
@@ -31,19 +31,19 @@ python3 $DB_SCRIPT --db $DB_PATH create-session \
 ```bash
 # Mark session as completed
 python3 $DB_SCRIPT --db $DB_PATH update-session-status \
-  "bazinga_20250112_143022" \
+  "orchestrix_20250112_143022" \
   "completed"
 
 # Mark as failed
 python3 $DB_SCRIPT --db $DB_PATH update-session-status \
-  "bazinga_20250112_143022" \
+  "orchestrix_20250112_143022" \
   "failed"
 ```
 
 ### Get Session Details
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH get-session \
-  "bazinga_20250112_143022"
+  "orchestrix_20250112_143022"
 ```
 
 ---
@@ -53,7 +53,7 @@ python3 $DB_SCRIPT --db $DB_PATH get-session \
 ### Log PM Interaction
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH log-interaction \
-  "bazinga_123" \
+  "orchestrix_123" \
   "pm" \
   "Analyzed requirements and created 3 task groups..." \
   1 \
@@ -63,7 +63,7 @@ python3 $DB_SCRIPT --db $DB_PATH log-interaction \
 ### Log Developer Interaction
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH log-interaction \
-  "bazinga_123" \
+  "orchestrix_123" \
   "developer" \
   "Implemented authentication controller..." \
   5 \
@@ -73,7 +73,7 @@ python3 $DB_SCRIPT --db $DB_PATH log-interaction \
 ### Log Orchestrator Decision
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH log-interaction \
-  "bazinga_123" \
+  "orchestrix_123" \
   "orchestrator" \
   "Spawning 2 developers in parallel for Groups A and B" \
   3
@@ -86,7 +86,7 @@ python3 $DB_SCRIPT --db $DB_PATH log-interaction \
 ### Save PM State
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH save-state \
-  "bazinga_123" \
+  "orchestrix_123" \
   "pm" \
   '{"mode":"parallel","iteration":3,"task_groups":[{"id":"group_a","status":"completed"}]}'
 ```
@@ -94,7 +94,7 @@ python3 $DB_SCRIPT --db $DB_PATH save-state \
 ### Save Orchestrator State
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH save-state \
-  "bazinga_123" \
+  "orchestrix_123" \
   "orchestrator" \
   '{"phase":"development","active_agents":["developer_1","developer_2"],"iteration":10}'
 ```
@@ -103,12 +103,12 @@ python3 $DB_SCRIPT --db $DB_PATH save-state \
 ```bash
 # Get PM state
 python3 $DB_SCRIPT --db $DB_PATH get-state \
-  "bazinga_123" \
+  "orchestrix_123" \
   "pm"
 
 # Get orchestrator state
 python3 $DB_SCRIPT --db $DB_PATH get-state \
-  "bazinga_123" \
+  "orchestrix_123" \
   "orchestrator"
 ```
 
@@ -120,7 +120,7 @@ python3 $DB_SCRIPT --db $DB_PATH get-state \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH create-task-group \
   "group_a" \
-  "bazinga_123" \
+  "orchestrix_123" \
   "Authentication Implementation" \
   "pending"
 ```
@@ -129,7 +129,7 @@ python3 $DB_SCRIPT --db $DB_PATH create-task-group \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
-  "bazinga_123" \
+  "orchestrix_123" \
   --status "completed" \
   --last_review_status "APPROVED"
 ```
@@ -138,7 +138,7 @@ python3 $DB_SCRIPT --db $DB_PATH update-task-group \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
-  "bazinga_123" \
+  "orchestrix_123" \
   --revision_count 2
 ```
 
@@ -146,7 +146,7 @@ python3 $DB_SCRIPT --db $DB_PATH update-task-group \
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "group_a" \
-  "bazinga_123" \
+  "orchestrix_123" \
   --assigned_to "developer_1"
 ```
 
@@ -158,11 +158,11 @@ python3 $DB_SCRIPT --db $DB_PATH update-task-group \
 ```bash
 # Get last 50 logs
 python3 $DB_SCRIPT --db $DB_PATH stream-logs \
-  "bazinga_123"
+  "orchestrix_123"
 
 # With pagination
 python3 $DB_SCRIPT --db $DB_PATH stream-logs \
-  "bazinga_123" \
+  "orchestrix_123" \
   50 \
   100  # offset
 ```
@@ -171,18 +171,18 @@ python3 $DB_SCRIPT --db $DB_PATH stream-logs \
 ```bash
 # Recent logs
 python3 $DB_SCRIPT --db $DB_PATH get-logs \
-  "bazinga_123" \
+  "orchestrix_123" \
   --limit 10
 
 # Filter by agent type
 python3 $DB_SCRIPT --db $DB_PATH get-logs \
-  "bazinga_123" \
+  "orchestrix_123" \
   --agent-type developer \
   --limit 20
 
 # Time-range query
 python3 $DB_SCRIPT --db $DB_PATH get-logs \
-  "bazinga_123" \
+  "orchestrix_123" \
   --since "2025-01-12 14:00:00" \
   --limit 100
 ```
@@ -194,7 +194,7 @@ python3 $DB_SCRIPT --db $DB_PATH get-logs \
 ### Log Token Usage
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH log-tokens \
-  "bazinga_123" \
+  "orchestrix_123" \
   "developer" \
   15000 \
   "developer_1"
@@ -204,12 +204,12 @@ python3 $DB_SCRIPT --db $DB_PATH log-tokens \
 ```bash
 # By agent type
 python3 $DB_SCRIPT --db $DB_PATH token-summary \
-  "bazinga_123" \
+  "orchestrix_123" \
   agent_type
 
 # By agent ID
 python3 $DB_SCRIPT --db $DB_PATH token-summary \
-  "bazinga_123" \
+  "orchestrix_123" \
   agent_id
 ```
 
@@ -231,7 +231,7 @@ Example output:
 ### Save Skill Output
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH save-skill-output \
-  "bazinga_123" \
+  "orchestrix_123" \
   "security_scan" \
   '{"vulnerabilities":5,"severity":"medium","details":[...]}'
 ```
@@ -239,7 +239,7 @@ python3 $DB_SCRIPT --db $DB_PATH save-skill-output \
 ### Retrieve Skill Output
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH get-skill-output \
-  "bazinga_123" \
+  "orchestrix_123" \
   "security_scan"
 ```
 
@@ -261,7 +261,7 @@ Use file-based configuration instead:
 ### Get Complete Dashboard Snapshot
 ```bash
 python3 $DB_SCRIPT --db $DB_PATH dashboard-snapshot \
-  "bazinga_123"
+  "orchestrix_123"
 ```
 
 Returns:
@@ -284,11 +284,11 @@ Returns:
 ```bash
 # Agent interaction counts
 python3 $DB_SCRIPT --db $DB_PATH query \
-  "SELECT agent_type, COUNT(*) as count FROM orchestration_logs WHERE session_id = 'bazinga_123' GROUP BY agent_type"
+  "SELECT agent_type, COUNT(*) as count FROM orchestration_logs WHERE session_id = 'orchestrix_123' GROUP BY agent_type"
 
 # Average response length
 python3 $DB_SCRIPT --db $DB_PATH query \
-  "SELECT agent_type, AVG(LENGTH(content)) as avg_length FROM orchestration_logs WHERE session_id = 'bazinga_123' GROUP BY agent_type"
+  "SELECT agent_type, AVG(LENGTH(content)) as avg_length FROM orchestration_logs WHERE session_id = 'orchestrix_123' GROUP BY agent_type"
 ```
 
 ---
@@ -379,7 +379,7 @@ When using from Claude Code's Bash tool:
 # Set up variables (relative paths for portability)
 DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
 DB_PATH="orchestrix/orchestrix.db"
-SESSION_ID="bazinga_20250112_143022"
+SESSION_ID="orchestrix_20250112_143022"
 
 # Example: Log interaction and update state in one command chain
 python3 "$DB_SCRIPT" --db "$DB_PATH" log-interaction \
@@ -400,11 +400,11 @@ from orchestrix_db import OrchestrixDB
 db = OrchestrixDB('/home/user/orchestrix/orchestrix/orchestrix.db')
 
 # Query logs
-logs = db.get_logs('bazinga_123', limit=10, agent_type='developer')
+logs = db.get_logs('orchestrix_123', limit=10, agent_type='developer')
 
 # Get dashboard data
-snapshot = db.get_dashboard_snapshot('bazinga_123')
+snapshot = db.get_dashboard_snapshot('orchestrix_123')
 
 # Stream logs in markdown
-markdown = db.stream_logs('bazinga_123', limit=50)
+markdown = db.stream_logs('orchestrix_123', limit=50)
 ```

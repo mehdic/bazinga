@@ -22,13 +22,13 @@ if [ "$PARENT_DIR" = "orchestrix" ]; then
     # Installed layout: PROJECT_ROOT/orchestrix/scripts/start-dashboard.sh
     # Dashboard at: PROJECT_ROOT/orchestrix/dashboard-v2
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-    Orchestrix_DIR="$PROJECT_ROOT/bazinga"
+    Orchestrix_DIR="$PROJECT_ROOT/orchestrix"
     DASHBOARD_DIR="$Orchestrix_DIR/dashboard-v2"
 else
     # Development layout: PROJECT_ROOT/scripts/start-dashboard.sh
     # Dashboard at: PROJECT_ROOT/dashboard-v2 (not inside orchestrix/)
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-    Orchestrix_DIR="$PROJECT_ROOT/bazinga"
+    Orchestrix_DIR="$PROJECT_ROOT/orchestrix"
     DASHBOARD_DIR="$PROJECT_ROOT/dashboard-v2"
 fi
 
@@ -126,7 +126,7 @@ STRICT="${DASHBOARD_STRICT:-0}"
 if [ ! -d "$DASHBOARD_DIR" ]; then
     msg "⏭️  Dashboard not installed, skipping startup"
     msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
-    msg "   To install: bazinga setup-dashboard"
+    msg "   To install: orchestrix setup-dashboard"
     [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
@@ -134,7 +134,7 @@ fi
 if ! command -v node >/dev/null 2>&1; then
     msg "⚠️  Node.js not found, cannot start dashboard"
     msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
-    msg "   To enable: install Node.js and run 'bazinga setup-dashboard'"
+    msg "   To enable: install Node.js and run 'orchestrix setup-dashboard'"
     [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
@@ -144,7 +144,7 @@ NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d. -f1)
 if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ] 2>/dev/null; then
     msg "⚠️  Node.js 18+ required for dashboard (found v$NODE_VERSION)"
     msg "   (Dashboard is optional - no impact on Orchestrix functionality)"
-    msg "   To enable: upgrade Node.js to 18+ and run 'bazinga setup-dashboard'"
+    msg "   To enable: upgrade Node.js to 18+ and run 'orchestrix setup-dashboard'"
     [ "$STRICT" = "1" ] && exit 1 || exit 0
 fi
 
@@ -241,7 +241,7 @@ if [ -f "$STANDALONE_SERVER" ]; then
         # Neither source nor standalone has BUILD_ID - standalone is incomplete
         # Fall back to dev mode instead of failing
         msg "⚠️  Standalone build incomplete (missing BUILD_ID), falling back to dev mode..."
-        msg "   Tip: run 'bazinga update --force' to fetch a complete standalone build"
+        msg "   Tip: run 'orchestrix update --force' to fetch a complete standalone build"
         USE_STANDALONE="false"
     fi
 fi
@@ -283,7 +283,7 @@ fi
 
 # Auto-detect DATABASE_URL if not set
 if [ -z "$DATABASE_URL" ]; then
-    # Look for database in project root bazinga folder
+    # Look for database in project root orchestrix folder
     DB_PATH="$PROJECT_ROOT/orchestrix/orchestrix.db"
     if [ -f "$DB_PATH" ]; then
         export DATABASE_URL="$DB_PATH"

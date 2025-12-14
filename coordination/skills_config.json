@@ -28,7 +28,7 @@
     "dashboard_ai_diagram_enabled": false
   },
   "_metadata": {
-    "description": "Skills configuration for BAZINGA agents",
+    "description": "Skills configuration for Orchestrix agents",
     "last_updated": "2025-01-09T00:00:00Z",
     "configuration_notes": [
       "MANDATORY: Skill will be automatically invoked by the agent",

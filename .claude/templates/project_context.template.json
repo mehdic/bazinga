@@ -9,7 +9,7 @@
     "Agent-based architecture (.claude/agents/)",
     "Skill-based extensions (.claude/skills/)",
     "Command pattern (.claude/commands/)",
-    "Database persistence (bazinga/bazinga.db)"
+    "Database persistence (orchestrix/orchestrix.db)"
   ],
 
   "conventions": {
@@ -25,15 +25,15 @@
     "skills": ".claude/skills/ - Reusable skill implementations",
     "commands": ".claude/commands/ - Slash command definitions",
     "scripts": "scripts/ - Build and utility scripts",
-    "database": "bazinga/ - Session state and orchestration data",
+    "database": "orchestrix/ - Session state and orchestration data",
     "tests": "tests/ - Test suites",
     "research": "research/ - Analysis and design documents"
   },
 
   "common_utilities": [
     {
-      "name": "bazinga-db",
-      "location": ".claude/skills/bazinga-db/",
+      "name": "orchestrix-db",
+      "location": ".claude/skills/orchestrix-db/",
       "purpose": "Database operations for orchestration state"
     },
     {

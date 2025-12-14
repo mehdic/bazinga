@@ -1,13 +1,13 @@
-# BAZINGA Integration Test: Simple Calculator App
+# Orchestrix Integration Test: Simple Calculator App
 
 ## Purpose
-This spec is used to test the complete BAZINGA orchestration workflow. Running this spec through the orchestrator validates:
+This spec is used to test the complete Orchestrix orchestration workflow. Running this spec through the orchestrator validates:
 - PM task breakdown and mode selection
 - Developer implementation
 - QA Expert testing (all 5 challenge levels if applicable)
 - Tech Lead review
-- DB field population via bazinga-db skill
-- Complete workflow from start to BAZINGA completion
+- DB field population via orchestrix-db skill
+- Complete workflow from start to Orchestrix completion
 
 ## Target Directory
 `tmp/simple-calculator-app/`
@@ -61,7 +61,7 @@ The orchestration must be run by the main Claude instance directly. Spawning an 
 
 ```
 # ✅ CORRECT: Run inline via slash command
-/bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
+/orchestrix.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 
 # ❌ WRONG: Do NOT spawn orchestrator as sub-agent
 Task(description="run orchestrator", prompt="...")  # Will fail - nested spawning limits
@@ -75,7 +75,7 @@ When spawning agents (Developer, QA, Tech Lead), the orchestrator MUST:
 For each agent spawn:
 1. Read FULL agent definition: agents/{agent_type}.md
 2. Add specialization block from specialization-loader skill
-3. Add configuration from bazinga/templates/prompt_building.md
+3. Add configuration from orchestrix/templates/prompt_building.md
 4. Include task-specific context
 5. Pass complete prompt to Task()
 ```
@@ -87,7 +87,7 @@ For each agent spawn:
 The full agent definitions contain:
 ```markdown
 ## 🧠 Reasoning Documentation (MANDATORY)
-**CRITICAL**: You MUST document your reasoning via the bazinga-db skill.
+**CRITICAL**: You MUST document your reasoning via the orchestrix-db skill.
 ```
 
 If agents don't log reasoning, the prompt was incomplete.
@@ -95,7 +95,7 @@ If agents don't log reasoning, the prompt was incomplete.
 ### Pre-Test Cleanup
 
 ```bash
-rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
+rm -rf tmp/simple-calculator-app orchestrix/orchestrix.db orchestrix/project_context.json
 ```
 
 ### Expected DB Population
@@ -114,7 +114,7 @@ After correct execution, ALL these tables should have data:
 **If `orchestration_logs` or `reasoning_log` are empty, the test was run incorrectly.**
 
 ## Post-Orchestration Verification
-After BAZINGA completion, verify:
+After Orchestrix completion, verify:
 
 ### 1. File Verification
 All expected files exist in `tmp/simple-calculator-app/`:
@@ -124,7 +124,7 @@ All expected files exist in `tmp/simple-calculator-app/`:
 
 ### 2. Core DB Tables
 - [ ] `sessions` - New session with status "completed"
-- [ ] `orchestration_logs` - Entries for PM, Developer, QA, Tech Lead, BAZINGA
+- [ ] `orchestration_logs` - Entries for PM, Developer, QA, Tech Lead, Orchestrix
 - [ ] `task_groups` - Task group CALC with status "completed"
 
 ### 3. Context Engineering Verification (NEW)
@@ -132,13 +132,13 @@ All expected files exist in `tmp/simple-calculator-app/`:
 **First, get the session ID:**
 ```bash
 # Get most recent session ID
-SESSION_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 | grep -o 'bazinga_[0-9_]*')
+SESSION_ID=$(python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet list-sessions 1 | grep -o 'orchestrix_[0-9_]*')
 echo "Session: $SESSION_ID"
 ```
 
 **QA Specialization Templates:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
 ```
 - [ ] QA Expert should receive > 0 templates (not 0)
 - [ ] If testing_mode=full, expect: `08-testing/qa-strategies.md` or `08-testing/testing-patterns.md`
@@ -146,27 +146,27 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 
 **Success Criteria:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "$SESSION_ID"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-success-criteria "$SESSION_ID"
 ```
 - [ ] Should return 7-11 criteria (matching acceptance criteria above)
-- [ ] All criteria should have status "met" at BAZINGA time
+- [ ] All criteria should have status "met" at Orchestrix time
 
 **Skill Outputs:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
 ```
 - [ ] At least 1 entry for specialization-loader
 - [ ] Contains fields: `templates_after`, `augmented_templates`, `skipped_missing`, `testing_mode_used`
 
 **Reasoning Logs (MANDATORY when run correctly):**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "$SESSION_ID" 20
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet stream-logs "$SESSION_ID" 20
 ```
 - [ ] Developer: `understanding`, `completion` phases logged
 - [ ] QA Expert: `understanding`, `completion` phases logged
 - [ ] Tech Lead: `understanding`, `completion` phases logged
 
-**If reasoning logs are empty:** The orchestrator used simplified prompts instead of full agent definitions. Re-run using `/bazinga.orchestrate` which follows `bazinga/templates/orchestrator/phase_simple.md` to read full agent files.
+**If reasoning logs are empty:** The orchestrator used simplified prompts instead of full agent definitions. Re-run using `/orchestrix.orchestrate` which follows `orchestrix/templates/orchestrator/phase_simple.md` to read full agent files.
 
 ### 4. Test Execution
 ```bash
@@ -181,16 +181,16 @@ cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
 |-------|-------|-----|
 | QA Expert 0 templates | Compatibility filtering removed all templates | Fixed in specialization-loader Step 3.6 (auto-augment) |
 | Empty `skill_outputs` | Specialization-loader didn't save output | Check skill invocation in orchestrator |
-| Empty `orchestration_logs` | Orchestrator didn't log agent interactions | Run via `/bazinga.orchestrate` (follows full workflow) |
+| Empty `orchestration_logs` | Orchestrator didn't log agent interactions | Run via `/orchestrix.orchestrate` (follows full workflow) |
 | Empty `reasoning_log` | Agent prompts missing full definition | **Re-run test** - orchestrator must read `agents/*.md` files |
 | Empty `success_criteria` | PM didn't save criteria | Check PM spawn included full `agents/project_manager.md` |
 
 **🔴 If logs are empty, the test was executed incorrectly.**
 
-The `/bazinga.orchestrate` slash command follows `bazinga/templates/orchestrator/phase_simple.md` which mandates:
+The `/orchestrix.orchestrate` slash command follows `orchestrix/templates/orchestrator/phase_simple.md` which mandates:
 - Reading full agent definitions from `agents/*.md`
 - Including specialization blocks
-- Building complete prompts per `bazinga/templates/prompt_building.md`
+- Building complete prompts per `orchestrix/templates/prompt_building.md`
 
 Simplified prompts (without full agent definitions) will skip mandatory workflows like reasoning documentation.
 
@@ -198,19 +198,19 @@ Simplified prompts (without full agent definitions) will skip mandatory workflow
 
 ```bash
 # Get session ID first
-SESSION_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 | grep -o 'bazinga_[0-9_]*')
+SESSION_ID=$(python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet list-sessions 1 | grep -o 'orchestrix_[0-9_]*')
 
 # Check session status
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet list-sessions 1
 
 # Full dashboard snapshot
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "$SESSION_ID"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet dashboard-snapshot "$SESSION_ID"
 
 # QA template verification
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-skill-output "$SESSION_ID" "specialization-loader"
 
 # Success criteria
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "$SESSION_ID"
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-success-criteria "$SESSION_ID"
 
 # Run tests
 cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v

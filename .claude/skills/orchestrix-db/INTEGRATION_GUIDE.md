@@ -42,7 +42,7 @@ python3 /home/user/orchestrix/.claude/skills/orchestrix-db/scripts/orchestrix_db
 {
   "success": true,
   "log_id": 42,
-  "session_id": "bazinga_20250113_143530",
+  "session_id": "orchestrix_20250113_143530",
   "agent_type": "developer",
   "content_length": 2847,
   "timestamp": "2025-01-13 14:35:42",
@@ -71,7 +71,7 @@ python3 /home/user/orchestrix/.claude/skills/orchestrix-db/scripts/auto_logger.p
   "details": {
     "success": true,
     "log_id": 42,
-    "session_id": "bazinga_20250113_143530",
+    "session_id": "orchestrix_20250113_143530",
     "agent_type": "developer",
     "content_length": 2847,
     "timestamp": "2025-01-13 14:35:42",

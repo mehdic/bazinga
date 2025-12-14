@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 
 # Add database script to path
-sys.path.insert(0, str(Path(__file__).parent / '.claude' / 'skills' / 'bazinga-db' / 'scripts'))
+sys.path.insert(0, str(Path(__file__).parent / '.claude' / 'skills' / 'orchestrix-db' / 'scripts'))
 from orchestrix_db import OrchestrixDB
 
 DB_PATH = Path(__file__).parent / 'coordination' / 'orchestrix.db'

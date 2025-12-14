@@ -7,7 +7,7 @@ Agent prompts are dynamically built by reading configuration files and appending
 
 ### 1. Skills Configuration
 ```bash
-cat bazinga/skills_config.json
+cat orchestrix/skills_config.json
 ```
 
 Check which advanced skills are mandatory for each agent:
@@ -22,7 +22,7 @@ Check which advanced skills are mandatory for each agent:
 
 ### 2. Testing Configuration
 ```bash
-cat bazinga/testing_config.json
+cat orchestrix/testing_config.json
 ```
 
 Extract key settings:

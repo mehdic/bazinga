@@ -16,9 +16,9 @@ echo "🔒 Security Scan Starting (Mode: $MODE)..."
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="bazinga/bazinga.db"
+    local db_path="orchestrix/orchestrix.db"
     if [ ! -f "$db_path" ]; then
-        echo "bazinga_default"
+        echo "orchestrix_default"
         return
     fi
 
@@ -31,17 +31,17 @@ try:
     if row:
         print(row[0])
     else:
-        print('bazinga_default')
+        print('orchestrix_default')
     conn.close()
 except:
-    print('bazinga_default')
-" 2>/dev/null || echo "bazinga_default")
+    print('orchestrix_default')
+" 2>/dev/null || echo "orchestrix_default")
 
     echo "$session_id"
 }
 
 SESSION_ID=$(get_current_session_id)
-OUTPUT_DIR="bazinga/artifacts/$SESSION_ID/skills"
+OUTPUT_DIR="orchestrix/artifacts/$SESSION_ID/skills"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/security_scan.json"
 
@@ -54,8 +54,8 @@ TOOL_USED="none"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
-if [ -f "bazinga/skills_config.json" ] && command -v jq &> /dev/null; then
-    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
+if [ -f "orchestrix/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' orchestrix/skills_config.json 2>/dev/null || echo "lite")
 fi
 
 # Detect project language
@@ -144,10 +144,10 @@ case $MODE in
                 TOOL_USED="bandit"
                 # Basic: High/medium severity only (-ll flag)
                 echo "  Running bandit (high/medium severity)..."
-                if ! bandit -r . -f json -o bazinga/security_scan_raw.json -ll 2>/dev/null; then
+                if ! bandit -r . -f json -o orchestrix/security_scan_raw.json -ll 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="Bandit scan failed or had errors"
-                    echo '{"results":[]}' > bazinga/security_scan_raw.json
+                    echo '{"results":[]}' > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -155,10 +155,10 @@ case $MODE in
                 TOOL_USED="npm-audit"
                 # npm audit is built-in
                 echo "  Running npm audit (high severity)..."
-                if ! npm audit --audit-level=high --json > bazinga/security_scan_raw.json 2>/dev/null; then
+                if ! npm audit --audit-level=high --json > orchestrix/security_scan_raw.json 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="npm audit failed (possibly network issue)"
-                    echo '{"vulnerabilities":{}}' > bazinga/security_scan_raw.json
+                    echo '{"vulnerabilities":{}}' > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -169,10 +169,10 @@ case $MODE in
                 export PATH=$PATH:$(go env GOPATH)/bin
                 TOOL_USED="gosec"
                 echo "  Running gosec (high severity)..."
-                if ! gosec -severity high -fmt json -out bazinga/security_scan_raw.json ./... 2>/dev/null; then
+                if ! gosec -severity high -fmt json -out orchestrix/security_scan_raw.json ./... 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="gosec scan failed"
-                    echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                    echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -182,10 +182,10 @@ case $MODE in
 
                 TOOL_USED="brakeman"
                 echo "  Running brakeman (high severity)..."
-                if ! brakeman -f json -o bazinga/security_scan_raw.json --severity-level 1 2>/dev/null; then
+                if ! brakeman -f json -o orchestrix/security_scan_raw.json --severity-level 1 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="brakeman scan failed"
-                    echo '{"warnings":[]}' > bazinga/security_scan_raw.json
+                    echo '{"warnings":[]}' > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -202,14 +202,14 @@ case $MODE in
                         # Check if SpotBugs report exists
                         if [ -f "target/spotbugsXml.xml" ]; then
                             # Convert XML to JSON if possible
-                            echo '{"tool":"spotbugs","source":"target/spotbugsXml.xml"}' > bazinga/security_scan_raw.json
+                            echo '{"tool":"spotbugs","source":"target/spotbugsXml.xml"}' > orchestrix/security_scan_raw.json
                         else
-                            echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                            echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                         fi
                     else
                         SCAN_STATUS="error"
                         SCAN_ERROR="Maven not found for Java project"
-                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                        echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                     fi
                 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
                     TOOL_USED="spotbugs-gradle"
@@ -224,19 +224,19 @@ case $MODE in
                         fi
                         # Check for Gradle SpotBugs report
                         if [ -f "build/reports/spotbugs/main.xml" ]; then
-                            echo '{"tool":"spotbugs","source":"build/reports/spotbugs/main.xml"}' > bazinga/security_scan_raw.json
+                            echo '{"tool":"spotbugs","source":"build/reports/spotbugs/main.xml"}' > orchestrix/security_scan_raw.json
                         else
-                            echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                            echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                         fi
                     else
                         SCAN_STATUS="error"
                         SCAN_ERROR="Gradle not found for Java project"
-                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                        echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                     fi
                 else
                     SCAN_STATUS="error"
                     SCAN_ERROR="No Maven or Gradle build file found for Java project"
-                    echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                    echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -244,7 +244,7 @@ case $MODE in
                 echo "❌ Unknown language. Cannot run security scan."
                 SCAN_STATUS="error"
                 SCAN_ERROR="Unknown or unsupported language"
-                echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                 ;;
         esac
 
@@ -268,29 +268,29 @@ case $MODE in
 
                 # Run bandit (all severities)
                 echo "  Running bandit (all severities)..."
-                if ! bandit -r . -f json -o bazinga/bandit_full.json 2>/dev/null; then
+                if ! bandit -r . -f json -o orchestrix/bandit_full.json 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Bandit scan failed"
-                    echo '{"results":[]}' > bazinga/bandit_full.json
+                    echo '{"results":[]}' > orchestrix/bandit_full.json
                 fi
 
                 # Run semgrep if available (comprehensive patterns)
                 if command_exists "semgrep"; then
                     echo "  Running semgrep (security patterns)..."
-                    if ! semgrep --config=auto --json -o bazinga/semgrep.json 2>/dev/null; then
+                    if ! semgrep --config=auto --json -o orchestrix/semgrep.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Semgrep scan failed"
-                        echo '{"results":[]}' > bazinga/semgrep.json
+                        echo '{"results":[]}' > orchestrix/semgrep.json
                     fi
                 else
-                    echo '{"results":[]}' > bazinga/semgrep.json
+                    echo '{"results":[]}' > orchestrix/semgrep.json
                 fi
 
                 # Combine results
                 if command_exists "jq"; then
-                    jq -s '{"bandit": .[0], "semgrep": .[1]}' bazinga/bandit_full.json bazinga/semgrep.json > bazinga/security_scan_raw.json
+                    jq -s '{"bandit": .[0], "semgrep": .[1]}' orchestrix/bandit_full.json orchestrix/semgrep.json > orchestrix/security_scan_raw.json
                 else
-                    cat bazinga/bandit_full.json > bazinga/security_scan_raw.json
+                    cat orchestrix/bandit_full.json > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -298,30 +298,30 @@ case $MODE in
                 TOOL_USED="npm-audit"
                 # Full npm audit
                 echo "  Running npm audit (all severabilities)..."
-                if ! npm audit --json > bazinga/npm_audit.json 2>/dev/null; then
+                if ! npm audit --json > orchestrix/npm_audit.json 2>/dev/null; then
                     SCAN_STATUS="partial"
                     SCAN_ERROR="npm audit failed (possibly network issue)"
-                    echo '{"vulnerabilities":{}}' > bazinga/npm_audit.json
+                    echo '{"vulnerabilities":{}}' > orchestrix/npm_audit.json
                 fi
 
                 # Try eslint with security plugin if available
                 if npm list eslint-plugin-security &> /dev/null; then
                     TOOL_USED="npm-audit+eslint-security"
                     echo "  Running eslint security plugin..."
-                    if ! npx eslint . --plugin security --format json > bazinga/eslint_security.json 2>/dev/null; then
+                    if ! npx eslint . --plugin security --format json > orchestrix/eslint_security.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }eslint-security scan failed"
-                        echo '[]' > bazinga/eslint_security.json
+                        echo '[]' > orchestrix/eslint_security.json
                     fi
 
                     # Combine if jq available
                     if command_exists "jq"; then
-                        jq -s '{"npm_audit": .[0], "eslint": .[1]}' bazinga/npm_audit.json bazinga/eslint_security.json > bazinga/security_scan_raw.json
+                        jq -s '{"npm_audit": .[0], "eslint": .[1]}' orchestrix/npm_audit.json orchestrix/eslint_security.json > orchestrix/security_scan_raw.json
                     else
-                        cat bazinga/npm_audit.json > bazinga/security_scan_raw.json
+                        cat orchestrix/npm_audit.json > orchestrix/security_scan_raw.json
                     fi
                 else
-                    cat bazinga/npm_audit.json > bazinga/security_scan_raw.json
+                    cat orchestrix/npm_audit.json > orchestrix/security_scan_raw.json
                 fi
                 ;;
 
@@ -333,7 +333,7 @@ case $MODE in
                     if ! go install github.com/securego/gosec/v2/cmd/gosec@latest; then
                         SCAN_STATUS="error"
                         SCAN_ERROR="Failed to install gosec"
-                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                        echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                     else
                         export PATH=$PATH:$(go env GOPATH)/bin
                     fi
@@ -341,10 +341,10 @@ case $MODE in
 
                 if [ "$SCAN_STATUS" != "error" ]; then
                     echo "  Running gosec (all severities)..."
-                    if ! gosec -fmt json -out bazinga/security_scan_raw.json ./... 2>/dev/null; then
+                    if ! gosec -fmt json -out orchestrix/security_scan_raw.json ./... 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="gosec scan failed"
-                        echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                        echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                     fi
                 fi
                 ;;
@@ -355,13 +355,13 @@ case $MODE in
                 if ! install_if_missing "brakeman" "gem install brakeman"; then
                     SCAN_STATUS="error"
                     SCAN_ERROR="Failed to install brakeman"
-                    echo '{"warnings":[]}' > bazinga/security_scan_raw.json
+                    echo '{"warnings":[]}' > orchestrix/security_scan_raw.json
                 else
                     echo "  Running brakeman (all findings)..."
-                    if ! brakeman -f json -o bazinga/security_scan_raw.json 2>/dev/null; then
+                    if ! brakeman -f json -o orchestrix/security_scan_raw.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="brakeman scan failed"
-                        echo '{"warnings":[]}' > bazinga/security_scan_raw.json
+                        echo '{"warnings":[]}' > orchestrix/security_scan_raw.json
                     fi
                 fi
                 ;;
@@ -415,22 +415,22 @@ case $MODE in
                 # Run semgrep if available
                 if command_exists "semgrep"; then
                     echo "  Running semgrep for Java..."
-                    if ! semgrep --config=auto --json -o bazinga/semgrep_java.json 2>/dev/null; then
+                    if ! semgrep --config=auto --json -o orchestrix/semgrep_java.json 2>/dev/null; then
                         SCAN_STATUS="partial"
                         SCAN_ERROR="${SCAN_ERROR:+$SCAN_ERROR; }Semgrep scan failed"
-                        echo '{"results":[]}' > bazinga/semgrep_java.json
+                        echo '{"results":[]}' > orchestrix/semgrep_java.json
                     fi
                 fi
 
                 # Consolidate Java results
-                echo '{"tool":"spotbugs+owasp+semgrep","status":"see_build_reports"}' > bazinga/security_scan_raw.json
+                echo '{"tool":"spotbugs+owasp+semgrep","status":"see_build_reports"}' > orchestrix/security_scan_raw.json
                 ;;
 
             *)
                 echo "❌ Unknown language. Cannot run security scan."
                 SCAN_STATUS="error"
                 SCAN_ERROR="Unknown or unsupported language"
-                echo '{"issues":[]}' > bazinga/security_scan_raw.json
+                echo '{"issues":[]}' > orchestrix/security_scan_raw.json
                 ;;
         esac
 
@@ -449,7 +449,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata and status
 if command_exists "jq"; then
     jq ". + {\"scan_mode\": \"$MODE\", \"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"status\": \"$SCAN_STATUS\", \"tool\": \"$TOOL_USED\", \"error\": \"$SCAN_ERROR\"}" \
-        bazinga/security_scan_raw.json > $OUTPUT_FILE
+        orchestrix/security_scan_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available - simple JSON append
     cat > $OUTPUT_FILE <<EOF
@@ -460,13 +460,13 @@ else
   "status": "$SCAN_STATUS",
   "tool": "$TOOL_USED",
   "error": "$SCAN_ERROR",
-  "raw_results": $(cat bazinga/security_scan_raw.json)
+  "raw_results": $(cat orchestrix/security_scan_raw.json)
 }
 EOF
 fi
 
 # Clean up intermediate files
-rm -f bazinga/bandit_full.json bazinga/semgrep.json bazinga/npm_audit.json bazinga/eslint_security.json bazinga/security_scan_raw.json 2>/dev/null || true
+rm -f orchestrix/bandit_full.json orchestrix/semgrep.json orchestrix/npm_audit.json orchestrix/eslint_security.json orchestrix/security_scan_raw.json 2>/dev/null || true
 
 # Report status
 echo "📊 Scan mode: $MODE | Language: $LANG | Status: $SCAN_STATUS"
@@ -477,8 +477,8 @@ echo "📁 Results saved to: $OUTPUT_FILE"
 
 # Save to database
 echo "💾 Saving to database..."
-DB_PATH="bazinga/bazinga.db"
-DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_PATH="orchestrix/orchestrix.db"
+DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
 SKILL_OUTPUT=$(cat "$OUTPUT_FILE")
 
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \

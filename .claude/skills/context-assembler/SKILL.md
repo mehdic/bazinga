@@ -20,7 +20,7 @@ You are the context-assembler skill. When invoked, you assemble relevant context
 **Do NOT invoke when:**
 - No active orchestration session exists
 - Manually reading specific files (use Read tool directly)
-- Working outside BAZINGA orchestration
+- Working outside Orchestrix orchestration
 
 ---
 
@@ -49,7 +49,7 @@ If `session_id` or `agent_type` are missing, check recent conversation context o
 AGENT_TYPE="developer"  # Replace with actual agent_type
 
 # Pass AGENT_TYPE via command-line argument (not string interpolation)
-LIMIT=$(cat bazinga/skills_config.json 2>/dev/null | python3 -c "
+LIMIT=$(cat orchestrix/skills_config.json 2>/dev/null | python3 -c "
 import sys, json
 agent = sys.argv[1] if len(sys.argv) > 1 else 'developer'
 defaults = {'developer': 3, 'senior_software_engineer': 5, 'qa_expert': 5, 'tech_lead': 5, 'investigator': 5}
@@ -109,7 +109,7 @@ MODEL_LIMITS = {
 
 # Read safety margin from config (default 15%)
 try:
-    with open('bazinga/skills_config.json') as f:
+    with open('orchestrix/skills_config.json') as f:
         cfg = json.load(f).get('context_engineering', {})
         SAFETY_MARGIN = cfg.get('token_safety_margin', 0.15)
 except:
@@ -238,7 +238,7 @@ def db_query_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 25
             return []
     return []
 
-db_path = 'bazinga/bazinga.db'
+db_path = 'orchestrix/orchestrix.db'
 
 # Priority fallback: fill up to LIMIT across critical → high → medium
 priorities = ['critical', 'high', 'medium']
@@ -300,9 +300,9 @@ def db_query_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
         return []
     return []
 
-# Use bazinga-db get-context-packages (parameterized, safe)
+# Use orchestrix-db get-context-packages (parameterized, safe)
 result = db_query_with_retry([
-    'python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet',
+    'python3', '.claude/skills/orchestrix-db/scripts/orchestrix_db.py', '--quiet',
     'get-context-packages', session_id, group_id, agent_type, str(limit)
 ])
 
@@ -328,12 +328,12 @@ echo "Query returned: $(echo "$QUERY_RESULT" | python3 -c "import sys,json; d=js
 
 ```bash
 # Fetch packages with LEFT JOIN to get consumer info for agent_relevance calculation
-SESSION_ID="bazinga_20250212_143530"
+SESSION_ID="orchestrix_20250212_143530"
 GROUP_ID="group_a"  # or empty string for session-wide
 AGENT_TYPE="developer"
 
 # Note: SESSION_ID is system-generated (not user input), but use shell variables for clarity
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet query \
   "SELECT cp.id, cp.file_path, cp.priority, cp.summary, cp.group_id, cp.created_at,
           GROUP_CONCAT(cs.agent_type) as consumers
    FROM context_packages cp
@@ -493,10 +493,10 @@ If the agent previously failed or error patterns might be relevant:
 
 **Step 4a: Get project_id from session:**
 ```bash
-SESSION_ID="bazinga_20250212_143530"
+SESSION_ID="orchestrix_20250212_143530"
 
 # Retrieve project_id (defaults to 'default' if not set)
-PROJECT_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+PROJECT_ID=$(python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet query \
   "SELECT COALESCE(json_extract(metadata, '\$.project_id'), 'default') as pid FROM sessions WHERE session_id = '$SESSION_ID'" \
   2>/dev/null | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['pid'] if r else 'default')" 2>/dev/null || echo "default")
 ```
@@ -504,7 +504,7 @@ PROJECT_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet que
 **Step 4b: Query matching error patterns:**
 ```bash
 # Filter by project_id and optionally session_id for more specific matches
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet query \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet query \
   "SELECT signature_json, solution, confidence, occurrences FROM error_patterns WHERE project_id = '$PROJECT_ID' AND confidence > 0.7 ORDER BY confidence DESC, occurrences DESC LIMIT 3"
 ```
 
@@ -719,7 +719,7 @@ def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 
 
 # Insert consumption records into consumption_scope table (per data-model.md)
 # Uses parameterized queries for SQL injection prevention
-db_path = 'bazinga/bazinga.db'
+db_path = 'orchestrix/orchestrix.db'
 sql = '''INSERT OR IGNORE INTO consumption_scope
          (scope_id, session_id, group_id, agent_type, iteration, package_id, consumed_at)
          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))'''
@@ -791,10 +791,10 @@ Strategy extraction should run when:
 
 ### Strategy Extraction Process
 
-**Note:** Strategy extraction is triggered by the orchestrator (phase_simple.md, phase_parallel.md) after Tech Lead approval using the `bazinga-db extract-strategies` command:
+**Note:** Strategy extraction is triggered by the orchestrator (phase_simple.md, phase_parallel.md) after Tech Lead approval using the `orchestrix-db extract-strategies` command:
 
 ```
-bazinga-db, please extract strategies:
+orchestrix-db, please extract strategies:
 
 Session ID: {session_id}
 Group ID: {group_id}
@@ -802,7 +802,7 @@ Project ID: {project_id}
 Lang: {detected_lang}
 Framework: {detected_framework}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "orchestrix-db")`
 
 **What the command does:**
 1. Queries `agent_reasoning` table for completion/decisions/approach phases
@@ -842,7 +842,7 @@ LIMIT 3
 
 ## Configuration Reference
 
-From `bazinga/skills_config.json`:
+From `orchestrix/skills_config.json`:
 
 ```json
 {
@@ -879,7 +879,7 @@ From `bazinga/skills_config.json`:
 **Request:**
 ```
 Assemble context for developer spawn:
-- Session: bazinga_20250212_143530
+- Session: orchestrix_20250212_143530
 - Group: group_a
 - Agent: developer
 ```
@@ -913,15 +913,15 @@ Assemble context for developer spawn:
 **Request:**
 ```
 Assemble context for tech_lead spawn:
-- Session: bazinga_20250212_143530
+- Session: orchestrix_20250212_143530
 - Group: (none - session-wide)
 - Agent: tech_lead
 ```
 
 **Commands used:**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-context-packages \
-  "bazinga_20250212_143530" "" "tech_lead" 5
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet get-context-packages \
+  "orchestrix_20250212_143530" "" "tech_lead" 5
 ```
 
 ### Example 3: Empty Context
@@ -953,7 +953,7 @@ No context packages found for this session/group. The agent will proceed with ta
 **Parameter Handling:**
 - Always assign user-provided values to shell variables first
 - Use quoted variable expansion (`"$VAR"`) in commands
-- The bazinga-db CLI uses positional arguments (safer than string interpolation)
+- The orchestrix-db CLI uses positional arguments (safer than string interpolation)
 - Avoid constructing SQL strings with raw user input
 
 **Example of safe vs unsafe:**

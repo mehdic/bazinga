@@ -15,7 +15,7 @@ You are the velocity-tracker skill. When invoked, you analyze historical project
 - After completing each task group (to track cycle time)
 - Before spawning new developers (to check velocity capacity)
 - When a task appears stuck (to detect 99% rule violations)
-- Before sending BAZINGA (to record final metrics for learning)
+- Before sending Orchestrix (to record final metrics for learning)
 - Planning next iteration (to use historical data)
 
 **Do NOT invoke when:**
@@ -52,13 +52,13 @@ pwsh .claude/skills/velocity-tracker/scripts/track.ps1
 > **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
-- Read PM state from database (`bazinga/bazinga.db`)
+- Read PM state from database (`orchestrix/orchestrix.db`)
 - Calculate current velocity and cycle times
 - Compare against historical metrics
 - Detect trends (improving/stable/declining)
 - Identify 99% rule violations
-- Generate `bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json`
-- Update `bazinga/artifacts/{SESSION_ID}/skills/historical_metrics.json`
+- Generate `orchestrix/artifacts/{SESSION_ID}/skills/project_metrics.json`
+- Update `orchestrix/artifacts/{SESSION_ID}/skills/historical_metrics.json`
 
 ---
 
@@ -67,7 +67,7 @@ This script will:
 Use the **Read** tool to read the generated report:
 
 ```bash
-bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
+orchestrix/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 Extract key information:
@@ -100,7 +100,7 @@ Top Recommendations:
 2. {recommendation 2}
 3. {recommendation 3}
 
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
+Details saved to: orchestrix/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 ---
@@ -123,7 +123,7 @@ Top Recommendations:
 1. Current velocity exceeds historical average - good progress
 2. Estimated remaining time: 3.5 hours
 
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
+Details saved to: orchestrix/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 **Scenario 2: 99% Rule Violation Detected**
@@ -146,7 +146,7 @@ Top Recommendations:
 2. Velocity below average - may need task breakdown
 3. Database tasks pattern: taking 2.5x estimate
 
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
+Details saved to: orchestrix/artifacts/{SESSION_ID}/skills/project_metrics.json
 ```
 
 ---
@@ -155,7 +155,7 @@ Details saved to: bazinga/artifacts/{SESSION_ID}/skills/project_metrics.json
 
 **If script fails:**
 - Check the script output for error messages
-- Verify database `bazinga/bazinga.db` exists and contains PM state
+- Verify database `orchestrix/orchestrix.db` exists and contains PM state
 - Return error message to calling agent
 
 **If no completed groups:**

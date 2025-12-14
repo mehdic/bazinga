@@ -18,7 +18,7 @@
 # Example:
 #   ./dev-scripts/llm-reviews.sh research/my-plan.md scripts/foo.sh src/bar.py
 #
-# Note: This script is for BAZINGA development only, not copied to clients.
+# Note: This script is for Orchestrix development only, not copied to clients.
 
 # Don't use set -e to allow explicit error handling for API calls
 
@@ -174,8 +174,8 @@ CONTEXT_TEMP_FILE=$(mktemp)
 
 # Write project header
 cat > "$CONTEXT_TEMP_FILE" <<'EOF'
-=== PROJECT: BAZINGA Multi-Agent Orchestration System ===
-Repository: https://github.com/mehdic/bazinga
+=== PROJECT: Orchestrix Multi-Agent Orchestration System ===
+Repository: https://github.com/mehdic/orchestrix
 
 This is a Claude Code multi-agent orchestration system where specialized agents
 (PM, Developer, QA, Tech Lead) collaborate on software development tasks.

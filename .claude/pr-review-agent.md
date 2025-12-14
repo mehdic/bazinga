@@ -415,12 +415,12 @@ Always create `research/prXXX-review-analysis.md` with full ultrathink analysis.
 ### GitHub Token Setup
 
 **Token sources (in order of preference):**
-1. Environment variable: `BAZINGA_GITHUB_TOKEN` (Claude Code Web)
-2. File: `~/.bazinga-github-token` (local development)
+1. Environment variable: `Orchestrix_GITHUB_TOKEN` (Claude Code Web)
+2. File: `~/.orchestrix-github-token` (local development)
 
 **Load token in scripts:**
 ```bash
-GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+GITHUB_TOKEN="${Orchestrix_GITHUB_TOKEN:-$(cat ~/.orchestrix-github-token 2>/dev/null)}"
 ```
 
 **Token requirements:**
@@ -433,14 +433,14 @@ GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)
 
 **Step 1: Fetch reviews + comments (combined query)**
 ```bash
-GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+GITHUB_TOKEN="${Orchestrix_GITHUB_TOKEN:-$(cat ~/.orchestrix-github-token 2>/dev/null)}"
 PR_NUMBER=XXX
 
 curl -sSf -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 30) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"orchestrix\\\") { pullRequest(number: $PR_NUMBER) { reviews(last: 30) { nodes { author { login } body state createdAt commit { oid } } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
 
 # List reviews (author | commit | date)
 # Note: Use null-coalescing (//) to handle reviews with null commit
@@ -462,7 +462,7 @@ curl -sSf -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { reviewThreads(last: 20) { nodes { id isResolved path line comments(first: 2) { nodes { author { login } body } } } } } } }\"}" > /tmp/pr_threads.json
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"orchestrix\\\") { pullRequest(number: $PR_NUMBER) { reviewThreads(last: 20) { nodes { id isResolved path line comments(first: 2) { nodes { author { login } body } } } } } } }\"}" > /tmp/pr_threads.json
 
 # Show unresolved threads
 jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | "[\(.path):\(.line)]\n\(.comments.nodes[0].body)\n---"' /tmp/pr_threads.json
@@ -679,7 +679,7 @@ When a review workflow fails (503, timeout), trigger a rerun via REST API:
 rerun_workflow() {
   WORKFLOW_NAME=$1  # e.g., "Gemini PR Review"
   HEAD_SHA=$2
-  GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+  GITHUB_TOKEN="${Orchestrix_GITHUB_TOKEN:-$(cat ~/.orchestrix-github-token 2>/dev/null)}"
 
   # Find the workflow run by name and head_sha
   # Use workflow file path for reliable matching
@@ -691,14 +691,14 @@ rerun_workflow() {
 
   # Sort by run_number descending to get the most recent run (not first match)
   RUN_ID=$(curl -sSf -H "Authorization: Bearer $GITHUB_TOKEN" \
-    "https://api.github.com/repos/mehdic/bazinga/actions/runs?event=pull_request&head_sha=$HEAD_SHA" | \
+    "https://api.github.com/repos/mehdic/orchestrix/actions/runs?event=pull_request&head_sha=$HEAD_SHA" | \
     jq -r "[.workflow_runs[] | select(.path == \"$WORKFLOW_PATH\")] | sort_by(.run_number) | last | .id")
 
   if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
     # Trigger rerun and check HTTP status (expect 201 Created)
     HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/rerun_response.json -X POST \
       -H "Authorization: Bearer $GITHUB_TOKEN" \
-      "https://api.github.com/repos/mehdic/bazinga/actions/runs/$RUN_ID/rerun")
+      "https://api.github.com/repos/mehdic/orchestrix/actions/runs/$RUN_ID/rerun")
 
     if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
       echo "✅ Workflow rerun triggered: $WORKFLOW_NAME (Run ID: $RUN_ID)"
@@ -724,7 +724,7 @@ check_for_reviews() {
   PUSH_TIME=$3
 
   # Initialize GITHUB_TOKEN (critical - needed for API calls)
-  GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+  GITHUB_TOKEN="${Orchestrix_GITHUB_TOKEN:-$(cat ~/.orchestrix-github-token 2>/dev/null)}"
   if [ -z "$GITHUB_TOKEN" ]; then
     echo "ERROR: GITHUB_TOKEN not set" >&2
     return 1
@@ -735,7 +735,7 @@ check_for_reviews() {
     -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "Content-Type: application/json" \
     "https://api.github.com/graphql" \
-    -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { headRefOid reviews(last: 30) { nodes { author { login } body commit { oid } createdAt } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
+    -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"orchestrix\\\") { pullRequest(number: $PR_NUMBER) { headRefOid reviews(last: 30) { nodes { author { login } body commit { oid } createdAt } } comments(last: 50) { nodes { author { login } body createdAt } } } } }\"}" > /tmp/pr_data.json
 
   # Get current head SHA
   HEAD_SHA=$(jq -r '.data.repository.pullRequest.headRefOid' /tmp/pr_data.json)
@@ -778,7 +778,7 @@ This serves two purposes:
 
 **Step 1: Reply to the thread explaining your action**
 ```bash
-GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+GITHUB_TOKEN="${Orchestrix_GITHUB_TOKEN:-$(cat ~/.orchestrix-github-token 2>/dev/null)}"
 
 # Reply to a review thread (use the comment's node_id)
 curl -s -X POST \
@@ -824,11 +824,11 @@ This enables timestamp-windowed filtering: each LLM only sees responses to ITS O
 PR_NUMBER=155
 
 # Load token with fallback (consistent with other sections)
-GITHUB_TOKEN="${BAZINGA_GITHUB_TOKEN:-$(cat ~/.bazinga-github-token 2>/dev/null)}"
+GITHUB_TOKEN="${Orchestrix_GITHUB_TOKEN:-$(cat ~/.orchestrix-github-token 2>/dev/null)}"
 
 # Validate token exists
 if [ -z "$GITHUB_TOKEN" ]; then
-  echo "ERROR: GITHUB_TOKEN not set (need BAZINGA_GITHUB_TOKEN or ~/.bazinga-github-token)" >&2
+  echo "ERROR: GITHUB_TOKEN not set (need Orchestrix_GITHUB_TOKEN or ~/.orchestrix-github-token)" >&2
   exit 1
 fi
 ```
@@ -839,7 +839,7 @@ RESPONSE=$(curl -sSf -X POST \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "Content-Type: application/json" \
   "https://api.github.com/graphql" \
-  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"bazinga\\\") { pullRequest(number: $PR_NUMBER) { id } } }\"}")
+  -d "{\"query\": \"query { repository(owner: \\\"mehdic\\\", name: \\\"orchestrix\\\") { pullRequest(number: $PR_NUMBER) { id } } }\"}")
 
 PR_NODE_ID=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.id')
 

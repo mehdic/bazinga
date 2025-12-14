@@ -15,7 +15,7 @@ This allows the same group ID to be reused across different sessions.
 
 Usage:
 ------
-python3 migrate_task_groups_schema.py --db /path/to/bazinga.db [--dry-run]
+python3 migrate_task_groups_schema.py --db /path/to/orchestrix.db [--dry-run]
 
 Author: Claude Code
 Date: 2025-11-21
@@ -181,7 +181,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    parser.add_argument('--db', required=True, help='Path to bazinga.db database')
+    parser.add_argument('--db', required=True, help='Path to orchestrix.db database')
     parser.add_argument('--dry-run', action='store_true',
                        help='Show what would be migrated without making changes')
 

@@ -107,7 +107,7 @@ class TestProjectRootValidation:
     """Test _is_orchestrix_project_root function."""
 
     def test_valid_project_root(self, temp_project: Path):
-        """Valid project root has both .claude and bazinga directories."""
+        """Valid project root has both .claude and orchestrix directories."""
         is_valid, reason = _is_orchestrix_project_root(temp_project)
         assert is_valid is True
         assert "found .claude/ and orchestrix/" in reason
@@ -120,7 +120,7 @@ class TestProjectRootValidation:
         assert "missing .claude/" in reason
 
     def test_missing_orchestrix_dir(self, temp_project: Path):
-        """Missing bazinga directory is not valid."""
+        """Missing orchestrix directory is not valid."""
         shutil.rmtree(temp_project / "orchestrix")
         is_valid, reason = _is_orchestrix_project_root(temp_project)
         assert is_valid is False
@@ -508,7 +508,7 @@ class TestRealWorldScenarios:
         project = temp_project_with_db
 
         # Create script structure like orchestrix_db.py
-        scripts_dir = project / ".claude" / "skills" / "bazinga-db" / "scripts"
+        scripts_dir = project / ".claude" / "skills" / "orchestrix-db" / "scripts"
         scripts_dir.mkdir(parents=True)
         script_path = scripts_dir / "orchestrix_db.py"
         script_path.touch()
@@ -523,13 +523,13 @@ class TestRealWorldScenarios:
         assert db_path.exists()
 
     def test_installed_project_scenario(self):
-        """Simulate installed project (bazinga install)."""
+        """Simulate installed project (orchestrix install)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project = Path(tmpdir) / "my_client_project"
             project.mkdir()
 
             # Installed structure
-            (project / ".claude" / "skills" / "bazinga-db" / "scripts").mkdir(parents=True)
+            (project / ".claude" / "skills" / "orchestrix-db" / "scripts").mkdir(parents=True)
             (project / "orchestrix").mkdir()
             (project / "orchestrix" / "orchestrix.db").touch()
 
@@ -540,7 +540,7 @@ class TestRealWorldScenarios:
             assert db == project / "orchestrix" / "orchestrix.db"
 
     def test_dev_environment_scenario(self):
-        """Simulate development environment (bazinga repo)."""
+        """Simulate development environment (orchestrix repo)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Dev structure (like /home/user/orchestrix/)
             repo = Path(tmpdir) / "orchestrix"

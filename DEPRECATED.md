@@ -34,7 +34,7 @@ This document tracks files that have been moved or removed from the root directo
 
 | Original Location | New Location | Reason |
 |-------------------|--------------|--------|
-| `coordination_vs_bazinga_analysis.md` | `research/coordination_vs_bazinga_analysis.md` | Analysis document belongs with 40+ other research docs |
+| `coordination_vs_orchestrix_analysis.md` | `research/coordination_vs_orchestrix_analysis.md` | Analysis document belongs with 40+ other research docs |
 | `copilot_review_analysis.md` | `research/copilot_review_analysis.md` | Analysis document belongs with other research docs |
 | `critical_gap_analysis.md` | `research/critical_gap_analysis.md` | Analysis document belongs with other research docs |
 | `orchestrator_size_reduction_strategy.md` | `research/orchestrator_size_reduction_strategy.md` | Strategy document belongs with other research docs |
@@ -135,11 +135,11 @@ These files **should** remain in the root directory:
 ## Updated Project Structure
 
 ```
-bazinga/                          # Root
+orchestrix/                          # Root
 ├── .claude/                      # Claude Code configuration
 ├── .github/                      # GitHub configuration
 ├── agents/                       # Agent definitions (packaged separately)
-├── bazinga/                      # Runtime state (gitignored except templates/)
+├── orchestrix/                      # Runtime state (gitignored except templates/)
 ├── config/                       # ✅ KEPT - Configuration files
 ├── coordination/                 # ✅ KEPT - Legacy directory preserved
 ├── dashboard/                    # Dashboard UI
@@ -213,7 +213,7 @@ If you're having trouble finding a file or have questions about this reorganizat
 
 1. Check this document for the new location
 2. Search the repository: `git grep "filename"`
-3. Open an issue: https://github.com/mehdic/bazinga/issues
+3. Open an issue: https://github.com/mehdic/orchestrix/issues
 
 ---
 

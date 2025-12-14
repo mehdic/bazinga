@@ -13,13 +13,13 @@ cd "$REPO_ROOT"
 echo "🔨 Building slash commands from agent sources..."
 
 # -----------------------------------------------------------------------------
-# 1. Build bazinga.orchestrate.md from agents/orchestrator.md
+# 1. Build orchestrix.orchestrate.md from agents/orchestrator.md
 # -----------------------------------------------------------------------------
 
-echo "  → Building .claude/commands/bazinga.orchestrate.md"
+echo "  → Building .claude/commands/orchestrix.orchestrate.md"
 
 SOURCE_FILE="agents/orchestrator.md"
-TARGET_FILE=".claude/commands/bazinga.orchestrate.md"
+TARGET_FILE=".claude/commands/orchestrix.orchestrate.md"
 TEMP_FILE=$(mktemp)
 
 # Cleanup temp file on exit
@@ -148,7 +148,7 @@ echo "  ✅ Validation passed ($LINE_COUNT lines)"
 # Only move to final location if all validations passed
 mv "$TEMP_FILE" "$TARGET_FILE"
 
-echo "  ✅ bazinga.orchestrate.md built successfully"
+echo "  ✅ orchestrix.orchestrate.md built successfully"
 
 # -----------------------------------------------------------------------------
 # Summary
@@ -158,6 +158,6 @@ echo ""
 echo "✅ Slash commands built successfully!"
 echo ""
 echo "Generated files:"
-echo "  - .claude/commands/bazinga.orchestrate.md (from agents/orchestrator.md)"
+echo "  - .claude/commands/orchestrix.orchestrate.md (from agents/orchestrator.md)"
 echo ""
 echo "Note: orchestrate-advanced uses embedded prompts and doesn't need building"

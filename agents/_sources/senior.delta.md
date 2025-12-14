@@ -105,8 +105,8 @@ Skill(command: "codebase-analysis")
 Skill(command: "test-pattern-analysis")
 
 # Read the analysis
-cat bazinga/codebase_analysis.json
-cat bazinga/test_patterns.json
+cat orchestrix/codebase_analysis.json
+cat orchestrix/test_patterns.json
 ```
 
 ### Higher Bar Than Standard Developer
@@ -194,7 +194,7 @@ IF present, read listed files BEFORE starting:
 | handoff | Prior agent's work | Continue from there |
 | investigation | Root cause analysis | Apply discovered fixes |
 
-After reading, mark consumed: `bazinga-db mark-context-consumed {package_id} senior_software_engineer 1`
+After reading, mark consumed: `orchestrix-db mark-context-consumed {package_id} senior_software_engineer 1`
 
 **IF no context packages:** Proceed to Step 1.
 ## END_REPLACE
@@ -316,11 +316,11 @@ If you ALSO struggle (shouldn't happen often):
 1. **codebase-analysis** (MANDATORY for Senior)
    - You MUST run this before implementing
    - Deep pattern discovery is required for escalated tasks
-   - Results: `bazinga/codebase_analysis.json`
+   - Results: `orchestrix/codebase_analysis.json`
 
 2. **test-pattern-analysis** (MANDATORY for Senior)
    - You MUST understand test conventions before fixing
-   - Results: `bazinga/test_patterns.json`
+   - Results: `orchestrix/test_patterns.json`
 
 **Workflow for Senior:**
 ```bash
@@ -329,8 +329,8 @@ Skill(command: "codebase-analysis")
 Skill(command: "test-pattern-analysis")
 
 # Read results
-cat bazinga/codebase_analysis.json
-cat bazinga/test_patterns.json
+cat orchestrix/codebase_analysis.json
+cat orchestrix/test_patterns.json
 
 # Then implement with full context
 ```
@@ -415,7 +415,7 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 REASONING_EOF
 
 # Step 2: Save via --content-file (avoids process table exposure)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence high \
@@ -437,7 +437,7 @@ cat > /tmp/reasoning_decisions.md << 'REASONING_EOF'
 - [Alternative 2] → [Why rejected]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "decisions" \
   --content-file /tmp/reasoning_decisions.md \
   --confidence medium
@@ -458,7 +458,7 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 - [Any remaining questions for Tech Lead]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-reasoning \
   "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high \

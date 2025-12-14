@@ -5,7 +5,7 @@
 
 ## Overview
 
-The context-assembler skill provides intelligent context assembly for BAZINGA agents. It retrieves, ranks, and delivers relevant context packages while respecting token budgets and learning from error patterns.
+The context-assembler skill provides intelligent context assembly for Orchestrix agents. It retrieves, ranks, and delivers relevant context packages while respecting token budgets and learning from error patterns.
 
 ## Dependencies
 
@@ -53,7 +53,7 @@ From the orchestrator, before spawning an agent:
 Skill(command: "context-assembler")
 ```
 
-The skill reads the current session/group context from bazinga-db and outputs a structured markdown block.
+The skill reads the current session/group context from orchestrix-db and outputs a structured markdown block.
 
 ## Output Format Examples
 
@@ -154,7 +154,7 @@ Token budget: Soft Warning (70%) - using summaries
 
 ## Retrieval Limits
 
-Configurable per agent type in `bazinga/skills_config.json`:
+Configurable per agent type in `orchestrix/skills_config.json`:
 
 ```json
 {
@@ -194,7 +194,7 @@ Configurable per agent type in `bazinga/skills_config.json`:
 
 ## Configuration
 
-Full configuration in `bazinga/skills_config.json`:
+Full configuration in `orchestrix/skills_config.json`:
 
 ```json
 {
@@ -326,12 +326,12 @@ Packages can have one of four priority levels:
   - Added deterministic tie-breaker (created_at DESC) for equal scores
   - Added note about system-generated session_ids in SQL queries
 - v1.1.0 (2025-12-12): Critical fixes
-  - Fixed query syntax for bazinga-db commands
+  - Fixed query syntax for orchestrix-db commands
   - Added Security Notes section
   - Clarified group_id handling (use empty string for session-wide)
 - v1.0.0 (2025-12-12): Initial production release (Phase 3 complete)
   - Full heuristic relevance ranking
-  - Package retrieval via bazinga-db
+  - Package retrieval via orchestrix-db
   - Output formatting with priority indicators
   - Empty packages handling
   - FTS5 availability check with fallback

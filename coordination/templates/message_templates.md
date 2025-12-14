@@ -30,7 +30,7 @@ These are the standard message formats for displaying orchestration progress to 
 
 **Example:**
 ```
-🚀 Starting orchestration | Session: bazinga_20251117_143530
+🚀 Starting orchestration | Session: orchestrix_20251117_143530
 ```
 
 ---
@@ -140,9 +140,9 @@ These are the standard message formats for displaying orchestration progress to 
 
 **Examples:**
 ```
-⚠️ Group B QA failed | 3/15 tests failing (auth edge cases) → See bazinga/artifacts/{SESSION_ID}/qa_failures.md | Developer fixing
+⚠️ Group B QA failed | 3/15 tests failing (auth edge cases) → See orchestrix/artifacts/{SESSION_ID}/qa_failures.md | Developer fixing
 
-⚠️ Group C QA failed | 5 tests timeout (performance regression) → See bazinga/artifacts/{SESSION_ID}/qa_failures.md | Investigating
+⚠️ Group C QA failed | 5 tests timeout (performance regression) → See orchestrix/artifacts/{SESSION_ID}/qa_failures.md | Investigating
 ```
 
 ---
@@ -216,7 +216,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Examples:**
 ```
-⚠️ Group C security scan | 1 high (SQL injection), 2 medium (XSS) | Developer addressing → See bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
+⚠️ Group C security scan | 1 high (SQL injection), 2 medium (XSS) | Developer addressing → See orchestrix/artifacts/{SESSION_ID}/skills/security_scan.json
 
 ⚠️ Group A security scan | 3 low severity issues (hardcoded strings) | Quick fixes applied → Re-scanning
 ```
@@ -228,7 +228,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Example:**
 ```
-⚠️ Group C coverage gaps | 2 files below 80% (password_reset: 72%, validators: 75%) → See bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json | Adding tests
+⚠️ Group C coverage gaps | 2 files below 80% (password_reset: 72%, validators: 75%) → See orchestrix/artifacts/{SESSION_ID}/skills/coverage_report.json | Adding tests
 ```
 
 ### Lint Issues
@@ -238,7 +238,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Example:**
 ```
-⚠️ Group B linting issues | 12 issues (5 errors, 7 warnings) → See bazinga/artifacts/{SESSION_ID}/skills/lint_results.json | Auto-fixing
+⚠️ Group B linting issues | 12 issues (5 errors, 7 warnings) → See orchestrix/artifacts/{SESSION_ID}/skills/lint_results.json | Auto-fixing
 ```
 
 ### Build Failure
@@ -258,7 +258,7 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 **Example:**
 ```
-⚠️ Tests failed in Group B | 3/15 auth edge cases failing | Developer fixing → See bazinga/artifacts/{SESSION_ID}/test_failures.md
+⚠️ Tests failed in Group B | 3/15 auth edge cases failing | Developer fixing → See orchestrix/artifacts/{SESSION_ID}/test_failures.md
 ```
 
 ### Iteration Loop Detected
@@ -321,17 +321,17 @@ All error messages must include: WHAT failed, WHY (if known), WHAT'S NEXT
 
 ### All Groups Complete
 ```
-✅ All groups complete | {total_groups}/{total_groups} groups approved, all quality gates passed | Final PM check → BAZINGA
+✅ All groups complete | {total_groups}/{total_groups} groups approved, all quality gates passed | Final PM check → Orchestrix
 ```
 
 **Example:**
 ```
-✅ All groups complete | 3/3 groups approved, all quality gates passed | Final PM check → BAZINGA
+✅ All groups complete | 3/3 groups approved, all quality gates passed | Final PM check → Orchestrix
 ```
 
 ### Session Complete
 ```
-✅ BAZINGA - Orchestration Complete!
+✅ Orchestrix - Orchestration Complete!
 ```
 
 ---
@@ -385,9 +385,9 @@ When detail exceeds 3 lines, use summary + link:
 [Emoji] [Summary] → See [artifact_path]
 
 Examples:
-⚠️ 12 linting issues found in Group B (5 errors, 7 warnings) → See bazinga/artifacts/{SESSION_ID}/skills/lint_results.json
-⚠️ Coverage gaps in 2 files (password_reset: 72%, validators: 75%) → See bazinga/artifacts/{SESSION_ID}/skills/coverage_report.json
-🔬 Investigation findings: 3 hypotheses, 12 diagnostic tests → See bazinga/artifacts/{SESSION_ID}/investigation_group_c.md
+⚠️ 12 linting issues found in Group B (5 errors, 7 warnings) → See orchestrix/artifacts/{SESSION_ID}/skills/lint_results.json
+⚠️ Coverage gaps in 2 files (password_reset: 72%, validators: 75%) → See orchestrix/artifacts/{SESSION_ID}/skills/coverage_report.json
+🔬 Investigation findings: 3 hypotheses, 12 diagnostic tests → See orchestrix/artifacts/{SESSION_ID}/investigation_group_c.md
 ```
 
 ---
@@ -435,7 +435,7 @@ If PASS:
 
 If FAIL:
 ```
-⚠️ Group {id} QA failed | {failed}/{run} tests failing ({failure_summary}) | Developer fixing → See bazinga/artifacts/{session}/qa_failures.md
+⚠️ Group {id} QA failed | {failed}/{run} tests failing ({failure_summary}) | Developer fixing → See orchestrix/artifacts/{session}/qa_failures.md
 ```
 
 ### Tech Lead Report Structure
@@ -475,7 +475,7 @@ If SPAWN_INVESTIGATOR:
 
 ### PM Report Structure
 ```yaml
-status: BAZINGA | CONTINUE | NEEDS_CLARIFICATION
+status: Orchestrix | CONTINUE | NEEDS_CLARIFICATION
 decision: Final decision
 assessment: Evaluation of completion
 feedback: null | Specific feedback for next iteration
@@ -483,9 +483,9 @@ feedback: null | Specific feedback for next iteration
 
 **Orchestrator transforms to:**
 
-If BAZINGA:
+If Orchestrix:
 ```
-✅ BAZINGA - Orchestration Complete!
+✅ Orchestrix - Orchestration Complete!
 [Shows final report]
 ```
 
@@ -520,7 +520,7 @@ If NEEDS_CLARIFICATION:
 ### Full Orchestration Flow Example
 
 ```
-🚀 Starting orchestration | Session: bazinga_20251117_143530
+🚀 Starting orchestration | Session: orchestrix_20251117_143530
 
 📋 Planning complete | 3 parallel groups: JWT auth (5 files), User reg (3 files), Password reset (4 files) | Starting development → Groups A, B, C
 
@@ -539,15 +539,15 @@ If NEEDS_CLARIFICATION:
 
 ✅ Group C tests passing | 13/13 tests passed, 85% coverage, security clear | Approved → Tech Lead review
 
-⚠️ Group C security scan | 1 high (SQL injection in password_reset.py:45) | Fixing with parameterized queries → See bazinga/artifacts/{SESSION_ID}/skills/security_scan.json
+⚠️ Group C security scan | 1 high (SQL injection in password_reset.py:45) | Fixing with parameterized queries → See orchestrix/artifacts/{SESSION_ID}/skills/security_scan.json
 
 🔨 Group C complete | SQL injection fixed, re-scanned clean | Ready → Tech Lead re-review
 
 ✅ Group C approved | Security clear, coverage 85%, all quality gates passed | Complete (3/3 groups)
 
-✅ All groups complete | 3/3 groups approved, all quality gates passed | Final PM check → BAZINGA
+✅ All groups complete | 3/3 groups approved, all quality gates passed | Final PM check → Orchestrix
 
-✅ BAZINGA - Orchestration Complete!
+✅ Orchestrix - Orchestration Complete!
 ```
 
 ---

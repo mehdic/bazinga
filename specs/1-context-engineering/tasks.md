@@ -16,8 +16,8 @@
 ## Path Conventions
 
 - **Skill files**: `.claude/skills/context-assembler/`
-- **Database schema**: `bazinga/bazinga.db` (via bazinga-db skill)
-- **Config**: `bazinga/skills_config.json`
+- **Database schema**: `orchestrix/orchestrix.db` (via orchestrix-db skill)
+- **Config**: `orchestrix/skills_config.json`
 - **Tests**: `tests/skills/`
 
 ---
@@ -27,7 +27,7 @@
 **Purpose**: Project initialization and database schema setup
 
 - [x] T001 Create skill directory structure at `.claude/skills/context-assembler/`
-- [x] T002 [P] Add `context_engineering` section to `bazinga/skills_config.json`
+- [x] T002 [P] Add `context_engineering` section to `orchestrix/skills_config.json`
 - [x] T003 [P] Create skill reference docs at `.claude/skills/context-assembler/references/usage.md`
 
 ---
@@ -38,11 +38,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [x] T004 Extend `context_packages` table with `priority` and `summary` columns via bazinga-db skill
+- [x] T004 Extend `context_packages` table with `priority` and `summary` columns via orchestrix-db skill
 - [x] T005 [P] Create `error_patterns` table with schema from data-model.md
 - [x] T006 [P] Create `strategies` table with schema from data-model.md
 - [x] T007 [P] Create `consumption_scope` table with schema from data-model.md
-- [x] T008 Enable WAL mode on bazinga.db (`PRAGMA journal_mode=WAL`)
+- [x] T008 Enable WAL mode on orchestrix.db (`PRAGMA journal_mode=WAL`)
 - [x] T009 Create indexes per data-model.md specifications
 
 **Checkpoint**: Database schema ready - user story implementation can now begin
@@ -65,7 +65,7 @@
   - Same-group boost
   - Agent-type relevance
   - Recency
-- [x] T012 [US1] Implement package retrieval via bazinga-db skill queries
+- [x] T012 [US1] Implement package retrieval via orchestrix-db skill queries
 - [x] T013 [US1] Add output formatting per quickstart.md specification:
   - `## Context for {agent_type}` header
   - `### Relevant Packages ({count}/{available})` section
@@ -134,7 +134,7 @@
 - [X] T026 [US3] Implement pattern_hash generation (SHA256 of normalized signature)
 - [X] T027 [US3] Add error pattern capture to fail-then-succeed flow:
   - Initial confidence 0.5
-  - Store via bazinga-db skill
+  - Store via orchestrix-db skill
 - [X] T028 [US3] Implement error pattern matching query:
   - Project isolation (project_id)
   - Language filtering (optional)
@@ -191,26 +191,26 @@
 - [X] T037 [P] Add consumption tracking to `consumption_scope` table on each context delivery
 - [X] T038 [P] Implement strategies table population (extract insights from successful tasks)
 - [X] T039 [P] Add database lock retry logic (exponential backoff: 100ms, 200ms, 400ms)
-- [X] T040 [P] Update bazinga-db skill to expose context engineering table operations
+- [X] T040 [P] Update orchestrix-db skill to expose context engineering table operations
 - [X] T041 Validate quickstart.md scenarios against implementation
 - [X] T042 Integrate context-assembler into orchestrator spawn workflow:
 
-  **Problem**: Currently orchestrator queries `bazinga-db` directly for context packages (see `phase_simple.md` lines 24-35, 604-616, 743-755). The context-assembler skill exists but is never invoked. The 2000 token cap in context-assembler (SKILL.md line 149) is a workaround because `current_tokens` is never passed.
+  **Problem**: Currently orchestrator queries `orchestrix-db` directly for context packages (see `phase_simple.md` lines 24-35, 604-616, 743-755). The context-assembler skill exists but is never invoked. The 2000 token cap in context-assembler (SKILL.md line 149) is a workaround because `current_tokens` is never passed.
 
   **Solution - Part A: Token Estimation in Orchestrator**
   1. Track `total_spawns` in orchestrator state (already exists at line 832 in orchestrator.md)
   2. After each Task() spawn, increment: `total_spawns += 1`
   3. Estimate tokens: `estimated_tokens = total_spawns * 15000` (avg ~15k tokens per spawn cycle)
-  4. Store in session via bazinga-db: `estimated_token_usage` field
+  4. Store in session via orchestrix-db: `estimated_token_usage` field
 
-  **Solution - Part B: Replace Direct bazinga-db Calls**
+  **Solution - Part B: Replace Direct orchestrix-db Calls**
 
-  Update `bazinga/templates/orchestrator/phase_simple.md`:
-  - Lines 24-35: Replace bazinga-db context query with context-assembler invocation
+  Update `orchestrix/templates/orchestrator/phase_simple.md`:
+  - Lines 24-35: Replace orchestrix-db context query with context-assembler invocation
   - Lines 604-616: Same for QA Expert spawn
   - Lines 743-755: Same for Tech Lead spawn
 
-  Update `bazinga/templates/orchestrator/phase_parallel.md`:
+  Update `orchestrix/templates/orchestrator/phase_parallel.md`:
   - Lines 163-174: Same pattern for parallel spawns
 
   **New Context Query Pattern** (replace existing):
@@ -230,8 +230,8 @@
   After orchestrator passes real `current_tokens`, remove the conservative cap from SKILL.md (lines 147-151) since zone detection will work properly.
 
   **Files to Modify**:
-  - `bazinga/templates/orchestrator/phase_simple.md` (3 locations)
-  - `bazinga/templates/orchestrator/phase_parallel.md` (1 location)
+  - `orchestrix/templates/orchestrator/phase_simple.md` (3 locations)
+  - `orchestrix/templates/orchestrator/phase_parallel.md` (1 location)
   - `agents/orchestrator.md` (add token tracking after spawns)
   - `.claude/skills/context-assembler/SKILL.md` (remove 2000 cap after integration)
 

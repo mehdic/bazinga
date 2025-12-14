@@ -2,7 +2,7 @@
 version: 1.0.0
 name: codebase-analysis
 description: Analyzes codebase to find similar features, reusable utilities, and architectural patterns
-author: BAZINGA Team
+author: Orchestrix Team
 tags: [development, analysis, codebase, context]
 allowed-tools: [Bash, Read]
 ---
@@ -31,13 +31,13 @@ python3 .claude/skills/codebase-analysis/scripts/analyze_codebase.py \
   --cache-enabled
 ```
 
-**Note:** Output path defaults to `bazinga/artifacts/{session_id}/skills/codebase-analysis/report.json` (session-isolated)
+**Note:** Output path defaults to `orchestrix/artifacts/{session_id}/skills/codebase-analysis/report.json` (session-isolated)
 
 ### Step 2: Read Analysis Results
 
 ```bash
 # Read from session-isolated artifact directory
-cat bazinga/artifacts/$SESSION_ID/skills/codebase-analysis/report.json
+cat orchestrix/artifacts/$SESSION_ID/skills/codebase-analysis/report.json
 ```
 
 ### Step 3: Return Actionable Summary
@@ -73,7 +73,7 @@ CODEBASE ANALYSIS COMPLETE
 3. Use TokenGenerator for reset tokens
 4. Follow transaction pattern from register.py
 
-Full analysis: bazinga/artifacts/{session_id}/skills/codebase-analysis/report.json
+Full analysis: orchestrix/artifacts/{session_id}/skills/codebase-analysis/report.json
 ```
 
 ## Error Handling

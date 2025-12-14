@@ -17,7 +17,7 @@ else
 fi
 
 # Check config file sync (pyproject.toml vs ALLOWED_CONFIG_FILES)
-if [ -f "pyproject.toml" ] && [ -f "src/bazinga_cli/__init__.py" ]; then
+if [ -f "pyproject.toml" ] && [ -f "src/orchestrix_cli/__init__.py" ]; then
   # Quick sync check using Python
   python3 -c '
 import tomllib
@@ -28,10 +28,10 @@ from pathlib import Path
 with open("pyproject.toml", "rb") as f:
     pyproject = tomllib.load(f)
 force_include = pyproject.get("tool", {}).get("hatch", {}).get("build", {}).get("targets", {}).get("wheel", {}).get("force-include", {})
-pyproject_configs = {Path(k).name for k in force_include.keys() if k.startswith("bazinga/") and "templates" not in k}
+pyproject_configs = {Path(k).name for k in force_include.keys() if k.startswith("orchestrix/") and "templates" not in k}
 
 # Get ALLOWED_CONFIG_FILES from __init__.py
-init_content = Path("src/bazinga_cli/__init__.py").read_text()
+init_content = Path("src/orchestrix_cli/__init__.py").read_text()
 match = re.search(r"ALLOWED_CONFIG_FILES\s*=\s*\[(.*?)\]", init_content, re.DOTALL)
 if match:
     allowed_configs = set(re.findall(r"\"([^\"]+)\"", match.group(1)))

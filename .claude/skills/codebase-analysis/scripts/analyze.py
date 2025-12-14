@@ -8,7 +8,7 @@ Usage:
     python analyze.py "Implement password reset endpoint"
 
 Output:
-    bazinga/artifacts/{SESSION_ID}/skills/codebase_analysis.json
+    orchestrix/artifacts/{SESSION_ID}/skills/codebase_analysis.json
 """
 
 import os
@@ -21,7 +21,7 @@ from typing import List, Dict, Any
 from collections import Counter
 from datetime import datetime
 
-# Add _shared directory to path for bazinga_paths import
+# Add _shared directory to path for orchestrix_paths import
 # Assumes structure: .claude/skills/<skill_name>/scripts/<script>.py
 # _shared is at: .claude/skills/_shared/
 _script_dir = Path(__file__).parent.resolve()
@@ -30,26 +30,26 @@ if _shared_dir.exists() and str(_shared_dir) not in sys.path:
     sys.path.insert(0, str(_shared_dir))
 
 try:
-    from bazinga_paths import get_db_path, get_artifacts_dir
-    _HAS_BAZINGA_PATHS = True
+    from orchestrix_paths import get_db_path, get_artifacts_dir
+    _HAS_ORCHESTRIX_PATHS = True
 except ImportError:
-    _HAS_BAZINGA_PATHS = False
+    _HAS_ORCHESTRIX_PATHS = False
 
 def _get_db_path_safe() -> str:
     """Get database path with fallback for backward compatibility."""
-    if _HAS_BAZINGA_PATHS:
+    if _HAS_ORCHESTRIX_PATHS:
         try:
             return str(get_db_path())
         except RuntimeError:
             pass
-    return "bazinga/bazinga.db"
+    return "orchestrix/orchestrix.db"
 
 # Get current session ID from database
 def get_current_session_id():
     """Get the most recent session ID from the database."""
     db_path = _get_db_path_safe()
     if not os.path.exists(db_path):
-        return "bazinga_default"
+        return "orchestrix_default"
 
     try:
         conn = sqlite3.connect(db_path)
@@ -58,20 +58,20 @@ def get_current_session_id():
         conn.close()
         if row:
             return row[0]
-        return "bazinga_default"
+        return "orchestrix_default"
     except:
-        return "bazinga_default"
+        return "orchestrix_default"
 
 SESSION_ID = get_current_session_id()
 
-# Use bazinga_paths for output directory if available
-if _HAS_BAZINGA_PATHS:
+# Use orchestrix_paths for output directory if available
+if _HAS_ORCHESTRIX_PATHS:
     try:
         OUTPUT_DIR = get_artifacts_dir(session_id=SESSION_ID) / "skills"
     except RuntimeError:
-        OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
+        OUTPUT_DIR = Path(f"orchestrix/artifacts/{SESSION_ID}/skills")
 else:
-    OUTPUT_DIR = Path(f"bazinga/artifacts/{SESSION_ID}/skills")
+    OUTPUT_DIR = Path(f"orchestrix/artifacts/{SESSION_ID}/skills")
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_FILE = OUTPUT_DIR / "codebase_analysis.json"
@@ -82,7 +82,7 @@ print(f"📁 Output directory: {OUTPUT_DIR}")
 def load_profile():
     """Load profile from skills_config.json"""
     try:
-        with open("bazinga/skills_config.json", "r") as f:
+        with open("orchestrix/skills_config.json", "r") as f:
             config = json.load(f)
             return config.get("_metadata", {}).get("profile", "lite")
     except:
@@ -137,7 +137,7 @@ def find_code_files(root_dir: str = ".", exclude_dirs: List[str] = None) -> List
     if exclude_dirs is None:
         exclude_dirs = [
             ".git", "node_modules", "venv", "__pycache__", ".pytest_cache",
-            "build", "dist", ".next", ".cache", "bazinga", "docs"
+            "build", "dist", ".next", ".cache", "orchestrix", "docs"
         ]
 
     code_extensions = {

@@ -1,4 +1,4 @@
-# BAZINGA CLI Test Suite
+# Orchestrix CLI Test Suite
 
 Comprehensive tests for security, state management, and CLI functionality.
 
@@ -36,7 +36,7 @@ pytest tests/test_cli.py
 ### Run with Coverage
 
 ```bash
-pytest --cov=src/bazinga_cli --cov-report=html
+pytest --cov=src/orchestrix_cli --cov-report=html
 ```
 
 Then open `htmlcov/index.html` in a browser.
@@ -190,7 +190,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -e ".[dev]"
-      - run: pytest --cov=src/bazinga_cli
+      - run: pytest --cov=src/orchestrix_cli
 ```
 
 ## Troubleshooting
@@ -223,5 +223,5 @@ pip install pytest-cov
 
 Run with coverage explicitly:
 ```bash
-pytest --cov=src/bazinga_cli
+pytest --cov=src/orchestrix_cli
 ```

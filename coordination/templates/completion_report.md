@@ -4,19 +4,19 @@
 
 Generate report filename:
 ```
-bazinga/reports/session_{YYYYMMDD_HHMMSS}.md
+orchestrix/reports/session_{YYYYMMDD_HHMMSS}.md
 ```
 
 Query dashboard snapshot from database (contains all metrics):
 ```
-bazinga-db, please provide dashboard snapshot:
+orchestrix-db, please provide dashboard snapshot:
 
 Session ID: [current session_id]
 ```
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "orchestrix-db")
 ```
 
 The snapshot contains:
@@ -41,7 +41,7 @@ Keep under 30 lines:
 
 ```markdown
 ═══════════════════════════════════════════════════════════
-✅ BAZINGA - Orchestration Complete!
+✅ Orchestrix - Orchestration Complete!
 ═══════════════════════════════════════════════════════════
 
 ## Summary
@@ -65,7 +65,7 @@ Keep under 30 lines:
 - **lint-check**: ✅ Success - 12 issues fixed
 - **test-coverage**: ✅ Success - 87.5% average coverage
 
-📁 **Detailed results**: See `bazinga/` folder for full JSON outputs
+📁 **Detailed results**: See `orchestrix/` folder for full JSON outputs
 
 ## Efficiency
 

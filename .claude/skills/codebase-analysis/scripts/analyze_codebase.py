@@ -35,7 +35,7 @@ class CodebaseAnalyzer:
         self.cache_enabled = cache_enabled
         self.timeout = timeout
         # Global cache for cross-session sharing (project_patterns cached 1h, utilities per-session via key)
-        self.cache = CacheManager("bazinga/.analysis_cache") if cache_enabled else None
+        self.cache = CacheManager("orchestrix/.analysis_cache") if cache_enabled else None
         self.pattern_detector = PatternDetector()
         self.similarity_finder = SimilarityFinder()
         self.gitignore_patterns = self._load_gitignore()
@@ -150,7 +150,7 @@ class CodebaseAnalyzer:
         utilities = []
         utility_dirs = [
             "utils", "helpers", "lib", "common", "shared", "utilities",
-            ".claude/skills"  # Added: BAZINGA-specific skills directory
+            ".claude/skills"  # Added: Orchestrix-specific skills directory
         ]
 
         for dir_name in utility_dirs:
@@ -369,9 +369,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Session-isolated output path (follows BAZINGA artifact conventions)
+    # Session-isolated output path (follows Orchestrix artifact conventions)
     if not args.output:
-        args.output = f'bazinga/artifacts/{args.session}/skills/codebase-analysis/report.json'
+        args.output = f'orchestrix/artifacts/{args.session}/skills/codebase-analysis/report.json'
 
     analyzer = CodebaseAnalyzer(
         task=args.task,

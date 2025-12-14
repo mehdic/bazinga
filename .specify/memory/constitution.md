@@ -1,4 +1,4 @@
-# BAZINGA Constitution
+# Orchestrix Constitution
 
 <!--
 Sync Impact Report:
@@ -30,17 +30,17 @@ The Project Manager is the **strategic brain** of the system.
 - PM MUST decide execution mode (simple/parallel)
 - PM MUST define task groups and assignments
 - PM MUST determine parallelism count (1-4 developers)
-- PM MUST send BAZINGA to signal completion (not Tech Lead)
+- PM MUST send Orchestrix to signal completion (not Tech Lead)
 - Orchestrator MUST NOT make decisions that belong to PM
 
 **Rationale**: Centralized strategic decision-making prevents conflicting directives and ensures coherent project execution.
 
 ### III. Database Is Memory
 
-All orchestration state MUST be persisted to SQLite database via the `bazinga-db` skill.
+All orchestration state MUST be persisted to SQLite database via the `orchestrix-db` skill.
 
-- State MUST be stored in `bazinga/bazinga.db`
-- Agents MUST use bazinga-db skill for all state operations
+- State MUST be stored in `orchestrix/orchestrix.db`
+- Agents MUST use orchestrix-db skill for all state operations
 - No file-based state storage (except JSON configs)
 - State MUST survive context compaction and session restarts
 
@@ -63,7 +63,7 @@ Context is a **compiled view**, not a chat log. Follow the tiered memory model.
 The workflow is **MANDATORY** and MUST NOT be skipped.
 
 ```
-Developer complete → QA Expert → Tech Lead → PM → (BAZINGA or next task)
+Developer complete → QA Expert → Tech Lead → PM → (Orchestrix or next task)
 ```
 
 - NEVER skip QA after development
@@ -91,7 +91,7 @@ All changes MUST be minimal, precise, and focused.
 
 - **Runtime**: Python 3.11+
 - **AI Framework**: Claude Code with Claude Agent SDK
-- **Database**: SQLite (via bazinga-db skill)
+- **Database**: SQLite (via orchestrix-db skill)
 - **State Format**: JSON for configuration, SQLite for orchestration state
 
 ### Code Quality
@@ -103,7 +103,7 @@ All changes MUST be minimal, precise, and focused.
 
 ### Agent Model Assignment
 
-Model assignments are defined in `bazinga/model_selection.json`:
+Model assignments are defined in `orchestrix/model_selection.json`:
 - Developer: Haiku (cost-efficient)
 - QA Expert: Sonnet (balanced)
 - Tech Lead: Opus (critical decisions)
@@ -128,9 +128,9 @@ Before QA testing:
 - [ ] Lint check passes
 - [ ] Security scan passes (basic mode)
 
-### Pre-BAZINGA Gate
+### Pre-Orchestrix Gate
 
-Before PM sends BAZINGA:
+Before PM sends Orchestrix:
 - [ ] All task groups complete
 - [ ] QA has validated (if testing mode = full)
 - [ ] Tech Lead has approved
@@ -138,7 +138,7 @@ Before PM sends BAZINGA:
 
 ## Governance
 
-This constitution is the **supreme authority** for BAZINGA development. All decisions, implementations, and reviews MUST comply with these principles.
+This constitution is the **supreme authority** for Orchestrix development. All decisions, implementations, and reviews MUST comply with these principles.
 
 ### Amendment Process
 

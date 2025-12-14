@@ -366,7 +366,7 @@ Update skills list:
 
 ```markdown
 ---
-name: bazinga.configure-profile
+name: orchestrix.configure-profile
 description: Switch between lite and advanced profiles
 ---
 

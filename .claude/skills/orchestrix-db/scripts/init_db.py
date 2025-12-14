@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Initialize BAZINGA database schema.
+Initialize Orchestrix database schema.
 Creates all necessary tables for managing orchestration state.
 
 Path Resolution:
     If no database path is provided, auto-detects project root and uses:
-    PROJECT_ROOT/bazinga/bazinga.db
+    PROJECT_ROOT/orchestrix/orchestrix.db
 """
 
 import sqlite3
@@ -15,17 +15,17 @@ from pathlib import Path
 import tempfile
 import shutil
 
-# Add _shared directory to path for bazinga_paths import
+# Add _shared directory to path for orchestrix_paths import
 _script_dir = Path(__file__).parent.resolve()
 _shared_dir = _script_dir.parent.parent / '_shared'
 if _shared_dir.exists() and str(_shared_dir) not in sys.path:
     sys.path.insert(0, str(_shared_dir))
 
 try:
-    from bazinga_paths import get_db_path
-    _HAS_BAZINGA_PATHS = True
+    from orchestrix_paths import get_db_path
+    _HAS_ORCHESTRIX_PATHS = True
 except ImportError:
-    _HAS_BAZINGA_PATHS = False
+    _HAS_ORCHESTRIX_PATHS = False
 
 # Current schema version
 SCHEMA_VERSION = 10
@@ -88,7 +88,7 @@ def migrate_v1_to_v2(conn, cursor) -> None:
     print("✓ Migration to v2 complete")
 
 def init_database(db_path: str) -> None:
-    """Initialize the BAZINGA database with complete schema."""
+    """Initialize the Orchestrix database with complete schema."""
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -924,7 +924,7 @@ def init_database(db_path: str) -> None:
     elif current_version == SCHEMA_VERSION:
         print(f"✓ Schema is up-to-date (v{SCHEMA_VERSION})")
 
-    print("\nCreating/verifying BAZINGA database schema...")
+    print("\nCreating/verifying Orchestrix database schema...")
 
     # Sessions table
     # Extended in v9 to support metadata (JSON) for original_scope tracking
@@ -945,7 +945,7 @@ def init_database(db_path: str) -> None:
 
     # Orchestration logs table (replaces orchestration-log.md)
     # Extended in v8 to support agent reasoning capture
-    # Extended in v9 to support event logging (pm_bazinga, scope_change, validator_verdict)
+    # Extended in v9 to support event logging (pm_orchestrix, scope_change, validator_verdict)
     # CHECK constraints enforce valid enumeration values at database layer
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orchestration_logs (
@@ -1114,7 +1114,7 @@ def init_database(db_path: str) -> None:
     """)
     print("✓ Created development_plans table with indexes")
 
-    # Success criteria table (for BAZINGA validation)
+    # Success criteria table (for Orchestrix validation)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS success_criteria (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1267,19 +1267,19 @@ def main():
     if len(sys.argv) >= 2:
         # Explicit path provided
         db_path = sys.argv[1]
-    elif _HAS_BAZINGA_PATHS:
-        # Auto-detect using bazinga_paths
+    elif _HAS_ORCHESTRIX_PATHS:
+        # Auto-detect using orchestrix_paths
         try:
             db_path = str(get_db_path())
             print(f"Auto-detected database path: {db_path}")
         except RuntimeError as e:
             print(f"Error: Could not auto-detect database path: {e}", file=sys.stderr)
             print("Usage: python init_db.py [database_path]", file=sys.stderr)
-            print("Example: python init_db.py bazinga/bazinga.db", file=sys.stderr)
+            print("Example: python init_db.py orchestrix/orchestrix.db", file=sys.stderr)
             sys.exit(1)
     else:
         print("Usage: python init_db.py <database_path>", file=sys.stderr)
-        print("Example: python init_db.py bazinga/bazinga.db", file=sys.stderr)
+        print("Example: python init_db.py orchestrix/orchestrix.db", file=sys.stderr)
         sys.exit(1)
 
     # Create parent directory if it doesn't exist

@@ -20,7 +20,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Import OrchestrixDB for database operations
-sys.path.insert(0, str(Path(__file__).parent.parent / '.claude' / 'skills' / 'bazinga-db' / 'scripts'))
+sys.path.insert(0, str(Path(__file__).parent.parent / '.claude' / 'skills' / 'orchestrix-db' / 'scripts'))
 from orchestrix_db import OrchestrixDB
 
 app = Flask(__name__, static_folder='.')
@@ -75,7 +75,7 @@ class CoordinationWatcher(FileSystemEventHandler):
         # Broadcast update to all clients
         try:
             print(f"📡 Broadcasting database update")
-            data = load_bazinga_data()
+            data = load_orchestrix_data()
             broadcast_to_clients(data)
             print(f"✅ Broadcasted successfully (clients: {len(clients)})")
         except Exception as e:
@@ -126,7 +126,7 @@ def get_current_session_id():
         print(f"⚠️  Error getting current session: {e}")
         return None
 
-def load_bazinga_data():
+def load_orchestrix_data():
     """Load all coordination state from database."""
     global db
 
@@ -288,7 +288,7 @@ def serve_static(path):
 @app.route('/api/data')
 def get_data():
     """Get all coordination data."""
-    data = load_bazinga_data()
+    data = load_orchestrix_data()
     return jsonify(data)
 
 @app.route('/api/log')
@@ -316,7 +316,7 @@ def generate_ai_diagram():
 
     try:
         # Get current state
-        data = load_bazinga_data()
+        data = load_orchestrix_data()
 
         # Get API key from environment
         api_key = os.environ.get('ANTHROPIC_API_KEY')
@@ -724,7 +724,7 @@ def generate_session_diff(session1, session2):
 def get_timeline():
     """Get timeline data for agent execution visualization."""
     try:
-        data = load_bazinga_data()
+        data = load_orchestrix_data()
         log = load_orchestration_log()
         timeline = []
 
@@ -884,7 +884,7 @@ def websocket(ws):
     try:
         # Send initial data
         print(f"📤 Sending initial data to client...")
-        data = load_bazinga_data()
+        data = load_orchestrix_data()
         ws.send(json.dumps(data))
         print(f"✅ Initial data sent successfully")
 

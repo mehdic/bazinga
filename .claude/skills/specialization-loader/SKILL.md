@@ -2,7 +2,7 @@
 name: specialization-loader
 description: Compose technology-specific agent identity and patterns. Invoke before spawning agents (Developer, SSE, QA, Tech Lead, RE, Investigator) to enhance expertise based on project stack. Returns composed specialization block with token budgeting.
 version: 1.0.0
-author: BAZINGA Team
+author: Orchestrix Team
 tags: [orchestration, specialization, context]
 allowed-tools: [Read, Grep, Bash]
 ---
@@ -51,7 +51,7 @@ Testing Mode: {full|minimal|disabled}  # Orchestrator-provided, defaults to "ful
 
 **Step 2a: Try reading cached project context**
 ```bash
-cat bazinga/project_context.json
+cat orchestrix/project_context.json
 ```
 
 **Step 2b: If file missing → Run inline fallback detection**
@@ -153,7 +153,7 @@ If `project_context.json` exists, derive QA templates from detected testing fram
 2. **Verify each template path exists before adding:**
    ```
    FOR each candidate_template in role_defaults:
-     Use Glob to check if file exists at bazinga/templates/specializations/{candidate_template}
+     Use Glob to check if file exists at orchestrix/templates/specializations/{candidate_template}
      IF exists: add to augmented_templates
      IF NOT exists: add to skipped_missing list, log warning
    ```
@@ -163,7 +163,7 @@ If `project_context.json` exists, derive QA templates from detected testing fram
 **Template Path Verification:**
 ```
 # Before adding any template, verify it exists
-Glob(pattern: "bazinga/templates/specializations/08-testing/qa-strategies.md")
+Glob(pattern: "orchestrix/templates/specializations/08-testing/qa-strategies.md")
 # If no match, skip and record in skipped_missing
 ```
 
@@ -298,7 +298,7 @@ Your expertise includes:
 Log the specialization decision for audit trail:
 
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-output \
+python3 .claude/skills/orchestrix-db/scripts/orchestrix_db.py --quiet save-skill-output \
   "{session_id}" "specialization-loader" '{
     "group_id": "{group_id}",
     "agent_type": "{agent_type}",
@@ -414,14 +414,14 @@ public final class User {
 
 **Input:**
 ```
-Session ID: bazinga_20251204_120000
+Session ID: orchestrix_20251204_120000
 Group ID: AUTH
 Agent Type: developer
 Model: haiku
 Specialization Paths: [
-  "bazinga/templates/specializations/01-languages/java.md",
-  "bazinga/templates/specializations/03-frameworks-backend/spring-boot.md",
-  "bazinga/templates/specializations/11-domains/backend-api.md"
+  "orchestrix/templates/specializations/01-languages/java.md",
+  "orchestrix/templates/specializations/03-frameworks-backend/spring-boot.md",
+  "orchestrix/templates/specializations/11-domains/backend-api.md"
 ]
 ```
 

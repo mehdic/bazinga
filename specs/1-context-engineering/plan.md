@@ -5,16 +5,16 @@
 
 ## Summary
 
-Implement a tiered context engineering system for BAZINGA that intelligently assembles, prioritizes, and manages context passed to agents. The core component is a `context-assembler` skill that ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
+Implement a tiered context engineering system for Orchestrix that intelligently assembles, prioritizes, and manages context passed to agents. The core component is a `context-assembler` skill that ranks packages by relevance, enforces token budgets with graduated zones, captures error patterns for learning, and supports configurable per-agent retrieval limits.
 
 ## Technical Context
 
 **Language/Version**: Python 3.11+
-**Primary Dependencies**: SQLite (via bazinga-db skill), tiktoken (token estimation)
-**Storage**: SQLite (`bazinga/bazinga.db`) - extends existing schema
-**Testing**: pytest with existing BAZINGA test infrastructure
+**Primary Dependencies**: SQLite (via orchestrix-db skill), tiktoken (token estimation)
+**Storage**: SQLite (`orchestrix/orchestrix.db`) - extends existing schema
+**Testing**: pytest with existing Orchestrix test infrastructure
 **Target Platform**: Claude Code environment (Linux/macOS/Windows)
-**Project Type**: Skill extension to existing BAZINGA orchestration system
+**Project Type**: Skill extension to existing Orchestrix orchestration system
 **Performance Goals**: <500ms context assembly latency (SC-005)
 **Constraints**: 15% token safety margin, graceful degradation on failures
 **Scale/Scope**: Per-session context (100s of packages), cross-session patterns (1000s)
@@ -27,7 +27,7 @@ Implement a tiered context engineering system for BAZINGA that intelligently ass
 |-----------|--------|-------|
 | I. Orchestrator Never Implements | ✅ PASS | Skill invoked by orchestrator, not implementation in orchestrator |
 | II. PM Decides Everything | ✅ PASS | No changes to PM decision authority |
-| III. Database Is Memory | ✅ PASS | All state stored in bazinga.db via bazinga-db skill |
+| III. Database Is Memory | ✅ PASS | All state stored in orchestrix.db via orchestrix-db skill |
 | IV. Agentic Context Engineering | ✅ PASS | **This feature implements this principle** |
 | V. Mandatory Workflow Sequence | ✅ PASS | No workflow changes |
 | VI. Surgical Edits Only | ✅ PASS | New skill + schema extensions, minimal changes to existing code |
@@ -56,12 +56,12 @@ specs/1-context-engineering/
 └── references/
     └── usage.md         # Detailed usage documentation
 
-bazinga/
-├── bazinga.db           # Extended with new tables
+orchestrix/
+├── orchestrix.db           # Extended with new tables
 └── skills_config.json   # Updated with context-assembler config
 ```
 
-**Structure Decision**: This is a new skill added to the existing `.claude/skills/` directory. Database schema extensions are applied to the existing `bazinga/bazinga.db` via the bazinga-db skill. No new top-level directories required.
+**Structure Decision**: This is a new skill added to the existing `.claude/skills/` directory. Database schema extensions are applied to the existing `orchestrix/orchestrix.db` via the orchestrix-db skill. No new top-level directories required.
 
 ## Phase 0: Research Summary
 
@@ -158,4 +158,4 @@ No constitution violations requiring justification.
 
 1. Run `/speckit.tasks` to generate detailed task breakdown
 2. Tasks will be organized by user story (P1 → P4)
-3. Implementation follows BAZINGA workflow: dev → QA → tech lead → PM
+3. Implementation follows Orchestrix workflow: dev → QA → tech lead → PM

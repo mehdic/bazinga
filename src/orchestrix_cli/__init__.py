@@ -57,11 +57,11 @@ class OrchestrixSetup:
         Initialize setup handler.
 
         Args:
-            source_dir: Source directory containing bazinga files.
+            source_dir: Source directory containing orchestrix files.
                        If None, uses the package installation directory.
         """
         if source_dir is None:
-            # Try multiple locations to find the bazinga files
+            # Try multiple locations to find the orchestrix files
 
             # Option 1: Development mode (running from git clone)
             dev_dir = Path(__file__).parent.parent.parent
@@ -172,7 +172,7 @@ class OrchestrixSetup:
 
         # Copy from both source locations:
         # 1. source_dir/scripts (main scripts folder)
-        # 2. source_dir/orchestrix/scripts (bazinga-specific scripts like build-baseline.sh)
+        # 2. source_dir/orchestrix/scripts (orchestrix-specific scripts like build-baseline.sh)
         source_locations = [
             self.source_dir / "scripts",
             self.source_dir / "orchestrix" / "scripts",
@@ -411,7 +411,7 @@ class OrchestrixSetup:
 
     def copy_orchestrix_configs(self, target_dir: Path) -> bool:
         """
-        Copy bazinga config files (JSON) to target orchestrix/ directory.
+        Copy orchestrix config files (JSON) to target orchestrix/ directory.
 
         Args:
             target_dir: Target directory for installation
@@ -419,20 +419,20 @@ class OrchestrixSetup:
         Returns:
             True if configs were copied successfully, False otherwise
         """
-        bazinga_dir = target_dir / "orchestrix"
-        bazinga_dir.mkdir(parents=True, exist_ok=True)
+        orchestrix_dir = target_dir / "orchestrix"
+        orchestrix_dir.mkdir(parents=True, exist_ok=True)
 
         # Use helper for path resolution (handles shared-data, package, and dev installs)
-        source_bazinga = self._get_config_source("orchestrix")
-        if not source_bazinga:
-            console.print("[yellow]⚠️  No bazinga config directory found in source[/yellow]")
+        source_orchestrix = self._get_config_source("orchestrix")
+        if not source_orchestrix:
+            console.print("[yellow]⚠️  No orchestrix config directory found in source[/yellow]")
             console.print("[dim]   Checked: package dir, shared-data, project root[/dim]")
             console.print("[dim]   Hint: Update CLI with 'uv tool upgrade orchestrix-cli' or reinstall[/dim]")
             return False
 
         copied_count = 0
         for filename in self.ALLOWED_CONFIG_FILES:
-            config_file = source_bazinga / filename
+            config_file = source_orchestrix / filename
             if not config_file.exists():
                 console.print(f"[yellow]⚠️  Warning: Expected config file not found: {filename}[/yellow]")
                 continue
@@ -440,10 +440,10 @@ class OrchestrixSetup:
             try:
                 # SECURITY: Validate filename doesn't contain path traversal
                 safe_filename = PathValidator.validate_filename(filename)
-                dest = bazinga_dir / safe_filename
+                dest = orchestrix_dir / safe_filename
 
-                # SECURITY: Ensure destination is within bazinga_dir
-                PathValidator.ensure_within_directory(dest, bazinga_dir)
+                # SECURITY: Ensure destination is within orchestrix_dir
+                PathValidator.ensure_within_directory(dest, orchestrix_dir)
 
                 shutil.copy2(config_file, dest)
                 console.print(f"  ✓ Copied {safe_filename}")
@@ -471,7 +471,7 @@ class OrchestrixSetup:
         console.print(f"  [dim]Skipping config setup (users manage their own .claude/claude.md)[/dim]")
         return True
 
-    def _replace_bazinga_section(self, content: str, new_bazinga_section: str) -> Optional[str]:
+    def _replace_orchestrix_section(self, content: str, new_orchestrix_section: str) -> Optional[str]:
         """
         Replace the Orchestrix section in the content with a new version.
 
@@ -485,22 +485,22 @@ class OrchestrixSetup:
             r'^## ⚠️ CRITICAL: Orchestrator Role Enforcement',
         ]
 
-        content_before_bazinga = None
+        content_before_orchestrix = None
 
         for pattern in start_patterns:
             match = re.search(pattern, content, re.MULTILINE)
             if match:
                 # Found the start of Orchestrix section
-                content_before_bazinga = content[:match.start()].rstrip()
+                content_before_orchestrix = content[:match.start()].rstrip()
                 break
 
-        if content_before_bazinga is None:
+        if content_before_orchestrix is None:
             # Couldn't find Orchestrix section start
             return None
 
         # Orchestrix section goes to the end of file (it's the last section)
         # So we just take everything before it and append the new section
-        updated_content = content_before_bazinga + '\n\n' + new_bazinga_section
+        updated_content = content_before_orchestrix + '\n\n' + new_orchestrix_section
 
         return updated_content
 
@@ -639,7 +639,7 @@ def update_gitignore(target_dir: Path) -> bool:
 
     # The marker and entries we'll add
     marker = "# Orchestrix - Auto-generated (do not edit this section)"
-    bazinga_entries = f"""{marker}
+    orchestrix_entries = f"""{marker}
 orchestrix/*.db*
 orchestrix/artifacts/
 """
@@ -666,14 +666,14 @@ orchestrix/artifacts/
             separator = newline_style if existing_content and not existing_content.endswith(('\n', '\r\n')) else ""
             separator += newline_style if existing_content else ""
 
-            # Normalize bazinga_entries to match the file's newline style
-            normalized_entries = bazinga_entries.replace('\n', newline_style)
+            # Normalize orchestrix_entries to match the file's newline style
+            normalized_entries = orchestrix_entries.replace('\n', newline_style)
 
             gitignore_path.write_text(existing_content + separator + normalized_entries, encoding='utf-8')
             console.print("  [green]✓ Added Orchestrix entries to .gitignore[/green]")
         else:
             # Create new .gitignore with our entries
-            gitignore_path.write_text(bazinga_entries, encoding='utf-8')
+            gitignore_path.write_text(orchestrix_entries, encoding='utf-8')
             console.print("  [green]✓ Created .gitignore with Orchestrix entries[/green]")
 
         return True
@@ -1012,7 +1012,7 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
     console.print(f"  [dim]Found dashboard release v{version}[/dim]")
 
     # Find the right asset for this platform
-    asset_name = f"bazinga-dashboard-{platform}-{arch}.tar.gz"
+    asset_name = f"orchestrix-dashboard-{platform}-{arch}.tar.gz"
     asset_url = None
 
     for asset in dashboard_release.get("assets", []):
@@ -1065,18 +1065,18 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
             if next_dir.exists():
                 shutil.rmtree(next_dir)
 
-        # Ensure bazinga directory exists
-        bazinga_dir = target_dir / "orchestrix"
-        bazinga_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure orchestrix directory exists
+        orchestrix_dir = target_dir / "orchestrix"
+        orchestrix_dir.mkdir(parents=True, exist_ok=True)
 
         with tarfile.open(tmp_path, "r:gz") as tar:
-            # Extract to bazinga directory (tarball contains dashboard-v2/)
+            # Extract to orchestrix directory (tarball contains dashboard-v2/)
             # Security: Validate paths to prevent tar slip attacks
             for member in tar.getmembers():
-                member_path = os.path.normpath(os.path.join(bazinga_dir, member.name))
-                if not member_path.startswith(str(bazinga_dir)):
+                member_path = os.path.normpath(os.path.join(orchestrix_dir, member.name))
+                if not member_path.startswith(str(orchestrix_dir)):
                     raise tarfile.TarError(f"Unsafe path in tarball: {member.name}")
-            tar.extractall(path=bazinga_dir)
+            tar.extractall(path=orchestrix_dir)
 
         # Cleanup temp file
         os.unlink(tmp_path)
@@ -1417,7 +1417,7 @@ def init(
         console.print("\n[bold cyan]6. Dashboard v2[/bold cyan]")
         if dashboard:
             console.print("  [dim]Installing (early experimental feature)...[/dim]")
-            # Ensure bazinga directory exists
+            # Ensure orchestrix directory exists
             (target_dir / "orchestrix").mkdir(parents=True, exist_ok=True)
 
             # Try downloading pre-built dashboard first (faster, no npm required)
@@ -1459,7 +1459,7 @@ def init(
                     shutil.copy2(dashboard_doc, target_research / "dashboard-v2-design.md")
                     console.print("  ✓ Copied dashboard documentation")
         else:
-            console.print("  [dim]Skipped (experimental; install later: 'bazinga setup-dashboard')[/dim]")
+            console.print("  [dim]Skipped (experimental; install later: 'orchestrix setup-dashboard')[/dim]")
 
         console.print("\n[bold cyan]7. Copying templates[/bold cyan]")
         if not setup.copy_templates(target_dir):
@@ -1574,19 +1574,19 @@ def init(
         "disabled": "Prototyping mode (lint only)"
     }
 
-    bazinga_commands = "[bold]Orchestrix Commands:[/bold]\n"
-    bazinga_commands += "[dim]  • /bazinga.orchestrate           (start orchestration)\n"
-    bazinga_commands += "  • /bazinga.orchestrate-advanced  (with requirements discovery)\n"
-    bazinga_commands += "  • /bazinga.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
-    bazinga_commands += "[dim]Customize:\n"
-    bazinga_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
-    bazinga_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
+    orchestrix_commands = "[bold]Orchestrix Commands:[/bold]\n"
+    orchestrix_commands += "[dim]  • /orchestrix.orchestrate           (start orchestration)\n"
+    orchestrix_commands += "  • /orchestrix.orchestrate-advanced  (with requirements discovery)\n"
+    orchestrix_commands += "  • /orchestrix.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
+    orchestrix_commands += "[dim]Customize:\n"
+    orchestrix_commands += "  • /orchestrix.configure-skills    (add/remove skills)\n"
+    orchestrix_commands += "  • /orchestrix.configure-testing   (change testing mode)[/dim]"
 
     # Determine next steps message based on whether project was created
     if project_name:
-        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: /bazinga.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
+        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: /orchestrix.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
     else:
-        next_steps = "  1. Open with Claude Code\n  2. Use: /bazinga.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
+        next_steps = "  1. Open with Claude Code\n  2. Use: /orchestrix.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
 
     console.print(
         Panel.fit(
@@ -1597,9 +1597,9 @@ def init(
             "[bold]Next steps:[/bold]\n"
             f"{next_steps}\n\n"
             "[bold]Example:[/bold]\n"
-            "  /bazinga.orchestrate implement user authentication with JWT\n"
+            "  /orchestrix.orchestrate implement user authentication with JWT\n"
             "  [dim](or: @orchestrator implement user authentication with JWT)[/dim]\n\n"
-            f"{bazinga_commands}",
+            f"{orchestrix_commands}",
             title="🎉 Installation Complete",
             border_style="green",
         )
@@ -1629,7 +1629,7 @@ def check():
     Verifies:
     - Git installation
     - Claude Code configuration
-    - Orchestrix setup (if in a bazinga project)
+    - Orchestrix setup (if in a orchestrix project)
     """
     print_banner()
 
@@ -1651,9 +1651,9 @@ def check():
     config_file_new = claude_dir / "CLAUDE.md"
     config_file_old = cwd / ".claude.md"
     config_exists = config_file_new.exists() or config_file_old.exists()
-    bazinga_dir = cwd / "orchestrix"
+    orchestrix_dir = cwd / "orchestrix"
 
-    bazinga_installed = all(
+    orchestrix_installed = all(
         [
             claude_dir.exists(),
             agents_dir.exists(),
@@ -1662,7 +1662,7 @@ def check():
         ]
     )
 
-    if bazinga_installed:
+    if orchestrix_installed:
         checks.append(("Orchestrix Setup", True, "Found in current directory"))
 
         # Check for required agents
@@ -1686,12 +1686,12 @@ def check():
         else:
             checks.append(("Agent Files", True, "All 7 agents present"))
 
-        if bazinga_dir.exists():
+        if orchestrix_dir.exists():
             checks.append(("Coordination Files", True, "Initialized"))
         else:
             checks.append(("Coordination Files", False, "Not initialized"))
     else:
-        checks.append(("Orchestrix Setup", False, "Not found (run 'bazinga init')"))
+        checks.append(("Orchestrix Setup", False, "Not found (run 'orchestrix init')"))
 
     # Display results
     table = Table(show_header=True, header_style="bold cyan")
@@ -1716,10 +1716,10 @@ def check():
         console.print(
             "\n[bold yellow]⚠️  Some components are missing. Install with:[/bold yellow]"
         )
-        console.print("    bazinga init --here")
+        console.print("    orchestrix init --here")
 
 
-def get_bazinga_git_url(branch: Optional[str] = None) -> str:
+def get_orchestrix_git_url(branch: Optional[str] = None) -> str:
     """
     Construct the git URL for installing/updating Orchestrix CLI.
 
@@ -1763,13 +1763,13 @@ def update_cli(branch: Optional[str] = None) -> bool:
 
             # If it's an editable install, update from git
             if editable_project_location:
-                bazinga_repo = Path(editable_project_location)
-                console.print(f"  [dim]Found editable install at: {bazinga_repo}[/dim]")
+                orchestrix_repo = Path(editable_project_location)
+                console.print(f"  [dim]Found editable install at: {orchestrix_repo}[/dim]")
 
                 was_updated = False
 
                 # Check if it's a git repo
-                if not (bazinga_repo / ".git").exists():
+                if not (orchestrix_repo / ".git").exists():
                     console.print("  [dim]Not a git repository, skipping git pull[/dim]")
                 else:
                     # Pull latest changes
@@ -1778,7 +1778,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                         # Fetch the branch first
                         fetch_result = subprocess.run(
                             ["git", "fetch", "origin", branch],
-                            cwd=bazinga_repo,
+                            cwd=orchestrix_repo,
                             capture_output=True,
                             text=True,
                             check=False
@@ -1789,7 +1789,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                         # Checkout the branch
                         checkout_result = subprocess.run(
                             ["git", "checkout", branch],
-                            cwd=bazinga_repo,
+                            cwd=orchestrix_repo,
                             capture_output=True,
                             text=True,
                             check=False
@@ -1800,7 +1800,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                         # Pull the latest changes for this branch
                         pull_result = subprocess.run(
                             ["git", "pull", "origin", branch],
-                            cwd=bazinga_repo,
+                            cwd=orchestrix_repo,
                             capture_output=True,
                             text=True,
                             check=False
@@ -1809,7 +1809,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                         console.print("  [dim]Pulling latest changes...[/dim]")
                         pull_result = subprocess.run(
                             ["git", "pull"],
-                            cwd=bazinga_repo,
+                            cwd=orchestrix_repo,
                             capture_output=True,
                             text=True,
                             check=False
@@ -1826,7 +1826,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                         # We only want to warn/return True if files in src/ changed
                         diff_result = subprocess.run(
                             ["git", "diff", "--name-only", "HEAD@{1}", "HEAD"],
-                            cwd=bazinga_repo,
+                            cwd=orchestrix_repo,
                             capture_output=True,
                             text=True,
                             check=False
@@ -1853,7 +1853,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                 if was_updated:
                     console.print("  [dim]Reinstalling CLI...[/dim]")
                     install_result = subprocess.run(
-                        ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
+                        ["pip", "install", "-e", str(orchestrix_repo), "--quiet"],
                         capture_output=True,
                         text=True,
                         check=False
@@ -1866,7 +1866,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                 return was_updated
             else:
                 # Not an editable install, try upgrading from PyPI or git
-                git_url = get_bazinga_git_url(branch)
+                git_url = get_orchestrix_git_url(branch)
                 if branch:
                     console.print(f"  [dim]Upgrading from git repository (branch: {branch})...[/dim]")
                 else:
@@ -1904,7 +1904,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
         )
 
         if uv_check.returncode == 0 and "orchestrix-cli" in uv_check.stdout:
-            git_url = get_bazinga_git_url(branch)
+            git_url = get_orchestrix_git_url(branch)
             if branch:
                 console.print(f"  [dim]Found uv tool installation, updating from branch: {branch}...[/dim]")
             else:
@@ -1967,9 +1967,9 @@ def update(
     from a specific branch before they're merged to main.
 
     Examples:
-      bazinga update                    # Update from main branch
-      bazinga update -b develop         # Test changes from develop branch
-      bazinga update -b feature/new-fix # Test a specific feature branch
+      orchestrix update                    # Update from main branch
+      orchestrix update -b develop         # Test changes from develop branch
+      orchestrix update -b feature/new-fix # Test a specific feature branch
     """
     print_banner()
 
@@ -1979,7 +1979,7 @@ def update(
     if not (target_dir / ".claude" / "agents" / "orchestrator.md").exists():
         console.print(
             "[red]✗ Orchestrix not found in current directory[/red]\n"
-            "Run 'bazinga init --here' to install first."
+            "Run 'orchestrix init --here' to install first."
         )
         raise typer.Exit(1)
 
@@ -2040,7 +2040,7 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
 
-    # Remove deprecated commands (old names without bazinga. prefix)
+    # Remove deprecated commands (old names without orchestrix. prefix)
     console.print("\n[bold cyan]3.1. Removing deprecated commands[/bold cyan]")
     deprecated_commands = [
         "orchestrate.md",
@@ -2100,32 +2100,32 @@ def update(
     # Update dashboard from pre-built releases
     console.print("\n[bold cyan]6. Dashboard v2[/bold cyan]")
     # Auto-detect existing dashboard installation
-    bazinga_dir = target_dir / "orchestrix"
-    dashboard_installed = (bazinga_dir / "dashboard-v2").exists()
+    orchestrix_dir = target_dir / "orchestrix"
+    dashboard_installed = (orchestrix_dir / "dashboard-v2").exists()
 
     if not dashboard and not dashboard_installed:
-        console.print("  [dim]Skipped (experimental; install: 'bazinga setup-dashboard')[/dim]")
+        console.print("  [dim]Skipped (experimental; install: 'orchestrix setup-dashboard')[/dim]")
     else:
         if dashboard_installed and not dashboard:
             console.print("  [dim]Existing dashboard detected, updating...[/dim]")
-        bazinga_dir.mkdir(parents=True, exist_ok=True)
+        orchestrix_dir.mkdir(parents=True, exist_ok=True)
 
         # Check for orphaned dashboard from previous buggy update (extracted to wrong path)
-        orphaned_dashboard = bazinga_dir / "orchestrix" / "dashboard-v2"
+        orphaned_dashboard = orchestrix_dir / "orchestrix" / "dashboard-v2"
         if orphaned_dashboard.exists():
             # Safety guards: ensure it's a directory, not a symlink, and within expected path
             try:
                 is_safe_to_remove = (
                     orphaned_dashboard.is_dir()
                     and not orphaned_dashboard.is_symlink()
-                    and os.path.commonpath([str(orphaned_dashboard.resolve()), str(bazinga_dir.resolve())]) == str(bazinga_dir.resolve())
+                    and os.path.commonpath([str(orphaned_dashboard.resolve()), str(orchestrix_dir.resolve())]) == str(orchestrix_dir.resolve())
                 )
                 if is_safe_to_remove:
                     console.print("  [yellow]⚠️  Found orphaned dashboard at orchestrix/orchestrix/dashboard-v2[/yellow]")
                     console.print("  [dim]This was created by a previous buggy update. Removing...[/dim]")
                     shutil.rmtree(orphaned_dashboard)
                     # Also remove empty parent if it exists
-                    orphaned_parent = bazinga_dir / "orchestrix"
+                    orphaned_parent = orchestrix_dir / "orchestrix"
                     if orphaned_parent.exists() and not any(orphaned_parent.iterdir()):
                         orphaned_parent.rmdir()
                     console.print("  [green]✓ Orphaned dashboard removed[/green]")
@@ -2135,7 +2135,7 @@ def update(
                 console.print(f"  [yellow]⚠️  Could not remove orphaned dashboard: {e}[/yellow]")
 
         # Try to download pre-built dashboard from GitHub releases
-        # Note: Pass target_dir (project root), not bazinga_dir - function adds /orchestrix/dashboard-v2
+        # Note: Pass target_dir (project root), not orchestrix_dir - function adds /orchestrix/dashboard-v2
         prebuilt_ok = False
         try:
             prebuilt_ok = download_prebuilt_dashboard(target_dir, force=True)
@@ -2148,7 +2148,7 @@ def update(
             # Fall back to copying source files if pre-built not available
             console.print("  [dim]Pre-built not available, copying source files...[/dim]")
             source_dashboard = setup.source_dir / "dashboard-v2"
-            target_dashboard = bazinga_dir / "dashboard-v2"
+            target_dashboard = orchestrix_dir / "dashboard-v2"
 
             if source_dashboard.exists():
                 try:
@@ -2207,7 +2207,7 @@ def update(
     if cli_was_updated:
         success_message += (
             "[bold yellow]⚠️  CLI was updated during this run[/bold yellow]\n"
-            "[yellow]Run 'bazinga update' again to use new CLI features.[/yellow]\n\n"
+            "[yellow]Run 'orchestrix update' again to use new CLI features.[/yellow]\n\n"
         )
 
     success_message += (
@@ -2215,10 +2215,10 @@ def update(
     )
 
     if cli_was_updated:
-        success_message += "  • [cyan]bazinga update[/cyan] (run again to complete update)\n"
+        success_message += "  • [cyan]orchestrix update[/cyan] (run again to complete update)\n"
 
     success_message += "  • Review updated agent definitions if needed\n"
-    success_message += "  • Continue using: /bazinga.orchestrate <your request>\n"
+    success_message += "  • Continue using: /orchestrix.orchestrate <your request>\n"
     success_message += "    [dim](or @orchestrator if you prefer)[/dim]"
 
     console.print(
@@ -2262,7 +2262,7 @@ def setup_dashboard(
     if not (target_dir / ".claude" / "agents" / "orchestrator.md").exists():
         console.print(
             "[red]✗ Orchestrix not found in current directory[/red]\n"
-            "Run 'bazinga init --here' to install Orchestrix first."
+            "Run 'orchestrix init --here' to install Orchestrix first."
         )
         raise typer.Exit(1)
 
@@ -2278,7 +2278,7 @@ def setup_dashboard(
         if not force and not yes:
             if not typer.confirm("  Install dashboard?", default=True):
                 console.print("[yellow]Cancelled[/yellow]")
-                console.print("[dim]You can install later with: bazinga setup-dashboard[/dim]")
+                console.print("[dim]You can install later with: orchestrix setup-dashboard[/dim]")
                 raise typer.Exit(0)
 
         # Download pre-built dashboard
@@ -2294,7 +2294,7 @@ def setup_dashboard(
         else:
             # Fall back to copying source files if we have access to them
             console.print("  [yellow]⚠️  Pre-built not available[/yellow]")
-            console.print("  [dim]Try running 'bazinga update --dashboard' instead[/dim]")
+            console.print("  [dim]Try running 'orchestrix update --dashboard' instead[/dim]")
             raise typer.Exit(1)
 
     # Check for node_modules indicating dependencies were already installed
@@ -2303,7 +2303,7 @@ def setup_dashboard(
         console.print("\n[bold green]✓ Dashboard v2 dependencies already installed![/bold green]\n")
         console.print("[dim]You can start the dashboard with:[/dim]")
         console.print("[dim]  cd orchestrix/dashboard-v2 && npm run dev[/dim]")
-        console.print("\n[dim]To reinstall, use: bazinga setup-dashboard --force[/dim]")
+        console.print("\n[dim]To reinstall, use: orchestrix setup-dashboard --force[/dim]")
         return
 
     console.print("\n[bold]Dashboard v2 Dependency Installation[/bold]\n")
@@ -2424,7 +2424,7 @@ def main_callback(
             "  [cyan]setup-dashboard[/cyan] - Install dashboard dependencies\n"
             "  [cyan]check[/cyan]          - Check system requirements and setup\n"
             "  [cyan]version[/cyan]        - Show version information\n\n"
-            "[dim]Use 'bazinga --help' for more information[/dim]"
+            "[dim]Use 'orchestrix --help' for more information[/dim]"
         )
 
 

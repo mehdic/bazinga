@@ -12,9 +12,9 @@ echo "🧪 Test Coverage Analysis Starting..."
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="bazinga/bazinga.db"
+    local db_path="orchestrix/orchestrix.db"
     if [ ! -f "$db_path" ]; then
-        echo "bazinga_default"
+        echo "orchestrix_default"
         return
     fi
 
@@ -27,17 +27,17 @@ try:
     if row:
         print(row[0])
     else:
-        print('bazinga_default')
+        print('orchestrix_default')
     conn.close()
 except:
-    print('bazinga_default')
-" 2>/dev/null || echo "bazinga_default")
+    print('orchestrix_default')
+" 2>/dev/null || echo "orchestrix_default")
 
     echo "$session_id"
 }
 
 SESSION_ID=$(get_current_session_id)
-OUTPUT_DIR="bazinga/artifacts/$SESSION_ID/skills"
+OUTPUT_DIR="orchestrix/artifacts/$SESSION_ID/skills"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/coverage_report.json"
 
@@ -45,8 +45,8 @@ echo "📁 Output directory: $OUTPUT_DIR"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
-if [ -f "bazinga/skills_config.json" ] && command -v jq &> /dev/null; then
-    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
+if [ -f "orchestrix/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' orchestrix/skills_config.json 2>/dev/null || echo "lite")
 fi
 
 # Detect project language and test framework
@@ -126,14 +126,14 @@ case $LANG in
         echo "  Running pytest with coverage..."
         pytest --cov=. --cov-report=json --cov-report=term-missing --quiet 2>/dev/null || {
             echo "⚠️  Tests failed or no tests found"
-            echo '{"totals":{"percent_covered":0},"files":{}}' > bazinga/coverage_report_raw.json
+            echo '{"totals":{"percent_covered":0},"files":{}}' > orchestrix/coverage_report_raw.json
         }
 
         # pytest-cov outputs to coverage.json by default
         if [ -f "coverage.json" ]; then
-            mv coverage.json bazinga/coverage_report_raw.json
-        elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
-            echo '{"totals":{"percent_covered":0},"files":{}}' > bazinga/coverage_report_raw.json
+            mv coverage.json orchestrix/coverage_report_raw.json
+        elif [ ! -f "orchestrix/coverage_report_raw.json" ]; then
+            echo '{"totals":{"percent_covered":0},"files":{}}' > orchestrix/coverage_report_raw.json
         fi
         ;;
 
@@ -144,32 +144,32 @@ case $LANG in
         fi
 
         echo "  Running jest with coverage..."
-        npm test -- --coverage --json --outputFile=bazinga/jest-results.json 2>/dev/null || {
+        npm test -- --coverage --json --outputFile=orchestrix/jest-results.json 2>/dev/null || {
             echo "⚠️  Tests failed or no tests found"
-            echo '{"coverageMap":{}}' > bazinga/coverage_report_raw.json
+            echo '{"coverageMap":{}}' > orchestrix/coverage_report_raw.json
         }
 
         # Jest outputs to coverage/coverage-final.json
         if [ -f "coverage/coverage-final.json" ]; then
-            cp coverage/coverage-final.json bazinga/coverage_report_raw.json
-        elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
-            echo '{"coverageMap":{}}' > bazinga/coverage_report_raw.json
+            cp coverage/coverage-final.json orchestrix/coverage_report_raw.json
+        elif [ ! -f "orchestrix/coverage_report_raw.json" ]; then
+            echo '{"coverageMap":{}}' > orchestrix/coverage_report_raw.json
         fi
         ;;
 
     go)
         echo "  Running go test with coverage..."
-        go test -coverprofile=bazinga/coverage.out ./... 2>/dev/null || {
+        go test -coverprofile=orchestrix/coverage.out ./... 2>/dev/null || {
             echo "⚠️  Tests failed or no tests found"
-            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+            echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
         }
 
-        if [ -f "bazinga/coverage.out" ]; then
+        if [ -f "orchestrix/coverage.out" ]; then
             # Parse go coverage output
-            COVERAGE=$(go tool cover -func=bazinga/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-            echo "{\"coverage\":$COVERAGE}" > bazinga/coverage_report_raw.json
-        elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
-            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+            COVERAGE=$(go tool cover -func=orchestrix/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+            echo "{\"coverage\":$COVERAGE}" > orchestrix/coverage_report_raw.json
+        elif [ ! -f "orchestrix/coverage_report_raw.json" ]; then
+            echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
         fi
         ;;
 
@@ -180,7 +180,7 @@ case $LANG in
                 echo "  Running Maven tests with JaCoCo coverage..."
                 mvn test jacoco:report 2>/dev/null || {
                     echo "⚠️  Tests failed or no tests found"
-                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+                    echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
                 }
 
                 # JaCoCo XML report location (Maven)
@@ -192,20 +192,20 @@ case $LANG in
                         TOTAL=$((LINE_COVERED + LINE_MISSED))
                         if [ $TOTAL -gt 0 ]; then
                             COVERAGE=$(echo "scale=2; $LINE_COVERED * 100 / $TOTAL" | bc)
-                            echo "{\"coverage\":$COVERAGE,\"source\":\"target/site/jacoco/jacoco.xml\"}" > bazinga/coverage_report_raw.json
+                            echo "{\"coverage\":$COVERAGE,\"source\":\"target/site/jacoco/jacoco.xml\"}" > orchestrix/coverage_report_raw.json
                         else
-                            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+                            echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
                         fi
                     else
                         # Fallback without xmllint
-                        echo '{"coverage":"see target/site/jacoco/index.html","source":"target/site/jacoco/jacoco.xml"}' > bazinga/coverage_report_raw.json
+                        echo '{"coverage":"see target/site/jacoco/index.html","source":"target/site/jacoco/jacoco.xml"}' > orchestrix/coverage_report_raw.json
                     fi
-                elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
-                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+                elif [ ! -f "orchestrix/coverage_report_raw.json" ]; then
+                    echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
                 fi
             else
                 echo "❌ Maven not found for Java project"
-                echo '{"error":"Maven not found"}' > bazinga/coverage_report_raw.json
+                echo '{"error":"Maven not found"}' > orchestrix/coverage_report_raw.json
             fi
         elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
             GRADLE_CMD="gradle"
@@ -215,7 +215,7 @@ case $LANG in
                 echo "  Running Gradle tests with JaCoCo coverage..."
                 $GRADLE_CMD test jacocoTestReport 2>/dev/null || {
                     echo "⚠️  Tests failed or no tests found"
-                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+                    echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
                 }
 
                 # JaCoCo XML report location (Gradle)
@@ -227,30 +227,30 @@ case $LANG in
                         TOTAL=$((LINE_COVERED + LINE_MISSED))
                         if [ $TOTAL -gt 0 ]; then
                             COVERAGE=$(echo "scale=2; $LINE_COVERED * 100 / $TOTAL" | bc)
-                            echo "{\"coverage\":$COVERAGE,\"source\":\"build/reports/jacoco/test/jacocoTestReport.xml\"}" > bazinga/coverage_report_raw.json
+                            echo "{\"coverage\":$COVERAGE,\"source\":\"build/reports/jacoco/test/jacocoTestReport.xml\"}" > orchestrix/coverage_report_raw.json
                         else
-                            echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+                            echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
                         fi
                     else
                         # Fallback without xmllint
-                        echo '{"coverage":"see build/reports/jacoco/test/html/index.html","source":"build/reports/jacoco/test/jacocoTestReport.xml"}' > bazinga/coverage_report_raw.json
+                        echo '{"coverage":"see build/reports/jacoco/test/html/index.html","source":"build/reports/jacoco/test/jacocoTestReport.xml"}' > orchestrix/coverage_report_raw.json
                     fi
-                elif [ ! -f "bazinga/coverage_report_raw.json" ]; then
-                    echo '{"coverage":0}' > bazinga/coverage_report_raw.json
+                elif [ ! -f "orchestrix/coverage_report_raw.json" ]; then
+                    echo '{"coverage":0}' > orchestrix/coverage_report_raw.json
                 fi
             else
                 echo "❌ Gradle not found for Java project"
-                echo '{"error":"Gradle not found"}' > bazinga/coverage_report_raw.json
+                echo '{"error":"Gradle not found"}' > orchestrix/coverage_report_raw.json
             fi
         else
             echo "❌ No Maven or Gradle build file found"
-            echo '{"error":"No build file"}' > bazinga/coverage_report_raw.json
+            echo '{"error":"No build file"}' > orchestrix/coverage_report_raw.json
         fi
         ;;
 
     *)
         echo "❌ Unknown language. Cannot run coverage analysis."
-        echo '{"error":"Unknown language"}' > bazinga/coverage_report_raw.json
+        echo '{"error":"Unknown language"}' > orchestrix/coverage_report_raw.json
         ;;
 esac
 
@@ -260,28 +260,28 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata
 if command_exists "jq"; then
     jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\"}" \
-        bazinga/coverage_report_raw.json > $OUTPUT_FILE
+        orchestrix/coverage_report_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
     cat > $OUTPUT_FILE <<EOF
 {
   "timestamp": "$TIMESTAMP",
   "language": "$LANG",
-  "raw_results": $(cat bazinga/coverage_report_raw.json)
+  "raw_results": $(cat orchestrix/coverage_report_raw.json)
 }
 EOF
 fi
 
 # Clean up
-rm -f bazinga/coverage_report_raw.json bazinga/jest-results.json 2>/dev/null || true
+rm -f orchestrix/coverage_report_raw.json orchestrix/jest-results.json 2>/dev/null || true
 
 echo "✅ Coverage analysis complete"
 echo "📁 Results saved to: $OUTPUT_FILE"
 
 # Save to database
 echo "💾 Saving to database..."
-DB_PATH="bazinga/bazinga.db"
-DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_PATH="orchestrix/orchestrix.db"
+DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
 SKILL_OUTPUT=$(cat "$OUTPUT_FILE")
 
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \

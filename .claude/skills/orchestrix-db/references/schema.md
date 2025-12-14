@@ -47,7 +47,7 @@ CREATE TABLE sessions (
 ```
 
 **Columns:**
-- `session_id`: Unique session identifier (e.g., `bazinga_20250112_143022`)
+- `session_id`: Unique session identifier (e.g., `orchestrix_20250112_143022`)
 - `start_time`: Session start timestamp
 - `end_time`: Session completion timestamp (NULL if active)
 - `mode`: Execution mode (`simple` or `parallel`)
@@ -59,10 +59,10 @@ CREATE TABLE sessions (
 **Usage Example:**
 ```python
 # Create new session
-db.create_session('bazinga_20250112_143022', 'parallel', 'Add authentication feature')
+db.create_session('orchestrix_20250112_143022', 'parallel', 'Add authentication feature')
 
 # Update session status
-db.update_session_status('bazinga_20250112_143022', 'completed')
+db.update_session_status('orchestrix_20250112_143022', 'completed')
 ```
 
 ---
@@ -132,7 +132,7 @@ CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id
 ```python
 # Log agent interaction
 db.log_interaction(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     agent_type='developer',
     content='Implemented authentication...',
     iteration=5,
@@ -140,14 +140,14 @@ db.log_interaction(
 )
 
 # Query recent logs
-logs = db.get_logs('bazinga_123', limit=10, agent_type='developer')
+logs = db.get_logs('orchestrix_123', limit=10, agent_type='developer')
 ```
 
 **Usage Example - Reasoning Capture:**
 ```python
 # Save agent reasoning (auto-redacts secrets)
 result = db.save_reasoning(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     group_id='group_a',
     agent_type='developer',
     reasoning_phase='understanding',
@@ -158,7 +158,7 @@ result = db.save_reasoning(
 
 # Get reasoning entries for a group
 reasoning = db.get_reasoning(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     group_id='group_a',
     agent_type='developer',
     phase='understanding'
@@ -166,7 +166,7 @@ reasoning = db.get_reasoning(
 
 # Get full reasoning timeline
 timeline = db.reasoning_timeline(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     group_id='group_a',
     format='markdown'
 )
@@ -207,10 +207,10 @@ pm_state = {
     'iteration': 5,
     'task_groups': [...]
 }
-db.save_state('bazinga_123', 'pm', pm_state)
+db.save_state('orchestrix_123', 'pm', pm_state)
 
 # Retrieve latest state
-current_state = db.get_latest_state('bazinga_123', 'pm')
+current_state = db.get_latest_state('orchestrix_123', 'pm')
 ```
 
 ---
@@ -287,21 +287,21 @@ OR test_failure (tests failed after merge → dev fixes tests)
 ```python
 # Create task group with specializations
 db.create_task_group(
-    'group_a', 'bazinga_123', 'Authentication',
+    'group_a', 'orchestrix_123', 'Authentication',
     status='pending',
     specializations=['orchestrix/templates/specializations/01-languages/typescript.md']
 )
 
 # Update task group with specializations (requires session_id for composite key)
 db.update_task_group(
-    'group_a', 'bazinga_123',
+    'group_a', 'orchestrix_123',
     status='completed',
     last_review_status='APPROVED',
     specializations=['orchestrix/templates/specializations/03-frameworks-backend/express.md']
 )
 
 # Get task groups (includes specializations)
-groups = db.get_task_groups('bazinga_123', status='in_progress')
+groups = db.get_task_groups('orchestrix_123', status='in_progress')
 # Returns: [{'id': 'group_a', 'specializations': '[...]', ...}]
 ```
 
@@ -337,10 +337,10 @@ CREATE INDEX idx_tokens_session ON token_usage(session_id, agent_type);
 **Usage Example:**
 ```python
 # Log token usage
-db.log_tokens('bazinga_123', 'developer', 15000, agent_id='developer_1')
+db.log_tokens('orchestrix_123', 'developer', 15000, agent_id='developer_1')
 
 # Get token summary
-summary = db.get_token_summary('bazinga_123', by='agent_type')
+summary = db.get_token_summary('orchestrix_123', by='agent_type')
 # Returns: {'pm': 5000, 'developer': 25000, 'qa': 8000, 'total': 38000}
 ```
 
@@ -375,10 +375,10 @@ CREATE INDEX idx_skill_session ON skill_outputs(session_id, skill_name, timestam
 ```python
 # Save skill output
 security_results = {'vulnerabilities': [...], 'severity': 'high'}
-db.save_skill_output('bazinga_123', 'security_scan', security_results)
+db.save_skill_output('orchestrix_123', 'security_scan', security_results)
 
 # Retrieve latest skill output
-results = db.get_skill_output('bazinga_123', 'security_scan')
+results = db.get_skill_output('orchestrix_123', 'security_scan')
 ```
 
 ---
@@ -541,10 +541,10 @@ CREATE INDEX idx_cp_scope ON context_packages(scope);
 ```python
 # Create context package
 db.save_context_package(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     group_id='group_a',
     package_type='research',
-    file_path='orchestrix/artifacts/bazinga_123/context/research-group_a-hin.md',
+    file_path='orchestrix/artifacts/orchestrix_123/context/research-group_a-hin.md',
     producer_agent='requirements_engineer',
     consumers=['developer', 'senior_software_engineer'],
     priority='high',
@@ -553,7 +553,7 @@ db.save_context_package(
 
 # Get packages for agent spawn
 packages = db.get_context_packages(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     group_id='group_a',
     agent_type='developer',
     limit=3
@@ -601,7 +601,7 @@ db.mark_context_consumed(
 
 # Get pending packages for agent
 pending = db.get_pending_context(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     agent_type='developer',
     group_id='group_a'
 )
@@ -619,14 +619,14 @@ pending = db.get_pending_context(
 
 ### Get Dashboard Overview
 ```python
-snapshot = db.get_dashboard_snapshot('bazinga_123')
+snapshot = db.get_dashboard_snapshot('orchestrix_123')
 # Returns complete dashboard state in one query
 ```
 
 ### Filter Logs by Time Range
 ```python
 logs = db.get_logs(
-    session_id='bazinga_123',
+    session_id='orchestrix_123',
     since='2025-01-12 14:00:00',
     limit=100
 )
@@ -634,13 +634,13 @@ logs = db.get_logs(
 
 ### Get Incomplete Tasks
 ```python
-tasks = db.get_task_groups('bazinga_123', status='in_progress')
+tasks = db.get_task_groups('orchestrix_123', status='in_progress')
 ```
 
 ### Token Usage Analysis
 ```python
-by_type = db.get_token_summary('bazinga_123', by='agent_type')
-by_agent = db.get_token_summary('bazinga_123', by='agent_id')
+by_type = db.get_token_summary('orchestrix_123', by='agent_type')
+by_agent = db.get_token_summary('orchestrix_123', by='agent_id')
 ```
 
 ### Custom Analytics Query
@@ -651,7 +651,7 @@ results = db.query("""
     FROM orchestration_logs
     WHERE session_id = ?
     GROUP BY agent_type
-""", ('bazinga_123',))
+""", ('orchestrix_123',))
 ```
 
 ---
@@ -693,7 +693,7 @@ All high-frequency queries have supporting indexes:
 
 ### Backup Database
 ```bash
-sqlite3 orchestrix.db ".backup bazinga_backup.db"
+sqlite3 orchestrix.db ".backup orchestrix_backup.db"
 ```
 
 ### Vacuum (Reclaim Space)

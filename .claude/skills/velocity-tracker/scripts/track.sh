@@ -6,9 +6,9 @@ set +e  # Don't exit on error for graceful degradation
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="bazinga/bazinga.db"
+    local db_path="orchestrix/orchestrix.db"
     if [ ! -f "$db_path" ]; then
-        echo "bazinga_default"
+        echo "orchestrix_default"
         return
     fi
 
@@ -21,24 +21,24 @@ try:
     if row:
         print(row[0])
     else:
-        print('bazinga_default')
+        print('orchestrix_default')
     conn.close()
 except:
-    print('bazinga_default')
-" 2>/dev/null || echo "bazinga_default")
+    print('orchestrix_default')
+" 2>/dev/null || echo "orchestrix_default")
 
     echo "$session_id"
 }
 
 SESSION_ID=$(get_current_session_id)
 
-COORD_DIR="bazinga"
+COORD_DIR="orchestrix"
 SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
 mkdir -p "$SKILLS_DIR"
 
 # Database paths
-DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
-DB_PATH="${COORD_DIR}/bazinga.db"
+DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
+DB_PATH="${COORD_DIR}/orchestrix.db"
 
 METRICS_FILE="${SKILLS_DIR}/project_metrics.json"
 HISTORICAL_FILE="${SKILLS_DIR}/historical_metrics.json"

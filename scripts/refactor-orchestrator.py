@@ -23,7 +23,7 @@ def replace_parsing_section(content: str) -> str:
 
     replacement = '''## 📊 Agent Response Parsing for Capsule Construction
 
-**Complete parsing guide:** `bazinga/templates/response_parsing.md`
+**Complete parsing guide:** `orchestrix/templates/response_parsing.md`
 
 **Quick Reference:**
 
@@ -31,7 +31,7 @@ For each agent type, extract:
 - **Developer**: Status (READY_FOR_QA/REVIEW/BLOCKED/PARTIAL), files, tests, coverage
 - **QA Expert**: Status (PASS/FAIL/PARTIAL), test results, failures, quality signals
 - **Tech Lead**: Decision (APPROVED/CHANGES_REQUESTED/ESCALATE/INVESTIGATION), security/lint issues
-- **PM**: Status (BAZINGA/CONTINUE/CLARIFY), mode decision, task groups
+- **PM**: Status (Orchestrix/CONTINUE/CLARIFY), mode decision, task groups
 - **Investigator**: Status (ROOT_CAUSE_FOUND/NEED_DIAGNOSTIC/etc.), hypotheses
 
 **Parsing principle:** Best-effort extraction with fallbacks. Never fail on missing data.
@@ -44,7 +44,7 @@ For each agent type, extract:
 📋 PM: Planning complete | {mode}: {groups} | Starting development
 ```
 
-**Detailed extraction patterns, fallback strategies, and complete examples:** See `bazinga/templates/response_parsing.md`
+**Detailed extraction patterns, fallback strategies, and complete examples:** See `orchestrix/templates/response_parsing.md`
 
 ---
 '''
@@ -74,7 +74,7 @@ def replace_simple_mode_prompt_building(content: str) -> str:
 
     replacement = '''### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-**Follow the prompt building guide:** `bazinga/templates/prompt_building.md`
+**Follow the prompt building guide:** `orchestrix/templates/prompt_building.md`
 
 **Required sections for developer prompt:**
 1. ✓ Session ID (from Step 0)
@@ -92,7 +92,7 @@ def replace_simple_mode_prompt_building(content: str) -> str:
 - [ ] MANDATORY WORKFLOW section present
 - [ ] Report format specified
 
-See `bazinga/templates/prompt_building.md` for complete instructions.
+See `orchestrix/templates/prompt_building.md` for complete instructions.
 See `agents/developer.md` for full agent definition.
 
 '''
@@ -143,7 +143,7 @@ def replace_parallel_mode_prompt_building(content: str) -> str:
 
 **IMPORTANT:** Build prompts for ALL groups BEFORE spawning any.
 
-See `bazinga/templates/prompt_building.md` for detailed instructions.
+See `orchestrix/templates/prompt_building.md` for detailed instructions.
 
 '''
 

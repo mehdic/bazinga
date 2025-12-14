@@ -51,15 +51,15 @@ pwsh .claude/skills/quality-dashboard/scripts/dashboard.ps1
 > **Cross-platform detection:** Check if running on Windows (`$env:OS` contains "Windows" or `uname` doesn't exist) and run the appropriate script.
 
 This script will:
-- Read `bazinga/security_scan.json`
-- Read `bazinga/coverage_report.json`
-- Read `bazinga/lint_results.json`
-- Read `bazinga/project_metrics.json`
+- Read `orchestrix/security_scan.json`
+- Read `orchestrix/coverage_report.json`
+- Read `orchestrix/lint_results.json`
+- Read `orchestrix/project_metrics.json`
 - Calculate component scores (0-100 for each)
 - Compute overall health score (weighted average)
 - Detect trends by comparing to previous run
 - Identify anomalies
-- Generate `bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json`
+- Generate `orchestrix/artifacts/{SESSION_ID}/skills/quality_dashboard.json`
 
 ---
 
@@ -68,7 +68,7 @@ This script will:
 Use the **Read** tool to read:
 
 ```bash
-bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+orchestrix/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 Extract key information:
@@ -114,7 +114,7 @@ Top Recommendations:
 2. {recommendation}
 3. {recommendation}
 
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+Details saved to: orchestrix/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 ---
@@ -147,7 +147,7 @@ Top Recommendations:
 1. Continue current practices
 2. Coverage improved by 12% this iteration
 
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+Details saved to: orchestrix/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 **Scenario: Quality Issues Detected**
@@ -182,7 +182,7 @@ Top Recommendations:
 2. Add tests for auth module (20% coverage drop)
 3. Fix 12 linting errors
 
-Details saved to: bazinga/artifacts/{SESSION_ID}/skills/quality_dashboard.json
+Details saved to: orchestrix/artifacts/{SESSION_ID}/skills/quality_dashboard.json
 ```
 
 ---

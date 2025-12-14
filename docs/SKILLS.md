@@ -936,7 +936,7 @@ Time: 1 minute (skip basic checks)
 **Solution:** Orchestrix CLI automatically detects and offers to install missing tools:
 ```bash
 # During init or first use
-bazinga check
+orchestrix check
 # Shows: "python: ruff not found. Install? (y/n)"
 ```
 

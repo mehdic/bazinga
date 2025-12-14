@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document defines the data model for the context engineering system. All tables are stored in `bazinga/bazinga.db` and accessed via the `bazinga-db` skill.
+This document defines the data model for the context engineering system. All tables are stored in `orchestrix/orchestrix.db` and accessed via the `orchestrix-db` skill.
 
 ## Entity Relationship Diagram
 

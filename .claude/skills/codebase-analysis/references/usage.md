@@ -12,9 +12,9 @@ The skill maintains an intelligent cache to improve performance:
 - **Project-wide patterns**: Cached for 1 hour (shared across all sessions)
 - **Utilities**: Cached per session (via session-keyed cache names)
 - **Similar features**: Always fresh (task-specific, never cached)
-- **Cache location**: `bazinga/.analysis_cache/` (global, shared)
+- **Cache location**: `orchestrix/.analysis_cache/` (global, shared)
 
-**Expected cache efficiency:** 33%+ after first session (measured on BAZINGA project)
+**Expected cache efficiency:** 33%+ after first session (measured on Orchestrix project)
 
 **Cross-session benefits:** When multiple sessions run within 1 hour, they share the project patterns cache, improving performance for all sessions.
 
@@ -45,7 +45,7 @@ ANALYSIS PARTIALLY COMPLETE
 
 Suggestion: Manually explore /auth and /utils directories for patterns
 
-Partial results saved to: bazinga/artifacts/{session_id}/skills/codebase-analysis/report.json
+Partial results saved to: orchestrix/artifacts/{session_id}/skills/codebase-analysis/report.json
 ```
 
 ---
@@ -87,10 +87,10 @@ Your analysis helps developers:
 
 **Session-Isolated Artifacts:**
 
-Results are saved to session-isolated directories following BAZINGA conventions:
+Results are saved to session-isolated directories following Orchestrix conventions:
 
 ```
-bazinga/artifacts/{session_id}/skills/codebase-analysis/report.json
+orchestrix/artifacts/{session_id}/skills/codebase-analysis/report.json
 ```
 
 This prevents concurrent sessions from overwriting each other's results.
@@ -99,7 +99,7 @@ This prevents concurrent sessions from overwriting each other's results.
 ```json
 {
   "task": "task description",
-  "session_id": "bazinga_20251119_100000",
+  "session_id": "orchestrix_20251119_100000",
   "timestamp": "2025-11-19T10:00:00",
   "cache_hits": 1,
   "cache_misses": 2,

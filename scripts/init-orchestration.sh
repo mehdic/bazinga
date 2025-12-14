@@ -148,7 +148,7 @@ if [ ! -f "orchestrix/skills_config.json" ]; then
       "MANDATORY: Skill will be automatically invoked by the agent (always runs)",
       "OPTIONAL: Skill can be invoked by agent if needed (framework-driven, not automatic)",
       "DISABLED: Skill will not be invoked (not available to agent)",
-      "Use /bazinga.configure-skills to modify this configuration interactively",
+      "Use /orchestrix.configure-skills to modify this configuration interactively",
       "LITE PROFILE: 3 mandatory core skills + optional framework skills",
       "ADVANCED PROFILE: All 10 skills enabled - use --profile advanced during init"
     ]
@@ -234,7 +234,7 @@ if [ ! -f "orchestrix/testing_config.json" ]; then
       "disabled": "Only lint checks - fastest iteration"
     },
     "notes": [
-      "Use /bazinga.configure-testing to modify this configuration interactively",
+      "Use /orchestrix.configure-testing to modify this configuration interactively",
       "Mode 'minimal' is the default - balances speed and quality (current Orchestrix default)",
       "Mode 'full' enables complete QA workflow for production-critical code",
       "Mode 'disabled' is for rapid prototyping only (lint checks still run)"
@@ -435,7 +435,7 @@ else
     fi
 fi
 
-# Copy templates to bazinga folder if not present
+# Copy templates to orchestrix folder if not present
 if [ ! -d "orchestrix/templates" ]; then
     echo ""
     echo "📝 Copying templates to orchestrix/templates..."
@@ -453,7 +453,7 @@ if [ ! -d "orchestrix/templates" ]; then
         fi
     else
         echo "⚠️  Warning: No templates found (looking for orchestrix/templates or coordination/templates)"
-        echo "   Templates will be used from bazinga CLI installation"
+        echo "   Templates will be used from orchestrix CLI installation"
     fi
 else
     echo "✓ orchestrix/templates already exists"

@@ -12,9 +12,9 @@ echo "📋 Code Linting Starting..."
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="bazinga/bazinga.db"
+    local db_path="orchestrix/orchestrix.db"
     if [ ! -f "$db_path" ]; then
-        echo "bazinga_default"
+        echo "orchestrix_default"
         return
     fi
 
@@ -27,17 +27,17 @@ try:
     if row:
         print(row[0])
     else:
-        print('bazinga_default')
+        print('orchestrix_default')
     conn.close()
 except:
-    print('bazinga_default')
-" 2>/dev/null || echo "bazinga_default")
+    print('orchestrix_default')
+" 2>/dev/null || echo "orchestrix_default")
 
     echo "$session_id"
 }
 
 SESSION_ID=$(get_current_session_id)
-OUTPUT_DIR="bazinga/artifacts/$SESSION_ID/skills"
+OUTPUT_DIR="orchestrix/artifacts/$SESSION_ID/skills"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/lint_results.json"
 
@@ -45,8 +45,8 @@ echo "📁 Output directory: $OUTPUT_DIR"
 
 # Load profile from skills_config.json for graceful degradation
 PROFILE="lite"
-if [ -f "bazinga/skills_config.json" ] && command -v jq &> /dev/null; then
-    PROFILE=$(jq -r '._metadata.profile // "lite"' bazinga/skills_config.json 2>/dev/null || echo "lite")
+if [ -f "orchestrix/skills_config.json" ] && command -v jq &> /dev/null; then
+    PROFILE=$(jq -r '._metadata.profile // "lite"' orchestrix/skills_config.json 2>/dev/null || echo "lite")
 fi
 
 # TIMEOUT PROTECTION: Max 45 seconds for linting
@@ -152,12 +152,12 @@ case $LANG in
             if [ -n "$CHANGED_FILES" ]; then
                 PYTHON_FILES=$(echo "$CHANGED_FILES" | grep '\.py$' || echo "")
                 if [ -n "$PYTHON_FILES" ]; then
-                    run_with_timeout ruff check $PYTHON_FILES --output-format=json > bazinga/lint_results_raw.json 2>/dev/null || echo '[]' > bazinga/lint_results_raw.json
+                    run_with_timeout ruff check $PYTHON_FILES --output-format=json > orchestrix/lint_results_raw.json 2>/dev/null || echo '[]' > orchestrix/lint_results_raw.json
                 else
-                    echo '[]' > bazinga/lint_results_raw.json
+                    echo '[]' > orchestrix/lint_results_raw.json
                 fi
             else
-                run_with_timeout ruff check . --output-format=json > bazinga/lint_results_raw.json 2>/dev/null || echo '[]' > bazinga/lint_results_raw.json
+                run_with_timeout ruff check . --output-format=json > orchestrix/lint_results_raw.json 2>/dev/null || echo '[]' > orchestrix/lint_results_raw.json
             fi
         elif command_exists "pylint"; then
             TOOL="pylint"
@@ -165,12 +165,12 @@ case $LANG in
             if [ -n "$CHANGED_FILES" ]; then
                 PYTHON_FILES=$(echo "$CHANGED_FILES" | grep '\.py$' || echo "")
                 if [ -n "$PYTHON_FILES" ]; then
-                    run_with_timeout pylint --output-format=json $PYTHON_FILES > bazinga/lint_results_raw.json 2>/dev/null || echo '[]' > bazinga/lint_results_raw.json
+                    run_with_timeout pylint --output-format=json $PYTHON_FILES > orchestrix/lint_results_raw.json 2>/dev/null || echo '[]' > orchestrix/lint_results_raw.json
                 else
-                    echo '[]' > bazinga/lint_results_raw.json
+                    echo '[]' > orchestrix/lint_results_raw.json
                 fi
             else
-                run_with_timeout pylint --output-format=json **/*.py > bazinga/lint_results_raw.json 2>/dev/null || echo '[]' > bazinga/lint_results_raw.json
+                run_with_timeout pylint --output-format=json **/*.py > orchestrix/lint_results_raw.json 2>/dev/null || echo '[]' > orchestrix/lint_results_raw.json
             fi
         fi
         ;;
@@ -187,12 +187,12 @@ case $LANG in
         if [ -n "$CHANGED_FILES" ]; then
             JS_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(js|jsx|ts|tsx)$' || echo "")
             if [ -n "$JS_FILES" ]; then
-                run_with_timeout npx eslint $JS_FILES --format json > bazinga/lint_results_raw.json 2>/dev/null || echo '[]' > bazinga/lint_results_raw.json
+                run_with_timeout npx eslint $JS_FILES --format json > orchestrix/lint_results_raw.json 2>/dev/null || echo '[]' > orchestrix/lint_results_raw.json
             else
-                echo '[]' > bazinga/lint_results_raw.json
+                echo '[]' > orchestrix/lint_results_raw.json
             fi
         else
-            run_with_timeout npx eslint . --format json > bazinga/lint_results_raw.json 2>/dev/null || echo '[]' > bazinga/lint_results_raw.json
+            run_with_timeout npx eslint . --format json > orchestrix/lint_results_raw.json 2>/dev/null || echo '[]' > orchestrix/lint_results_raw.json
         fi
         ;;
 
@@ -207,12 +207,12 @@ case $LANG in
             GO_FILES=$(echo "$CHANGED_FILES" | grep '\.go$' || echo "")
             if [ -n "$GO_FILES" ]; then
                 # Use --new to only lint changed code
-                run_with_timeout golangci-lint run --new --out-format json > bazinga/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > bazinga/lint_results_raw.json
+                run_with_timeout golangci-lint run --new --out-format json > orchestrix/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > orchestrix/lint_results_raw.json
             else
-                echo '{"Issues":[]}' > bazinga/lint_results_raw.json
+                echo '{"Issues":[]}' > orchestrix/lint_results_raw.json
             fi
         else
-            run_with_timeout golangci-lint run --out-format json --timeout ${LINT_TIMEOUT}s > bazinga/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > bazinga/lint_results_raw.json
+            run_with_timeout golangci-lint run --out-format json --timeout ${LINT_TIMEOUT}s > orchestrix/lint_results_raw.json 2>/dev/null || echo '{"Issues":[]}' > orchestrix/lint_results_raw.json
         fi
         ;;
 
@@ -222,7 +222,7 @@ case $LANG in
 
         TOOL="rubocop"
         echo "  Running rubocop..."
-        rubocop --format json > bazinga/lint_results_raw.json 2>/dev/null || echo '{"files":[]}' > bazinga/lint_results_raw.json
+        rubocop --format json > orchestrix/lint_results_raw.json 2>/dev/null || echo '{"files":[]}' > orchestrix/lint_results_raw.json
         ;;
 
     java)
@@ -238,14 +238,14 @@ case $LANG in
 
                 # Consolidate results (Checkstyle XML + PMD XML)
                 if [ -f "target/checkstyle-result.xml" ] || [ -f "target/pmd.xml" ]; then
-                    echo '{"tool":"checkstyle+pmd","checkstyle":"target/checkstyle-result.xml","pmd":"target/pmd.xml"}' > bazinga/lint_results_raw.json
+                    echo '{"tool":"checkstyle+pmd","checkstyle":"target/checkstyle-result.xml","pmd":"target/pmd.xml"}' > orchestrix/lint_results_raw.json
                 else
-                    echo '{"issues":[]}' > bazinga/lint_results_raw.json
+                    echo '{"issues":[]}' > orchestrix/lint_results_raw.json
                 fi
             else
                 echo "❌ Maven not found for Java project"
                 TOOL="none"
-                echo '{"error":"Maven not found"}' > bazinga/lint_results_raw.json
+                echo '{"error":"Maven not found"}' > orchestrix/lint_results_raw.json
             fi
         elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
             GRADLE_CMD="gradle"
@@ -261,26 +261,26 @@ case $LANG in
 
                 # Consolidate results (Checkstyle XML + PMD XML)
                 if [ -f "build/reports/checkstyle/main.xml" ] || [ -f "build/reports/pmd/main.xml" ]; then
-                    echo '{"tool":"checkstyle+pmd","checkstyle":"build/reports/checkstyle/main.xml","pmd":"build/reports/pmd/main.xml"}' > bazinga/lint_results_raw.json
+                    echo '{"tool":"checkstyle+pmd","checkstyle":"build/reports/checkstyle/main.xml","pmd":"build/reports/pmd/main.xml"}' > orchestrix/lint_results_raw.json
                 else
-                    echo '{"issues":[]}' > bazinga/lint_results_raw.json
+                    echo '{"issues":[]}' > orchestrix/lint_results_raw.json
                 fi
             else
                 echo "❌ Gradle not found for Java project"
                 TOOL="none"
-                echo '{"error":"Gradle not found"}' > bazinga/lint_results_raw.json
+                echo '{"error":"Gradle not found"}' > orchestrix/lint_results_raw.json
             fi
         else
             echo "❌ No Maven or Gradle build file found"
             TOOL="none"
-            echo '{"error":"No build file"}' > bazinga/lint_results_raw.json
+            echo '{"error":"No build file"}' > orchestrix/lint_results_raw.json
         fi
         ;;
 
     *)
         echo "❌ Unknown language. Cannot run linting."
         TOOL="none"
-        echo '{"error":"Unknown language"}' > bazinga/lint_results_raw.json
+        echo '{"error":"Unknown language"}' > orchestrix/lint_results_raw.json
         ;;
 esac
 
@@ -290,7 +290,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Create final report with metadata
 if command_exists "jq"; then
     jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"tool\": \"$TOOL\"}" \
-        bazinga/lint_results_raw.json > $OUTPUT_FILE
+        orchestrix/lint_results_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
     cat > $OUTPUT_FILE <<EOF
@@ -298,21 +298,21 @@ else
   "timestamp": "$TIMESTAMP",
   "language": "$LANG",
   "tool": "$TOOL",
-  "raw_results": $(cat bazinga/lint_results_raw.json)
+  "raw_results": $(cat orchestrix/lint_results_raw.json)
 }
 EOF
 fi
 
 # Clean up
-rm -f bazinga/lint_results_raw.json 2>/dev/null || true
+rm -f orchestrix/lint_results_raw.json 2>/dev/null || true
 
 echo "✅ Linting complete"
 echo "📁 Results saved to: $OUTPUT_FILE"
 
 # Save to database
 echo "💾 Saving to database..."
-DB_PATH="bazinga/bazinga.db"
-DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+DB_PATH="orchestrix/orchestrix.db"
+DB_SCRIPT=".claude/skills/orchestrix-db/scripts/orchestrix_db.py"
 SKILL_OUTPUT=$(cat "$OUTPUT_FILE")
 
 python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \

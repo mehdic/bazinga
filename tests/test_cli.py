@@ -68,7 +68,7 @@ class TestInitCommand:
 
     def test_init_with_path_traversal(self):
         """Test init rejects path traversal attempts."""
-        result = runner.invoke(app, ["init", "../../etc/bazinga"], input="\n")
+        result = runner.invoke(app, ["init", "../../etc/orchestrix"], input="\n")
 
         assert result.exit_code == 1
         assert "Invalid project name" in result.output
