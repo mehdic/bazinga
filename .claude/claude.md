@@ -901,64 +901,7 @@ rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
 /bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 ```
 
-### 🔴 Manual Orchestration Workflow (When Slash Command Unavailable)
-
-**If `/bazinga.orchestrate` cannot be invoked, follow this EXACT workflow:**
-
-#### Phase 1: Initialize Session
-```bash
-SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
-mkdir -p tmp/simple-calculator-app
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-session "$SESSION_ID" "simple" "Integration test"
-```
-
-#### Phase 2: Spawn PM for Planning
-```python
-Task(subagent_type: "general-purpose", model: "opus", prompt: "You are PM...")
-# PM creates task groups with specialization paths
-```
-
-#### Phase 3: Before EACH Agent Spawn - Invoke Specialization Loader
-```python
-# 🔴 MANDATORY: Before spawning Developer, QA, or Tech Lead
-# Provide context BEFORE invoking skill:
-"""
-Session ID: {session_id}
-Group ID: CALC
-Agent Type: developer
-Model: haiku
-Specialization Paths: ["bazinga/templates/specializations/01-languages/python.md"]
-Testing Mode: full
-"""
-
-# Then invoke the skill:
-Skill(command: "specialization-loader")
-
-# Skill returns composed block via Bash heredoc
-# Extract [SPECIALIZATION_BLOCK_START]...[SPECIALIZATION_BLOCK_END]
-```
-
-#### Phase 4: Spawn Agent WITH Composed Block
-```python
-# Include the composed specialization block in agent prompt
-Task(subagent_type: "general-purpose", model: "haiku", prompt: """
-You are a Developer agent.
-
-{PASTE COMPOSED SPECIALIZATION BLOCK HERE}
-
-Your task: Implement the calculator...
-""")
-```
-
-#### Phase 5: Repeat for Each Agent
-- Developer → invoke specialization-loader → spawn with block
-- QA Expert → invoke specialization-loader → spawn with block
-- Tech Lead → invoke specialization-loader → spawn with block
-
-#### Phase 6: PM Sends BAZINGA
-```python
-Task(subagent_type: "general-purpose", model: "opus", prompt: "You are PM. Verify all criteria and send BAZINGA...")
-```
+**🔴 IMPORTANT:** Always run the ACTUAL `/bazinga.orchestrate` command. Never manually simulate orchestration steps - the orchestrator itself must handle specialization-loader invocation, agent spawning, and workflow routing. Manual simulation would become invalid when orchestrator logic changes.
 
 ### What This Tests
 
@@ -967,7 +910,7 @@ The integration test validates the complete BAZINGA workflow:
 1. **Session Management** - Creates session with all required fields
 2. **Tech Stack Detection** - Spawns Tech Stack Scout, creates `project_context.json`
 3. **PM Planning** - Spawns PM (opus), analyzes requirements, creates task groups with specialization paths
-4. **🔴 Specialization Building** - Invokes `specialization-loader` skill to compose identity blocks
+4. **🔴 Specialization Building** - Orchestrator invokes `specialization-loader` skill to compose identity blocks
 5. **Development** - Spawns Developer (haiku) WITH composed specialization block
 6. **QA Testing** - Spawns QA Expert (sonnet) WITH composed specialization block
 7. **Code Review** - Spawns Tech Lead (opus) WITH composed specialization block
