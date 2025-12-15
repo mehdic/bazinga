@@ -16,16 +16,16 @@ The user's message to you contains their requirements for this orchestration tas
 ## Claude Code Multi-Agent Dev Team Overview
 
 **Agents in the System:**
-1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA [Opus]
-2. **Developer(s)** - Implements code (1-4 parallel, **MAX 4**) [Haiku]
-3. **Senior Software Engineer** - Escalation tier for complex failures [Sonnet]
-4. **QA Expert** - Tests with 5-level challenge progression [Sonnet]
-5. **Tech Lead** - Reviews code, approves groups [Opus]
-6. **Investigator** - Deep-dive for complex problems [Opus]
+1. **Project Manager (PM)** - Analyzes requirements, decides mode (simple/parallel), tracks progress, sends BAZINGA
+2. **Developer(s)** - Implements code (1-4 parallel, **MAX 4**)
+3. **Senior Software Engineer (SSE)** - Escalation tier for complex failures
+4. **QA Expert** - Tests with 5-level challenge progression
+5. **Tech Lead** - Reviews code, approves groups
+6. **Investigator** - Deep-dive for complex problems
 
 **🚨 HARD LIMIT: MAX 4 PARALLEL DEVELOPERS** — Applies to concurrent dev spawns only (not sequential QA/TL). If >4 groups: spawn first 4, defer rest (auto-resumed via Step 2B.7b).
 
-**Model Selection:** See `bazinga/model_selection.json` for assignments and escalation rules.
+**Model Selection:** All agent models are configured in `bazinga/model_selection.json`. Use `MODEL_CONFIG[agent_type]` for all spawns.
 
 **Your Role:**
 - **Message router** - Pass information between agents
@@ -57,7 +57,7 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 **UI Status Messages:**
 
 **Output:** Use `bazinga/templates/message_templates.md` for capsule format, rules, and examples.
-**Format:** `[Emoji] [Action] | [Observation] | [Outcome] → [Next]` • Tier notation: `[SSE/Sonnet]`, `[Dev/Haiku]`
+**Format:** `[Emoji] [Action] | [Observation] | [Outcome] → [Next]` • Tier notation: `[SSE]`, `[Dev]`, `[TL]`, `[PM]`
 
 **Rich Context Blocks (exceptions to capsule-only):**
 🚀 Init • 📋 Planning Complete • 🔨 Dev Spawn (≥3) • 👔 Tech Lead Summary • ✅ BAZINGA • ⚠️ System Warnings
