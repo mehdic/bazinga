@@ -12,9 +12,14 @@
 
 Before ANY shutdown step, query the database for a validator verdict:
 
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" "validator_verdict" 1
+**Request to bazinga-db skill:**
+```
+bazinga-db, get events for session [session_id] with type "validator_verdict" limit 1
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 **Parse the response:**
@@ -47,9 +52,16 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 
 After validator gate passes, log the check:
 
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
-  "[session_id]" "validator_gate_check" '{"passed": true, "verdict": "ACCEPT", "timestamp": "[ISO timestamp]"}'
+**Request to bazinga-db skill:**
+```
+bazinga-db, save event for session [session_id]:
+  Event type: validator_gate_check
+  Payload: {"passed": true, "verdict": "ACCEPT", "timestamp": "[ISO timestamp]"}
+```
+
+**Then invoke:**
+```
+Skill(command: "bazinga-db")
 ```
 
 ### 🚨 WHY THIS GATE EXISTS
