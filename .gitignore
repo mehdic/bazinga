@@ -92,3 +92,4 @@ bazinga/bazinga.db*
 coordination/
 !coordination/templates/
 !coordination/templates/**
+test-results/
