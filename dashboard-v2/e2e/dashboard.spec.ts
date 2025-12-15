@@ -3,8 +3,8 @@ import { seedTestDatabase, SESSION_IDS } from "./fixtures/seed-database";
 import path from "path";
 import fs from "fs";
 
-// Database path for tests - use the actual bazinga.db
-const BAZINGA_DB_PATH = path.resolve(__dirname, "../../bazinga/bazinga.db");
+// Database path for tests - use the local bazinga.db (same as dashboard-integration.spec.ts)
+const BAZINGA_DB_PATH = path.resolve(__dirname, "../bazinga/bazinga.db");
 
 // Test data constants - these match the seeded data
 const TEST_DATA = {

@@ -34,5 +34,9 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    env: {
+      // Ensure server uses the same database path as tests seed to
+      DATABASE_URL: "./bazinga/bazinga.db",
+    },
   },
 });
