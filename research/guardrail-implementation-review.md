@@ -5,6 +5,13 @@
 **Decision:** Added guardrails to orchestrator.md and phase templates
 **Status:** Implemented
 **Reviewed by:** External LLM review (OpenAI, Google Gemini)
+**Implementation Commits:**
+- `aa232d6` - Initial guardrails implementation
+- `57c72b7` - OpenAI-recommended improvements
+- `327566d` - DB API consistency fix (get-state, clarification_used/resolved)
+- `8c7e3b5` - Review fixes (status consistency, atomic increment, security)
+- `33ddc74` - Escalation target fix (SSE → Tech Lead)
+- `bb3572a` - CLI → Skill invocations
 
 ---
 

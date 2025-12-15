@@ -127,6 +127,8 @@ Operation → Check result → If error: Output capsule with error
 
 **Invoke bazinga-db at:** 1) Init (save state), 2) PM response (log), 3) Task groups (query/create), 4) Agent spawn (update), 5) Agent response (log), 6) Status change (update), 7) Completion (finalize). **Error handling:** Init fails → stop. Logging fails → warn, continue.
 
+**Logging destination:** All "Log warning" instructions mean output to user as `⚠️ **WARNING**: {message}` - warnings are NOT silent.
+
 ---
 
 ## 📁 File Paths
