@@ -17,7 +17,7 @@ permissions:
 
 # Prevent duplicate runs on same PR
 concurrency:
-  group: gemini-pr-review-${{ inputs.pr_number }}
+  group: gemini-pr-review-${{ github.event.inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
@@ -50,11 +50,33 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
+          # Full history ensures merge base is always available for diff
           fetch-depth: 0
-          ref: ${{ steps.pr.outputs.head_sha }}
+          # Checkout the PR branch by name (not just SHA) to ensure we're on the right branch
+          ref: ${{ steps.pr.outputs.head_ref }}
+
+      - name: Verify checkout
+        env:
+          EXPECTED_SHA: ${{ steps.pr.outputs.head_sha }}
+          EXPECTED_REF: ${{ steps.pr.outputs.head_ref }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          ACTUAL_BRANCH=$(git branch --show-current || echo "detached")
+
+          echo "Expected branch: $EXPECTED_REF"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual branch: $ACTUAL_BRANCH"
+          echo "Actual SHA: $ACTUAL_SHA"
+
+          # Verify we have the right commit (SHA should match or be ancestor if force-pushed)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::warning::Checked out SHA ($ACTUAL_SHA) differs from PR head ($EXPECTED_SHA). PR may have been updated."
+          fi
+
+          echo "✅ Checkout verified: reviewing branch '$EXPECTED_REF' at commit ${ACTUAL_SHA:0:7}"
 
       - name: Compute diff
         id: diff
