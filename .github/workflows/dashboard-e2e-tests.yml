@@ -112,11 +112,12 @@ jobs:
         run: |
           # Count failures from output
           FAILURES=$(grep -c "✘" test-output.txt || echo "0")
-          if [ "$FAILURES" -gt "0" ]; then
-            echo "::warning::$FAILURES test(s) failed"
-          fi
-
-          # Check for any passed tests
           PASSED=$(grep -c "✓" test-output.txt || echo "0")
           echo "Tests passed: $PASSED"
           echo "Tests failed: $FAILURES"
+
+          # Fail the workflow if any tests failed
+          if [ "$FAILURES" -gt "0" ]; then
+            echo "::error::$FAILURES test(s) failed"
+            exit 1
+          fi
