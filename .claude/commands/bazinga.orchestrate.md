@@ -977,8 +977,8 @@ Task(
    **🔴 IF "missing":** Scout returned but didn't write the file. Create fallback immediately:
    ```bash
    mkdir -p bazinga
-   if [ -f ".claude/templates/project_context.template.json" ]; then
-       cp .claude/templates/project_context.template.json bazinga/project_context.json
+   if [ -f "bazinga/templates/project_context.template.json" ]; then
+       cp bazinga/templates/project_context.template.json bazinga/project_context.json
        echo "⚠️ Scout didn't write file - using template fallback"
    else
        cat > bazinga/project_context.json <<'EOF'
@@ -1127,12 +1127,12 @@ mkdir -p bazinga
 
 # Copy template if project_context doesn't exist
 if [ ! -f "bazinga/project_context.json" ]; then
-    if [ -f ".claude/templates/project_context.template.json" ]; then
-        cp .claude/templates/project_context.template.json bazinga/project_context.json
+    if [ -f "bazinga/templates/project_context.template.json" ]; then
+        cp bazinga/templates/project_context.template.json bazinga/project_context.json
     else
         # Create minimal fallback to prevent downstream agent crashes
         # Use atomic write to prevent TOCTOU race with PM context generation
-        # ⚠️ IMPORTANT: Fallback structure must match .claude/templates/project_context.template.json
+        # ⚠️ IMPORTANT: Fallback structure must match bazinga/templates/project_context.template.json
         # If template structure changes, update fallback here to match
         TEMP_FALLBACK=$(mktemp)
         cat > "$TEMP_FALLBACK" <<'FALLBACK_EOF'
