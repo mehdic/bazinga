@@ -1692,13 +1692,18 @@ IF specializations is null OR empty:
         IF empty AND project_context.suggested_specializations exists:
             specializations = project_context.suggested_specializations
 
-        # Last resort: map primary_language + framework
+        # Last resort: map primary_language + framework from components
         IF empty:
             IF project_context.primary_language:
                 specializations.append(map_to_template(primary_language))
-            IF project_context.framework:
-                FOR fw in parse_comma_separated(framework):
-                    specializations.append(map_to_template(fw))
+
+            # Extract frameworks from components (Scout schema)
+            IF project_context.components exists:
+                FOR component in components:
+                    IF component.framework:
+                        specializations.append(map_to_template(component.framework))
+                    IF component.language AND component.language != primary_language:
+                        specializations.append(map_to_template(component.language))
 
         specializations = deduplicate(specializations)
 

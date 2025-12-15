@@ -1661,10 +1661,15 @@ If project_context.json is missing, empty, or lacks `suggested_specializations`,
 
 **Example fallback derivation:**
 ```
-project_context.json has: primary_language = "typescript", framework = "nextjs"
+project_context.json has:
+  primary_language = "typescript"
+  components = [{ "framework": "nextjs", ... }, { "framework": "react-native", ... }]
+
+→ Extract frameworks from components[].framework
 → specializations = [
     "bazinga/templates/specializations/01-languages/typescript.md",
-    "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"
+    "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
+    "bazinga/templates/specializations/04-mobile-desktop/react-native.md"
   ]
 ```
 
