@@ -39,8 +39,8 @@ PM assigns a complexity score (1-10) to each task group:
 
 | Complexity | Initial Tier |
 |------------|--------------|
-| 1-6 | Developer |
-| 7-10 | Senior Software Engineer |
+| 1-3 | Developer |
+| 4-10 | Senior Software Engineer |
 
 ### Override Rules
 

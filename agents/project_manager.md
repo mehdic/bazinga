@@ -239,7 +239,7 @@ IF task_name contains security keywords OR task touches auth/security files:
 | Complexity Score | Tier | Agent |
 |-----------------|------|-------|
 | 1-3 | Low | Developer (Haiku) |
-| 4-6 | Medium | Developer (Haiku) |
+| 4-6 | Medium | Senior Software Engineer (Sonnet) |
 | 7+ | High | Senior Software Engineer (Sonnet) |
 
 **Scoring Factors:**
@@ -2002,8 +2002,8 @@ Return structured response:
 
 | Complexity | Initial Tier | Rationale |
 |------------|--------------|-----------|
-| 1-4 (Low) | Developer (Haiku) | Standard tasks, cost-efficient |
-| 5-6 (Medium) | Developer (Haiku) | Worth trying Haiku first |
+| 1-3 (Low) | Developer (Haiku) | Standard tasks, cost-efficient |
+| 4-6 (Medium) | Senior Software Engineer (Sonnet) | Medium complexity benefits from SSE |
 | 7-10 (High) | Senior Software Engineer (Sonnet) | Complex, skip Haiku to save time |
 
 **Override rules (regardless of complexity score):**
