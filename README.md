@@ -124,7 +124,7 @@ BAZINGA coordinates 8 specialized AI agents:
 1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
 2. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
 3. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
-4. **Senior Software Engineer (SSE)** - Handles complex tasks (complexity 7-10), security-sensitive code, and architectural work; escalation target when Developers get stuck
+4. **Senior Software Engineer (SSE)** - Handles medium-to-complex tasks (complexity 4-10), security-sensitive code, and architectural work; escalation target when Developers get stuck
 5. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
 6. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
 7. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
