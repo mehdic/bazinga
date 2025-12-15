@@ -134,11 +134,11 @@ AGENT_FILE_MAP = {
   "investigator": "agents/investigator.md"
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]
 agent_definition = Read(agent_file_path)  // Full 1400+ lines of agent instructions
 IF Read fails OR agent_definition is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -343,7 +343,7 @@ END TURN 1
 // 🔴 MANDATORY: Read the FULL Investigator agent file
 investigator_definition = Read("agents/investigator.md")  // Full agent instructions
 IF Read fails OR investigator_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/investigator.md` and STOP
+    ⚠️ Agent file read failed | agents/investigator.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -426,7 +426,7 @@ END TURN 1
 // 🔴 MANDATORY: Read the FULL SSE agent file
 sse_definition = Read("agents/senior_software_engineer.md")  // Full agent instructions
 IF Read fails OR sse_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/senior_software_engineer.md` and STOP
+    ⚠️ Agent file read failed | agents/senior_software_engineer.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -529,7 +529,7 @@ END TURN 1
 // 🔴 MANDATORY: Read the FULL Developer agent file
 dev_definition = Read("agents/developer.md")  // Full agent instructions
 IF Read fails OR dev_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/developer.md` and STOP
+    ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -646,7 +646,7 @@ END TURN 1 (wait for skill responses)
 // 🔴 MANDATORY: Read the FULL QA Expert agent file
 qa_definition = Read("agents/qa_expert.md")  // Full agent instructions
 IF Read fails OR qa_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/qa_expert.md` and STOP
+    ⚠️ Agent file read failed | agents/qa_expert.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -815,7 +815,7 @@ END TURN 1 (wait for skill responses)
 // 🔴 MANDATORY: Read the FULL Tech Lead agent file
 tl_definition = Read("agents/techlead.md")  // Full agent instructions
 IF Read fails OR tl_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/techlead.md` and STOP
+    ⚠️ Agent file read failed | agents/techlead.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -1053,14 +1053,20 @@ Task(
 - **IMMEDIATELY spawn appropriate agent Task** with Tech Lead feedback (do NOT just write a message)
 
 **Determine which agent to spawn:**
-- If code issues → Spawn developer with Tech Lead's code feedback
+- If code issues → Spawn Developer (or SSE based on revision count) with Tech Lead's code feedback
 - If test issues → Spawn QA Expert with Tech Lead's test feedback
 
-**Build prompt and spawn Task:**
-```
-# Model selection: use MODEL_CONFIG for appropriate agent
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description="{agent} {id}: fix Tech Lead issues", prompt=[prompt with feedback])
-```
+**🔴 MANDATORY: Use TWO-TURN spawn sequence with full agent file:**
+
+For code issues (Developer/SSE):
+- Use Step 2A.2 (TWO-TURN SPAWN SEQUENCE) with agent_type based on revision count
+- Include Tech Lead's feedback in task_context
+- MUST Read(agents/developer.md) or Read(agents/senior_software_engineer.md) first
+
+For test issues (QA Expert):
+- Use Step 2A.4 (QA spawn sequence)
+- Include Tech Lead's test feedback
+- MUST Read(agents/qa_expert.md) first
 
 **Track revision count in database (increment by 1)**
 
@@ -1074,7 +1080,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["{agent}"], description
 - On failure, escalate directly to Tech Lead (skip revision count check)
 - Security tasks CANNOT be simplified by PM - must be completed by SSE
 
-**🔴 CRITICAL:** SPAWN the Task - don't write "Fix the Tech Lead's feedback" and stop
+**🔴 CRITICAL:** Use TWO-TURN spawn sequence - DO NOT create custom prompts
 
 **IF Tech Lead requests investigation:**
 - Already handled in Step 2A.6b
@@ -1137,8 +1143,38 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 **FIRST:** Output §Technical Review Summary from `message_templates.md` (aggregate all Tech Lead responses).
 **Skip if:** Only one group (already shown in individual review).
 
-**THEN:** Build PM prompt with implementation summary + quality metrics → Spawn:
-`Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt=[PM prompt])`
+**THEN:** Build PM prompt using TWO-TURN spawn sequence:
+
+**TURN 1: Invoke Skills**
+- Invoke context-assembler (if enabled)
+- Invoke specialization-loader with agent_type=project_manager
+
+**TURN 2: Build Prompt & Spawn**
+```
+// 🔴 MANDATORY: Read the FULL PM agent file
+pm_definition = Read("agents/project_manager.md")
+IF Read fails OR pm_definition is empty:
+    ⚠️ Agent file read failed | agents/project_manager.md | Cannot proceed - spawn aborted
+
+task_context = """
+## Final Assessment Task
+
+**SESSION:** {session_id}
+**MODE:** {mode}
+
+**Implementation Summary:**
+{implementation_summary}
+
+**Quality Metrics:**
+{quality_metrics}
+
+**Your Task:** Assess if all success criteria are met and decide: BAZINGA or CONTINUE
+"""
+
+base_prompt = pm_definition + task_context
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt={prompt})`
 
 **AFTER PM response:** Parse using `response_parsing.md` §PM Response Parsing. Construct output capsule:
 - **BAZINGA:** §Completion template (groups, tests, criteria)
@@ -1228,12 +1264,11 @@ Prior agents' documented decision progression:
 - Use timeline to avoid repeating prior failed hypotheses
 ```
 
-- Build Investigator prompt with context:
-  * Session ID, Group ID, Branch
-  * Problem description (any blocker: test failures, build errors, deployment issues, bugs, performance problems, etc.)
-  * Available evidence (logs, error messages, diagnostics, stack traces, metrics)
-  * **Reasoning Timeline (if any)** - prior agent decisions and pivots
-- Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigate blocker", prompt=[Investigator prompt])`
+- **🔴 Use Step 2A.6b (SPAWN INVESTIGATOR sequence)** which includes:
+  * TWO-TURN spawn sequence with full agent file reading
+  * Read(agents/investigator.md) for full ~1400 lines of agent instructions
+  * CONTEXT_BLOCK + SPEC_BLOCK + investigator_definition + task_context
+  * Context includes: Session ID, Group ID, Branch, Problem description, Evidence, Reasoning Timeline
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
 

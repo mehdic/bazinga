@@ -13,16 +13,47 @@ This template contains the merge task prompt and response handling for the Devel
 - `{feature_branch}` - From `task_groups.feature_branch` in database (set by Developer when creating branch)
 - `{group_id}` - Current group being merged (e.g., "A", "B", "main")
 
+### Variable Hygiene
+
+**When interpolating variables into prompts, apply these sanitization rules:**
+
+| Variable | Max Length | Sanitization |
+|----------|------------|--------------|
+| `{test_failures}` | 2000 chars | Truncate with "... (truncated)" |
+| `{blocker_reason}` | 500 chars | Truncate, remove control chars |
+| `{conflict_files}` | 1000 chars | Truncate, one file per line |
+| `{error_details}` | 1000 chars | Truncate, remove ANSI codes |
+
+**General rules:**
+- Strip leading/trailing whitespace
+- Remove control characters (except newlines)
+- Truncate with "... (truncated, {N} more chars)" indicator
+- Never include raw stack traces > 50 lines
+
 ---
 
 ## Merge Task Prompt Template
 
-Build the Developer prompt with this template:
+**🔴 CRITICAL: The prompt MUST include the full Developer agent file + merge task context**
 
-```markdown
-## Your Task: Merge Feature Branch
+Build the Developer prompt using TWO-TURN spawn sequence:
 
-You are a Developer performing a merge task.
+**TURN 1: Invoke Skills**
+- Invoke context-assembler (if enabled)
+- Invoke specialization-loader with agent_type=developer
+
+**TURN 2: Build Prompt & Spawn**
+```
+// 🔴 MANDATORY: Read the FULL Developer agent file
+dev_definition = Read("agents/developer.md")  // ~1400 lines of agent instructions
+IF Read fails OR dev_definition is empty:
+    ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
+
+// Build merge task context (this is APPENDED to the agent file, not a replacement)
+task_context = """
+---
+
+## Current Task: Merge Feature Branch
 
 **Context:**
 - Session ID: {session_id}
@@ -55,6 +86,11 @@ Report one of:
 - `MERGE_CONFLICT` - Conflicts found (list conflicting files)
 - `MERGE_TEST_FAILURE` - Tests failed after merge (list failures)
 - `MERGE_BLOCKED` - Cannot proceed (environment issue, missing deps, CI blocked)
+"""
+
+// Compose full prompt: agent file + task context
+base_prompt = dev_definition + task_context
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
 ```
 
 ---
@@ -62,11 +98,12 @@ Report one of:
 ## Spawn Configuration
 
 ```
+// Full prompt includes: CONTEXT_BLOCK + SPEC_BLOCK + dev_definition (~1400 lines) + task_context
 Task(
   subagent_type: "general-purpose",
-  model: MODEL_CONFIG["developer"],  # Uses Haiku (simple merge task)
+  model: MODEL_CONFIG["developer"],
   description: "Dev {group_id}: merge to {initial_branch}",
-  prompt: [Merge prompt above with variables filled in]
+  prompt: {prompt}  // NOT a custom template - includes full agent file!
 )
 ```
 
@@ -97,6 +134,8 @@ Parse the Developer's merge response. Extract status:
   - status: "in_progress"
   - merge_status: "conflict"
 - **🔴 Spawn Developer with Specializations (INLINE)** - conflict resolution:
+
+  **TURN 1: Invoke Skills**
   1. Output this context block (skill reads from conversation):
      ```
      [SPEC_CTX_START group={group_id} agent=developer]
@@ -108,15 +147,49 @@ Parse the Developer's merge response. Extract status:
      [SPEC_CTX_END group={group_id}]
      ```
   2. IMMEDIATELY invoke: `Skill(command: "specialization-loader")`
-  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`, prepend to base_prompt
-  4. Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev: resolve conflicts", prompt=full_prompt)`
-  * Instructions for Developer in prompt:
-    1. Checkout feature_branch: `git checkout {feature_branch}`
-    2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
-    3. Resolve all conflicts
-    4. Commit the resolution: `git commit -m "Resolve merge conflicts with {initial_branch}"`
-    5. Push feature_branch: `git push origin {feature_branch}`
-  * **CRITICAL:** This ensures feature_branch is up-to-date with initial_branch before retry merge
+  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` → {SPEC_BLOCK}
+
+  **TURN 2: Build Prompt & Spawn**
+  ```
+  // 🔴 MANDATORY: Read the FULL Developer agent file
+  dev_definition = Read("agents/developer.md")
+  IF Read fails OR dev_definition is empty:
+      ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
+
+  task_context = """
+  ---
+
+  ## Current Task: Resolve Merge Conflicts
+
+  **Context:**
+  - Session ID: {session_id}
+  - Feature Branch: {feature_branch}
+  - Initial Branch: {initial_branch}
+  - Group ID: {group_id}
+
+  **Instructions:**
+  1. Checkout feature_branch: `git checkout {feature_branch}`
+  2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
+  3. Resolve all conflicts
+  4. Commit the resolution: `git commit -m "Resolve merge conflicts with {initial_branch}"`
+  5. Push feature_branch: `git push origin {feature_branch}`
+
+  **⚠️ CRITICAL:** This ensures feature_branch is up-to-date with initial_branch before retry merge.
+
+  **Response Format:**
+  Report CONFLICTS_RESOLVED when done, or CONFLICTS_FAILED if unable to resolve.
+  """
+
+  base_prompt = dev_definition + task_context
+  prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+
+  Task(
+    subagent_type="general-purpose",
+    model=MODEL_CONFIG["developer"],
+    description="Dev {group_id}: resolve conflicts",
+    prompt={prompt}
+  )
+  ```
   * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
 
 **IF status = MERGE_TEST_FAILURE:**
@@ -125,6 +198,8 @@ Parse the Developer's merge response. Extract status:
   - status: "in_progress"
   - merge_status: "test_failure"  # NOT "conflict" - these are distinct issues
 - **🔴 Spawn Developer with Specializations (INLINE)** - test failure:
+
+  **TURN 1: Invoke Skills**
   1. Output this context block (skill reads from conversation):
      ```
      [SPEC_CTX_START group={group_id} agent=developer]
@@ -136,15 +211,50 @@ Parse the Developer's merge response. Extract status:
      [SPEC_CTX_END group={group_id}]
      ```
   2. IMMEDIATELY invoke: `Skill(command: "specialization-loader")`
-  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`, prepend to base_prompt
-  4. Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev: fix test failures", prompt=full_prompt)`
-  * Instructions for Developer in prompt:
-    1. Checkout feature_branch: `git checkout {feature_branch}`
-    2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
-    3. Fix the integration test failures
-    4. Run tests locally to verify fixes
-    5. Commit and push: `git add . && git commit -m "Fix integration test failures" && git push origin {feature_branch}`
-  * **CRITICAL:** This ensures feature_branch incorporates latest initial_branch changes before retry
+  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` → {SPEC_BLOCK}
+
+  **TURN 2: Build Prompt & Spawn**
+  ```
+  // 🔴 MANDATORY: Read the FULL Developer agent file
+  dev_definition = Read("agents/developer.md")
+  IF Read fails OR dev_definition is empty:
+      ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
+
+  task_context = """
+  ---
+
+  ## Current Task: Fix Integration Test Failures
+
+  **Context:**
+  - Session ID: {session_id}
+  - Feature Branch: {feature_branch}
+  - Initial Branch: {initial_branch}
+  - Group ID: {group_id}
+  - Test Failures: {test_failures}
+
+  **Instructions:**
+  1. Checkout feature_branch: `git checkout {feature_branch}`
+  2. Fetch and merge latest initial_branch INTO feature_branch: `git fetch origin && git merge origin/{initial_branch}`
+  3. Fix the integration test failures
+  4. Run tests locally to verify fixes
+  5. Commit and push: `git add . && git commit -m "Fix integration test failures" && git push origin {feature_branch}`
+
+  **⚠️ CRITICAL:** This ensures feature_branch incorporates latest initial_branch changes before retry.
+
+  **Response Format:**
+  Report TESTS_FIXED when done, or TESTS_STILL_FAILING if unable to fix.
+  """
+
+  base_prompt = dev_definition + task_context
+  prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+
+  Task(
+    subagent_type="general-purpose",
+    model=MODEL_CONFIG["developer"],
+    description="Dev {group_id}: fix test failures",
+    prompt={prompt}
+  )
+  ```
   * After Developer fixes: Route back through QA → Tech Lead → Developer (merge)
 
 **IF status = MERGE_BLOCKED:**
@@ -153,6 +263,8 @@ Parse the Developer's merge response. Extract status:
   - status: "in_progress"
   - merge_status: "blocked"
 - **🔴 Spawn Tech Lead with Specializations (INLINE)** - assess blockage:
+
+  **TURN 1: Invoke Skills**
   1. Output this context block (skill reads from conversation):
      ```
      [SPEC_CTX_START group={group_id} agent=tech_lead]
@@ -164,8 +276,53 @@ Parse the Developer's merge response. Extract status:
      [SPEC_CTX_END group={group_id}]
      ```
   2. IMMEDIATELY invoke: `Skill(command: "specialization-loader")`
-  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]`, prepend to base_prompt
-  4. Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TechLead: assess blockage", prompt=full_prompt)`
+  3. Extract block between `[SPECIALIZATION_BLOCK_START]` and `[SPECIALIZATION_BLOCK_END]` → {SPEC_BLOCK}
+
+  **TURN 2: Build Prompt & Spawn**
+  ```
+  // 🔴 MANDATORY: Read the FULL Tech Lead agent file
+  // NOTE: File is techlead.md (no underscore)
+  tl_definition = Read("agents/techlead.md")
+  IF Read fails OR tl_definition is empty:
+      ⚠️ Agent file read failed | agents/techlead.md | Cannot proceed - spawn aborted
+
+  task_context = """
+  ---
+
+  ## Current Task: Assess Merge Blockage
+
+  **Context:**
+  - Session ID: {session_id}
+  - Feature Branch: {feature_branch}
+  - Initial Branch: {initial_branch}
+  - Group ID: {group_id}
+  - Blocker Reason: {blocker_reason}
+
+  **Instructions:**
+  1. Analyze the merge blocker cause
+  2. Determine if it's an environment issue, CI configuration problem, or dependency conflict
+  3. Recommend resolution path:
+     - If fixable: Provide specific fix steps for Developer
+     - If infrastructure: Flag for manual intervention
+     - If fundamental: Recommend task redesign
+
+  **Response Format:**
+  Report one of:
+  - BLOCKER_RESOLVABLE - Provide fix instructions for Developer
+  - BLOCKER_INFRASTRUCTURE - Requires manual ops intervention
+  - BLOCKER_FUNDAMENTAL - Task needs PM reassessment
+  """
+
+  base_prompt = tl_definition + task_context
+  prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+
+  Task(
+    subagent_type="general-purpose",
+    model=MODEL_CONFIG["tech_lead"],
+    description="TechLead {group_id}: assess blockage",
+    prompt={prompt}
+  )
+  ```
 
 ---
 

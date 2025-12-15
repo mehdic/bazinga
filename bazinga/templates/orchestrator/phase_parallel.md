@@ -278,11 +278,11 @@ AGENT_FILE_MAP = {
   "investigator": "agents/investigator.md"
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/developer.md or agents/techlead.md
 agent_definitions[group_id] = Read(agent_file_path)  // Full 1400+ lines of agent instructions
 IF Read fails OR agent_definitions[group_id] is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_contexts[group_id] = """
@@ -427,6 +427,143 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 - ❌ NEVER serialize: "first A, then B"
 - ❌ NEVER partial spawn: handle ALL groups NOW
 
+### Step 2B.2b: Developer/SSE Spawn on Failure or Escalation (Per Group)
+
+**When a Developer reports PARTIAL, INCOMPLETE, or ESCALATE_SENIOR, use this section.**
+
+**Escalation Rules:**
+- 1st failure → Re-spawn Developer
+- 2nd failure → Escalate to SSE
+- 3rd+ failure → Route to Tech Lead
+
+**TURN 1: Invoke Both Skills**
+
+**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
+
+IF context-assembler ENABLED:
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {developer OR senior_software_engineer based on revision_count}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {revision_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
+→ Capture output as `{CONTEXT_BLOCK}`
+
+IF context-assembler DISABLED or returns empty:
+→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
+
+**B. Specialization Loading:**
+```
+[SPEC_CTX_START group={group_id} agent={agent_type}]
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Model: {MODEL_CONFIG[agent_type]}
+Specialization Paths: {specializations from task_group or project_context.json}
+Testing Mode: {testing_mode}
+[SPEC_CTX_END]
+```
+Then invoke: `Skill(command: "specialization-loader")`
+→ Capture output as `{SPEC_BLOCK}`
+
+**✅ TURN 1 SELF-CHECK:**
+- [ ] Context-assembler invoked (or explicitly disabled/empty fallback)?
+- [ ] Specialization-loader invoked?
+
+END TURN 1
+
+---
+
+**TURN 2: Compose & Spawn Developer/SSE/TL**
+
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
+```
+// 🔴 MANDATORY: Read the FULL agent file
+// Determine agent_type based on revision_count:
+// - revision_count < 2 → developer
+// - revision_count >= 2 AND < 3 → senior_software_engineer
+// - revision_count >= 3 → tech_lead (for architectural guidance)
+AGENT_FILE_MAP = {
+  "developer": "agents/developer.md",
+  "senior_software_engineer": "agents/senior_software_engineer.md",
+  "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
+}
+IF agent_type NOT IN AGENT_FILE_MAP:
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
+agent_file_path = AGENT_FILE_MAP[agent_type]
+agent_definition = Read(agent_file_path)  // Full agent instructions
+IF Read fails OR agent_definition is empty:
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
+
+// Build task context based on agent_type
+IF agent_type == "tech_lead":
+    task_context = """
+    ---
+
+    ## Architectural Assessment (3rd+ Failure)
+
+    **SESSION:** {session_id}
+    **GROUP:** {group_id}
+    **MODE:** Parallel
+    **BRANCH:** {branch}
+    **FAILURE_COUNT:** {revision_count}
+
+    **ORIGINAL TASK:** {original_task}
+    **PREVIOUS ATTEMPTS:** Developer × {developer_attempts}, SSE × {sse_attempts}
+    **RECURRING ISSUES:** {recurring_issues}
+
+    **Your Task:** Assess if this task has fundamental architectural issues:
+    1. Review the recurring failure patterns
+    2. Determine if the approach needs rethinking
+    3. Provide either:
+       - Specific fix guidance for SSE retry
+       - Recommendation to simplify/deprioritize task (route to PM)
+       - Architectural changes needed
+
+    **REPORT STATUS:** GUIDANCE_PROVIDED, NEEDS_PM_REVIEW, or BLOCKED
+    """
+ELSE:
+    task_context = """
+    ---
+
+    ## Continuation/Escalation Assignment
+
+    **SESSION:** {session_id}
+    **GROUP:** {group_id}
+    **MODE:** Parallel
+    **BRANCH:** {branch}
+    **ITERATION:** {revision_count}
+
+    **ORIGINAL TASK:** {original_task}
+    **PREVIOUS ATTEMPT:** {previous_attempt_summary}
+    **REMAINING ISSUES:** {remaining_issues}
+
+    **COMMIT TO:** {branch}
+    **REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
+    """
+
+// Combine: Full agent definition + Task context
+base_prompt = agent_definition + task_context
+```
+
+**D. Compose Full Prompt & Spawn**:
+```
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt={prompt})`
+
+**✅ TURN 2 SELF-CHECK:**
+- [ ] Agent file Read() called?
+- [ ] CONTEXT_BLOCK present?
+- [ ] SPEC_BLOCK present?
+- [ ] Task() called?
+
+---
+
 ### Step 2B.3-2B.7: Route Each Group Independently
 
 **Critical difference from Simple Mode:** Each group flows through the workflow INDEPENDENTLY and CONCURRENTLY.
@@ -515,11 +652,11 @@ AGENT_FILE_MAP = {
   "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/qa_expert.md or agents/techlead.md
 agent_definition = Read(agent_file_path)  // Full agent instructions
 IF Read fails OR agent_definition is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
 // Build task context to append (specific to QA or Tech Lead role)
 task_context = """
@@ -579,7 +716,7 @@ Task(subagent_type="general-purpose", model={model}, prompt={prompt})
   *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2B.7a** (Spawn Developer for merge)
 
-**IF Tech Lead requests changes:** Route back to Developer/SSE for this group (same as Step 2A.7).
+**IF Tech Lead requests changes:** Route back to Developer/SSE for this group using Step 2B.2b (Developer/SSE Spawn on Failure or Escalation).
 
 ### Step 2B.7a: Spawn Developer for Merge (Parallel Mode - Per Group)
 
@@ -647,10 +784,15 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 **AUTO-FIX (IF ANY question fails):**
 1. DO NOT end message without spawning
-2. Build spawn queue: INCOMPLETE/PARTIAL → Developer, FAILED → Investigator, READY_FOR_QA → QA, READY_FOR_REVIEW → Tech Lead
-3. Spawn ALL missing Tasks in ONE message
-4. Output: `🔄 Auto-fix: Found {N} incomplete → Spawning {agents} in parallel`
-5. Re-run checklist
+2. Build spawn queue using Step 2B.2b for agent selection:
+   - INCOMPLETE/PARTIAL: Developer (1st fail) OR SSE (2nd+ fail) - check revision_count
+   - FAILED → Investigator
+   - READY_FOR_QA → QA
+   - READY_FOR_REVIEW → Tech Lead
+3. For Developer/SSE spawns, use Step 2B.2b (full agent file + CONTEXT_BLOCK + SPEC_BLOCK)
+4. Spawn ALL missing Tasks in ONE message
+5. Output: `🔄 Auto-fix: Found {N} incomplete → Spawning {agents} in parallel`
+6. Re-run checklist
 
 **PASS CRITERIA (ALL THREE must pass):** ✅ All responses processed ✅ No incomplete groups unhandled ✅ All required Tasks spawned
 
@@ -667,12 +809,36 @@ Use the template for merge prompt and response handling. Apply to this group's c
 ✅ All groups complete | {N}/{N} groups approved, all quality gates passed | Final PM check → BAZINGA
 ```
 
-Build PM prompt with:
-- Session context
-- All group results and commit summaries
-- Overall status check request
+**Build PM prompt using TWO-TURN spawn sequence:**
 
-Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt=[PM prompt])`
+**TURN 1: Invoke Skills**
+- Invoke context-assembler (if enabled)
+- Invoke specialization-loader with agent_type=project_manager
+
+**TURN 2: Build Prompt & Spawn**
+```
+// 🔴 MANDATORY: Read the FULL PM agent file
+pm_definition = Read("agents/project_manager.md")
+IF Read fails OR pm_definition is empty:
+    ⚠️ Agent file read failed | agents/project_manager.md | Cannot proceed - spawn aborted
+
+task_context = """
+## Final Assessment Task (Parallel Mode)
+
+**SESSION:** {session_id}
+**MODE:** Parallel
+**GROUPS:** {N} groups completed
+
+**Group Results:**
+{all_group_results_and_commit_summaries}
+
+**Your Task:** Assess if all success criteria are met across ALL groups and decide: BAZINGA or CONTINUE
+"""
+
+base_prompt = pm_definition + task_context
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt={prompt})`
 
 
 **AFTER PM response:** Follow §Step 2A.8 process (parse, construct capsule, apply auto-route rules).
