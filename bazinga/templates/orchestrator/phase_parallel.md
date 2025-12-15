@@ -275,6 +275,16 @@ You are a {Agent Type} in a Claude Code Multi-Agent Dev Team.
 **MODE:** Parallel
 **BRANCH:** {branch}
 
+🔴 **CRITICAL: YOU ARE AN IMPLEMENTER - NO DELEGATION**
+
+❌ ABSOLUTELY FORBIDDEN:
+- DO NOT use the Task tool to spawn subagents
+- DO NOT delegate work to other agents
+- DO NOT say "let me spawn an agent to..."
+
+✅ YOU MUST DO THE WORK YOURSELF using:
+- Read, Write, Edit, Bash, Skill, Grep, Glob
+
 **TASK:** {task_title}
 
 **REQUIREMENTS:**
