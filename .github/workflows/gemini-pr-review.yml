@@ -2,36 +2,88 @@
 name: Gemini PR Review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - 'research/**'
-      - 'LICENSE*'
-      - 'CHANGELOG*'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/PULL_REQUEST_TEMPLATE/**'
+  # Manual trigger only - automatic PR triggers disabled
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull Request number to review'
+        required: true
+        type: number
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
 
+# Prevent duplicate runs on same PR
+concurrency:
+  group: gemini-pr-review-${{ github.event.inputs.pr_number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Fetch PR details
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ inputs.pr_number }}
+          echo "Fetching details for PR #$PR_NUMBER..."
+
+          # Fetch PR data
+          PR_DATA=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER")
+
+          # Extract needed fields
+          echo "head_ref=$(echo "$PR_DATA" | jq -r '.head.ref')" >> $GITHUB_OUTPUT
+          echo "base_ref=$(echo "$PR_DATA" | jq -r '.base.ref')" >> $GITHUB_OUTPUT
+          echo "head_sha=$(echo "$PR_DATA" | jq -r '.head.sha')" >> $GITHUB_OUTPUT
+          echo "title=$(echo "$PR_DATA" | jq -r '.title')" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+          # Check if PR is from same repo (not a fork)
+          HEAD_REPO=$(echo "$PR_DATA" | jq -r '.head.repo.full_name')
+          if [ "$HEAD_REPO" != "${{ github.repository }}" ]; then
+            echo "::error::PR is from a fork ($HEAD_REPO). Cannot review fork PRs due to secret access restrictions."
+            exit 1
+          fi
+
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 20
+          # Full history ensures merge base is always available for diff
+          fetch-depth: 0
+          # Checkout the PR branch by name (not just SHA) to ensure we're on the right branch
+          ref: ${{ steps.pr.outputs.head_ref }}
+
+      - name: Verify checkout
+        env:
+          EXPECTED_SHA: ${{ steps.pr.outputs.head_sha }}
+          EXPECTED_REF: ${{ steps.pr.outputs.head_ref }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          ACTUAL_BRANCH=$(git branch --show-current || echo "detached")
+
+          echo "Expected branch: $EXPECTED_REF"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual branch: $ACTUAL_BRANCH"
+          echo "Actual SHA: $ACTUAL_SHA"
+
+          # Verify we have the right commit (SHA should match or be ancestor if force-pushed)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::warning::Checked out SHA ($ACTUAL_SHA) differs from PR head ($EXPECTED_SHA). PR may have been updated."
+          fi
+
+          echo "✅ Checkout verified: reviewing branch '$EXPECTED_REF' at commit ${ACTUAL_SHA:0:7}"
 
       - name: Compute diff
         id: diff
+        env:
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
         run: |
-          git fetch origin ${{ github.base_ref }}
+          git fetch origin "$BASE_REF"
 
           # Capture the commit SHA being reviewed (important for staleness detection)
           REVIEW_SHA=$(git rev-parse HEAD)
@@ -41,7 +93,7 @@ jobs:
           echo "Reviewing commit: $REVIEW_SHA_SHORT ($REVIEW_SHA)"
 
           # Exclude package-lock.json (large, auto-generated) from review diff
-          git diff origin/${{ github.base_ref }}...HEAD -- . ':!**/package-lock.json' > diff.patch
+          git diff "origin/$BASE_REF"...HEAD -- . ':!**/package-lock.json' > diff.patch
 
       - name: Check API key
         id: api_key_check
@@ -61,14 +113,15 @@ jobs:
         id: previous_gemini
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
           # Fetch previous review comments from this PR posted by github-actions bot
           # This ensures Gemini has context from its own previous reviews
-          echo "Fetching comments from PR #${{ github.event.pull_request.number }}..."
+          echo "Fetching comments from PR #$PR_NUMBER..."
 
           # Fetch previous review for context AND timestamp for response filtering
           # Note: (last // {}) handles case when no previous reviews exist (avoids jq null error)
-          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+          gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
             --jq '[.[] | select((.user.login == "github-actions[bot]" or .user.login == "github-actions") and (.body | contains("## Gemini Code Review")))] | (last // {}) | {body: .body, created_at: .created_at, id: .id}' \
             > previous_gemini_review.json
 
@@ -93,10 +146,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PREV_REVIEW_TIMESTAMP: ${{ steps.previous_gemini.outputs.prev_review_timestamp }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
           # Fetch responses to THIS bot's review only (not all responses)
           # Uses hybrid approach: timestamp window + marker filter
-          echo "Fetching responses to Gemini review from PR #${{ github.event.pull_request.number }}..."
+          echo "Fetching responses to Gemini review from PR #$PR_NUMBER..."
 
           if [ -z "$PREV_REVIEW_TIMESTAMP" ]; then
             echo "No previous review timestamp, skipping response fetch"
@@ -109,7 +163,7 @@ jobs:
 
           # Filter: posted AFTER our last review AND contains "Response to Gemini"
           # Note: gh api --jq doesn't support --arg, so pipe to jq separately
-          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+          gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
             | jq -r --arg since "$PREV_REVIEW_TIMESTAMP" \
             '[.[] | select(.created_at > $since and (.body | contains("Response to Gemini")))] | .[] | "--- Response from \(.user.login) at \(.created_at) ---\n\(.body)\n"' \
             > review_responses.txt
@@ -125,9 +179,9 @@ jobs:
 
       - name: Build prompt
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_TITLE: ${{ steps.pr.outputs.title }}
           REPO_NAME: ${{ github.repository }}
-          BRANCH_NAME: ${{ github.head_ref }}
+          BRANCH_NAME: ${{ steps.pr.outputs.head_ref }}
           REVIEW_SHA: ${{ steps.diff.outputs.review_sha }}
           REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
           HAS_PREVIOUS_GEMINI: ${{ steps.previous_gemini.outputs.has_previous_gemini }}
@@ -528,6 +582,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_SHA_SHORT: ${{ steps.diff.outputs.review_sha_short }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
           echo "Preparing to post review comment..."
 
@@ -561,7 +616,6 @@ jobs:
             cat review.txt >> prefixed_review.txt
           fi
 
-          PR_NUMBER=${{ github.event.pull_request.number }}
           echo "Posting comment to PR #$PR_NUMBER..."
 
           gh pr comment $PR_NUMBER --body-file prefixed_review.txt

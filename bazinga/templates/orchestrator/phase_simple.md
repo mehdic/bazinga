@@ -215,7 +215,7 @@ Process skill outputs SILENTLY:
    **Specializations:** ✓ (3 templates)
    **Context:** ✓ (2 packages)
 
-Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement OAuth login", prompt=FULL_PROMPT)
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Developer: Implement OAuth login", prompt=FULL_PROMPT)
 ```
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
@@ -1278,5 +1278,55 @@ Prior agents' documented decision progression:
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
 
 **IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md` (loaded at initialization).
+
+---
+
+## 🔴 PHASE COMPLETION - MANDATORY PM RE-SPAWN
+
+**When ALL groups in this phase are APPROVED and MERGED:**
+
+### What You MUST Do:
+
+1. **DO NOT** summarize to user and stop
+2. **DO NOT** ask user what to do next
+3. **DO NOT** ask "Would you like me to continue?"
+4. **MUST** spawn PM immediately
+
+### Mandatory PM Spawn Prompt:
+
+```
+Phase {N} complete. All groups approved and merged: {group_list}.
+
+Query database for Original_Scope and compare to completed work:
+- Original estimated items: {Original_Scope.estimated_items}
+- Completed items: {sum of completed group item_counts}
+
+Based on this comparison, you MUST either:
+- Assign next phase groups (if work remains from Original_Scope), OR
+- Send BAZINGA (if ALL original tasks from scope are complete)
+
+DO NOT ask for permission. Make the decision based on scope comparison.
+```
+
+### Spawn Command:
+
+```
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["project_manager"],
+  description: "PM: Phase {N} complete - assess scope",
+  prompt: [PM prompt above]
+)
+```
+
+### Why This Rule Exists:
+
+Without this mandatory re-spawn:
+- Orchestrator may stop after phase completion
+- User has to manually restart
+- Original scope tracking is lost
+- Multi-phase tasks don't complete
+
+**NEVER stop between phases. ALWAYS spawn PM to decide next steps or send BAZINGA.**
 
 ---

@@ -394,6 +394,22 @@ Agent frontmatter model: field = Documentation only (NOT read by orchestrator)
 
 The orchestrator reads `bazinga/model_selection.json` at session start and caches the values. There is no DB layer for config - JSON files are the single source of truth.
 
+### 🔴 CRITICAL: NEVER Hardcode Model Names in Agent Code
+
+**ABSOLUTELY FORBIDDEN in agent files, orchestrator, and templates:**
+- ❌ `model: "haiku"` in code/prompts (frontmatter is OK - it's documentation)
+- ❌ `"spawn with opus"` or `"use sonnet for this"`
+- ❌ `MODEL_CONFIG["developer"] = "haiku"` (hardcoded assignment)
+- ❌ Any mention of specific model names in text content that implies runtime behavior
+
+**ALWAYS USE:**
+- ✅ `MODEL_CONFIG["developer"]` - variable reference
+- ✅ `MODEL_CONFIG["tech_lead"]` - variable reference
+- ✅ "Developer tier model" - tier-based language in documentation
+- ✅ Frontmatter `model: haiku` is OK (documentation only, not read at runtime)
+
+**Why:** Model assignments are configured in `bazinga/model_selection.json`. Hardcoding in agent files creates inconsistency when config changes.
+
 ### 1. `model_selection.json` - Agent Model Assignment
 
 **Purpose:** Controls which AI model (haiku/sonnet/opus) each agent uses
@@ -1098,6 +1114,68 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
    - Orchestrator skipped the skill invocation
    - Agents received raw template text instead of composed blocks
    - **FIX:** Follow Manual Orchestration Workflow above - invoke skill before EACH agent spawn
+
+---
+
+## 🔴 CRITICAL: Dashboard-Schema Synchronization
+
+**When modifying the database schema (bazinga-db skill), the dashboard MUST be updated to match.**
+
+### Why This Matters
+
+The dashboard (`dashboard-v2/`) has its own schema definition in Drizzle ORM that must stay in sync with the authoritative schema in `.claude/skills/bazinga-db/scripts/init_db.py`. If they diverge:
+- Dashboard queries fail silently or return incomplete data
+- New features (reasoning, success criteria, etc.) won't appear in UI
+- Composite primary keys may cause data collisions
+
+### Checklist for Schema Changes
+
+When you modify the database schema:
+
+- [ ] **1. Update Drizzle schema** in `dashboard-v2/src/lib/db/schema.ts`
+  - Add new columns to existing tables
+  - Add new tables with proper relations
+  - Match column names EXACTLY (snake_case in DB → camelCase in Drizzle)
+  - Ensure primary keys match (especially composite PKs like `task_groups`)
+
+- [ ] **2. Update TypeScript types** in `dashboard-v2/src/types/index.ts`
+  - Add interfaces for new tables
+  - Update existing interfaces with new fields
+  - Add summary/helper types as needed
+
+- [ ] **3. Add TRPC queries** in `dashboard-v2/src/lib/trpc/routers/sessions.ts`
+  - Create queries for new tables
+  - Add pagination (limit/offset) to list queries
+  - Wrap new queries in try/catch for graceful degradation
+
+- [ ] **4. Update capability detection** in `dashboard-v2/src/lib/db/capabilities.ts`
+  - Add probes for new tables/columns
+  - Expose capabilities via TRPC
+
+- [ ] **5. Update UI components** to display new data
+  - Create viewer components for new data types
+  - Add tabs to session detail page (gated by capabilities)
+  - Handle missing data gracefully
+
+- [ ] **6. Test both scenarios**
+  - Old database (missing new tables/columns)
+  - Fresh database (all structures present)
+
+### Quick Reference
+
+| DB Schema File | Dashboard Schema File |
+|----------------|----------------------|
+| `.claude/skills/bazinga-db/scripts/init_db.py` | `dashboard-v2/src/lib/db/schema.ts` |
+| `.claude/skills/bazinga-db/references/schema.md` | `dashboard-v2/src/types/index.ts` |
+
+### Schema Version Tracking
+
+The DB schema version is defined in `init_db.py`:
+```python
+SCHEMA_VERSION = 12  # Current version
+```
+
+The dashboard should reference this version in comments for traceability.
 
 ---
 
