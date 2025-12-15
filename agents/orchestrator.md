@@ -520,7 +520,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{ses
 ```
 Task(
   subagent_type: "general-purpose",
-  model: "opus",
+  model: MODEL_CONFIG["tech_lead"],
   description: "Tech Lead: PM escalation - make planning decision",
   prompt: "PM failed to make decision after 3 fallback attempts. Review requirements and make planning decision. Return SIMPLE MODE or PARALLEL MODE with task groups."
 )

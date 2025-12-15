@@ -215,7 +215,7 @@ Process skill outputs SILENTLY:
    **Specializations:** ✓ (3 templates)
    **Context:** ✓ (2 packages)
 
-Task(subagent_type="general-purpose", model="haiku", description="Developer: Implement OAuth login", prompt=FULL_PROMPT)
+Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Developer: Implement OAuth login", prompt=FULL_PROMPT)
 ```
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
