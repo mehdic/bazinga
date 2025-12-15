@@ -490,12 +490,32 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{sess
 - **VIOLATION** - Hard cap exceeded
 - **DO NOT** surface question to user
 - **DO NOT** wait for response
-- **AUTO-FALLBACK:** Respawn PM immediately with:
-  ```
-  "Clarification limit reached (max 1 per session). Your previous question was answered.
-  Make best decision with available information. If user response was: '{user_response}',
-  use that context. Otherwise proceed with reasonable defaults."
-  ```
+- Increment `autofallback_attempts` in database state
+- **AUTO-FALLBACK:** Respawn PM immediately with fallback message
+
+**Auto-Fallback State Tracking:**
+```bash
+# Before respawning PM with fallback, update counter:
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{session_id}" "orchestrator" '{"clarification_used": true, "clarification_resolved": true, "autofallback_attempts": N}'
+```
+
+**Auto-Fallback Attempt Limits (max_autofallback=3):**
+
+| Attempt | Action |
+|---------|--------|
+| 1-2 | Respawn PM: "Clarification limit reached. Make best decision with available info. User response was: '{user_response}'. Proceed with reasonable defaults." |
+| 3 | **ESCALATE TO SSE:** "PM unable to proceed after 3 fallback attempts. Escalating to Senior Software Engineer for decision." |
+| >3 | **FORCE PROCEED:** Skip PM, proceed with simplest valid approach (SIMPLE MODE, 1 task group) |
+
+**Escalation Flow (attempt 3):**
+```
+Task(
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "SSE: PM escalation - make planning decision",
+  prompt: "PM failed to make decision after 3 fallback attempts. Review requirements and make planning decision. Return SIMPLE MODE or PARALLEL MODE with task groups."
+)
+```
 
 **This hard cap is ENFORCED via database state - survives context compaction.**
 
@@ -523,6 +543,18 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups 
 original_items = session.Original_Scope.estimated_items
 completed_items = sum(group.item_count for group in task_groups if group.status == "completed")
 ```
+
+### Step 2.4: Validate estimated_items is Set (MANDATORY)
+
+**Before using scope comparison, verify Original_Scope has estimated_items:**
+
+**IF `session.Original_Scope` is null OR `estimated_items` is null/0:**
+- **DO NOT** proceed with scope comparison (will be inaccurate)
+- **DERIVE from task groups:** `estimated_items = sum(group.item_count for group in task_groups)`
+- Update session with derived value OR respawn PM to set Original_Scope
+- Log warning: "Original_Scope.estimated_items missing - derived from task groups"
+
+**Note:** PM should set this during planning. If missing, deriving from task groups is the safe fallback.
 
 ### Step 2.5: Validate item_count is Set (MANDATORY)
 
@@ -585,23 +617,11 @@ This check prevents premature stops by ensuring:
 
 ---
 
-## 🔴 ANTI-PATTERN DETECTION (SELF-CHECK)
+## 🔴 ANTI-PATTERN QUICK REFERENCE
 
-**If you catch yourself about to do any of the following, STOP and course-correct:**
+**For full enforcement details, see PRE-OUTPUT SELF-CHECK section above.**
 
-### Forbidden Patterns (Always Violations)
-
-| Pattern | Detection | Correction |
-|---------|-----------|------------|
-| "Would you like me to continue?" | Permission-seeking | Continue workflow - spawn next agent |
-| "Should I proceed with..." | Permission-seeking | Continue workflow - spawn next agent |
-| "Here are your options:" | User delegation (unless PM NEEDS_CLARIFICATION) | Make the decision, continue workflow |
-| "What would you like to do next?" | User delegation | Spawn PM to decide next steps |
-| Status output → end message | No action taken | Add Task() or Skill() call before ending |
-| "Let me spawn..." without Task() | Intent without action | Call Task() in same turn |
-| "Complete" without BAZINGA+Validator | Premature completion claim | Continue until validator ACCEPT |
-
-### Allowed Patterns
+### Allowed Patterns (Exceptions)
 
 | Pattern | When Allowed |
 |---------|--------------|
@@ -610,37 +630,18 @@ This check prevents premature stops by ensuring:
 | Analysis/summary | OK as part of ongoing workflow, not as stopping point |
 | Waiting for user | ONLY after PM's `NEEDS_CLARIFICATION` (once per session) |
 
-### Key Distinction: Status vs Stop
-
-**Valid (continues):**
-```
-🔨 Phase 2 complete | 15 tests passing, 92% coverage
-📨 Spawning PM for final assessment...
-[Task() call]
-```
-
-**Invalid (stops):**
-```
-🔨 Phase 2 complete | 15 tests passing, 92% coverage
-
-Would you like me to continue to Phase 3?
-```
-
-### Self-Correction Procedure
+### Quick Self-Correction
 
 **If you detect a violation about to occur:**
 
-1. **DO NOT** output the violating message
-2. **IDENTIFY** what the next workflow step should be
-3. **SPAWN** the appropriate agent immediately
-4. **OUTPUT** only the status capsule + action
+1. **STOP** - don't output the violating message
+2. **SPAWN** - call Task() or Skill() immediately
+3. **OUTPUT** - status capsule + action only
 
-**Example self-correction:**
+**Example:**
 ```
 ❌ About to write: "Phase 1 complete. Would you like me to continue?"
-✅ Self-correct: Spawn PM to assess completion and assign next phase
-Output: "📨 Phase 1 complete | Spawning PM for next assignment..."
-[Task() call]
+✅ Self-correct: "📨 Phase 1 complete | Spawning PM for next assignment..." [Task() call]
 ```
 
 ---
@@ -678,14 +679,19 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
 
 ### Resume Logic (Active Session)
 
-**IF `clarification_pending = true`:**
+**Query orchestrator state:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+
+**IF `clarification_used = true` AND `clarification_resolved = false`:**
 - User response still needed from PM's question
-- Query stored clarification: `get-pm-state {session_id}`
+- Read `clarification_question` from state
 - Surface PM's question to user again
 - Wait for response (this is the ONE allowed pause)
-- After response: Resume workflow from where it paused
+- After response: Update state with `clarification_resolved: true`, resume workflow
 
-**IF `clarification_pending = false` OR `clarification_resolved = true`:**
+**IF `clarification_resolved = true` OR `clarification_used = false` OR state not found:**
 - Normal resume
 - Find groups with status != "completed"
 - Determine next workflow step:
@@ -709,7 +715,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
 Orchestrator check:
 1. list-sessions 1 → Found bazinga_xxx (status: active)
 2. get-task-groups → Group A: completed, Group B: in_progress (last: QA passed)
-3. get-session → clarification_pending: false
+3. get-state "{session_id}" "orchestrator" → clarification_resolved: true (or no state)
 
 Resume action:
 → Group B was at QA pass → Next step is Tech Lead
@@ -1716,7 +1722,7 @@ Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill() o
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
 **Step 1: Log** via §Logging Reference (type: `pm_clarification`, status: `pending`)
-**Step 2: Update orchestrator state** via bazinga-db (`clarification_pending: true`, `phase: awaiting_clarification`)
+**Step 2: Update orchestrator state** via bazinga-db (`clarification_used: true`, `clarification_resolved: false`)
 **Step 3: Surface Clarification to User**
 
 **User output (capsule format):**
@@ -1818,14 +1824,15 @@ You are the Project Manager. You previously requested clarification and received
 
 - PM should now return normal decision (SIMPLE MODE or PARALLEL MODE)
 - Log this interaction to database (same as Step 1.3)
-- Update orchestrator state to clear clarification_pending flag:
+- Update orchestrator state to mark clarification resolved:
 
 ```
 bazinga-db, please update orchestrator state:
 
 Session ID: [current session_id]
 State Data: {
-  "clarification_pending": false,
+  "clarification_used": true,
+  "clarification_resolved": true,
   "phase": "planning_complete"
 }
 ```

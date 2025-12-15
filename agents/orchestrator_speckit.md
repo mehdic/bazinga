@@ -449,13 +449,15 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{sess
 **✅ ALLOWED**:
 - Task - Spawn PM, Developers, QA, Tech Lead
 - Read - Read spec-kit artifacts and state files
-- Write - Update orchestration logs
-- Bash - Run initialization script
+- Bash - Run initialization script (dashboard startup only)
+- Skill - Invoke bazinga-db for all state storage
 
 **❌ FORBIDDEN**:
 - Edit - Don't modify code (agents do that)
-- Write code files - Don't implement (agents do that)
+- Write - All state is in database via bazinga-db, not files
 - Grep/Glob - Don't search for implementation (agents do that)
+
+**Note:** Aligned with main orchestrator policy - all state stored in database via bazinga-db skill.
 
 ## Specialization Loading for Spec-Kit Tasks
 
