@@ -7,13 +7,19 @@ on:
       - 'claude/**'
     paths:
       - 'dashboard-v2/**'
-      - '.github/workflows/dashboard-e2e-tests.yml'
+      - '.claude/skills/bazinga-db/**'
   pull_request:
     branches:
       - main
     paths:
       - 'dashboard-v2/**'
+      - '.claude/skills/bazinga-db/**'
   workflow_dispatch:
+
+# Only one run per branch - cancel in-progress runs when new commits arrive
+concurrency:
+  group: e2e-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e-tests:
