@@ -775,12 +775,36 @@ Use the template for merge prompt and response handling. Apply to this group's c
 ✅ All groups complete | {N}/{N} groups approved, all quality gates passed | Final PM check → BAZINGA
 ```
 
-Build PM prompt with:
-- Session context
-- All group results and commit summaries
-- Overall status check request
+**Build PM prompt using TWO-TURN spawn sequence:**
 
-Spawn: `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt=[PM prompt])`
+**TURN 1: Invoke Skills**
+- Invoke context-assembler (if enabled)
+- Invoke specialization-loader with agent_type=project_manager
+
+**TURN 2: Build Prompt & Spawn**
+```
+// 🔴 MANDATORY: Read the FULL PM agent file
+pm_definition = Read("agents/project_manager.md")
+IF Read fails OR pm_definition is empty:
+    Output: `⚠️ Agent file read failed | agents/project_manager.md` and STOP
+
+task_context = """
+## Final Assessment Task (Parallel Mode)
+
+**SESSION:** {session_id}
+**MODE:** Parallel
+**GROUPS:** {N} groups completed
+
+**Group Results:**
+{all_group_results_and_commit_summaries}
+
+**Your Task:** Assess if all success criteria are met across ALL groups and decide: BAZINGA or CONTINUE
+"""
+
+base_prompt = pm_definition + task_context
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt={prompt})`
 
 
 **AFTER PM response:** Follow §Step 2A.8 process (parse, construct capsule, apply auto-route rules).
