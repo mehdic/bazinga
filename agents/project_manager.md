@@ -130,7 +130,7 @@ For each task group, classify the type FIRST:
 - Task name contains: "research", "evaluate", "select", "compare"
 - Task produces: decision document, comparison matrix, recommendation
 - **DB Initial Tier:** `developer` (DB constraint - Orchestrator reads `Type: research` and spawns RE instead)
-- **Agent Spawned:** Requirements Engineer (Sonnet)
+- **Agent Spawned:** Requirements Engineer (RE tier)
 - **Execution Phase:** 1 (before implementation)
 - **NOTE:** "investigation" and "analyze" are NOT research keywords - too generic, causes misrouting
 
@@ -139,7 +139,7 @@ For each task group, classify the type FIRST:
 - Task produces: design document, architecture decision record (ADR)
 - **Type:** `research` (use same flow as research tasks)
 - **DB Initial Tier:** `developer` (DB constraint - Orchestrator spawns RE based on Type)
-- **Agent Spawned:** Requirements Engineer (Sonnet)
+- **Agent Spawned:** Requirements Engineer (RE tier)
 - **Execution Phase:** 1 (before implementation)
 - **Tech Lead Validation:** MANDATORY (architecture decisions require TL approval)
 - **Example:** "API Design [R]" → RE produces design doc → TL validates → Implementation begins
@@ -228,7 +228,7 @@ IF task_name contains security keywords OR task touches auth/security files:
 ```
 
 **🔴 CRITICAL: Security Override Rules**
-1. Security flag OVERRIDES complexity scoring (always SSE, never Haiku)
+1. Security flag OVERRIDES complexity scoring (always SSE, never Dev tier)
 2. Tech Lead MUST approve security tasks (cannot skip to PM)
 3. Failed security reviews return to SSE (not regular Developer)
 
@@ -238,9 +238,9 @@ IF task_name contains security keywords OR task touches auth/security files:
 
 | Complexity Score | Tier | Agent |
 |-----------------|------|-------|
-| 1-3 | Low | Developer (Haiku) |
-| 4-6 | Medium | Senior Software Engineer (Sonnet) |
-| 7+ | High | Senior Software Engineer (Sonnet) |
+| 1-3 | Low | Developer (Dev tier) |
+| 4-6 | Medium | Senior Software Engineer (SSE tier) |
+| 7+ | High | Senior Software Engineer (SSE tier) |
 
 **Scoring Factors:**
 
@@ -268,14 +268,14 @@ Total: 7 → HIGH → Assign to Senior Software Engineer
 Task: "Fix typo in error message"
 - Touches 1 file (+1)
 - Bug fix with clear symptoms (+1)
-Total: 2 → LOW → Assign to Developer (Haiku)
+Total: 2 → LOW → Assign to Developer (Dev tier)
 ```
 
 **Include in task group assignment:**
 ```markdown
 **Group A:** Password Reset
 - **Complexity:** 7 (HIGH)
-- **Initial Agent:** Senior Software Engineer (Sonnet)
+- **Initial Agent:** Senior Software Engineer (SSE tier)
 - **Tasks:** T001, T002, T003
 ```
 
@@ -2011,9 +2011,9 @@ Return structured response:
 
 | Complexity | Initial Tier | Rationale |
 |------------|--------------|-----------|
-| 1-3 (Low) | Developer (Haiku) | Standard tasks, cost-efficient |
-| 4-6 (Medium) | Senior Software Engineer (Sonnet) | Medium complexity benefits from SSE |
-| 7-10 (High) | Senior Software Engineer (Sonnet) | Complex, skip Haiku to save time |
+| 1-3 (Low) | Developer (Dev tier) | Standard tasks, cost-efficient |
+| 4-6 (Medium) | Senior Software Engineer (SSE tier) | Medium complexity benefits from SSE |
+| 7-10 (High) | Senior Software Engineer (SSE tier) | Complex, skip Dev tier to save time |
 
 **Override rules (regardless of complexity score):**
 - Security-sensitive code → **Senior Software Engineer**
@@ -2098,8 +2098,10 @@ Skill(command: "bazinga-db")
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 **Model selection based on revisions:**
-- Revisions 1-2: Tech Lead uses **Sonnet** (fast, default)
-- Revisions 3+: Tech Lead uses **Opus** (powerful, for persistent issues)
+- Revisions 1-2: Tech Lead uses **MODEL_CONFIG["tech_lead"]** (configured default)
+- Revisions 3+: Tech Lead escalates to higher tier if available
+
+*Note: Model/tier selection is driven by `bazinga/model_selection.json`. Do not embed model names in prompts.*
 
 **Response:**
 ```markdown
@@ -2107,7 +2109,7 @@ Skill(command: "bazinga-db")
 
 ### Issue Detected
 Group B requires changes: [description]
-**Revision Count:** [N] (next Tech Lead review will use Opus if this fails again)
+**Revision Count:** [N] (persistent issues may trigger model escalation)
 
 ### Action Taken
 Updated revision_count in database to [N]
