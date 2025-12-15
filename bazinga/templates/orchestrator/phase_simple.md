@@ -124,7 +124,16 @@ group_id = task_group["group_id"]
 agent_type = task_group["initial_tier"]  // developer, senior_software_engineer, or requirements_engineer
 
 // 🔴 MANDATORY: Read the FULL agent file
-agent_file_path = f"agents/{agent_type}.md"  // e.g., agents/developer.md or agents/senior_software_engineer.md
+// NOTE: tech_lead maps to techlead.md (no underscore), all others use {agent_type}.md
+AGENT_FILE_MAP = {
+  "developer": "agents/developer.md",
+  "senior_software_engineer": "agents/senior_software_engineer.md",
+  "requirements_engineer": "agents/requirements_engineer.md",
+  "qa_expert": "agents/qa_expert.md",
+  "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
+  "investigator": "agents/investigator.md"
+}
+agent_file_path = AGENT_FILE_MAP[agent_type]
 agent_definition = Read(agent_file_path)  // Full 1400+ lines of agent instructions
 
 // Build task context to append
@@ -667,7 +676,7 @@ Output summary:
    **Specializations:** {status}
    **Context Packages:** {count if any}
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt={spec_block + base_prompt})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
 
 **🔴 SELF-CHECK (QA Spawn):**
 - ✅ Did I query context packages for qa_expert?
@@ -836,7 +845,7 @@ Output summary:
    **Context Packages:** {count if any}
    **Reasoning Entries:** {count if any}
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt={spec_block + base_prompt})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
 
 **🔴 SELF-CHECK (TL Spawn):**
 - ✅ Did I query context packages for tech_lead?

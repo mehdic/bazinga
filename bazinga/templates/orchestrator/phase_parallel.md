@@ -268,7 +268,16 @@ branch = task_groups[group_id]["branch"] or session_branch
 agent_type = task_groups[group_id]["initial_tier"]  // developer, senior_software_engineer, or requirements_engineer
 
 // 🔴 MANDATORY: Read the FULL agent file for this group's agent type
-agent_file_path = f"agents/{agent_type}.md"  // e.g., agents/developer.md or agents/senior_software_engineer.md
+// NOTE: tech_lead maps to techlead.md (no underscore), all others use {agent_type}.md
+AGENT_FILE_MAP = {
+  "developer": "agents/developer.md",
+  "senior_software_engineer": "agents/senior_software_engineer.md",
+  "requirements_engineer": "agents/requirements_engineer.md",
+  "qa_expert": "agents/qa_expert.md",
+  "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
+  "investigator": "agents/investigator.md"
+}
+agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/developer.md or agents/techlead.md
 agent_definitions[group_id] = Read(agent_file_path)  // Full 1400+ lines of agent instructions
 
 // Build task context to append
@@ -496,7 +505,12 @@ END TURN 1 (wait for skill responses)
 ```
 // 🔴 MANDATORY: Read the FULL agent file for this agent type
 // agent_type is one of: qa_expert, tech_lead
-agent_file_path = f"agents/{agent_type}.md"  // e.g., agents/qa_expert.md or agents/techlead.md
+// NOTE: tech_lead maps to techlead.md (no underscore)
+AGENT_FILE_MAP = {
+  "qa_expert": "agents/qa_expert.md",
+  "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
+}
+agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/qa_expert.md or agents/techlead.md
 agent_definition = Read(agent_file_path)  // Full agent instructions
 
 // Build task context to append (specific to QA or Tech Lead role)

@@ -2,9 +2,9 @@
 
 **Date:** 2025-12-15
 **Context:** Investigation of why SSE agents spawn subagents instead of implementing
-**Decision:** Architecture needs clarification - inconsistent agent file usage
-**Status:** Proposed
-**Reviewed by:** Pending external LLM review
+**Decision:** Include full agent files in all spawn prompts
+**Status:** Implemented (commit 51a61b3)
+**Reviewed by:** Pending ultrathink verification
 
 ---
 
@@ -246,15 +246,51 @@ Rationale:
 3. Token budget concerns can be managed via specialization-loader limits
 4. Makes agent files authoritative, not just documentation
 
-## Implementation Plan
+## Implementation (Completed)
 
-If Option 1 approved:
+**Commit:** `51a61b3` - Include full agent files in all spawn prompts
 
-1. **Modify phase_simple.md** - Add `Read(agents/{agent_type}.md)` before base_prompt
-2. **Modify phase_parallel.md** - Same change
-3. **Update prompt_building.md** - Document the full architecture
-4. **Adjust token budgets** - Reduce specialization limits if needed
-5. **Test with integration test** - Verify full workflow works
+### Changes Made
+
+**phase_simple.md:**
+- Developer/SSE/RE spawn: Added `Read("agents/{agent_type}.md")`
+- QA Expert spawn: Added `Read("agents/qa_expert.md")`
+- Tech Lead spawn: Added `Read("agents/techlead.md")`
+- Investigator spawn: Added `Read("agents/investigator.md")`
+- SSE escalation spawn: Added `Read("agents/senior_software_engineer.md")`
+- Developer continuation spawn: Added `Read("agents/developer.md")`
+
+**phase_parallel.md:**
+- Main Developer/SSE/RE spawn: Added `Read("agents/{agent_type}.md")`
+- QA/Tech Lead spawn: Added `Read("agents/{agent_type}.md")`
+
+### New Prompt Structure
+
+```
+FULL_PROMPT =
+    CONTEXT_BLOCK (from context-assembler: ~800 tokens)
+    +
+    SPEC_BLOCK (from specialization-loader: ~900-2400 tokens)
+    +
+    agent_definition (from Read: ~1400 lines)
+    +
+    task_context (~20 lines of session/task specific info)
+```
+
+### Updated Comparison Table
+
+| Agent | Full File Included? | Evidence |
+|-------|---------------------|----------|
+| Tech Stack Scout | YES | orchestrator.md:966 |
+| Project Manager | YES | orchestrator.md:1155 |
+| Tech Lead (all cases) | YES | phase_simple.md (updated) |
+| Developer | YES | phase_simple.md (updated) |
+| Senior Software Engineer | YES | phase_simple.md (updated) |
+| QA Expert | YES | phase_simple.md (updated) |
+| Requirements Engineer | YES | phase_simple.md (updated) |
+| Investigator | YES | phase_simple.md (updated) |
+
+**All agents now receive full definitions.**
 
 ## Open Questions
 

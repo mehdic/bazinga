@@ -185,10 +185,12 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
   - **context-assembler**: Intelligent context assembly before agent spawns (if `context_engineering.enable_context_assembler` is true in skills_config.json)
   - **specialization-loader**: Load agent specializations based on tech stack
   - **IMPORTANT**: Do NOT display raw skill output to user. Verify operation succeeded, then IMMEDIATELY continue to next workflow step. If skill invocation fails, output error capsule per §Error Handling and STOP.
-- ✅ **Read** - ONLY for reading configuration files:
+- ✅ **Read** - ONLY for reading configuration, templates, and agent definition files:
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
   - `bazinga/project_context.json` (project tech stack - for specialization loading)
+  - `bazinga/templates/*.md` (orchestrator templates, message templates, etc.)
+  - `agents/*.md` (agent definition files - required before spawning agents)
 - ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
 **FORBIDDEN tools for implementation:**
