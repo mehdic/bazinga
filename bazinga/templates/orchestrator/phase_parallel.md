@@ -278,11 +278,11 @@ AGENT_FILE_MAP = {
   "investigator": "agents/investigator.md"
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/developer.md or agents/techlead.md
 agent_definitions[group_id] = Read(agent_file_path)  // Full 1400+ lines of agent instructions
 IF Read fails OR agent_definitions[group_id] is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_contexts[group_id] = """
@@ -438,7 +438,9 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 
 **TURN 1: Invoke Both Skills**
 
-**A. Context Assembly:**
+**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
+
+IF context-assembler ENABLED:
 ```
 Assemble context for agent spawn:
 - Session: {session_id}
@@ -450,6 +452,9 @@ Assemble context for agent spawn:
 ```
 Then invoke: `Skill(command: "context-assembler")`
 → Capture output as `{CONTEXT_BLOCK}`
+
+IF context-assembler DISABLED or returns empty:
+→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
 
 **B. Specialization Loading:**
 ```
@@ -466,51 +471,80 @@ Then invoke: `Skill(command: "specialization-loader")`
 → Capture output as `{SPEC_BLOCK}`
 
 **✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked?
+- [ ] Context-assembler invoked (or explicitly disabled/empty fallback)?
 - [ ] Specialization-loader invoked?
 
 END TURN 1
 
 ---
 
-**TURN 2: Compose & Spawn Developer/SSE**
+**TURN 2: Compose & Spawn Developer/SSE/TL**
 
 **C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
 ```
 // 🔴 MANDATORY: Read the FULL agent file
 // Determine agent_type based on revision_count:
 // - revision_count < 2 → developer
-// - revision_count >= 2 → senior_software_engineer
+// - revision_count >= 2 AND < 3 → senior_software_engineer
+// - revision_count >= 3 → tech_lead (for architectural guidance)
 AGENT_FILE_MAP = {
   "developer": "agents/developer.md",
-  "senior_software_engineer": "agents/senior_software_engineer.md"
+  "senior_software_engineer": "agents/senior_software_engineer.md",
+  "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]
 agent_definition = Read(agent_file_path)  // Full agent instructions
 IF Read fails OR agent_definition is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
-// Build task context to append
-task_context = """
----
+// Build task context based on agent_type
+IF agent_type == "tech_lead":
+    task_context = """
+    ---
 
-## Continuation/Escalation Assignment
+    ## Architectural Assessment (3rd+ Failure)
 
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Parallel
-**BRANCH:** {branch}
-**ITERATION:** {revision_count}
+    **SESSION:** {session_id}
+    **GROUP:** {group_id}
+    **MODE:** Parallel
+    **BRANCH:** {branch}
+    **FAILURE_COUNT:** {revision_count}
 
-**ORIGINAL TASK:** {original_task}
-**PREVIOUS ATTEMPT:** {previous_attempt_summary}
-**REMAINING ISSUES:** {remaining_issues}
+    **ORIGINAL TASK:** {original_task}
+    **PREVIOUS ATTEMPTS:** Developer × {developer_attempts}, SSE × {sse_attempts}
+    **RECURRING ISSUES:** {recurring_issues}
 
-**COMMIT TO:** {branch}
-**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
-"""
+    **Your Task:** Assess if this task has fundamental architectural issues:
+    1. Review the recurring failure patterns
+    2. Determine if the approach needs rethinking
+    3. Provide either:
+       - Specific fix guidance for SSE retry
+       - Recommendation to simplify/deprioritize task (route to PM)
+       - Architectural changes needed
+
+    **REPORT STATUS:** GUIDANCE_PROVIDED, NEEDS_PM_REVIEW, or BLOCKED
+    """
+ELSE:
+    task_context = """
+    ---
+
+    ## Continuation/Escalation Assignment
+
+    **SESSION:** {session_id}
+    **GROUP:** {group_id}
+    **MODE:** Parallel
+    **BRANCH:** {branch}
+    **ITERATION:** {revision_count}
+
+    **ORIGINAL TASK:** {original_task}
+    **PREVIOUS ATTEMPT:** {previous_attempt_summary}
+    **REMAINING ISSUES:** {remaining_issues}
+
+    **COMMIT TO:** {branch}
+    **REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
+    """
 
 // Combine: Full agent definition + Task context
 base_prompt = agent_definition + task_context
@@ -618,11 +652,11 @@ AGENT_FILE_MAP = {
   "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/qa_expert.md or agents/techlead.md
 agent_definition = Read(agent_file_path)  // Full agent instructions
 IF Read fails OR agent_definition is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
 // Build task context to append (specific to QA or Tech Lead role)
 task_context = """
@@ -786,7 +820,7 @@ Use the template for merge prompt and response handling. Apply to this group's c
 // 🔴 MANDATORY: Read the FULL PM agent file
 pm_definition = Read("agents/project_manager.md")
 IF Read fails OR pm_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/project_manager.md` and STOP
+    ⚠️ Agent file read failed | agents/project_manager.md | Cannot proceed - spawn aborted
 
 task_context = """
 ## Final Assessment Task (Parallel Mode)

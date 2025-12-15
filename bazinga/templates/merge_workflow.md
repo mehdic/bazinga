@@ -13,6 +13,23 @@ This template contains the merge task prompt and response handling for the Devel
 - `{feature_branch}` - From `task_groups.feature_branch` in database (set by Developer when creating branch)
 - `{group_id}` - Current group being merged (e.g., "A", "B", "main")
 
+### Variable Hygiene
+
+**When interpolating variables into prompts, apply these sanitization rules:**
+
+| Variable | Max Length | Sanitization |
+|----------|------------|--------------|
+| `{test_failures}` | 2000 chars | Truncate with "... (truncated)" |
+| `{blocker_reason}` | 500 chars | Truncate, remove control chars |
+| `{conflict_files}` | 1000 chars | Truncate, one file per line |
+| `{error_details}` | 1000 chars | Truncate, remove ANSI codes |
+
+**General rules:**
+- Strip leading/trailing whitespace
+- Remove control characters (except newlines)
+- Truncate with "... (truncated, {N} more chars)" indicator
+- Never include raw stack traces > 50 lines
+
 ---
 
 ## Merge Task Prompt Template
@@ -30,7 +47,7 @@ Build the Developer prompt using TWO-TURN spawn sequence:
 // 🔴 MANDATORY: Read the FULL Developer agent file
 dev_definition = Read("agents/developer.md")  // ~1400 lines of agent instructions
 IF Read fails OR dev_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/developer.md` and STOP
+    ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
 
 // Build merge task context (this is APPENDED to the agent file, not a replacement)
 task_context = """
@@ -137,7 +154,7 @@ Parse the Developer's merge response. Extract status:
   // 🔴 MANDATORY: Read the FULL Developer agent file
   dev_definition = Read("agents/developer.md")
   IF Read fails OR dev_definition is empty:
-      Output: `⚠️ Agent file read failed | agents/developer.md` and STOP
+      ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
 
   task_context = """
   ---
@@ -201,7 +218,7 @@ Parse the Developer's merge response. Extract status:
   // 🔴 MANDATORY: Read the FULL Developer agent file
   dev_definition = Read("agents/developer.md")
   IF Read fails OR dev_definition is empty:
-      Output: `⚠️ Agent file read failed | agents/developer.md` and STOP
+      ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
 
   task_context = """
   ---
@@ -267,7 +284,7 @@ Parse the Developer's merge response. Extract status:
   // NOTE: File is techlead.md (no underscore)
   tl_definition = Read("agents/techlead.md")
   IF Read fails OR tl_definition is empty:
-      Output: `⚠️ Agent file read failed | agents/techlead.md` and STOP
+      ⚠️ Agent file read failed | agents/techlead.md | Cannot proceed - spawn aborted
 
   task_context = """
   ---

@@ -134,11 +134,11 @@ AGENT_FILE_MAP = {
   "investigator": "agents/investigator.md"
 }
 IF agent_type NOT IN AGENT_FILE_MAP:
-    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
 agent_file_path = AGENT_FILE_MAP[agent_type]
 agent_definition = Read(agent_file_path)  // Full 1400+ lines of agent instructions
 IF Read fails OR agent_definition is empty:
-    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -343,7 +343,7 @@ END TURN 1
 // 🔴 MANDATORY: Read the FULL Investigator agent file
 investigator_definition = Read("agents/investigator.md")  // Full agent instructions
 IF Read fails OR investigator_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/investigator.md` and STOP
+    ⚠️ Agent file read failed | agents/investigator.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -426,7 +426,7 @@ END TURN 1
 // 🔴 MANDATORY: Read the FULL SSE agent file
 sse_definition = Read("agents/senior_software_engineer.md")  // Full agent instructions
 IF Read fails OR sse_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/senior_software_engineer.md` and STOP
+    ⚠️ Agent file read failed | agents/senior_software_engineer.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -529,7 +529,7 @@ END TURN 1
 // 🔴 MANDATORY: Read the FULL Developer agent file
 dev_definition = Read("agents/developer.md")  // Full agent instructions
 IF Read fails OR dev_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/developer.md` and STOP
+    ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -646,7 +646,7 @@ END TURN 1 (wait for skill responses)
 // 🔴 MANDATORY: Read the FULL QA Expert agent file
 qa_definition = Read("agents/qa_expert.md")  // Full agent instructions
 IF Read fails OR qa_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/qa_expert.md` and STOP
+    ⚠️ Agent file read failed | agents/qa_expert.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -815,7 +815,7 @@ END TURN 1 (wait for skill responses)
 // 🔴 MANDATORY: Read the FULL Tech Lead agent file
 tl_definition = Read("agents/techlead.md")  // Full agent instructions
 IF Read fails OR tl_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/techlead.md` and STOP
+    ⚠️ Agent file read failed | agents/techlead.md | Cannot proceed - spawn aborted
 
 // Build task context to append
 task_context = """
@@ -1154,7 +1154,7 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 // 🔴 MANDATORY: Read the FULL PM agent file
 pm_definition = Read("agents/project_manager.md")
 IF Read fails OR pm_definition is empty:
-    Output: `⚠️ Agent file read failed | agents/project_manager.md` and STOP
+    ⚠️ Agent file read failed | agents/project_manager.md | Cannot proceed - spawn aborted
 
 task_context = """
 ## Final Assessment Task
