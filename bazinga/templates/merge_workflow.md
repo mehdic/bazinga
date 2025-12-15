@@ -84,7 +84,7 @@ prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
 // Full prompt includes: CONTEXT_BLOCK + SPEC_BLOCK + dev_definition (~1400 lines) + task_context
 Task(
   subagent_type: "general-purpose",
-  model: MODEL_CONFIG["developer"],  # Uses Haiku (simple merge task)
+  model: MODEL_CONFIG["developer"],
   description: "Dev {group_id}: merge to {initial_branch}",
   prompt: {prompt}  // NOT a custom template - includes full agent file!
 )
