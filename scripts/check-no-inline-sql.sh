@@ -4,9 +4,7 @@
 #
 # ALLOWED exceptions:
 # - .claude/skills/bazinga-db/ (the DB skill itself)
-# - .claude/skills/context-assembler/ (internal ranking queries)
 # - Documentation/examples explaining what NOT to do (marked with NEVER/❌/🚫)
-# - Educational content about SQL injection prevention
 
 # Don't use set -e as it interferes with loops and grep
 set +e
@@ -32,7 +30,8 @@ for path in "${ALLOWED_PATHS[@]}"; do
 done
 
 # Files to check (excluding research folder - contains analysis docs)
-FILES_TO_CHECK=$(eval "find agents .claude/commands .claude/skills bazinga/templates -name '*.md' $EXCLUDE_ARGS ! -path '**/resources/*' ! -path 'research/*' 2>/dev/null" || true)
+# Use ./ prefix for consistent path matching with find
+FILES_TO_CHECK=$(eval "find agents .claude/commands .claude/skills bazinga/templates -name '*.md' $EXCLUDE_ARGS ! -path '*/resources/*' ! -path './research/*' 2>/dev/null" || true)
 
 # Check 1: Inline SQL statements (the real danger)
 # These are hardcoded SQL strings that bypass the bazinga-db skill entirely
@@ -56,8 +55,8 @@ for file in $FILES_TO_CHECK; do
     fi
 
     # Look for actual SQL statements in code (not documentation)
-    # Pattern: SQL keywords followed by table-like patterns
-    matches=$(grep -n -E "cursor\.execute\(|\.execute\(['\"]?(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)" "$file" 2>/dev/null || true)
+    # Pattern: SQL keywords followed by table-like patterns (case-insensitive)
+    matches=$(grep -niE "cursor\.execute\(|\.execute\(['\"]?(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)" "$file" 2>/dev/null || true)
 
     if [ -n "$matches" ]; then
         # Filter out documentation/educational context
@@ -113,7 +112,8 @@ for file in $FILES_TO_CHECK; do
     fi
 
     # Look for sqlite3.connect which indicates actual DB connection code
-    matches=$(grep -n "sqlite3\.connect\|conn = sqlite3\|import sqlite3" "$file" 2>/dev/null || true)
+    # Note: -E flag required for alternation with |
+    matches=$(grep -nE "sqlite3\.connect|conn = sqlite3|import sqlite3" "$file" 2>/dev/null || true)
 
     if [ -n "$matches" ]; then
         # Filter out documentation/educational context
@@ -163,7 +163,6 @@ if [ $ERRORS_FOUND -gt 0 ]; then
     echo ""
     echo "Allowed exceptions:"
     echo "  ✅ .claude/skills/bazinga-db/ (the skill itself)"
-    echo "  ✅ .claude/skills/context-assembler/ (internal ranking)"
     echo "  ✅ Documentation examples marked with NEVER/❌/🚫/example"
     echo ""
     echo "See: .claude/skills/bazinga-db/SKILL.md for correct usage"

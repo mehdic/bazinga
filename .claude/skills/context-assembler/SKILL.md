@@ -225,6 +225,7 @@ import time
 session_id = sys.argv[1]
 group_id = sys.argv[2]
 limit = int(sys.argv[3])
+agent_type = sys.argv[4] if len(sys.argv) > 4 else 'developer'
 
 def db_cmd_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
     '''Execute bazinga-db command with retry on database busy.'''
@@ -234,11 +235,16 @@ def db_cmd_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
             try:
                 return json.loads(result.stdout) if result.stdout.strip() else []
             except json.JSONDecodeError:
+                # Surface error rather than silently returning empty
+                sys.stderr.write(f'JSON decode error: {result.stdout[:100]}\\n')
                 return []
         if 'database is locked' in result.stderr or 'SQLITE_BUSY' in result.stderr:
             if attempt < max_retries:
                 time.sleep(backoff_ms[attempt] / 1000.0)
                 continue
+        # Surface command errors
+        if result.stderr:
+            sys.stderr.write(f'Command error: {result.stderr[:200]}\\n')
         return []
     return []
 
@@ -246,7 +252,7 @@ def db_cmd_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
 # The get-context-packages command handles priority ordering internally
 collected = db_cmd_with_retry([
     'python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet',
-    'get-context-packages', session_id, group_id, 'developer', str(limit)
+    'get-context-packages', session_id, group_id, agent_type, str(limit)
 ])
 
 # Handle result format
@@ -261,7 +267,7 @@ else:
     total_available = 0
 
 print(json.dumps({'packages': packages, 'total_available': total_available}))
-" "$SESSION_ID" "$GROUP_ID" "$LIMIT")
+" "$SESSION_ID" "$GROUP_ID" "$LIMIT" "$AGENT_TYPE")
 
 else
     # Normal or Soft_Warning zone: Standard query

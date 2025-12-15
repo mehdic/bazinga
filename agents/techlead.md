@@ -1275,9 +1275,15 @@ os.system(f'rm -rf /tmp/{user_filename}')
 
 **Should be:**
 ```python
-import shlex
-safe_filename = shlex.quote(user_filename)
-subprocess.run(['rm', '-rf', f'/tmp/{safe_filename}'], shell=False)
+import os
+from pathlib import Path
+
+# Validate and sanitize filename (reject path traversal)
+safe_filename = Path(user_filename).name  # Strip any path components
+if not safe_filename or safe_filename.startswith('.'):
+    raise ValueError("Invalid filename")
+target_path = Path('/tmp') / safe_filename
+os.remove(target_path)  # Safer than rm -rf
 ```
 
 **Why:** Attacker could inject commands: `filename="; rm -rf /"` to execute arbitrary code
@@ -1346,26 +1352,27 @@ Migration 0005_add_user_tokens.py attempts to add user_id column, but migration 
 ### Solution 1: Make Migration Idempotent
 **Steps:**
 1. Edit migrations/0005_add_user_tokens.py
-2. Use Django's built-in state operations for idempotency:
+2. Use RunSQL with conditional logic that works on both fresh and existing DBs:
 ```python
-from django.db import migrations, models
+from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [('myapp', '0004_previous')]
 
     operations = [
-        # Use state_operations to avoid duplicate column errors
-        migrations.SeparateDatabaseAndState(
+        # PostgreSQL: Use IF NOT EXISTS for idempotency
+        migrations.RunSQL(
+            sql="ALTER TABLE users ADD COLUMN IF NOT EXISTS user_id INTEGER;",
+            reverse_sql="ALTER TABLE users DROP COLUMN IF EXISTS user_id;",
             state_operations=[
-                migrations.AddField('User', 'user_id', models.IntegerField(null=True)),
+                migrations.AddField('users', 'user_id', models.IntegerField(null=True)),
             ],
-            database_operations=[],  # Skip if column exists
         ),
     ]
 ```
 3. Run: `python manage.py migrate`
 
-**Expected Result:** Migration completes without error
+**Expected Result:** Migration completes on both fresh installs and existing DBs
 
 ### Solution 2: Use ALTER Instead of ADD
 **Steps:**

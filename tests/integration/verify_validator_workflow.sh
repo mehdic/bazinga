@@ -2,9 +2,10 @@
 # Verify validator workflow integration
 # Usage: ./verify_validator_workflow.sh <session_id>
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
-SESSION_ID=$1
+SESSION_ID="${1:-}"
 
 if [ -z "$SESSION_ID" ]; then
     echo "Usage: $0 <session_id>"
@@ -47,6 +48,11 @@ else
     elif [ "$VERDICT_VALUE" = "ACCEPT" ] || [ "$VERDICT_VALUE" = "REJECT" ]; then
         echo "✅ PASS: Validator verdict found"
         echo "   Verdict: $VERDICT_VALUE"
+        # Extract additional diagnostics (reason, scope_check) for troubleshooting
+        VERDICT_REASON=$(echo "$VERDICT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('event_payload',{}).get('reason','N/A')[:100] if isinstance(d,list) and len(d)>0 else 'N/A')" 2>/dev/null || echo "N/A")
+        VERDICT_SCOPE=$(echo "$VERDICT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('event_payload',{}).get('scope_check','N/A') if isinstance(d,list) and len(d)>0 else 'N/A')" 2>/dev/null || echo "N/A")
+        echo "   Reason: $VERDICT_REASON"
+        echo "   Scope check: $VERDICT_SCOPE"
         PASS_COUNT=$((PASS_COUNT + 1))
         VERDICT_STATUS="$VERDICT_VALUE"
     else
@@ -61,11 +67,13 @@ echo ""
 # Check 2: Validator gate check exists AND passed=true
 echo "━━━ Check 2: Validator Gate Check ━━━"
 GATE=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events "$SESSION_ID" "validator_gate_check" 1 2>/dev/null || echo "")
+GATE_MISSING="false"
 if [ -z "$GATE" ] || [ "$GATE" = "[]" ] || [ "$GATE" = "null" ]; then
     echo "⚠️ WARNING: No validator_gate_check event found"
     echo "   → Shutdown protocol may not have executed Step 0"
-    echo "   → If session is completed, the gate may have been bypassed"
+    echo "   → Will verify against session status"
     WARN_COUNT=$((WARN_COUNT + 1))
+    GATE_MISSING="true"
 else
     # FIX #3: Check if passed=true, not just if event exists
     GATE_PASSED=$(echo "$GATE" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d[0].get('event_payload',{}).get('passed',False) if isinstance(d,list) and len(d)>0 else False; print('true' if p is True or p == 'true' else 'false')" 2>/dev/null || echo "false")
@@ -156,6 +164,17 @@ elif [ "$VERDICT_STATUS" = "missing" ]; then
 elif [ "$VERDICT_STATUS" = "unknown" ] || [ "$VERDICT_STATUS" = "invalid" ]; then
     echo "   → Cannot validate session status consistency (verdict was invalid)"
     # Already counted as fail in Check 1, don't double-count
+fi
+
+# Additional check: Missing gate + completed session = FAIL
+if [ "$GATE_MISSING" = "true" ] && [ "$SESSION_STATUS" = "completed" ]; then
+    echo ""
+    echo "❌ FAIL: Session completed but validator_gate_check was missing"
+    echo "   → The shutdown protocol's Step 0 gate was bypassed"
+    echo "   → This indicates a critical security issue"
+    # Convert the warning to a failure
+    WARN_COUNT=$((WARN_COUNT - 1))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 echo ""
 
