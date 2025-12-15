@@ -548,7 +548,10 @@ completed_items = sum(group.item_count for group in task_groups if group.status 
 **IF `session.Original_Scope` is null OR `estimated_items` is null/0:**
 - **DO NOT** proceed with scope comparison (will be inaccurate)
 - **DERIVE from task groups:** `estimated_items = sum(group.item_count for group in task_groups)`
-- Update session with derived value OR respawn PM to set Original_Scope
+- Update session with derived value:
+  ```
+  Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"derived_estimated_items": N, "derivation_source": "task_groups"}
+  ```
 - Log warning: "Original_Scope.estimated_items missing - derived from task groups"
 
 **Note:** PM should set this during planning. If missing, deriving from task groups is the safe fallback.
@@ -566,7 +569,11 @@ for group in task_groups:
 
 **IF any group has item_count=0 or null:**
 - **DO NOT** proceed with scope comparison (will be inaccurate)
-- Respawn PM with: "Task group '{group_id}' missing item_count. Invoke bazinga-db update-task-group to set --item_count (default 1 if unsure)."
+- Respawn PM with: "Task group '{group_id}' missing item_count. Use update-task-group to set item_count."
+- PM fixes via:
+  ```
+  Skill(command: "bazinga-db") → update-task-group {session_id} {group_id} in_progress --item_count 1
+  ```
 - **BLOCK** workflow until PM fixes this
 
 **Note:** Database defaults item_count to 1 on INSERT, so this should rarely trigger. If it does, PM violated the mandatory field requirement.

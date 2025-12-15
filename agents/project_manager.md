@@ -2101,6 +2101,8 @@ Skill(command: "bazinga-db")
 - Revisions 1-2: Tech Lead uses **MODEL_CONFIG["tech_lead"]** (configured default)
 - Revisions 3+: Tech Lead escalates to higher tier if available
 
+*Note: Model/tier selection is driven by `bazinga/model_selection.json`. Do not embed model names in prompts.*
+
 **Response:**
 ```markdown
 ## PM Status Update
