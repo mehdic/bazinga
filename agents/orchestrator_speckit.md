@@ -414,9 +414,9 @@ Note: Developers won't have full requirements context."
 ### Fix 3: Scope Continuity Check (EVERY TURN)
 
 **At the START of every turn:**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session "{session_id}"
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+```
+Skill(command: "bazinga-db") → get-session {session_id}
+Skill(command: "bazinga-db") → get-task-groups {session_id}
 ```
 
 **Compare:** `completed_items` vs `Original_Scope.estimated_items`
@@ -436,8 +436,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups 
 ### Fix 5: Post-Compaction Recovery
 
 **After context compaction, automatically resume:**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 ```
 - Resume from where workflow paused
 - Never ask permission after recovery

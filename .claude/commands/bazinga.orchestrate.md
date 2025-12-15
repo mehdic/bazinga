@@ -238,7 +238,7 @@ IF about to call Task():
 | `bash bazinga/scripts/build-baseline.sh` | Run build baseline |
 | `git branch --show-current` | Get current branch (init only) |
 
-**ANY command not matching above → STOP → Spawn agent**
+**ANY command not matching above → STOP → Spawn agent OR use Skill**
 
 **Explicitly FORBIDDEN (spawn agent instead):**
 - `git push/pull/merge/checkout` → Spawn Developer
@@ -246,6 +246,8 @@ IF about to call Task():
 - `npm/yarn/pnpm *` → Spawn Developer (except via build-baseline.sh)
 - `python/pytest *` → Spawn QA Expert
 - Commands with credentials/tokens → Spawn agent
+
+**Database operations → Use `Skill(command: "bazinga-db")`** (NOT CLI)
 
 ### §Policy-Gate: Pre-Bash Validation
 
@@ -447,25 +449,24 @@ Am I saying "complete", "done", "finished" without:
 
 **Database-Backed State (Survives Context Compaction):**
 
-```bash
-# Check if clarification already used (MANDATORY before honoring NEEDS_CLARIFICATION)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 # Look for: "clarification_used": true
 ```
 
 **FIRST TIME PM returns `NEEDS_CLARIFICATION`:**
 1. Check database state - if `clarification_used` is false or state doesn't exist:
 2. Save state to database IMMEDIATELY:
-   ```bash
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{session_id}" "orchestrator" '{"clarification_used": true, "clarification_question": "PM_QUESTION_HERE"}'
+   ```
+   Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"clarification_used": true, "clarification_question": "PM_QUESTION_HERE"}
    ```
 3. Output PM's question to user - ALLOWED
 4. Wait for user response - ALLOWED
 
 **AFTER USER RESPONDS:**
 1. Update database with resolution:
-   ```bash
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{session_id}" "orchestrator" '{"clarification_used": true, "clarification_resolved": true, "user_response": "RESPONSE_SUMMARY"}'
+   ```
+   Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"clarification_used": true, "clarification_resolved": true, "user_response": "RESPONSE_SUMMARY"}
    ```
 2. Resume workflow with user's answer
 
@@ -479,14 +480,14 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{sess
 - **AUTO-FALLBACK:** Respawn PM immediately with fallback message
 
 **Auto-Fallback State Tracking (Read-Modify-Write Pattern):**
-```bash
+```
 # Step 1: Read current state to get existing counter
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 # Returns: {"clarification_used": true, "autofallback_attempts": 1, ...}
 
 # Step 2: Increment counter (current_value + 1)
 # Step 3: Save updated state
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{session_id}" "orchestrator" '{"clarification_used": true, "clarification_resolved": true, "autofallback_attempts": 2}'
+Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"clarification_used": true, "clarification_resolved": true, "autofallback_attempts": 2}
 ```
 
 **Note:** Always read current state first to avoid overwriting. If `autofallback_attempts` doesn't exist, default to 0 before incrementing.
@@ -523,12 +524,12 @@ Task(
 
 ### Step 1: Query Current State
 
-```bash
+```
 # Get session with original scope
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session "{session_id}"
+Skill(command: "bazinga-db") → get-session {session_id}
 
 # Get all task groups
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+Skill(command: "bazinga-db") → get-task-groups {session_id}
 ```
 
 ### Step 2: Compare Progress to Original Scope
@@ -585,8 +586,8 @@ for group in task_groups:
 
 **Check orchestrator state in database:**
 
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 ```
 
 **IF `clarification_used = true` AND `clarification_resolved = false`:**
@@ -655,9 +656,9 @@ Context compaction may occur when:
 
 **Step 1: Check Session State**
 
-```bash
+```
 # Get most recent session (newest-first ordering, limit 1)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+Skill(command: "bazinga-db") → list-sessions 1
 ```
 
 **Note:** `list-sessions` returns sessions ordered by `created_at DESC` (newest first). The argument `1` limits results to the most recent session.
@@ -665,8 +666,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
 **Step 2: Evaluate Session Status**
 
 **IF `status = "active"`:**
-1. Query task groups: `get-task-groups {session_id}`
-2. Query session: `get-session {session_id}` for clarification state
+1. Query task groups: `Skill(command: "bazinga-db") → get-task-groups {session_id}`
+2. Query session: `Skill(command: "bazinga-db") → get-session {session_id}` for clarification state
 3. Apply resume logic below
 
 **IF `status = "completed"`:**
@@ -676,8 +677,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
 ### Resume Logic (Active Session)
 
 **Query orchestrator state:**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 ```
 
 **IF `clarification_used = true` AND `clarification_resolved = false`:**
@@ -1507,10 +1508,8 @@ Before ANY analysis, save your understanding of this request:
    ```
 
 2. Save to database:
-   ```bash
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-     "{session_id}" "global" "project_manager" "understanding" \
-     --content-file bazinga/artifacts/{session_id}/pm_understanding.md --confidence high
+   ```
+   Skill(command: "bazinga-db") → save-reasoning {session_id} global project_manager understanding --content-file bazinga/artifacts/{session_id}/pm_understanding.md --confidence high
    ```
 
 **Do NOT proceed with planning until understanding is saved.**
@@ -2091,26 +2090,22 @@ Extract the block content.
 
 After extracting the block, verify the skill saved its output to the database:
 
-```bash
-# Check if skill output was saved using get-skill-output-all (returns array)
-SKILL_COUNT=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet \
-  get-skill-output-all "{session_id}" "specialization-loader" --agent "{agent_type}" 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d, list) else 0)" 2>/dev/null)
+```
+# Check if skill output was saved
+Skill(command: "bazinga-db") → get-skill-output-all {session_id} specialization-loader --agent {agent_type}
+# Returns array of outputs
 
-if [ -z "$SKILL_COUNT" ] || [ "$SKILL_COUNT" = "0" ]; then
-  echo "⚠️ WARNING: Skill output not saved to database. Saving fallback..."
-  # Orchestrator saves minimal record as fallback
-  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-skill-output \
-    "{session_id}" "specialization-loader" '{
-      "group_id": "{group_id}",
-      "agent_type": "{agent_type}",
-      "model": "{model}",
-      "templates_used": ["fallback-orchestrator-save"],
-      "token_count": 0,
-      "composed_identity": "Fallback: skill did not save output",
-      "fallback": true
-    }' --agent "{agent_type}" --group "{group_id}"
-fi
+# IF result is empty array [] or error:
+# Save fallback record:
+Skill(command: "bazinga-db") → save-skill-output {session_id} specialization-loader {
+  "group_id": "{group_id}",
+  "agent_type": "{agent_type}",
+  "model": "{model}",
+  "templates_used": ["fallback-orchestrator-save"],
+  "token_count": 0,
+  "composed_identity": "Fallback: skill did not save output",
+  "fallback": true
+} --agent {agent_type} --group {group_id}
 ```
 
 **🔴 This verification is MANDATORY.** Silent failures in skill persistence will be caught and remediated.
