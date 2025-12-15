@@ -119,15 +119,18 @@ This adds 2-4 minutes upfront but provides better decisions, fewer revisions, an
 
 ### The Team
 
-BAZINGA coordinates 7 specialized AI agents:
+BAZINGA coordinates 8 specialized AI agents:
 
 1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
 2. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
 3. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
-4. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
-5. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
-6. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
-7. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
+4. **Senior Software Engineer (SSE)** - Handles complex tasks (complexity 7-10), security-sensitive code, and architectural work; escalation target when Developers get stuck
+5. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
+6. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
+7. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
+8. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
+
+All agents are enhanced with **72 technology specializations** covering languages, frameworks, databases, and infrastructure—ensuring each agent receives context-appropriate expertise for your project's tech stack.
 
 ### The Workflow
 
