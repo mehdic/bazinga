@@ -427,6 +427,109 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 - ❌ NEVER serialize: "first A, then B"
 - ❌ NEVER partial spawn: handle ALL groups NOW
 
+### Step 2B.2b: Developer/SSE Spawn on Failure or Escalation (Per Group)
+
+**When a Developer reports PARTIAL, INCOMPLETE, or ESCALATE_SENIOR, use this section.**
+
+**Escalation Rules:**
+- 1st failure → Re-spawn Developer
+- 2nd failure → Escalate to SSE
+- 3rd+ failure → Route to Tech Lead
+
+**TURN 1: Invoke Both Skills**
+
+**A. Context Assembly:**
+```
+Assemble context for agent spawn:
+- Session: {session_id}
+- Group: {group_id}
+- Agent: {developer OR senior_software_engineer based on revision_count}
+- Model: {MODEL_CONFIG[agent_type]}
+- Current Tokens: {estimated_token_usage}
+- Iteration: {revision_count}
+```
+Then invoke: `Skill(command: "context-assembler")`
+→ Capture output as `{CONTEXT_BLOCK}`
+
+**B. Specialization Loading:**
+```
+[SPEC_CTX_START group={group_id} agent={agent_type}]
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+Model: {MODEL_CONFIG[agent_type]}
+Specialization Paths: {specializations from task_group or project_context.json}
+Testing Mode: {testing_mode}
+[SPEC_CTX_END]
+```
+Then invoke: `Skill(command: "specialization-loader")`
+→ Capture output as `{SPEC_BLOCK}`
+
+**✅ TURN 1 SELF-CHECK:**
+- [ ] Context-assembler invoked?
+- [ ] Specialization-loader invoked?
+
+END TURN 1
+
+---
+
+**TURN 2: Compose & Spawn Developer/SSE**
+
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
+```
+// 🔴 MANDATORY: Read the FULL agent file
+// Determine agent_type based on revision_count:
+// - revision_count < 2 → developer
+// - revision_count >= 2 → senior_software_engineer
+AGENT_FILE_MAP = {
+  "developer": "agents/developer.md",
+  "senior_software_engineer": "agents/senior_software_engineer.md"
+}
+IF agent_type NOT IN AGENT_FILE_MAP:
+    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
+agent_file_path = AGENT_FILE_MAP[agent_type]
+agent_definition = Read(agent_file_path)  // Full agent instructions
+IF Read fails OR agent_definition is empty:
+    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
+
+// Build task context to append
+task_context = """
+---
+
+## Continuation/Escalation Assignment
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Parallel
+**BRANCH:** {branch}
+**ITERATION:** {revision_count}
+
+**ORIGINAL TASK:** {original_task}
+**PREVIOUS ATTEMPT:** {previous_attempt_summary}
+**REMAINING ISSUES:** {remaining_issues}
+
+**COMMIT TO:** {branch}
+**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = agent_definition + task_context
+```
+
+**D. Compose Full Prompt & Spawn**:
+```
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt={prompt})`
+
+**✅ TURN 2 SELF-CHECK:**
+- [ ] Agent file Read() called?
+- [ ] CONTEXT_BLOCK present?
+- [ ] SPEC_BLOCK present?
+- [ ] Task() called?
+
+---
+
 ### Step 2B.3-2B.7: Route Each Group Independently
 
 **Critical difference from Simple Mode:** Each group flows through the workflow INDEPENDENTLY and CONCURRENTLY.
@@ -579,7 +682,7 @@ Task(subagent_type="general-purpose", model={model}, prompt={prompt})
   *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2B.7a** (Spawn Developer for merge)
 
-**IF Tech Lead requests changes:** Route back to Developer/SSE for this group (same as Step 2A.7).
+**IF Tech Lead requests changes:** Route back to Developer/SSE for this group using Step 2B.2b (Developer/SSE Spawn on Failure or Escalation).
 
 ### Step 2B.7a: Spawn Developer for Merge (Parallel Mode - Per Group)
 
@@ -647,10 +750,15 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 **AUTO-FIX (IF ANY question fails):**
 1. DO NOT end message without spawning
-2. Build spawn queue: INCOMPLETE/PARTIAL → Developer, FAILED → Investigator, READY_FOR_QA → QA, READY_FOR_REVIEW → Tech Lead
-3. Spawn ALL missing Tasks in ONE message
-4. Output: `🔄 Auto-fix: Found {N} incomplete → Spawning {agents} in parallel`
-5. Re-run checklist
+2. Build spawn queue using Step 2B.2b for agent selection:
+   - INCOMPLETE/PARTIAL: Developer (1st fail) OR SSE (2nd+ fail) - check revision_count
+   - FAILED → Investigator
+   - READY_FOR_QA → QA
+   - READY_FOR_REVIEW → Tech Lead
+3. For Developer/SSE spawns, use Step 2B.2b (full agent file + CONTEXT_BLOCK + SPEC_BLOCK)
+4. Spawn ALL missing Tasks in ONE message
+5. Output: `🔄 Auto-fix: Found {N} incomplete → Spawning {agents} in parallel`
+6. Re-run checklist
 
 **PASS CRITERIA (ALL THREE must pass):** ✅ All responses processed ✅ No incomplete groups unhandled ✅ All required Tasks spawned
 
