@@ -17,8 +17,9 @@ on:
   workflow_dispatch:
 
 # Only one run per branch - cancel in-progress runs when new commits arrive
+# Use head_ref for PRs (source branch) or ref for push (branch name)
 concurrency:
-  group: e2e-tests-${{ github.ref }}
+  group: e2e-tests-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
