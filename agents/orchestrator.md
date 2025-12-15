@@ -989,6 +989,31 @@ Task(
    test -f bazinga/project_context.json && echo "exists" || echo "missing"
    ```
 
+   **🔴 IF "missing":** Scout returned but didn't write the file. Create fallback immediately:
+   ```bash
+   mkdir -p bazinga
+   if [ -f ".claude/templates/project_context.template.json" ]; then
+       cp .claude/templates/project_context.template.json bazinga/project_context.json
+       echo "⚠️ Scout didn't write file - using template fallback"
+   else
+       cat > bazinga/project_context.json <<'EOF'
+   {
+     "schema_version": "2.0",
+     "detected_at": "1970-01-01T00:00:00Z",
+     "confidence": "low",
+     "primary_language": "unknown",
+     "secondary_languages": [],
+     "structure": "unknown",
+     "components": [],
+     "infrastructure": {},
+     "detection_notes": ["Scout completed but didn't write file - minimal fallback created"]
+   }
+   EOF
+       echo "⚠️ Scout didn't write file - using minimal fallback"
+   fi
+   ```
+   Then continue to step 2.
+
 2. **Register detection as context package (optional but recommended):**
    ```
    bazinga-db, save context package:
