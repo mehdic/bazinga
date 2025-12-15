@@ -76,22 +76,15 @@ echo "Retrieval limit for $AGENT_TYPE: $LIMIT"
 
 Default limits: developer=3, senior_software_engineer=5, qa_expert=5, tech_lead=5, investigator=5
 
-**Step 2b: Check FTS5 availability:**
+**Step 2b: FTS5 availability:**
+
+FTS5 is assumed unavailable (requires special SQLite build). Always use heuristic fallback in Step 3b for ranking.
 
 ```bash
-# Test FTS5 support by attempting to create a virtual table
-python3 -c "
-import sqlite3
-try:
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE VIRTUAL TABLE test USING fts5(x)')
-    print('FTS5_AVAILABLE=true')
-except:
-    print('FTS5_AVAILABLE=false')
-" 2>/dev/null || echo "FTS5_AVAILABLE=false"
+# FTS5 disabled by default - use heuristic ranking
+FTS5_AVAILABLE="false"
+echo "FTS5_AVAILABLE=$FTS5_AVAILABLE (heuristic fallback enabled)"
 ```
-
-If FTS5 is unavailable, Step 3 may return less optimal ranking; Step 3b provides heuristic fallback.
 
 **Step 2c: Determine token zone and budget:**
 
@@ -220,9 +213,11 @@ elif [ "$ZONE" = "Wrap-up" ]; then
 
 elif [ "$ZONE" = "Conservative" ]; then
     # Conservative zone: Priority fallback with LIMIT items across buckets
-    echo "ZONE=Conservative: Using priority fallback ladder"
+    echo "ZONE=Conservative: Using priority fallback ladder via bazinga-db"
+
+    # Use bazinga-db get-context-packages command for each priority level
     QUERY_RESULT=$(python3 -c "
-import sqlite3
+import subprocess
 import json
 import sys
 import time
@@ -230,57 +225,49 @@ import time
 session_id = sys.argv[1]
 group_id = sys.argv[2]
 limit = int(sys.argv[3])
+agent_type = sys.argv[4] if len(sys.argv) > 4 else 'developer'
 
-def db_query_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 250, 500]):
-    '''Execute parameterized query with retry on SQLITE_BUSY.'''
+def db_cmd_with_retry(cmd_args, max_retries=3, backoff_ms=[100, 250, 500]):
+    '''Execute bazinga-db command with retry on database busy.'''
     for attempt in range(max_retries + 1):
-        try:
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            rows = [dict(row) for row in cursor.fetchall()]
-            conn.close()
-            return rows
-        except sqlite3.OperationalError as e:
-            if 'database is locked' in str(e) and attempt < max_retries:
+        result = subprocess.run(cmd_args, capture_output=True, text=True)
+        if result.returncode == 0:
+            try:
+                return json.loads(result.stdout) if result.stdout.strip() else []
+            except json.JSONDecodeError:
+                # Surface error rather than silently returning empty
+                sys.stderr.write(f'JSON decode error: {result.stdout[:100]}\\n')
+                return []
+        if 'database is locked' in result.stderr or 'SQLITE_BUSY' in result.stderr:
+            if attempt < max_retries:
                 time.sleep(backoff_ms[attempt] / 1000.0)
                 continue
-            return []
+        # Surface command errors
+        if result.stderr:
+            sys.stderr.write(f'Command error: {result.stderr[:200]}\\n')
+        return []
     return []
 
-db_path = 'bazinga/bazinga.db'
+# Priority fallback: Use bazinga-db to fetch packages by priority
+# The get-context-packages command handles priority ordering internally
+collected = db_cmd_with_retry([
+    'python3', '.claude/skills/bazinga-db/scripts/bazinga_db.py', '--quiet',
+    'get-context-packages', session_id, group_id, agent_type, str(limit)
+])
 
-# Priority fallback: fill up to LIMIT across critical → high → medium
-priorities = ['critical', 'high', 'medium']
-collected = []
-total_available = 0
+# Handle result format
+if isinstance(collected, dict):
+    packages = collected.get('packages', [])
+    total_available = collected.get('total_available', len(packages))
+elif isinstance(collected, list):
+    packages = collected
+    total_available = len(packages)
+else:
+    packages = []
+    total_available = 0
 
-for priority in priorities:
-    if len(collected) >= limit:
-        break
-    remaining = limit - len(collected)
-
-    # Count total available at this priority (parameterized - NO SQL injection)
-    count_sql = '''SELECT COUNT(*) as cnt FROM context_packages
-                   WHERE session_id = ?
-                   AND (group_id = ? OR group_id IS NULL OR ? = '')
-                   AND priority = ?'''
-    count_result = db_query_with_retry(db_path, count_sql, (session_id, group_id, group_id, priority))
-    if count_result:
-        total_available += count_result[0].get('cnt', 0)
-
-    # Fetch packages at this priority (parameterized - NO SQL injection)
-    fetch_sql = '''SELECT id, file_path, priority, summary FROM context_packages
-                   WHERE session_id = ?
-                   AND (group_id = ? OR group_id IS NULL OR ? = '')
-                   AND priority = ?
-                   ORDER BY created_at DESC LIMIT ?'''
-    packages = db_query_with_retry(db_path, fetch_sql, (session_id, group_id, group_id, priority, remaining))
-    collected.extend(packages)
-
-print(json.dumps({'packages': collected, 'total_available': total_available}))
-" "$SESSION_ID" "$GROUP_ID" "$LIMIT")
+print(json.dumps({'packages': packages, 'total_available': total_available}))
+" "$SESSION_ID" "$GROUP_ID" "$LIMIT" "$AGENT_TYPE")
 
 else
     # Normal or Soft_Warning zone: Standard query
@@ -953,66 +940,25 @@ After formatting output, mark delivered packages as consumed in the `consumption
 ```bash
 # Only mark consumption if packages were actually delivered
 if { [ "$ZONE" = "Normal" ] || [ "$ZONE" = "Soft_Warning" ]; } && [ ${#PACKAGE_IDS[@]} -gt 0 ]; then
-    # Mark consumed packages using consumption_scope table (iteration-aware tracking per data-model.md)
-    python3 -c "
-import sys
-import time
-import sqlite3
-import hashlib
-
-session_id = sys.argv[1]
-group_id = sys.argv[2]
-agent_type = sys.argv[3]
-iteration = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].isdigit() else 0
-package_ids = sys.argv[5:] if len(sys.argv) > 5 else []  # Remaining args are package IDs
-
-def db_execute_with_retry(db_path, sql, params, max_retries=3, backoff_ms=[100, 200, 400]):
-    '''Execute SQL with retry on SQLITE_BUSY (exponential backoff per FR-010).'''
-    for attempt in range(max_retries + 1):
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            conn.commit()
-            conn.close()
-            return True
-        except sqlite3.OperationalError as e:
-            if 'database is locked' in str(e) and attempt < max_retries:
-                time.sleep(backoff_ms[attempt] / 1000.0)
-                continue
-            return False
-    return False
-
-# Insert consumption records into consumption_scope table (per data-model.md)
-# Uses parameterized queries for SQL injection prevention
-db_path = 'bazinga/bazinga.db'
-sql = '''INSERT OR IGNORE INTO consumption_scope
-         (scope_id, session_id, group_id, agent_type, iteration, package_id, consumed_at)
-         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))'''
-
-marked = 0
-for pkg_id in package_ids:
-    # Deterministic scope_id from composite key (ensures idempotency with unique index)
-    composite = f'{session_id}:{group_id}:{agent_type}:{iteration}:{pkg_id}'
-    scope_id = hashlib.sha256(composite.encode()).hexdigest()[:32]
-    if db_execute_with_retry(db_path, sql, (scope_id, session_id, group_id, agent_type, iteration, pkg_id)):
-        marked += 1
-
-print(f'Marked {marked}/{len(package_ids)} packages as consumed in consumption_scope')
-" "$SESSION_ID" "$GROUP_ID" "$AGENT_TYPE" "$ITERATION" "${PACKAGE_IDS[@]}"
+    # Mark consumed packages using bazinga-db mark-context-consumed command
+    marked=0
+    for pkg_id in "${PACKAGE_IDS[@]}"; do
+        if python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet \
+            mark-context-consumed "$pkg_id" "$AGENT_TYPE" "$ITERATION" 2>/dev/null; then
+            marked=$((marked + 1))
+        fi
+    done
+    echo "Marked $marked/${#PACKAGE_IDS[@]} packages as consumed via bazinga-db"
 else
     echo "Skipping consumption tracking (zone=$ZONE or no packages)"
 fi
 ```
 
 **Key features:**
-- Uses **consumption_scope** table (per data-model.md) for iteration-aware tracking
-- Uses **parameterized queries** (no SQL injection via f-strings)
-- Includes **exponential backoff retry** (100ms, 200ms, 400ms) per FR-010
-- Generates **deterministic scope_id** (SHA256 hash of session:group:agent:iteration:package) for idempotency
-- Includes **group_id** for proper session/group/agent/iteration tracking
+- Uses **bazinga-db mark-context-consumed** command (proper skill invocation)
+- Handles retry logic internally within bazinga-db skill
+- Iteration-aware tracking per data-model.md
 - **Skips** in Wrap-up/Emergency zones (nothing delivered)
-- Uses **sqlite3 directly** for parameterized safety
 
 ### Step 6: Handle Edge Cases
 

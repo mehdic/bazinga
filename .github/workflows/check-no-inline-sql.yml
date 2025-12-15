@@ -1,0 +1,75 @@
+name: Check No Inline SQL
+
+on:
+  pull_request:
+    paths:
+      - 'agents/**'
+      - '.claude/commands/**'
+      - '.claude/skills/**'
+      - 'bazinga/templates/**'
+      - 'scripts/check-no-inline-sql.sh'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'agents/**'
+      - '.claude/commands/**'
+      - '.claude/skills/**'
+      - 'bazinga/templates/**'
+      - 'scripts/check-no-inline-sql.sh'
+
+jobs:
+  check-no-inline-sql:
+    name: Verify No Direct SQL in Agents
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x scripts/check-no-inline-sql.sh
+
+      - name: Check for inline SQL violations
+        run: |
+          echo "🔍 Checking for prohibited inline SQL usage..."
+          echo ""
+          echo "Rule: All database operations MUST use Skill(command: \"bazinga-db\")"
+          echo ""
+          echo "Allowed exceptions:"
+          echo "  - .claude/skills/bazinga-db/ (skill implementation)"
+          echo "  - Documentation examples marked with NEVER/❌/🚫/example"
+          echo ""
+          ./scripts/check-no-inline-sql.sh
+
+      - name: Check passed
+        if: success()
+        run: |
+          echo ""
+          echo "✅ All files comply with the no-inline-SQL rule!"
+          echo ""
+          echo "Verified that:"
+          echo "  - No sqlite3 imports or commands in agent files"
+          echo "  - No cursor.execute() or raw SQL statements"
+          echo "  - No direct bazinga.db file access"
+          echo "  - All DB operations use Skill(command: \"bazinga-db\")"
+
+      - name: Check failed
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ Inline SQL check failed!"
+          echo ""
+          echo "One or more files contain direct SQL usage."
+          echo ""
+          echo "To fix:"
+          echo "  1. Replace raw SQL with Skill(command: \"bazinga-db\") invocations"
+          echo "  2. See .claude/skills/bazinga-db/SKILL.md for available commands"
+          echo "  3. See research/skill-implementation-guide.md for best practices"
+          echo ""
+          echo "Example correct usage:"
+          echo "  bazinga-db, get events for session [session_id] with type \"validator_verdict\" limit 1"
+          echo "  Skill(command: \"bazinga-db\")"
+          echo ""
+          exit 1
