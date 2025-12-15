@@ -119,12 +119,27 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 ### Check 3: Session Completed Successfully
 
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
+# Query sessions and filter by specific session_id
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 100 | \
+  python3 -c "
+import sys, json
+sessions = json.load(sys.stdin)
+target = '[session_id]'  # Replace with actual session ID
+for s in sessions:
+    if s.get('session_id') == target:
+        print(json.dumps(s, indent=2))
+        break
+else:
+    print('Session not found')
+"
 ```
 
 **Expected:**
 - `status: "completed"` (not "active")
 - `end_time` is set
+- `session_id` matches the target session
+
+**IMPORTANT:** Do NOT use `list-sessions 1` - it returns the most recent session which may not be your target session in multi-session environments.
 
 ---
 
@@ -201,76 +216,26 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-orchestratio
 
 ## Automated Verification Script
 
-Save as `tests/integration/verify_validator_workflow.sh`:
+**Location:** `tests/integration/verify_validator_workflow.sh`
 
+**Usage:**
 ```bash
-#!/bin/bash
-# Verify validator workflow integration
-# Usage: ./verify_validator_workflow.sh <session_id>
-
-SESSION_ID=$1
-
-if [ -z "$SESSION_ID" ]; then
-    echo "Usage: $0 <session_id>"
-    exit 1
-fi
-
-echo "=== Validator Workflow Verification ==="
-echo "Session: $SESSION_ID"
-echo ""
-
-# Check 1: Validator verdict exists
-echo "Check 1: Validator verdict..."
-VERDICT=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events "$SESSION_ID" "validator_verdict" 1 2>/dev/null)
-if [ -z "$VERDICT" ] || [ "$VERDICT" = "[]" ]; then
-    echo "❌ FAIL: No validator_verdict event found"
-    echo "   Validator was NOT invoked"
-    exit 1
-else
-    echo "✅ PASS: Validator verdict found"
-    echo "   $VERDICT"
-fi
-
-echo ""
-
-# Check 2: Validator gate check exists
-echo "Check 2: Validator gate check..."
-GATE=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events "$SESSION_ID" "validator_gate_check" 1 2>/dev/null)
-if [ -z "$GATE" ] || [ "$GATE" = "[]" ]; then
-    echo "⚠️ WARNING: No validator_gate_check event found"
-    echo "   Shutdown protocol may not have executed Step 0"
-else
-    echo "✅ PASS: Validator gate check found"
-    echo "   $GATE"
-fi
-
-echo ""
-
-# Check 3: Session status
-echo "Check 3: Session status..."
-STATUS=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 2>/dev/null | grep -o '"status": "[^"]*"' | head -1)
-echo "   $STATUS"
-
-# Check if verdict was ACCEPT and session is completed
-if echo "$VERDICT" | grep -q '"verdict": "ACCEPT"'; then
-    if echo "$STATUS" | grep -q '"status": "completed"'; then
-        echo "✅ PASS: ACCEPT verdict led to completed session"
-    else
-        echo "❌ FAIL: ACCEPT verdict but session not completed"
-        exit 1
-    fi
-elif echo "$VERDICT" | grep -q '"verdict": "REJECT"'; then
-    if echo "$STATUS" | grep -q '"status": "active"'; then
-        echo "✅ PASS: REJECT verdict kept session active"
-    else
-        echo "⚠️ WARNING: REJECT verdict but session is completed"
-        echo "   This may indicate a bypass of the validator gate"
-    fi
-fi
-
-echo ""
-echo "=== Verification Complete ==="
+./tests/integration/verify_validator_workflow.sh <session_id>
 ```
+
+**What it checks:**
+1. **Validator verdict** - Event exists with valid ACCEPT/REJECT value (not unknown)
+2. **Validator gate check** - Event exists AND `passed=true` (not just exists)
+3. **Session status** - Queries by specific session_id (not just first session)
+4. **PM BAZINGA message** - Logged for validator access
+
+**Key features:**
+- Filters sessions by SESSION_ID (not `list-sessions 1`)
+- Validates verdict is ACCEPT or REJECT (fails on unknown/parse_error)
+- Checks gate `passed` field is true (not just event existence)
+- Returns proper exit codes for CI integration
+
+**See the actual script for implementation details.**
 
 ---
 
