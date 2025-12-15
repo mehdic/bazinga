@@ -1,6 +1,7 @@
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
+import { existsSync } from "fs";
 
 // Types for better-sqlite3 (imported dynamically to handle architecture mismatch)
 type DatabaseInstance = {
@@ -22,7 +23,7 @@ type DrizzleFunction = (client: DatabaseInstance, config: { schema: typeof schem
 // Lazy database initialization to avoid build-time and architecture errors
 let _sqlite: DatabaseInstance | null = null;
 let _db: BetterSQLite3Database<typeof schema> | null = null;
-let _dbPath: string | null = null;
+let _dbPath: string | null = null;  // Cache the resolved path (but allow re-resolution on reconnect)
 let _moduleLoadFailed = false;
 let _DatabaseClass: DatabaseConstructor | null = null;
 let _drizzle: DrizzleFunction | null = null;
@@ -108,24 +109,48 @@ function resolveDatabasePath(): string {
   }
 
   // Development fallback: look for database relative to project
+  // Try two locations:
+  // 1. dashboard-v2/bazinga/bazinga.db (when running from dashboard-v2, e.g. tests)
+  // 2. ../bazinga/bazinga.db (when running from root bazinga directory)
+  const localPath = path.resolve(process.cwd(), "bazinga", "bazinga.db");
+  if (existsSync(localPath)) {
+    return localPath;
+  }
   return path.resolve(process.cwd(), "..", "bazinga", "bazinga.db");
 }
 
 function getDatabase(): DatabaseInstance | null {
-  if (_sqlite) return _sqlite;
   if (_moduleLoadFailed) return null;
+
+  // Always recalculate the path (in case database appears after server startup)
+  const currentPath = resolveDatabasePath();
+
+  // If we have a cached connection, verify the path is still the same
+  if (_sqlite) {
+    if (currentPath === _dbPath) {
+      return _sqlite;
+    }
+    // Path changed (e.g., database now exists in a different location)
+    // Close old connection and open new one
+    try {
+      _sqlite.close();
+    } catch {
+      // Already closed, that's fine
+    }
+    _sqlite = null;
+    _db = null;  // Clear drizzle cache too since underlying database changed
+  }
 
   // First, try to load the modules
   const modules = loadDatabaseModules();
   if (!modules) return null;
 
   try {
-    // Resolve path lazily on first access (not at import time)
-    if (!_dbPath) {
-      _dbPath = resolveDatabasePath();
-    }
-    _sqlite = new modules.Database(_dbPath, { readonly: true });
-    // Note: WAL mode not set - requires write access, but we're read-only
+    _dbPath = currentPath;  // Always update _dbPath with current resolution
+    // In development/test, allow write access (may be needed for tests seeding data)
+    // In production, use read-only mode (set via DATABASE_URL or environment)
+    const isReadOnly = process.env.NODE_ENV === "production" && !process.env.DATABASE_URL?.startsWith("file:");
+    _sqlite = new modules.Database(_dbPath, { readonly: isReadOnly });
     return _sqlite;
   } catch (error) {
     // If database file doesn't exist, return null (allows build to succeed)
@@ -134,7 +159,7 @@ function getDatabase(): DatabaseInstance | null {
     if (errorMessage.includes("SQLITE_CANTOPEN") ||
         errorMessage.includes("unable to open database") ||
         errorMessage.includes("no such file")) {
-      console.warn(`Database not available at ${_dbPath}: ${error}`);
+      // This is expected during initial server startup before database is created
       return null;
     }
 
@@ -149,8 +174,18 @@ function getDatabase(): DatabaseInstance | null {
 }
 
 function getDrizzle(): BetterSQLite3Database<typeof schema> | null {
-  if (_db) return _db;
   if (_moduleLoadFailed) return null;
+
+  // If we have a cached drizzle instance, check if underlying database changed
+  if (_db && _sqlite) {
+    // If getDatabase() returns a different instance, our drizzle is stale
+    const currentSqlite = getDatabase();
+    if (currentSqlite && currentSqlite === _sqlite) {
+      return _db;  // Same database connection, safe to return cached drizzle
+    }
+    // Database changed (or closed), clear stale drizzle instance
+    _db = null;
+  }
 
   const sqlite = getDatabase();
   if (!sqlite) return null;
