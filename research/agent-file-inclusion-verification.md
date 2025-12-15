@@ -2,18 +2,19 @@
 
 **Date:** 2025-12-15
 **Context:** Verification of changes to include full agent files in spawn prompts
-**Related Commits:** 71b6d31, 69ba322, 51a61b3
-**Status:** Under Review
+**Related Commits:** 71b6d31, 69ba322, 51a61b3, f225625
+**Status:** Completed - All issues resolved
 
 ---
 
 ## Summary of Changes
 
-We made three commits to fix the "SSE spawns subagents instead of implementing" bug:
+We made four commits to fix the "SSE spawns subagents instead of implementing" bug:
 
 1. **71b6d31** - Added NO DELEGATION rule to agent source files (developer.base.md, senior.delta.md)
 2. **69ba322** - Added NO DELEGATION rule to base_prompt templates (the actual fix)
 3. **51a61b3** - Changed architecture to read full agent files before spawning
+4. **f225625** - Fixed critical bugs identified by ultrathink review (AGENT_FILE_MAP, Read allowlist)
 
 ## Change Analysis
 
@@ -27,9 +28,20 @@ We made three commits to fix the "SSE spawns subagents instead of implementing" 
 - `bazinga/templates/orchestrator/phase_simple.md` (+168 lines, -75 lines)
 - `bazinga/templates/orchestrator/phase_parallel.md` (+49 lines, -22 lines)
 
+### Commit 4 (f225625) - Ultrathink Review Fixes
+
+**What we changed:**
+- Added explicit `AGENT_FILE_MAP` to handle file naming inconsistencies (tech_lead → techlead.md)
+- Updated orchestrator Read allowlist to include `agents/*.md` and `bazinga/templates/*.md`
+
+**Files Modified:**
+- `bazinga/templates/orchestrator/phase_simple.md` - Added AGENT_FILE_MAP
+- `bazinga/templates/orchestrator/phase_parallel.md` - Added AGENT_FILE_MAP in 2 locations
+- `agents/orchestrator.md` - Updated Read allowlist
+
 ---
 
-## Potential Issues to Verify
+## Potential Issues (All Resolved)
 
 ### 1. Agent File Paths
 
@@ -44,7 +56,19 @@ We made three commits to fix the "SSE spawns subagents instead of implementing" 
 | tech_lead | `agents/techlead.md` | `agents/techlead.md` |
 | investigator | `agents/investigator.md` | `agents/investigator.md` |
 
-**Issue Found:** Tech Lead file is `techlead.md` (no underscore) but other agents use underscores. This is intentional (matches existing files) but should be noted.
+**Issue Found:** Tech Lead file is `techlead.md` (no underscore) but other agents use underscores.
+
+**✅ RESOLVED (commit f225625):** Added explicit `AGENT_FILE_MAP` to handle this:
+```python
+AGENT_FILE_MAP = {
+  "developer": "agents/developer.md",
+  "senior_software_engineer": "agents/senior_software_engineer.md",
+  "requirements_engineer": "agents/requirements_engineer.md",
+  "qa_expert": "agents/qa_expert.md",
+  "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
+  "investigator": "agents/investigator.md"
+}
+```
 
 ### 2. Token Budget Concerns
 
@@ -188,7 +212,8 @@ ls -la agents/investigator.md
 
 ### Must Fix (Before Merge)
 
-1. **None identified** - Changes appear correct
+1. ✅ **DONE** - Added AGENT_FILE_MAP to fix tech_lead path
+2. ✅ **DONE** - Updated orchestrator Read allowlist for agent files
 
 ### Should Fix (Soon)
 
@@ -202,15 +227,36 @@ ls -la agents/investigator.md
 
 ---
 
+## External LLM Review Integration
+
+**Reviewed by:** OpenAI GPT-4, Google Gemini (via ultrathink process)
+
+### Critical Issues Identified & Fixed
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| tech_lead → techlead.md path mismatch | Critical | ✅ Fixed (AGENT_FILE_MAP) |
+| Missing CONTEXT_BLOCK in QA/TL spawns | High | ✅ Fixed |
+| Read allowlist doesn't include agent files | High | ✅ Fixed |
+
+### Consensus Points (Both LLMs Agreed)
+
+1. Architecture change (full agent files) is correct approach
+2. Token budget is not a concern (~5-7K tokens per spawn vs 200K limit)
+3. AGENT_FILE_MAP needed for path consistency
+
+---
+
 ## Conclusion
 
-The implementation appears **correct and safe**. The main architectural change (reading full agent files) is:
+The implementation is **complete and verified**. The main architectural change (reading full agent files) is:
 
 1. **Consistent** with existing PM/Scout pattern
-2. **Complete** - covers all agent types
+2. **Complete** - covers all agent types with explicit path mapping
 3. **Token-safe** - well within context limits
 4. **Effective** - agents now receive full instructions
+5. **Policy-compliant** - orchestrator Read allowlist updated
 
-The NO DELEGATION rule duplication concern is a non-issue since we replaced the old template.
+All critical issues from ultrathink review have been resolved.
 
-**Recommendation:** Proceed with external LLM review for additional validation.
+**Status:** Ready for merge.
