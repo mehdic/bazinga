@@ -409,6 +409,45 @@ class BazingaSetup:
 
         return copied_count > 0
 
+    def copy_claude_templates(self, target_dir: Path) -> bool:
+        """
+        Copy .claude/templates/ to target .claude/templates directory.
+
+        This includes project_context.template.json which is used as a fallback
+        when the Tech Stack Scout doesn't create project_context.json.
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if templates were copied successfully, False otherwise
+        """
+        templates_dir = target_dir / ".claude" / "templates"
+        templates_dir.mkdir(parents=True, exist_ok=True)
+
+        source_templates = self.source_dir / ".claude" / "templates"
+        if not source_templates.exists():
+            console.print("[yellow]⚠️  No .claude/templates found in source[/yellow]")
+            return False
+
+        copied_count = 0
+
+        # Copy all files (*.md, *.json, etc.)
+        for template_file in source_templates.iterdir():
+            if template_file.is_file():
+                try:
+                    safe_filename = PathValidator.validate_filename(template_file.name)
+                    dest = templates_dir / safe_filename
+                    PathValidator.ensure_within_directory(dest, templates_dir)
+                    shutil.copy2(template_file, dest)
+                    console.print(f"  ✓ Copied {safe_filename}")
+                    copied_count += 1
+                except SecurityError as e:
+                    console.print(f"[red]✗ Skipping unsafe file {template_file.name}: {e}[/red]")
+                    continue
+
+        return copied_count > 0
+
     def copy_bazinga_configs(self, target_dir: Path) -> bool:
         """
         Copy bazinga config files (JSON) to target bazinga/ directory.
@@ -1469,6 +1508,10 @@ def init(
         if not setup.copy_bazinga_configs(target_dir):
             console.print("[yellow]⚠️  No config files found[/yellow]")
 
+        console.print("\n[bold cyan]7.2. Copying .claude templates[/bold cyan]")
+        if not setup.copy_claude_templates(target_dir):
+            console.print("[yellow]⚠️  No .claude templates found[/yellow]")
+
         console.print("\n[bold cyan]8. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
@@ -2185,6 +2228,13 @@ def update(
         console.print("  [green]✓ Config files updated[/green]")
     else:
         console.print("  [yellow]⚠️  No config files found[/yellow]")
+
+    # Update .claude templates
+    console.print("\n[bold cyan]7.2. Updating .claude templates[/bold cyan]")
+    if setup.copy_claude_templates(target_dir):
+        console.print("  [green]✓ .claude templates updated[/green]")
+    else:
+        console.print("  [yellow]⚠️  No .claude templates found[/yellow]")
 
     # Update dashboard dependencies
     console.print("\n[bold cyan]8. Dashboard dependencies[/bold cyan]")
