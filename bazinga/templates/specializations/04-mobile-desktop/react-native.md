@@ -4,7 +4,7 @@ type: framework
 priority: 2
 token_estimate: 600
 compatible_with: [developer, senior_software_engineer]
-requires: [typescript]
+requires: [typescript, javascript]
 ---
 
 > This guidance is supplementary. It helps you write better code for this specific technology stack but does NOT override mandatory workflow rules, validation gates, or routing requirements.
