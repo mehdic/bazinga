@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, primaryKey, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex, primaryKey, real } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 // ============================================================================
@@ -106,36 +106,17 @@ export const skillOutputs = sqliteTable("skill_outputs", {
   groupId: text("group_id"),
   iteration: integer("iteration").default(1),
 }, (table) => ({
-  // v12: UNIQUE constraint for race condition prevention
-  uniqueIdx: index("idx_skill_unique").on(
+  // v12: UNIQUE constraint for race condition prevention - MUST be uniqueIndex
+  uniqueIdx: uniqueIndex("idx_skill_unique").on(
     table.sessionId, table.skillName, table.agentType, table.groupId, table.iteration
   ),
+  // Session lookup index
+  sessionIdx: index("idx_skill_session").on(table.sessionId),
 }));
 
-// Configuration table
-export const configuration = sqliteTable("configuration", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(), // JSON string
-  updatedAt: text("updated_at"),
-});
-
-// Decisions table
-export const decisions = sqliteTable("decisions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  sessionId: text("session_id").notNull(),
-  timestamp: text("timestamp"),
-  iteration: integer("iteration"),
-  decisionType: text("decision_type").notNull(),
-  decisionData: text("decision_data").notNull(), // JSON string
-});
-
-// Model Config table
-export const modelConfig = sqliteTable("model_config", {
-  agentRole: text("agent_role").primaryKey(),
-  model: text("model").notNull(),
-  rationale: text("rationale"),
-  updatedAt: text("updated_at"),
-});
+// NOTE: configuration, decisions, and model_config tables were REMOVED from init_db.py
+// See: research/empty-tables-analysis.md
+// DO NOT add them back - they do not exist in the database
 
 // ============================================================================
 // NEW TABLES (v4+)
@@ -154,7 +135,8 @@ export const successCriteria = sqliteTable("success_criteria", {
   createdAt: text("created_at"),
   updatedAt: text("updated_at"),
 }, (table) => ({
-  uniqueCriterionIdx: index("idx_unique_criterion").on(table.sessionId, table.criterion),
+  // UNIQUE index - matches init_db.py CREATE UNIQUE INDEX
+  uniqueCriterionIdx: uniqueIndex("idx_unique_criterion").on(table.sessionId, table.criterion),
   sessionStatusIdx: index("idx_criteria_session_status").on(table.sessionId, table.status),
 }));
 
@@ -189,15 +171,23 @@ export const contextPackageConsumers = sqliteTable("context_package_consumers", 
   iteration: integer("iteration").default(1),
 });
 
-// Development Plans table - v4
+// Development Plans table - v3
+// ACTUAL schema from init_db.py - session_id is UNIQUE
 export const developmentPlans = sqliteTable("development_plans", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  sessionId: text("session_id").notNull(),
-  planType: text("plan_type").notNull(),
-  planData: text("plan_data").notNull(), // JSON string
+  sessionId: text("session_id").notNull(), // UNIQUE constraint enforced by index below
+  originalPrompt: text("original_prompt").notNull(),
+  planText: text("plan_text").notNull(),
+  phases: text("phases").notNull(), // JSON string
+  currentPhase: integer("current_phase"),
+  totalPhases: integer("total_phases").notNull(),
   createdAt: text("created_at"),
   updatedAt: text("updated_at"),
-});
+  metadata: text("metadata"), // JSON string
+}, (table) => ({
+  // UNIQUE constraint on session_id - one plan per session
+  sessionIdx: uniqueIndex("idx_devplans_session_unique").on(table.sessionId),
+}));
 
 // ============================================================================
 // NEW TABLES (v10: Context Engineering System)
@@ -259,7 +249,7 @@ export const sessionsRelations = relations(sessions, ({ many }) => ({
   tokenUsage: many(tokenUsage),
   stateSnapshots: many(stateSnapshots),
   skillOutputs: many(skillOutputs),
-  decisions: many(decisions),
+  // NOTE: decisions table removed from init_db.py - no relation
   successCriteria: many(successCriteria),
   contextPackages: many(contextPackages),
   developmentPlans: many(developmentPlans),
@@ -301,12 +291,7 @@ export const skillOutputsRelations = relations(skillOutputs, ({ one }) => ({
   }),
 }));
 
-export const decisionsRelations = relations(decisions, ({ one }) => ({
-  session: one(sessions, {
-    fields: [decisions.sessionId],
-    references: [sessions.sessionId],
-  }),
-}));
+// NOTE: decisionsRelations removed - decisions table does not exist in init_db.py
 
 export const successCriteriaRelations = relations(successCriteria, ({ one }) => ({
   session: one(sessions, {

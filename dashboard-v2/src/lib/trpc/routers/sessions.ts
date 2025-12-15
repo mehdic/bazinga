@@ -8,7 +8,7 @@ import {
   tokenUsage,
   stateSnapshots,
   skillOutputs,
-  decisions,
+  // NOTE: decisions table removed from init_db.py - do not import
   successCriteria,
   contextPackages,
   contextPackageConsumers,
@@ -22,7 +22,8 @@ export const sessionsRouter = router({
   // ============================================================================
 
   // Get schema capabilities for graceful degradation
-  getCapabilities: publicProcedure.query(async () => {
+  // NOTE: detectCapabilities() is synchronous (uses better-sqlite3 sync API)
+  getCapabilities: publicProcedure.query(() => {
     return detectCapabilities();
   }),
 
@@ -639,29 +640,6 @@ export const sessionsRouter = router({
       }));
     }),
 
-  // Get decisions for a session
-  getDecisions: publicProcedure
-    .input(z.object({ sessionId: z.string() }))
-    .query(async ({ input }) => {
-      try {
-        const result = await db
-          .select()
-          .from(decisions)
-          .where(eq(decisions.sessionId, input.sessionId))
-          .orderBy(desc(decisions.timestamp));
-
-        return result.map((decision) => ({
-          ...decision,
-          decisionData: (() => {
-            try {
-              return JSON.parse(decision.decisionData);
-            } catch {
-              return decision.decisionData;
-            }
-          })(),
-        }));
-      } catch {
-        return [];
-      }
-    }),
+  // NOTE: getDecisions removed - decisions table does not exist in init_db.py
+  // Decision data is now stored in orchestration_logs with log_type='event'
 });

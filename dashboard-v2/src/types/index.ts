@@ -191,14 +191,19 @@ export interface ContextPackageConsumer {
   iteration: number | null;
 }
 
-// Development Plan types - v4
+// Development Plan types - v3
+// ACTUAL schema from init_db.py - one plan per session (UNIQUE session_id)
 export interface DevelopmentPlan {
   id: number;
-  sessionId: string;
-  planType: string;
-  planData: string; // JSON string
+  sessionId: string; // UNIQUE constraint
+  originalPrompt: string;
+  planText: string;
+  phases: string; // JSON string array
+  currentPhase: number | null;
+  totalPhases: number;
   createdAt: string | null;
   updatedAt: string | null;
+  metadata: string | null; // JSON string
 }
 
 // ============================================================================
@@ -257,6 +262,7 @@ export interface SchemaCapabilities {
   hasTaskGroupExtensions: boolean;
   hasSkillOutputExtensions: boolean;
   hasContextEngineering: boolean; // error_patterns, strategies, consumption_scope
+  hasDevelopmentPlans: boolean; // development_plans table
 }
 
 // ============================================================================

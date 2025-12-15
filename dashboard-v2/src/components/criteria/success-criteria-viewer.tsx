@@ -76,8 +76,10 @@ export function SuccessCriteriaViewer({ sessionId }: SuccessCriteriaViewerProps)
     : 0;
 
   // Separate required and optional criteria
-  const requiredCriteria = criteria.filter((c) => c.requiredForCompletion);
-  const optionalCriteria = criteria.filter((c) => !c.requiredForCompletion);
+  // requiredForCompletion is INTEGER (0/1/null). Default in DB is 1.
+  // null should be treated as required (default behavior)
+  const requiredCriteria = criteria.filter((c) => c.requiredForCompletion !== 0);
+  const optionalCriteria = criteria.filter((c) => c.requiredForCompletion === 0);
 
   return (
     <div className="space-y-4">
@@ -182,6 +184,7 @@ interface CriterionItemProps {
     status: string | null;
     actual: string | null;
     evidence: string | null;
+    requiredForCompletion: number | null; // BOOLEAN as INTEGER (0/1/null)
     updatedAt: string | null;
   };
 }
