@@ -3230,7 +3230,7 @@ def main():
                 print(json.dumps({"success": False, "error": f"Invalid JSON in output_data: {e}"}, indent=2), file=sys.stderr)
                 sys.exit(1)
             iteration = db.save_skill_output(session_id, skill_name, output_data, agent_type, group_id)
-            if not quiet:
+            if not args.quiet:
                 print(json.dumps({"iteration": iteration}))
         elif cmd == 'get-skill-output':
             # Parse --agent flag
