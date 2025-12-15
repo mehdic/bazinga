@@ -1697,7 +1697,7 @@ IF specializations is null OR empty:
         # Last resort: map primary_language + framework from components
         IF empty:
             IF project_context.primary_language:
-                specializations.append(map_to_template(primary_language))
+                specializations.append(map_to_template(project_context.primary_language))
 
             # Try top-level framework field (legacy/simple projects)
             IF project_context.framework:
@@ -1709,7 +1709,7 @@ IF specializations is null OR empty:
                 FOR component in project_context.components:
                     IF component.framework:
                         specializations.append(map_to_template(component.framework))
-                    IF component.language AND component.language != primary_language:
+                    IF component.language AND component.language != project_context.primary_language:
                         specializations.append(map_to_template(component.language))
 
         specializations = deduplicate(specializations)

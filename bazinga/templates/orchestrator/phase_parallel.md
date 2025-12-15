@@ -277,8 +277,12 @@ AGENT_FILE_MAP = {
   "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
   "investigator": "agents/investigator.md"
 }
+IF agent_type NOT IN AGENT_FILE_MAP:
+    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
 agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/developer.md or agents/techlead.md
 agent_definitions[group_id] = Read(agent_file_path)  // Full 1400+ lines of agent instructions
+IF Read fails OR agent_definitions[group_id] is empty:
+    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
 
 // Build task context to append
 task_contexts[group_id] = """
@@ -510,8 +514,12 @@ AGENT_FILE_MAP = {
   "qa_expert": "agents/qa_expert.md",
   "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
 }
+IF agent_type NOT IN AGENT_FILE_MAP:
+    Output: `❌ Unknown agent type: {agent_type} | Cannot spawn without agent file` and STOP
 agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/qa_expert.md or agents/techlead.md
 agent_definition = Read(agent_file_path)  // Full agent instructions
+IF Read fails OR agent_definition is empty:
+    Output: `⚠️ Agent file read failed | {agent_file_path}` and STOP
 
 // Build task context to append (specific to QA or Tech Lead role)
 task_context = """
