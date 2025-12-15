@@ -36,7 +36,10 @@ jobs:
           echo "🔍 Checking for prohibited inline SQL usage..."
           echo ""
           echo "Rule: All database operations MUST use Skill(command: \"bazinga-db\")"
-          echo "Only .claude/skills/bazinga-db/ is allowed to contain SQL"
+          echo ""
+          echo "Allowed exceptions:"
+          echo "  - .claude/skills/bazinga-db/ (skill implementation)"
+          echo "  - Documentation examples marked with NEVER/❌/🚫/example"
           echo ""
           ./scripts/check-no-inline-sql.sh
 

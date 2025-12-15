@@ -93,18 +93,18 @@ echo ""
 # Check 3: Session status (query specific session by ID)
 echo "━━━ Check 3: Session Status ━━━"
 
-# FIX #2: Query specific session by ID instead of just taking first session
-SESSION_INFO=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 100 2>/dev/null || echo "[]")
+# Use get-session for direct lookup (no pagination issues)
+SESSION_INFO=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session "$SESSION_ID" 2>/dev/null || echo "null")
 SESSION_STATUS=$(echo "$SESSION_INFO" | python3 -c "
 import sys, json
 try:
-    sessions = json.load(sys.stdin)
-    target_id = '$SESSION_ID'
-    for s in sessions:
-        if s.get('session_id') == target_id or s.get('id') == target_id:
-            print(s.get('status', 'unknown'))
-            sys.exit(0)
-    print('not_found')
+    data = json.load(sys.stdin)
+    if data is None or data == 'null':
+        print('not_found')
+    elif isinstance(data, dict):
+        print(data.get('status', 'unknown'))
+    else:
+        print('parse_error')
 except:
     print('parse_error')
 " 2>/dev/null || echo "parse_error")
