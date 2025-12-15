@@ -688,3 +688,61 @@ Follow §Step 2A.9 routing rules with parallel-mode adaptations:
 
 ---
 
+## 🔴 PHASE COMPLETION - MANDATORY PM RE-SPAWN (Parallel Mode)
+
+**When ALL groups in the CURRENT PHASE are APPROVED and MERGED:**
+
+### What You MUST Do:
+
+1. **DO NOT** summarize to user and stop
+2. **DO NOT** ask user what to do next
+3. **DO NOT** ask "Would you like me to continue?"
+4. **MUST** spawn PM immediately (after phase continuation check in Step 2B.7b finds no more phases)
+
+### Mandatory PM Spawn Prompt:
+
+```
+All phases complete. All groups approved and merged: {group_list}.
+
+Query database for Original_Scope and compare to completed work:
+- Original estimated items: {Original_Scope.estimated_items}
+- Completed items: {sum of completed group item_counts}
+
+Based on this comparison, you MUST either:
+- Identify additional work items missed (if any remain from Original_Scope), OR
+- Send BAZINGA (if ALL original tasks from scope are complete)
+
+DO NOT ask for permission. Make the decision based on scope comparison.
+```
+
+### Integration with Step 2B.7b:
+
+The Phase Continuation Check (Step 2B.7b) handles phase-to-phase transitions automatically.
+This rule applies when:
+- Step 2B.7b finds NO more pending phases
+- All execution_phases are complete
+- PM needs to assess final completion
+
+### Spawn Command:
+
+```
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["project_manager"],
+  description: "PM: All phases complete - final assessment",
+  prompt: [PM prompt above]
+)
+```
+
+### Why This Rule Exists:
+
+Without this mandatory re-spawn:
+- Orchestrator may stop after final phase
+- Original scope may not be fully verified
+- BAZINGA decision is skipped
+- User has to manually trigger completion
+
+**NEVER stop after phases complete. ALWAYS spawn PM to verify scope and send BAZINGA.**
+
+---
+
