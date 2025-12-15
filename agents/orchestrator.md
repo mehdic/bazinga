@@ -1697,9 +1697,14 @@ IF specializations is null OR empty:
             IF project_context.primary_language:
                 specializations.append(map_to_template(primary_language))
 
+            # Try top-level framework field (legacy/simple projects)
+            IF project_context.framework:
+                FOR fw in parse_comma_separated(project_context.framework):
+                    specializations.append(map_to_template(fw))
+
             # Extract frameworks from components (Scout schema)
             IF project_context.components exists:
-                FOR component in components:
+                FOR component in project_context.components:
                     IF component.framework:
                         specializations.append(map_to_template(component.framework))
                     IF component.language AND component.language != primary_language:
