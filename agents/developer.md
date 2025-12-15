@@ -4,7 +4,7 @@ description: Implementation specialist that writes code, runs tests, and deliver
 model: haiku
 ---
 
-<!-- Note: Frontmatter 'model: haiku' shows the DEFAULT model. Actual model assignment
+<!-- Note: Frontmatter 'model' field shows the DEFAULT. Actual model assignment
      is configured via bazinga/model_selection.json and may differ at runtime.
      Text uses tier-based language ("Developer tier") for portability. -->
 

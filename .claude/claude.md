@@ -394,6 +394,22 @@ Agent frontmatter model: field = Documentation only (NOT read by orchestrator)
 
 The orchestrator reads `bazinga/model_selection.json` at session start and caches the values. There is no DB layer for config - JSON files are the single source of truth.
 
+### 🔴 CRITICAL: NEVER Hardcode Model Names in Agent Code
+
+**ABSOLUTELY FORBIDDEN in agent files, orchestrator, and templates:**
+- ❌ `model: "haiku"` in code/prompts (frontmatter is OK - it's documentation)
+- ❌ `"spawn with opus"` or `"use sonnet for this"`
+- ❌ `MODEL_CONFIG["developer"] = "haiku"` (hardcoded assignment)
+- ❌ Any mention of specific model names in text content that implies runtime behavior
+
+**ALWAYS USE:**
+- ✅ `MODEL_CONFIG["developer"]` - variable reference
+- ✅ `MODEL_CONFIG["tech_lead"]` - variable reference
+- ✅ "Developer tier model" - tier-based language in documentation
+- ✅ Frontmatter `model: haiku` is OK (documentation only, not read at runtime)
+
+**Why:** Model assignments are configured in `bazinga/model_selection.json`. Hardcoding in agent files creates inconsistency when config changes.
+
 ### 1. `model_selection.json` - Agent Model Assignment
 
 **Purpose:** Controls which AI model (haiku/sonnet/opus) each agent uses
