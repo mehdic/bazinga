@@ -25,6 +25,8 @@ import {
   Play,
   Workflow,
   Wand2,
+  Brain,
+  Target,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TokenCharts } from "@/components/charts/token-charts";
@@ -34,6 +36,8 @@ import { SessionReplay } from "@/components/replay/session-replay";
 import { SkillOutputViewer } from "@/components/skills/skill-output-viewer";
 import { SessionHeader } from "@/components/session/session-header";
 import { useRefetchInterval } from "@/lib/hooks/use-smart-refetch";
+import { ReasoningViewer } from "@/components/reasoning/reasoning-viewer";
+import { SuccessCriteriaViewer } from "@/components/criteria/success-criteria-viewer";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -56,6 +60,8 @@ export default function SessionDetailPage() {
     { sessionId },
     { enabled: !!sessionId }
   );
+
+  const { data: capabilities } = trpc.sessions.getCapabilities.useQuery();
 
   const [elapsed, setElapsed] = useState(0);
 
@@ -195,7 +201,7 @@ export default function SessionDetailPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="workflow" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="flex flex-wrap gap-1">
           <TabsTrigger value="workflow">
             <Workflow className="h-4 w-4 mr-1" />
             Workflow
@@ -212,6 +218,18 @@ export default function SessionDetailPage() {
             <FileText className="h-4 w-4 mr-1" />
             Logs
           </TabsTrigger>
+          {capabilities?.hasReasoningColumns && (
+            <TabsTrigger value="reasoning">
+              <Brain className="h-4 w-4 mr-1" />
+              Reasoning
+            </TabsTrigger>
+          )}
+          {capabilities?.hasSuccessCriteria && (
+            <TabsTrigger value="criteria">
+              <Target className="h-4 w-4 mr-1" />
+              Criteria
+            </TabsTrigger>
+          )}
           <TabsTrigger value="tokens">
             <Zap className="h-4 w-4 mr-1" />
             Tokens
@@ -324,6 +342,20 @@ export default function SessionDetailPage() {
         <TabsContent value="logs">
           <LogFilters logs={session.logs || []} />
         </TabsContent>
+
+        {/* Reasoning Tab (v8+) */}
+        {capabilities?.hasReasoningColumns && (
+          <TabsContent value="reasoning">
+            <ReasoningViewer sessionId={sessionId} />
+          </TabsContent>
+        )}
+
+        {/* Success Criteria Tab (v4+) */}
+        {capabilities?.hasSuccessCriteria && (
+          <TabsContent value="criteria">
+            <SuccessCriteriaViewer sessionId={sessionId} />
+          </TabsContent>
+        )}
 
         {/* Tokens Tab */}
         <TabsContent value="tokens">

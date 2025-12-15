@@ -1,0 +1,123 @@
+name: Dashboard E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'dashboard-v2/**'
+      - '.claude/skills/bazinga-db/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'dashboard-v2/**'
+      - '.claude/skills/bazinga-db/**'
+  workflow_dispatch:
+
+# Only one run per branch - cancel in-progress runs when new commits arrive
+# Use head_ref for PRs (source branch) or ref for push (branch name)
+concurrency:
+  group: e2e-tests-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-tests:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard-v2/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard-v2
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: dashboard-v2
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: dashboard-v2
+        run: |
+          npx playwright test --reporter=json,html,list 2>&1 | tee test-output.txt
+        env:
+          CI: true
+        continue-on-error: true
+
+      - name: Generate test summary
+        working-directory: dashboard-v2
+        if: always()
+        run: |
+          echo "## E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Parse test results from playwright-report
+          if [ -f "test-results.json" ]; then
+            PASSED=$(cat test-results.json | jq '[.suites[].specs[].tests[] | select(.status == "expected")] | length')
+            FAILED=$(cat test-results.json | jq '[.suites[].specs[].tests[] | select(.status == "unexpected")] | length')
+            SKIPPED=$(cat test-results.json | jq '[.suites[].specs[].tests[] | select(.status == "skipped")] | length')
+            TOTAL=$((PASSED + FAILED + SKIPPED))
+
+            echo "| Status | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| :white_check_mark: Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| :x: Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+            echo "| :fast_forward: Skipped | $SKIPPED |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Total** | **$TOTAL** |" >> $GITHUB_STEP_SUMMARY
+          else
+            # Fallback: parse from test output
+            echo "### Test Output Summary" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -20 test-output.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Failed Tests" >> $GITHUB_STEP_SUMMARY
+
+          # Extract failed test names from output
+          grep -E "^\s*✘" test-output.txt | head -30 >> $GITHUB_STEP_SUMMARY || echo "No failures found in output" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: dashboard-v2/playwright-report/
+          retention-days: 14
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            dashboard-v2/test-results/
+            dashboard-v2/test-output.txt
+          retention-days: 14
+
+      - name: Check test results
+        working-directory: dashboard-v2
+        run: |
+          # Count failures from output
+          FAILURES=$(grep -c "✘" test-output.txt || echo "0")
+          PASSED=$(grep -c "✓" test-output.txt || echo "0")
+          echo "Tests passed: $PASSED"
+          echo "Tests failed: $FAILURES"
+
+          # Fail the workflow if any tests failed
+          if [ "$FAILURES" -gt "0" ]; then
+            echo "::error::$FAILURES test(s) failed"
+            exit 1
+          fi
