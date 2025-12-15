@@ -458,19 +458,46 @@ Am I saying "complete", "done", "finished" without:
 
 **IF YES → VIOLATION.** Never claim completion before validator acceptance.
 
-### Exception: NEEDS_CLARIFICATION (Once Per Session)
+### Exception: NEEDS_CLARIFICATION (Once Per Session - Hard Cap Enforced)
 
-**Track state:** `clarification_used: false` (initial)
+**Database-Backed State (Survives Context Compaction):**
 
-**IF PM returned `NEEDS_CLARIFICATION`:**
-- Outputting PM's question to user is ALLOWED
-- Waiting for user response is ALLOWED
-- After user responds: Set `clarification_used: true`
-- Mark `clarification_resolved: true` in database
+```bash
+# Check if clarification already used (MANDATORY before honoring NEEDS_CLARIFICATION)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+# Look for: "clarification_used": true
+```
 
-**IF `clarification_used` is already true AND PM returns NEEDS_CLARIFICATION again:**
-- **VIOLATION** - PM cannot ask twice
-- Respawn PM with: "You already used your clarification. Make best decision with available information."
+**FIRST TIME PM returns `NEEDS_CLARIFICATION`:**
+1. Check database state - if `clarification_used` is false or state doesn't exist:
+2. Save state to database IMMEDIATELY:
+   ```bash
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{session_id}" "orchestrator" '{"clarification_used": true, "clarification_question": "PM_QUESTION_HERE"}'
+   ```
+3. Output PM's question to user - ALLOWED
+4. Wait for user response - ALLOWED
+
+**AFTER USER RESPONDS:**
+1. Update database with resolution:
+   ```bash
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state "{session_id}" "orchestrator" '{"clarification_used": true, "clarification_resolved": true, "user_response": "RESPONSE_SUMMARY"}'
+   ```
+2. Resume workflow with user's answer
+
+**HARD CAP ENFORCEMENT (max_retries=1):**
+
+**IF PM returns `NEEDS_CLARIFICATION` AND database shows `clarification_used: true`:**
+- **VIOLATION** - Hard cap exceeded
+- **DO NOT** surface question to user
+- **DO NOT** wait for response
+- **AUTO-FALLBACK:** Respawn PM immediately with:
+  ```
+  "Clarification limit reached (max 1 per session). Your previous question was answered.
+  Make best decision with available information. If user response was: '{user_response}',
+  use that context. Otherwise proceed with reasonable defaults."
+  ```
+
+**This hard cap is ENFORCED via database state - survives context compaction.**
 
 **This is the ONLY case where you stop for user input. Everything else continues autonomously.**
 
@@ -497,6 +524,24 @@ original_items = session.Original_Scope.estimated_items
 completed_items = sum(group.item_count for group in task_groups if group.status == "completed")
 ```
 
+### Step 2.5: Validate item_count is Set (MANDATORY)
+
+**Before using scope comparison, verify all task groups have item_count:**
+
+```python
+for group in task_groups:
+    if group.item_count is None or group.item_count == 0:
+        # VALIDATION FAILED - item_count not set
+        # This should not happen if PM followed template
+```
+
+**IF any group has item_count=0 or null:**
+- **DO NOT** proceed with scope comparison (will be inaccurate)
+- Respawn PM with: "Task group '{group_id}' missing item_count. Invoke bazinga-db update-task-group to set --item_count (default 1 if unsure)."
+- **BLOCK** workflow until PM fixes this
+
+**Note:** Database defaults item_count to 1 on INSERT, so this should rarely trigger. If it does, PM violated the mandatory field requirement.
+
 ### Step 3: Decision Logic
 
 **IF `completed_items < original_items`:**
@@ -512,18 +557,22 @@ completed_items = sum(group.item_count for group in task_groups if group.status 
 
 ### Exception: NEEDS_CLARIFICATION Pending
 
-**Check session state for `clarification_pending`:**
+**Check orchestrator state in database:**
 
-**IF `clarification_pending = true` AND `clarification_resolved = false`:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+
+**IF `clarification_used = true` AND `clarification_resolved = false`:**
 - Scope check is PAUSED
 - User response still needed
-- Surface PM's stored question to user
+- Surface PM's stored question from `clarification_question` field
 - Wait for response (this is the ONE allowed pause)
-- After response: Set `clarification_resolved: true`, resume scope check
+- After response: Update state with `clarification_resolved: true`, resume scope check
 
 **IF `clarification_resolved = true` AND PM returns NEEDS_CLARIFICATION again:**
-- **REJECT** - PM already used their one clarification
-- Respawn PM: "Clarification already resolved. Make best decision with available information."
+- **HARD CAP EXCEEDED** - PM already used their one clarification
+- **AUTO-FALLBACK:** Respawn PM with fallback message (see PRE-OUTPUT SELF-CHECK section)
 
 ### Enforcement
 

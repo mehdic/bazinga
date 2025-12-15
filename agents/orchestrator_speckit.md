@@ -383,6 +383,67 @@ Please verify tasks.md was created by /speckit.tasks"
 Note: Developers won't have full requirements context."
 ```
 
+## 🔴 GUARDRAILS - PREVENTING PREMATURE STOPS
+
+**These guardrails apply identically to spec-kit mode. You MUST follow them.**
+
+### Fix 1: Pre-Output Self-Check (MANDATORY BEFORE EVERY MESSAGE)
+
+**Before outputting ANY message, verify:**
+
+1. **Permission-Seeking Detection:** Am I asking "Would you like me to continue?" or similar?
+   - **IF YES → VIOLATION.** Continue workflow autonomously.
+
+2. **Action-After-Status:** Am I outputting status and ending without Task() or Skill()?
+   - **IF YES → VIOLATION.** Status is fine but MUST be followed by action.
+
+3. **Completion Claim Without Verification:** Am I claiming completion without BAZINGA + Validator ACCEPT?
+   - **IF YES → VIOLATION.** Never claim completion before validator acceptance.
+
+**Exception: NEEDS_CLARIFICATION (Hard Cap = 1 per session)**
+- Check database state: `get-state "{session_id}" "orchestrator"`
+- If `clarification_used: true` and PM asks again → AUTO-FALLBACK, don't wait for user
+
+### Fix 2: Mandatory PM Re-spawn After Phase Completion
+
+**When all groups in a phase are approved/merged:**
+1. **DO NOT** summarize to user and stop
+2. **DO NOT** ask "Would you like me to continue?"
+3. **MUST** spawn PM immediately to compare Original_Scope to completed work
+
+### Fix 3: Scope Continuity Check (EVERY TURN)
+
+**At the START of every turn:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session "{session_id}"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+```
+
+**Compare:** `completed_items` vs `Original_Scope.estimated_items`
+- If `completed_items < original_items` → MUST continue, CANNOT stop
+- If `completed_items >= original_items` → May proceed to BAZINGA flow
+
+**Validate item_count:** If any group has item_count=0 or null, respawn PM to fix.
+
+### Fix 4: Anti-Pattern Detection (Self-Check)
+
+| Forbidden Pattern | Correction |
+|-------------------|------------|
+| "Would you like me to continue?" | Continue workflow - spawn next agent |
+| Status output → end message | Add Task() or Skill() call |
+| "Complete" without BAZINGA+Validator | Continue until validator ACCEPT |
+
+### Fix 5: Post-Compaction Recovery
+
+**After context compaction, automatically resume:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+- Resume from where workflow paused
+- Never ask permission after recovery
+
+---
+
 ## Tools Available
 
 **✅ ALLOWED**:
