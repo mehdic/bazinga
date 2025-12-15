@@ -1694,13 +1694,23 @@ IF specializations is null OR empty:
         IF empty AND project_context.suggested_specializations exists:
             specializations = project_context.suggested_specializations
 
-        # Last resort: map primary_language + framework
+        # Last resort: map primary_language + framework from components
         IF empty:
             IF project_context.primary_language:
                 specializations.append(map_to_template(primary_language))
+
+            # Try top-level framework field (legacy/simple projects)
             IF project_context.framework:
-                FOR fw in parse_comma_separated(framework):
+                FOR fw in parse_comma_separated(project_context.framework):
                     specializations.append(map_to_template(fw))
+
+            # Extract frameworks from components (Scout schema)
+            IF project_context.components exists:
+                FOR component in project_context.components:
+                    IF component.framework:
+                        specializations.append(map_to_template(component.framework))
+                    IF component.language AND component.language != primary_language:
+                        specializations.append(map_to_template(component.language))
 
         specializations = deduplicate(specializations)
 
@@ -1717,6 +1727,10 @@ IF specializations still empty:
 | javascript | `bazinga/templates/specializations/01-languages/javascript.md` |
 | react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
 | nextjs | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| react-native | `bazinga/templates/specializations/04-mobile-desktop/react-native.md` |
+| flutter | `bazinga/templates/specializations/04-mobile-desktop/flutter.md` |
+| electron | `bazinga/templates/specializations/04-mobile-desktop/electron-tauri.md` |
+| tauri | `bazinga/templates/specializations/04-mobile-desktop/electron-tauri.md` |
 | express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
 | fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
 
