@@ -35,16 +35,30 @@ if [ -z "$VERDICT" ] || [ "$VERDICT" = "[]" ] || [ "$VERDICT" = "null" ]; then
     FAIL_COUNT=$((FAIL_COUNT + 1))
     VERDICT_STATUS="missing"
 else
-    echo "✅ PASS: Validator verdict found"
     # Extract verdict value
-    VERDICT_VALUE=$(echo "$VERDICT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('event_payload',{}).get('verdict','unknown') if isinstance(d,list) and len(d)>0 else 'unknown')" 2>/dev/null || echo "unknown")
-    echo "   Verdict: $VERDICT_VALUE"
-    PASS_COUNT=$((PASS_COUNT + 1))
-    VERDICT_STATUS="$VERDICT_VALUE"
+    VERDICT_VALUE=$(echo "$VERDICT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('event_payload',{}).get('verdict','unknown') if isinstance(d,list) and len(d)>0 else 'unknown')" 2>/dev/null || echo "parse_error")
+
+    # FIX #1: Handle unknown/parse_error verdicts explicitly
+    if [ "$VERDICT_VALUE" = "unknown" ] || [ "$VERDICT_VALUE" = "parse_error" ]; then
+        echo "❌ FAIL: Validator verdict event exists but verdict value is '$VERDICT_VALUE'"
+        echo "   → Event payload may be malformed or missing 'verdict' field"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        VERDICT_STATUS="unknown"
+    elif [ "$VERDICT_VALUE" = "ACCEPT" ] || [ "$VERDICT_VALUE" = "REJECT" ]; then
+        echo "✅ PASS: Validator verdict found"
+        echo "   Verdict: $VERDICT_VALUE"
+        PASS_COUNT=$((PASS_COUNT + 1))
+        VERDICT_STATUS="$VERDICT_VALUE"
+    else
+        echo "❌ FAIL: Unexpected verdict value: '$VERDICT_VALUE'"
+        echo "   → Expected 'ACCEPT' or 'REJECT'"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        VERDICT_STATUS="invalid"
+    fi
 fi
 echo ""
 
-# Check 2: Validator gate check exists
+# Check 2: Validator gate check exists AND passed=true
 echo "━━━ Check 2: Validator Gate Check ━━━"
 GATE=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events "$SESSION_ID" "validator_gate_check" 1 2>/dev/null || echo "")
 if [ -z "$GATE" ] || [ "$GATE" = "[]" ] || [ "$GATE" = "null" ]; then
@@ -53,24 +67,58 @@ if [ -z "$GATE" ] || [ "$GATE" = "[]" ] || [ "$GATE" = "null" ]; then
     echo "   → If session is completed, the gate may have been bypassed"
     WARN_COUNT=$((WARN_COUNT + 1))
 else
-    echo "✅ PASS: Validator gate check logged"
-    GATE_PASSED=$(echo "$GATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('event_payload',{}).get('passed',False) if isinstance(d,list) and len(d)>0 else False)" 2>/dev/null || echo "false")
-    echo "   Gate passed: $GATE_PASSED"
-    PASS_COUNT=$((PASS_COUNT + 1))
+    # FIX #3: Check if passed=true, not just if event exists
+    GATE_PASSED=$(echo "$GATE" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d[0].get('event_payload',{}).get('passed',False) if isinstance(d,list) and len(d)>0 else False; print('true' if p is True or p == 'true' else 'false')" 2>/dev/null || echo "false")
+
+    if [ "$GATE_PASSED" = "true" ]; then
+        echo "✅ PASS: Validator gate check logged with passed=true"
+        PASS_COUNT=$((PASS_COUNT + 1))
+    else
+        echo "❌ FAIL: Validator gate check exists but passed=$GATE_PASSED"
+        echo "   → Gate check was logged but did not pass"
+        echo "   → This indicates a validation failure that was not handled"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
 fi
 echo ""
 
-# Check 3: Session status
+# Check 3: Session status (query specific session by ID)
 echo "━━━ Check 3: Session Status ━━━"
-SESSION_INFO=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 2>/dev/null || echo "[]")
-SESSION_STATUS=$(echo "$SESSION_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('status','unknown') if isinstance(d,list) and len(d)>0 else 'unknown')" 2>/dev/null || echo "unknown")
-echo "   Session status: $SESSION_STATUS"
 
-# Validate verdict vs session status
+# FIX #2: Query specific session by ID instead of just taking first session
+SESSION_INFO=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 100 2>/dev/null || echo "[]")
+SESSION_STATUS=$(echo "$SESSION_INFO" | python3 -c "
+import sys, json
+try:
+    sessions = json.load(sys.stdin)
+    target_id = '$SESSION_ID'
+    for s in sessions:
+        if s.get('session_id') == target_id or s.get('id') == target_id:
+            print(s.get('status', 'unknown'))
+            sys.exit(0)
+    print('not_found')
+except:
+    print('parse_error')
+" 2>/dev/null || echo "parse_error")
+
+if [ "$SESSION_STATUS" = "not_found" ]; then
+    echo "❌ FAIL: Session '$SESSION_ID' not found in database"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+elif [ "$SESSION_STATUS" = "parse_error" ]; then
+    echo "❌ FAIL: Could not parse session data from database"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+    echo "   Session status: $SESSION_STATUS"
+fi
+
+# Validate verdict vs session status consistency
 if [ "$VERDICT_STATUS" = "ACCEPT" ]; then
     if [ "$SESSION_STATUS" = "completed" ]; then
         echo "✅ PASS: ACCEPT verdict → session completed (correct)"
         PASS_COUNT=$((PASS_COUNT + 1))
+    elif [ "$SESSION_STATUS" = "not_found" ] || [ "$SESSION_STATUS" = "parse_error" ]; then
+        # Already counted as fail above, don't double-count
+        :
     else
         echo "⚠️ WARNING: ACCEPT verdict but session is '$SESSION_STATUS'"
         echo "   → Shutdown may not have completed"
@@ -85,6 +133,9 @@ elif [ "$VERDICT_STATUS" = "REJECT" ]; then
         echo "   → Runtime guard was BYPASSED"
         echo "   → This is a critical security issue"
         FAIL_COUNT=$((FAIL_COUNT + 1))
+    elif [ "$SESSION_STATUS" = "not_found" ] || [ "$SESSION_STATUS" = "parse_error" ]; then
+        # Already counted as fail above, don't double-count
+        :
     else
         echo "⚠️ WARNING: REJECT verdict, session status is '$SESSION_STATUS'"
         WARN_COUNT=$((WARN_COUNT + 1))
@@ -95,9 +146,16 @@ elif [ "$VERDICT_STATUS" = "missing" ]; then
         echo "   → Validator was SKIPPED entirely"
         echo "   → This is a critical workflow violation"
         FAIL_COUNT=$((FAIL_COUNT + 1))
+    elif [ "$SESSION_STATUS" = "not_found" ] || [ "$SESSION_STATUS" = "parse_error" ]; then
+        # Already counted as fail above, don't double-count
+        :
     else
         echo "   Session not completed (validator may still be pending)"
     fi
+# FIX #1 continued: Handle unknown/invalid verdict status
+elif [ "$VERDICT_STATUS" = "unknown" ] || [ "$VERDICT_STATUS" = "invalid" ]; then
+    echo "   → Cannot validate session status consistency (verdict was invalid)"
+    # Already counted as fail in Check 1, don't double-count
 fi
 echo ""
 
