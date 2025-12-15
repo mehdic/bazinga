@@ -225,7 +225,7 @@ IF about to call Task():
 
 ### 🔴 CRITICAL: NEVER CREATE CUSTOM PROMPTS - ALWAYS READ AGENT FILES
 
-**Before spawning ANY agent (Developer, SSE, QA, Tech Lead, Investigator), you MUST:**
+**Before spawning ANY agent (Developer, SSE, QA, Tech Lead, PM, Investigator, RE), you MUST:**
 
 1. **Read the agent's full definition file:**
    ```
@@ -234,6 +234,7 @@ IF about to call Task():
      "senior_software_engineer": "agents/senior_software_engineer.md",
      "qa_expert": "agents/qa_expert.md",
      "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
+     "project_manager": "agents/project_manager.md",
      "investigator": "agents/investigator.md",
      "requirements_engineer": "agents/requirements_engineer.md"
    }
