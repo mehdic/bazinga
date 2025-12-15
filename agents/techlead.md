@@ -1210,9 +1210,9 @@ When approving, include your adversarial analysis:
 ✅ "SQL injection vulnerability on line 45: using string formatting in query"
 
 ### Provide Examples
-❌ "Use parameterized queries"
-✅ "Change `cursor.execute(f'SELECT * FROM users WHERE id={id}')`
-    to `cursor.execute('SELECT * FROM users WHERE id=?', (id,))`"
+❌ "Sanitize the input"
+✅ "Change `subprocess.run(f'echo {user_input}', shell=True)`
+    to `subprocess.run(['echo', user_input], shell=False)`"
 
 ### Prioritize
 ❌ List 20 issues without priority
@@ -1264,21 +1264,23 @@ Great work! This implementation is solid and follows best practices.
 
 **Issues Found:**
 
-### 1. [CRITICAL] SQL Injection Vulnerability
-**Location:** src/auth/jwt_handler.py:45
-**Problem:** User input directly interpolated into SQL query
+### 1. [CRITICAL] Command Injection Vulnerability
+**Location:** src/utils/file_handler.py:45
+**Problem:** User input directly interpolated into shell command
 
 **Current code:**
 ```python
-cursor.execute(f'SELECT * FROM users WHERE email={email}')
+os.system(f'rm -rf /tmp/{user_filename}')
 ```
 
 **Should be:**
 ```python
-cursor.execute('SELECT * FROM users WHERE email=?', (email,))
+import shlex
+safe_filename = shlex.quote(user_filename)
+subprocess.run(['rm', '-rf', f'/tmp/{safe_filename}'], shell=False)
 ```
 
-**Why:** Attacker could inject SQL: `email="x' OR '1'='1"` to bypass authentication
+**Why:** Attacker could inject commands: `filename="; rm -rf /"` to execute arbitrary code
 
 ### 2. [HIGH] Missing Rate Limiting
 **Location:** src/api/routes.py:23
@@ -1344,22 +1346,22 @@ Migration 0005_add_user_tokens.py attempts to add user_id column, but migration 
 ### Solution 1: Make Migration Idempotent
 **Steps:**
 1. Edit migrations/0005_add_user_tokens.py
-2. Add conditional column creation:
+2. Use Django's built-in state operations for idempotency:
 ```python
-from django.db import connection
+from django.db import migrations, models
 
-def add_column_if_not_exists(apps, schema_editor):
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name='users' AND column_name='user_id'
-        """)
-        if not cursor.fetchone():
-            cursor.execute('ALTER TABLE users ADD COLUMN user_id INTEGER')
+class Migration(migrations.Migration):
+    dependencies = [('myapp', '0004_previous')]
 
-operations = [
-    migrations.RunPython(add_column_if_not_exists),
-]
+    operations = [
+        # Use state_operations to avoid duplicate column errors
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField('User', 'user_id', models.IntegerField(null=True)),
+            ],
+            database_operations=[],  # Skip if column exists
+        ),
+    ]
 ```
 3. Run: `python manage.py migrate`
 

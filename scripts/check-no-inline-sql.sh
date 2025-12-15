@@ -16,20 +16,14 @@ echo ""
 
 ERRORS_FOUND=0
 
-# Paths ALLOWED to contain SQL
+# Paths ALLOWED to contain SQL (ONLY the DB skill itself)
 ALLOWED_PATHS=(
-    # Skills that need internal SQL
     ".claude/skills/bazinga-db/"
-    ".claude/skills/context-assembler/"
 )
 
-# Files with educational SQL examples (security reviews, migration guides, etc.)
-# These files contain SQL to teach developers what to look for
-EDUCATIONAL_FILES=(
-    "agents/techlead.md"           # Security review examples
-    "agents/qa_expert.md"          # SQL injection test examples
-    "agents/investigator.md"       # Debugging examples
-)
+# No educational exceptions - agents should NOT know SQL implementation details
+# They should only use Skill(command: "bazinga-db")
+EDUCATIONAL_FILES=()
 
 # Build find exclusion arguments
 EXCLUDE_ARGS=""
@@ -37,8 +31,8 @@ for path in "${ALLOWED_PATHS[@]}"; do
     EXCLUDE_ARGS="$EXCLUDE_ARGS ! -path \"$path*\""
 done
 
-# Files to check
-FILES_TO_CHECK=$(eval "find agents .claude/commands .claude/skills bazinga/templates -name '*.md' $EXCLUDE_ARGS ! -path '**/resources/*' 2>/dev/null" || true)
+# Files to check (excluding research folder - contains analysis docs)
+FILES_TO_CHECK=$(eval "find agents .claude/commands .claude/skills bazinga/templates -name '*.md' $EXCLUDE_ARGS ! -path '**/resources/*' ! -path 'research/*' 2>/dev/null" || true)
 
 # Check 1: Inline SQL statements (the real danger)
 # These are hardcoded SQL strings that bypass the bazinga-db skill entirely
