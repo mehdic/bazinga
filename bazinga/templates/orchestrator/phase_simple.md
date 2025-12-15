@@ -114,7 +114,7 @@ END TURN 1 (wait for skill responses)
 
 **TURN 2: Compose & Spawn**
 
-**C. Build Base Prompt** (internal, DO NOT OUTPUT):
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
 
 ```
 task_title = task_group["title"]
@@ -123,50 +123,42 @@ branch = task_group["branch"] or session_branch
 group_id = task_group["group_id"]
 agent_type = task_group["initial_tier"]  // developer, senior_software_engineer, or requirements_engineer
 
-base_prompt = """
-You are a {Agent Type} in a Claude Code Multi-Agent Dev Team.
+// 🔴 MANDATORY: Read the FULL agent file
+agent_file_path = f"agents/{agent_type}.md"  // e.g., agents/developer.md or agents/senior_software_engineer.md
+agent_definition = Read(agent_file_path)  // Full 1400+ lines of agent instructions
+
+// Build task context to append
+task_context = """
+---
+
+## Current Task Assignment
 
 **SESSION:** {session_id}
 **GROUP:** {group_id}
 **MODE:** Simple
 **BRANCH:** {branch}
 
-🔴 **CRITICAL: YOU ARE AN IMPLEMENTER - NO DELEGATION**
-
-❌ ABSOLUTELY FORBIDDEN:
-- DO NOT use the Task tool to spawn subagents
-- DO NOT delegate work to other agents
-- DO NOT say "let me spawn an agent to..."
-
-✅ YOU MUST DO THE WORK YOURSELF using:
-- Read, Write, Edit, Bash, Skill, Grep, Glob
-
 **TASK:** {task_title}
 
 **REQUIREMENTS:**
 {task_requirements}
 
-**MANDATORY WORKFLOW:**
-1. Implement the complete solution
-2. Write unit tests for new code
-3. Run lint check (must pass)
-4. Run build check (must pass)
-5. Commit to branch: {branch}
-6. Report status: READY_FOR_QA or BLOCKED
-
-**OUTPUT FORMAT:**
-Use standard response format with STATUS, FILES, TESTS, COVERAGE sections.
+**COMMIT TO:** {branch}
+**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
 """
+
+// Combine: Full agent definition + Task context
+base_prompt = agent_definition + task_context
 ```
 
-**D. Compose Full Prompt** (token-conscious):
+**D. Compose Full Prompt**:
 ```
 prompt =
   {CONTEXT_BLOCK}  // Prior reasoning + packages (from context-assembler)
   +
   {SPEC_BLOCK}     // Tech identity (from specialization-loader)
   +
-  base_prompt      // Role + task details
+  base_prompt      // Full agent file + task context
 ```
 
 **E. Spawn Agent:**
@@ -333,8 +325,35 @@ END TURN 1
 
 **TURN 2: Compose & Spawn Investigator**
 
-Compose prompt with: blocker description, evidence from Developer, context + spec blocks
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
+```
+// 🔴 MANDATORY: Read the FULL Investigator agent file
+investigator_definition = Read("agents/investigator.md")  // Full agent instructions
+
+// Build task context to append
+task_context = """
+---
+
+## Current Investigation Assignment
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+
+**BLOCKER:** {blocker_description}
+**Evidence from Developer:** {developer_evidence}
+
+**INVESTIGATE AND REPORT:** ROOT_CAUSE_FOUND or BLOCKED when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = investigator_definition + task_context
+```
+
+**D. Compose Full Prompt & Spawn**:
+```
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt={prompt})`
 
 After Investigator provides solution, spawn Developer again with resolution using the unified sequence above.
 
@@ -387,8 +406,39 @@ END TURN 1
 
 **TURN 2: Compose & Spawn SSE**
 
-Build base prompt with: original task, developer's attempt, reason for escalation
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
+```
+// 🔴 MANDATORY: Read the FULL SSE agent file
+sse_definition = Read("agents/senior_software_engineer.md")  // Full agent instructions
+
+// Build task context to append
+task_context = """
+---
+
+## Escalation Assignment
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Simple
+**BRANCH:** {branch}
+
+**ORIGINAL TASK:** {original_task}
+**DEVELOPER'S ATTEMPT:** {developer_attempt}
+**ESCALATION REASON:** {escalation_reason}
+
+**COMMIT TO:** {branch}
+**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = sse_definition + task_context
+```
+
+**D. Compose Full Prompt & Spawn**:
+```
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={prompt})`
 
 ---
 
@@ -457,13 +507,48 @@ END TURN 1
 
 **TURN 2: Compose & Spawn Developer**
 
-Build base prompt with:
-- Summary of work completed so far
-- Specific gaps/issues that remain
-- User's completion requirements
-- Concrete next steps
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
+```
+// 🔴 MANDATORY: Read the FULL Developer agent file
+dev_definition = Read("agents/developer.md")  // Full agent instructions
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
+// Build task context to append
+task_context = """
+---
+
+## Continuation Assignment
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Simple
+**BRANCH:** {branch}
+**ITERATION:** {revision_count + 1}
+
+**WORK COMPLETED SO FAR:**
+{summary_of_completed_work}
+
+**REMAINING GAPS/ISSUES:**
+{specific_gaps_and_issues}
+
+**REQUIREMENTS:**
+{user_completion_requirements}
+
+**CONCRETE NEXT STEPS:**
+{next_steps}
+
+**COMMIT TO:** {branch}
+**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = dev_definition + task_context
+```
+
+**D. Compose Full Prompt & Spawn**:
+```
+prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+```
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt={prompt})`
 
 ---
 
@@ -537,19 +622,16 @@ END TURN 1 (wait for skill responses)
 
 **TURN 2: Compose & Spawn**
 
-**C. Compose Prompt** (token-conscious, ~1000 tokens preface max):
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
 ```
-prompt =
-  {CONTEXT_BLOCK}  // Prior reasoning + packages (~400 tokens)
-  +
-  {SPEC_BLOCK}     // Tech identity (~600 tokens)
-  +
-  base_qa_prompt   // Role + task details
-```
+// 🔴 MANDATORY: Read the FULL QA Expert agent file
+qa_definition = Read("agents/qa_expert.md")  // Full agent instructions
 
-**Base QA Prompt:**
-```
-You are a QA Expert in a Claude Code Multi-Agent Dev Team.
+// Build task context to append
+task_context = """
+---
+
+## Current Task Assignment
 
 **SESSION:** {session_id}
 **GROUP:** {group_id}
@@ -559,13 +641,24 @@ You are a QA Expert in a Claude Code Multi-Agent Dev Team.
 **Developer Changes:** {files_changed}
 **Challenge Level:** {level}/5
 
-**MANDATORY WORKFLOW:**
-1. Run test suite against changes
-2. Check coverage metrics
-3. Report: PASS, FAIL, or BLOCKED
+**REPORT STATUS:** PASS, FAIL, or BLOCKED when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = qa_definition + task_context
 ```
 
-**D. Spawn QA:**
+**D. Compose Full Prompt**:
+```
+prompt =
+  {CONTEXT_BLOCK}  // Prior reasoning + packages
+  +
+  {SPEC_BLOCK}     // Tech identity
+  +
+  base_prompt      // Full agent file + task context
+```
+
+**E. Spawn QA:**
 
 Output summary:
 ```
@@ -696,19 +789,16 @@ END TURN 1 (wait for skill responses)
 
 **TURN 2: Compose & Spawn**
 
-**C. Compose Prompt** (token-conscious, ~1200 tokens preface max for opus):
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
 ```
-prompt =
-  {CONTEXT_BLOCK}  // Prior reasoning + packages (~500 tokens)
-  +
-  {SPEC_BLOCK}     // Tech identity (~700 tokens)
-  +
-  base_tl_prompt   // Role + task details
-```
+// 🔴 MANDATORY: Read the FULL Tech Lead agent file
+tl_definition = Read("agents/techlead.md")  // Full agent instructions
 
-**Base Tech Lead Prompt:**
-```
-You are a Tech Lead in a Claude Code Multi-Agent Dev Team.
+// Build task context to append
+task_context = """
+---
+
+## Current Task Assignment
 
 **SESSION:** {session_id}
 **GROUP:** {group_id}
@@ -719,14 +809,24 @@ You are a Tech Lead in a Claude Code Multi-Agent Dev Team.
 **Coverage:** {coverage_pct}%
 **Files Changed:** {files_list}
 
-**MANDATORY WORKFLOW:**
-1. Run security scan
-2. Check lint compliance
-3. Evaluate architecture
-4. Report: APPROVED, CHANGES_REQUESTED, or SPAWN_INVESTIGATOR
+**REPORT STATUS:** APPROVED, CHANGES_REQUESTED, or SPAWN_INVESTIGATOR when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = tl_definition + task_context
 ```
 
-**D. Spawn Tech Lead:**
+**D. Compose Full Prompt**:
+```
+prompt =
+  {CONTEXT_BLOCK}  // Prior reasoning + packages
+  +
+  {SPEC_BLOCK}     // Tech identity
+  +
+  base_prompt      // Full agent file + task context
+```
+
+**E. Spawn Tech Lead:**
 
 Output summary:
 ```

@@ -257,50 +257,42 @@ END TURN 1 (wait for skill responses)
 
 **TURN 2: Compose & Spawn ALL Agents**
 
-### Build Base Prompts (FOR EACH GROUP)
+### Read Agent Files & Build Base Prompts (FOR EACH GROUP)
 
-**For EACH group, build base_prompt with task details:**
+**For EACH group, read agent file and build prompt:**
 
 ```
 task_title = task_groups[group_id]["title"]
 task_requirements = task_groups[group_id]["requirements"]
 branch = task_groups[group_id]["branch"] or session_branch
-agent_type = task_groups[group_id]["initial_tier"]
+agent_type = task_groups[group_id]["initial_tier"]  // developer, senior_software_engineer, or requirements_engineer
 
-base_prompts[group_id] = """
-You are a {Agent Type} in a Claude Code Multi-Agent Dev Team.
+// 🔴 MANDATORY: Read the FULL agent file for this group's agent type
+agent_file_path = f"agents/{agent_type}.md"  // e.g., agents/developer.md or agents/senior_software_engineer.md
+agent_definitions[group_id] = Read(agent_file_path)  // Full 1400+ lines of agent instructions
+
+// Build task context to append
+task_contexts[group_id] = """
+---
+
+## Current Task Assignment
 
 **SESSION:** {session_id}
 **GROUP:** {group_id}
 **MODE:** Parallel
 **BRANCH:** {branch}
 
-🔴 **CRITICAL: YOU ARE AN IMPLEMENTER - NO DELEGATION**
-
-❌ ABSOLUTELY FORBIDDEN:
-- DO NOT use the Task tool to spawn subagents
-- DO NOT delegate work to other agents
-- DO NOT say "let me spawn an agent to..."
-
-✅ YOU MUST DO THE WORK YOURSELF using:
-- Read, Write, Edit, Bash, Skill, Grep, Glob
-
 **TASK:** {task_title}
 
 **REQUIREMENTS:**
 {task_requirements}
 
-**MANDATORY WORKFLOW:**
-1. Implement the complete solution
-2. Write unit tests for new code
-3. Run lint check (must pass)
-4. Run build check (must pass)
-5. Commit to branch: {branch}
-6. Report status: READY_FOR_QA or BLOCKED
-
-**OUTPUT FORMAT:**
-Use standard response format with STATUS, FILES, TESTS, COVERAGE sections.
+**COMMIT TO:** {branch}
+**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
 """
+
+// Combine: Full agent definition + Task context
+base_prompts[group_id] = agent_definitions[group_id] + task_contexts[group_id]
 ```
 
 ### Compose Full Prompts & Spawn ALL Agents
@@ -312,7 +304,7 @@ FULL_PROMPT[group_id] =
   +
   {SPEC_BLOCK[group_id]}     // From specialization-loader (or shared block)
   +
-  base_prompts[group_id]     // Task details
+  base_prompts[group_id]     // Full agent file + task context
 ```
 
 **Spawn ALL agents in ONE message:**
@@ -500,22 +492,50 @@ END TURN 1 (wait for skill responses)
 
 **TURN 2: Compose & Spawn**
 
-**C. Compose Prompt:**
+**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
+```
+// 🔴 MANDATORY: Read the FULL agent file for this agent type
+// agent_type is one of: qa_expert, tech_lead
+agent_file_path = f"agents/{agent_type}.md"  // e.g., agents/qa_expert.md or agents/techlead.md
+agent_definition = Read(agent_file_path)  // Full agent instructions
+
+// Build task context to append (specific to QA or Tech Lead role)
+task_context = """
+---
+
+## Current Task Assignment
+
+**SESSION:** {session_id}
+**GROUP:** {group_id}
+**MODE:** Parallel
+
+**TASK:** {task_description}
+**FILES:** {files_changed}
+
+**REPORT STATUS:** {expected_status_codes} when complete
+"""
+
+// Combine: Full agent definition + Task context
+base_prompt = agent_definition + task_context
+```
+
+**D. Compose Full Prompt:**
 ```
 prompt =
   {CONTEXT_BLOCK}  // Prior reasoning + packages
   +
   {SPEC_BLOCK}     // Tech identity
   +
-  base_prompt      // Role + task details
+  base_prompt      // Full agent file + task context
 ```
 
-**D. Spawn Agent:**
+**E. Spawn Agent:**
 ```
 Task(subagent_type="general-purpose", model={model}, prompt={prompt})
 ```
 
 **✅ TURN 2 SELF-CHECK:**
+- [ ] Agent file Read() called?
 - [ ] CONTEXT_BLOCK present (or fallback used)?
 - [ ] SPEC_BLOCK present?
 - [ ] Task() called?
