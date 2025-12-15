@@ -1,10 +1,35 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../server";
 import { db } from "../../db/client";
-import { sessions, orchestrationLogs, taskGroups, tokenUsage, stateSnapshots, skillOutputs, decisions } from "../../db/schema";
+import {
+  sessions,
+  orchestrationLogs,
+  taskGroups,
+  tokenUsage,
+  stateSnapshots,
+  skillOutputs,
+  decisions,
+  successCriteria,
+  contextPackages,
+  contextPackageConsumers,
+} from "../../db/schema";
 import { desc, eq, and, gte, lte, like, count, sql } from "drizzle-orm";
+import { detectCapabilities } from "../../db/capabilities";
 
 export const sessionsRouter = router({
+  // ============================================================================
+  // CAPABILITY DETECTION
+  // ============================================================================
+
+  // Get schema capabilities for graceful degradation
+  getCapabilities: publicProcedure.query(async () => {
+    return detectCapabilities();
+  }),
+
+  // ============================================================================
+  // SESSION QUERIES
+  // ============================================================================
+
   // List all sessions with pagination and filters
   list: publicProcedure
     .input(
@@ -18,7 +43,6 @@ export const sessionsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // Build where conditions
       const conditions = [];
       if (input.status !== "all") {
         conditions.push(eq(sessions.status, input.status));
@@ -41,7 +65,6 @@ export const sessionsRouter = router({
         .limit(input.limit)
         .offset(input.offset);
 
-      // Get total count for pagination
       const totalResult = await db
         .select({ count: count() })
         .from(sessions)
@@ -68,8 +91,7 @@ export const sessionsRouter = router({
         return null;
       }
 
-      // Fetch related data (no successCriteria table in actual DB)
-      // Note: logs ordered ASC for chronological timeline display
+      // Fetch core related data
       const [logs, groups, tokens, snapshots] = await Promise.all([
         db
           .select()
@@ -94,12 +116,38 @@ export const sessionsRouter = router({
           .limit(20),
       ]);
 
+      // Try to fetch success criteria (may not exist in older DBs)
+      let criteria: typeof successCriteria.$inferSelect[] = [];
+      try {
+        criteria = await db
+          .select()
+          .from(successCriteria)
+          .where(eq(successCriteria.sessionId, input.sessionId))
+          .orderBy(successCriteria.id);
+      } catch {
+        // Table doesn't exist - ignore
+      }
+
+      // Try to fetch context packages (may not exist in older DBs)
+      let packages: typeof contextPackages.$inferSelect[] = [];
+      try {
+        packages = await db
+          .select()
+          .from(contextPackages)
+          .where(eq(contextPackages.sessionId, input.sessionId))
+          .orderBy(desc(contextPackages.createdAt));
+      } catch {
+        // Table doesn't exist - ignore
+      }
+
       return {
         ...session[0],
         logs,
         taskGroups: groups,
         tokenUsage: tokens,
         stateSnapshots: snapshots,
+        successCriteria: criteria,
+        contextPackages: packages,
       };
     }),
 
@@ -112,7 +160,6 @@ export const sessionsRouter = router({
       db.select({ count: count() }).from(sessions).where(eq(sessions.status, "failed")),
     ]);
 
-    // Get total tokens (using tokensEstimated column)
     const tokensResult = await db
       .select({ total: sql<number>`COALESCE(SUM(${tokenUsage.tokensEstimated}), 0)` })
       .from(tokenUsage);
@@ -142,14 +189,19 @@ export const sessionsRouter = router({
     return active[0] || null;
   }),
 
-  // Get recent logs for a session
+  // ============================================================================
+  // LOGS QUERIES (with v8+ reasoning support)
+  // ============================================================================
+
+  // Get logs for a session with pagination and filtering
   getLogs: publicProcedure
     .input(
       z.object({
         sessionId: z.string(),
-        limit: z.number().default(50),
+        limit: z.number().min(1).max(500).default(50),
         offset: z.number().default(0),
         agentType: z.string().optional(),
+        logType: z.enum(["all", "interaction", "reasoning", "event"]).default("all"),
       })
     )
     .query(async ({ input }) => {
@@ -157,8 +209,10 @@ export const sessionsRouter = router({
       if (input.agentType) {
         conditions.push(eq(orchestrationLogs.agentType, input.agentType));
       }
+      if (input.logType !== "all") {
+        conditions.push(eq(orchestrationLogs.logType, input.logType));
+      }
 
-      // Order ASC for chronological display, then reverse client-side if needed
       const logs = await db
         .select()
         .from(orchestrationLogs)
@@ -167,11 +221,329 @@ export const sessionsRouter = router({
         .limit(input.limit)
         .offset(input.offset);
 
-      return logs;
+      const totalResult = await db
+        .select({ count: count() })
+        .from(orchestrationLogs)
+        .where(and(...conditions));
+
+      return {
+        logs,
+        total: totalResult[0]?.count || 0,
+        hasMore: input.offset + logs.length < (totalResult[0]?.count || 0),
+      };
     }),
 
+  // Get reasoning logs with phase filtering (v8+)
+  getReasoning: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        limit: z.number().min(1).max(500).default(50),
+        offset: z.number().default(0),
+        groupId: z.string().optional(),
+        phase: z.string().optional(),
+        agentType: z.string().optional(),
+        confidenceLevel: z.enum(["all", "high", "medium", "low"]).default("all"),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const conditions = [
+          eq(orchestrationLogs.sessionId, input.sessionId),
+          eq(orchestrationLogs.logType, "reasoning"),
+        ];
+        if (input.groupId) {
+          conditions.push(eq(orchestrationLogs.groupId, input.groupId));
+        }
+        if (input.phase) {
+          conditions.push(eq(orchestrationLogs.reasoningPhase, input.phase));
+        }
+        if (input.agentType) {
+          conditions.push(eq(orchestrationLogs.agentType, input.agentType));
+        }
+        if (input.confidenceLevel !== "all") {
+          conditions.push(eq(orchestrationLogs.confidenceLevel, input.confidenceLevel));
+        }
+
+        const logs = await db
+          .select()
+          .from(orchestrationLogs)
+          .where(and(...conditions))
+          .orderBy(orchestrationLogs.timestamp)
+          .limit(input.limit)
+          .offset(input.offset);
+
+        const totalResult = await db
+          .select({ count: count() })
+          .from(orchestrationLogs)
+          .where(and(...conditions));
+
+        return {
+          logs: logs.map((log) => ({
+            ...log,
+            redacted: log.redacted === 1,
+            references: log.referencesJson ? JSON.parse(log.referencesJson) : [],
+          })),
+          total: totalResult[0]?.count || 0,
+          hasMore: input.offset + logs.length < (totalResult[0]?.count || 0),
+        };
+      } catch {
+        // log_type column doesn't exist in older DBs
+        return { logs: [], total: 0, hasMore: false };
+      }
+    }),
+
+  // Get reasoning summary/stats for a session
+  getReasoningSummary: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const [total, byPhase, byAgent, byConfidence, redacted] = await Promise.all([
+          db
+            .select({ count: count() })
+            .from(orchestrationLogs)
+            .where(
+              and(
+                eq(orchestrationLogs.sessionId, input.sessionId),
+                eq(orchestrationLogs.logType, "reasoning")
+              )
+            ),
+          db
+            .select({
+              phase: orchestrationLogs.reasoningPhase,
+              count: sql<number>`COUNT(*)`,
+            })
+            .from(orchestrationLogs)
+            .where(
+              and(
+                eq(orchestrationLogs.sessionId, input.sessionId),
+                eq(orchestrationLogs.logType, "reasoning")
+              )
+            )
+            .groupBy(orchestrationLogs.reasoningPhase),
+          db
+            .select({
+              agent: orchestrationLogs.agentType,
+              count: sql<number>`COUNT(*)`,
+            })
+            .from(orchestrationLogs)
+            .where(
+              and(
+                eq(orchestrationLogs.sessionId, input.sessionId),
+                eq(orchestrationLogs.logType, "reasoning")
+              )
+            )
+            .groupBy(orchestrationLogs.agentType),
+          db
+            .select({
+              level: orchestrationLogs.confidenceLevel,
+              count: sql<number>`COUNT(*)`,
+            })
+            .from(orchestrationLogs)
+            .where(
+              and(
+                eq(orchestrationLogs.sessionId, input.sessionId),
+                eq(orchestrationLogs.logType, "reasoning")
+              )
+            )
+            .groupBy(orchestrationLogs.confidenceLevel),
+          db
+            .select({ count: count() })
+            .from(orchestrationLogs)
+            .where(
+              and(
+                eq(orchestrationLogs.sessionId, input.sessionId),
+                eq(orchestrationLogs.logType, "reasoning"),
+                eq(orchestrationLogs.redacted, 1)
+              )
+            ),
+        ]);
+
+        return {
+          totalEntries: total[0]?.count || 0,
+          byPhase: Object.fromEntries(byPhase.map((p) => [p.phase || "unknown", p.count])),
+          byAgent: Object.fromEntries(byAgent.map((a) => [a.agent, a.count])),
+          byConfidence: Object.fromEntries(byConfidence.map((c) => [c.level || "unknown", c.count])),
+          redactedCount: redacted[0]?.count || 0,
+        };
+      } catch {
+        return {
+          totalEntries: 0,
+          byPhase: {},
+          byAgent: {},
+          byConfidence: {},
+          redactedCount: 0,
+        };
+      }
+    }),
+
+  // Get events for a session (v9+)
+  getEvents: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().default(0),
+        subtype: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const conditions = [
+          eq(orchestrationLogs.sessionId, input.sessionId),
+          eq(orchestrationLogs.logType, "event"),
+        ];
+        if (input.subtype) {
+          conditions.push(eq(orchestrationLogs.eventSubtype, input.subtype));
+        }
+
+        const events = await db
+          .select()
+          .from(orchestrationLogs)
+          .where(and(...conditions))
+          .orderBy(orchestrationLogs.timestamp)
+          .limit(input.limit)
+          .offset(input.offset);
+
+        return events.map((event) => ({
+          id: event.id,
+          sessionId: event.sessionId,
+          timestamp: event.timestamp,
+          agentType: event.agentType,
+          eventSubtype: event.eventSubtype,
+          eventPayload: event.eventPayload ? JSON.parse(event.eventPayload) : null,
+        }));
+      } catch {
+        return [];
+      }
+    }),
+
+  // ============================================================================
+  // SUCCESS CRITERIA QUERIES (v4+)
+  // ============================================================================
+
+  // Get success criteria for a session
+  getSuccessCriteria: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const criteria = await db
+          .select()
+          .from(successCriteria)
+          .where(eq(successCriteria.sessionId, input.sessionId))
+          .orderBy(successCriteria.id);
+
+        return criteria;
+      } catch {
+        return [];
+      }
+    }),
+
+  // Get success criteria summary
+  getCriteriaSummary: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const criteria = await db
+          .select()
+          .from(successCriteria)
+          .where(eq(successCriteria.sessionId, input.sessionId));
+
+        const byCategory: Record<string, { met: number; pending: number; failed: number }> = {};
+        let met = 0,
+          pending = 0,
+          failed = 0;
+
+        for (const c of criteria) {
+          const category = c.category || "uncategorized";
+          if (!byCategory[category]) {
+            byCategory[category] = { met: 0, pending: 0, failed: 0 };
+          }
+          if (c.status === "met") {
+            met++;
+            byCategory[category].met++;
+          } else if (c.status === "failed") {
+            failed++;
+            byCategory[category].failed++;
+          } else {
+            pending++;
+            byCategory[category].pending++;
+          }
+        }
+
+        return {
+          total: criteria.length,
+          met,
+          pending,
+          failed,
+          byCategory,
+        };
+      } catch {
+        return { total: 0, met: 0, pending: 0, failed: 0, byCategory: {} };
+      }
+    }),
+
+  // ============================================================================
+  // CONTEXT PACKAGES QUERIES (v4/v10+)
+  // ============================================================================
+
+  // Get context packages for a session
+  getContextPackages: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        groupId: z.string().optional(),
+        packageType: z.string().optional(),
+        priority: z.enum(["all", "low", "medium", "high", "critical"]).default("all"),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const conditions = [eq(contextPackages.sessionId, input.sessionId)];
+        if (input.groupId) {
+          conditions.push(eq(contextPackages.groupId, input.groupId));
+        }
+        if (input.packageType) {
+          conditions.push(eq(contextPackages.packageType, input.packageType));
+        }
+        if (input.priority !== "all") {
+          conditions.push(eq(contextPackages.priority, input.priority));
+        }
+
+        const packages = await db
+          .select()
+          .from(contextPackages)
+          .where(and(...conditions))
+          .orderBy(desc(contextPackages.createdAt));
+
+        return packages;
+      } catch {
+        return [];
+      }
+    }),
+
+  // Get context package consumers
+  getContextConsumers: publicProcedure
+    .input(z.object({ packageId: z.number() }))
+    .query(async ({ input }) => {
+      try {
+        const consumers = await db
+          .select()
+          .from(contextPackageConsumers)
+          .where(eq(contextPackageConsumers.packageId, input.packageId))
+          .orderBy(contextPackageConsumers.consumedAt);
+
+        return consumers;
+      } catch {
+        return [];
+      }
+    }),
+
+  // ============================================================================
+  // TOKEN & METRICS QUERIES
+  // ============================================================================
+
   // Get token usage breakdown for a session
-  // Note: Actual DB has tokensEstimated, no modelTier or estimatedCost
   getTokenBreakdown: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ input }) => {
@@ -195,7 +567,6 @@ export const sessionsRouter = router({
 
   // Get agent performance metrics across all sessions
   getAgentMetrics: publicProcedure.query(async () => {
-    // Tokens by agent type (using tokensEstimated)
     const tokensByAgent = await db
       .select({
         agentType: tokenUsage.agentType,
@@ -205,8 +576,6 @@ export const sessionsRouter = router({
       .from(tokenUsage)
       .groupBy(tokenUsage.agentType);
 
-    // Log counts by agent (activity level)
-    // Note: No statusCode column in actual DB
     const logsByAgent = await db
       .select({
         agentType: orchestrationLogs.agentType,
@@ -215,7 +584,6 @@ export const sessionsRouter = router({
       .from(orchestrationLogs)
       .groupBy(orchestrationLogs.agentType);
 
-    // Revision patterns (task groups with multiple revisions)
     const revisionStats = await db
       .select({
         totalGroups: sql<number>`COUNT(*)`,
@@ -231,14 +599,36 @@ export const sessionsRouter = router({
     };
   }),
 
+  // ============================================================================
+  // SKILL OUTPUTS QUERIES (v11-12+)
+  // ============================================================================
+
   // Get skill outputs for a session
   getSkillOutputs: publicProcedure
-    .input(z.object({ sessionId: z.string() }))
+    .input(
+      z.object({
+        sessionId: z.string(),
+        skillName: z.string().optional(),
+        agentType: z.string().optional(),
+        groupId: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
+      const conditions = [eq(skillOutputs.sessionId, input.sessionId)];
+      if (input.skillName) {
+        conditions.push(eq(skillOutputs.skillName, input.skillName));
+      }
+      if (input.agentType) {
+        conditions.push(eq(skillOutputs.agentType, input.agentType));
+      }
+      if (input.groupId) {
+        conditions.push(eq(skillOutputs.groupId, input.groupId));
+      }
+
       const outputs = await db
         .select()
         .from(skillOutputs)
-        .where(eq(skillOutputs.sessionId, input.sessionId))
+        .where(and(...conditions))
         .orderBy(desc(skillOutputs.timestamp));
 
       return outputs.map((output) => ({
@@ -254,7 +644,6 @@ export const sessionsRouter = router({
     }),
 
   // Get decisions for a session
-  // Note: decisions table may not exist in all environments - returns empty array if query fails
   getDecisions: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ input }) => {
@@ -276,7 +665,6 @@ export const sessionsRouter = router({
           })(),
         }));
       } catch {
-        // Table may not exist in some environments
         return [];
       }
     }),
