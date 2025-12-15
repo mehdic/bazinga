@@ -342,6 +342,8 @@ END TURN 1
 ```
 // 🔴 MANDATORY: Read the FULL Investigator agent file
 investigator_definition = Read("agents/investigator.md")  // Full agent instructions
+IF Read fails OR investigator_definition is empty:
+    Output: `⚠️ Agent file read failed | agents/investigator.md` and STOP
 
 // Build task context to append
 task_context = """
@@ -423,6 +425,8 @@ END TURN 1
 ```
 // 🔴 MANDATORY: Read the FULL SSE agent file
 sse_definition = Read("agents/senior_software_engineer.md")  // Full agent instructions
+IF Read fails OR sse_definition is empty:
+    Output: `⚠️ Agent file read failed | agents/senior_software_engineer.md` and STOP
 
 // Build task context to append
 task_context = """
@@ -524,6 +528,8 @@ END TURN 1
 ```
 // 🔴 MANDATORY: Read the FULL Developer agent file
 dev_definition = Read("agents/developer.md")  // Full agent instructions
+IF Read fails OR dev_definition is empty:
+    Output: `⚠️ Agent file read failed | agents/developer.md` and STOP
 
 // Build task context to append
 task_context = """
@@ -639,6 +645,8 @@ END TURN 1 (wait for skill responses)
 ```
 // 🔴 MANDATORY: Read the FULL QA Expert agent file
 qa_definition = Read("agents/qa_expert.md")  // Full agent instructions
+IF Read fails OR qa_definition is empty:
+    Output: `⚠️ Agent file read failed | agents/qa_expert.md` and STOP
 
 // Build task context to append
 task_context = """
@@ -806,6 +814,8 @@ END TURN 1 (wait for skill responses)
 ```
 // 🔴 MANDATORY: Read the FULL Tech Lead agent file
 tl_definition = Read("agents/techlead.md")  // Full agent instructions
+IF Read fails OR tl_definition is empty:
+    Output: `⚠️ Agent file read failed | agents/techlead.md` and STOP
 
 // Build task context to append
 task_context = """
