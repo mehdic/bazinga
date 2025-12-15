@@ -142,22 +142,24 @@ export const modelConfig = sqliteTable("model_config", {
 // ============================================================================
 
 // Success Criteria table - v4: BAZINGA validation tracking
+// ACTUAL schema from init_db.py - status has different values than originally assumed
 export const successCriteria = sqliteTable("success_criteria", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   sessionId: text("session_id").notNull(),
   criterion: text("criterion").notNull(),
-  category: text("category"),
-  status: text("status").default("pending"), // pending/met/failed
-  verifiedAt: text("verified_at"),
-  verifiedBy: text("verified_by"),
+  status: text("status").default("pending"), // 'pending' | 'met' | 'blocked' | 'failed'
+  actual: text("actual"), // Actual value achieved
   evidence: text("evidence"),
+  requiredForCompletion: integer("required_for_completion").default(1), // BOOLEAN as integer
   createdAt: text("created_at"),
+  updatedAt: text("updated_at"),
 }, (table) => ({
-  sessionCriterionIdx: index("idx_criteria_session").on(table.sessionId, table.criterion),
-  sessionStatusIdx: index("idx_criteria_status").on(table.sessionId, table.status),
+  uniqueCriterionIdx: index("idx_unique_criterion").on(table.sessionId, table.criterion),
+  sessionStatusIdx: index("idx_criteria_session_status").on(table.sessionId, table.status),
 }));
 
 // Context Packages table - v4/v10: Inter-agent context sharing
+// ACTUAL schema: priority and summary are NOT NULL, scope is 'group'|'global'
 export const contextPackages = sqliteTable("context_packages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   sessionId: text("session_id").notNull(),
@@ -166,16 +168,16 @@ export const contextPackages = sqliteTable("context_packages", {
   filePath: text("file_path").notNull(),
   producerAgent: text("producer_agent").notNull(),
   // v10 columns
-  priority: text("priority").default("medium"), // low/medium/high/critical
-  summary: text("summary"),
+  priority: text("priority").notNull().default("medium"), // low/medium/high/critical
+  summary: text("summary").notNull(),
   sizeBytes: integer("size_bytes"),
   version: integer("version").default(1),
   supersedesId: integer("supersedes_id"),
-  scope: text("scope").default("group"), // group/session
+  scope: text("scope").default("group"), // 'group' | 'global' (NOT 'session')
   createdAt: text("created_at"),
 }, (table) => ({
-  sessionIdx: index("idx_packages_session").on(table.sessionId),
-  priorityIdx: index("idx_packages_priority").on(table.sessionId, table.priority, table.createdAt),
+  sessionIdx: index("idx_cp_session").on(table.sessionId),
+  priorityIdx: index("idx_packages_priority_ranking").on(table.sessionId, table.priority, table.createdAt),
 }));
 
 // Context Package Consumers table - v4: Who consumed what context

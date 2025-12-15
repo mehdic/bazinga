@@ -150,19 +150,21 @@ export interface ModelConfig {
 // ============================================================================
 
 // Success Criteria types - v4: BAZINGA validation tracking
+// ACTUAL schema from init_db.py - status includes 'blocked'
 export interface SuccessCriterion {
   id: number;
   sessionId: string;
   criterion: string;
-  category: string | null;
-  status: string | null; // 'pending' | 'met' | 'failed'
-  verifiedAt: string | null;
-  verifiedBy: string | null;
+  status: string | null; // 'pending' | 'met' | 'blocked' | 'failed'
+  actual: string | null; // Actual value achieved
   evidence: string | null;
+  requiredForCompletion: number | null; // BOOLEAN stored as 0/1
   createdAt: string | null;
+  updatedAt: string | null;
 }
 
 // Context Package types - v4/v10: Inter-agent context sharing
+// ACTUAL schema: priority and summary are NOT NULL, scope is 'group'|'global'
 export interface ContextPackage {
   id: number;
   sessionId: string;
@@ -171,12 +173,12 @@ export interface ContextPackage {
   filePath: string;
   producerAgent: string;
   // v10 columns
-  priority: string | null; // low/medium/high/critical
-  summary: string | null;
+  priority: string; // NOT NULL with default 'medium': low/medium/high/critical
+  summary: string; // NOT NULL
   sizeBytes: number | null;
   version: number | null;
   supersedesId: number | null;
-  scope: string | null; // group/session
+  scope: string | null; // 'group' | 'global' (NOT 'session')
   createdAt: string | null;
 }
 
@@ -312,10 +314,11 @@ export interface ReasoningSummary {
 }
 
 // Success criteria summary
+// ACTUAL status values: 'pending' | 'met' | 'blocked' | 'failed'
 export interface CriteriaSummary {
   total: number;
   met: number;
   pending: number;
+  blocked: number;
   failed: number;
-  byCategory: Record<string, { met: number; pending: number; failed: number }>;
 }

@@ -13,7 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Brain, ChevronDown, ChevronUp, Eye, EyeOff, FileText } from "lucide-react";
+import { Brain, ChevronDown, ChevronUp, Eye, EyeOff, FileText, Loader2 } from "lucide-react";
+
+const PAGE_SIZE = 50;
 
 interface ReasoningViewerProps {
   sessionId: string;
@@ -52,15 +54,23 @@ export function ReasoningViewer({ sessionId }: ReasoningViewerProps) {
   const [confidenceLevel, setConfidenceLevel] = useState<"all" | "high" | "medium" | "low">("all");
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showRedacted, setShowRedacted] = useState<Set<number>>(new Set());
+  const [offset, setOffset] = useState(0);
 
   const { data: summary } = trpc.sessions.getReasoningSummary.useQuery({ sessionId });
-  const { data: reasoningData, isLoading } = trpc.sessions.getReasoning.useQuery({
+  const { data: reasoningData, isLoading, isFetching } = trpc.sessions.getReasoning.useQuery({
     sessionId,
     phase: phase === "all" ? undefined : phase,
     agentType: agentType === "all" ? undefined : agentType,
     confidenceLevel,
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset,
   });
+
+  // Reset offset when filters change
+  const handleFilterChange = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    setOffset(0);
+  };
 
   const agents = summary?.byAgent ? Object.keys(summary.byAgent) : [];
 
@@ -143,7 +153,7 @@ export function ReasoningViewer({ sessionId }: ReasoningViewerProps) {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
-            <Select value={phase} onValueChange={setPhase}>
+            <Select value={phase} onValueChange={(v) => handleFilterChange(setPhase, v)}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Phase" />
               </SelectTrigger>
@@ -156,7 +166,7 @@ export function ReasoningViewer({ sessionId }: ReasoningViewerProps) {
               </SelectContent>
             </Select>
 
-            <Select value={agentType} onValueChange={setAgentType}>
+            <Select value={agentType} onValueChange={(v) => handleFilterChange(setAgentType, v)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Agent" />
               </SelectTrigger>
@@ -172,7 +182,10 @@ export function ReasoningViewer({ sessionId }: ReasoningViewerProps) {
 
             <Select
               value={confidenceLevel}
-              onValueChange={(v) => setConfidenceLevel(v as typeof confidenceLevel)}
+              onValueChange={(v) => {
+                setConfidenceLevel(v as typeof confidenceLevel);
+                setOffset(0);
+              }}
             >
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Confidence" />
@@ -191,8 +204,11 @@ export function ReasoningViewer({ sessionId }: ReasoningViewerProps) {
       {/* Reasoning Entries */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">
-            Reasoning Entries ({logs.length})
+          <CardTitle className="text-sm font-medium flex items-center justify-between">
+            <span>
+              Reasoning Entries ({offset + 1}-{Math.min(offset + logs.length, reasoningData?.total || 0)} of {reasoningData?.total || 0})
+            </span>
+            {isFetching && <Loader2 className="h-4 w-4 animate-spin" />}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -324,6 +340,33 @@ export function ReasoningViewer({ sessionId }: ReasoningViewerProps) {
                 ))}
               </div>
             </ScrollArea>
+          )}
+
+          {/* Pagination Controls */}
+          {logs.length > 0 && (
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <div className="text-sm text-muted-foreground">
+                Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil((reasoningData?.total || 0) / PAGE_SIZE)}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                  disabled={offset === 0 || isFetching}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOffset(offset + PAGE_SIZE)}
+                  disabled={!reasoningData?.hasMore || isFetching}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

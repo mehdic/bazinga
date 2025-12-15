@@ -440,6 +440,7 @@ export const sessionsRouter = router({
     }),
 
   // Get success criteria summary
+  // ACTUAL status values: 'pending' | 'met' | 'blocked' | 'failed'
   getCriteriaSummary: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ input }) => {
@@ -449,25 +450,20 @@ export const sessionsRouter = router({
           .from(successCriteria)
           .where(eq(successCriteria.sessionId, input.sessionId));
 
-        const byCategory: Record<string, { met: number; pending: number; failed: number }> = {};
         let met = 0,
           pending = 0,
+          blocked = 0,
           failed = 0;
 
         for (const c of criteria) {
-          const category = c.category || "uncategorized";
-          if (!byCategory[category]) {
-            byCategory[category] = { met: 0, pending: 0, failed: 0 };
-          }
           if (c.status === "met") {
             met++;
-            byCategory[category].met++;
+          } else if (c.status === "blocked") {
+            blocked++;
           } else if (c.status === "failed") {
             failed++;
-            byCategory[category].failed++;
           } else {
             pending++;
-            byCategory[category].pending++;
           }
         }
 
@@ -475,11 +471,11 @@ export const sessionsRouter = router({
           total: criteria.length,
           met,
           pending,
+          blocked,
           failed,
-          byCategory,
         };
       } catch {
-        return { total: 0, met: 0, pending: 0, failed: 0, byCategory: {} };
+        return { total: 0, met: 0, pending: 0, blocked: 0, failed: 0 };
       }
     }),
 
