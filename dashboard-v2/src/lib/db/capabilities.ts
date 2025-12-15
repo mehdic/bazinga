@@ -53,7 +53,11 @@ function probeColumn(tableName: string, columnName: string): boolean {
   }
   try {
     // sqlite.pragma() is the proper way to execute PRAGMA in better-sqlite3
-    const columns = sqlite.pragma(`table_info(${tableName})`) as { name: string }[];
+    // NOTE: NOOP_SQLITE.pragma() returns undefined, so we must handle that case
+    const columns = sqlite.pragma(`table_info(${tableName})`) as { name: string }[] | undefined;
+    if (!columns || !Array.isArray(columns)) {
+      return false;
+    }
     return columns.some((col) => col.name === columnName);
   } catch {
     return false;

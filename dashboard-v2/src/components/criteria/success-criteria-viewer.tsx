@@ -71,7 +71,8 @@ export function SuccessCriteriaViewer({ sessionId }: SuccessCriteriaViewerProps)
     );
   }
 
-  const progressPercent = summary
+  // Guard against division by zero when total is 0
+  const progressPercent = summary && summary.total > 0
     ? Math.round((summary.met / summary.total) * 100)
     : 0;
 

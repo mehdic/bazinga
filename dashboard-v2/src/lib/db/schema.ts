@@ -169,7 +169,10 @@ export const contextPackageConsumers = sqliteTable("context_package_consumers", 
   agentType: text("agent_type").notNull(),
   consumedAt: text("consumed_at"),
   iteration: integer("iteration").default(1),
-});
+}, (table) => ({
+  // Index for getContextConsumers query performance
+  packageIdx: index("idx_consumers_package").on(table.packageId),
+}));
 
 // Development Plans table - v3
 // ACTUAL schema from init_db.py - session_id is UNIQUE

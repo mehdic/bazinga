@@ -92,18 +92,34 @@ export const sessionsRouter = router({
         return null;
       }
 
-      // Fetch core related data
-      const [logs, groups, tokens, snapshots] = await Promise.all([
-        db
+      // Fetch core related data with try/catch for backward compat
+      // Older DBs may lack v8/v9 columns (log_type, event_subtype, etc.)
+      let logs: typeof orchestrationLogs.$inferSelect[] = [];
+      let groups: typeof taskGroups.$inferSelect[] = [];
+
+      try {
+        logs = await db
           .select()
           .from(orchestrationLogs)
           .where(eq(orchestrationLogs.sessionId, input.sessionId))
           .orderBy(orchestrationLogs.timestamp)
-          .limit(200),
-        db
+          .limit(200);
+      } catch {
+        // Schema mismatch - older DB lacks v8/v9 columns, return empty
+        logs = [];
+      }
+
+      try {
+        groups = await db
           .select()
           .from(taskGroups)
-          .where(eq(taskGroups.sessionId, input.sessionId)),
+          .where(eq(taskGroups.sessionId, input.sessionId));
+      } catch {
+        // Schema mismatch - older DB lacks v5/v9 columns, return empty
+        groups = [];
+      }
+
+      const [tokens, snapshots] = await Promise.all([
         db
           .select()
           .from(tokenUsage)
@@ -195,6 +211,7 @@ export const sessionsRouter = router({
   // ============================================================================
 
   // Get logs for a session with pagination and filtering
+  // Wrapped in try/catch for backward compat with older DBs lacking v8/v9 columns
   getLogs: publicProcedure
     .input(
       z.object({
@@ -206,32 +223,37 @@ export const sessionsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const conditions = [eq(orchestrationLogs.sessionId, input.sessionId)];
-      if (input.agentType) {
-        conditions.push(eq(orchestrationLogs.agentType, input.agentType));
+      try {
+        const conditions = [eq(orchestrationLogs.sessionId, input.sessionId)];
+        if (input.agentType) {
+          conditions.push(eq(orchestrationLogs.agentType, input.agentType));
+        }
+        if (input.logType !== "all") {
+          conditions.push(eq(orchestrationLogs.logType, input.logType));
+        }
+
+        const logs = await db
+          .select()
+          .from(orchestrationLogs)
+          .where(and(...conditions))
+          .orderBy(orchestrationLogs.timestamp)
+          .limit(input.limit)
+          .offset(input.offset);
+
+        const totalResult = await db
+          .select({ count: count() })
+          .from(orchestrationLogs)
+          .where(and(...conditions));
+
+        return {
+          logs,
+          total: totalResult[0]?.count || 0,
+          hasMore: input.offset + logs.length < (totalResult[0]?.count || 0),
+        };
+      } catch {
+        // Older DB lacks v8/v9 columns - return empty result
+        return { logs: [], total: 0, hasMore: false };
       }
-      if (input.logType !== "all") {
-        conditions.push(eq(orchestrationLogs.logType, input.logType));
-      }
-
-      const logs = await db
-        .select()
-        .from(orchestrationLogs)
-        .where(and(...conditions))
-        .orderBy(orchestrationLogs.timestamp)
-        .limit(input.limit)
-        .offset(input.offset);
-
-      const totalResult = await db
-        .select({ count: count() })
-        .from(orchestrationLogs)
-        .where(and(...conditions));
-
-      return {
-        logs,
-        total: totalResult[0]?.count || 0,
-        hasMore: input.offset + logs.length < (totalResult[0]?.count || 0),
-      };
     }),
 
   // Get reasoning logs with phase filtering (v8+)
@@ -280,11 +302,23 @@ export const sessionsRouter = router({
           .where(and(...conditions));
 
         return {
-          logs: logs.map((log) => ({
-            ...log,
-            redacted: log.redacted === 1,
-            references: log.referencesJson ? JSON.parse(log.referencesJson) : [],
-          })),
+          logs: logs.map((log) => {
+            // Parse references per-row to avoid one bad JSON breaking all results
+            let references: string[] = [];
+            if (log.referencesJson) {
+              try {
+                references = JSON.parse(log.referencesJson);
+              } catch {
+                // Malformed JSON - default to empty array
+                references = [];
+              }
+            }
+            return {
+              ...log,
+              redacted: log.redacted === 1,
+              references,
+            };
+          }),
           total: totalResult[0]?.count || 0,
           hasMore: input.offset + logs.length < (totalResult[0]?.count || 0),
         };
@@ -406,14 +440,26 @@ export const sessionsRouter = router({
           .limit(input.limit)
           .offset(input.offset);
 
-        return events.map((event) => ({
-          id: event.id,
-          sessionId: event.sessionId,
-          timestamp: event.timestamp,
-          agentType: event.agentType,
-          eventSubtype: event.eventSubtype,
-          eventPayload: event.eventPayload ? JSON.parse(event.eventPayload) : null,
-        }));
+        return events.map((event) => {
+          // Parse eventPayload per-row to avoid one bad JSON breaking all results
+          let eventPayload = null;
+          if (event.eventPayload) {
+            try {
+              eventPayload = JSON.parse(event.eventPayload);
+            } catch {
+              // Malformed JSON - keep as null
+              eventPayload = null;
+            }
+          }
+          return {
+            id: event.id,
+            sessionId: event.sessionId,
+            timestamp: event.timestamp,
+            agentType: event.agentType,
+            eventSubtype: event.eventSubtype,
+            eventPayload,
+          };
+        });
       } catch {
         return [];
       }
