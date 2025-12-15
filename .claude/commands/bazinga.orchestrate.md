@@ -942,6 +942,7 @@ test -f bazinga/project_context.json && echo "exists" || echo "missing"
 **User output (capsule format):**
 ```
 🔍 Detecting tech stack | Analyzing project structure for specializations
+   ℹ️  One-time detection | Results cached in bazinga/project_context.json | Skipped on future runs
 ```
 
 ### 🔴 MANDATORY: Spawn Tech Stack Scout (if no cached context)
