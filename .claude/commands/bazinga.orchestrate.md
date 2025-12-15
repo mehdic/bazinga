@@ -1700,6 +1700,10 @@ IF specializations still empty:
 | javascript | `bazinga/templates/specializations/01-languages/javascript.md` |
 | react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
 | nextjs | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
+| react-native | `bazinga/templates/specializations/04-mobile-desktop/react-native.md` |
+| flutter | `bazinga/templates/specializations/04-mobile-desktop/flutter.md` |
+| electron | `bazinga/templates/specializations/04-mobile-desktop/electron-tauri.md` |
+| tauri | `bazinga/templates/specializations/04-mobile-desktop/electron-tauri.md` |
 | express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
 | fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
 
