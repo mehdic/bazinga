@@ -10,13 +10,15 @@
 
 ## Problem Statement
 
-The BAZINGA dashboard-v2 was developed against database schema version ~3-4, but the database has since evolved to version 8+ with significant additions:
+The BAZINGA dashboard-v2 was developed against database schema version ~3-4, but the database has since evolved to **version 12** with significant additions:
 
 1. **Agent Reasoning Capture (v8)** - New columns for tracking agent decision-making process
-2. **Success Criteria** - Table for BAZINGA completion validation
-3. **Context Packages** - Inter-agent context sharing system
-4. **Task Group Enhancements** - Branch tracking, merge status, specializations
-5. **Supporting Tables** - Error patterns, strategies, consumption scope
+2. **Event Logging (v9)** - Event subtype/payload for PM BAZINGA, scope changes, validator verdicts
+3. **Context Engineering (v10)** - Priority ranking, error patterns, strategies, consumption scope
+4. **Skill Multi-Invocation (v11-12)** - Per-agent/group skill outputs with iteration tracking
+5. **Success Criteria** - Table for BAZINGA completion validation
+6. **Context Packages** - Inter-agent context sharing with priority/summary
+7. **Task Group Enhancements** - Branch tracking, merge status, specializations, item_count
 
 The dashboard currently cannot display this critical data, limiting visibility into orchestration quality and agent reasoning.
 
@@ -26,32 +28,35 @@ The dashboard currently cannot display this critical data, limiting visibility i
 
 ### A. Tables Completely Missing from Dashboard
 
-| Table | Purpose | Impact |
-|-------|---------|--------|
-| `success_criteria` | BAZINGA validation criteria tracking | Cannot view what criteria PM defined or their verification status |
-| `context_packages` | Inter-agent context files | No visibility into context passed between agents |
-| `context_package_consumers` | Who consumed what context | Cannot track context consumption patterns |
-| `error_patterns` | Pattern-miner skill output | Missing error pattern analysis |
-| `strategies` | Pattern-miner strategies | Missing strategy recommendations |
-| `consumption_scope` | Context assembler scopes | No context budget visibility |
-| `development_plans` | Development planning | Cannot view development plans |
+| Table | Version | Purpose | Impact |
+|-------|---------|---------|--------|
+| `success_criteria` | v4 | BAZINGA validation criteria tracking | Cannot view what criteria PM defined or their verification status |
+| `context_packages` | v4 | Inter-agent context files | No visibility into context passed between agents |
+| `context_package_consumers` | v4 | Who consumed what context | Cannot track context consumption patterns |
+| `error_patterns` | v10 | Learning from failed-then-succeeded agents | Missing error pattern analysis |
+| `strategies` | v10 | Successful approaches by topic | Missing strategy recommendations |
+| `consumption_scope` | v10 | Iteration-aware context tracking | No context budget visibility |
+| `development_plans` | v4 | Development planning | Cannot view development plans |
 
 ### B. sessions Table - Missing Columns
 
 | Column | Type | Purpose | Dashboard Impact |
 |--------|------|---------|-----------------|
 | `initial_branch` | TEXT | Base branch for all work | Cannot show what branch session targets |
+| `metadata` | TEXT (v9) | JSON metadata for original_scope | Cannot track scope changes |
 
-### C. orchestration_logs Table - Missing Columns (v8 Additions)
+### C. orchestration_logs Table - Missing Columns (v8-v9 Additions)
 
 | Column | Type | Purpose | Dashboard Impact |
 |--------|------|---------|-----------------|
-| `log_type` | TEXT | 'interaction' or 'reasoning' | Cannot distinguish agent reasoning from normal logs |
+| `log_type` | TEXT | 'interaction', 'reasoning', or 'event' | Cannot distinguish agent reasoning/events from normal logs |
 | `reasoning_phase` | TEXT | understanding/approach/decisions/risks/blockers/pivot/completion | Cannot show structured reasoning phases |
 | `confidence_level` | TEXT | high/medium/low | No visibility into agent confidence |
 | `references_json` | TEXT | JSON array of files consulted | Cannot show what files agent considered |
 | `redacted` | INTEGER | 1 if secrets were redacted | No indication of redacted content |
 | `group_id` | TEXT | Task group context | Cannot filter reasoning by task group |
+| `event_subtype` | TEXT (v9) | pm_bazinga/scope_change/validator_verdict | Cannot display orchestration events |
+| `event_payload` | TEXT (v9) | JSON event data | Cannot show event details |
 
 ### D. task_groups Table - Missing Columns
 
@@ -61,6 +66,22 @@ The dashboard currently cannot display this critical data, limiting visibility i
 | `merge_status` | TEXT | pending/in_progress/merged/conflict/test_failure | No merge workflow visibility |
 | `context_references` | TEXT | JSON array of context package IDs | Cannot show context assigned to group |
 | `specializations` | TEXT | JSON array of specialization paths | Cannot show tech stack specializations |
+| `item_count` | INTEGER (v9) | Number of tasks in group | Cannot show task counts |
+
+### E. skill_outputs Table - Missing Columns (v11-v12)
+
+| Column | Type | Purpose | Dashboard Impact |
+|--------|------|---------|-----------------|
+| `agent_type` | TEXT (v11) | Which agent invoked skill | Cannot filter skill outputs by agent |
+| `group_id` | TEXT (v11) | Task group context | Cannot associate skill outputs with groups |
+| `iteration` | INTEGER (v11) | Multi-invocation tracking | Cannot show skill invocation history |
+
+### F. context_packages Table - Missing Columns (v10)
+
+| Column | Type | Purpose | Dashboard Impact |
+|--------|------|---------|-----------------|
+| `priority` | TEXT | low/medium/high/critical | Cannot show context priority |
+| `summary` | TEXT | Brief package description | Cannot display package summaries |
 
 ---
 
