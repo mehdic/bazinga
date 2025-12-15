@@ -236,6 +236,43 @@ IF about to call Task():
 
 **If EITHER skill was skipped:** STOP. Re-invoke the missing skill(s). Do NOT call Task() until both are complete.
 
+### 🔴 CRITICAL: NEVER CREATE CUSTOM PROMPTS - ALWAYS READ AGENT FILES
+
+**Before spawning ANY agent (Developer, SSE, QA, Tech Lead, Investigator), you MUST:**
+
+1. **Read the agent's full definition file:**
+   ```
+   AGENT_FILE_MAP = {
+     "developer": "agents/developer.md",
+     "senior_software_engineer": "agents/senior_software_engineer.md",
+     "qa_expert": "agents/qa_expert.md",
+     "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
+     "investigator": "agents/investigator.md",
+     "requirements_engineer": "agents/requirements_engineer.md"
+   }
+   agent_definition = Read(AGENT_FILE_MAP[agent_type])
+   ```
+
+2. **Compose the prompt as:**
+   ```
+   base_prompt = agent_definition + task_context  // ~1400 lines of agent instructions + task details
+   full_prompt = CONTEXT_BLOCK + SPEC_BLOCK + base_prompt
+   ```
+
+**❌ ABSOLUTELY FORBIDDEN:**
+- ❌ Creating custom prompts like "## Your Mission" or "## Key Files to Investigate"
+- ❌ Writing task-specific instructions instead of using the agent file
+- ❌ Skipping the Read(agents/*.md) step
+- ❌ Building prompts that don't include the full ~1400 lines of agent instructions
+
+**✅ CORRECT APPROACH:**
+- ✅ ALWAYS Read(agents/{agent_type}.md) first
+- ✅ ALWAYS include the full agent file content in base_prompt
+- ✅ ALWAYS compose: CONTEXT_BLOCK + SPEC_BLOCK + agent_definition + task_context
+- ✅ task_context is SHORT (10-20 lines of session/group/task details)
+
+**Why:** Agent files contain critical instructions (NO DELEGATION rules, tool usage guidance, output formats) that prevent agents from misbehaving. Without the full agent file, agents may spawn subagents or produce incorrect output.
+
 **Why this matters:** Without context-assembler, agents don't receive prior reasoning (handoff breaks). Without specialization-loader, agents don't receive tech-specific guidance.
 
 ### §Bash Command Allowlist (EXHAUSTIVE)
@@ -1861,8 +1898,12 @@ After calling Read, verify you have the template content visible in your context
 - ✅ Can you see "SPAWN DEVELOPER (ATOMIC SEQUENCE)"?
 - ✅ Can you see "TWO-TURN SPAWN SEQUENCE"?
 - ✅ Can you see `Skill(command: "specialization-loader")`?
+- ✅ Can you see `AGENT_FILE_MAP` with paths like `agents/developer.md`?
+- ✅ Can you see `agent_definition = Read(agent_file_path)`?
 
 **IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
+
+**🔴 CRITICAL SPAWN RULE:** When you spawn any agent, the prompt MUST include the full agent file (~1400 lines) from `agents/{agent_type}.md`. DO NOT create custom prompts.
 
 **Execute the TWO-TURN SPAWN SEQUENCE as defined in the template.**
 
@@ -1887,8 +1928,12 @@ After calling Read, verify you have the template content visible in your context
 - ✅ Can you see "SPAWN DEVELOPERS - PARALLEL (ATOMIC SEQUENCE PER GROUP)"?
 - ✅ Can you see "TWO-TURN SPAWN SEQUENCE (Parallel Mode)"?
 - ✅ Can you see `Skill(command: "specialization-loader")` for each group?
+- ✅ Can you see `AGENT_FILE_MAP` with paths like `agents/developer.md`?
+- ✅ Can you see `agent_definitions[group_id] = Read(agent_file_path)`?
 
 **IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
+
+**🔴 CRITICAL SPAWN RULE:** When you spawn any agent, the prompt MUST include the full agent file (~1400 lines) from `agents/{agent_type}.md`. DO NOT create custom prompts.
 
 **Execute the TWO-TURN SPAWN SEQUENCE as defined in the template.**
 
