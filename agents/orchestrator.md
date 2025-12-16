@@ -327,12 +327,12 @@ Resume Context: {context if resume scenario}
 1. **Run prompt-builder** with `--output-file` to save prompt to file:
    ```bash
    python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-     --agent-type {agent_type} ... --output-file "bazinga/prompts/{agent_type}_{group_id}.md"
+     --agent-type {agent_type} ... --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
    ```
-2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{agent_type}_{group_id}.md`
+2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
 3. **Spawn agent** with file-based instruction:
    ```
-   Task(..., prompt="FIRST: Read bazinga/prompts/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+   Task(..., prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
    ```
 
 **🚫 FORBIDDEN: Spawning any agent WITHOUT going through prompt-builder.**
@@ -2069,11 +2069,11 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode {simple|parallel} \
   --testing-mode {full|minimal|disabled} \
   --model {haiku|sonnet|opus} \
-  --output-file "bazinga/prompts/{agent_type}_{group_id}.md"
+  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
 ```
 
 **Step 2: Verify file was created**
-Check stderr for: `PROMPT_FILE=bazinga/prompts/{agent_type}_{group_id}.md`
+Check stderr for: `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
 
 **Step 3: Spawn agent with file-based instructions**
 ```
@@ -2081,7 +2081,7 @@ Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["{agent_type}"],
   description: "{agent_type} working on {group_id}",
-  prompt: "FIRST: Read bazinga/prompts/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
+  prompt: "FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
 )
 ```
 
@@ -2135,13 +2135,13 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
    ```bash
    python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
      --agent-type {agent_type} --session-id "{session_id}" ... \
-     --output-file "bazinga/prompts/{agent_type}_{group_id}.md"
+     --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
    ```
-2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{agent_type}_{group_id}.md`
+2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
 3. **Spawn agent** with file-based instruction:
    ```
    Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
-        prompt="FIRST: Read bazinga/prompts/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+        prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
    ```
 
 **🔴 CRITICAL:** See `phase_simple.md` for complete spawn sequences with all parameters.
@@ -2166,13 +2166,13 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
    ```bash
    python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
      --agent-type {agent_type} --session-id "{session_id}" ... \
-     --output-file "bazinga/prompts/{agent_type}_{group_id}.md"
+     --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
    ```
-2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{agent_type}_{group_id}.md`
+2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
 3. **Spawn agent** with file-based instruction:
    ```
    Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
-        prompt="FIRST: Read bazinga/prompts/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+        prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
    ```
 
 **For parallel spawns:** Repeat steps 1-3 for each group, creating separate prompt files. You can call multiple Task() tools in the same message.

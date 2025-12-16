@@ -60,10 +60,10 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode simple \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG[agent_type]} \
-  --output-file "bazinga/prompts/{agent_type}_{group_id}.md"
+  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{agent_type}_{group_id}.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
 
 **IF exit code 1:** Read stderr for error → Output: `❌ Prompt build failed | {error}` → STOP
 
@@ -74,9 +74,9 @@ Output summary:
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
    **Task:** {task_title}
    **Branch:** {branch}
-   **Prompt file:** bazinga/prompts/{agent_type}_{group_id}.md
+   **Prompt file:** bazinga/prompts/{session_id}/{agent_type}_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type}: {task_title[:90]}", prompt="FIRST: Read bazinga/prompts/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file. The file contains your full agent definition, context, and task requirements.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type}: {task_title[:90]}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file. The file contains your full agent definition, context, and task requirements.\n\nDo NOT proceed without reading the file first.")`
 
 **🔴 SELF-CHECK:**
 - ✅ Did prompt-builder create the file successfully?
@@ -173,14 +173,14 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode simple \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["investigator"]} \
-  --output-file "bazinga/prompts/investigator_{group_id}.md"
+  --output-file "bazinga/prompts/{session_id}/investigator_{group_id}.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/investigator_{group_id}.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/investigator_{group_id}.md`
 
 **Step 2: Spawn Investigator with file-based instructions**
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt="FIRST: Read bazinga/prompts/investigator_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt="FIRST: Read bazinga/prompts/{session_id}/investigator_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 After Investigator provides solution, spawn Developer again with resolution using the prompt-builder sequence above.
 
@@ -203,14 +203,14 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode simple \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["senior_software_engineer"]} \
-  --output-file "bazinga/prompts/senior_software_engineer_{group_id}.md"
+  --output-file "bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/senior_software_engineer_{group_id}.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md`
 
 **Step 2: Spawn SSE with file-based instructions**
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt="FIRST: Read bazinga/prompts/senior_software_engineer_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt="FIRST: Read bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 ---
 
@@ -239,14 +239,14 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode simple \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["developer"]} \
-  --output-file "bazinga/prompts/developer_{group_id}_retry.md"
+  --output-file "bazinga/prompts/{session_id}/developer_{group_id}_retry.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/developer_{group_id}_retry.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/developer_{group_id}_retry.md`
 
 **Step 2: Spawn Developer with file-based instructions**
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/developer_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/{session_id}/developer_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 ---
 
@@ -282,10 +282,10 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode simple \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["qa_expert"]} \
-  --output-file "bazinga/prompts/qa_expert_{group_id}.md"
+  --output-file "bazinga/prompts/{session_id}/qa_expert_{group_id}.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/qa_expert_{group_id}.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/qa_expert_{group_id}.md`
 
 **Step 2: Spawn QA Expert with file-based instructions**
 
@@ -293,9 +293,9 @@ Output summary:
 ```
 📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
    **Task:** Validate {dev_task_title} | **Challenge Level:** {level}/5
-   **Prompt file:** bazinga/prompts/qa_expert_{group_id}.md
+   **Prompt file:** bazinga/prompts/{session_id}/qa_expert_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt="FIRST: Read bazinga/prompts/qa_expert_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt="FIRST: Read bazinga/prompts/{session_id}/qa_expert_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -374,10 +374,10 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode simple \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["tech_lead"]} \
-  --output-file "bazinga/prompts/tech_lead_{group_id}.md"
+  --output-file "bazinga/prompts/{session_id}/tech_lead_{group_id}.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/tech_lead_{group_id}.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/tech_lead_{group_id}.md`
 
 **Step 2: Spawn Tech Lead with file-based instructions**
 
@@ -385,9 +385,9 @@ Output summary:
 ```
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
    **Task:** Review {task_title} | **QA:** {result} | **Coverage:** {pct}%
-   **Prompt file:** bazinga/prompts/tech_lead_{group_id}.md
+   **Prompt file:** bazinga/prompts/{session_id}/tech_lead_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt="FIRST: Read bazinga/prompts/tech_lead_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt="FIRST: Read bazinga/prompts/{session_id}/tech_lead_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -678,14 +678,14 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode {mode} \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["project_manager"]} \
-  --output-file "bazinga/prompts/project_manager_final.md"
+  --output-file "bazinga/prompts/{session_id}/project_manager_final.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/project_manager_final.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/project_manager_final.md`
 
 **Step 2: Spawn PM with file-based instructions**
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt="FIRST: Read bazinga/prompts/project_manager_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt="FIRST: Read bazinga/prompts/{session_id}/project_manager_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 **AFTER PM response:** Parse using `response_parsing.md` §PM Response Parsing. Construct output capsule:
 - **BAZINGA:** §Completion template (groups, tests, criteria)
@@ -817,10 +817,10 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --mode {mode} \
   --testing-mode {testing_mode} \
   --model {MODEL_CONFIG["project_manager"]} \
-  --output-file "bazinga/prompts/project_manager_phase_{N}.md"
+  --output-file "bazinga/prompts/{session_id}/project_manager_phase_{N}.md"
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/project_manager_phase_{N}.md`
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/project_manager_phase_{N}.md`
 
 **Step 2: Spawn PM with file-based instructions**
 
@@ -829,7 +829,7 @@ Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["project_manager"],
   description: "PM: Phase {N} complete - assess scope",
-  prompt: "FIRST: Read bazinga/prompts/project_manager_phase_{N}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
+  prompt: "FIRST: Read bazinga/prompts/{session_id}/project_manager_phase_{N}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
 )
 ```
 
