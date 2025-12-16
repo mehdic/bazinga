@@ -733,7 +733,15 @@ def build_prompt(args):
             print("ERROR: Prompt validation failed - not emitting invalid prompt", file=sys.stderr)
             sys.exit(1)
 
-        # 12. Output prompt to stdout ONLY on success
+        # 12. Save to file if --output-file specified
+        if args.output_file:
+            output_path = os.path.join(PROJECT_ROOT, args.output_file)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            with open(output_path, 'w') as f:
+                f.write(full_prompt)
+            print(f"PROMPT_FILE={output_path}", file=sys.stderr)
+
+        # 13. Output prompt to stdout ONLY on success
         print(full_prompt)
 
     finally:
@@ -806,6 +814,10 @@ Debug mode:
                         help="PM state JSON from database")
     parser.add_argument("--resume-context", default="",
                         help="Resume context for PM resume spawns")
+
+    # Output file option (for file-based prompt delivery)
+    parser.add_argument("--output-file", default="",
+                        help="Save prompt to file (in addition to stdout). Path relative to project root.")
 
     # Sanitize sys.argv - remove empty or whitespace-only args that bash might pass
     # This handles issues with multiline commands using backslash continuations

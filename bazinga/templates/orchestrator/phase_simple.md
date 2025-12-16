@@ -47,42 +47,41 @@
 
 This section handles spawning Developer, SSE, or RE based on PM's `initial_tier` decision.
 
-**Step 1: Invoke prompt-builder skill**
+**Step 1: Build prompt to file**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type {agent_type} \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "{task_title}" \
+  --task-requirements "{task_requirements}" \
+  --branch "{branch}" \
+  --mode simple \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG[agent_type]} \
+  --output-file "bazinga/prompts/{agent_type}_{group_id}.md"
 ```
-Build prompt for agent spawn:
-- agent_type: {agent_type}  // developer, senior_software_engineer, or requirements_engineer
-- session_id: {session_id}
-- group_id: {group_id}
-- task_title: {task_group["title"]}
-- task_requirements: {task_group["requirements"]}
-- branch: {task_group["branch"] or session_branch}
-- mode: simple
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG[agent_type]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Skill returns COMPLETE prompt to stdout (context + specialization + agent file + task)
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**IF script returns exit code 1:**
-→ Read stderr for error message
-→ Output: `❌ Prompt build failed | {error}` → STOP (cannot spawn without valid prompt)
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{agent_type}_{group_id}.md`
 
-**Step 2: Spawn Agent**
+**IF exit code 1:** Read stderr for error → Output: `❌ Prompt build failed | {error}` → STOP
+
+**Step 2: Spawn Agent with file-based instructions**
 
 Output summary:
 ```
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
    **Task:** {task_title}
    **Branch:** {branch}
+   **Prompt file:** bazinga/prompts/{agent_type}_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type}: {task_title[:90]}", prompt={COMPLETE_PROMPT})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type}: {task_title[:90]}", prompt="FIRST: Read bazinga/prompts/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file. The file contains your full agent definition, context, and task requirements.\n\nDo NOT proceed without reading the file first.")`
 
 **🔴 SELF-CHECK:**
-- ✅ Did prompt-builder return exit code 0?
-- ✅ Does this message contain `Task()`?
-- ✅ Is Task() called with the COMPLETE_PROMPT from prompt-builder?
+- ✅ Did prompt-builder create the file successfully?
+- ✅ Does Task() prompt instruct agent to read the file FIRST?
+- ✅ Is the prompt file path correct?
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -159,28 +158,29 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 - **Do NOT stop for user input**
 - **IMMEDIATELY spawn Investigator using unified two-turn sequence:**
 
-#### SPAWN INVESTIGATOR (DETERMINISTIC PROMPT)
+#### SPAWN INVESTIGATOR (FILE-BASED PROMPT)
 
-**Step 1: Invoke prompt-builder skill**
+**Step 1: Build prompt to file**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type investigator \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "Investigate: {blocker_description[:60]}" \
+  --task-requirements "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}" \
+  --branch "{branch}" \
+  --mode simple \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["investigator"]} \
+  --output-file "bazinga/prompts/investigator_{group_id}.md"
 ```
-Build prompt for agent spawn:
-- agent_type: investigator
-- session_id: {session_id}
-- group_id: {group_id}
-- task_title: "Investigate: {blocker_description[:60]}"
-- task_requirements: "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}"
-- branch: {branch}
-- mode: simple
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG["investigator"]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Step 2: Spawn Investigator**
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/investigator_{group_id}.md`
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt={COMPLETE_PROMPT})`
+**Step 2: Spawn Investigator with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt="FIRST: Read bazinga/prompts/investigator_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 After Investigator provides solution, spawn Developer again with resolution using the prompt-builder sequence above.
 
@@ -188,28 +188,29 @@ After Investigator provides solution, spawn Developer again with resolution usin
 
 **IF Developer reports ESCALATE_SENIOR:**
 
-#### SPAWN SSE ON ESCALATION (DETERMINISTIC PROMPT)
+#### SPAWN SSE ON ESCALATION (FILE-BASED PROMPT)
 
-**Step 1: Invoke prompt-builder skill**
+**Step 1: Build prompt to file**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type senior_software_engineer \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "Escalation: {original_task[:60]}" \
+  --task-requirements "ORIGINAL TASK: {original_task}\nDEVELOPER'S ATTEMPT: {developer_attempt}\nESCALATION REASON: {escalation_reason}" \
+  --branch "{branch}" \
+  --mode simple \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["senior_software_engineer"]} \
+  --output-file "bazinga/prompts/senior_software_engineer_{group_id}.md"
 ```
-Build prompt for agent spawn:
-- agent_type: senior_software_engineer
-- session_id: {session_id}
-- group_id: {group_id}
-- task_title: "Escalation: {original_task[:60]}"
-- task_requirements: "ORIGINAL TASK: {original_task}\nDEVELOPER'S ATTEMPT: {developer_attempt}\nESCALATION REASON: {escalation_reason}"
-- branch: {branch}
-- mode: simple
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG["senior_software_engineer"]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Step 2: Spawn SSE**
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/senior_software_engineer_{group_id}.md`
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={COMPLETE_PROMPT})`
+**Step 2: Spawn SSE with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt="FIRST: Read bazinga/prompts/senior_software_engineer_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 ---
 
@@ -223,28 +224,29 @@ Then invoke: `Skill(command: "prompt-builder")`
   ```
   Invoke: `Skill(command: "bazinga-db")`
 
-#### SPAWN DEVELOPER RETRY (DETERMINISTIC PROMPT)
+#### SPAWN DEVELOPER RETRY (FILE-BASED PROMPT)
 
-**Step 1: Invoke prompt-builder skill with retry context**
+**Step 1: Build prompt to file with retry context**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type developer \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "Continuation: {task_title}" \
+  --task-requirements "WORK COMPLETED SO FAR: {summary_of_completed_work}\n\nREMAINING GAPS/ISSUES: {specific_gaps_and_issues}\n\nCONCRETE NEXT STEPS: {next_steps}" \
+  --branch "{branch}" \
+  --mode simple \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["developer"]} \
+  --output-file "bazinga/prompts/developer_{group_id}_retry.md"
 ```
-Build prompt for agent spawn:
-- agent_type: developer
-- session_id: {session_id}
-- group_id: {group_id}
-- task_title: "Continuation: {task_title}"
-- task_requirements: "WORK COMPLETED SO FAR: {summary_of_completed_work}\n\nREMAINING GAPS/ISSUES: {specific_gaps_and_issues}\n\nCONCRETE NEXT STEPS: {next_steps}"
-- branch: {branch}
-- mode: simple
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG["developer"]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Step 2: Spawn Developer**
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/developer_{group_id}_retry.md`
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt={COMPLETE_PROMPT})`
+**Step 2: Spawn Developer with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/developer_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 ---
 
@@ -265,33 +267,35 @@ Then invoke: `Skill(command: "prompt-builder")`
 ✅ Testing | Running tests + coverage analysis
 ```
 
-### SPAWN QA EXPERT (DETERMINISTIC PROMPT)
+### SPAWN QA EXPERT (FILE-BASED PROMPT)
 
-**Step 1: Invoke prompt-builder skill**
+**Step 1: Build prompt to file**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type qa_expert \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "Validate: {dev_task_title}" \
+  --task-requirements "Developer Changes: {files_changed}\nChallenge Level: {level}/5" \
+  --branch "{branch}" \
+  --mode simple \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["qa_expert"]} \
+  --output-file "bazinga/prompts/qa_expert_{group_id}.md"
 ```
-Build prompt for agent spawn:
-- agent_type: qa_expert
-- session_id: {session_id}
-- group_id: {group_id}
-- task_title: "Validate: {dev_task_title}"
-- task_requirements: "Developer Changes: {files_changed}\nChallenge Level: {level}/5"
-- branch: {branch}
-- mode: simple
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG["qa_expert"]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Step 2: Spawn QA Expert**
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/qa_expert_{group_id}.md`
+
+**Step 2: Spawn QA Expert with file-based instructions**
 
 Output summary:
 ```
 📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
    **Task:** Validate {dev_task_title} | **Challenge Level:** {level}/5
+   **Prompt file:** bazinga/prompts/qa_expert_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt={COMPLETE_PROMPT})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt="FIRST: Read bazinga/prompts/qa_expert_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -355,33 +359,35 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 👔 Reviewing | Security scan + lint check + architecture analysis
 ```
 
-### SPAWN TECH LEAD (DETERMINISTIC PROMPT)
+### SPAWN TECH LEAD (FILE-BASED PROMPT)
 
-**Step 1: Invoke prompt-builder skill**
+**Step 1: Build prompt to file**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type tech_lead \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "Review: {task_title}" \
+  --task-requirements "QA Result: {qa_result}\nCoverage: {coverage_pct}%\nFiles Changed: {files_list}" \
+  --branch "{branch}" \
+  --mode simple \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["tech_lead"]} \
+  --output-file "bazinga/prompts/tech_lead_{group_id}.md"
 ```
-Build prompt for agent spawn:
-- agent_type: tech_lead
-- session_id: {session_id}
-- group_id: {group_id}
-- task_title: "Review: {task_title}"
-- task_requirements: "QA Result: {qa_result}\nCoverage: {coverage_pct}%\nFiles Changed: {files_list}"
-- branch: {branch}
-- mode: simple
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG["tech_lead"]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Step 2: Spawn Tech Lead**
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/tech_lead_{group_id}.md`
+
+**Step 2: Spawn Tech Lead with file-based instructions**
 
 Output summary:
 ```
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
    **Task:** Review {task_title} | **QA:** {result} | **Coverage:** {pct}%
+   **Prompt file:** bazinga/prompts/tech_lead_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt={COMPLETE_PROMPT})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt="FIRST: Read bazinga/prompts/tech_lead_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -659,26 +665,27 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 **THEN:** Build PM prompt using prompt-builder:
 
-**Step 1: Invoke prompt-builder skill**
+**Step 1: Build prompt to file**
 
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type project_manager \
+  --session-id "{session_id}" \
+  --group-id "global" \
+  --task-title "Final Assessment" \
+  --task-requirements "Implementation Summary: {implementation_summary}\n\nQuality Metrics: {quality_metrics}\n\nAssess if all success criteria are met and decide: BAZINGA or CONTINUE" \
+  --branch "{branch}" \
+  --mode {mode} \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["project_manager"]} \
+  --output-file "bazinga/prompts/project_manager_final.md"
 ```
-Build prompt for agent spawn:
-- agent_type: project_manager
-- session_id: {session_id}
-- group_id: "global"
-- task_title: "Final Assessment"
-- task_requirements: "Implementation Summary: {implementation_summary}\n\nQuality Metrics: {quality_metrics}\n\nAssess if all success criteria are met and decide: BAZINGA or CONTINUE"
-- branch: {branch}
-- mode: {mode}
-- testing_mode: {testing_mode}
-- model: {MODEL_CONFIG["project_manager"]}
-```
-Then invoke: `Skill(command: "prompt-builder")`
-→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Step 2: Spawn PM**
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/project_manager_final.md`
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt={COMPLETE_PROMPT})`
+**Step 2: Spawn PM with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt="FIRST: Read bazinga/prompts/project_manager_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 **AFTER PM response:** Parse using `response_parsing.md` §PM Response Parsing. Construct output capsule:
 - **BAZINGA:** §Completion template (groups, tests, criteria)
@@ -795,30 +802,34 @@ Prior agents' documented decision progression:
 3. **DO NOT** ask "Would you like me to continue?"
 4. **MUST** spawn PM immediately
 
-### Mandatory PM Spawn Prompt:
+### Mandatory PM Spawn (FILE-BASED PROMPT):
 
+**Step 1: Build prompt to file**
+
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type project_manager \
+  --session-id "{session_id}" \
+  --group-id "global" \
+  --task-title "Phase {N} Assessment" \
+  --task-requirements "Phase {N} complete. All groups approved and merged: {group_list}.\n\nQuery database for Original_Scope and compare to completed work:\n- Original estimated items: {Original_Scope.estimated_items}\n- Completed items: {sum of completed group item_counts}\n\nBased on this comparison, you MUST either:\n- Assign next phase groups (if work remains from Original_Scope), OR\n- Send BAZINGA (if ALL original tasks from scope are complete)\n\nDO NOT ask for permission. Make the decision based on scope comparison." \
+  --branch "{branch}" \
+  --mode {mode} \
+  --testing-mode {testing_mode} \
+  --model {MODEL_CONFIG["project_manager"]} \
+  --output-file "bazinga/prompts/project_manager_phase_{N}.md"
 ```
-Phase {N} complete. All groups approved and merged: {group_list}.
 
-Query database for Original_Scope and compare to completed work:
-- Original estimated items: {Original_Scope.estimated_items}
-- Completed items: {sum of completed group item_counts}
+**Check stderr for:** `PROMPT_FILE=bazinga/prompts/project_manager_phase_{N}.md`
 
-Based on this comparison, you MUST either:
-- Assign next phase groups (if work remains from Original_Scope), OR
-- Send BAZINGA (if ALL original tasks from scope are complete)
-
-DO NOT ask for permission. Make the decision based on scope comparison.
-```
-
-### Spawn Command:
+**Step 2: Spawn PM with file-based instructions**
 
 ```
 Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["project_manager"],
   description: "PM: Phase {N} complete - assess scope",
-  prompt: [PM prompt above]
+  prompt: "FIRST: Read bazinga/prompts/project_manager_phase_{N}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
 )
 ```
 
