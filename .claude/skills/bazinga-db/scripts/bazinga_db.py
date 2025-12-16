@@ -3314,7 +3314,10 @@ def main():
             positional_args = []
             i = 0
             while i < len(cmd_args):
-                if cmd_args[i] == '--specializations' and i + 1 < len(cmd_args):
+                arg = cmd_args[i]
+                # Normalize dashes to underscores for flag comparison
+                arg_normalized = arg.replace('-', '_') if arg.startswith('--') else arg
+                if arg_normalized == '--specializations' and i + 1 < len(cmd_args):
                     try:
                         specializations = json.loads(cmd_args[i + 1])
                         if not isinstance(specializations, list):
@@ -3327,7 +3330,7 @@ def main():
                         print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                     i += 2  # Skip flag and value
-                elif cmd_args[i] == '--item_count' and i + 1 < len(cmd_args):
+                elif arg_normalized == '--item_count' and i + 1 < len(cmd_args):
                     try:
                         item_count = int(cmd_args[i + 1])
                         if item_count < 1:
@@ -3369,6 +3372,7 @@ def main():
             valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
+                key = key.replace('-', '_')  # Normalize dashes to underscores (--assigned-to → assigned_to)
                 # Validate flag is in allowlist
                 if key not in valid_flags:
                     print(json.dumps({"success": False, "error": f"Unknown flag --{key}. Valid flags: {', '.join(sorted(valid_flags))}"}, indent=2), file=sys.stderr)
