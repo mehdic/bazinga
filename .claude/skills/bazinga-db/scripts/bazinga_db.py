@@ -1223,7 +1223,11 @@ class BazingaDB:
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
                          last_review_status: Optional[str] = None,
                          auto_create: bool = True, name: Optional[str] = None,
-                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
+                         specializations: Optional[List[str]] = None,
+                         item_count: Optional[int] = None,
+                         security_sensitive: Optional[int] = None,
+                         qa_attempts: Optional[int] = None,
+                         tl_review_attempts: Optional[int] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -1236,6 +1240,10 @@ class BazingaDB:
             auto_create: If True and group doesn't exist, create it (default: True)
             name: Name for auto-creation (defaults to group_id if not provided)
             specializations: List of specialization file paths for this group
+            item_count: Number of discrete tasks/items in this group
+            security_sensitive: Whether this group has security-sensitive code (0 or 1)
+            qa_attempts: Number of QA test attempts
+            tl_review_attempts: Number of Tech Lead review attempts
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1285,6 +1293,18 @@ class BazingaDB:
             if specializations is not None:
                 updates.append("specializations = ?")
                 params.append(json.dumps(specializations))
+            if item_count is not None:
+                updates.append("item_count = ?")
+                params.append(item_count)
+            if security_sensitive is not None:
+                updates.append("security_sensitive = ?")
+                params.append(security_sensitive)
+            if qa_attempts is not None:
+                updates.append("qa_attempts = ?")
+                params.append(qa_attempts)
+            if tl_review_attempts is not None:
+                updates.append("tl_review_attempts = ?")
+                params.append(tl_review_attempts)
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")

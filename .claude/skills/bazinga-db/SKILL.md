@@ -157,6 +157,24 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-session \
 
 **IMPORTANT:** This command will auto-initialize the database if it doesn't exist. No separate initialization needed!
 
+⚠️ **BASH COMMAND SUBSTITUTION WARNING:**
+
+Do NOT use `$()` command substitution to capture session IDs:
+```bash
+# ❌ WRONG - causes syntax errors in eval context
+SESSION_ID=$(python3 ... create-session ...)
+
+# ✅ CORRECT - run command directly, session_id is in output
+python3 .../bazinga_db.py --quiet create-session ...
+# Output includes session_id - capture it by parsing the JSON output
+```
+
+For session initialization with config seeding, use the unified init script:
+```bash
+python3 .claude/skills/bazinga-db/scripts/init_session.py --session-id "bazinga_xxx"
+# Outputs session_id to stdout, status to stderr
+```
+
 ### Common Operations
 
 **Log agent interaction:**
@@ -178,20 +196,40 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state \
 ```
 
 **Create task group:**
+
+⚠️ **CRITICAL: Argument order is `<group_id> <session_id>` (NOT session first)**
+
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-task-group \
   "<group_id>" "<session_id>" "<name>" [status] [assigned_to] \
   [--specializations '<json_array>'] [--item_count N]
 ```
 
+**Example (correct):**
+```bash
+python3 .../bazinga_db.py --quiet create-task-group "CALC" "bazinga_xxx" "Calculator Implementation"
+```
+
 Parameters:
+- `group_id`: Task group identifier (e.g., "CALC", "AUTH", "API")
+- `session_id`: Session identifier (e.g., "bazinga_20251216_123456")
+- `name`: Human-readable task group name
 - `specializations`: JSON array of specialization file paths (e.g., `'["bazinga/templates/specializations/01-languages/typescript.md"]'`)
 - `item_count`: Number of discrete tasks/items in this group (used for progress tracking)
 
 **Update task group:**
+
+⚠️ **CRITICAL: Argument order is `<group_id> <session_id>` (NOT session first)**
+
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
-  "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"] [--specializations '<json_array>']
+  "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"] \
+  [--specializations '<json_array>'] [--qa_attempts N] [--tl_review_attempts N]
+```
+
+**Example (correct):**
+```bash
+python3 .../bazinga_db.py --quiet update-task-group "CALC" "bazinga_xxx" --status "in_progress"
 ```
 
 **Get task groups:**

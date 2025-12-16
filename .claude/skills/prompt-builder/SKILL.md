@@ -33,6 +33,20 @@ This skill builds complete agent prompts by calling a Python script that:
 - When orchestrator needs a complete prompt for Developer, QA Expert, Tech Lead, PM, Investigator, or Requirements Engineer
 - Called ON-DEMAND to get the latest context from database
 
+## Quick Reference - Required Arguments
+
+⚠️ **All these arguments are REQUIRED** (except where noted):
+
+| Argument | Example | Description |
+|----------|---------|-------------|
+| `--agent-type` | `developer` | Agent type (developer, qa_expert, tech_lead, project_manager, etc.) |
+| `--session-id` | `bazinga_20251216_123456` | Current session ID |
+| `--branch` | `main` | Git branch name |
+| `--mode` | `simple` | Orchestration mode (simple or parallel) |
+| `--testing-mode` | `full` | Testing mode (full, minimal, or disabled) |
+| `--group-id` | `CALC` | Task group ID (optional for PM, required for others) |
+| `--model` | `haiku` | Model for token budgets (optional, defaults to sonnet) |
+
 ## Your Task
 
 When invoked, you must:
@@ -42,12 +56,12 @@ When invoked, you must:
 Parse the following from the orchestrator's context or message:
 - `agent_type` (required): developer, qa_expert, tech_lead, project_manager, investigator, requirements_engineer, senior_software_engineer
 - `session_id` (required): Current session ID
+- `branch` (required): Git branch name
+- `mode` (required): simple or parallel
+- `testing_mode` (required): full, minimal, or disabled
 - `group_id` (required for non-PM): Task group ID (e.g., "AUTH", "API")
 - `task_title`: Brief title of the task
 - `task_requirements`: Detailed requirements
-- `branch`: Git branch name
-- `mode`: simple or parallel
-- `testing_mode`: full, minimal, or disabled
 - `model`: haiku, sonnet, or opus (for token budgeting)
 
 **For retries, also extract:**
