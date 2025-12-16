@@ -2,8 +2,8 @@
 
 **Date:** 2025-12-16
 **Context:** Replace LLM-based prompt composition and workflow routing with deterministic scripts
-**Decision:** Hybrid approach - JSON configs seeded to DB, Skills calling Python scripts
-**Status:** Approved - Awaiting implementation
+**Decision:** Unified prompt-builder - Python script does everything, called ON-DEMAND before each spawn
+**Status:** Approved - Ready for implementation
 **Reviewed by:** OpenAI GPT-5
 
 ---
@@ -12,14 +12,95 @@
 
 The BAZINGA orchestrator currently relies on an LLM to compose agent prompts and determine workflow routing. This is inherently non-deterministic and causes bugs (e.g., prompts missing agent file content).
 
-**Solution:** Two deterministic components:
-1. **`prompt-builder` Skill** - Assembles agent prompts from components via Python script
-2. **`workflow-router` Skill** - Determines next action based on state via Python script
+**Solution:** Two deterministic Python scripts, each wrapped by a thin skill:
+
+1. **`prompt-builder` Skill** → `prompt_builder.py` - Builds complete agent prompts
+2. **`workflow-router` Skill** → `workflow_router.py` - Determines next action based on state
+
+**Key Design Decisions:**
+
+| Decision | Rationale |
+|----------|-----------|
+| Python script does ALL composition | 100% deterministic - no LLM interpretation |
+| Script queries DB directly | Specializations + context read from DB at spawn time |
+| Called ON-DEMAND | Fresh DB query before EACH spawn gets latest context |
+| Skill is thin wrapper | Just calls script, returns output |
+| No skill-to-skill invocation | Skills can't reliably invoke other skills |
 
 **Architecture:**
-- JSON config files (version controlled) → Seeded to DB at session start
-- Skills call Python scripts that read from DB
-- Orchestrator becomes thin coordination layer
+```
+Orchestrator
+    │
+    └─→ Skill(command: "prompt-builder")
+              │
+              └─→ prompt_builder.py
+                    ├── Reads DB: task_groups.specializations
+                    ├── Reads DB: context_packages
+                    ├── Reads DB: error_patterns
+                    ├── Reads DB: agent_reasoning
+                    ├── Reads FS: agents/*.md (full file)
+                    ├── Reads FS: templates/specializations/*.md
+                    ├── Applies token budgets
+                    ├── Validates required markers
+                    └── Returns: COMPLETE PROMPT
+```
+
+---
+
+## Part 0: On-Demand Invocation Timing
+
+### Why On-Demand Matters
+
+Context is **CUMULATIVE** during orchestration. The prompt_builder.py script is called RIGHT BEFORE each spawn to get the latest DB state.
+
+### Context Growth Timeline
+
+```
+Session Start:
+├── Config seeded to DB
+└── Context: Empty
+
+PM Spawn:
+├── prompt_builder.py queries DB
+├── Context: Only session info
+└── PM gets: agent file + task
+
+PM Creates Task Groups:
+└── Specializations stored in DB (per task group)
+
+Developer Spawn:
+├── prompt_builder.py queries DB
+├── Context: Specializations from task_groups
+└── Developer gets: specialization + agent file + task
+
+Developer Completes → Saves Reasoning:
+└── agent_reasoning table updated
+
+QA Spawn:
+├── prompt_builder.py queries DB (FRESH query!)
+├── Context NOW includes: Developer's reasoning!
+└── QA gets: specialization + context + agent file + task
+
+QA Completes → Saves Reasoning:
+└── agent_reasoning table updated
+
+Tech Lead Spawn:
+├── prompt_builder.py queries DB (FRESH query!)
+├── Context NOW includes: Dev + QA reasoning!
+└── TL gets: specialization + full context + agent file + task
+```
+
+### What Each Agent Receives
+
+| Agent | Specialization | Context | Agent File |
+|-------|---------------|---------|------------|
+| PM (initial) | None | None | Full ~2500 lines |
+| PM (resume) | None | Session state | Full ~2500 lines |
+| Developer (1st) | From task_groups | None | Full ~1200 lines |
+| Developer (retry) | From task_groups | Prior reasoning + feedback | Full ~1200 lines |
+| QA Expert | From task_groups | Developer reasoning | Full ~1000 lines |
+| Tech Lead | From task_groups | Dev + QA reasoning | Full ~800 lines |
+| Investigator | From task_groups | All prior reasoning | Full ~500 lines |
 
 ---
 
@@ -513,7 +594,7 @@ validate-prompt-markers {agent_type} {prompt_hash}  - Validate markers present
 
 ---
 
-## Part 5: New Python Scripts
+## Part 5: Python Scripts
 
 ### 5.1 `bazinga/scripts/seed_configs.py`
 
@@ -681,12 +762,23 @@ if __name__ == "__main__":
     main()
 ```
 
-### 5.2 `bazinga/scripts/prompt_builder.py`
+### 5.2 `bazinga/scripts/prompt_builder.py` (UNIFIED - Does Everything)
 
 ```python
 #!/usr/bin/env python3
 """
 Deterministically builds agent prompts.
+This script does ALL prompt composition - no LLM interpretation.
+
+It queries the database for:
+- Specializations (from task_groups.specializations)
+- Context packages
+- Error patterns
+- Prior agent reasoning
+
+Then reads from filesystem:
+- Agent definition files (agents/*.md)
+- Specialization templates (templates/specializations/*.md)
 
 Usage:
     python3 bazinga/scripts/prompt_builder.py \
@@ -706,6 +798,7 @@ Output:
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -733,6 +826,29 @@ MIN_AGENT_LINES = {
     "requirements_engineer": 600,
 }
 
+# Token budgets per model
+TOKEN_BUDGETS = {
+    "haiku": {"soft": 900, "hard": 1350},
+    "sonnet": {"soft": 1800, "hard": 2700},
+    "opus": {"soft": 2400, "hard": 3600},
+}
+
+# Context budget allocation by agent type
+CONTEXT_ALLOCATION = {
+    "developer": 0.20,
+    "senior_software_engineer": 0.25,
+    "qa_expert": 0.30,
+    "tech_lead": 0.40,
+    "investigator": 0.35,
+    "project_manager": 0.10,
+    "requirements_engineer": 0.25,
+}
+
+
+def estimate_tokens(text):
+    """Rough token estimate (characters / 4)."""
+    return len(text) // 4
+
 
 def get_required_markers(conn, agent_type):
     """Read required markers from database."""
@@ -754,11 +870,6 @@ def validate_markers(prompt, markers, agent_type):
         print(f"ERROR: Prompt for {agent_type} missing required markers: {missing}", file=sys.stderr)
         print(f"This means the agent file may be corrupted or incomplete.", file=sys.stderr)
         sys.exit(1)
-
-
-def estimate_tokens(text):
-    """Rough token estimate (characters / 4)."""
-    return len(text) // 4
 
 
 def read_agent_file(agent_type):
@@ -783,6 +894,227 @@ def read_agent_file(agent_type):
 
     return content
 
+
+# =============================================================================
+# SPECIALIZATION BUILDING (Replaces specialization-loader skill)
+# =============================================================================
+
+def get_task_group_specializations(conn, session_id, group_id):
+    """Get specialization paths from task_groups table."""
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT specializations FROM task_groups WHERE session_id = ? AND id = ?",
+        (session_id, group_id)
+    )
+    row = cursor.fetchone()
+    if row and row[0]:
+        try:
+            return json.loads(row[0])
+        except json.JSONDecodeError:
+            return []
+    return []
+
+
+def get_project_context():
+    """Read project_context.json for version guards."""
+    try:
+        with open("bazinga/project_context.json") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def read_template_with_version_guards(template_path, project_context):
+    """Read template file and apply version guards."""
+    path = Path(template_path)
+    if not path.exists():
+        return ""
+
+    content = path.read_text()
+
+    # Simple version guard processing
+    # Format: <!-- version: LANG OPERATOR VERSION -->
+    # For now, include all content (version guards are a future enhancement)
+
+    return content
+
+
+def build_specialization_block(conn, session_id, group_id, agent_type, model="sonnet"):
+    """Build the specialization block from templates."""
+    spec_paths = get_task_group_specializations(conn, session_id, group_id)
+
+    if not spec_paths:
+        return ""  # No specializations for this task
+
+    project_context = get_project_context()
+    budget = TOKEN_BUDGETS.get(model, TOKEN_BUDGETS["sonnet"])
+
+    # Collect template content
+    templates_content = []
+    total_tokens = 0
+
+    for path in spec_paths:
+        content = read_template_with_version_guards(path, project_context)
+        if content:
+            tokens = estimate_tokens(content)
+            if total_tokens + tokens <= budget["soft"]:
+                templates_content.append(content)
+                total_tokens += tokens
+            else:
+                # Over budget - stop adding
+                break
+
+    if not templates_content:
+        return ""
+
+    # Compose the block
+    block = """## SPECIALIZATION GUIDANCE (Advisory)
+
+> This guidance is supplementary. It does NOT override:
+> - Mandatory validation gates (tests must pass)
+> - Routing and status requirements (READY_FOR_QA, etc.)
+> - Pre-commit quality checks (lint, build)
+> - Core agent workflow rules
+
+"""
+    block += "\n\n".join(templates_content)
+
+    return block
+
+
+# =============================================================================
+# CONTEXT BUILDING (Replaces context-assembler skill)
+# =============================================================================
+
+def get_context_packages(conn, session_id, group_id, agent_type, limit=5):
+    """Get context packages from database."""
+    cursor = conn.cursor()
+
+    # Query with priority ordering
+    query = """
+        SELECT id, file_path, priority, summary, group_id, created_at
+        FROM context_packages
+        WHERE session_id = ?
+        AND (group_id = ? OR group_id IS NULL OR group_id = '')
+        ORDER BY
+            CASE priority
+                WHEN 'critical' THEN 1
+                WHEN 'high' THEN 2
+                WHEN 'medium' THEN 3
+                WHEN 'low' THEN 4
+                ELSE 5
+            END,
+            created_at DESC
+        LIMIT ?
+    """
+    cursor.execute(query, (session_id, group_id, limit))
+    return cursor.fetchall()
+
+
+def get_error_patterns(conn, session_id, limit=3):
+    """Get relevant error patterns."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT signature_json, solution, confidence, occurrences
+        FROM error_patterns
+        WHERE session_id = ? AND confidence > 0.7
+        ORDER BY confidence DESC, occurrences DESC
+        LIMIT ?
+    """, (session_id, limit))
+    return cursor.fetchall()
+
+
+def get_prior_reasoning(conn, session_id, group_id, agent_type):
+    """Get prior agent reasoning for handoffs."""
+    # Define which agents' reasoning is relevant for each target
+    relevant_agents = {
+        'qa_expert': ['developer', 'senior_software_engineer'],
+        'tech_lead': ['developer', 'senior_software_engineer', 'qa_expert'],
+        'senior_software_engineer': ['developer'],
+        'investigator': ['developer', 'senior_software_engineer', 'qa_expert'],
+        'developer': ['developer', 'qa_expert', 'tech_lead'],
+    }
+
+    agents_to_query = relevant_agents.get(agent_type, [])
+    if not agents_to_query:
+        return []
+
+    cursor = conn.cursor()
+    placeholders = ','.join('?' * len(agents_to_query))
+    cursor.execute(f"""
+        SELECT agent_type, phase, content, confidence_level, timestamp
+        FROM agent_reasoning
+        WHERE session_id = ?
+        AND (group_id = ? OR group_id = 'global')
+        AND agent_type IN ({placeholders})
+        ORDER BY timestamp DESC
+        LIMIT 5
+    """, (session_id, group_id, *agents_to_query))
+    return cursor.fetchall()
+
+
+def build_context_block(conn, session_id, group_id, agent_type, model="sonnet"):
+    """Build the context block from database."""
+    budget = TOKEN_BUDGETS.get(model, TOKEN_BUDGETS["sonnet"])
+    allocation = CONTEXT_ALLOCATION.get(agent_type, 0.20)
+    context_budget = int(budget["soft"] * allocation)
+
+    sections = []
+    used_tokens = 0
+
+    # 1. Context packages
+    packages = get_context_packages(conn, session_id, group_id, agent_type)
+    if packages:
+        pkg_section = "### Relevant Context\n\n"
+        for pkg_id, file_path, priority, summary, pkg_group, created in packages:
+            if summary:
+                # Truncate long summaries
+                truncated = summary[:200] + "..." if len(summary) > 200 else summary
+                line = f"**[{priority.upper()}]** {file_path}\n> {truncated}\n\n"
+                line_tokens = estimate_tokens(line)
+                if used_tokens + line_tokens <= context_budget:
+                    pkg_section += line
+                    used_tokens += line_tokens
+        if pkg_section != "### Relevant Context\n\n":
+            sections.append(pkg_section)
+
+    # 2. Prior reasoning (for handoffs)
+    if agent_type in ['qa_expert', 'tech_lead', 'senior_software_engineer', 'investigator']:
+        reasoning = get_prior_reasoning(conn, session_id, group_id, agent_type)
+        if reasoning:
+            reason_section = "### Prior Agent Reasoning\n\n"
+            for r_agent, r_phase, r_content, r_conf, r_time in reasoning:
+                content_truncated = r_content[:300] if r_content else ""
+                line = f"**[{r_agent}] {r_phase}:** {content_truncated}\n\n"
+                line_tokens = estimate_tokens(line)
+                if used_tokens + line_tokens <= context_budget:
+                    reason_section += line
+                    used_tokens += line_tokens
+            if reason_section != "### Prior Agent Reasoning\n\n":
+                sections.append(reason_section)
+
+    # 3. Error patterns
+    errors = get_error_patterns(conn, session_id)
+    if errors:
+        err_section = "### Known Error Patterns\n\n"
+        for sig_json, solution, confidence, occurrences in errors:
+            line = f"⚠️ **Known Issue**: {sig_json[:100]}\n> **Solution**: {solution[:200]}\n\n"
+            line_tokens = estimate_tokens(line)
+            if used_tokens + line_tokens <= context_budget:
+                err_section += line
+                used_tokens += line_tokens
+        if err_section != "### Known Error Patterns\n\n":
+            sections.append(err_section)
+
+    if not sections:
+        return ""
+
+    return "## Context from Prior Work\n\n" + "\n".join(sections)
+
+
+# =============================================================================
+# TASK CONTEXT BUILDING
+# =============================================================================
 
 def build_task_context(args):
     """Build the task context section."""
@@ -883,64 +1215,69 @@ Do NOT reduce scope without explicit user approval.
     return ""
 
 
+# =============================================================================
+# MAIN PROMPT COMPOSITION
+# =============================================================================
+
 def build_prompt(args):
     """Build the complete agent prompt."""
     conn = sqlite3.connect(DB_PATH)
 
-    # 1. Read agent definition (MANDATORY - this is the core)
-    agent_definition = read_agent_file(args.agent_type)
-
-    # 2. Build task context
-    task_context = build_task_context(args)
-
-    # 3. Build feedback context (if retry)
-    feedback_context = build_feedback_context(args)
-
-    # 4. Build PM-specific context
-    pm_context = build_pm_context(args) if args.agent_type == "project_manager" else ""
-    resume_context = build_resume_context(args) if args.agent_type == "project_manager" else ""
-
-    # 5. Compose prompt in order
+    model = args.model or "sonnet"
     components = []
 
-    # Optional: Context block from context-assembler (prior reasoning)
-    if args.context_block:
-        components.append(args.context_block)
+    # 1. Build CONTEXT block (from DB - prior reasoning, packages, errors)
+    if args.agent_type != "project_manager":  # PM doesn't need prior context
+        context_block = build_context_block(
+            conn, args.session_id, args.group_id, args.agent_type, model
+        )
+        if context_block:
+            components.append(context_block)
 
-    # Optional: Specialization block from specialization-loader
-    if args.spec_block:
-        components.append(args.spec_block)
+    # 2. Build SPECIALIZATION block (from DB task_groups + template files)
+    if args.group_id and args.agent_type not in ["project_manager"]:
+        spec_block = build_specialization_block(
+            conn, args.session_id, args.group_id, args.agent_type, model
+        )
+        if spec_block:
+            components.append(spec_block)
 
-    # MANDATORY: Full agent definition
+    # 3. Read AGENT DEFINITION (MANDATORY - this is the core)
+    agent_definition = read_agent_file(args.agent_type)
     components.append(agent_definition)
 
-    # Task-specific context
+    # 4. Build TASK CONTEXT
+    task_context = build_task_context(args)
     components.append(task_context)
 
-    # PM-specific context
-    if pm_context:
-        components.append(pm_context)
-    if resume_context:
-        components.append(resume_context)
+    # 5. Build PM-specific context
+    if args.agent_type == "project_manager":
+        pm_context = build_pm_context(args)
+        if pm_context:
+            components.append(pm_context)
+        resume_context = build_resume_context(args)
+        if resume_context:
+            components.append(resume_context)
 
-    # Feedback for retries
+    # 6. Build FEEDBACK context (for retries)
+    feedback_context = build_feedback_context(args)
     if feedback_context:
         components.append(feedback_context)
 
     # Compose final prompt
     full_prompt = "\n\n".join(components)
 
-    # 6. Validate required markers
+    # 7. Validate required markers
     markers = get_required_markers(conn, args.agent_type)
     if markers:
         validate_markers(full_prompt, markers, args.agent_type)
 
     conn.close()
 
-    # 7. Output prompt to stdout
+    # 8. Output prompt to stdout
     print(full_prompt)
 
-    # 8. Output metadata to stderr
+    # 9. Output metadata to stderr
     lines = len(full_prompt.splitlines())
     tokens = estimate_tokens(full_prompt)
     print(f"[PROMPT_METADATA]", file=sys.stderr)
@@ -948,8 +1285,6 @@ def build_prompt(args):
     print(f"lines={lines}", file=sys.stderr)
     print(f"tokens_estimate={tokens}", file=sys.stderr)
     print(f"markers_validated={len(markers)}", file=sys.stderr)
-    print(f"has_context_block={bool(args.context_block)}", file=sys.stderr)
-    print(f"has_spec_block={bool(args.spec_block)}", file=sys.stderr)
 
 
 def main():
@@ -970,19 +1305,16 @@ def main():
                         choices=["full", "minimal", "disabled"],
                         help="Testing mode")
 
-    # Conditional arguments (required for non-PM)
+    # Conditional arguments
     parser.add_argument("--group-id", default="",
                         help="Task group identifier")
     parser.add_argument("--task-title", default="",
                         help="Task title")
     parser.add_argument("--task-requirements", default="",
                         help="Task requirements")
-
-    # Optional context blocks
-    parser.add_argument("--context-block", default="",
-                        help="Context block from context-assembler")
-    parser.add_argument("--spec-block", default="",
-                        help="Specialization block from specialization-loader")
+    parser.add_argument("--model", default="sonnet",
+                        choices=["haiku", "sonnet", "opus"],
+                        help="Model for token budgeting")
 
     # Feedback for retries
     parser.add_argument("--qa-feedback", default="",
@@ -1267,33 +1599,39 @@ if __name__ == "__main__":
 
 ## Part 6: Skills Definitions
 
-### 6.1 `prompt-builder` Skill
+### 6.1 `prompt-builder` Skill (Thin Wrapper)
 
 **Location:** `.claude/skills/prompt-builder/SKILL.md`
 
 ```markdown
 ---
 name: prompt-builder
-description: Deterministically builds agent prompts by calling Python script. Ensures all agent prompts include full agent definition files and are validated.
-version: 1.0.0
-allowed-tools: [Bash, Read]
+description: Builds complete agent prompts deterministically via Python script. Call this before spawning ANY agent.
+version: 2.0.0
+allowed-tools: [Bash]
 ---
 
 # Prompt Builder Skill
 
-You build agent prompts deterministically by calling the Python script.
-This ensures prompts ALWAYS include full agent definition files.
+You build agent prompts by calling `prompt_builder.py`. This script handles EVERYTHING:
+- Reads specializations from DB (task_groups.specializations)
+- Reads context from DB (context_packages, error_patterns, reasoning)
+- Reads agent definition files from filesystem
+- Applies token budgets
+- Validates required markers
+- Returns complete prompt
 
 ## When to Invoke
 
-Before spawning ANY agent (Developer, SSE, QA, Tech Lead, PM, Investigator, RE).
+**RIGHT BEFORE spawning ANY agent** (Developer, SSE, QA, Tech Lead, PM, Investigator, RE).
+
+This is called ON-DEMAND to get the latest context from DB.
 
 ## Your Task
 
-### Step 1: Parse Input Context
+### Step 1: Extract Parameters from Orchestrator Context
 
-Extract from orchestrator's context:
-- agent_type (required)
+- agent_type (required): developer, qa_expert, tech_lead, etc.
 - session_id (required)
 - group_id (required for non-PM)
 - task_title
@@ -1301,14 +1639,13 @@ Extract from orchestrator's context:
 - branch
 - mode (simple/parallel)
 - testing_mode (full/minimal/disabled)
-- context_block (from context-assembler, if any)
-- spec_block (from specialization-loader, if any)
+- model (haiku/sonnet/opus)
 - qa_feedback (if retry after QA failure)
 - tl_feedback (if retry after Tech Lead changes)
 - pm_state (for PM spawns)
 - resume_context (for PM resume)
 
-### Step 2: Call the Script
+### Step 2: Call the Python Script
 
 ```bash
 python3 bazinga/scripts/prompt_builder.py \
@@ -1320,30 +1657,34 @@ python3 bazinga/scripts/prompt_builder.py \
   --branch "{branch}" \
   --mode "{mode}" \
   --testing-mode "{testing_mode}" \
-  --context-block "{context_block}" \
-  --spec-block "{spec_block}" \
+  --model "{model}" \
   --qa-feedback "{qa_feedback}" \
   --tl-feedback "{tl_feedback}" \
   --pm-state '{pm_state_json}' \
   --resume-context "{resume_context}"
 ```
 
-### Step 3: Return Result
+### Step 3: Return the Output
 
-The script outputs:
-- Complete prompt to stdout (return this)
-- Metadata to stderr (for logging)
+- stdout = Complete prompt (return this to orchestrator)
+- stderr = Metadata (for logging)
 
-Return the stdout content as the built prompt.
+## What the Script Does Internally
+
+1. Queries DB for `task_groups.specializations` → reads template files
+2. Queries DB for `context_packages`, `error_patterns`, `agent_reasoning`
+3. Reads full agent definition file (`agents/*.md`)
+4. Applies token budgets per model
+5. Validates required markers are present
+6. Returns composed prompt
 
 ## Error Handling
 
-If script exits with non-zero code:
-- Missing required markers: Agent file may be corrupted
-- Unknown agent type: Check AGENT_FILE_MAP
-- File not found: Check agents/ directory
-
-Report errors to orchestrator for handling.
+| Error | Meaning |
+|-------|---------|
+| Exit code 1 + "missing markers" | Agent file corrupted/incomplete |
+| Exit code 1 + "file not found" | Agent file missing |
+| Exit code 1 + "unknown agent type" | Invalid agent_type parameter |
 ```
 
 ### 6.2 `workflow-router` Skill
@@ -1353,26 +1694,24 @@ Report errors to orchestrator for handling.
 ```markdown
 ---
 name: workflow-router
-description: Deterministically determines next agent based on current state. Reads transitions from database.
+description: Determines next agent based on state machine rules. Call after receiving ANY agent response.
 version: 1.0.0
 allowed-tools: [Bash]
 ---
 
 # Workflow Router Skill
 
-You determine the next agent to spawn by calling the Python script.
-This ensures consistent routing based on state machine rules.
+You determine the next action by calling `workflow_router.py`.
 
 ## When to Invoke
 
-After receiving ANY agent response, to determine next step.
+**After receiving ANY agent response**, to determine what to do next.
 
 ## Your Task
 
-### Step 1: Parse Input Context
+### Step 1: Extract Parameters
 
-Extract from orchestrator's context:
-- current_agent: Agent that just responded
+- current_agent: Agent that just responded (developer, qa_expert, etc.)
 - status: Status code from response (READY_FOR_QA, PASS, APPROVED, etc.)
 - session_id
 - group_id
@@ -1389,9 +1728,9 @@ python3 bazinga/scripts/workflow_router.py \
   --testing-mode "{testing_mode}"
 ```
 
-### Step 3: Return Result
+### Step 3: Return JSON Result
 
-The script outputs JSON with:
+The script outputs JSON:
 ```json
 {
   "success": true,
@@ -1399,27 +1738,20 @@ The script outputs JSON with:
   "action": "spawn",
   "model": "sonnet",
   "include_context": ["dev_output", "test_results"],
-  "groups_to_spawn": ["AUTH", "API"]  // For batch spawns
+  "groups_to_spawn": ["AUTH", "API"]
 }
 ```
 
-Return this JSON for orchestrator to act on.
+## Actions Explained
 
-## Special Actions
-
-- `spawn`: Spawn single agent
-- `spawn_batch`: Spawn multiple developers (up to 4)
-- `spawn_merge`: Spawn developer for merge task, then check phase
-- `respawn`: Re-spawn same agent type with feedback
-- `validate_then_end`: Run bazinga-validator, then end
-- `pause_for_user`: Pause and wait for user input
-- `end_session`: Mark session complete
-
-## Error Handling
-
-If unknown transition:
-- Script returns fallback to tech_lead
-- Report to orchestrator for logging
+| Action | What to Do |
+|--------|------------|
+| `spawn` | Spawn single agent (use prompt-builder first) |
+| `spawn_batch` | Spawn multiple developers for `groups_to_spawn` |
+| `respawn` | Re-spawn same agent type with feedback |
+| `validate_then_end` | Run bazinga-validator, then end session |
+| `pause_for_user` | Surface clarification question to user |
+| `end_session` | Mark session complete |
 ```
 
 ### 6.3 `config-seeder` Skill
@@ -1436,44 +1768,36 @@ allowed-tools: [Bash]
 
 # Config Seeder Skill
 
-You seed JSON configuration files into the database.
-This is run ONCE at the start of each orchestration session.
+Seeds JSON config files into database tables.
 
 ## When to Invoke
 
-At orchestrator initialization, BEFORE spawning PM.
+**Once at session start**, BEFORE spawning PM.
 
 ## Your Task
-
-### Step 1: Run the Seeding Script
 
 ```bash
 python3 bazinga/scripts/seed_configs.py --all
 ```
 
-### Step 2: Verify Success
-
-The script outputs:
-- "Seeded X transitions"
-- "Seeded X agent marker sets"
-- "Seeded X special rules"
-- "✅ Config seeding complete"
-
-If any errors, report to orchestrator.
-
 ## What Gets Seeded
 
-1. **transitions.json** → `workflow_transitions` table
-2. **agent-markers.json** → `agent_markers` table
-3. **_special_rules** → `workflow_special_rules` table
+1. `bazinga/config/transitions.json` → `workflow_transitions` table
+2. `bazinga/config/agent-markers.json` → `agent_markers` table
+3. `_special_rules` → `workflow_special_rules` table
+
+## Success Output
+
+```
+Seeded 45 transitions
+Seeded 7 agent marker sets
+Seeded 5 special rules
+✅ Config seeding complete
+```
 
 ## Error Handling
 
-If JSON files not found:
-- Check bazinga/config/ directory exists
-- Ensure transitions.json and agent-markers.json exist
-
-Report errors - orchestration cannot proceed without configs.
+If JSON files not found, orchestration CANNOT proceed.
 ```
 
 ---
@@ -1499,30 +1823,16 @@ Must complete before any agent spawns.
 **If seeding fails:** STOP - cannot proceed without routing config.
 ```
 
-### 7.2 Agent Spawning Changes
+### 7.2 Agent Spawning Changes (SIMPLIFIED)
 
-Replace all prompt composition logic with:
+Replace ALL prompt composition logic with:
 
 ```markdown
-## Agent Spawning (ALL AGENTS)
+## Spawning ANY Agent
 
-### Step 1: Get Specialization (if enabled)
+**Step 1: Invoke prompt-builder**
 
-```
-Skill(command: "specialization-loader")
-```
-Capture SPEC_BLOCK from output.
-
-### Step 2: Get Context (if enabled)
-
-```
-Skill(command: "context-assembler")
-```
-Capture CONTEXT_BLOCK from output.
-
-### Step 3: Build Prompt (MANDATORY)
-
-**Provide context for prompt-builder:**
+Provide context in your message:
 ```
 Build prompt for:
 - Agent Type: {agent_type}
@@ -1533,29 +1843,32 @@ Build prompt for:
 - Branch: {branch}
 - Mode: {mode}
 - Testing Mode: {testing_mode}
-- Context Block: {CONTEXT_BLOCK}
-- Spec Block: {SPEC_BLOCK}
-- QA Feedback: {if retry}
-- TL Feedback: {if changes requested}
+- Model: {model}
+- QA Feedback: {if retry after QA fail}
+- TL Feedback: {if retry after changes requested}
+- PM State: {for PM spawns}
+- Resume Context: {for PM resume}
 ```
 
-**Then invoke:**
+Then invoke:
 ```
 Skill(command: "prompt-builder")
 ```
 
-Capture the complete prompt from output.
+**Step 2: Spawn Agent**
 
-### Step 4: Spawn Agent
-
+Use the complete prompt from skill output:
 ```
 Task(
   subagent_type: "general-purpose",
-  model: {model from router or MODEL_CONFIG},
+  model: {model},
   description: "{agent_type}: {task_title[:90]}",
   prompt: {COMPLETE_PROMPT from prompt-builder}
 )
 ```
+
+**Note:** The prompt-builder script queries DB for specializations and context
+automatically - no need to invoke other skills first.
 ```
 
 ### 7.3 Routing Changes
@@ -1563,15 +1876,15 @@ Task(
 Replace all routing logic with:
 
 ```markdown
-## Routing After Agent Response
+## After Receiving Agent Response
 
-### Step 1: Extract Status
+**Step 1: Extract Status**
 
 Parse agent response for status code (READY_FOR_QA, PASS, APPROVED, etc.)
 
-### Step 2: Get Next Action
+**Step 2: Invoke workflow-router**
 
-**Provide context for workflow-router:**
+Provide context:
 ```
 Route from:
 - Current Agent: {agent_type}
@@ -1581,17 +1894,17 @@ Route from:
 - Testing Mode: {testing_mode}
 ```
 
-**Then invoke:**
+Then invoke:
 ```
 Skill(command: "workflow-router")
 ```
 
-### Step 3: Execute Action
+**Step 3: Execute Action**
 
-Parse JSON result and execute action:
-- `spawn` → Go to Agent Spawning with next_agent
-- `spawn_batch` → Spawn multiple developers for groups_to_spawn
-- `respawn` → Re-spawn same agent with feedback
+Parse JSON result and execute:
+- `spawn` → Go to "Spawning ANY Agent" with next_agent
+- `spawn_batch` → Spawn developers for each group in groups_to_spawn
+- `respawn` → Re-spawn with feedback
 - `validate_then_end` → Invoke bazinga-validator skill
 - `pause_for_user` → Surface clarification question
 - `end_session` → Mark session complete
@@ -1599,7 +1912,7 @@ Parse JSON result and execute action:
 
 ---
 
-## Part 8: Detailed Task List
+## Part 8: Updated Task List
 
 ### Phase 0: Preparation (Do First)
 
@@ -1625,46 +1938,48 @@ Parse JSON result and execute action:
 | # | Task | Description | Files |
 |---|------|-------------|-------|
 | 2.1 | Create seed_configs.py | Config seeding script | `bazinga/scripts/seed_configs.py` |
-| 2.2 | Create prompt_builder.py | Prompt building script | `bazinga/scripts/prompt_builder.py` |
+| 2.2 | Create prompt_builder.py | **UNIFIED** prompt building (does everything) | `bazinga/scripts/prompt_builder.py` |
 | 2.3 | Create workflow_router.py | Routing script | `bazinga/scripts/workflow_router.py` |
 | 2.4 | Test seed_configs.py | Verify seeding works | - |
-| 2.5 | Test prompt_builder.py | Verify all agent types | - |
+| 2.5 | Test prompt_builder.py | Verify all agent types, DB queries | - |
 | 2.6 | Test workflow_router.py | Verify all transitions | - |
 
-### Phase 3: Skills
+### Phase 3: Skills (Thin Wrappers)
 
 | # | Task | Description | Files |
 |---|------|-------------|-------|
 | 3.1 | Create prompt-builder skill directory | `mkdir -p .claude/skills/prompt-builder` | - |
-| 3.2 | Create prompt-builder SKILL.md | Skill definition | `.claude/skills/prompt-builder/SKILL.md` |
+| 3.2 | Create prompt-builder SKILL.md | Thin wrapper that calls script | `.claude/skills/prompt-builder/SKILL.md` |
 | 3.3 | Create workflow-router skill directory | `mkdir -p .claude/skills/workflow-router` | - |
-| 3.4 | Create workflow-router SKILL.md | Skill definition | `.claude/skills/workflow-router/SKILL.md` |
+| 3.4 | Create workflow-router SKILL.md | Thin wrapper that calls script | `.claude/skills/workflow-router/SKILL.md` |
 | 3.5 | Create config-seeder skill directory | `mkdir -p .claude/skills/config-seeder` | - |
-| 3.6 | Create config-seeder SKILL.md | Skill definition | `.claude/skills/config-seeder/SKILL.md` |
+| 3.6 | Create config-seeder SKILL.md | Calls seed_configs.py | `.claude/skills/config-seeder/SKILL.md` |
 
 ### Phase 4: Orchestrator Updates
 
 | # | Task | Description | Files |
 |---|------|-------------|-------|
 | 4.1 | Add config seeding step | Step 0.3 in initialization | `agents/orchestrator.md` |
-| 4.2 | Update PM spawn to use prompt-builder | Replace PM prompt composition | `agents/orchestrator.md` |
-| 4.3 | Update Developer spawn to use prompt-builder | Replace Dev prompt composition | `bazinga/templates/orchestrator/phase_simple.md` |
-| 4.4 | Update Developer spawn (parallel) | Replace Dev prompt composition | `bazinga/templates/orchestrator/phase_parallel.md` |
-| 4.5 | Update QA spawn to use prompt-builder | Replace QA prompt composition | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
-| 4.6 | Update Tech Lead spawn to use prompt-builder | Replace TL prompt composition | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
-| 4.7 | Add workflow-router calls after responses | Replace routing logic | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
-| 4.8 | Update PM spawn (resume) to use prompt-builder | Fix the original bug | `agents/orchestrator.md` |
+| 4.2 | Update PM spawn (new session) | Use prompt-builder skill only | `agents/orchestrator.md` |
+| 4.3 | Update PM spawn (resume) | Use prompt-builder skill only | `agents/orchestrator.md` |
+| 4.4 | Update Developer spawn (simple) | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_simple.md` |
+| 4.5 | Update Developer spawn (parallel) | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_parallel.md` |
+| 4.6 | Update QA spawn | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
+| 4.7 | Update Tech Lead spawn | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
+| 4.8 | Add workflow-router calls | Replace all routing logic | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
+| 4.9 | Remove old prompt composition | Clean up duplicated logic | Various |
 
-### Phase 5: Integration Testing
+### Phase 5: Testing
 
 | # | Task | Description | Files |
 |---|------|-------------|-------|
 | 5.1 | Create unit tests for seed_configs.py | Test config seeding | `tests/unit/test_seed_configs.py` |
-| 5.2 | Create unit tests for prompt_builder.py | Test all agent types | `tests/unit/test_prompt_builder.py` |
+| 5.2 | Create unit tests for prompt_builder.py | Test all agent types + DB queries | `tests/unit/test_prompt_builder.py` |
 | 5.3 | Create unit tests for workflow_router.py | Test all transitions | `tests/unit/test_workflow_router.py` |
 | 5.4 | Run integration test | Full orchestration test | - |
-| 5.5 | Verify prompt contains agent file | Check developer prompt | - |
-| 5.6 | Verify PM resume includes agent file | Original bug fix | - |
+| 5.5 | Verify Developer prompt contains full file | Check line count ≥1200 | - |
+| 5.6 | Verify PM resume includes full file | Original bug fix verified | - |
+| 5.7 | Verify context accumulates | QA gets Dev reasoning, TL gets Dev+QA | - |
 
 ### Phase 6: Documentation & Cleanup
 
@@ -1673,6 +1988,8 @@ Parse JSON result and execute action:
 | 6.1 | Update prompt_building.md | Remove old instructions | `bazinga/templates/prompt_building.md` |
 | 6.2 | Update claude.md | Add deterministic system docs | `.claude/claude.md` |
 | 6.3 | Remove old prompt composition code | Clean up templates | Various |
+| 6.4 | Update specialization-loader SKILL.md | Document that prompt-builder replaces it for spawns | `.claude/skills/specialization-loader/SKILL.md` |
+| 6.5 | Update context-assembler SKILL.md | Document that prompt-builder replaces it for spawns | `.claude/skills/context-assembler/SKILL.md` |
 
 ---
 
@@ -1680,19 +1997,68 @@ Parse JSON result and execute action:
 
 After implementation, verify:
 
-- [ ] `bazinga/config/transitions.json` exists with all transitions
-- [ ] `bazinga/config/agent-markers.json` exists with all agents
-- [ ] Database has `workflow_transitions` table
-- [ ] Database has `agent_markers` table
-- [ ] `seed_configs.py` successfully seeds configs
-- [ ] `prompt_builder.py` outputs complete prompts for all agents
+**Configuration:**
+- [ ] `bazinga/config/transitions.json` exists with all 45+ transitions
+- [ ] `bazinga/config/agent-markers.json` exists with all 7 agents
+- [ ] Files included in pyproject.toml for installation
+
+**Database:**
+- [ ] `workflow_transitions` table created
+- [ ] `agent_markers` table created
+- [ ] `workflow_special_rules` table created
+- [ ] SCHEMA_VERSION incremented
+
+**Scripts:**
+- [ ] `seed_configs.py` runs without errors
+- [ ] `prompt_builder.py` outputs complete prompts for all 7 agent types
+- [ ] `prompt_builder.py` queries DB for specializations
+- [ ] `prompt_builder.py` queries DB for context/reasoning
 - [ ] `workflow_router.py` returns correct next actions
-- [ ] Orchestrator calls config-seeder at init
-- [ ] All agent spawns go through prompt-builder skill
-- [ ] All routing goes through workflow-router skill
+
+**Skills:**
+- [ ] `prompt-builder` skill invokes script correctly
+- [ ] `workflow-router` skill invokes script correctly
+- [ ] `config-seeder` skill invokes script correctly
+
+**Orchestrator:**
+- [ ] Config seeding happens at init
+- [ ] All agent spawns use prompt-builder skill ONLY
+- [ ] All routing uses workflow-router skill
+- [ ] No direct calls to specialization-loader or context-assembler for spawns
+
+**Integration:**
 - [ ] Integration test passes
 - [ ] Developer prompt includes full agent file (1200+ lines)
 - [ ] PM resume prompt includes full agent file (2000+ lines)
+- [ ] QA prompt includes Developer reasoning (context accumulated)
+- [ ] Tech Lead prompt includes Dev + QA reasoning
+
+---
+
+## Part 10: Migration Notes
+
+### What Gets Replaced
+
+| Old Pattern | New Pattern |
+|-------------|-------------|
+| Orchestrator calls specialization-loader | prompt_builder.py queries DB + reads templates |
+| Orchestrator calls context-assembler | prompt_builder.py queries DB |
+| Orchestrator composes prompt inline | Orchestrator calls prompt-builder skill |
+| LLM interprets routing rules | workflow_router.py reads transitions from DB |
+
+### Backward Compatibility
+
+- `specialization-loader` skill remains available for other uses
+- `context-assembler` skill remains available for other uses
+- Neither is REMOVED, just not called during agent spawns
+- Skills can still be invoked directly if needed
+
+### Rollback Plan
+
+If issues arise:
+1. Revert orchestrator to old pattern (call skills directly)
+2. The skills still work independently
+3. New DB tables don't affect old flow
 
 ---
 
@@ -1700,6 +2066,6 @@ After implementation, verify:
 
 - Original bug analysis: `research/agent-prompt-composition-fix.md`
 - Initial deterministic design: `research/deterministic-orchestration-system.md`
+- Unified skill analysis: `research/unified-prompt-builder-skill.md`
 - Agent files: `agents/*.md`
 - Response parsing: `bazinga/templates/response_parsing.md`
-- Specialization loader: `.claude/skills/specialization-loader/SKILL.md`
