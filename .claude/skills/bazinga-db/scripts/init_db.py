@@ -1158,46 +1158,55 @@ def init_database(db_path: str) -> None:
         if current_version == 13:
             print("\n--- Migrating v13 → v14 (escalation tracking columns) ---")
 
-            try:
-                # Add security_sensitive column
-                try:
-                    cursor.execute("ALTER TABLE task_groups ADD COLUMN security_sensitive INTEGER DEFAULT 0")
-                    print("   ✓ Added task_groups.security_sensitive")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column" in str(e).lower():
-                        print("   ⊘ task_groups.security_sensitive already exists")
-                    else:
-                        raise
+            # Check if task_groups table exists (may not exist in fresh DBs during sequential migration)
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'
+            """).fetchone()
 
-                # Add qa_attempts column for QA failure escalation
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ task_groups table will be created with new columns")
+            else:
                 try:
-                    cursor.execute("ALTER TABLE task_groups ADD COLUMN qa_attempts INTEGER DEFAULT 0")
-                    print("   ✓ Added task_groups.qa_attempts")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column" in str(e).lower():
-                        print("   ⊘ task_groups.qa_attempts already exists")
-                    else:
-                        raise
+                    # Add security_sensitive column
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN security_sensitive INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.security_sensitive")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.security_sensitive already exists")
+                        else:
+                            raise
 
-                # Add tl_review_attempts column for TL review loop tracking
-                try:
-                    cursor.execute("ALTER TABLE task_groups ADD COLUMN tl_review_attempts INTEGER DEFAULT 0")
-                    print("   ✓ Added task_groups.tl_review_attempts")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column" in str(e).lower():
-                        print("   ⊘ task_groups.tl_review_attempts already exists")
-                    else:
-                        raise
+                    # Add qa_attempts column for QA failure escalation
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN qa_attempts INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.qa_attempts")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.qa_attempts already exists")
+                        else:
+                            raise
 
-                conn.commit()
+                    # Add tl_review_attempts column for TL review loop tracking
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN tl_review_attempts INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.tl_review_attempts")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.tl_review_attempts already exists")
+                        else:
+                            raise
 
-            except Exception as e:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-                print(f"   ✗ v13→v14 migration failed, rolled back: {e}")
-                raise
+                    conn.commit()
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v13→v14 migration failed, rolled back: {e}")
+                    raise
 
             current_version = 14
             print("✓ Migration to v14 complete (escalation tracking columns)")
