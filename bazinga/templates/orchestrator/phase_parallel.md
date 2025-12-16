@@ -18,7 +18,7 @@
 
 2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
 
-**This enables graduated token zones in context-assembler.** Without tracking, zone detection always defaults to "Normal" and graduated budget management won't activate.
+**Note:** The prompt-builder script applies token budgets automatically based on model tier (haiku=900, sonnet=1800, opus=2400). The spawn counter is tracked for metrics and debugging purposes.
 
 ---
 
@@ -180,178 +180,51 @@ IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not e
 IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```
 
-### SPAWN IMPLEMENTATION AGENTS - PARALLEL (TWO-TURN SEQUENCE)
+### SPAWN IMPLEMENTATION AGENTS - PARALLEL (DETERMINISTIC PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED (PER GROUP)**
+**🔴 SINGLE-STEP PROMPT BUILDING (PER GROUP)**
 
 This section handles spawning Developer, SSE, or RE for each group based on PM's `initial_tier` decision.
 
-**TURN 1: Invoke Both Skills (FOR EACH GROUP)**
+**Step 1: Invoke prompt-builder for EACH group**
 
-**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
-
-IF context-assembler ENABLED:
-For EACH group, output and invoke:
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: {agent_type}  // developer, senior_software_engineer, or requirements_engineer
-- Model: {MODEL_CONFIG[agent_type]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {iteration_count}
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK[group_id]}`
-
-**Reasoning Auto-Inclusion Rules (handled by context-assembler):**
-| Agent Type | Iteration | Reasoning Included? | Level |
-|------------|-----------|---------------------|-------|
-| `developer` | 0 (initial) | **NO** | - |
-| `developer` | > 0 (retry) | **YES** | medium (800 tokens) |
-| `senior_software_engineer` | any | **YES** | medium (800 tokens) |
-| `requirements_engineer` | any | **YES** | medium (800 tokens) |
-
-**Note:** `estimated_token_usage` = `total_spawns * 15000`. If not tracked, pass 0.
-
-IF context-assembler DISABLED or returns empty:
-→ Output warning: `⚠️ Context assembly empty for {group_id} | Proceeding without prior reasoning`
-→ Set `{CONTEXT_BLOCK[group_id]}` = "" (empty, non-blocking)
-
-**B. Specialization Loading** (FOR EACH GROUP):
-
-Check `bazinga/skills_config.json` → `specializations.enabled` and `enabled_agents`:
-
-IF specializations ENABLED:
-For EACH group, output and invoke:
-```
-[SPEC_CTX_START group={group_id} agent={agent_type}]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: {agent_type}
-Model: {MODEL_CONFIG[agent_type]}
-Specialization Paths: {specializations from task_group or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK[group_id]}`
-
-**🔴 SHARED SPECIALIZATION OPTIMIZATION:**
-If ALL groups need the SAME specialization (same template paths):
-- Call context-assembler for EACH group (different contexts)
-- Call specialization-loader **ONCE** (shared spec)
-- Use that ONE spec_block for ALL groups
-
-IF specializations DISABLED:
-→ Set `{SPEC_BLOCK[group_id]}` = "" (empty) for all groups
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked for EACH group (or explicitly disabled)?
-- [ ] Specialization-loader invoked (once if shared, per-group if different)?
-- [ ] All skills returned valid output (or empty with warning)?
-
-END TURN 1 (wait for skill responses)
-
----
-
-**TURN 2: Compose & Spawn ALL Agents**
-
-### Read Agent Files & Build Base Prompts (FOR EACH GROUP)
-
-**For EACH group, read agent file and build prompt:**
+For EACH group, invoke the prompt-builder skill:
 
 ```
-task_title = task_groups[group_id]["title"]
-task_requirements = task_groups[group_id]["requirements"]
-branch = task_groups[group_id]["branch"] or session_branch
-agent_type = task_groups[group_id]["initial_tier"]  // developer, senior_software_engineer, or requirements_engineer
-
-// 🔴 MANDATORY: Read the FULL agent file for this group's agent type
-// NOTE: tech_lead maps to techlead.md (no underscore), all others use {agent_type}.md
-AGENT_FILE_MAP = {
-  "developer": "agents/developer.md",
-  "senior_software_engineer": "agents/senior_software_engineer.md",
-  "requirements_engineer": "agents/requirements_engineer.md",
-  "qa_expert": "agents/qa_expert.md",
-  "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
-  "investigator": "agents/investigator.md"
-}
-IF agent_type NOT IN AGENT_FILE_MAP:
-    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
-agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/developer.md or agents/techlead.md
-agent_definitions[group_id] = Read(agent_file_path)  // Full 1400+ lines of agent instructions
-IF Read fails OR agent_definitions[group_id] is empty:
-    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_contexts[group_id] = """
----
-
-## Current Task Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Parallel
-**BRANCH:** {branch}
-
-**TASK:** {task_title}
-
-**REQUIREMENTS:**
-{task_requirements}
-
-**COMMIT TO:** {branch}
-**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompts[group_id] = agent_definitions[group_id] + task_contexts[group_id]
+Build prompt for agent spawn:
+- agent_type: {task_groups[group_id]["initial_tier"]}
+- session_id: {session_id}
+- group_id: {group_id}
+- task_title: {task_groups[group_id]["title"]}
+- task_requirements: {task_groups[group_id]["requirements"]}
+- branch: {task_groups[group_id]["branch"] or session_branch}
+- mode: parallel
+- testing_mode: {testing_mode}
+- model: {MODEL_CONFIG[agent_type]}
 ```
+Then invoke: `Skill(command: "prompt-builder")`
+→ Capture stdout as `{COMPLETE_PROMPT[group_id]}`
 
-### Compose Full Prompts & Spawn ALL Agents
+**IF script returns exit code 1 for any group:**
+→ Read stderr for error message
+→ Output: `❌ Prompt build failed for {group_id} | {error}` → Skip that group, continue with others
 
-**For EACH group, compose full prompt:**
-```
-FULL_PROMPT[group_id] =
-  {CONTEXT_BLOCK[group_id]}  // From context-assembler (packages + reasoning)
-  +
-  {SPEC_BLOCK[group_id]}     // From specialization-loader (or shared block)
-  +
-  base_prompts[group_id]     // Full agent file + task context
-```
+**Step 2: Spawn ALL agents in ONE message**
 
-**Spawn ALL agents in ONE message:**
 ```
 📝 Spawning {count} agents in parallel:
 • Group A: {agent_type} | {task_title}
 • Group B: {agent_type} | {task_title}
 ...
 
-Task(... prompt=FULL_PROMPT["A"])
-Task(... prompt=FULL_PROMPT["B"])
+Task(... prompt=COMPLETE_PROMPT["A"])
+Task(... prompt=COMPLETE_PROMPT["B"])
 ...
 ```
 
-**🔴 SELF-CHECK (Turn 2):**
-- ✅ Did I include CONTEXT_BLOCK from context-assembler for each group?
-- ✅ Did I include SPEC_BLOCK from specialization-loader for each group?
+**🔴 SELF-CHECK:**
+- ✅ Did prompt-builder return exit code 0 for each group?
 - ✅ Did I call Task() for EACH group?
-
----
-
-**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT BLOCKS 🔴🔴🔴**
-
-Process skill outputs SILENTLY:
-1. **INTERNALLY** extract CONTEXT_BLOCK and SPEC_BLOCK for each group
-2. **INTERNALLY** build FULL_PROMPT for each group
-3. **OUTPUT** only brief capsule (shown above)
-4. **CALL** Task() for ALL groups
-
-**🔴 FORBIDDEN - DO NOT OUTPUT:**
-- ❌ The context blocks
-- ❌ The specialization blocks
-- ❌ The full prompts
-- ❌ Any "here's what I'm sending..." preview
 
 **🔴 MAX 4 groups.** If >4, spawn first 4, defer rest.
 
@@ -371,12 +244,12 @@ ELSE IF primary_language or framework:
 
 ### Example: FULL_PROMPT composition
 
-Each group's prompt combines three parts:
+The prompt-builder combines internally:
 ```
 FULL_PROMPT[group_id] =
-  CONTEXT_BLOCK     // From context-assembler (packages + reasoning)
+  CONTEXT_BLOCK     // From DB: context_packages, prior reasoning, error patterns
   +
-  SPEC_BLOCK        // From specialization-loader (tech identity)
+  SPEC_BLOCK        // From DB: task_groups.specializations → template files
   +
   base_prompt       // Task details (session, group, requirements)
 ```
@@ -436,131 +309,35 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 - 2nd failure → Escalate to SSE
 - 3rd+ failure → Route to Tech Lead
 
-**TURN 1: Invoke Both Skills**
+**Determine agent_type based on revision_count:**
+- revision_count < 2 → developer
+- revision_count >= 2 AND < 3 → senior_software_engineer
+- revision_count >= 3 → tech_lead (for architectural guidance)
 
-**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
+**Step 1: Invoke prompt-builder skill**
 
-IF context-assembler ENABLED:
 ```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: {developer OR senior_software_engineer based on revision_count}
-- Model: {MODEL_CONFIG[agent_type]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {revision_count}
+Build prompt for agent spawn:
+- agent_type: {determined based on revision_count above}
+- session_id: {session_id}
+- group_id: {group_id}
+- task_title: "Continuation: {original_task[:60]}"
+- task_requirements: "PREVIOUS ATTEMPT: {previous_attempt_summary}\nREMAINING ISSUES: {remaining_issues}"
+- branch: {branch}
+- mode: parallel
+- testing_mode: {testing_mode}
+- model: {MODEL_CONFIG[agent_type]}
 ```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
+Then invoke: `Skill(command: "prompt-builder")`
+→ Capture stdout as `{COMPLETE_PROMPT}`
 
-IF context-assembler DISABLED or returns empty:
-→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
+**Step 2: Spawn Agent**
 
-**B. Specialization Loading:**
-```
-[SPEC_CTX_START group={group_id} agent={agent_type}]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: {agent_type}
-Model: {MODEL_CONFIG[agent_type]}
-Specialization Paths: {specializations from task_group or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt={COMPLETE_PROMPT})`
 
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked (or explicitly disabled/empty fallback)?
-- [ ] Specialization-loader invoked?
-
-END TURN 1
-
----
-
-**TURN 2: Compose & Spawn Developer/SSE/TL**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL agent file
-// Determine agent_type based on revision_count:
-// - revision_count < 2 → developer
-// - revision_count >= 2 AND < 3 → senior_software_engineer
-// - revision_count >= 3 → tech_lead (for architectural guidance)
-AGENT_FILE_MAP = {
-  "developer": "agents/developer.md",
-  "senior_software_engineer": "agents/senior_software_engineer.md",
-  "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
-}
-IF agent_type NOT IN AGENT_FILE_MAP:
-    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
-agent_file_path = AGENT_FILE_MAP[agent_type]
-agent_definition = Read(agent_file_path)  // Full agent instructions
-IF Read fails OR agent_definition is empty:
-    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
-
-// Build task context based on agent_type
-IF agent_type == "tech_lead":
-    task_context = """
-    ---
-
-    ## Architectural Assessment (3rd+ Failure)
-
-    **SESSION:** {session_id}
-    **GROUP:** {group_id}
-    **MODE:** Parallel
-    **BRANCH:** {branch}
-    **FAILURE_COUNT:** {revision_count}
-
-    **ORIGINAL TASK:** {original_task}
-    **PREVIOUS ATTEMPTS:** Developer × {developer_attempts}, SSE × {sse_attempts}
-    **RECURRING ISSUES:** {recurring_issues}
-
-    **Your Task:** Assess if this task has fundamental architectural issues:
-    1. Review the recurring failure patterns
-    2. Determine if the approach needs rethinking
-    3. Provide either:
-       - Specific fix guidance for SSE retry
-       - Recommendation to simplify/deprioritize task (route to PM)
-       - Architectural changes needed
-
-    **REPORT STATUS:** GUIDANCE_PROVIDED, NEEDS_PM_REVIEW, or BLOCKED
-    """
-ELSE:
-    task_context = """
-    ---
-
-    ## Continuation/Escalation Assignment
-
-    **SESSION:** {session_id}
-    **GROUP:** {group_id}
-    **MODE:** Parallel
-    **BRANCH:** {branch}
-    **ITERATION:** {revision_count}
-
-    **ORIGINAL TASK:** {original_task}
-    **PREVIOUS ATTEMPT:** {previous_attempt_summary}
-    **REMAINING ISSUES:** {remaining_issues}
-
-    **COMMIT TO:** {branch}
-    **REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
-    """
-
-// Combine: Full agent definition + Task context
-base_prompt = agent_definition + task_context
-```
-
-**D. Compose Full Prompt & Spawn**:
-```
-prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
-```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt={prompt})`
-
-**✅ TURN 2 SELF-CHECK:**
-- [ ] Agent file Read() called?
-- [ ] CONTEXT_BLOCK present?
-- [ ] SPEC_BLOCK present?
-- [ ] Task() called?
+**🔴 SELF-CHECK:**
+- ✅ Did prompt-builder return exit code 0?
+- ✅ Did I call Task() with COMPLETE_PROMPT?
 
 ---
 
@@ -591,113 +368,36 @@ prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
-**🔴 PRE-SPAWN CHECKLIST (QA/TL Per Group) - BOTH SKILLS REQUIRED**
+**🔴 PRE-SPAWN CHECKLIST (QA/TL Per Group) - DETERMINISTIC PROMPT**
 
-When spawning QA or Tech Lead for a group, invoke BOTH skills:
+When spawning QA or Tech Lead for a group:
 
-**TURN 1: Invoke Both Skills**
+**Step 1: Invoke prompt-builder skill**
 
-**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
-
-IF context-assembler ENABLED:
 ```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: {qa_expert|tech_lead}
-- Model: {MODEL_CONFIG[agent_type]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {iteration_count}
+Build prompt for agent spawn:
+- agent_type: {qa_expert|tech_lead}
+- session_id: {session_id}
+- group_id: {group_id}
+- task_title: {task_description}
+- task_requirements: "FILES: {files_changed}"
+- branch: {branch}
+- mode: parallel
+- testing_mode: {testing_mode}
+- model: {MODEL_CONFIG[agent_type]}
 ```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
+Then invoke: `Skill(command: "prompt-builder")`
+→ Capture stdout as `{COMPLETE_PROMPT}`
 
-**Note:** Reasoning is **automatically included** for `qa_expert` and `tech_lead` at medium level (800 tokens). Prior agent reasoning provides handoff continuity (Developer→QA→TL).
+**Step 2: Spawn Agent**
 
-IF context-assembler DISABLED or returns empty:
-→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
-
-**B. Specialization Loading:**
 ```
-[SPEC_CTX_START group={group_id} agent={agent_type}]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: {agent_type}
-Model: {MODEL_CONFIG[agent_type]}
-Specialization Paths: {specializations from PM or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked (or explicitly disabled)?
-- [ ] Specialization-loader invoked?
-- [ ] Both returned valid output?
-
-END TURN 1 (wait for skill responses)
-
----
-
-**TURN 2: Compose & Spawn**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL agent file for this agent type
-// agent_type is one of: qa_expert, tech_lead
-// NOTE: tech_lead maps to techlead.md (no underscore)
-AGENT_FILE_MAP = {
-  "qa_expert": "agents/qa_expert.md",
-  "tech_lead": "agents/techlead.md"  // NOTE: no underscore!
-}
-IF agent_type NOT IN AGENT_FILE_MAP:
-    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
-agent_file_path = AGENT_FILE_MAP[agent_type]  // e.g., agents/qa_expert.md or agents/techlead.md
-agent_definition = Read(agent_file_path)  // Full agent instructions
-IF Read fails OR agent_definition is empty:
-    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
-
-// Build task context to append (specific to QA or Tech Lead role)
-task_context = """
----
-
-## Current Task Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Parallel
-
-**TASK:** {task_description}
-**FILES:** {files_changed}
-
-**REPORT STATUS:** {expected_status_codes} when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = agent_definition + task_context
+Task(subagent_type="general-purpose", model={model}, prompt={COMPLETE_PROMPT})
 ```
 
-**D. Compose Full Prompt:**
-```
-prompt =
-  {CONTEXT_BLOCK}  // Prior reasoning + packages
-  +
-  {SPEC_BLOCK}     // Tech identity
-  +
-  base_prompt      // Full agent file + task context
-```
-
-**E. Spawn Agent:**
-```
-Task(subagent_type="general-purpose", model={model}, prompt={prompt})
-```
-
-**✅ TURN 2 SELF-CHECK:**
-- [ ] Agent file Read() called?
-- [ ] CONTEXT_BLOCK present (or fallback used)?
-- [ ] SPEC_BLOCK present?
-- [ ] Task() called?
+**🔴 SELF-CHECK:**
+- ✅ Did prompt-builder return exit code 0?
+- ✅ Did I call Task() with COMPLETE_PROMPT?
 
 ### Step 2B.7: Route Tech Lead Response (Per Group)
 
@@ -809,36 +509,28 @@ Use the template for merge prompt and response handling. Apply to this group's c
 ✅ All groups complete | {N}/{N} groups approved, all quality gates passed | Final PM check → BAZINGA
 ```
 
-**Build PM prompt using TWO-TURN spawn sequence:**
+**Build PM prompt using prompt-builder:**
 
-**TURN 1: Invoke Skills**
-- Invoke context-assembler (if enabled)
-- Invoke specialization-loader with agent_type=project_manager
+**Step 1: Invoke prompt-builder skill**
 
-**TURN 2: Build Prompt & Spawn**
 ```
-// 🔴 MANDATORY: Read the FULL PM agent file
-pm_definition = Read("agents/project_manager.md")
-IF Read fails OR pm_definition is empty:
-    ⚠️ Agent file read failed | agents/project_manager.md | Cannot proceed - spawn aborted
-
-task_context = """
-## Final Assessment Task (Parallel Mode)
-
-**SESSION:** {session_id}
-**MODE:** Parallel
-**GROUPS:** {N} groups completed
-
-**Group Results:**
-{all_group_results_and_commit_summaries}
-
-**Your Task:** Assess if all success criteria are met across ALL groups and decide: BAZINGA or CONTINUE
-"""
-
-base_prompt = pm_definition + task_context
-prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+Build prompt for agent spawn:
+- agent_type: project_manager
+- session_id: {session_id}
+- group_id: "global"
+- task_title: "Final Assessment (Parallel Mode)"
+- task_requirements: "GROUPS: {N} groups completed\n\nGroup Results:\n{all_group_results_and_commit_summaries}\n\nAssess if all success criteria are met across ALL groups and decide: BAZINGA or CONTINUE"
+- branch: {branch}
+- mode: parallel
+- testing_mode: {testing_mode}
+- model: {MODEL_CONFIG["project_manager"]}
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt={prompt})`
+Then invoke: `Skill(command: "prompt-builder")`
+→ Capture stdout as `{COMPLETE_PROMPT}`
+
+**Step 2: Spawn PM**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt={COMPLETE_PROMPT})`
 
 
 **AFTER PM response:** Follow §Step 2A.8 process (parse, construct capsule, apply auto-route rules).

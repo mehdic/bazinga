@@ -60,7 +60,7 @@ def seed_transitions(conn):
             ))
             count += 1
 
-    conn.commit()
+    # Note: commit handled by caller in transaction wrapper
     print(f"Seeded {count} transitions")
     return True
 
@@ -94,7 +94,7 @@ def seed_markers(conn):
         ))
         count += 1
 
-    conn.commit()
+    # Note: commit handled by caller in transaction wrapper
     print(f"Seeded {count} agent marker sets")
     return True
 
@@ -131,7 +131,7 @@ def seed_special_rules(conn):
         ))
         count += 1
 
-    conn.commit()
+    # Note: commit handled by caller in transaction wrapper
     print(f"Seeded {count} special rules")
     return True
 
@@ -157,21 +157,34 @@ def main():
 
     conn = sqlite3.connect(args.db)
 
-    success = True
-    if args.all or args.transitions:
-        success = seed_transitions(conn) and success
-    if args.all or args.markers:
-        success = seed_markers(conn) and success
-    if args.all or args.rules:
-        success = seed_special_rules(conn) and success
+    # Wrap all seeding in a single transaction for atomicity
+    # If any seeding fails, rollback all changes
+    try:
+        conn.execute("BEGIN TRANSACTION")
 
-    conn.close()
+        success = True
+        if args.all or args.transitions:
+            success = seed_transitions(conn) and success
+        if args.all or args.markers:
+            success = seed_markers(conn) and success
+        if args.all or args.rules:
+            success = seed_special_rules(conn) and success
 
-    if success:
-        print("✅ Config seeding complete")
-    else:
-        print("❌ Config seeding had errors", file=sys.stderr)
+        if success:
+            conn.commit()
+            print("✅ Config seeding complete")
+        else:
+            conn.rollback()
+            print("❌ Config seeding had errors - rolled back", file=sys.stderr)
+            sys.exit(1)
+
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Config seeding failed: {e} - rolled back", file=sys.stderr)
         sys.exit(1)
+
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

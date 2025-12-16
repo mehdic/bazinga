@@ -50,7 +50,7 @@ Parse from the agent's response and current state:
 ### Step 2: Call the Python Script
 
 ```bash
-python3 bazinga/scripts/workflow_router.py \
+python3 .claude/skills/workflow-router/scripts/workflow_router.py \
   --current-agent "{current_agent}" \
   --status "{status}" \
   --session-id "{session_id}" \

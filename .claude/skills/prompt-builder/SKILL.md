@@ -63,7 +63,7 @@ Parse the following from the orchestrator's context or message:
 Run the prompt builder script with extracted parameters:
 
 ```bash
-python3 bazinga/scripts/prompt_builder.py \
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   --agent-type "{agent_type}" \
   --session-id "{session_id}" \
   --group-id "{group_id}" \

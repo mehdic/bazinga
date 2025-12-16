@@ -68,14 +68,15 @@ TOKEN_BUDGETS = {
 }
 
 # Context budget allocation by agent type
+# Increased developer from 0.20 to 0.35 (haiku 900 * 0.35 = 315 tokens for context)
 CONTEXT_ALLOCATION = {
-    "developer": 0.20,
-    "senior_software_engineer": 0.25,
+    "developer": 0.35,
+    "senior_software_engineer": 0.30,
     "qa_expert": 0.30,
     "tech_lead": 0.40,
     "investigator": 0.35,
     "project_manager": 0.10,
-    "requirements_engineer": 0.25,
+    "requirements_engineer": 0.30,
 }
 
 
@@ -86,18 +87,22 @@ def estimate_tokens(text):
 
 def get_required_markers(conn, agent_type):
     """Read required markers from database."""
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT required_markers FROM agent_markers WHERE agent_type = ?",
-        (agent_type,)
-    )
-    row = cursor.fetchone()
-    if row:
-        try:
-            return json.loads(row[0])
-        except json.JSONDecodeError:
-            return []
-    return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT required_markers FROM agent_markers WHERE agent_type = ?",
+            (agent_type,)
+        )
+        row = cursor.fetchone()
+        if row:
+            try:
+                return json.loads(row[0])
+            except json.JSONDecodeError:
+                return []
+        return []
+    except sqlite3.OperationalError as e:
+        print(f"WARNING: DB query failed (agent_markers): {e}", file=sys.stderr)
+        return []
 
 
 def validate_markers(prompt, markers, agent_type):
@@ -138,18 +143,22 @@ def read_agent_file(agent_type):
 
 def get_task_group_specializations(conn, session_id, group_id):
     """Get specialization paths from task_groups table."""
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT specializations FROM task_groups WHERE session_id = ? AND id = ?",
-        (session_id, group_id)
-    )
-    row = cursor.fetchone()
-    if row and row[0]:
-        try:
-            return json.loads(row[0])
-        except json.JSONDecodeError:
-            return []
-    return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT specializations FROM task_groups WHERE session_id = ? AND id = ?",
+            (session_id, group_id)
+        )
+        row = cursor.fetchone()
+        if row and row[0]:
+            try:
+                return json.loads(row[0])
+            except json.JSONDecodeError:
+                return []
+        return []
+    except sqlite3.OperationalError as e:
+        print(f"WARNING: DB query failed (task_groups): {e}", file=sys.stderr)
+        return []
 
 
 def get_project_context():
@@ -161,13 +170,45 @@ def get_project_context():
         return {}
 
 
+def validate_template_path(template_path):
+    """Validate that template path is safe (no path traversal)."""
+    ALLOWED_BASE = Path("bazinga/templates/specializations").resolve()
+
+    # Reject absolute paths
+    if Path(template_path).is_absolute():
+        print(f"WARNING: Rejecting absolute template path: {template_path}", file=sys.stderr)
+        return None
+
+    # Reject paths with parent traversal
+    if ".." in str(template_path):
+        print(f"WARNING: Rejecting path with traversal: {template_path}", file=sys.stderr)
+        return None
+
+    # Resolve and check it's under allowed base
+    resolved = Path(template_path).resolve()
+    try:
+        resolved.relative_to(ALLOWED_BASE)
+        return resolved
+    except ValueError:
+        print(f"WARNING: Template path outside allowed directory: {template_path}", file=sys.stderr)
+        return None
+
+
 def read_template_with_version_guards(template_path, project_context):
-    """Read template file and apply version guards."""
-    path = Path(template_path)
-    if not path.exists():
+    """Read template file and apply version guards (with path validation)."""
+    # Validate path for security
+    validated_path = validate_template_path(template_path)
+    if validated_path is None:
         return ""
 
-    content = path.read_text()
+    if not validated_path.exists():
+        return ""
+
+    try:
+        content = validated_path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, IOError) as e:
+        print(f"WARNING: Failed to read template {template_path}: {e}", file=sys.stderr)
+        return ""
 
     # Simple version guard processing
     # Format: <!-- version: LANG OPERATOR VERSION -->
@@ -225,40 +266,48 @@ def build_specialization_block(conn, session_id, group_id, agent_type, model="so
 
 def get_context_packages(conn, session_id, group_id, agent_type, limit=5):
     """Get context packages from database."""
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    # Query with priority ordering
-    query = """
-        SELECT id, file_path, priority, summary, group_id, created_at
-        FROM context_packages
-        WHERE session_id = ?
-        AND (group_id = ? OR group_id IS NULL OR group_id = '')
-        ORDER BY
-            CASE priority
-                WHEN 'critical' THEN 1
-                WHEN 'high' THEN 2
-                WHEN 'medium' THEN 3
-                WHEN 'low' THEN 4
-                ELSE 5
-            END,
-            created_at DESC
-        LIMIT ?
-    """
-    cursor.execute(query, (session_id, group_id, limit))
-    return cursor.fetchall()
+        # Query with priority ordering
+        query = """
+            SELECT id, file_path, priority, summary, group_id, created_at
+            FROM context_packages
+            WHERE session_id = ?
+            AND (group_id = ? OR group_id IS NULL OR group_id = '')
+            ORDER BY
+                CASE priority
+                    WHEN 'critical' THEN 1
+                    WHEN 'high' THEN 2
+                    WHEN 'medium' THEN 3
+                    WHEN 'low' THEN 4
+                    ELSE 5
+                END,
+                created_at DESC
+            LIMIT ?
+        """
+        cursor.execute(query, (session_id, group_id, limit))
+        return cursor.fetchall()
+    except sqlite3.OperationalError as e:
+        print(f"WARNING: DB query failed (context_packages): {e}", file=sys.stderr)
+        return []
 
 
 def get_error_patterns(conn, session_id, limit=3):
     """Get relevant error patterns."""
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT signature_json, solution, confidence, occurrences
-        FROM error_patterns
-        WHERE confidence > 0.7
-        ORDER BY confidence DESC, occurrences DESC
-        LIMIT ?
-    """, (limit,))
-    return cursor.fetchall()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT signature_json, solution, confidence, occurrences
+            FROM error_patterns
+            WHERE confidence > 0.7
+            ORDER BY confidence DESC, occurrences DESC
+            LIMIT ?
+        """, (limit,))
+        return cursor.fetchall()
+    except sqlite3.OperationalError as e:
+        print(f"WARNING: DB query failed (error_patterns): {e}", file=sys.stderr)
+        return []
 
 
 def get_prior_reasoning(conn, session_id, group_id, agent_type):
@@ -276,19 +325,23 @@ def get_prior_reasoning(conn, session_id, group_id, agent_type):
     if not agents_to_query:
         return []
 
-    cursor = conn.cursor()
-    placeholders = ','.join('?' * len(agents_to_query))
-    cursor.execute(f"""
-        SELECT agent_type, reasoning_phase, content, confidence_level, timestamp
-        FROM orchestration_logs
-        WHERE session_id = ?
-        AND (group_id = ? OR group_id = 'global')
-        AND agent_type IN ({placeholders})
-        AND log_type = 'reasoning'
-        ORDER BY timestamp DESC
-        LIMIT 5
-    """, (session_id, group_id, *agents_to_query))
-    return cursor.fetchall()
+    try:
+        cursor = conn.cursor()
+        placeholders = ','.join('?' * len(agents_to_query))
+        cursor.execute(f"""
+            SELECT agent_type, reasoning_phase, content, confidence_level, timestamp
+            FROM orchestration_logs
+            WHERE session_id = ?
+            AND (group_id = ? OR group_id = 'global')
+            AND agent_type IN ({placeholders})
+            AND log_type = 'reasoning'
+            ORDER BY timestamp DESC
+            LIMIT 5
+        """, (session_id, group_id, *agents_to_query))
+        return cursor.fetchall()
+    except sqlite3.OperationalError as e:
+        print(f"WARNING: DB query failed (orchestration_logs): {e}", file=sys.stderr)
+        return []
 
 
 def build_context_block(conn, session_id, group_id, agent_type, model="sonnet"):

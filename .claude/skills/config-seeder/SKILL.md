@@ -38,7 +38,7 @@ When invoked, you must:
 ### Step 1: Call the Seed Script
 
 ```bash
-python3 bazinga/scripts/seed_configs.py --all
+python3 .claude/skills/config-seeder/scripts/seed_configs.py --all
 ```
 
 ### Step 2: Verify Success

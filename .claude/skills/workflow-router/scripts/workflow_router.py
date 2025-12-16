@@ -23,8 +23,11 @@ from pathlib import Path
 # Database path - relative to project root
 DB_PATH = "bazinga/bazinga.db"
 
-# Default model assignments per agent
-MODEL_CONFIG = {
+# Config file path - relative to project root
+MODEL_CONFIG_PATH = "bazinga/model_selection.json"
+
+# Fallback model assignments (used if config file missing)
+DEFAULT_MODEL_CONFIG = {
     "developer": "haiku",
     "senior_software_engineer": "sonnet",
     "qa_expert": "sonnet",
@@ -33,6 +36,28 @@ MODEL_CONFIG = {
     "investigator": "opus",
     "requirements_engineer": "opus",
 }
+
+
+def load_model_config():
+    """Load model config from JSON file, fallback to defaults."""
+    try:
+        if Path(MODEL_CONFIG_PATH).exists():
+            with open(MODEL_CONFIG_PATH) as f:
+                data = json.load(f)
+            # Extract agent -> model mapping
+            config = {}
+            for agent_name, agent_data in data.get("agents", {}).items():
+                if isinstance(agent_data, dict) and "model" in agent_data:
+                    config[agent_name] = agent_data["model"]
+            if config:
+                return config
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"WARNING: Failed to load model config: {e}", file=sys.stderr)
+    return DEFAULT_MODEL_CONFIG
+
+
+# Load model config at module init
+MODEL_CONFIG = load_model_config()
 
 
 def get_transition(conn, current_agent, status):
