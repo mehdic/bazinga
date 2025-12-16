@@ -633,10 +633,25 @@ def enforce_global_budget(components, model="sonnet"):
 
 def build_prompt(args):
     """Build the complete agent prompt."""
-    # Check database exists
+    global PROJECT_ROOT, SPECIALIZATIONS_BASE
+
+    # Allow project root override for testing
+    if args.project_root:
+        PROJECT_ROOT = Path(args.project_root)
+        SPECIALIZATIONS_BASE = PROJECT_ROOT / "bazinga" / "templates" / "specializations"
+        print(f"[INFO] Using override project root: {PROJECT_ROOT}", file=sys.stderr)
+
+    # Check database exists - FAIL by default (deterministic orchestration requires DB)
     if not Path(args.db).exists():
-        print(f"WARNING: Database not found at {args.db}, proceeding without DB data", file=sys.stderr)
-        conn = None
+        if args.allow_no_db:
+            print(f"WARNING: Database not found at {args.db}, proceeding without DB data (--allow-no-db)", file=sys.stderr)
+            conn = None
+        else:
+            print(f"ERROR: Database not found at {args.db}", file=sys.stderr)
+            print(f"Deterministic orchestration requires database. Options:", file=sys.stderr)
+            print(f"  1. Run config-seeder skill to initialize database", file=sys.stderr)
+            print(f"  2. Use --allow-no-db to skip DB validation (NOT RECOMMENDED)", file=sys.stderr)
+            sys.exit(1)
     else:
         conn = sqlite3.connect(args.db)
 
@@ -773,6 +788,10 @@ Debug mode:
                         help="Model for token budgeting")
     parser.add_argument("--db", default=DB_PATH,
                         help="Database path")
+    parser.add_argument("--allow-no-db", action="store_true",
+                        help="Allow building prompts without database (NOT RECOMMENDED)")
+    parser.add_argument("--project-root", default=None,
+                        help="Override detected project root (for testing)")
 
     # Feedback for retries
     parser.add_argument("--qa-feedback", default="",
