@@ -1106,7 +1106,12 @@ def init_database(db_path: str) -> None:
                         UNIQUE(current_agent, response_status)
                     )
                 """)
-                print("   ✓ Created workflow_transitions table")
+                # Add index for performance (matches fresh DB path)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_wt_agent
+                    ON workflow_transitions(current_agent)
+                """)
+                print("   ✓ Created workflow_transitions table with index")
 
                 # Create agent_markers table (seeded from agent-markers.json)
                 cursor.execute("""

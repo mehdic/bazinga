@@ -2011,7 +2011,7 @@ ELSE IF PM chose "parallel":
 
 **Purpose:** Build complete agent prompts deterministically via prompt-builder skill.
 
-**The prompt-builder script (`bazinga/scripts/prompt_builder.py`) does EVERYTHING:**
+**The prompt-builder script (`.claude/skills/prompt-builder/scripts/prompt_builder.py`) does EVERYTHING:**
 - Reads full agent definition files from `agents/*.md`
 - Queries DB for specializations (from task_groups.specializations)
 - Queries DB for context (reasoning, packages, error patterns)
@@ -2168,7 +2168,7 @@ Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes s
 
 **Purpose:** After receiving an agent response, use workflow-router to determine the next action deterministically.
 
-**The workflow-router script (`bazinga/scripts/workflow_router.py`) determines:**
+**The workflow-router script (`.claude/skills/workflow-router/scripts/workflow_router.py`) determines:**
 - Next agent to spawn based on current agent + status code
 - Whether escalation is needed (revision count threshold)
 - Whether QA should be skipped (testing_mode)

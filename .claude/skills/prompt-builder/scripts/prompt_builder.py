@@ -132,7 +132,7 @@ def read_agent_file(agent_type):
         print(f"ERROR: Agent file not found: {file_path}", file=sys.stderr)
         sys.exit(1)
 
-    content = path.read_text()
+    content = path.read_text(encoding="utf-8")
     lines = len(content.splitlines())
 
     min_lines = MIN_AGENT_LINES.get(agent_type, 400)
@@ -169,9 +169,9 @@ def get_task_group_specializations(conn, session_id, group_id):
 def get_project_context():
     """Read project_context.json for version guards."""
     try:
-        with open("bazinga/project_context.json") as f:
+        with open("bazinga/project_context.json", encoding="utf-8") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
 
 

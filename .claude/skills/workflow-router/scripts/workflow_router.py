@@ -42,7 +42,7 @@ def load_model_config():
     """Load model config from JSON file, fallback to defaults."""
     try:
         if Path(MODEL_CONFIG_PATH).exists():
-            with open(MODEL_CONFIG_PATH) as f:
+            with open(MODEL_CONFIG_PATH, encoding="utf-8") as f:
                 data = json.load(f)
             # Extract agent -> model mapping
             config = {}
@@ -72,10 +72,16 @@ def get_transition(conn, current_agent, status):
     row = cursor.fetchone()
 
     if row:
+        # Parse include_context safely - handle malformed JSON
+        try:
+            include_context = json.loads(row[2]) if row[2] else []
+        except json.JSONDecodeError:
+            include_context = []
+
         return {
             "next_agent": row[0],
             "action": row[1],
-            "include_context": json.loads(row[2]) if row[2] else [],
+            "include_context": include_context,
             "escalation_check": bool(row[3]),
             "model_override": row[4],
             "fallback_agent": row[5],
@@ -268,7 +274,8 @@ def route(args):
     groups_to_spawn = []
     if action == "spawn_batch":
         pending = get_pending_groups(conn, args.session_id)
-        max_parallel = transition.get("max_parallel", 4)
+        # Use 'or 4' instead of default to handle NULL from DB (which returns None, not default)
+        max_parallel = transition.get("max_parallel") or 4
         groups_to_spawn = pending[:max_parallel]
 
     # Handle phase check (after merge)

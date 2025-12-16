@@ -4,7 +4,7 @@ Seeds JSON configuration files into the database.
 Called by orchestrator at session initialization.
 
 Usage:
-    python3 bazinga/scripts/seed_configs.py [--transitions] [--markers] [--rules] [--all]
+    python3 .claude/skills/config-seeder/scripts/seed_configs.py [--transitions] [--markers] [--rules] [--all]
 """
 
 import argparse
@@ -27,7 +27,7 @@ def seed_transitions(conn):
         print(f"ERROR: {config_path} not found", file=sys.stderr)
         return False
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         data = json.load(f)
 
     cursor = conn.cursor()
@@ -72,7 +72,7 @@ def seed_markers(conn):
         print(f"ERROR: {config_path} not found", file=sys.stderr)
         return False
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         data = json.load(f)
 
     cursor = conn.cursor()
@@ -106,7 +106,7 @@ def seed_special_rules(conn):
         print(f"ERROR: {config_path} not found", file=sys.stderr)
         return False
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         data = json.load(f)
 
     rules = data.get("_special_rules", {})
