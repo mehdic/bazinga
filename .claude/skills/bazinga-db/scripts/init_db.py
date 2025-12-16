@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1149,6 +1149,54 @@ def init_database(db_path: str) -> None:
             current_version = 13
             print("✓ Migration to v13 complete (deterministic orchestration tables)")
 
+        # v13 → v14: Add escalation tracking columns to task_groups
+        if current_version == 13:
+            print("\n--- Migrating v13 → v14 (escalation tracking columns) ---")
+
+            try:
+                # Add security_sensitive column
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN security_sensitive INTEGER DEFAULT 0")
+                    print("   ✓ Added task_groups.security_sensitive")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.security_sensitive already exists")
+                    else:
+                        raise
+
+                # Add qa_attempts column for QA failure escalation
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN qa_attempts INTEGER DEFAULT 0")
+                    print("   ✓ Added task_groups.qa_attempts")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.qa_attempts already exists")
+                    else:
+                        raise
+
+                # Add tl_review_attempts column for TL review loop tracking
+                try:
+                    cursor.execute("ALTER TABLE task_groups ADD COLUMN tl_review_attempts INTEGER DEFAULT 0")
+                    print("   ✓ Added task_groups.tl_review_attempts")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" in str(e).lower():
+                        print("   ⊘ task_groups.tl_review_attempts already exists")
+                    else:
+                        raise
+
+                conn.commit()
+
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                print(f"   ✗ v13→v14 migration failed, rolled back: {e}")
+                raise
+
+            current_version = 14
+            print("✓ Migration to v14 complete (escalation tracking columns)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
@@ -1253,6 +1301,7 @@ def init_database(db_path: str) -> None:
     # Task groups table (normalized from pm_state.json)
     # PRIMARY KEY: Composite (id, session_id) allows same group ID across sessions
     # Extended in v9 to support item_count for progress tracking
+    # Extended in v14 to support security_sensitive, qa_attempts, tl_review_attempts
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT NOT NULL,
@@ -1272,6 +1321,9 @@ def init_database(db_path: str) -> None:
             context_references TEXT,
             specializations TEXT,
             item_count INTEGER DEFAULT 1,
+            security_sensitive INTEGER DEFAULT 0,
+            qa_attempts INTEGER DEFAULT 0,
+            tl_review_attempts INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),

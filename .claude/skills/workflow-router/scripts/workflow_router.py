@@ -113,6 +113,44 @@ def get_revision_count(conn, session_id, group_id):
     return row[0] if row else 0
 
 
+def get_qa_attempts(conn, session_id, group_id):
+    """Get QA failure attempts count for a group (v14+)."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT qa_attempts FROM task_groups
+        WHERE session_id = ? AND id = ?
+    """, (session_id, group_id))
+    row = cursor.fetchone()
+    return row[0] if row and row[0] else 0
+
+
+def get_tl_review_attempts(conn, session_id, group_id):
+    """Get TL review attempts count for a group (v14+)."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT tl_review_attempts FROM task_groups
+        WHERE session_id = ? AND id = ?
+    """, (session_id, group_id))
+    row = cursor.fetchone()
+    return row[0] if row and row[0] else 0
+
+
+def get_escalation_count(conn, session_id, group_id, current_agent):
+    """Get the appropriate escalation counter based on agent type.
+
+    v14: Uses separate counters for different failure loops:
+    - qa_expert FAIL → qa_attempts
+    - tech_lead CHANGES_REQUESTED → tl_review_attempts
+    - Other → revision_count (legacy)
+    """
+    if current_agent == "qa_expert":
+        return get_qa_attempts(conn, session_id, group_id)
+    elif current_agent == "tech_lead":
+        return get_tl_review_attempts(conn, session_id, group_id)
+    else:
+        return get_revision_count(conn, session_id, group_id)
+
+
 def get_pending_groups(conn, session_id):
     """Get list of pending groups."""
     cursor = conn.cursor()
@@ -134,17 +172,31 @@ def get_in_progress_groups(conn, session_id):
 
 
 def check_security_sensitive(conn, session_id, group_id):
-    """Check if task is security sensitive."""
+    """Check if task is security sensitive.
+
+    Checks in order:
+    1. security_sensitive column (v14+) - PM's explicit flag
+    2. Fallback: name-based detection ("security", "auth" in name)
+    """
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT name FROM task_groups
+        SELECT name, security_sensitive FROM task_groups
         WHERE session_id = ? AND id = ?
     """, (session_id, group_id))
     row = cursor.fetchone()
-    if row and row[0]:
-        name = row[0].lower()
-        return "security" in name or "auth" in name
-    return False
+    if not row:
+        return False
+
+    name = row[0] or ""
+    security_flag = row[1] if len(row) > 1 else None
+
+    # Check explicit flag first (v14+)
+    if security_flag is not None and security_flag == 1:
+        return True
+
+    # Fallback: name-based detection
+    name_lower = name.lower()
+    return "security" in name_lower or "auth" in name_lower
 
 
 def route(args):
@@ -190,16 +242,18 @@ def route(args):
             transition["skip_reason"] = f"QA skipped (testing_mode={args.testing_mode})"
 
     # Apply escalation rules
+    # v14: Use appropriate counter based on agent type (qa_attempts, tl_review_attempts, or revision_count)
     if transition.get("escalation_check"):
-        revision_count = get_revision_count(conn, args.session_id, args.group_id)
+        escalation_count = get_escalation_count(conn, args.session_id, args.group_id, args.current_agent)
         escalation_rule = get_special_rule(conn, "escalation_after_failures")
         threshold = escalation_rule.get("threshold", 2) if escalation_rule else 2
 
-        if revision_count >= threshold:
+        if escalation_count >= threshold:
             next_agent = "senior_software_engineer"
             action = "spawn"
             transition["escalation_applied"] = True
-            transition["escalation_reason"] = f"Escalated after {revision_count} failures"
+            transition["escalation_counter"] = f"{args.current_agent}_attempts={escalation_count}"
+            transition["escalation_reason"] = f"Escalated after {escalation_count} failures"
 
     # Apply security sensitive rules
     if check_security_sensitive(conn, args.session_id, args.group_id):

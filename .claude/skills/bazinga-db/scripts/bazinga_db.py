@@ -3345,7 +3345,8 @@ def main():
             session_id = cmd_args[1]
             kwargs = {}
             # Allowlist of valid flags
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count"}
+            # v14: Added security_sensitive, qa_attempts, tl_review_attempts for escalation tracking
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 # Validate flag is in allowlist
@@ -3356,13 +3357,16 @@ def main():
                     print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2), file=sys.stderr)
                     sys.exit(1)
                 value = cmd_args[i + 1]
-                # Convert revision_count and item_count to int if present
-                if key == 'revision_count' or key == 'item_count':
+                # Convert integer flags
+                if key in ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts'):
                     try:
                         value = int(value)
                     except ValueError:
                         print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
+                # Convert security_sensitive to int (0 or 1)
+                elif key == 'security_sensitive':
+                    value = 1 if value.lower() in ('true', '1', 'yes') else 0
                 # Convert auto_create to bool
                 elif key == 'auto_create':
                     value = value.lower() in ('true', '1', 'yes')

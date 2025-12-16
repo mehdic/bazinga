@@ -106,12 +106,17 @@ def get_required_markers(conn, agent_type):
 
 
 def validate_markers(prompt, markers, agent_type):
-    """Ensure all required markers are present in prompt."""
+    """Ensure all required markers are present in prompt.
+
+    Returns:
+        True if all markers present, False if missing (caller should handle exit)
+    """
     missing = [m for m in markers if m not in prompt]
     if missing:
         print(f"ERROR: Prompt for {agent_type} missing required markers: {missing}", file=sys.stderr)
         print(f"This means the agent file may be corrupted or incomplete.", file=sys.stderr)
-        sys.exit(1)
+        return False
+    return True
 
 
 def read_agent_file(agent_type):
@@ -509,6 +514,77 @@ Do NOT reduce scope without explicit user approval.
 
 
 # =============================================================================
+# GLOBAL BUDGET ENFORCEMENT
+# =============================================================================
+
+def enforce_global_budget(components, model="sonnet"):
+    """Enforce global token budget by trimming lowest-priority sections.
+
+    Priority order (highest to lowest):
+    1. Agent definition (NEVER trim)
+    2. Task context (NEVER trim)
+    3. PM context (NEVER trim if PM)
+    4. Context block (trim if needed)
+    5. Specialization block (trim if needed)
+    6. Feedback context (trim first)
+
+    Returns:
+        tuple: (trimmed_components, trimmed_sections_log)
+    """
+    budget = TOKEN_BUDGETS.get(model, TOKEN_BUDGETS["sonnet"])
+    hard_limit = budget["hard"]
+
+    # Calculate total tokens
+    total_tokens = sum(estimate_tokens(c) for c in components)
+
+    if total_tokens <= hard_limit:
+        return components, []
+
+    # Need to trim - identify sections by content markers
+    trimmed_log = []
+    result = []
+
+    # Categorize components by priority
+    for i, comp in enumerate(components):
+        # High priority - never trim
+        if "Current Task Assignment" in comp:
+            result.append(comp)
+        elif "## RESUME CONTEXT" in comp or "## PM STATE" in comp:
+            result.append(comp)
+        # Agent definition - never trim (identified by size)
+        elif estimate_tokens(comp) > 500 and "SPECIALIZATION GUIDANCE" not in comp and "Context from Prior Work" not in comp:
+            result.append(comp)
+        # Medium priority - trim if needed
+        elif "Context from Prior Work" in comp:
+            # Context block - can be trimmed
+            if total_tokens > hard_limit:
+                trimmed_log.append(f"Trimmed: Context block ({estimate_tokens(comp)} tokens)")
+                total_tokens -= estimate_tokens(comp)
+            else:
+                result.append(comp)
+        elif "SPECIALIZATION GUIDANCE" in comp:
+            # Specialization block - can be trimmed
+            if total_tokens > hard_limit:
+                trimmed_log.append(f"Trimmed: Specialization block ({estimate_tokens(comp)} tokens)")
+                total_tokens -= estimate_tokens(comp)
+            else:
+                result.append(comp)
+        # Low priority - trim first
+        elif "Previous QA Feedback" in comp or "Tech Lead Feedback" in comp or "Investigation Findings" in comp:
+            # Feedback context - trim first
+            if total_tokens > hard_limit:
+                trimmed_log.append(f"Trimmed: Feedback context ({estimate_tokens(comp)} tokens)")
+                total_tokens -= estimate_tokens(comp)
+            else:
+                result.append(comp)
+        else:
+            # Unknown section - keep by default
+            result.append(comp)
+
+    return result, trimmed_log
+
+
+# =============================================================================
 # MAIN PROMPT COMPOSITION
 # =============================================================================
 
@@ -521,69 +597,87 @@ def build_prompt(args):
     else:
         conn = sqlite3.connect(args.db)
 
-    model = args.model or "sonnet"
-    components = []
+    # Use try/finally to ensure conn.close() is always called
+    try:
+        model = args.model or "sonnet"
+        components = []
+        markers_valid = True
 
-    # 1. Build CONTEXT block (from DB - prior reasoning, packages, errors)
-    if conn and args.agent_type != "project_manager":  # PM doesn't need prior context
-        context_block = build_context_block(
-            conn, args.session_id, args.group_id or "", args.agent_type, model
-        )
-        if context_block:
-            components.append(context_block)
+        # 1. Build CONTEXT block (from DB - prior reasoning, packages, errors)
+        if conn and args.agent_type != "project_manager":  # PM doesn't need prior context
+            context_block = build_context_block(
+                conn, args.session_id, args.group_id or "", args.agent_type, model
+            )
+            if context_block:
+                components.append(context_block)
 
-    # 2. Build SPECIALIZATION block (from DB task_groups + template files)
-    if conn and args.group_id and args.agent_type not in ["project_manager"]:
-        spec_block = build_specialization_block(
-            conn, args.session_id, args.group_id, args.agent_type, model
-        )
-        if spec_block:
-            components.append(spec_block)
+        # 2. Build SPECIALIZATION block (from DB task_groups + template files)
+        if conn and args.group_id and args.agent_type not in ["project_manager"]:
+            spec_block = build_specialization_block(
+                conn, args.session_id, args.group_id, args.agent_type, model
+            )
+            if spec_block:
+                components.append(spec_block)
 
-    # 3. Read AGENT DEFINITION (MANDATORY - this is the core)
-    agent_definition = read_agent_file(args.agent_type)
-    components.append(agent_definition)
+        # 3. Read AGENT DEFINITION (MANDATORY - this is the core)
+        agent_definition = read_agent_file(args.agent_type)
+        components.append(agent_definition)
 
-    # 4. Build TASK CONTEXT
-    task_context = build_task_context(args)
-    components.append(task_context)
+        # 4. Build TASK CONTEXT
+        task_context = build_task_context(args)
+        components.append(task_context)
 
-    # 5. Build PM-specific context
-    if args.agent_type == "project_manager":
-        pm_context = build_pm_context(args)
-        if pm_context:
-            components.append(pm_context)
-        resume_context = build_resume_context(args)
-        if resume_context:
-            components.append(resume_context)
+        # 5. Build PM-specific context
+        if args.agent_type == "project_manager":
+            pm_context = build_pm_context(args)
+            if pm_context:
+                components.append(pm_context)
+            resume_context = build_resume_context(args)
+            if resume_context:
+                components.append(resume_context)
 
-    # 6. Build FEEDBACK context (for retries)
-    feedback_context = build_feedback_context(args)
-    if feedback_context:
-        components.append(feedback_context)
+        # 6. Build FEEDBACK context (for retries)
+        feedback_context = build_feedback_context(args)
+        if feedback_context:
+            components.append(feedback_context)
 
-    # Compose final prompt
-    full_prompt = "\n\n".join(components)
+        # 7. Enforce global budget - trim lowest-priority sections if over hard limit
+        components, trimmed_sections = enforce_global_budget(components, model)
+        if trimmed_sections:
+            for trim_msg in trimmed_sections:
+                print(f"WARNING: {trim_msg}", file=sys.stderr)
 
-    # 7. Validate required markers (only if DB available)
-    if conn:
-        markers = get_required_markers(conn, args.agent_type)
-        if markers:
-            validate_markers(full_prompt, markers, args.agent_type)
-        conn.close()
+        # Compose final prompt
+        full_prompt = "\n\n".join(components)
 
-    # 8. Output prompt to stdout
-    print(full_prompt)
+        # 8. Validate required markers (only if DB available)
+        if conn:
+            markers = get_required_markers(conn, args.agent_type)
+            if markers:
+                markers_valid = validate_markers(full_prompt, markers, args.agent_type)
 
-    # 9. Output metadata to stderr
-    lines = len(full_prompt.splitlines())
-    tokens = estimate_tokens(full_prompt)
-    print(f"[PROMPT_METADATA]", file=sys.stderr)
-    print(f"agent_type={args.agent_type}", file=sys.stderr)
-    print(f"lines={lines}", file=sys.stderr)
-    print(f"tokens_estimate={tokens}", file=sys.stderr)
-    if conn:
-        print(f"markers_validated=true", file=sys.stderr)
+        # 9. Output prompt to stdout (even if markers invalid for debugging)
+        print(full_prompt)
+
+        # 10. Output metadata to stderr
+        lines = len(full_prompt.splitlines())
+        tokens = estimate_tokens(full_prompt)
+        print(f"[PROMPT_METADATA]", file=sys.stderr)
+        print(f"agent_type={args.agent_type}", file=sys.stderr)
+        print(f"lines={lines}", file=sys.stderr)
+        print(f"tokens_estimate={tokens}", file=sys.stderr)
+        print(f"sections_trimmed={len(trimmed_sections)}", file=sys.stderr)
+        if conn:
+            print(f"markers_validated={str(markers_valid).lower()}", file=sys.stderr)
+
+        # Exit with error if markers were invalid
+        if not markers_valid:
+            sys.exit(1)
+
+    finally:
+        # Always close database connection
+        if conn:
+            conn.close()
 
 
 def main():
