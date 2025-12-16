@@ -155,11 +155,8 @@ Operation → Check result → If error: Output capsule with error
 ❌ WRONG: "Database updated. Now let me spawn the SSE for FORECAST group..." [STOPS]
    → The agent never gets spawned. Your message ends. Workflow hangs.
 
-✅ CORRECT (specializations enabled): "Database updated." [Skill(command: "specialization-loader")]
-   → Turn 1 starts. Workflow continues to Turn 2 with Task().
-
-✅ CORRECT (specializations disabled): "Database updated." [Task(subagent_type="general-purpose", ...)]
-   → The agent is spawned in the same turn. Workflow continues.
+✅ CORRECT: "Database updated. Building prompt." [Skill(command: "prompt-builder")]
+   → Prompt is built. Then call Task() with the built prompt.
 ```
 Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool (Skill or Task) MUST be CALLED.
 
@@ -173,8 +170,7 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 
 **THE RULE:**
 - ❌ FORBIDDEN: `"Now let me spawn the SSE..."` (text only - workflow hangs)
-- ✅ REQUIRED (specializations enabled): `"Loading specialization:" + Skill(command: "specialization-loader")` (Turn 1)
-- ✅ REQUIRED (specializations disabled): `"Spawning SSE:" + Task(subagent_type="general-purpose", ...)` (direct spawn)
+- ✅ REQUIRED: `"Building prompt:" + Skill(command: "prompt-builder")` then `Task()` with built prompt
 
 **SELF-CHECK:** Before ending ANY message, verify: **Did I call the tool I said I would call?** If you wrote "spawn", "route", "invoke" → the tool call MUST be in THIS message.
 
@@ -184,8 +180,9 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 - ✅ **Task** - Spawn agents
 - ✅ **Skill** - MANDATORY: Invoke skills for:
   - **bazinga-db**: Database operations (initialization, logging, state management) - REQUIRED
-  - **context-assembler**: Intelligent context assembly before agent spawns (if `context_engineering.enable_context_assembler` is true in skills_config.json)
-  - **specialization-loader**: Load agent specializations based on tech stack
+  - **config-seeder**: Seed workflow configs to database (ONCE at session initialization)
+  - **prompt-builder**: Build complete agent prompts deterministically (BEFORE every Task() call)
+  - **workflow-router**: Get next action after agent response (deterministic routing)
   - **IMPORTANT**: Do NOT display raw skill output to user. Verify operation succeeded, then IMMEDIATELY continue to next workflow step. If skill invocation fails, output error capsule per §Error Handling and STOP.
 - ✅ **Read** - ONLY for reading configuration, templates, and agent definition files:
   - `bazinga/skills_config.json` (skills configuration)
@@ -211,72 +208,75 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 
 ### 🔴 PRE-TASK VALIDATION (MANDATORY RUNTIME GUARD)
 
-**Before ANY `Task()` call to spawn an agent, VERIFY both skills were invoked:**
+**Before ANY `Task()` call to spawn an agent, you MUST invoke prompt-builder skill:**
 
-| Skill | Required For | Check |
-|-------|--------------|-------|
-| **context-assembler** | QA, Tech Lead, SSE, Investigator, Developer retries | `## Context for {agent}` in output OR explicitly disabled in skills_config |
-| **specialization-loader** | ALL agents | `[SPECIALIZATION_BLOCK_START]` in output |
+| Skill | Required For | What It Does |
+|-------|--------------|--------------|
+| **prompt-builder** | ALL agent spawns | Builds complete prompt with context, specializations, agent file, and task context |
 
 **Validation Logic:**
 ```
 IF about to call Task():
-  1. Check: Did I invoke context-assembler in this turn?
-     - YES: Continue
-     - NO + enable_context_assembler=true: STOP, invoke it first
-     - NO + enable_context_assembler=false: Continue (disabled)
-
-  2. Check: Did I invoke specialization-loader in this turn?
-     - YES and got valid block: Continue
-     - YES but no block: Proceed with fallback (non-blocking)
-     - NO: STOP, invoke it first
-
-  3. Check: Does my prompt include BOTH outputs?
-     - YES: Call Task()
-     - NO: Build prompt with {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
+  1. Invoke prompt-builder skill with agent type, session ID, group ID, etc.
+  2. Capture the full prompt output from prompt-builder
+  3. Use that prompt in Task() call
 ```
 
-**If EITHER skill was skipped:** STOP. Re-invoke the missing skill(s). Do NOT call Task() until both are complete.
+**If prompt-builder was NOT invoked:** STOP. Invoke prompt-builder first. Do NOT call Task() without it.
 
-### 🔴 CRITICAL: NEVER CREATE CUSTOM PROMPTS - ALWAYS READ AGENT FILES
+### 🔴 CRITICAL: USE PROMPT-BUILDER FOR ALL SPAWNS
 
-**Before spawning ANY agent (Developer, SSE, QA, Tech Lead, PM, Investigator, RE), you MUST:**
+**The prompt-builder skill does EVERYTHING deterministically:**
+- Reads full agent definition files (agents/*.md)
+- Builds specialization block from DB task_groups + template files
+- Builds context block from DB (reasoning, context packages, error patterns)
+- Composes task context
+- Validates required markers
+- Returns complete prompt to stdout
 
-1. **Read the agent's full definition file:**
-   ```
-   AGENT_FILE_MAP = {
-     "developer": "agents/developer.md",
-     "senior_software_engineer": "agents/senior_software_engineer.md",
-     "qa_expert": "agents/qa_expert.md",
-     "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
-     "project_manager": "agents/project_manager.md",
-     "investigator": "agents/investigator.md",
-     "requirements_engineer": "agents/requirements_engineer.md"
-   }
-   agent_definition = Read(AGENT_FILE_MAP[agent_type])
-   ```
+**Invoke prompt-builder like this:**
+```
+Skill(command: "prompt-builder")
+```
 
-2. **Compose the prompt as:**
-   ```
-   base_prompt = agent_definition + task_context  // ~1400 lines of agent instructions + task details
-   full_prompt = CONTEXT_BLOCK + SPEC_BLOCK + base_prompt
-   ```
+**Provide these parameters in conversation context BEFORE invoking:**
+```
+Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|project_manager|investigator|requirements_engineer}
+Session ID: {session_id}
+Group ID: {group_id or empty}
+Task Title: {task title}
+Task Requirements: {requirements}
+Branch: {branch name}
+Mode: {simple|parallel}
+Testing Mode: {full|minimal|disabled}
+Model: {haiku|sonnet|opus}
+```
+
+**Optional parameters for retries:**
+```
+QA Feedback: {failure details if developer retry}
+TL Feedback: {code review feedback if developer changes}
+```
+
+**For PM spawns:**
+```
+PM State: {JSON from database}
+Resume Context: {context if resume scenario}
+```
 
 **❌ ABSOLUTELY FORBIDDEN:**
 - ❌ Creating custom prompts like "## Your Mission" or "## Key Files to Investigate"
-- ❌ Writing task-specific instructions instead of using the agent file
-- ❌ Skipping the Read(agents/*.md) step
-- ❌ Building prompts that don't include the full ~1400 lines of agent instructions
+- ❌ Writing task-specific instructions instead of using prompt-builder
+- ❌ Manually reading agent files (prompt-builder does this)
+- ❌ Building prompts that don't go through prompt-builder
 
 **✅ CORRECT APPROACH:**
-- ✅ ALWAYS Read(agents/{agent_type}.md) first
-- ✅ ALWAYS include the full agent file content in base_prompt
-- ✅ ALWAYS compose: CONTEXT_BLOCK + SPEC_BLOCK + agent_definition + task_context
-- ✅ task_context is SHORT (10-20 lines of session/group/task details)
+- ✅ ALWAYS invoke prompt-builder skill BEFORE calling Task()
+- ✅ ALWAYS provide required parameters in conversation context
+- ✅ ALWAYS use the full prompt returned by prompt-builder
+- ✅ The prompt-builder handles EVERYTHING (agent file, context, specializations)
 
-**Why:** Agent files contain critical instructions (NO DELEGATION rules, tool usage guidance, output formats) that prevent agents from misbehaving. Without the full agent file, agents may spawn subagents or produce incorrect output.
-
-**Why this matters:** Without context-assembler, agents don't receive prior reasoning (handoff breaks). Without specialization-loader, agents don't receive tech-specific guidance.
+**Why:** The prompt-builder deterministically builds complete prompts including the full agent file (~1400 lines), specializations from templates, and context from database. Without prompt-builder, agents receive abbreviated prompts and may misbehave.
 
 ### §Bash Command Allowlist (EXHAUSTIVE)
 
@@ -318,25 +318,27 @@ IF about to call Task():
 
 ---
 
-## 🔴🔴🔴 MANDATORY: SPECIALIZATION LOADING BEFORE EVERY AGENT SPAWN 🔴🔴🔴
+## 🔴🔴🔴 MANDATORY: PROMPT-BUILDER BEFORE EVERY AGENT SPAWN 🔴🔴🔴
 
-**THIS RULE APPLIES TO ALL AGENT SPAWNS (Developer, SSE, QA, Tech Lead, RE, Investigator).**
+**THIS RULE APPLIES TO ALL AGENT SPAWNS (Developer, SSE, QA, Tech Lead, PM, RE, Investigator).**
 
 **🚨 BEFORE INVOKING Task() TO SPAWN ANY AGENT, YOU MUST:**
 
-1. **Check** if specializations are enabled in `bazinga/skills_config.json`
-2. **IF enabled** for this agent type:
-   - **Output** the specialization context block with `[SPEC_CTX_START]...[SPEC_CTX_END]`
-   - **Invoke** `Skill(command: "specialization-loader")`
-   - **Extract** the block from the response
-   - **Prepend** the block to the agent's prompt
-3. **THEN** invoke `Task()` with the full prompt
+1. **Output** the parameters for prompt-builder (agent type, session ID, group ID, etc.)
+2. **Invoke** `Skill(command: "prompt-builder")`
+3. **Capture** the full prompt from stdout
+4. **THEN** invoke `Task()` with the captured prompt
 
-**🚫 FORBIDDEN: Spawning any agent WITHOUT going through this sequence when specializations are enabled.**
+**🚫 FORBIDDEN: Spawning any agent WITHOUT going through prompt-builder.**
 
-**Why this matters:** Specializations provide critical technology-specific guidance (Java 8 patterns, Spring Boot 2.7 conventions, etc.) that significantly improve agent output quality. Skipping this makes agents generic and miss project-specific patterns.
+**Why this matters:** The prompt-builder deterministically:
+- Reads the full agent definition file (~1400+ lines)
+- Builds specialization blocks from DB + template files
+- Builds context blocks from prior agent reasoning
+- Validates required markers are present
+- Returns a complete, verified prompt
 
-**See:** Phase templates (`phase_simple.md`, `phase_parallel.md`) for the complete SPAWN STEP 2 procedure.
+**Skipping prompt-builder results in abbreviated prompts that cause agents to misbehave.**
 
 ---
 
@@ -1040,9 +1042,9 @@ Display:
 2. Parse PM status (CONTINUE/BAZINGA/etc)
 3. Start spawn sequence or proceed to completion - **all within this turn**
 4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Skill() or Task() tool NOW
-   - **If specializations ENABLED:** Call `Skill(command: "specialization-loader")` in this turn (Task() follows in Turn 2)
-   - **If specializations DISABLED:** Call `Task()` directly in this turn
-5. Multi-step sequences (DB query → spawn) are expected within the same turn
+   - Call `Skill(command: "prompt-builder")` to build the prompt
+   - Then call `Task()` with the built prompt
+5. Multi-step sequences (DB query → prompt-builder → spawn) are expected within the same turn
 
 ---
 
@@ -1052,7 +1054,7 @@ Display:
 
 | PM Status | Action |
 |-----------|--------|
-| `CONTINUE` | **IMMEDIATELY start spawn sequence** for pending groups. If specializations enabled: Turn 1 calls Skill(), Turn 2 calls Task(). |
+| `CONTINUE` | **IMMEDIATELY start spawn sequence** for pending groups. Call prompt-builder, then Task(). |
 | `BAZINGA` | Session is complete → Jump to Completion phase, invoke validator |
 | `PLANNING_COMPLETE` | New work added → Jump to Step 1.4, then Phase 2 |
 | `NEEDS_CLARIFICATION` | Surface question to user |
@@ -1066,8 +1068,8 @@ In resume scenarios, the most common bug is:
 - Workflow hangs
 
 **RULE:** When PM says CONTINUE, you MUST start the spawn sequence IMMEDIATELY:
-- **If specializations DISABLED:** Call `Task()` in THIS turn
-- **If specializations ENABLED:** Call `Skill(command: "specialization-loader")` in THIS turn, then call `Task()` in the NEXT turn after receiving skill output
+1. Call `Skill(command: "prompt-builder")` with agent parameters
+2. Then call `Task()` with the built prompt
 
 The key is: SOME tool call must happen NOW. Don't just write text describing what you will do.
 
@@ -1145,7 +1147,31 @@ The key is: SOME tool call must happen NOW. Don't just write text describing wha
 
    **IF bazinga-db skill fails or returns error:** Output `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill` and STOP.
 
-   **AFTER successful session creation: IMMEDIATELY continue to step 4 (Load configurations). Do NOT stop.**
+   **AFTER successful session creation: IMMEDIATELY continue to step 3.5 (Seed workflow configs). Do NOT stop.**
+
+3.5 **Seed workflow configurations (MANDATORY):**
+
+   ### 🔴 MANDATORY: Seed Workflow Configs to Database
+
+   **YOU MUST invoke the config-seeder skill to seed routing and marker configs to database.**
+   **This enables deterministic prompt building and workflow routing.**
+
+   ```
+   Skill(command: "config-seeder")
+   ```
+
+   **Expected output:**
+   ```
+   Seeded 45 transitions
+   Seeded 7 agent marker sets
+   Seeded 5 special rules
+   ✅ Config seeding complete
+   ```
+
+   **IF config-seeder skill fails:** Output `❌ Config seeding failed | Workflow routing unavailable | Cannot proceed` and STOP.
+   **Config seeding is MANDATORY** - without it, prompt-builder and workflow-router cannot function.
+
+   **AFTER successful config seeding: IMMEDIATELY continue to step 4 (Load configurations). Do NOT stop.**
 
 4. **Load configurations:**
 
@@ -1743,8 +1769,8 @@ Before continuing to Step 1.3a, verify:
 - But DON'T call any tool in the same turn (no action)
 
 **RULE:** If you write "spawn", "route", "invoke", "call" → you MUST call SOME tool in the SAME turn:
-- For spawns with specializations: Call `Skill(command: "specialization-loader")` in Turn 1, then `Task()` in Turn 2
-- For spawns without specializations: Call `Task()` directly
+- Call `Skill(command: "prompt-builder")` to build the prompt
+- Then call `Task()` with the built prompt
 - Saying you will do something is NOT doing it. The tool call must happen NOW.
 
 ---
@@ -1759,15 +1785,14 @@ Before continuing to Step 1.3a, verify:
 - **Step 1:** Query task groups: `Skill(command: "bazinga-db")` → get all task groups for session
 - **Step 2:** Find groups with status: `in_progress` or `pending`
 - **Step 3:** Read the appropriate phase template (`phase_simple.md` or `phase_parallel.md`)
-- **Step 4:** Spawn appropriate agent using the **TWO-TURN SPAWN SEQUENCE** if specializations enabled:
-  - **If specializations ENABLED:** Turn 1: Call `Skill(command: "specialization-loader")`. Turn 2: Extract block, call `Task()`.
-  - **If specializations DISABLED:** Call `Task()` directly in THIS turn.
+- **Step 4:** Spawn appropriate agent using prompt-builder:
+  - Call `Skill(command: "prompt-builder")` with agent parameters
+  - Then call `Task()` with the built prompt
   - **⚠️ CAPACITY LIMIT: Respect MAX 4 PARALLEL DEVELOPERS hard limit**
   - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
-- **🔴 You MUST call SOME tool in THIS turn** - either Skill() or Task(). Do NOT just say "let me spawn"
-  - **Key insight:** Calling `Skill(command: "specialization-loader")` FULLY satisfies the "act now" requirement. Task() will follow in Turn 2.
+- **🔴 You MUST call SOME tool in THIS turn**. Do NOT just say "let me spawn"
 
-**Clarification:** Multi-step tool sequences (DB query → spawn) within the same assistant turn are expected. The rule is: **complete all steps before your turn ends** - never stop to wait for user input between receiving PM CONTINUE and spawning agents.
+**Clarification:** Multi-step tool sequences (DB query → prompt-builder → spawn) within the same assistant turn are expected. The rule is: **complete all steps before your turn ends** - never stop to wait for user input between receiving PM CONTINUE and spawning agents.
 
 **IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
 
@@ -1795,11 +1820,10 @@ Before continuing to Step 1.3a, verify:
 - **IMMEDIATELY jump to appropriate phase after status determined. Do NOT stop.**
 
 **🔴 ANTI-PATTERN - INTENT WITHOUT ACTION:**
-❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS - turn ends without Task/Skill call]
-✅ **CORRECT (specializations enabled):** "Database updated." [Skill(command: "specialization-loader") in this turn → Task() in next turn]
-✅ **CORRECT (specializations disabled):** "Database updated." [Task() call in same turn, before turn ends]
+❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS - turn ends without any tool call]
+✅ **CORRECT:** "Database updated. Building prompt." [Skill(command: "prompt-builder")] → then [Task() with built prompt]
 
-Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill() or Task() in the same turn. **Note:** When specializations are enabled, calling Skill() satisfies the "act now" requirement - Task() follows in Turn 2 after receiving the specialization block.
+Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill(command: "prompt-builder") followed by Task() in the same turn.
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
 
@@ -1998,13 +2022,20 @@ ELSE IF PM chose "parallel":
 
 ---
 
-## §Specialization Loading
+## §Prompt Building (Deterministic)
 
-**Purpose:** Inject technology-specific patterns into agent prompts via specialization-loader skill.
+**Purpose:** Build complete agent prompts deterministically via prompt-builder skill.
 
-**Location:** `bazinga/templates/specializations/{category}/{technology}.md`
+**The prompt-builder script (`bazinga/scripts/prompt_builder.py`) does EVERYTHING:**
+- Reads full agent definition files from `agents/*.md`
+- Queries DB for specializations (from task_groups.specializations)
+- Queries DB for context (reasoning, packages, error patterns)
+- Reads specialization templates from `bazinga/templates/specializations/`
+- Applies token budgets per model
+- Validates required markers
+- Returns complete prompt to stdout
 
-### Two-Phase Specialization Workflow
+### Prompt Building Workflow
 
 **Phase 1: PM Assignment (during planning)** - UNCHANGED
 - PM reads `bazinga/project_context.json` (created by Tech Stack Scout at Step 0.5)
@@ -2013,222 +2044,73 @@ ELSE IF PM chose "parallel":
   - Scout's suggested_specializations for that component
 - PM stores specializations via `bazinga-db create-task-group --specializations '[...]'`
 
-**Phase 2: Orchestrator Loading (at agent spawn)** - NEW SKILL-BASED
-- Check if specializations enabled in skills_config.json
-- Check if agent type is in enabled_agents list
-- Invoke specialization-loader skill to compose block
-- Prepend composed block to agent prompt
-
-**🔴 FORBIDDEN ACTIONS:**
-- ❌ **DO NOT** search for templates with `Search()` or `Glob()` - the skill handles path resolution
-- ❌ **DO NOT** conclude "no templates exist" based on search results
-- ❌ **DO NOT** skip specialization loading if you can't find template files yourself
-- ❌ **DO NOT** try to "pre-verify" or "quickly check" before invoking the skill - this is role drift
-- ✅ **ALWAYS** pass the specializations array to the skill - it handles validation
-- ✅ **ALWAYS** invoke the skill when specializations array is non-empty - let it handle errors
-- ✅ **ALWAYS** follow the workflow even if you think a step "might not be needed"
-
-**Path Security (handled by specialization-loader skill):**
-The skill validates all paths before loading:
-- Paths must start with `bazinga/templates/specializations/`
-- No `..` components allowed (path traversal prevention)
-- No absolute paths allowed
-- No symlinks followed outside allowed directories
-- Invalid paths are rejected with error message
-
-**Why delegate to skill?** Working directories vary. The skill uses validated relative paths from project root. Search/Glob may run from a different directory and fail to find files that exist.
-
-**Anti-pattern to avoid:**
-```
-❌ "Let me quickly verify if templates exist before invoking the skill..."
-   → This is YOU doing the skill's job. Role drift.
-   → The skill exists precisely to handle this. Trust the architecture.
-
-✅ "Specializations array is non-empty. Invoking specialization-loader skill."
-   → Follow the workflow. The skill will report errors if files don't exist.
-```
+**Phase 2: Orchestrator Prompt Building (at agent spawn)**
+1. Output parameters for prompt-builder
+2. Invoke `Skill(command: "prompt-builder")`
+3. Capture complete prompt from output
+4. Use prompt in `Task()` call
 
 ### Process (at agent spawn)
 
-**Step 1: Check if enabled**
+**Step 1: Output parameters in conversation context**
 ```
-Read bazinga/skills_config.json
-IF specializations.enabled == false:
-    Skip specialization loading, continue to spawn
-IF agent_type NOT IN specializations.enabled_agents:
-    Skip specialization loading, continue to spawn
-```
-
-**Step 2: Query DB for group's specializations**
-```
-bazinga-db, get task groups for session [session_id]
-```
-Then invoke: `Skill(command: "bazinga-db")`
-
-**Step 3: Extract specializations (with fallback derivation)**
-```
-specializations = task_group["specializations"]  # JSON array or null
-
-IF specializations is null OR empty:
-    # FALLBACK: Derive from project_context.json
-    Read(file_path: "bazinga/project_context.json")
-
-    IF file exists:
-        specializations = []
-
-        # Try components.suggested_specializations first
-        IF project_context.components exists:
-            FOR component in components:
-                IF component.suggested_specializations:
-                    specializations.extend(component.suggested_specializations)
-
-        # Try session-wide suggested_specializations
-        IF empty AND project_context.suggested_specializations exists:
-            specializations = project_context.suggested_specializations
-
-        # Last resort: map primary_language + framework from components
-        IF empty:
-            IF project_context.primary_language:
-                specializations.append(map_to_template(project_context.primary_language))
-
-            # Try top-level framework field (legacy/simple projects)
-            IF project_context.framework:
-                FOR fw in parse_comma_separated(project_context.framework):
-                    specializations.append(map_to_template(fw))
-
-            # Extract frameworks from components (Scout schema)
-            IF project_context.components exists:
-                FOR component in project_context.components:
-                    IF component.framework:
-                        specializations.append(map_to_template(component.framework))
-                    IF component.language AND component.language != project_context.primary_language:
-                        specializations.append(map_to_template(component.language))
-
-        specializations = deduplicate(specializations)
-
-IF specializations still empty:
-    Skip specialization loading, continue to spawn
-```
-
-**Template mapping (fallback derivation):**
-
-| Technology | Template Path |
-|------------|---------------|
-| typescript | `bazinga/templates/specializations/01-languages/typescript.md` |
-| python | `bazinga/templates/specializations/01-languages/python.md` |
-| javascript | `bazinga/templates/specializations/01-languages/javascript.md` |
-| react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
-| nextjs | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
-| react-native | `bazinga/templates/specializations/04-mobile-desktop/react-native.md` |
-| flutter | `bazinga/templates/specializations/04-mobile-desktop/flutter.md` |
-| electron | `bazinga/templates/specializations/04-mobile-desktop/electron-tauri.md` |
-| tauri | `bazinga/templates/specializations/04-mobile-desktop/electron-tauri.md` |
-| express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
-| fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
-
-**Step 4: Invoke specialization-loader skill**
-
-**🔴 CRITICAL: THREE ACTIONS** (structured context + skill invocation + verification)
-
-**Action 4a: Create structured context file (REQUIRED):**
-```bash
-mkdir -p bazinga/artifacts/{session_id}/skills
-cat > bazinga/artifacts/{session_id}/skills/spec_ctx_{group_id}_{agent_type}.json << 'CTX_EOF'
-{
-  "session_id": "{session_id}",
-  "group_id": "{group_id}",
-  "agent_type": "{developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}",
-  "model": "{model from model_selection.json}",
-  "testing_mode": "full",
-  "specialization_paths": {JSON array from step 3}
-}
-CTX_EOF
-```
-
-**Action 4b: Output context as text AND invoke skill:**
-```text
+Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|project_manager|investigator|requirements_engineer}
 Session ID: {session_id}
 Group ID: {group_id}
-Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|requirements_engineer|investigator}
-Model: {model from model_selection.json}
-Specialization Paths: {JSON array from step 3}
-Context File: bazinga/artifacts/{session_id}/skills/spec_ctx_{group_id}_{agent_type}.json
+Task Title: {task title from PM}
+Task Requirements: {requirements}
+Branch: {branch name}
+Mode: {simple|parallel}
+Testing Mode: {full|minimal|disabled}
+Model: {haiku|sonnet|opus}
 ```
 
-Then invoke:
+**Step 2: Invoke prompt-builder**
 ```
-Skill(command: "specialization-loader")
-```
-
-The skill reads context from conversation text AND can fallback to the JSON file.
-
-**Step 5: Extract composed block**
-
-The skill returns a composed block between markers:
-```
-[SPECIALIZATION_BLOCK_START]
-{composed markdown block}
-[SPECIALIZATION_BLOCK_END]
+Skill(command: "prompt-builder")
 ```
 
-Extract the block content.
-
-**Step 5.5: Verify skill output saved (REQUIRED)**
-
-After extracting the block, verify the skill saved its output to the database:
+**Step 3: Capture and use prompt**
+The skill returns the complete prompt to stdout. Use this prompt directly in Task():
 
 ```
-# Check if skill output was saved
-Skill(command: "bazinga-db") → get-skill-output-all {session_id} specialization-loader --agent {agent_type}
-# Returns array of outputs
-
-# IF result is empty array [] or error:
-# Save fallback record:
-Skill(command: "bazinga-db") → save-skill-output {session_id} specialization-loader {
-  "group_id": "{group_id}",
-  "agent_type": "{agent_type}",
-  "model": "{model}",
-  "templates_used": ["fallback-orchestrator-save"],
-  "token_count": 0,
-  "composed_identity": "Fallback: skill did not save output",
-  "fallback": true
-} --agent {agent_type} --group {group_id}
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["{agent_type}"],
+  description: "{agent_type} working on {group_id}",
+  prompt: [FULL PROMPT FROM PROMPT-BUILDER]
+)
 ```
 
-**🔴 This verification is MANDATORY.** Silent failures in skill persistence will be caught and remediated.
+### What prompt-builder includes
 
-**Step 6: Prepend to agent prompt**
+| Component | Source | Description |
+|-----------|--------|-------------|
+| Context block | DB: reasoning, packages, errors | Prior agent work and known issues |
+| Specialization block | DB: task_groups.specializations + template files | Tech-specific guidance |
+| Agent definition | File: agents/*.md | Full agent instructions (~1400 lines) |
+| Task context | Parameters | Session, group, branch, requirements |
+| Feedback (retries) | Parameters | QA/TL feedback for fixes |
 
-The composed block goes at the TOP of the agent prompt, before the task description:
-```markdown
-{composed_specialization_block}
+### Token Budgets
 
----
+| Model | Specialization Budget | Context Budget |
+|-------|----------------------|----------------|
+| haiku | 900 soft / 1350 hard | 20% of soft |
+| sonnet | 1800 soft / 2700 hard | varies by agent |
+| opus | 2400 soft / 3600 hard | varies by agent |
 
-## Your Task
-{task_description from PM}
-```
+The prompt-builder enforces these limits automatically.
 
-### Fallback Scenarios
+### Marker Validation
 
-| Scenario | Action |
-|----------|--------|
-| specializations.enabled = false | Skip entirely |
-| Agent type not in enabled_agents | Skip entirely |
-| No specializations in DB (null/empty) | **Derive from project_context.json** (Step 3 fallback) |
-| Derivation returns empty | Skip (no specializations available) |
-| Skill invocation fails | Log warning, spawn without specialization |
-| project_context.json missing | Skip (no source for derivation) |
+The prompt-builder validates required markers from the `agent_markers` DB table:
+- developer: "NO DELEGATION", "READY_FOR_QA", "BLOCKED"
+- qa_expert: "PASS", "FAIL", "Challenge Level"
+- tech_lead: "APPROVED", "CHANGES_REQUESTED"
+- etc.
 
-### Token Budget (per-model)
-
-| Model | Soft Limit | Hard Limit |
-|-------|------------|------------|
-| haiku | 600 | 900 |
-| sonnet | 1200 | 1800 |
-| opus | 1600 | 2400 |
-
-The skill enforces these limits. Orchestrator does not need to track tokens.
+If markers are missing, prompt-builder exits with error (prevents malformed agent files).
 
 ---
 
@@ -2244,21 +2126,14 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_simple.md` and STOP.
 
-**🚨 TEMPLATE VERIFICATION CHECKPOINT:**
-After calling Read, verify you have the template content visible in your context:
-- ✅ Can you see "SPAWN DEVELOPER (ATOMIC SEQUENCE)"?
-- ✅ Can you see "TWO-TURN SPAWN SEQUENCE"?
-- ✅ Can you see `Skill(command: "specialization-loader")`?
-- ✅ Can you see `AGENT_FILE_MAP` with paths like `agents/developer.md`?
-- ✅ Can you see `agent_definition = Read(agent_file_path)`?
+**🚨 SPAWN SEQUENCE (using prompt-builder):**
 
-**IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
+1. **Output parameters** for prompt-builder (agent type, session ID, group ID, etc.)
+2. **Invoke:** `Skill(command: "prompt-builder")`
+3. **Capture** the full prompt from output
+4. **Invoke:** `Task(subagent_type: "general-purpose", model: MODEL_CONFIG[agent_type], prompt: [captured prompt])`
 
-**🔴 CRITICAL SPAWN RULE:** When you spawn any agent, the prompt MUST include the full agent file (~1400 lines) from `agents/{agent_type}.md`. DO NOT create custom prompts.
-
-**Execute the TWO-TURN SPAWN SEQUENCE as defined in the template.**
-
-**⚠️ WARNING: Skill() and Task() are in SEPARATE messages. Turn 1: Call Skill(). Turn 2: Extract block, call Task(). If you try to put both in one message, Task() won't have the specialization block yet.**
+**🔴 CRITICAL:** The prompt-builder builds the complete prompt deterministically (agent file + specializations + context). DO NOT manually read agent files or create custom prompts.
 
 ---
 
@@ -2274,21 +2149,16 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_parallel.md` and STOP.
 
-**🚨 TEMPLATE VERIFICATION CHECKPOINT:**
-After calling Read, verify you have the template content visible in your context:
-- ✅ Can you see "SPAWN DEVELOPERS - PARALLEL (ATOMIC SEQUENCE PER GROUP)"?
-- ✅ Can you see "TWO-TURN SPAWN SEQUENCE (Parallel Mode)"?
-- ✅ Can you see `Skill(command: "specialization-loader")` for each group?
-- ✅ Can you see `AGENT_FILE_MAP` with paths like `agents/developer.md`?
-- ✅ Can you see `agent_definitions[group_id] = Read(agent_file_path)`?
+**🚨 SPAWN SEQUENCE (using prompt-builder) - FOR EACH GROUP:**
 
-**IF ANY verification fails:** You did NOT read the template. Call Read again before proceeding.
+1. **Output parameters** for prompt-builder (agent type, session ID, group ID, etc.)
+2. **Invoke:** `Skill(command: "prompt-builder")`
+3. **Capture** the full prompt from output
+4. **Invoke:** `Task(subagent_type: "general-purpose", model: MODEL_CONFIG[agent_type], prompt: [captured prompt])`
 
-**🔴 CRITICAL SPAWN RULE:** When you spawn any agent, the prompt MUST include the full agent file (~1400 lines) from `agents/{agent_type}.md`. DO NOT create custom prompts.
+**For parallel spawns:** Repeat steps 1-4 for each group. You can call multiple Task() tools in the same message for parallelism.
 
-**Execute the TWO-TURN SPAWN SEQUENCE as defined in the template.**
-
-**⚠️ WARNING: Skill() and Task() are in SEPARATE messages. Turn 1: Call all Skill() for each group. Turn 2: Extract all blocks, call all Task(). If you try to put both in one message, Task() won't have the specialization blocks yet.**
+**🔴 CRITICAL:** The prompt-builder builds the complete prompt deterministically (agent file + specializations + context). DO NOT manually read agent files or create custom prompts.
 
 ---
 
@@ -2309,6 +2179,66 @@ Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes s
 
 ---
 
+## §Workflow Routing (Deterministic)
+
+**Purpose:** After receiving an agent response, use workflow-router to determine the next action deterministically.
+
+**The workflow-router script (`bazinga/scripts/workflow_router.py`) determines:**
+- Next agent to spawn based on current agent + status code
+- Whether escalation is needed (revision count threshold)
+- Whether QA should be skipped (testing_mode)
+- Security-sensitive task handling
+
+### When to Use Workflow-Router
+
+**AFTER receiving ANY agent response:**
+1. Extract status code from response (READY_FOR_QA, PASS, APPROVED, etc.)
+2. Invoke workflow-router with current state
+3. Follow the returned action
+
+### Invocation
+
+**Output parameters in conversation context:**
+```
+Current Agent: {developer|qa_expert|tech_lead|etc.}
+Response Status: {READY_FOR_QA|PASS|FAIL|APPROVED|CHANGES_REQUESTED|etc.}
+Session ID: {session_id}
+Group ID: {group_id}
+Testing Mode: {full|minimal|disabled}
+```
+
+**Then invoke:**
+```
+Skill(command: "workflow-router")
+```
+
+### Response Format
+
+The skill returns JSON with:
+```json
+{
+  "success": true,
+  "next_agent": "qa_expert",
+  "action": "spawn",
+  "model": "sonnet",
+  "group_id": "AUTH",
+  "include_context": ["reasoning", "packages"]
+}
+```
+
+**Use the returned `next_agent` and `action` to determine what to do next:**
+- `action: spawn` → Build prompt for `next_agent` and spawn
+- `action: merge` → Developer performs merge to initial_branch
+- `action: check_phase` → Check if more groups need work
+
+### Fallback
+
+If workflow-router returns an error or unknown transition:
+- Log warning: `⚠️ Unknown transition: {agent} + {status}`
+- Route to Tech Lead for manual handling (escalation fallback)
+
+---
+
 ## §DB Persistence Verification Gates
 
 **🔴 MANDATORY after each agent spawn: Verify expected DB writes occurred.**
@@ -2326,28 +2256,20 @@ Skill(command: "bazinga-db") → get-task-groups {session_id}
 
 **If empty:** PM didn't save state properly. Log warning and continue (non-blocking).
 
-### After Specialization-Loader Invocation
+### After Prompt-Builder Invocation
 
-Verify skill logged its output via bazinga-db skill:
-```
-Skill(command: "bazinga-db") → get-skill-output {session_id} "specialization-loader"
-# Should return: templates_after, augmented_templates, skipped_missing, testing_mode_used
-```
+Verify prompt was built successfully:
+- Check prompt-builder output includes full agent definition (~1400+ lines)
+- Check metadata in stderr shows `lines=` and `tokens_estimate=`
 
-**If empty:** Specialization-loader didn't log. Non-blocking but note in orchestrator log.
-
-**If templates_after = 0 for QA Expert and testing_mode_used = "full":**
-- This indicates the QA template augmentation failed
-- The skill_outputs will include `"augmentation_error": true`
-- Log warning: "QA Expert received 0 templates despite testing_mode=full"
-- Check skill_outputs for `skipped_missing` to identify which templates were unavailable
+**If prompt seems short:** Prompt-builder may have failed. Check stderr for errors.
 
 ### Verification Gate Summary
 
 | Checkpoint | Expected DB Content | Action if Missing |
 |------------|--------------------|--------------------|
 | After PM | success_criteria, task_groups | Log warning, continue |
-| After spec-loader | skill_outputs | Log warning, continue |
+| After prompt-builder | Complete prompt in output | Re-invoke prompt-builder |
 | Before BAZINGA | All criteria status updated | Block if incomplete |
 
 **Note:** These are non-blocking verification gates except for BAZINGA validation. The workflow continues even if some DB writes are missing, but gaps are logged for debugging.
