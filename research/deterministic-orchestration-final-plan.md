@@ -3,8 +3,23 @@
 **Date:** 2025-12-16
 **Context:** Replace LLM-based prompt composition and workflow routing with deterministic scripts
 **Decision:** Unified prompt-builder - Python script does everything, called ON-DEMAND before each spawn
-**Status:** Approved - Ready for implementation
+**Status:** ✅ IMPLEMENTED
 **Reviewed by:** OpenAI GPT-5
+
+### Implementation Summary (2025-12-16)
+
+All phases completed successfully:
+- ✅ Phase 0: Created config directory and JSON files (transitions.json, agent-markers.json)
+- ✅ Phase 1: Database schema v13 with workflow_transitions, agent_markers, workflow_special_rules tables
+- ✅ Phase 2: Created Python scripts (prompt_builder.py, workflow_router.py, seed_configs.py)
+- ✅ Phase 3: Created skill wrappers (prompt-builder, workflow-router, config-seeder)
+- ✅ Phase 4: Updated orchestrator to use new deterministic system
+- ✅ Phase 5: All tests passing
+
+**Verification:**
+- prompt_builder.py generates 1557 lines for developer, 2539 lines for PM (full agent files)
+- workflow_router.py returns correct routing decisions from DB
+- seed_configs.py seeds 37 transitions, 7 markers, 5 special rules
 
 ---
 
