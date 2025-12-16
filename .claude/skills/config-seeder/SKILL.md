@@ -35,10 +35,30 @@ This skill seeds workflow configuration from JSON files into database tables:
 
 When invoked, you must:
 
-### Step 1: Call the Seed Script
+### Step 1: Call the Session Init Script (RECOMMENDED)
+
+Use the unified initialization script that handles DB + config in one step:
+
+```bash
+python3 .claude/skills/bazinga-db/scripts/init_session.py --session-id "{session_id}"
+```
+
+This script:
+1. Ensures database exists with correct schema
+2. Seeds workflow configs (transitions, markers, rules)
+3. Creates artifacts directory
+4. Verifies everything is ready
+
+**Alternative:** Call seed script directly (requires DB to exist first):
 
 ```bash
 python3 .claude/skills/config-seeder/scripts/seed_configs.py --all
+```
+
+**With auto-init:** Initialize DB if missing:
+
+```bash
+python3 .claude/skills/config-seeder/scripts/seed_configs.py --all --auto-init-db
 ```
 
 ### Step 2: Verify Success
