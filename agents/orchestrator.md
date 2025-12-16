@@ -627,7 +627,7 @@ for group in task_groups:
 - Respawn PM with: "Task group '{group_id}' missing item_count. Use update-task-group to set item_count."
 - PM fixes via:
   ```
-  Skill(command: "bazinga-db") → update-task-group {session_id} {group_id} in_progress --item_count 1
+  Skill(command: "bazinga-db") → update-task-group {group_id} {session_id} --status in_progress --item_count 1
   ```
 - **BLOCK** workflow until PM fixes this
 
