@@ -289,7 +289,8 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Create final report with metadata
 if command_exists "jq"; then
-    jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"tool\": \"$TOOL\"}" \
+    # Wrap results in object to handle both array and object inputs
+    jq "{\"results\": ., \"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"tool\": \"$TOOL\"}" \
         bazinga/lint_results_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
