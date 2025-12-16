@@ -491,6 +491,24 @@ class BazingaSetup:
                 console.print(f"[red]✗ Skipping unsafe file {filename}: {e}[/red]")
                 continue
 
+        # Copy config subdirectory (transitions.json, agent-markers.json)
+        source_config_dir = source_bazinga / "config"
+        if source_config_dir.exists() and source_config_dir.is_dir():
+            target_config_dir = bazinga_dir / "config"
+            target_config_dir.mkdir(parents=True, exist_ok=True)
+
+            for config_file in source_config_dir.glob("*.json"):
+                try:
+                    safe_filename = PathValidator.validate_filename(config_file.name)
+                    dest = target_config_dir / safe_filename
+                    PathValidator.ensure_within_directory(dest, target_config_dir)
+                    shutil.copy2(config_file, dest)
+                    console.print(f"  ✓ Copied config/{safe_filename}")
+                    copied_count += 1
+                except SecurityError as e:
+                    console.print(f"[red]✗ Skipping unsafe file config/{config_file.name}: {e}[/red]")
+                    continue
+
         return copied_count > 0
 
     def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:
