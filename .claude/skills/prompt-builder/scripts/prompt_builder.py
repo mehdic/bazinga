@@ -14,7 +14,7 @@ Then reads from filesystem:
 - Specialization templates (bazinga/templates/specializations/*.md)
 
 Usage:
-    python3 bazinga/scripts/prompt_builder.py \
+    python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
         --agent-type developer \
         --session-id "bazinga_xxx" \
         --group-id "AUTH" \
@@ -25,20 +25,54 @@ Usage:
         --testing-mode "full"
 
 Output:
-    Complete prompt to stdout
+    Complete prompt to stdout (only on success)
     Metadata to stderr
+    Exit code 0 on success, 1 on validation failure
 """
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
 
-# Database path - relative to project root
-DB_PATH = "bazinga/bazinga.db"
 
-# Agent file mapping
+def get_project_root():
+    """Detect project root by looking for .claude directory or bazinga directory.
+
+    Returns:
+        Path to project root, or current working directory if not found.
+    """
+    # Start from script location and traverse up
+    script_dir = Path(__file__).resolve().parent
+
+    # Look for project markers going up from script location
+    current = script_dir
+    for _ in range(10):  # Max 10 levels up
+        if (current / ".claude").is_dir() or (current / "bazinga").is_dir():
+            return current
+        parent = current.parent
+        if parent == current:  # Reached filesystem root
+            break
+        current = parent
+
+    # Fallback: check CWD
+    cwd = Path.cwd()
+    if (cwd / ".claude").is_dir() or (cwd / "bazinga").is_dir():
+        return cwd
+
+    # Last resort: use CWD and hope for the best
+    return cwd
+
+
+# Detect project root once at module load
+PROJECT_ROOT = get_project_root()
+
+# Database path - relative to project root
+DB_PATH = str(PROJECT_ROOT / "bazinga" / "bazinga.db")
+
+# Agent file mapping (relative to PROJECT_ROOT)
 AGENT_FILE_MAP = {
     "developer": "agents/developer.md",
     "senior_software_engineer": "agents/senior_software_engineer.md",
@@ -48,6 +82,9 @@ AGENT_FILE_MAP = {
     "investigator": "agents/investigator.md",
     "requirements_engineer": "agents/requirements_engineer.md",
 }
+
+# Specialization templates base directory
+SPECIALIZATIONS_BASE = PROJECT_ROOT / "bazinga" / "templates" / "specializations"
 
 # Minimum lines expected in each agent file (sanity check)
 MIN_AGENT_LINES = {
@@ -127,9 +164,10 @@ def read_agent_file(agent_type):
         print(f"Valid types: {list(AGENT_FILE_MAP.keys())}", file=sys.stderr)
         sys.exit(1)
 
-    path = Path(file_path)
+    path = PROJECT_ROOT / file_path
     if not path.exists():
-        print(f"ERROR: Agent file not found: {file_path}", file=sys.stderr)
+        print(f"ERROR: Agent file not found: {path}", file=sys.stderr)
+        print(f"Project root: {PROJECT_ROOT}", file=sys.stderr)
         sys.exit(1)
 
     content = path.read_text(encoding="utf-8")
@@ -137,7 +175,7 @@ def read_agent_file(agent_type):
 
     min_lines = MIN_AGENT_LINES.get(agent_type, 400)
     if lines < min_lines:
-        print(f"WARNING: Agent file {file_path} has only {lines} lines (expected {min_lines}+)", file=sys.stderr)
+        print(f"WARNING: Agent file {path} has only {lines} lines (expected {min_lines}+)", file=sys.stderr)
 
     return content
 
@@ -168,8 +206,9 @@ def get_task_group_specializations(conn, session_id, group_id):
 
 def get_project_context():
     """Read project_context.json for version guards."""
+    context_path = PROJECT_ROOT / "bazinga" / "project_context.json"
     try:
-        with open("bazinga/project_context.json", encoding="utf-8") as f:
+        with open(context_path, encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
@@ -177,7 +216,7 @@ def get_project_context():
 
 def validate_template_path(template_path):
     """Validate that template path is safe (no path traversal)."""
-    ALLOWED_BASE = Path("bazinga/templates/specializations").resolve()
+    allowed_base = SPECIALIZATIONS_BASE.resolve()
 
     # Reject absolute paths
     if Path(template_path).is_absolute():
@@ -189,10 +228,10 @@ def validate_template_path(template_path):
         print(f"WARNING: Rejecting path with traversal: {template_path}", file=sys.stderr)
         return None
 
-    # Resolve and check it's under allowed base
-    resolved = Path(template_path).resolve()
+    # Resolve relative to project root and check it's under allowed base
+    resolved = (PROJECT_ROOT / template_path).resolve()
     try:
-        resolved.relative_to(ALLOWED_BASE)
+        resolved.relative_to(allowed_base)
         return resolved
     except ValueError:
         print(f"WARNING: Template path outside allowed directory: {template_path}", file=sys.stderr)
@@ -298,8 +337,12 @@ def get_context_packages(conn, session_id, group_id, agent_type, limit=5):
         return []
 
 
-def get_error_patterns(conn, session_id, limit=3):
-    """Get relevant error patterns."""
+def get_error_patterns(conn, limit=3):
+    """Get relevant error patterns.
+
+    Note: Currently fetches global patterns. Per-session filtering can be added
+    if error_patterns table gains session_id column.
+    """
     try:
         cursor = conn.cursor()
         cursor.execute("""
@@ -389,8 +432,8 @@ def build_context_block(conn, session_id, group_id, agent_type, model="sonnet"):
             if reason_section != "### Prior Agent Reasoning\n\n":
                 sections.append(reason_section)
 
-    # 3. Error patterns
-    errors = get_error_patterns(conn, session_id)
+    # 3. Error patterns (global, not per-session)
+    errors = get_error_patterns(conn)
     if errors:
         err_section = "### Known Error Patterns\n\n"
         for sig_json, solution, confidence, occurrences in errors:
@@ -656,23 +699,27 @@ def build_prompt(args):
             if markers:
                 markers_valid = validate_markers(full_prompt, markers, args.agent_type)
 
-        # 9. Output prompt to stdout (even if markers invalid for debugging)
-        print(full_prompt)
-
-        # 10. Output metadata to stderr
+        # 9. Prepare metadata
         lines = len(full_prompt.splitlines())
         tokens = estimate_tokens(full_prompt)
+
+        # 10. Output metadata to stderr FIRST
         print(f"[PROMPT_METADATA]", file=sys.stderr)
         print(f"agent_type={args.agent_type}", file=sys.stderr)
+        print(f"project_root={PROJECT_ROOT}", file=sys.stderr)
         print(f"lines={lines}", file=sys.stderr)
         print(f"tokens_estimate={tokens}", file=sys.stderr)
         print(f"sections_trimmed={len(trimmed_sections)}", file=sys.stderr)
         if conn:
             print(f"markers_validated={str(markers_valid).lower()}", file=sys.stderr)
 
-        # Exit with error if markers were invalid
+        # 11. Exit with error if markers were invalid (WITHOUT emitting prompt)
         if not markers_valid:
+            print("ERROR: Prompt validation failed - not emitting invalid prompt", file=sys.stderr)
             sys.exit(1)
+
+        # 12. Output prompt to stdout ONLY on success
+        print(full_prompt)
 
     finally:
         # Always close database connection
@@ -681,7 +728,23 @@ def build_prompt(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build deterministic agent prompts")
+    parser = argparse.ArgumentParser(
+        description="Build deterministic agent prompts",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    python3 prompt_builder.py --agent-type developer --session-id "bazinga_123" \\
+        --branch "main" --mode "simple" --testing-mode "full"
+
+Debug mode:
+    python3 prompt_builder.py --debug --agent-type developer ...
+    (Prints received arguments to stderr for debugging)
+"""
+    )
+
+    # Debug flag
+    parser.add_argument("--debug", action="store_true",
+                        help="Print debug info including received arguments")
 
     # Required arguments
     parser.add_argument("--agent-type", required=True,
@@ -725,7 +788,47 @@ def main():
     parser.add_argument("--resume-context", default="",
                         help="Resume context for PM resume spawns")
 
-    args = parser.parse_args()
+    # Sanitize sys.argv - remove empty or whitespace-only args that bash might pass
+    # This handles issues with multiline commands using backslash continuations
+    original_argv = sys.argv.copy()
+    sanitized_argv = [arg for arg in sys.argv if arg.strip()]
+
+    # Check if sanitization changed anything
+    args_removed = len(original_argv) != len(sanitized_argv)
+
+    # First, check for --debug early to help diagnose parsing issues
+    if "--debug" in sanitized_argv:
+        print(f"[DEBUG] Original sys.argv ({len(original_argv)} args):", file=sys.stderr)
+        for i, arg in enumerate(original_argv):
+            # Show repr() to reveal whitespace/invisible chars
+            print(f"  [{i}] {repr(arg)}", file=sys.stderr)
+        if args_removed:
+            print(f"[DEBUG] Sanitized to ({len(sanitized_argv)} args):", file=sys.stderr)
+            for i, arg in enumerate(sanitized_argv):
+                print(f"  [{i}] {repr(arg)}", file=sys.stderr)
+        print(f"[DEBUG] Project root: {PROJECT_ROOT}", file=sys.stderr)
+
+    # Use sanitized argv for parsing
+    if args_removed:
+        print(f"[INFO] Removed {len(original_argv) - len(sanitized_argv)} empty/whitespace args from command line", file=sys.stderr)
+
+    try:
+        args = parser.parse_args(sanitized_argv[1:])  # Skip script name
+    except SystemExit as e:
+        # argparse calls sys.exit on error - intercept to add diagnostics
+        if e.code != 0:
+            print(f"\n[ERROR] Argument parsing failed. Raw sys.argv:", file=sys.stderr)
+            for i, arg in enumerate(original_argv):
+                print(f"  [{i}] {repr(arg)}", file=sys.stderr)
+            if args_removed:
+                print(f"\nSanitized argv:", file=sys.stderr)
+                for i, arg in enumerate(sanitized_argv):
+                    print(f"  [{i}] {repr(arg)}", file=sys.stderr)
+        raise
+
+    if args.debug:
+        print(f"[DEBUG] Parsed args: {args}", file=sys.stderr)
+
     build_prompt(args)
 
 

@@ -194,7 +194,8 @@ def check_security_sensitive(conn, session_id, group_id):
         return False
 
     name = row[0] or ""
-    security_flag = row[1] if len(row) > 1 else None
+    # SELECT always returns 2 columns (name, security_sensitive)
+    security_flag = row[1]
 
     # Check explicit flag first (v14+)
     if security_flag is not None and security_flag == 1:

@@ -60,32 +60,39 @@ Parse the following from the orchestrator's context or message:
 
 ### Step 2: Call the Python Script
 
-Run the prompt builder script with extracted parameters:
+Run the prompt builder script with extracted parameters.
+
+**⚠️ IMPORTANT: Single-line invocation to avoid bash argument parsing issues**
 
 ```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type "{agent_type}" \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "{task_title}" \
-  --task-requirements "{task_requirements}" \
-  --branch "{branch}" \
-  --mode "{mode}" \
-  --testing-mode "{testing_mode}" \
-  --model "{model}"
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py --agent-type "{agent_type}" --session-id "{session_id}" --group-id "{group_id}" --task-title "{task_title}" --task-requirements "{task_requirements}" --branch "{branch}" --mode "{mode}" --testing-mode "{testing_mode}" --model "{model}"
 ```
 
-**For retries, add:**
+**For retries, add to the same line:**
 ```bash
-  --qa-feedback "{qa_feedback}" \
-  --tl-feedback "{tl_feedback}"
+--qa-feedback "{qa_feedback}" --tl-feedback "{tl_feedback}"
 ```
 
-**For PM spawns, add:**
+**For PM spawns, add to the same line:**
 ```bash
-  --pm-state '{pm_state_json}' \
-  --resume-context "{resume_context}"
+--pm-state '{pm_state_json}' --resume-context "{resume_context}"
 ```
+
+**❌ DO NOT use backslash line continuations** - they can cause argument parsing errors:
+```bash
+# WRONG - avoid this pattern
+python3 script.py \
+  --arg1 "value" \
+  --arg2 "value"
+```
+
+**✅ Use single-line commands** - prevents empty argument issues:
+```bash
+# CORRECT - all on one line
+python3 script.py --arg1 "value" --arg2 "value"
+```
+
+**Debugging:** Add `--debug` flag to print received arguments if parsing fails.
 
 ### Step 3: Return the Complete Prompt
 
