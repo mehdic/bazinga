@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1081,6 +1081,74 @@ def init_database(db_path: str) -> None:
             current_version = 12
             print("✓ Migration to v12 complete (skill_outputs UNIQUE constraint)")
 
+        # v12 → v13: Deterministic orchestration tables
+        if current_version == 12:
+            print("\n--- Migrating v12 → v13 (deterministic orchestration) ---")
+
+            try:
+                cursor.execute("BEGIN IMMEDIATE")
+
+                # Create workflow_transitions table (seeded from transitions.json)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS workflow_transitions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        current_agent TEXT NOT NULL,
+                        response_status TEXT NOT NULL,
+                        next_agent TEXT,
+                        action TEXT NOT NULL,
+                        include_context TEXT,
+                        escalation_check INTEGER DEFAULT 0,
+                        model_override TEXT,
+                        fallback_agent TEXT,
+                        bypass_qa INTEGER DEFAULT 0,
+                        max_parallel INTEGER,
+                        then_action TEXT,
+                        UNIQUE(current_agent, response_status)
+                    )
+                """)
+                print("   ✓ Created workflow_transitions table")
+
+                # Create agent_markers table (seeded from agent-markers.json)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS agent_markers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        agent_type TEXT NOT NULL UNIQUE,
+                        required_markers TEXT NOT NULL,
+                        workflow_markers TEXT
+                    )
+                """)
+                print("   ✓ Created agent_markers table")
+
+                # Create workflow_special_rules table (seeded from transitions.json _special_rules)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS workflow_special_rules (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        rule_name TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        config TEXT NOT NULL
+                    )
+                """)
+                print("   ✓ Created workflow_special_rules table")
+
+                # Verify integrity
+                integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                if integrity != "ok":
+                    raise sqlite3.IntegrityError(f"Migration v12→v13: Integrity check failed: {integrity}")
+
+                conn.commit()
+                print("   ✓ Migration transaction committed")
+
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                print(f"   ✗ v12→v13 migration failed, rolled back: {e}")
+                raise
+
+            current_version = 13
+            print("✓ Migration to v13 complete (deterministic orchestration tables)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
@@ -1428,6 +1496,49 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_consumption_session ON consumption_scope(session_id, group_id, agent_type)")
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_consumption_unique ON consumption_scope(session_id, group_id, agent_type, iteration, package_id)")
     print("✓ Created consumption_scope table with indexes")
+
+    # Workflow transitions table (seeded from bazinga/config/transitions.json)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workflow_transitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            current_agent TEXT NOT NULL,
+            response_status TEXT NOT NULL,
+            next_agent TEXT,
+            action TEXT NOT NULL,
+            include_context TEXT,
+            escalation_check INTEGER DEFAULT 0,
+            model_override TEXT,
+            fallback_agent TEXT,
+            bypass_qa INTEGER DEFAULT 0,
+            max_parallel INTEGER,
+            then_action TEXT,
+            UNIQUE(current_agent, response_status)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_wt_agent ON workflow_transitions(current_agent)")
+    print("✓ Created workflow_transitions table with indexes")
+
+    # Agent markers table (seeded from bazinga/config/agent-markers.json)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_markers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_type TEXT NOT NULL UNIQUE,
+            required_markers TEXT NOT NULL,
+            workflow_markers TEXT
+        )
+    """)
+    print("✓ Created agent_markers table")
+
+    # Workflow special rules table (seeded from transitions.json _special_rules)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workflow_special_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule_name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            config TEXT NOT NULL
+        )
+    """)
+    print("✓ Created workflow_special_rules table")
 
     # Record schema version for new databases
     current_version = get_schema_version(cursor)
