@@ -647,7 +647,11 @@ def get_component_version_context(project_context, component_path):
     Returns:
         Dict with version fields, or empty dict if no match
     """
-    if not project_context or not component_path:
+    # Safety check for None project_context
+    if not project_context:
+        return {}
+
+    if not component_path:
         # Fallback to global versions if no component specified
         return {
             'primary_language': project_context.get('primary_language'),
@@ -701,7 +705,7 @@ def infer_component_from_specializations(spec_paths, project_context):
 
     If a specialization path includes a component-specific prefix (e.g.,
     'bazinga/templates/specializations/01-languages/python.md'), we can try
-    to match it to a component in project_context.json based on language.
+    to match it to a component in project_context.json based on language or framework.
 
     This is a fallback when component_path is not explicitly set.
 
@@ -719,14 +723,26 @@ def infer_component_from_specializations(spec_paths, project_context):
     if not components:
         return None
 
-    # Extract language from specialization paths (e.g., 'python.md' -> 'python')
     for spec_path in spec_paths:
         path_lower = spec_path.lower()
+        filename = spec_path.split('/')[-1].replace('.md', '').lower()
+
+        # 1. Check language templates (e.g., '01-languages/python.md')
         if '01-languages/' in path_lower:
-            # Extract language name from filename
-            filename = spec_path.split('/')[-1].replace('.md', '')
             for comp in components:
-                if comp.get('language', '').lower() == filename.lower():
+                if comp.get('language', '').lower() == filename:
+                    return comp.get('path')
+
+        # 2. Check frontend framework templates (e.g., '02-frameworks-frontend/react.md')
+        if '02-frameworks-frontend/' in path_lower:
+            for comp in components:
+                if comp.get('framework', '').lower() == filename:
+                    return comp.get('path')
+
+        # 3. Check backend framework templates (e.g., '03-frameworks-backend/fastapi.md')
+        if '03-frameworks-backend/' in path_lower:
+            for comp in components:
+                if comp.get('framework', '').lower() == filename:
                     return comp.get('path')
 
     # No inference possible
@@ -833,12 +849,12 @@ def version_matches(detected_version, operator, required_version):
 
 # Guard token normalization - map common aliases to canonical names
 # This ensures "py >= 3.10" matches against primary_language="python"
+# NOTE: 'node' is NOT aliased because node_version is a separate field, not a primary_language
 GUARD_TOKEN_ALIASES = {
     'py': 'python',
     'python3': 'python',
     'ts': 'typescript',
     'js': 'javascript',
-    'node': 'nodejs',
     'rb': 'ruby',
     'rs': 'rust',
 }
@@ -876,23 +892,34 @@ def evaluate_version_guard(guard_text, project_context):
         # Get detected version from project_context
         detected_version = None
 
-        # Check primary language
+        # 1. Check primary language
         if project_context.get('primary_language', '').lower() == lang_lower:
             detected_version = parse_version(project_context.get('primary_language_version'))
 
-        # Check secondary languages
-        for sec_lang in project_context.get('secondary_languages', []):
-            if isinstance(sec_lang, dict) and sec_lang.get('name', '').lower() == lang_lower:
-                detected_version = parse_version(sec_lang.get('version'))
-                break
-            elif isinstance(sec_lang, str) and sec_lang.lower() == lang_lower:
-                # No version info for this language
-                break
+        # 2. Check framework (e.g., "fastapi >= 0.100", "react >= 18")
+        if detected_version is None:
+            if project_context.get('framework', '').lower() == lang_lower:
+                detected_version = parse_version(project_context.get('framework_version'))
 
-        # Check infrastructure (test frameworks, etc.)
-        infra = project_context.get('infrastructure', {})
-        if lang_lower in ['jest', 'vitest', 'pytest', 'testcontainers']:
-            detected_version = parse_version(infra.get(f'{lang_lower}_version'))
+        # 3. Check node_version specifically (e.g., "node >= 18")
+        if detected_version is None and lang_lower == 'node':
+            detected_version = parse_version(project_context.get('node_version'))
+
+        # 4. Check secondary languages
+        if detected_version is None:
+            for sec_lang in project_context.get('secondary_languages', []):
+                if isinstance(sec_lang, dict) and sec_lang.get('name', '').lower() == lang_lower:
+                    detected_version = parse_version(sec_lang.get('version'))
+                    break
+                elif isinstance(sec_lang, str) and sec_lang.lower() == lang_lower:
+                    # No version info for this language
+                    break
+
+        # 5. Check infrastructure (test frameworks, etc.)
+        if detected_version is None:
+            infra = project_context.get('infrastructure', {})
+            if lang_lower in ['jest', 'vitest', 'pytest', 'testcontainers']:
+                detected_version = parse_version(infra.get(f'{lang_lower}_version'))
 
         # If we have a detected version, check the condition
         if detected_version is not None:
