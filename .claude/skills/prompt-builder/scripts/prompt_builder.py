@@ -796,18 +796,21 @@ Debug mode:
     parser.add_argument("--debug", action="store_true",
                         help="Print debug info including received arguments")
 
-    # Required arguments
-    parser.add_argument("--agent-type", required=True,
+    # Check if --params-file is present - if so, other args come from the file
+    using_params_file = any(arg.startswith('--params-file') for arg in sys.argv)
+
+    # Required arguments (not required if using --params-file)
+    parser.add_argument("--agent-type", required=not using_params_file,
                         choices=list(AGENT_FILE_MAP.keys()),
                         help="Type of agent to build prompt for")
-    parser.add_argument("--session-id", required=True,
+    parser.add_argument("--session-id", required=not using_params_file,
                         help="Session identifier")
-    parser.add_argument("--branch", required=True,
+    parser.add_argument("--branch", required=not using_params_file,
                         help="Git branch name")
-    parser.add_argument("--mode", required=True,
+    parser.add_argument("--mode", required=not using_params_file,
                         choices=["simple", "parallel"],
                         help="Execution mode")
-    parser.add_argument("--testing-mode", required=True,
+    parser.add_argument("--testing-mode", required=not using_params_file,
                         choices=["full", "minimal", "disabled"],
                         help="Testing mode")
 
@@ -952,6 +955,22 @@ Debug mode:
 
             if args.debug:
                 print(f"[DEBUG] Loaded params from {params_path}: {params}", file=sys.stderr)
+
+            # Validate required fields after loading params
+            required_fields = ['agent_type', 'session_id', 'branch', 'mode', 'testing_mode']
+            missing = [f for f in required_fields if not getattr(args, f, None)]
+            if missing:
+                error_result = {
+                    "success": False,
+                    "error": f"Missing required fields in params file: {missing}",
+                    "prompt_file": None,
+                    "tokens_estimate": 0,
+                    "lines": 0,
+                    "markers_ok": False,
+                    "missing_markers": []
+                }
+                print(json.dumps(error_result, indent=2))
+                sys.exit(1)
 
         except json.JSONDecodeError as e:
             error_result = {
