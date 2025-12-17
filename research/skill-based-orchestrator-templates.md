@@ -3,7 +3,7 @@
 **Date:** 2025-12-17
 **Context:** Orchestrator templates call `python3 prompt_builder.py` directly instead of using `Skill(command: "prompt-builder")`
 **Decision:** Update skill to return JSON, use file-based parameter handoff
-**Status:** Reviewed
+**Status:** Implemented
 **Reviewed by:** OpenAI GPT-5
 
 ---
