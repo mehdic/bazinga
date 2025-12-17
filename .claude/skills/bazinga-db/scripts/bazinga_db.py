@@ -246,8 +246,13 @@ class BazingaDB:
 
             # Normalize: auto-prefix if not already a full path
             if spec_path.startswith(spec_base):
+                # Already full path
                 normalized_path = spec_path
+            elif spec_path.startswith("specializations/"):
+                # Handle "specializations/01-languages/..." -> strip "specializations/" and prefix
+                normalized_path = spec_base + spec_path[len("specializations/"):]
             else:
+                # Short path like "01-languages/python.md" -> auto-prefix
                 normalized_path = spec_base + spec_path.lstrip('/')
 
             # Verify the normalized path is within allowed directory

@@ -223,8 +223,16 @@ def main():
 
     # Wrap all seeding in a single transaction for atomicity
     # If any seeding fails, rollback all changes
+    #
+    # CONCURRENCY NOTE: Using BEGIN IMMEDIATE to acquire write lock immediately.
+    # This ensures that if multiple processes try to seed simultaneously:
+    # - One process acquires the lock and completes
+    # - Other processes wait (up to SQLite's busy_timeout, default 5s)
+    # - After lock release, subsequent processes will see the seeded data and
+    #   their DELETE + INSERT will be a no-op (same data rewritten)
+    # This is safe because config data is idempotent.
     try:
-        conn.execute("BEGIN TRANSACTION")
+        conn.execute("BEGIN IMMEDIATE")
 
         success = True
         if args.all or args.transitions:

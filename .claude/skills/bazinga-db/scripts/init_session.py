@@ -170,9 +170,12 @@ def verify_ready(db_path: Path) -> dict:
         conn.close()
 
         # Ready if we have all required config
+        # Note: rules_count > 0 is required because special rules control
+        # testing_mode behavior, escalation triggers, and security enforcement
         status["ready"] = (
             status["transitions_count"] > 0 and
-            status["markers_count"] > 0
+            status["markers_count"] > 0 and
+            status["rules_count"] > 0
         )
     except sqlite3.OperationalError as e:
         status["error"] = str(e)

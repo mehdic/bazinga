@@ -202,12 +202,12 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 **Validation Logic:**
 ```
 IF about to call Task():
-  1. Invoke prompt-builder skill with agent type, session ID, group ID, etc.
-  2. Capture the full prompt output from prompt-builder
-  3. Use that prompt in Task() call
+  1. Run prompt-builder script with --output-file to save prompt to file
+  2. Verify PROMPT_FILE appears in stderr
+  3. Use Task() with instruction to read the prompt file first
 ```
 
-**If prompt-builder was NOT invoked:** STOP. Invoke prompt-builder first. Do NOT call Task() without it.
+**If prompt-builder was NOT invoked:** STOP. Run prompt-builder first. Do NOT call Task() without it.
 
 ### 🔴 CRITICAL: USE PROMPT-BUILDER FOR ALL SPAWNS
 
@@ -217,7 +217,7 @@ IF about to call Task():
 - Builds context block from DB (reasoning, context packages, error patterns)
 - Composes task context
 - Validates required markers
-- Returns complete prompt to stdout
+- Saves prompt to file and returns JSON with prompt_file path
 
 **Invoke prompt-builder like this:**
 ```
@@ -309,10 +309,16 @@ Resume Context: {context if resume scenario}
 
 **🚨 BEFORE INVOKING Task() TO SPAWN ANY AGENT, YOU MUST:**
 
-1. **Output** the parameters for prompt-builder (agent type, session ID, group ID, etc.)
-2. **Invoke** `Skill(command: "prompt-builder")`
-3. **Capture** the full prompt from stdout
-4. **THEN** invoke `Task()` with the captured prompt
+1. **Run prompt-builder** with `--output-file` to save prompt to file:
+   ```bash
+   python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+     --agent-type {agent_type} ... --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+   ```
+2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+3. **Spawn agent** with file-based instruction:
+   ```
+   Task(..., prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+   ```
 
 **🚫 FORBIDDEN: Spawning any agent WITHOUT going through prompt-builder.**
 
@@ -321,9 +327,9 @@ Resume Context: {context if resume scenario}
 - Builds specialization blocks from DB + template files
 - Builds context blocks from prior agent reasoning
 - Validates required markers are present
-- Returns a complete, verified prompt
+- Saves the complete, verified prompt to a file
 
-**Skipping prompt-builder results in abbreviated prompts that cause agents to misbehave.**
+**File-based delivery ensures the spawned agent (even haiku) receives the complete 1400+ line prompt.**
 
 ---
 
@@ -2018,7 +2024,7 @@ ELSE IF PM chose "parallel":
 - Reads specialization templates from `bazinga/templates/specializations/`
 - Applies token budgets per model
 - Validates required markers
-- Returns complete prompt to stdout
+- Saves prompt to file and returns JSON with prompt_file path
 
 ### Prompt Building Workflow
 
@@ -2030,40 +2036,37 @@ ELSE IF PM chose "parallel":
 - PM stores specializations via `bazinga-db create-task-group --specializations '[...]'`
 
 **Phase 2: Orchestrator Prompt Building (at agent spawn)**
-1. Output parameters for prompt-builder
-2. Invoke `Skill(command: "prompt-builder")`
-3. Capture complete prompt from output
-4. Use prompt in `Task()` call
+1. Run prompt-builder with `--output-file` to save prompt to file
+2. Verify PROMPT_FILE appears in stderr
+3. Spawn agent with instruction to read the file first
 
 ### Process (at agent spawn)
 
-**Step 1: Output parameters in conversation context**
-```
-Agent Type: {developer|senior_software_engineer|qa_expert|tech_lead|project_manager|investigator|requirements_engineer}
-Session ID: {session_id}
-Group ID: {group_id}
-Task Title: {task title from PM}
-Task Requirements: {requirements}
-Branch: {branch name}
-Mode: {simple|parallel}
-Testing Mode: {full|minimal|disabled}
-Model: {haiku|sonnet|opus}
-```
-
-**Step 2: Invoke prompt-builder**
-```
-Skill(command: "prompt-builder")
+**Step 1: Run prompt-builder with file output**
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type {developer|senior_software_engineer|qa_expert|tech_lead|project_manager|investigator|requirements_engineer} \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --task-title "{task title}" \
+  --task-requirements "{requirements}" \
+  --branch "{branch}" \
+  --mode {simple|parallel} \
+  --testing-mode {full|minimal|disabled} \
+  --model {haiku|sonnet|opus} \
+  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
 ```
 
-**Step 3: Capture and use prompt**
-The skill returns the complete prompt to stdout. Use this prompt directly in Task():
+**Step 2: Verify file was created**
+Check stderr for: `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
 
+**Step 3: Spawn agent with file-based instructions**
 ```
 Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["{agent_type}"],
   description: "{agent_type} working on {group_id}",
-  prompt: [FULL PROMPT FROM PROMPT-BUILDER]
+  prompt: "FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
 )
 ```
 
@@ -2111,14 +2114,22 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_simple.md` and STOP.
 
-**🚨 SPAWN SEQUENCE (using prompt-builder):**
+**🚨 SPAWN SEQUENCE (FILE-BASED PROMPT):**
 
-1. **Output parameters** for prompt-builder (agent type, session ID, group ID, etc.)
-2. **Invoke:** `Skill(command: "prompt-builder")`
-3. **Capture** the full prompt from output
-4. **Invoke:** `Task(subagent_type: "general-purpose", model: MODEL_CONFIG[agent_type], prompt: [captured prompt])`
+1. **Run prompt-builder** with `--output-file` to save prompt to file:
+   ```bash
+   python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+     --agent-type {agent_type} --session-id "{session_id}" ... \
+     --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+   ```
+2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+3. **Spawn agent** with file-based instruction:
+   ```
+   Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
+        prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+   ```
 
-**🔴 CRITICAL:** The prompt-builder builds the complete prompt deterministically (agent file + specializations + context). DO NOT manually read agent files or create custom prompts.
+**🔴 CRITICAL:** See `phase_simple.md` for complete spawn sequences with all parameters.
 
 ---
 
@@ -2134,16 +2145,24 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_parallel.md` and STOP.
 
-**🚨 SPAWN SEQUENCE (using prompt-builder) - FOR EACH GROUP:**
+**🚨 SPAWN SEQUENCE (FILE-BASED PROMPT) - FOR EACH GROUP:**
 
-1. **Output parameters** for prompt-builder (agent type, session ID, group ID, etc.)
-2. **Invoke:** `Skill(command: "prompt-builder")`
-3. **Capture** the full prompt from output
-4. **Invoke:** `Task(subagent_type: "general-purpose", model: MODEL_CONFIG[agent_type], prompt: [captured prompt])`
+1. **Run prompt-builder** with `--output-file` to save prompt to file:
+   ```bash
+   python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+     --agent-type {agent_type} --session-id "{session_id}" ... \
+     --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+   ```
+2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+3. **Spawn agent** with file-based instruction:
+   ```
+   Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
+        prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+   ```
 
-**For parallel spawns:** Repeat steps 1-4 for each group. You can call multiple Task() tools in the same message for parallelism.
+**For parallel spawns:** Repeat steps 1-3 for each group, creating separate prompt files. You can call multiple Task() tools in the same message.
 
-**🔴 CRITICAL:** The prompt-builder builds the complete prompt deterministically (agent file + specializations + context). DO NOT manually read agent files or create custom prompts.
+**🔴 CRITICAL:** See `phase_parallel.md` for complete spawn sequences with all parameters.
 
 ---
 

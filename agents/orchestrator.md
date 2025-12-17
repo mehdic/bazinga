@@ -232,7 +232,7 @@ IF about to call Task():
 - Builds context block from DB (reasoning, context packages, error patterns)
 - Composes task context
 - Validates required markers
-- Returns complete prompt to stdout
+- Saves prompt to file and returns JSON with prompt_file path
 
 **Invoke prompt-builder like this:**
 ```
@@ -2039,7 +2039,7 @@ ELSE IF PM chose "parallel":
 - Reads specialization templates from `bazinga/templates/specializations/`
 - Applies token budgets per model
 - Validates required markers
-- Returns complete prompt to stdout
+- Saves prompt to file and returns JSON with prompt_file path
 
 ### Prompt Building Workflow
 
