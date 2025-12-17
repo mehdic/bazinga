@@ -75,16 +75,24 @@ PROJECT_ROOT = get_project_root()
 # Database path - relative to project root
 DB_PATH = str(PROJECT_ROOT / "bazinga" / "bazinga.db")
 
-# Agent file mapping (relative to PROJECT_ROOT)
-AGENT_FILE_MAP = {
-    "developer": "agents/developer.md",
-    "senior_software_engineer": "agents/senior_software_engineer.md",
-    "qa_expert": "agents/qa_expert.md",
-    "tech_lead": "agents/techlead.md",
-    "project_manager": "agents/project_manager.md",
-    "investigator": "agents/investigator.md",
-    "requirements_engineer": "agents/requirements_engineer.md",
+# Agent file names (without directory prefix - resolved dynamically)
+AGENT_FILE_NAMES = {
+    "developer": "developer.md",
+    "senior_software_engineer": "senior_software_engineer.md",
+    "qa_expert": "qa_expert.md",
+    "tech_lead": "techlead.md",
+    "project_manager": "project_manager.md",
+    "investigator": "investigator.md",
+    "requirements_engineer": "requirements_engineer.md",
 }
+
+# Agent directories to search (in order of preference)
+# - .claude/agents/ is used in installed mode (client projects after `bazinga install`)
+# - agents/ is used in dev mode (running from bazinga repo)
+AGENT_DIRECTORIES = [
+    ".claude/agents",
+    "agents",
+]
 
 # Specialization templates base directory
 SPECIALIZATIONS_BASE = PROJECT_ROOT / "bazinga" / "templates" / "specializations"
@@ -554,27 +562,40 @@ def validate_markers(prompt, markers, agent_type):
 
 
 def read_agent_file(agent_type):
-    """Read the agent definition file."""
-    file_path = AGENT_FILE_MAP.get(agent_type)
-    if not file_path:
+    """Read the agent definition file.
+
+    Searches for agent files in multiple directories to support both:
+    - Dev mode: agents/ at repo root (bazinga repo)
+    - Installed mode: .claude/agents/ (client projects after `bazinga install`)
+    """
+    file_name = AGENT_FILE_NAMES.get(agent_type)
+    if not file_name:
         print(f"ERROR: Unknown agent type: {agent_type}", file=sys.stderr)
-        print(f"Valid types: {list(AGENT_FILE_MAP.keys())}", file=sys.stderr)
+        print(f"Valid types: {list(AGENT_FILE_NAMES.keys())}", file=sys.stderr)
         sys.exit(1)
 
-    path = PROJECT_ROOT / file_path
-    if not path.exists():
-        print(f"ERROR: Agent file not found: {path}", file=sys.stderr)
-        print(f"Project root: {PROJECT_ROOT}", file=sys.stderr)
-        sys.exit(1)
+    # Search for agent file in all configured directories
+    searched_paths = []
+    for agent_dir in AGENT_DIRECTORIES:
+        path = PROJECT_ROOT / agent_dir / file_name
+        searched_paths.append(str(path))
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+            lines = len(content.splitlines())
 
-    content = path.read_text(encoding="utf-8")
-    lines = len(content.splitlines())
+            min_lines = MIN_AGENT_LINES.get(agent_type, 400)
+            if lines < min_lines:
+                print(f"WARNING: Agent file {path} has only {lines} lines (expected {min_lines}+)", file=sys.stderr)
 
-    min_lines = MIN_AGENT_LINES.get(agent_type, 400)
-    if lines < min_lines:
-        print(f"WARNING: Agent file {path} has only {lines} lines (expected {min_lines}+)", file=sys.stderr)
+            return content
 
-    return content
+    # Not found in any directory
+    print(f"ERROR: Agent file not found for type '{agent_type}'", file=sys.stderr)
+    print(f"Project root: {PROJECT_ROOT}", file=sys.stderr)
+    print(f"Searched paths:", file=sys.stderr)
+    for p in searched_paths:
+        print(f"  - {p}", file=sys.stderr)
+    sys.exit(1)
 
 
 # =============================================================================
