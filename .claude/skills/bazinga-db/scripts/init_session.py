@@ -83,17 +83,27 @@ def ensure_config_seeded(db_path: Path) -> bool:
         print(f"ERROR: seed_configs.py not found at {seed_script}", file=sys.stderr)
         return False
 
-    # Check if config is already seeded by checking workflow_transitions count
+    # Check if config is already seeded by checking BOTH workflow_transitions AND agent_markers
     try:
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
+
+        # Check transitions count
         cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
-        count = cursor.fetchone()[0]
+        transitions_count = cursor.fetchone()[0]
+
+        # Check markers count - both are required for prompt-builder/marker validation
+        cursor.execute("SELECT COUNT(*) FROM agent_markers")
+        markers_count = cursor.fetchone()[0]
+
         conn.close()
 
-        if count > 0:
-            print(f"✓ Config already seeded ({count} transitions)", file=sys.stderr)
+        if transitions_count > 0 and markers_count > 0:
+            print(f"✓ Config already seeded ({transitions_count} transitions, {markers_count} markers)", file=sys.stderr)
             return True
+        elif transitions_count > 0 or markers_count > 0:
+            print(f"⚠ Partial config detected ({transitions_count} transitions, {markers_count} markers) - reseeding", file=sys.stderr)
+            # Fall through to reseed
     except sqlite3.OperationalError:
         # Table doesn't exist - need to seed
         pass
