@@ -65,6 +65,8 @@ When spawned, analyze the project and output a comprehensive `bazinga/project_co
 | `.nvmrc`, `.node-version` | Node.js | Full content → "18" |
 | `.ruby-version` | Ruby | Full content |
 | `.go-version` | Go | Full content |
+| `.java-version` | Java | Full content → "17" |
+| `.sdkmanrc` | Java | `java=17.0.x` → "17" |
 
 **Then check config files (medium confidence):**
 
@@ -79,6 +81,12 @@ When spawned, analyze the project and output a comprehensive `bazinga/project_co
 | `package.json` | `dependencies.@angular/core` | Angular |
 | `go.mod` | `go X.Y` directive | Go |
 | `Cargo.toml` | `rust-version` | Rust |
+| `pom.xml` | `<maven.compiler.source>` or `<java.version>` | Java |
+| `build.gradle` | `sourceCompatibility` or `java { toolchain { languageVersion } }` | Java |
+| `build.gradle.kts` | `jvmToolchain(17)` or `sourceCompatibility` | Kotlin/Java |
+| `composer.json` | `require.php` | PHP |
+| `*.csproj` | `<TargetFramework>net8.0</TargetFramework>` | C#/.NET |
+| `global.json` | `sdk.version` | .NET SDK |
 
 **Version Normalization Rules:**
 - `">=3.10"` → `"3.10"` (extract minimum)
@@ -86,6 +94,9 @@ When spawned, analyze the project and output a comprehensive `bazinga/project_co
 - `"~18.2.0"` → `"18.2"` (extract base)
 - `"3.11.4"` → `"3.11"` (major.minor only)
 - For ranges like `">=3.10,<4.0"` → use minimum `"3.10"`
+- Java: `"17.0.2"` → `"17"`, `"1.8"` → `"8"` (legacy format)
+- .NET: `"net8.0"` → `"8.0"`, `"netcoreapp3.1"` → `"3.1"`
+- PHP: `">=8.1"` → `"8.1"`
 
 **Output:** Store detected versions in `components[].language_version` and `components[].framework_version`.
 

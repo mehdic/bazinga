@@ -352,6 +352,11 @@ if not component_path:
 | `<!-- version: fastapi >= 0.100 -->` | Filter if FastAPI < 0.100 | ✅ Works | FIXED |
 | `<!-- version: python >= 3.10 -->` | Filter if Python < 3.10 | ✅ Works | - |
 | `<!-- version: typescript >= 5.0 -->` | Filter if TS < 5.0 | ✅ Works | - |
+| `<!-- version: java >= 17 -->` | Filter if Java < 17 | ✅ Works | ADDED |
+| `<!-- version: go >= 1.21 -->` | Filter if Go < 1.21 | ✅ Works | ADDED |
+| `<!-- version: csharp >= 8.0 -->` | Filter if .NET < 8.0 | ✅ Works | ADDED |
+| `<!-- version: php >= 8.1 -->` | Filter if PHP < 8.1 | ✅ Works | ADDED |
+| `<!-- version: kotlin >= 1.9 -->` | Filter if Kotlin < 1.9 | ✅ Works | ADDED |
 
 ---
 
@@ -364,5 +369,52 @@ The implementation now correctly:
 - ✅ Handles language version guards (python, typescript, etc.)
 - ✅ Handles framework version guards (fastapi, react, vue, etc.)
 - ✅ Handles Node.js version guards
+- ✅ **Handles Java, Go, PHP, Kotlin, C#/.NET version guards** (added)
 - ✅ Infers component from language AND framework specializations
 - ✅ Safe for None project_context input
+
+---
+
+## Additional Fix: Java and Other Technologies Support (Follow-up)
+
+**Gap identified:** Version guards only supported Python, TypeScript, JavaScript, Ruby, Rust, and Node.js. Java, Go, PHP, Kotlin, and C#/.NET were detected but couldn't be filtered by version guards.
+
+### Fix 5: Added version detection to Tech Stack Scout
+
+Added to `agents/tech_stack_scout.md` Step 0:
+- `.java-version`, `.sdkmanrc` for Java
+- `pom.xml` (`<maven.compiler.source>`, `<java.version>`)
+- `build.gradle` (`sourceCompatibility`, `java { toolchain }`)
+- `build.gradle.kts` (`jvmToolchain`)
+- `composer.json` (`require.php`) for PHP
+- `*.csproj` (`<TargetFramework>`) for C#/.NET
+- `global.json` (`sdk.version`) for .NET SDK
+
+### Fix 6: Added guard token aliases
+
+Added to `GUARD_TOKEN_ALIASES` in prompt_builder.py:
+```python
+'golang': 'go',
+'jdk': 'java',
+'openjdk': 'java',
+'kt': 'kotlin',
+'cs': 'csharp',
+'dotnet': 'csharp',
+'.net': 'csharp',
+```
+
+### Fix 7: Added language-specific version field lookups
+
+Added to `evaluate_version_guard()`:
+```python
+lang_version_map = {
+    'node': 'node_version',
+    'java': 'java_version',
+    'go': 'go_version',
+    'php': 'php_version',
+    'csharp': 'dotnet_version',
+    'kotlin': 'kotlin_version',
+}
+```
+
+This handles cases where versions are stored at top-level (e.g., `java_version: "17"`) rather than via component matching.

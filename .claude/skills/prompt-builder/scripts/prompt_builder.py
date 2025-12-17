@@ -857,6 +857,13 @@ GUARD_TOKEN_ALIASES = {
     'js': 'javascript',
     'rb': 'ruby',
     'rs': 'rust',
+    'golang': 'go',
+    'jdk': 'java',
+    'openjdk': 'java',
+    'kt': 'kotlin',
+    'cs': 'csharp',
+    'dotnet': 'csharp',
+    '.net': 'csharp',
 }
 
 
@@ -901,9 +908,19 @@ def evaluate_version_guard(guard_text, project_context):
             if project_context.get('framework', '').lower() == lang_lower:
                 detected_version = parse_version(project_context.get('framework_version'))
 
-        # 3. Check node_version specifically (e.g., "node >= 18")
-        if detected_version is None and lang_lower == 'node':
-            detected_version = parse_version(project_context.get('node_version'))
+        # 3. Check language-specific version fields (e.g., "node >= 18", "java >= 17")
+        # These handle cases where versions are stored at top-level rather than in primary_language
+        if detected_version is None:
+            lang_version_map = {
+                'node': 'node_version',
+                'java': 'java_version',
+                'go': 'go_version',
+                'php': 'php_version',
+                'csharp': 'dotnet_version',
+                'kotlin': 'kotlin_version',
+            }
+            if lang_lower in lang_version_map:
+                detected_version = parse_version(project_context.get(lang_version_map[lang_lower]))
 
         # 4. Check secondary languages
         if detected_version is None:
