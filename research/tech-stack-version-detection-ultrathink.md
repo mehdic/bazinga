@@ -3,8 +3,8 @@
 **Date:** 2025-12-17
 **Context:** Version information missing from project_context.json, preventing version guard filtering. Additionally, monorepos need per-component version binding.
 **Decision:** Extend schema, add per-component versions, bind task groups to components
-**Status:** Implementation Plan Ready
-**Reviewed by:** OpenAI GPT-5 (pending final validation)
+**Status:** LLM Review Integrated - Ready for Implementation
+**Reviewed by:** OpenAI GPT-5 ✅
 
 ---
 
@@ -155,18 +155,24 @@ Add new Step 0 before existing Step 1:
 
 **Check config files (medium confidence):**
 
-| File | Field | Language |
-|------|-------|----------|
+| File | Field | Language/Framework |
+|------|-------|---------------------|
 | `pyproject.toml` | `project.requires-python` | Python |
 | `pyproject.toml` | `tool.poetry.dependencies.python` | Python |
 | `package.json` | `engines.node` | Node.js |
+| `package.json` | `devDependencies.typescript` | TypeScript |
+| `package.json` | `dependencies.react` | React |
+| `package.json` | `dependencies.vue` | Vue |
+| `package.json` | `dependencies.@angular/core` | Angular |
 | `go.mod` | `go X.Y` directive | Go |
 | `Cargo.toml` | `rust-version` | Rust |
 
 **Version Normalization:**
 - ">=3.10" → "3.10" (extract minimum)
 - "^3.11" → "3.11" (extract base)
+- "~18.2.0" → "18.2" (extract base)
 - "3.11.4" → "3.11" (major.minor only)
+- For ranges like ">=3.10,<4.0" → use minimum "3.10"
 ```
 
 **Update output format (lines ~162-223):**
@@ -190,10 +196,10 @@ Add new Step 0 before existing Step 1:
     {
       "path": "frontend/",
       "language": "typescript",
-      "language_version": "5.0",       // NEW
-      "node_version": "18",            // NEW
+      "language_version": "5.0",       // NEW - from devDependencies.typescript
+      "node_version": "18",            // NEW - from engines.node or .nvmrc
       "framework": "react",
-      "framework_version": "18.2.0",   // NEW
+      "framework_version": "18.2.0",   // NEW - from dependencies.react
       "suggested_specializations": [...]
     }
   ]
@@ -311,16 +317,42 @@ CREATE TABLE IF NOT EXISTS task_groups (
 )
 ```
 
-Add migration for existing databases (in `migrate_schema()` function):
+**Add proper v15 migration** (following existing migration pattern with WAL checkpoint):
 
 ```python
-# Migration: Add component_path column if missing
-try:
-    cursor.execute("SELECT component_path FROM task_groups LIMIT 1")
-except sqlite3.OperationalError:
-    cursor.execute("ALTER TABLE task_groups ADD COLUMN component_path TEXT")
-    print("  ✓ Added component_path column to task_groups")
+# At top of file, bump schema version:
+SCHEMA_VERSION = 15  # Was 14
+
+# In migrate_schema() function, add v14→v15 migration block:
+if current_version < 15:
+    print("  Migrating v14 → v15: Adding component_path to task_groups...")
+    cursor.execute("BEGIN IMMEDIATE")
+    try:
+        cursor.execute("ALTER TABLE task_groups ADD COLUMN component_path TEXT")
+        cursor.execute("COMMIT")
+
+        # Post-commit integrity checks (required by existing pattern)
+        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        result = cursor.execute("PRAGMA integrity_check").fetchone()
+        if result[0] != "ok":
+            raise Exception(f"Integrity check failed: {result[0]}")
+        cursor.execute("ANALYZE task_groups")
+
+        print("  ✓ Added component_path column to task_groups")
+    except sqlite3.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            cursor.execute("ROLLBACK")
+            print("  ✓ component_path column already exists")
+        else:
+            cursor.execute("ROLLBACK")
+            raise
 ```
+
+**CRITICAL:** This follows the existing migration framework with:
+- `BEGIN IMMEDIATE` for exclusive lock
+- `PRAGMA wal_checkpoint(TRUNCATE)` for WAL cleanup
+- `PRAGMA integrity_check` for corruption detection
+- `ANALYZE` for query optimizer stats
 
 ---
 
@@ -372,13 +404,50 @@ cursor.execute("""
       component_path))  # NEW
 ```
 
-Update CLI argument parser:
+**Update CLI manual flag parsing** (bazinga_db.py uses manual parsing, NOT argparse):
 
 ```python
-# In argparse setup for 'create-task-group' command
-parser.add_argument('--component-path', type=str,
-                    help='Component path for version context (e.g., "backend/")')
+# In create-task-group command handler, extend existing flag parsing:
+# (around line ~2100 in handle_create_task_group or similar)
+
+# Existing pattern for reference:
+# --specializations '["path1", "path2"]'
+# --item_count 5
+
+# Add component_path parsing (normalize dashes to underscores):
+component_path = None
+for i, arg in enumerate(args):
+    if arg in ('--component-path', '--component_path'):
+        if i + 1 < len(args):
+            component_path = args[i + 1]
+        break
+
+# Pass to create_task_group():
+result = db.create_task_group(
+    group_id=group_id,
+    session_id=session_id,
+    name=name,
+    status=status,
+    specializations=specializations,
+    item_count=item_count,
+    component_path=component_path  # NEW
+)
 ```
+
+**Also update `update-task-group` command:**
+
+```python
+# Add component_path to valid_flags dict:
+valid_flags = {
+    'status', 'assigned_to', 'specializations', 'item_count',
+    'complexity', 'initial_tier', 'security_sensitive',
+    'component_path'  # NEW
+}
+
+# Include in SQL building when provided
+```
+
+**CRITICAL:** Do NOT use argparse - the CLI uses manual flag parsing for subcommands.
 
 ---
 
@@ -425,36 +494,86 @@ def get_component_version_context(project_context, component_path):
         Dict with version info, e.g., {"python": "3.11", "fastapi": "0.104.0"}
         Falls back to global versions if component not found.
     """
-    if not project_context or not component_path:
+    if not project_context:
+        return {}
+
+    if not component_path:
         # Fallback to global versions
+        return _get_global_version_context(project_context)
+
+    # LONGEST-PREFIX MATCH: Find most specific component
+    # e.g., "backend/api/" should match before "backend/"
+    best_match = None
+    best_match_len = 0
+
+    normalized_path = component_path.rstrip('/').replace('\\', '/') + '/'
+
+    for comp in project_context.get("components", []):
+        comp_path = (comp.get("path") or "").rstrip('/').replace('\\', '/') + '/'
+        if normalized_path.startswith(comp_path) and len(comp_path) > best_match_len:
+            best_match = comp
+            best_match_len = len(comp_path)
+
+    if best_match:
         return {
-            "python": project_context.get("primary_language_version") if project_context else None,
-            "node": project_context.get("infrastructure", {}).get("node_version") if project_context else None,
+            # Language version
+            best_match.get("language", "").lower(): best_match.get("language_version"),
+            # Framework version
+            best_match.get("framework", "").lower(): best_match.get("framework_version"),
+            # Node version (for JS/TS projects)
+            "node": best_match.get("node_version"),
+            # TypeScript version
+            "typescript": best_match.get("typescript_version"),
+            # Test framework versions
+            "pytest": best_match.get("pytest_version"),
+            "jest": best_match.get("jest_version"),
         }
 
-    # Find matching component
-    for comp in project_context.get("components", []):
-        if comp.get("path") == component_path or component_path.startswith(comp.get("path", "")):
-            return {
-                # Language version
-                comp.get("language", "").lower(): comp.get("language_version"),
-                # Framework version
-                comp.get("framework", "").lower(): comp.get("framework_version"),
-                # Node version (for JS/TS projects)
-                "node": comp.get("node_version"),
-                # Test framework versions
-                "pytest": comp.get("pytest_version"),
-                "jest": comp.get("jest_version"),
-            }
-
     # Fallback to global
+    return _get_global_version_context(project_context)
+
+
+def _get_global_version_context(project_context):
+    """Get global version context as fallback."""
     return {
         "python": project_context.get("primary_language_version"),
         "node": project_context.get("infrastructure", {}).get("node_version"),
+        "typescript": project_context.get("infrastructure", {}).get("typescript_version"),
     }
 ```
 
-#### Change 5.3: Update build_specialization_block to use component versions
+#### Change 5.3: Add inference fallback when component_path is missing
+
+```python
+def infer_component_from_specializations(project_context, spec_paths):
+    """Infer component_path from specialization template paths.
+
+    If PM didn't set component_path, try to match specialization paths
+    to components by their directory prefixes.
+
+    Example: "01-languages/python.md" → look for components with language="python"
+    """
+    if not project_context or not spec_paths:
+        return None
+
+    # Extract language hints from specialization paths
+    for path in spec_paths:
+        path_lower = path.lower()
+        for comp in project_context.get("components", []):
+            comp_lang = (comp.get("language") or "").lower()
+            comp_framework = (comp.get("framework") or "").lower()
+
+            # Match by language in path
+            if comp_lang and comp_lang in path_lower:
+                return comp.get("path")
+            # Match by framework in path
+            if comp_framework and comp_framework in path_lower:
+                return comp.get("path")
+
+    return None
+```
+
+#### Change 5.4: Update build_specialization_block to use component versions
 
 Update `build_specialization_block()` (lines ~830-850):
 
@@ -466,9 +585,15 @@ def build_specialization_block(conn, session_id, group_id, agent_type, model="so
     if not spec_paths:
         return ""
 
+    project_context = get_project_context()
+
     # Get component-specific version context (NEW)
     component_path = get_task_group_component_path(conn, session_id, group_id)
-    project_context = get_project_context()
+
+    # INFERENCE FALLBACK: If no component_path, try to infer from specializations
+    if not component_path:
+        component_path = infer_component_from_specializations(project_context, spec_paths)
+
     version_context = get_component_version_context(project_context, component_path)
 
     # Collect ALL template content - global budget trimming handles limits
@@ -483,11 +608,30 @@ def build_specialization_block(conn, session_id, group_id, agent_type, model="so
     # ... rest unchanged
 ```
 
-#### Change 5.4: Update evaluate_version_guard to use version_context dict
+#### Change 5.5: Update evaluate_version_guard with token normalization
 
 Update `evaluate_version_guard()` (lines ~712-766):
 
 ```python
+# Guard token vocabulary - maps aliases to canonical names
+GUARD_TOKEN_ALIASES = {
+    "py": "python",
+    "python3": "python",
+    "js": "javascript",
+    "ts": "typescript",
+    "nodejs": "node",
+    "node.js": "node",
+    "reactjs": "react",
+    "vuejs": "vue",
+    "angular": "angular",
+}
+
+def normalize_guard_token(token):
+    """Normalize guard token to canonical name."""
+    token_lower = token.lower().strip()
+    return GUARD_TOKEN_ALIASES.get(token_lower, token_lower)
+
+
 def evaluate_version_guard(guard_text, version_context):
     """Evaluate a version guard against version context.
 
@@ -505,15 +649,19 @@ def evaluate_version_guard(guard_text, version_context):
     conditions = [c.strip() for c in guard_text.split(',')]
 
     for condition in conditions:
-        match = re.match(r'(\w+)\s*(>=|>|<=|<|==)\s*([\d.]+)', condition)
+        # Support hyphenated names like "react-native"
+        match = re.match(r'([\w\-\.]+)\s*(>=|>|<=|<|==)\s*([\d.]+)', condition)
         if not match:
             continue
 
         lang, operator, version_str = match.groups()
         required_version = parse_version(version_str)
 
-        # Look up detected version from context (SIMPLIFIED)
-        detected_version = parse_version(version_context.get(lang.lower()))
+        # Normalize token (e.g., "py" → "python", "ts" → "typescript")
+        normalized_lang = normalize_guard_token(lang)
+
+        # Look up detected version from context
+        detected_version = parse_version(version_context.get(normalized_lang))
 
         if detected_version is not None:
             if not version_matches(detected_version, operator, required_version):
@@ -522,6 +670,18 @@ def evaluate_version_guard(guard_text, version_context):
 
     return True
 ```
+
+**Guard Token Vocabulary:**
+
+| Guard Token | Detected From | Aliases |
+|-------------|---------------|---------|
+| `python` | `.python-version`, `pyproject.toml` | `py`, `python3` |
+| `node` | `.nvmrc`, `package.json engines.node` | `nodejs`, `node.js` |
+| `typescript` | `package.json devDependencies.typescript` | `ts` |
+| `react` | `package.json dependencies.react` | `reactjs` |
+| `vue` | `package.json dependencies.vue` | `vuejs` |
+| `jest` | `package.json devDependencies.jest` | - |
+| `pytest` | `pyproject.toml` | - |
 
 ---
 
@@ -608,9 +768,11 @@ The schema change adds a nullable column, so existing databases will:
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Tech Stack Scout parses version incorrectly | Wrong guards applied | Add unit tests for version parsing |
-| PM doesn't set component_path | Falls back to global | Fallback is safe (conservative) |
-| Multiple components match path | Wrong component used | Use first match (order by specificity) |
-| Database migration fails | Old DBs broken | Nullable column, graceful ALTER TABLE |
+| PM doesn't set component_path | Falls back to global | Inference fallback + global fallback (conservative) |
+| Multiple components match path | Wrong component used | **Longest-prefix match** ensures most specific |
+| Database migration fails | Old DBs broken | Proper v15 migration with WAL checkpoint + integrity check |
+| Guard tokens mismatch template tokens | Guards don't filter | Token normalization + vocabulary mapping |
+| Version range parsing edge cases | Wrong minimum extracted | Unit tests for ">=", "^", "~" patterns |
 
 ---
 
@@ -619,4 +781,42 @@ The schema change adds a nullable column, so existing databases will:
 - [PEP 508](https://peps.python.org/pep-0508/) - Python dependency specifiers
 - [pyenv](https://github.com/pyenv/pyenv) - .python-version standard
 - [nvm](https://github.com/nvm-sh/nvm) - .nvmrc standard
-- OpenAI GPT-5 review feedback (per-component binding recommendation)
+
+---
+
+## Multi-LLM Review Integration
+
+**Reviewer:** OpenAI GPT-5
+**Date:** 2025-12-17
+
+### Consensus Points (Incorporated)
+
+All 6 recommendations from the LLM review were approved and integrated:
+
+1. ✅ **Proper v15 database migration** - Replaced ad-hoc ALTER TABLE with full migration block including WAL checkpoint, integrity check, and ANALYZE
+2. ✅ **Manual CLI flag parsing** - Replaced argparse suggestion with correct manual flag parsing pattern used by bazinga_db.py
+3. ✅ **Longest-prefix component matching** - Updated `get_component_version_context()` to find most specific matching component
+4. ✅ **Inference fallback** - Added `infer_component_from_specializations()` to derive component when PM doesn't set component_path
+5. ✅ **Guard token normalization** - Added `GUARD_TOKEN_ALIASES` and `normalize_guard_token()` for "py"→"python", "ts"→"typescript" etc.
+6. ✅ **Expanded version detection** - Added TypeScript, React, Vue, Angular version detection from package.json
+
+### Critical Issues Fixed
+
+| Issue | Original Plan | Fixed Plan |
+|-------|---------------|------------|
+| DB migration style | Ad-hoc ALTER TABLE | Proper v15 migration with WAL checkpoint |
+| CLI parsing | argparse | Manual flag parsing (matches codebase) |
+| Component matching | First match | Longest-prefix match |
+| Missing component_path | Global fallback only | Inference fallback + global fallback |
+
+### Rejected Suggestions
+
+None - all suggestions were approved.
+
+### Implementation Confidence
+
+**Medium-High** - With all LLM feedback integrated:
+- Database migration follows existing patterns
+- CLI parsing matches codebase conventions
+- Fallback chain ensures graceful degradation
+- Token normalization prevents template/guard mismatches
