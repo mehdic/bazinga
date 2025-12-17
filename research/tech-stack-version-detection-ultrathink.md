@@ -1,14 +1,16 @@
 # Tech Stack Version Detection: Ultrathink Analysis
 
 **Date:** 2025-12-17
-**Context:** Version information missing from project_context.json, preventing version guard filtering
-**Decision:** Extend Tech Stack Scout schema and detection logic to capture language/framework versions
-**Status:** Proposed
-**Reviewed by:** Pending OpenAI GPT-5, Google Gemini 3 Pro Preview
+**Context:** Version information missing from project_context.json, preventing version guard filtering. Additionally, monorepos need per-component version binding.
+**Decision:** Extend schema, add per-component versions, bind task groups to components
+**Status:** Implementation Plan Ready
+**Reviewed by:** OpenAI GPT-5 (pending final validation)
 
 ---
 
 ## Problem Statement
+
+### Problem 1: No Version Detection
 
 The prompt builder has version guard filtering implemented:
 
@@ -29,300 +31,549 @@ But it can't filter because **Tech Stack Scout doesn't detect versions**:
 }
 ```
 
-**Impact:**
-- All version-guarded content is included (conservative fallback)
-- Agent sees both Python 3.10+ AND pre-3.10 patterns
-- Wasted tokens (~100-200 per template)
-- Potentially confusing guidance
+### Problem 2: Monorepo Version Binding
 
----
+For monorepos with multiple languages/versions:
 
-## Root Cause Analysis
-
-### 1. Schema Gap
-
-The `project_context.json` schema has no version fields:
-
-| Field | Current | Needed |
-|-------|---------|--------|
-| `primary_language` | ✅ "python" | ✅ |
-| `primary_language_version` | ❌ Missing | "3.11" |
-| `secondary_languages` | ✅ ["sql"] | Need versions |
-| `components[].framework_version` | ❌ Missing | "14.0.0" |
-
-### 2. Detection Logic Gap
-
-Tech Stack Scout doesn't extract versions from:
-
-| Source File | Version Info |
-|-------------|--------------|
-| `pyproject.toml` | `tool.poetry.dependencies.python = "^3.11"` |
-| `pyproject.toml` | `project.requires-python = ">=3.10"` |
-| `.python-version` | `3.11.4` |
-| `setup.py` | `python_requires=">=3.10"` |
-| `runtime.txt` | `python-3.11.4` |
-| `package.json` | `engines.node: ">=18"` |
-| `.nvmrc` | `18.17.0` |
-| `go.mod` | `go 1.21` |
-| `Cargo.toml` | `rust-version = "1.70"` |
-
-### 3. Evidence Array Has Versions (Partial)
-
-Tech Stack Scout DOES capture framework versions in evidence:
-
-```json
-"evidence": [
-  {"file": "package.json", "key": "next", "version": "14.0.0"}
-]
+```
+project/
+├── backend/      # Python 3.11, FastAPI
+├── frontend/     # TypeScript, Node 18, React
+└── mobile/       # TypeScript, React Native
 ```
 
-But this isn't exposed at the top level for easy access.
+**Current Flow:**
+1. PM creates BACKEND task group → assigns python.md specialization
+2. PM creates FRONTEND task group → assigns react.md, typescript.md specializations
+3. Prompt builder loads templates but uses **global** `primary_language_version`
+
+**Problem:** Both groups get the SAME version context. BACKEND should use Python 3.11 guards, FRONTEND should use Node 18 guards.
+
+### Impact
+
+- All version-guarded content is included (conservative fallback)
+- Agent sees conflicting patterns (Python 3.10+ AND pre-3.10)
+- Wasted tokens (~100-200 per template)
+- Wrong version guidance for monorepo components
 
 ---
 
-## Proposed Solution
+## Architecture Analysis
 
-### Option A: Extend Schema (Recommended)
+### Current Data Flow
 
-**Add explicit version fields to project_context.json:**
+```
+┌─────────────────────┐
+│  Tech Stack Scout   │  Writes: project_context.json
+│  ─────────────────  │  - primary_language
+│  Detects languages  │  - components[].suggested_specializations
+│  Detects frameworks │  - NO per-component versions ❌
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  PM (Project Mgr)   │  Reads: project_context.json
+│  ─────────────────  │  Writes: task_groups table
+│  Creates groups     │  - group.specializations ✅
+│  Assigns specs      │  - NO component_path ❌
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  Prompt Builder     │  Reads: task_groups.specializations
+│  ─────────────────  │  Reads: project_context.json
+│  Loads templates    │  - Uses global primary_language_version ❌
+│  Applies guards     │  - NO per-component lookup ❌
+└─────────────────────┘
+```
+
+### Required Data Flow
+
+```
+┌─────────────────────┐
+│  Tech Stack Scout   │  Writes: project_context.json
+│  ─────────────────  │  - primary_language + primary_language_version ✅
+│  Detects versions   │  - components[].language_version ✅ NEW
+│  Per-component      │  - components[].framework_version ✅ NEW
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  PM (Project Mgr)   │  Reads: project_context.json
+│  ─────────────────  │  Writes: task_groups table
+│  Binds to component │  - group.specializations ✅
+│                     │  - group.component_path ✅ NEW
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  Prompt Builder     │  Reads: task_groups.specializations + component_path
+│  ─────────────────  │  Looks up: components[component_path].language_version
+│  Per-component ver  │  - Applies version guards with correct version ✅
+└─────────────────────┘
+```
+
+---
+
+## Files to Modify
+
+### Overview Table
+
+| # | File | Purpose | Changes |
+|---|------|---------|---------|
+| 1 | `agents/tech_stack_scout.md` | Version detection | Add version detection logic per component |
+| 2 | `bazinga/templates/pm_planning_steps.md` | PM workflow | Add component_path to task group creation |
+| 3 | `.claude/skills/bazinga-db/scripts/init_db.py` | DB schema | Add component_path column to task_groups |
+| 4 | `.claude/skills/bazinga-db/scripts/bazinga_db.py` | DB CLI | Support component_path in create/update |
+| 5 | `.claude/skills/prompt-builder/scripts/prompt_builder.py` | Prompt gen | Look up component version for guards |
+
+---
+
+## Detailed Implementation Plan
+
+### File 1: `agents/tech_stack_scout.md`
+
+**Purpose:** Add version detection for each component
+
+**Location:** Lines ~56-72 (detection steps)
+
+**Changes:**
+
+Add new Step 0 before existing Step 1:
+
+```markdown
+### Step 0: Detect Language/Framework Versions
+
+**Check version-specific files (highest confidence):**
+
+| File | Language | Parse |
+|------|----------|-------|
+| `.python-version` | Python | Full content → "3.11" |
+| `.nvmrc`, `.node-version` | Node.js | Full content → "18" |
+| `.ruby-version` | Ruby | Full content |
+| `.go-version` | Go | Full content |
+
+**Check config files (medium confidence):**
+
+| File | Field | Language |
+|------|-------|----------|
+| `pyproject.toml` | `project.requires-python` | Python |
+| `pyproject.toml` | `tool.poetry.dependencies.python` | Python |
+| `package.json` | `engines.node` | Node.js |
+| `go.mod` | `go X.Y` directive | Go |
+| `Cargo.toml` | `rust-version` | Rust |
+
+**Version Normalization:**
+- ">=3.10" → "3.10" (extract minimum)
+- "^3.11" → "3.11" (extract base)
+- "3.11.4" → "3.11" (major.minor only)
+```
+
+**Update output format (lines ~162-223):**
 
 ```json
 {
-  "schema_version": "2.1",  // Bump version
+  "schema_version": "2.1",
 
   "primary_language": "python",
   "primary_language_version": "3.11",  // NEW
-
-  "secondary_languages": [
-    {"name": "sql", "version": null},  // ENHANCED
-    {"name": "bash", "version": null}
-  ],
 
   "components": [
     {
       "path": "backend/",
       "language": "python",
-      "language_version": "3.11",  // NEW
+      "language_version": "3.11",      // NEW
       "framework": "fastapi",
-      "framework_version": "0.104.0",  // NEW (from evidence)
-      ...
+      "framework_version": "0.104.0",  // NEW
+      "suggested_specializations": [...]
+    },
+    {
+      "path": "frontend/",
+      "language": "typescript",
+      "language_version": "5.0",       // NEW
+      "node_version": "18",            // NEW
+      "framework": "react",
+      "framework_version": "18.2.0",   // NEW
+      "suggested_specializations": [...]
     }
-  ],
-
-  "infrastructure": {
-    "node_version": "18.17.0",  // NEW (if Node.js detected)
-    "python_version": "3.11",   // NEW (if Python detected)
-    ...
-  }
+  ]
 }
 ```
 
-**Pros:**
-- Clean, explicit schema
-- Easy for prompt builder to consume
-- Backward compatible (new fields are additive)
-
-**Cons:**
-- Requires Tech Stack Scout changes
-- More fields to maintain
-
-### Option B: Extract from Evidence Array
-
-**Prompt builder reads version from existing evidence:**
-
-```python
-def get_language_version(project_context, language):
-    for component in project_context.get('components', []):
-        if component.get('language') == language:
-            for ev in component.get('evidence', []):
-                if ev.get('key') == language:
-                    return ev.get('version')
-    return None
-```
-
-**Pros:**
-- No schema changes
-- Works with existing data
-
-**Cons:**
-- Fragile (evidence format varies)
-- Language versions != framework versions in evidence
-- Doesn't capture from dedicated version files (.python-version, .nvmrc)
-
-### Option C: Hybrid Approach (Best)
-
-1. **Schema extension** (Option A) for explicit version fields
-2. **Tech Stack Scout enhancement** to detect from version files
-3. **Prompt builder fallback** to evidence if explicit field missing
-
 ---
 
-## Implementation Plan
+### File 2: `bazinga/templates/pm_planning_steps.md`
 
-### Phase 1: Schema Extension (Low Effort)
+**Purpose:** PM binds each task group to a component path
 
-**File:** `agents/tech_stack_scout.md`
+**Location:** Lines ~123-162 (Step 3.5: Assign Specializations)
 
-Add to detection steps:
+**Changes:**
+
+Update Step 3.5.2 (lines ~123-136):
 
 ```markdown
-### Step 0: Detect Language Versions
+### Step 3.5.2: Map Task Groups to Components
 
-**Check version files first (highest confidence):**
+```
+FOR each task_group:
+  specializations = []
+  component_path = null  // NEW: Track which component this group belongs to
+  target_paths = extract file paths from task description
 
-| File | Language | Parse Pattern |
-|------|----------|---------------|
-| `.python-version` | Python | Full content (e.g., "3.11.4") |
-| `.nvmrc` | Node.js | Full content (e.g., "18.17.0") |
-| `.node-version` | Node.js | Full content |
-| `.ruby-version` | Ruby | Full content |
-| `.go-version` | Go | Full content |
+  FOR each component in project_context.components:
+    IF target_path starts with component.path:
+      specializations.extend(component.suggested_specializations)
+      component_path = component.path  // NEW: Bind to first matching component
 
-**Then check config files:**
-
-| File | Language | Parse Pattern |
-|------|----------|---------------|
-| `pyproject.toml` | Python | `tool.poetry.dependencies.python` or `project.requires-python` |
-| `setup.py` | Python | `python_requires` argument |
-| `setup.cfg` | Python | `[options] python_requires` |
-| `runtime.txt` | Python | "python-X.Y.Z" |
-| `package.json` | Node.js | `engines.node` |
-| `go.mod` | Go | `go X.Y` directive |
-| `Cargo.toml` | Rust | `rust-version` key |
-
-**Version normalization:**
-- Remove operators: ">=3.10" → "3.10", "^3.11" → "3.11"
-- Keep major.minor: "3.11.4" → "3.11" (for comparison)
-- Store full version in `_full` field if needed
+  task_group.specializations = list(dict.fromkeys(specializations))
+  task_group.component_path = component_path  // NEW
+```
 ```
 
-**Add to output format:**
+Update Step 3.5.3 (lines ~138-147):
 
-```json
-{
-  "primary_language": "python",
-  "primary_language_version": "3.11",
+```markdown
+### Step 3.5.3: Include in Task Group Definition
 
-  "versions_detected": {
-    "python": {"version": "3.11", "source": ".python-version", "confidence": "high"},
-    "node": {"version": "18", "source": "package.json", "confidence": "medium"}
-  }
-}
+```markdown
+**Group A:** Implement Login UI
+- **Type:** implementation
+- **Complexity:** 5 (MEDIUM)
+- **Initial Tier:** Developer
+- **Target Path:** frontend/src/pages/login.tsx
+- **Component Path:** frontend/              // NEW
+- **Specializations:** ["01-languages/typescript.md", ...]
+```
 ```
 
-### Phase 2: Prompt Builder Integration (Already Done)
+Update Step 3.5.4 canonical template (lines ~149-162):
 
-The prompt builder already checks:
-- `project_context.get('primary_language_version')`
-- `secondary_languages[].version`
-- `infrastructure.{lang}_version`
+```markdown
+### Step 3.5.4: Store via bazinga-db (CANONICAL TEMPLATE)
 
-Just needs Tech Stack Scout to populate these fields.
+```
+bazinga-db, please create task group:
 
-### Phase 3: Testing
+Group ID: A
+Session ID: [session_id]
+Name: Implement Login UI
+Status: pending
+Complexity: 5
+Initial Tier: Developer
+Item_Count: [number of tasks]
+--component-path 'frontend/'                    // NEW
+--specializations '["path/to/template1.md", ...]'
+```
 
-1. Run Tech Stack Scout on test project with `.python-version` file
-2. Verify `primary_language_version` is populated
-3. Rebuild developer prompt
-4. Verify version guards correctly filter content
+**Required fields:**
+- `Item_Count` - Number of discrete tasks
+- `--specializations` - Technology paths (NEVER empty)
+- `--component-path` - Component this group belongs to (for version context)  // NEW
+```
 
 ---
 
-## Version Detection Logic
+### File 3: `.claude/skills/bazinga-db/scripts/init_db.py`
 
-### Python Version Detection
+**Purpose:** Add component_path column to task_groups table
 
-**Priority order (highest to lowest confidence):**
+**Location:** Lines ~1320-1345 (CREATE TABLE task_groups)
 
-1. `.python-version` - Explicit, pyenv standard
-2. `pyproject.toml` - Modern Python projects
-3. `setup.cfg` - Legacy Python projects
-4. `setup.py` - Legacy Python projects
-5. `runtime.txt` - Heroku deployments
-6. `Pipfile` - Pipenv projects
+**Changes:**
 
-**Parsing examples:**
+Add column after `specializations` (line ~1336):
 
 ```python
-# .python-version
-"3.11.4"  # → "3.11"
-
-# pyproject.toml
-[tool.poetry.dependencies]
-python = "^3.11"  # → "3.11"
-
-[project]
-requires-python = ">=3.10"  # → "3.10"
-
-# setup.py
-setup(
-    python_requires=">=3.10",  # → "3.10"
+CREATE TABLE IF NOT EXISTS task_groups (
+    id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT CHECK(status IN (...)) DEFAULT 'pending',
+    assigned_to TEXT,
+    revision_count INTEGER DEFAULT 0,
+    last_review_status TEXT CHECK(...),
+    feature_branch TEXT,
+    merge_status TEXT CHECK(...),
+    complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
+    initial_tier TEXT CHECK(...) DEFAULT 'Developer',
+    context_references TEXT,
+    specializations TEXT,
+    component_path TEXT,  -- NEW: Links to project_context.components[].path
+    item_count INTEGER DEFAULT 1,
+    security_sensitive INTEGER DEFAULT 0,
+    qa_attempts INTEGER DEFAULT 0,
+    tl_review_attempts INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, session_id),
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 )
-
-# runtime.txt
-python-3.11.4  # → "3.11"
 ```
 
-### Node.js Version Detection
+Add migration for existing databases (in `migrate_schema()` function):
 
-**Priority order:**
-
-1. `.nvmrc` or `.node-version` - Explicit
-2. `package.json` engines.node - Project requirement
-3. `.tool-versions` (asdf) - Multi-language version manager
-
-**Parsing examples:**
-
-```json
-// package.json
-{
-  "engines": {
-    "node": ">=18.0.0"  // → "18"
-  }
-}
-
-// .nvmrc
-18.17.0  // → "18"
-lts/iron  // → "20" (resolve LTS name)
-```
-
-### Go Version Detection
-
-**Priority order:**
-
-1. `.go-version` - Explicit
-2. `go.mod` - Module file
-
-**Parsing examples:**
-
-```go
-// go.mod
-go 1.21  // → "1.21"
+```python
+# Migration: Add component_path column if missing
+try:
+    cursor.execute("SELECT component_path FROM task_groups LIMIT 1")
+except sqlite3.OperationalError:
+    cursor.execute("ALTER TABLE task_groups ADD COLUMN component_path TEXT")
+    print("  ✓ Added component_path column to task_groups")
 ```
 
 ---
 
-## Edge Cases
+### File 4: `.claude/skills/bazinga-db/scripts/bazinga_db.py`
 
-### No Version Detected
+**Purpose:** Support component_path in create/update task group operations
 
-If no version file found:
-- Set `primary_language_version: null`
-- Prompt builder uses conservative fallback (include all content)
-- Log detection note: "No Python version detected, version guards inactive"
+**Location:** Lines ~1166-1250 (create_task_group function)
 
-### Version Range
+**Changes:**
 
-If version is a range like ">=3.10,<4.0":
-- Extract minimum: "3.10"
-- This is the minimum required, safe for version guards
+Update function signature (line ~1166):
 
-### Multiple Python Versions (Monorepo)
+```python
+def create_task_group(self, group_id: str, session_id: str, name: str,
+                     status: str = 'pending', assigned_to: Optional[str] = None,
+                     specializations: Optional[List[str]] = None,
+                     item_count: Optional[int] = None,
+                     component_path: Optional[str] = None) -> Dict[str, Any]:  # NEW
+    """Create or update a task group (upsert - idempotent operation).
 
-If different components have different versions:
-- Set `primary_language_version` to the lowest common version
-- Store per-component versions in `components[].language_version`
-- Log: "Multiple Python versions detected: 3.10 (backend), 3.11 (scripts)"
+    Args:
+        ...
+        component_path: Path to the component this group belongs to (e.g., "backend/")
+                       Used for per-component version context in prompt building.
+    """
+```
+
+Update INSERT statement to include component_path:
+
+```python
+cursor.execute("""
+    INSERT INTO task_groups (
+        id, session_id, name, status, assigned_to,
+        specializations, item_count, component_path  -- NEW
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)  -- Add ? for component_path
+    ON CONFLICT(id, session_id) DO UPDATE SET
+        name = excluded.name,
+        status = excluded.status,
+        assigned_to = excluded.assigned_to,
+        specializations = excluded.specializations,
+        item_count = excluded.item_count,
+        component_path = excluded.component_path,  -- NEW
+        updated_at = CURRENT_TIMESTAMP
+""", (group_id, session_id, name, status, assigned_to,
+      json.dumps(specializations) if specializations else None,
+      item_count,
+      component_path))  # NEW
+```
+
+Update CLI argument parser:
+
+```python
+# In argparse setup for 'create-task-group' command
+parser.add_argument('--component-path', type=str,
+                    help='Component path for version context (e.g., "backend/")')
+```
+
+---
+
+### File 5: `.claude/skills/prompt-builder/scripts/prompt_builder.py`
+
+**Purpose:** Look up component-specific version for version guards
+
+**Location:** Lines ~584-599 (get_task_group_specializations) and ~769-802 (apply_version_guards)
+
+**Changes:**
+
+#### Change 5.1: Add function to get component path for task group
+
+Add after `get_task_group_specializations()` (line ~600):
+
+```python
+def get_task_group_component_path(conn, session_id, group_id):
+    """Get the component_path for a task group."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT component_path FROM task_groups WHERE session_id = ? AND id = ?",
+            (session_id, group_id)
+        )
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else None
+    except sqlite3.OperationalError:
+        return None
+```
+
+#### Change 5.2: Add function to get component version context
+
+Add after the above:
+
+```python
+def get_component_version_context(project_context, component_path):
+    """Get version context for a specific component.
+
+    Args:
+        project_context: The full project_context.json dict
+        component_path: Path like "backend/" or "frontend/"
+
+    Returns:
+        Dict with version info, e.g., {"python": "3.11", "fastapi": "0.104.0"}
+        Falls back to global versions if component not found.
+    """
+    if not project_context or not component_path:
+        # Fallback to global versions
+        return {
+            "python": project_context.get("primary_language_version") if project_context else None,
+            "node": project_context.get("infrastructure", {}).get("node_version") if project_context else None,
+        }
+
+    # Find matching component
+    for comp in project_context.get("components", []):
+        if comp.get("path") == component_path or component_path.startswith(comp.get("path", "")):
+            return {
+                # Language version
+                comp.get("language", "").lower(): comp.get("language_version"),
+                # Framework version
+                comp.get("framework", "").lower(): comp.get("framework_version"),
+                # Node version (for JS/TS projects)
+                "node": comp.get("node_version"),
+                # Test framework versions
+                "pytest": comp.get("pytest_version"),
+                "jest": comp.get("jest_version"),
+            }
+
+    # Fallback to global
+    return {
+        "python": project_context.get("primary_language_version"),
+        "node": project_context.get("infrastructure", {}).get("node_version"),
+    }
+```
+
+#### Change 5.3: Update build_specialization_block to use component versions
+
+Update `build_specialization_block()` (lines ~830-850):
+
+```python
+def build_specialization_block(conn, session_id, group_id, agent_type, model="sonnet"):
+    """Build the specialization block from templates."""
+    spec_paths = get_task_group_specializations(conn, session_id, group_id)
+
+    if not spec_paths:
+        return ""
+
+    # Get component-specific version context (NEW)
+    component_path = get_task_group_component_path(conn, session_id, group_id)
+    project_context = get_project_context()
+    version_context = get_component_version_context(project_context, component_path)
+
+    # Collect ALL template content - global budget trimming handles limits
+    templates_content = []
+
+    for path in spec_paths:
+        # Pass version_context instead of full project_context (CHANGED)
+        content = read_template_with_version_guards(path, version_context)
+        if content:
+            templates_content.append(content)
+
+    # ... rest unchanged
+```
+
+#### Change 5.4: Update evaluate_version_guard to use version_context dict
+
+Update `evaluate_version_guard()` (lines ~712-766):
+
+```python
+def evaluate_version_guard(guard_text, version_context):
+    """Evaluate a version guard against version context.
+
+    Args:
+        guard_text: e.g., "python >= 3.10" or "node >= 18"
+        version_context: Dict like {"python": "3.11", "node": "18", "react": "18.2.0"}
+
+    Returns:
+        True if condition is met, False otherwise
+    """
+    if not version_context:
+        return True  # No context = include everything
+
+    # Parse conditions (comma-separated for AND)
+    conditions = [c.strip() for c in guard_text.split(',')]
+
+    for condition in conditions:
+        match = re.match(r'(\w+)\s*(>=|>|<=|<|==)\s*([\d.]+)', condition)
+        if not match:
+            continue
+
+        lang, operator, version_str = match.groups()
+        required_version = parse_version(version_str)
+
+        # Look up detected version from context (SIMPLIFIED)
+        detected_version = parse_version(version_context.get(lang.lower()))
+
+        if detected_version is not None:
+            if not version_matches(detected_version, operator, required_version):
+                return False
+        # If no version detected, include content (conservative)
+
+    return True
+```
+
+---
+
+## Migration Strategy
+
+### Database Migration
+
+The schema change adds a nullable column, so existing databases will:
+1. Work without migration (component_path = NULL for old groups)
+2. Auto-migrate on next bazinga-db invocation (ALTER TABLE)
+3. New task groups will have component_path set by PM
+
+### Backward Compatibility
+
+| Scenario | Behavior |
+|----------|----------|
+| Old project_context.json (no versions) | Falls back to include all version-guarded content |
+| Old task_groups (no component_path) | Falls back to global primary_language_version |
+| New task_groups with component_path | Uses per-component versions |
+
+---
+
+## Testing Plan
+
+### Test Case 1: Single-Language Project (Python 3.11)
+
+1. Create `.python-version` with "3.11"
+2. Run Tech Stack Scout
+3. Verify `primary_language_version: "3.11"` in project_context.json
+4. Run orchestration with calculator spec
+5. Verify developer prompt excludes `<!-- version: python < 3.10 -->` content
+
+### Test Case 2: Monorepo (Python backend + Node frontend)
+
+1. Create structure:
+   ```
+   backend/.python-version  # 3.11
+   frontend/.nvmrc          # 18
+   ```
+2. Run Tech Stack Scout
+3. Verify components have language_version
+4. Create two task groups via PM (BACKEND, FRONTEND)
+5. Verify BACKEND group has `component_path: "backend/"`
+6. Build developer prompt for BACKEND
+7. Verify Python 3.11 guards applied (not Node guards)
+
+### Test Case 3: Backward Compatibility
+
+1. Use existing bazinga.db without component_path column
+2. Run bazinga-db
+3. Verify migration adds column
+4. Verify old task groups still work (fallback to global version)
 
 ---
 
@@ -330,39 +581,36 @@ If different components have different versions:
 
 | Task | Effort | Files |
 |------|--------|-------|
-| Update schema documentation | Low | tech_stack_scout.md |
-| Add version detection logic | Medium | tech_stack_scout.md |
-| Test with various projects | Low | Manual testing |
-| Update project_context.json examples | Low | tech_stack_scout.md |
+| Tech Stack Scout version detection | 2 hours | agents/tech_stack_scout.md |
+| PM component_path binding | 1 hour | bazinga/templates/pm_planning_steps.md |
+| Database schema + migration | 1 hour | init_db.py |
+| bazinga-db CLI update | 1 hour | bazinga_db.py |
+| Prompt builder component lookup | 2 hours | prompt_builder.py |
+| Testing | 2 hours | Manual |
 
-**Total: ~2-4 hours**
-
----
-
-## Decision Rationale
-
-### Why Option A (Schema Extension)?
-
-1. **Explicit > Implicit**: Clear version fields are easier to consume than parsing evidence arrays
-2. **Future-proof**: Schema versions can evolve independently
-3. **Single responsibility**: Tech Stack Scout handles all detection, prompt builder just reads
-4. **Debuggability**: Easy to see what version was detected in project_context.json
-
-### Why Not Option B (Evidence Parsing)?
-
-1. Evidence format is inconsistent (framework versions, not language versions)
-2. Doesn't capture from dedicated version files (.python-version, .nvmrc)
-3. Complex parsing logic duplicated in multiple places
+**Total: ~9 hours**
 
 ---
 
 ## Success Criteria
 
-1. ✅ Tech Stack Scout outputs `primary_language_version` when detected
-2. ✅ Prompt builder correctly filters Python 3.10+ vs pre-3.10 content
-3. ✅ Version guards remove conflicting guidance from prompts
-4. ✅ Conservative fallback works when version unknown
-5. ✅ Schema is backward compatible (old project_context.json still works)
+1. ✅ Tech Stack Scout outputs `components[].language_version`
+2. ✅ PM stores `component_path` for each task group
+3. ✅ Prompt builder looks up component-specific versions
+4. ✅ Version guards filter correctly per component
+5. ✅ Monorepo with Python backend + Node frontend works correctly
+6. ✅ Backward compatible with existing databases/projects
+
+---
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Tech Stack Scout parses version incorrectly | Wrong guards applied | Add unit tests for version parsing |
+| PM doesn't set component_path | Falls back to global | Fallback is safe (conservative) |
+| Multiple components match path | Wrong component used | Use first match (order by specificity) |
+| Database migration fails | Old DBs broken | Nullable column, graceful ALTER TABLE |
 
 ---
 
@@ -371,4 +619,4 @@ If different components have different versions:
 - [PEP 508](https://peps.python.org/pep-0508/) - Python dependency specifiers
 - [pyenv](https://github.com/pyenv/pyenv) - .python-version standard
 - [nvm](https://github.com/nvm-sh/nvm) - .nvmrc standard
-- [asdf](https://asdf-vm.com/) - .tool-versions format
+- OpenAI GPT-5 review feedback (per-component binding recommendation)
