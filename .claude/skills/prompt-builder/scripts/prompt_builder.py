@@ -728,12 +728,25 @@ def build_prompt(args):
         if conn:
             print(f"markers_validated={str(markers_valid).lower()}", file=sys.stderr)
 
-        # 11. Exit with error if markers were invalid (WITHOUT emitting prompt)
+        # 11. Handle marker validation failure
         if not markers_valid:
-            print("ERROR: Prompt validation failed - not emitting invalid prompt", file=sys.stderr)
+            if getattr(args, 'json_output', False):
+                error_result = {
+                    "success": False,
+                    "error": "Prompt validation failed - missing required markers",
+                    "prompt_file": None,
+                    "tokens_estimate": tokens,
+                    "lines": lines,
+                    "markers_ok": False,
+                    "missing_markers": []  # Could be populated by validate_markers if we tracked them
+                }
+                print(json.dumps(error_result, indent=2))
+            else:
+                print("ERROR: Prompt validation failed - not emitting invalid prompt", file=sys.stderr)
             sys.exit(1)
 
         # 12. Save to file if --output-file specified
+        output_path = None
         if args.output_file:
             output_path = os.path.join(PROJECT_ROOT, args.output_file)
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -741,8 +754,22 @@ def build_prompt(args):
                 f.write(full_prompt)
             print(f"PROMPT_FILE={output_path}", file=sys.stderr)
 
-        # 13. Output prompt to stdout ONLY on success
-        print(full_prompt)
+        # 13. Output result
+        if getattr(args, 'json_output', False):
+            # JSON output for skill invocation
+            result = {
+                "success": True,
+                "prompt_file": output_path,
+                "tokens_estimate": tokens,
+                "lines": lines,
+                "markers_ok": markers_valid,
+                "missing_markers": [],
+                "error": None
+            }
+            print(json.dumps(result, indent=2))
+        else:
+            # Raw prompt output for backward compatibility
+            print(full_prompt)
 
     finally:
         # Always close database connection
@@ -819,6 +846,12 @@ Debug mode:
     parser.add_argument("--output-file", default="",
                         help="Save prompt to file (in addition to stdout). Path relative to project root.")
 
+    # JSON input/output for skill-based invocation
+    parser.add_argument("--params-file", default="",
+                        help="Read parameters from JSON file instead of CLI args")
+    parser.add_argument("--json-output", action="store_true",
+                        help="Output JSON result instead of raw prompt (for skill invocation)")
+
     # Sanitize sys.argv - remove empty or whitespace-only args that bash might pass
     # This handles issues with multiline commands using backslash continuations
     original_argv = sys.argv.copy()
@@ -859,6 +892,82 @@ Debug mode:
 
     if args.debug:
         print(f"[DEBUG] Parsed args: {args}", file=sys.stderr)
+
+    # Handle --params-file: read parameters from JSON file
+    if args.params_file:
+        params_path = os.path.join(PROJECT_ROOT, args.params_file)
+        if not os.path.exists(params_path):
+            error_result = {
+                "success": False,
+                "error": f"Params file not found: {params_path}",
+                "prompt_file": None,
+                "tokens_estimate": 0,
+                "lines": 0,
+                "markers_ok": False,
+                "missing_markers": []
+            }
+            if args.json_output:
+                print(json.dumps(error_result, indent=2))
+            else:
+                print(f"ERROR: Params file not found: {params_path}", file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            with open(params_path, 'r') as f:
+                params = json.load(f)
+
+            # Map JSON params to args object
+            if 'agent_type' in params:
+                args.agent_type = params['agent_type']
+            if 'session_id' in params:
+                args.session_id = params['session_id']
+            if 'group_id' in params:
+                args.group_id = params['group_id']
+            if 'task_title' in params:
+                args.task_title = params['task_title']
+            if 'task_requirements' in params:
+                args.task_requirements = params['task_requirements']
+            if 'branch' in params:
+                args.branch = params['branch']
+            if 'mode' in params:
+                args.mode = params['mode']
+            if 'testing_mode' in params:
+                args.testing_mode = params['testing_mode']
+            if 'model' in params:
+                args.model = params['model']
+            if 'output_file' in params:
+                args.output_file = params['output_file']
+            if 'qa_feedback' in params:
+                args.qa_feedback = params['qa_feedback']
+            if 'tl_feedback' in params:
+                args.tl_feedback = params['tl_feedback']
+            if 'investigation_findings' in params:
+                args.investigation_findings = params['investigation_findings']
+            if 'pm_state' in params:
+                args.pm_state = params['pm_state'] if isinstance(params['pm_state'], str) else json.dumps(params['pm_state'])
+            if 'resume_context' in params:
+                args.resume_context = params['resume_context']
+            # Enable JSON output when using params file (skill invocation)
+            args.json_output = True
+
+            if args.debug:
+                print(f"[DEBUG] Loaded params from {params_path}: {params}", file=sys.stderr)
+
+        except json.JSONDecodeError as e:
+            error_result = {
+                "success": False,
+                "error": f"Invalid JSON in params file: {e}",
+                "prompt_file": None,
+                "tokens_estimate": 0,
+                "lines": 0,
+                "markers_ok": False,
+                "missing_markers": []
+            }
+            if args.json_output:
+                print(json.dumps(error_result, indent=2))
+            else:
+                print(f"ERROR: Invalid JSON in params file: {e}", file=sys.stderr)
+            sys.exit(1)
 
     build_prompt(args)
 

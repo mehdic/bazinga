@@ -180,34 +180,45 @@ IF len(research_groups) > 2: defer_excess_research()  # graceful deferral, not e
 IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 ```
 
-### SPAWN IMPLEMENTATION AGENTS - PARALLEL (FILE-BASED PROMPT)
+### SPAWN IMPLEMENTATION AGENTS - PARALLEL (SKILL-BASED PROMPT)
 
 **🔴 SINGLE-STEP PROMPT BUILDING (PER GROUP)**
 
 This section handles spawning Developer, SSE, or RE for each group based on PM's `initial_tier` decision.
 
-**Step 1: Build prompt files for EACH group**
+**Step 1: Write params files for EACH group**
 
-For EACH group, run prompt-builder:
+For EACH group, write a params JSON file:
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type {task_groups[group_id]["initial_tier"]} \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "{task_groups[group_id]["title"]}" \
-  --task-requirements "{task_groups[group_id]["requirements"]}" \
-  --branch "{task_groups[group_id]["branch"] or session_branch}" \
-  --mode parallel \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG[agent_type]} \
-  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+```json
+{
+  "agent_type": "{task_groups[group_id][\"initial_tier\"]}",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "{task_groups[group_id][\"title\"]}",
+  "task_requirements": "{task_groups[group_id][\"requirements\"]}",
+  "branch": "{task_groups[group_id][\"branch\"] or session_branch}",
+  "mode": "parallel",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[agent_type]}",
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+**Step 2: Invoke prompt-builder skill for EACH group**
 
-**IF exit code 1 for any group:**
-→ Read stderr for error → Output: `❌ Prompt build failed for {group_id} | {error}` → Skip that group, continue with others
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON results**
+
+For EACH group, check skill response:
+- `success` is `true`
+- `prompt_file` is non-empty
+- `markers_ok` is `true`
+
+**IF any check fails for a group:**
+→ Output: `❌ Prompt build failed for {group_id} | {error}` → Skip that group, continue with others
 
 **Step 2: Spawn ALL agents in ONE message with file-based instructions**
 
@@ -315,25 +326,33 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 - revision_count >= 2 AND < 3 → senior_software_engineer
 - revision_count >= 3 → tech_lead (for architectural guidance)
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type {determined based on revision_count above} \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "Continuation: {original_task[:60]}" \
-  --task-requirements "PREVIOUS ATTEMPT: {previous_attempt_summary}\nREMAINING ISSUES: {remaining_issues}" \
-  --branch "{branch}" \
-  --mode parallel \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG[agent_type]} \
-  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}_retry.md"
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}_retry.json`:
+```json
+{
+  "agent_type": "{determined based on revision_count above}",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Continuation: {original_task[:60]}",
+  "task_requirements": "PREVIOUS ATTEMPT: {previous_attempt_summary}\nREMAINING ISSUES: {remaining_issues}",
+  "branch": "{branch}",
+  "mode": "parallel",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[agent_type]}",
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}_retry.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}_retry.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn Agent with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Agent with file-based instructions**
 
 → `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
@@ -370,36 +389,44 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
 
 **Prompt building:** Use the same process as Step 2A.4 (QA), 2A.6 (Tech Lead), but substitute group-specific files and context.
 
-**🔴 PRE-SPAWN CHECKLIST (QA/TL Per Group) - FILE-BASED PROMPT**
+**🔴 PRE-SPAWN CHECKLIST (QA/TL Per Group) - SKILL-BASED PROMPT**
 
 When spawning QA or Tech Lead for a group:
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type {qa_expert|tech_lead} \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "{task_description}" \
-  --task-requirements "FILES: {files_changed}" \
-  --branch "{branch}" \
-  --mode parallel \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG[agent_type]} \
-  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+```json
+{
+  "agent_type": "{qa_expert|tech_lead}",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "{task_description}",
+  "task_requirements": "FILES: {files_changed}",
+  "branch": "{branch}",
+  "mode": "parallel",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[agent_type]}",
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn Agent with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Agent with file-based instructions**
 
 ```
 Task(subagent_type="general-purpose", model={model}, description="{agent_type} {group_id}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
 ```
 
 **🔴 SELF-CHECK:**
-- ✅ Did prompt-builder create the file successfully?
+- ✅ Did prompt-builder skill return success?
 - ✅ Did I call Task() with file-based instructions?
 
 ### Step 2B.7: Route Tech Lead Response (Per Group)
@@ -512,27 +539,35 @@ Use the template for merge prompt and response handling. Apply to this group's c
 ✅ All groups complete | {N}/{N} groups approved, all quality gates passed | Final PM check → BAZINGA
 ```
 
-**Build PM prompt using prompt-builder:**
+**Build PM prompt using prompt-builder skill:**
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type project_manager \
-  --session-id "{session_id}" \
-  --group-id "global" \
-  --task-title "Final Assessment (Parallel Mode)" \
-  --task-requirements "GROUPS: {N} groups completed\n\nGroup Results:\n{all_group_results_and_commit_summaries}\n\nAssess if all success criteria are met across ALL groups and decide: BAZINGA or CONTINUE" \
-  --branch "{branch}" \
-  --mode parallel \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["project_manager"]} \
-  --output-file "bazinga/prompts/{session_id}/project_manager_parallel_final.md"
+Write to `bazinga/prompts/{session_id}/params_project_manager_parallel_final.json`:
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "global",
+  "task_title": "Final Assessment (Parallel Mode)",
+  "task_requirements": "GROUPS: {N} groups completed\n\nGroup Results:\n{all_group_results_and_commit_summaries}\n\nAssess if all success criteria are met across ALL groups and decide: BAZINGA or CONTINUE",
+  "branch": "{branch}",
+  "mode": "parallel",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"project_manager\"]}",
+  "output_file": "bazinga/prompts/{session_id}/project_manager_parallel_final.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/project_manager_parallel_final.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn PM with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn PM with file-based instructions**
 
 → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt="FIRST: Read bazinga/prompts/{session_id}/project_manager_parallel_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
@@ -561,25 +596,33 @@ Follow §Step 2A.9 routing rules with parallel-mode adaptations:
 3. **DO NOT** ask "Would you like me to continue?"
 4. **MUST** spawn PM immediately (after phase continuation check in Step 2B.7b finds no more phases)
 
-### Mandatory PM Spawn (FILE-BASED PROMPT):
+### Mandatory PM Spawn (SKILL-BASED PROMPT):
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type project_manager \
-  --session-id "{session_id}" \
-  --group-id "global" \
-  --task-title "All Phases Assessment" \
-  --task-requirements "All phases complete. All groups approved and merged: {group_list}.\n\nQuery database for Original_Scope and compare to completed work:\n- Original estimated items: {Original_Scope.estimated_items}\n- Completed items: {sum of completed group item_counts}\n\nBased on this comparison, you MUST either:\n- Identify additional work items missed (if any remain from Original_Scope), OR\n- Send BAZINGA (if ALL original tasks from scope are complete)\n\nDO NOT ask for permission. Make the decision based on scope comparison." \
-  --branch "{branch}" \
-  --mode parallel \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["project_manager"]} \
-  --output-file "bazinga/prompts/{session_id}/project_manager_all_phases.md"
+Write to `bazinga/prompts/{session_id}/params_project_manager_all_phases.json`:
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "global",
+  "task_title": "All Phases Assessment",
+  "task_requirements": "All phases complete. All groups approved and merged: {group_list}.\n\nQuery database for Original_Scope and compare to completed work:\n- Original estimated items: {Original_Scope.estimated_items}\n- Completed items: {sum of completed group item_counts}\n\nBased on this comparison, you MUST either:\n- Identify additional work items missed (if any remain from Original_Scope), OR\n- Send BAZINGA (if ALL original tasks from scope are complete)\n\nDO NOT ask for permission. Make the decision based on scope comparison.",
+  "branch": "{branch}",
+  "mode": "parallel",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"project_manager\"]}",
+  "output_file": "bazinga/prompts/{session_id}/project_manager_all_phases.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/project_manager_all_phases.md`
+**Step 2: Invoke prompt-builder skill**
+
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
 
 ### Integration with Step 2B.7b:
 

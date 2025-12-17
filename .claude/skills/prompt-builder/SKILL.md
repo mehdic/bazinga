@@ -1,10 +1,10 @@
 ---
 name: prompt-builder
 description: Build complete agent prompts deterministically via Python script. Use BEFORE spawning any BAZINGA agent (Developer, QA, Tech Lead, PM, etc.).
-version: 1.0.0
+version: 2.0.0
 author: BAZINGA Team
 tags: [orchestration, prompts, agents]
-allowed-tools: [Bash]
+allowed-tools: [Bash, Read, Write]
 ---
 
 # Prompt Builder Skill
@@ -19,7 +19,7 @@ This skill builds complete agent prompts by calling a Python script that:
 - Reads full agent definition files from filesystem
 - Applies token budgets per model
 - Validates required markers are present
-- Returns the complete prompt to stdout
+- Saves prompt to file and returns JSON result
 
 ## Prerequisites
 
@@ -33,107 +33,154 @@ This skill builds complete agent prompts by calling a Python script that:
 - When orchestrator needs a complete prompt for Developer, QA Expert, Tech Lead, PM, Investigator, or Requirements Engineer
 - Called ON-DEMAND to get the latest context from database
 
-## Quick Reference - Required Arguments
-
-⚠️ **All these arguments are REQUIRED** (except where noted):
-
-| Argument | Example | Description |
-|----------|---------|-------------|
-| `--agent-type` | `developer` | Agent type (developer, qa_expert, tech_lead, project_manager, etc.) |
-| `--session-id` | `bazinga_20251216_123456` | Current session ID |
-| `--branch` | `main` | Git branch name |
-| `--mode` | `simple` | Orchestration mode (simple or parallel) |
-| `--testing-mode` | `full` | Testing mode (full, minimal, or disabled) |
-| `--group-id` | `CALC` | Task group ID (optional for PM, required for others) |
-| `--model` | `haiku` | Model for token budgets (optional, defaults to sonnet) |
-
 ## Your Task
 
 When invoked, you must:
 
-### Step 1: Extract Parameters from Orchestrator Context
+### Step 1: Read Parameters File
 
-Parse the following from the orchestrator's context or message:
-- `agent_type` (required): developer, qa_expert, tech_lead, project_manager, investigator, requirements_engineer, senior_software_engineer
-- `session_id` (required): Current session ID
-- `branch` (required): Git branch name
-- `mode` (required): simple or parallel
-- `testing_mode` (required): full, minimal, or disabled
-- `group_id` (required for non-PM): Task group ID (e.g., "AUTH", "API")
-- `task_title`: Brief title of the task
-- `task_requirements`: Detailed requirements
-- `model`: haiku, sonnet, or opus (for token budgeting)
+The orchestrator writes a params JSON file before invoking this skill. Look for it at:
 
-**For retries, also extract:**
-- `qa_feedback`: QA failure details (if retrying after QA fail)
-- `tl_feedback`: Tech Lead feedback (if retrying after changes requested)
+```
+bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json
+```
 
-**For PM spawns, also extract:**
-- `pm_state`: PM state JSON from database
-- `resume_context`: Context for PM resume spawns
+Example: `bazinga/prompts/bazinga_20251217_120000/params_developer_CALC.json`
+
+**Params file format:**
+```json
+{
+  "agent_type": "developer",
+  "session_id": "bazinga_20251217_120000",
+  "group_id": "CALC",
+  "task_title": "Implement calculator",
+  "task_requirements": "Create add/subtract functions",
+  "branch": "main",
+  "mode": "simple",
+  "testing_mode": "full",
+  "model": "haiku",
+  "output_file": "bazinga/prompts/bazinga_20251217_120000/developer_CALC.md"
+}
+```
+
+**Additional fields for retries:**
+```json
+{
+  "qa_feedback": "Tests failed: test_add expected 4, got 5",
+  "tl_feedback": "Error handling needs improvement"
+}
+```
+
+**Additional fields for PM spawns:**
+```json
+{
+  "pm_state": "{...json...}",
+  "resume_context": "Resuming after developer completion"
+}
+```
 
 ### Step 2: Call the Python Script
 
-Run the prompt builder script with extracted parameters.
-
-**⚠️ IMPORTANT: Single-line invocation to avoid bash argument parsing issues**
+Run the prompt builder with the params file:
 
 ```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py --agent-type "{agent_type}" --session-id "{session_id}" --group-id "{group_id}" --task-title "{task_title}" --task-requirements "{task_requirements}" --branch "{branch}" --mode "{mode}" --testing-mode "{testing_mode}" --model "{model}"
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py --params-file "bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json"
 ```
 
-**For retries, add to the same line:**
-```bash
---qa-feedback "{qa_feedback}" --tl-feedback "{tl_feedback}"
+The script will:
+1. Read all parameters from the JSON file
+2. Build the complete prompt
+3. Save prompt to `output_file` path
+4. Output JSON result to stdout
+
+### Step 3: Return JSON Result to Orchestrator
+
+The script outputs JSON to stdout:
+
+**Success response:**
+```json
+{
+  "success": true,
+  "prompt_file": "bazinga/prompts/bazinga_20251217_120000/developer_CALC.md",
+  "tokens_estimate": 10728,
+  "lines": 1406,
+  "markers_ok": true,
+  "missing_markers": [],
+  "error": null
+}
 ```
 
-**For PM spawns, add to the same line:**
-```bash
---pm-state '{pm_state_json}' --resume-context "{resume_context}"
+**Error response:**
+```json
+{
+  "success": false,
+  "prompt_file": null,
+  "tokens_estimate": 0,
+  "lines": 0,
+  "markers_ok": false,
+  "missing_markers": ["READY_FOR_QA"],
+  "error": "Prompt validation failed - missing required markers"
+}
 ```
 
-**❌ DO NOT use backslash line continuations** - they can cause argument parsing errors:
-```bash
-# WRONG - avoid this pattern
-python3 script.py \
-  --arg1 "value" \
-  --arg2 "value"
-```
+**Return this JSON to the orchestrator** so it can:
+1. Verify `success` is `true`
+2. Read prompt from `prompt_file` for the Task spawn
+3. Check `markers_ok` is `true`
 
-**✅ Use single-line commands** - prevents empty argument issues:
-```bash
-# CORRECT - all on one line
-python3 script.py --arg1 "value" --arg2 "value"
-```
+## Params File Reference
 
-**Debugging:** Add `--debug` flag to print received arguments if parsing fails.
-
-### Step 3: Return the Complete Prompt
-
-- The script outputs the COMPLETE prompt to stdout
-- The script outputs metadata to stderr (lines, tokens, validation status)
-- Return the stdout content to the orchestrator
+| Field | Required | Example | Description |
+|-------|----------|---------|-------------|
+| `agent_type` | Yes | `developer` | developer, qa_expert, tech_lead, project_manager, etc. |
+| `session_id` | Yes | `bazinga_20251217_120000` | Current session ID |
+| `group_id` | Non-PM | `CALC` | Task group ID |
+| `task_title` | No | `Implement calculator` | Brief title |
+| `task_requirements` | No | `Create functions...` | Detailed requirements |
+| `branch` | Yes | `main` | Git branch name |
+| `mode` | Yes | `simple` | simple or parallel |
+| `testing_mode` | Yes | `full` | full, minimal, or disabled |
+| `model` | No | `haiku` | haiku, sonnet, or opus (default: sonnet) |
+| `output_file` | No | `bazinga/prompts/.../dev.md` | Where to save prompt |
+| `qa_feedback` | No | `Tests failed...` | For developer retry after QA fail |
+| `tl_feedback` | No | `Needs refactoring` | For developer retry after TL review |
+| `pm_state` | No | `{...json...}` | PM state for resume spawns |
+| `resume_context` | No | `Resuming after...` | Context for PM resume |
 
 ## What the Script Does Internally
 
-1. Queries database for `task_groups.specializations` → reads template files
-2. Queries database for `context_packages`, `error_patterns`, `agent_reasoning`
-3. Reads full agent definition file (`agents/*.md`) - 800-2500 lines
-4. Applies token budgets per model (haiku=900, sonnet=1800, opus=2400)
-5. Validates required markers are present (e.g., "READY_FOR_QA", "NO DELEGATION")
-6. Returns composed prompt with: context + specialization + agent file + task
-
-## Output Format
-
-The skill returns the complete prompt text ready for use in a Task spawn.
+1. Reads parameters from JSON file
+2. Queries database for `task_groups.specializations` → reads template files
+3. Queries database for `context_packages`, `error_patterns`, `agent_reasoning`
+4. Reads full agent definition file (`agents/*.md`) - 800-2500 lines
+5. Applies token budgets per model (haiku=900, sonnet=1800, opus=2400)
+6. Validates required markers are present (e.g., "READY_FOR_QA", "NO DELEGATION")
+7. Saves prompt to `output_file`
+8. Returns JSON result to stdout
 
 ## Error Handling
 
-| Error | Exit Code | Meaning |
-|-------|-----------|---------|
-| Missing markers | 1 | Agent file corrupted/incomplete - STOP |
-| Agent file not found | 1 | Invalid agent_type or missing file - STOP |
-| Unknown agent type | 1 | Check agent_type parameter |
-| Database not found | Warning | Proceeds without DB data (specializations/context empty) |
+| Error | JSON Response | Action |
+|-------|---------------|--------|
+| Params file not found | `success: false`, `error: "Params file not found"` | Check file path |
+| Invalid JSON in params | `success: false`, `error: "Invalid JSON..."` | Fix params file |
+| Missing markers | `success: false`, `markers_ok: false` | Agent file corrupted |
+| Agent file not found | `success: false`, `error: "Agent file not found"` | Invalid agent_type |
+| Database not found | Warning, continues | Proceeds without DB data |
 
-If the script fails, do NOT proceed with agent spawn. Report the error to orchestrator.
+If the result has `success: false`, do NOT proceed with agent spawn. Report the error to orchestrator.
+
+## Legacy CLI Mode (Backward Compatibility)
+
+The script still supports direct CLI invocation for manual testing:
+
+```bash
+python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
+  --agent-type developer \
+  --session-id "bazinga_123" \
+  --branch "main" \
+  --mode "simple" \
+  --testing-mode "full"
+```
+
+Add `--json-output` to get JSON response in CLI mode.

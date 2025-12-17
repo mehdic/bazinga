@@ -47,25 +47,36 @@
 
 This section handles spawning Developer, SSE, or RE based on PM's `initial_tier` decision.
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type {agent_type} \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "{task_title}" \
-  --task-requirements "{task_requirements}" \
-  --branch "{branch}" \
-  --mode simple \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG[agent_type]} \
-  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+```json
+{
+  "agent_type": "{agent_type}",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "{task_title}",
+  "task_requirements": "{task_requirements}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[agent_type]}",
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**IF exit code 1:** Read stderr for error → Output: `❌ Prompt build failed | {error}` → STOP
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result**
+
+Skill returns JSON. Check:
+- `success` is `true`
+- `prompt_file` is non-empty
+- `markers_ok` is `true`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
 
 **Step 2: Spawn Agent with file-based instructions**
 
@@ -158,27 +169,35 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 - **Do NOT stop for user input**
 - **IMMEDIATELY spawn Investigator using unified two-turn sequence:**
 
-#### SPAWN INVESTIGATOR (FILE-BASED PROMPT)
+#### SPAWN INVESTIGATOR (SKILL-BASED PROMPT)
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type investigator \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "Investigate: {blocker_description[:60]}" \
-  --task-requirements "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}" \
-  --branch "{branch}" \
-  --mode simple \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["investigator"]} \
-  --output-file "bazinga/prompts/{session_id}/investigator_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_investigator_{group_id}.json`:
+```json
+{
+  "agent_type": "investigator",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Investigate: {blocker_description[:60]}",
+  "task_requirements": "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"investigator\"]}",
+  "output_file": "bazinga/prompts/{session_id}/investigator_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/investigator_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn Investigator with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Investigator with file-based instructions**
 
 → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt="FIRST: Read bazinga/prompts/{session_id}/investigator_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
@@ -188,27 +207,35 @@ After Investigator provides solution, spawn Developer again with resolution usin
 
 **IF Developer reports ESCALATE_SENIOR:**
 
-#### SPAWN SSE ON ESCALATION (FILE-BASED PROMPT)
+#### SPAWN SSE ON ESCALATION (SKILL-BASED PROMPT)
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type senior_software_engineer \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "Escalation: {original_task[:60]}" \
-  --task-requirements "ORIGINAL TASK: {original_task}\nDEVELOPER'S ATTEMPT: {developer_attempt}\nESCALATION REASON: {escalation_reason}" \
-  --branch "{branch}" \
-  --mode simple \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["senior_software_engineer"]} \
-  --output-file "bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_senior_software_engineer_{group_id}.json`:
+```json
+{
+  "agent_type": "senior_software_engineer",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Escalation: {original_task[:60]}",
+  "task_requirements": "ORIGINAL TASK: {original_task}\nDEVELOPER'S ATTEMPT: {developer_attempt}\nESCALATION REASON: {escalation_reason}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"senior_software_engineer\"]}",
+  "output_file": "bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn SSE with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn SSE with file-based instructions**
 
 → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt="FIRST: Read bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
@@ -224,27 +251,35 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
   ```
   Invoke: `Skill(command: "bazinga-db")`
 
-#### SPAWN DEVELOPER RETRY (FILE-BASED PROMPT)
+#### SPAWN DEVELOPER RETRY (SKILL-BASED PROMPT)
 
-**Step 1: Build prompt to file with retry context**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type developer \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "Continuation: {task_title}" \
-  --task-requirements "WORK COMPLETED SO FAR: {summary_of_completed_work}\n\nREMAINING GAPS/ISSUES: {specific_gaps_and_issues}\n\nCONCRETE NEXT STEPS: {next_steps}" \
-  --branch "{branch}" \
-  --mode simple \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["developer"]} \
-  --output-file "bazinga/prompts/{session_id}/developer_{group_id}_retry.md"
+Write to `bazinga/prompts/{session_id}/params_developer_{group_id}_retry.json`:
+```json
+{
+  "agent_type": "developer",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Continuation: {task_title}",
+  "task_requirements": "WORK COMPLETED SO FAR: {summary_of_completed_work}\n\nREMAINING GAPS/ISSUES: {specific_gaps_and_issues}\n\nCONCRETE NEXT STEPS: {next_steps}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"developer\"]}",
+  "output_file": "bazinga/prompts/{session_id}/developer_{group_id}_retry.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/developer_{group_id}_retry.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn Developer with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Developer with file-based instructions**
 
 → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/{session_id}/developer_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
@@ -267,27 +302,35 @@ python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
 ✅ Testing | Running tests + coverage analysis
 ```
 
-### SPAWN QA EXPERT (FILE-BASED PROMPT)
+### SPAWN QA EXPERT (SKILL-BASED PROMPT)
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type qa_expert \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "Validate: {dev_task_title}" \
-  --task-requirements "Developer Changes: {files_changed}\nChallenge Level: {level}/5" \
-  --branch "{branch}" \
-  --mode simple \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["qa_expert"]} \
-  --output-file "bazinga/prompts/{session_id}/qa_expert_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_qa_expert_{group_id}.json`:
+```json
+{
+  "agent_type": "qa_expert",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Validate: {dev_task_title}",
+  "task_requirements": "Developer Changes: {files_changed}\nChallenge Level: {level}/5",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"qa_expert\"]}",
+  "output_file": "bazinga/prompts/{session_id}/qa_expert_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/qa_expert_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn QA Expert with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn QA Expert with file-based instructions**
 
 Output summary:
 ```
@@ -359,27 +402,35 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 👔 Reviewing | Security scan + lint check + architecture analysis
 ```
 
-### SPAWN TECH LEAD (FILE-BASED PROMPT)
+### SPAWN TECH LEAD (SKILL-BASED PROMPT)
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type tech_lead \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "Review: {task_title}" \
-  --task-requirements "QA Result: {qa_result}\nCoverage: {coverage_pct}%\nFiles Changed: {files_list}" \
-  --branch "{branch}" \
-  --mode simple \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["tech_lead"]} \
-  --output-file "bazinga/prompts/{session_id}/tech_lead_{group_id}.md"
+Write to `bazinga/prompts/{session_id}/params_tech_lead_{group_id}.json`:
+```json
+{
+  "agent_type": "tech_lead",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Review: {task_title}",
+  "task_requirements": "QA Result: {qa_result}\nCoverage: {coverage_pct}%\nFiles Changed: {files_list}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"tech_lead\"]}",
+  "output_file": "bazinga/prompts/{session_id}/tech_lead_{group_id}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/tech_lead_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn Tech Lead with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Tech Lead with file-based instructions**
 
 Output summary:
 ```
@@ -663,27 +714,35 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 **FIRST:** Output §Technical Review Summary from `message_templates.md` (aggregate all Tech Lead responses).
 **Skip if:** Only one group (already shown in individual review).
 
-**THEN:** Build PM prompt using prompt-builder:
+**THEN:** Build PM prompt using prompt-builder skill:
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type project_manager \
-  --session-id "{session_id}" \
-  --group-id "global" \
-  --task-title "Final Assessment" \
-  --task-requirements "Implementation Summary: {implementation_summary}\n\nQuality Metrics: {quality_metrics}\n\nAssess if all success criteria are met and decide: BAZINGA or CONTINUE" \
-  --branch "{branch}" \
-  --mode {mode} \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["project_manager"]} \
-  --output-file "bazinga/prompts/{session_id}/project_manager_final.md"
+Write to `bazinga/prompts/{session_id}/params_project_manager_final.json`:
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "global",
+  "task_title": "Final Assessment",
+  "task_requirements": "Implementation Summary: {implementation_summary}\n\nQuality Metrics: {quality_metrics}\n\nAssess if all success criteria are met and decide: BAZINGA or CONTINUE",
+  "branch": "{branch}",
+  "mode": "{mode}",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"project_manager\"]}",
+  "output_file": "bazinga/prompts/{session_id}/project_manager_final.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/project_manager_final.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn PM with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn PM with file-based instructions**
 
 → `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt="FIRST: Read bazinga/prompts/{session_id}/project_manager_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
@@ -802,27 +861,35 @@ Prior agents' documented decision progression:
 3. **DO NOT** ask "Would you like me to continue?"
 4. **MUST** spawn PM immediately
 
-### Mandatory PM Spawn (FILE-BASED PROMPT):
+### Mandatory PM Spawn (SKILL-BASED PROMPT):
 
-**Step 1: Build prompt to file**
+**Step 1: Write params file**
 
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type project_manager \
-  --session-id "{session_id}" \
-  --group-id "global" \
-  --task-title "Phase {N} Assessment" \
-  --task-requirements "Phase {N} complete. All groups approved and merged: {group_list}.\n\nQuery database for Original_Scope and compare to completed work:\n- Original estimated items: {Original_Scope.estimated_items}\n- Completed items: {sum of completed group item_counts}\n\nBased on this comparison, you MUST either:\n- Assign next phase groups (if work remains from Original_Scope), OR\n- Send BAZINGA (if ALL original tasks from scope are complete)\n\nDO NOT ask for permission. Make the decision based on scope comparison." \
-  --branch "{branch}" \
-  --mode {mode} \
-  --testing-mode {testing_mode} \
-  --model {MODEL_CONFIG["project_manager"]} \
-  --output-file "bazinga/prompts/{session_id}/project_manager_phase_{N}.md"
+Write to `bazinga/prompts/{session_id}/params_project_manager_phase_{N}.json`:
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "global",
+  "task_title": "Phase {N} Assessment",
+  "task_requirements": "Phase {N} complete. All groups approved and merged: {group_list}.\n\nQuery database for Original_Scope and compare to completed work:\n- Original estimated items: {Original_Scope.estimated_items}\n- Completed items: {sum of completed group item_counts}\n\nBased on this comparison, you MUST either:\n- Assign next phase groups (if work remains from Original_Scope), OR\n- Send BAZINGA (if ALL original tasks from scope are complete)\n\nDO NOT ask for permission. Make the decision based on scope comparison.",
+  "branch": "{branch}",
+  "mode": "{mode}",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"project_manager\"]}",
+  "output_file": "bazinga/prompts/{session_id}/project_manager_phase_{N}.md"
+}
 ```
 
-**Check stderr for:** `PROMPT_FILE=bazinga/prompts/{session_id}/project_manager_phase_{N}.md`
+**Step 2: Invoke prompt-builder skill**
 
-**Step 2: Spawn PM with file-based instructions**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn PM with file-based instructions**
 
 ```
 Task(
