@@ -170,7 +170,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "$SE
 
 ### 4. Test Execution
 ```bash
-cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
+# Use subshell to prevent CWD change from affecting subsequent commands
+(cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v)
 ```
 - [ ] All tests pass (0 failures)
 - [ ] Comprehensive coverage of all requirements (operations, memory, history, error handling)
@@ -212,6 +213,6 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 # Success criteria
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "$SESSION_ID"
 
-# Run tests
-cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
+# Run tests (use subshell to preserve CWD)
+(cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v)
 ```

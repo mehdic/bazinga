@@ -238,7 +238,7 @@ class BazingaDB:
             try:
                 full_path.relative_to(allowed_base)
             except ValueError:
-                return False, f"Path escapes allowed directory: {spec_path}"
+                return False, f"Path must be relative from project root and within bazinga/templates/specializations/. Got: '{spec_path}'. Expected format: 'bazinga/templates/specializations/01-languages/python.md'"
 
             # Validate path contains only safe characters (alphanumeric, -, _, /, .)
             import re
@@ -3315,8 +3315,12 @@ def main():
             i = 0
             while i < len(cmd_args):
                 arg = cmd_args[i]
-                # Normalize dashes to underscores for flag comparison
-                arg_normalized = arg.replace('-', '_') if arg.startswith('--') else arg
+                # Normalize dashes to underscores in flag NAME only (preserve leading --)
+                # e.g., '--item-count' -> '--item_count', '--specializations' stays same
+                if arg.startswith('--'):
+                    arg_normalized = '--' + arg[2:].replace('-', '_')
+                else:
+                    arg_normalized = arg
                 if arg_normalized == '--specializations' and i + 1 < len(cmd_args):
                     try:
                         specializations = json.loads(cmd_args[i + 1])

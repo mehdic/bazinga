@@ -961,8 +961,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
 # Get full dashboard snapshot
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot <SESSION_ID>
 
-# Run the calculator tests
-cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v
+# Run the calculator tests (use subshell to preserve CWD)
+(cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v)
 ```
 
 ### Test Spec Location
@@ -1070,7 +1070,8 @@ ls -la tmp/simple-calculator-app/
 
 #### Step 9: Tests Pass Check
 ```bash
-cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=short
+# Use subshell to preserve CWD
+(cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=short)
 ```
 
 **Expected output:**
