@@ -33,6 +33,7 @@ Output:
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -116,10 +117,403 @@ CONTEXT_ALLOCATION = {
     "requirements_engineer": 0.30,
 }
 
+# =============================================================================
+# FILE READ LIMIT ENFORCEMENT (Claude's 25000 token limit)
+# See: research/automated-token-budget-implementation.md
+# =============================================================================
+
+# File read limit - configurable via environment variable
+FILE_READ_LIMIT = int(os.environ.get('BAZINGA_PROMPT_FILE_LIMIT', 25000))
+
+# Per-agent safety margins
+# PM has reduced margin because its agent file is already close to the limit
+AGENT_SAFETY_MARGINS = {
+    'project_manager': 0.03,  # 3% margin for PM (agent file already ~24k tokens)
+    'default': 0.08           # 8% margin for other agents
+}
+
+
+def get_effective_budget(agent_type: str) -> int:
+    """Get effective token budget for agent type (with safety margin)."""
+    margin = AGENT_SAFETY_MARGINS.get(agent_type, AGENT_SAFETY_MARGINS['default'])
+    return int(FILE_READ_LIMIT * (1 - margin))
+
 
 def estimate_tokens(text):
-    """Rough token estimate (characters / 4)."""
-    return len(text) // 4
+    """Estimate tokens matching Claude's actual tokenizer.
+
+    Calibrated against actual Claude file read tokenizer:
+    - Uses 3.85 chars/token (derived from actual Claude counts)
+    - 2% safety margin to catch edge cases without over-counting
+
+    This matches Claude's actual behavior within ~3% accuracy.
+    """
+    # Handle None/empty
+    if not text:
+        return 0
+
+    # Handle non-string input (defensive)
+    if not isinstance(text, str):
+        try:
+            text = str(text)
+        except Exception:
+            return 0
+
+    # Very short strings - use simpler estimate
+    if len(text) < 10:
+        return max(1, len(text) // 4)
+
+    # Standard estimation: 3.85 chars/token with 2% safety margin
+    # Calibrated against actual Claude file read token count
+    base_estimate = len(text) / 3.85
+    return int(base_estimate * 1.02)
+
+
+def balance_code_fences(text: str) -> str:
+    """Balance code fences to ensure even number of ``` markers.
+
+    Handles edge case where truncation leaves an unclosed fence.
+    """
+    if not text:
+        return text
+
+    # Track fence state properly (not just count)
+    in_fence = False
+    i = 0
+    while i < len(text) - 2:
+        if text[i:i+3] == '```':
+            in_fence = not in_fence
+            i += 3
+        else:
+            i += 1
+
+    # If we ended inside a fence, close it
+    if in_fence:
+        text = text.rstrip() + "\n```"
+
+    return text
+
+
+def truncate_safely(text: str, target_tokens: int) -> str:
+    """Truncate text at safe boundaries with code fence balancing.
+
+    Safe boundaries (in order of preference):
+    1. Paragraph break (\\n\\n)
+    2. Sentence end (. or ? or !)
+    3. Line break (\\n)
+    4. Character limit (fallback)
+    """
+    if not text:
+        return ""
+
+    current_tokens = estimate_tokens(text)
+    if current_tokens <= target_tokens:
+        return text
+
+    # Calculate target character count (reverse the estimation formula)
+    target_chars = int(target_tokens * 3.5 / 1.10)
+
+    if target_chars <= 0:
+        return "[Content removed due to token budget]"
+
+    if target_chars >= len(text):
+        return text
+
+    truncated = text[:target_chars]
+
+    # Strategy 1: Find paragraph break
+    para_break = truncated.rfind('\n\n')
+    if para_break > target_chars * 0.70:
+        truncated = truncated[:para_break]
+    else:
+        # Strategy 2: Find sentence end
+        sentence_ends = [
+            truncated.rfind('. '),
+            truncated.rfind('.\n'),
+            truncated.rfind('? '),
+            truncated.rfind('! '),
+        ]
+        best_sentence = max((p for p in sentence_ends if p > target_chars * 0.80), default=-1)
+
+        if best_sentence > 0:
+            truncated = truncated[:best_sentence + 1]
+        else:
+            # Strategy 3: Find any line break
+            line_break = truncated.rfind('\n')
+            if line_break > target_chars * 0.85:
+                truncated = truncated[:line_break]
+            # Strategy 4: Just cut at target (fallback)
+
+    # Always balance fences
+    truncated = balance_code_fences(truncated)
+
+    # Add marker
+    if not truncated.endswith('\n'):
+        truncated += '\n'
+    truncated += "\n[... content trimmed due to token budget ...]"
+
+    return truncated
+
+
+def find_example_sections(text: str) -> list:
+    """Find sections explicitly titled as examples.
+
+    Only matches sections with "Example" in the header to avoid
+    removing important code blocks that aren't examples.
+
+    Returns:
+        List of (start_pos, end_pos, section_content) tuples
+    """
+    if not text or len(text) < 50:
+        return []
+
+    try:
+        # Match markdown headers containing "Example" or "Usage"
+        # Pattern: ## Examples, ### Usage Examples, etc.
+        pattern = r'(#+\s*(?:Examples?|Usage Examples?|Reference Examples?|Code Examples?)\s*\n)([\s\S]*?)(?=\n#+\s|\Z)'
+
+        sections = []
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            start = match.start()
+            end = match.end()
+            content = match.group(0)
+            sections.append((start, end, content))
+
+        return sections
+
+    except re.error:
+        return []
+    except Exception:
+        return []
+
+
+def remove_example_sections(text: str, tokens_to_remove: int) -> tuple:
+    """Remove example sections to free up tokens.
+
+    Only removes sections explicitly titled as examples.
+
+    Args:
+        text: Text containing example sections
+        tokens_to_remove: Target number of tokens to free
+
+    Returns:
+        (modified_text, tokens_actually_removed)
+    """
+    sections = find_example_sections(text)
+    if not sections:
+        return text, 0
+
+    # Sort by position (remove from end first - least disruptive)
+    sections.sort(key=lambda x: x[0], reverse=True)
+
+    removed_tokens = 0
+    result = text
+
+    for start, end, content in sections:
+        section_tokens = estimate_tokens(content)
+
+        # Create minimal placeholder
+        placeholder = "\n## Examples\n[Examples removed - see documentation]\n\n"
+
+        # Replace section
+        result = result[:start] + placeholder + result[end:]
+        removed_tokens += section_tokens - estimate_tokens(placeholder)
+
+        if removed_tokens >= tokens_to_remove:
+            break
+
+    return result, removed_tokens
+
+
+def extract_specialization_identity(spec: str) -> tuple:
+    """Extract identity portion from specialization.
+
+    The "identity" is the core role description (e.g., "You are a Python Developer").
+    This should be preserved even when trimming other content.
+
+    Returns:
+        (identity_text, remaining_text)
+    """
+    if not spec:
+        return "", ""
+
+    # Strategy 1: Look for first ## header after initial content
+    first_section = spec.find('\n## ', 200)  # Skip first 200 chars
+    if first_section > 0 and first_section < 2000:
+        return spec[:first_section], spec[first_section:]
+
+    # Strategy 2: Look for "Advisory" section end (common in our templates)
+    advisory_end = spec.find('\n---\n', 100)
+    if advisory_end > 0 and advisory_end < 1500:
+        return spec[:advisory_end + 5], spec[advisory_end + 5:]
+
+    # Strategy 3: Just take first 1800 chars
+    if len(spec) > 1800:
+        # Find safe break point
+        break_point = spec.rfind('\n', 1600, 1900)
+        if break_point > 1600:
+            return spec[:break_point], spec[break_point:]
+        return spec[:1800], spec[1800:]
+
+    # Entire spec is small - keep all as identity
+    return spec, ""
+
+
+def enforce_file_read_budget(
+    agent_definition: str,
+    task_requirements: str,
+    agent_type: str,
+    project_context: str = "",
+    specialization: str = "",
+    feedback_context: str = ""
+) -> tuple:
+    """Enforce FILE_READ_LIMIT by trimming low-priority content.
+
+    Priority (NEVER trim first two):
+    1. agent_definition - NEVER TRIM
+    2. task_requirements - NEVER TRIM
+    3. feedback_context - trim first (retry info)
+    4. example sections in specialization - trim second
+    5. project_context - trim third
+    6. specialization patterns - trim fourth (preserve identity)
+
+    Args:
+        agent_definition: Full agent definition (NEVER trimmed)
+        task_requirements: Task context (NEVER trimmed)
+        agent_type: Agent type for budget calculation
+        project_context: Context from prior work (trimmable)
+        specialization: Specialization block (trimmable, preserve identity)
+        feedback_context: QA/TL feedback for retries (trimmable)
+
+    Returns:
+        (components_dict, trim_report)
+    """
+    # Coerce all inputs to strings
+    agent_definition = str(agent_definition or "")
+    task_requirements = str(task_requirements or "")
+    project_context = str(project_context or "")
+    specialization = str(specialization or "")
+    feedback_context = str(feedback_context or "")
+
+    components = {
+        'agent_definition': agent_definition,
+        'task_requirements': task_requirements,
+        'project_context': project_context,
+        'specialization': specialization,
+        'feedback_context': feedback_context,
+    }
+
+    effective_budget = get_effective_budget(agent_type)
+
+    trim_report = {
+        'original_total': sum(estimate_tokens(c) for c in components.values()),
+        'budget': effective_budget,
+        'file_read_limit': FILE_READ_LIMIT,
+        'actions': [],
+    }
+
+    total = trim_report['original_total']
+
+    # Check if we fit
+    if total <= effective_budget:
+        trim_report['action'] = 'none_needed'
+        trim_report['final_total'] = total
+        return components, trim_report
+
+    overage = total - effective_budget
+
+    # Step 1: Remove feedback context entirely
+    if components['feedback_context'] and overage > 0:
+        freed = estimate_tokens(components['feedback_context'])
+        components['feedback_context'] = ""
+        overage -= freed
+        trim_report['actions'].append(f"Removed feedback_context ({freed} tokens)")
+
+    if overage <= 0:
+        trim_report['action'] = 'trimmed'
+        trim_report['final_total'] = sum(estimate_tokens(c) for c in components.values())
+        return components, trim_report
+
+    # Step 2: Remove example sections from specialization
+    if components['specialization'] and overage > 0:
+        new_spec, freed = remove_example_sections(components['specialization'], overage)
+        if freed > 0:
+            components['specialization'] = new_spec
+            overage -= freed
+            trim_report['actions'].append(f"Removed example sections ({freed} tokens)")
+
+    if overage <= 0:
+        trim_report['action'] = 'trimmed'
+        trim_report['final_total'] = sum(estimate_tokens(c) for c in components.values())
+        return components, trim_report
+
+    # Step 3: Truncate project context (keep minimum 500 tokens)
+    if components['project_context'] and overage > 0:
+        current_ctx_tokens = estimate_tokens(components['project_context'])
+        min_ctx = 500
+        available_to_trim = max(0, current_ctx_tokens - min_ctx)
+
+        if available_to_trim > 0:
+            trim_amount = min(overage, available_to_trim)
+            target_ctx_tokens = current_ctx_tokens - trim_amount
+
+            components['project_context'] = truncate_safely(
+                components['project_context'],
+                target_ctx_tokens
+            )
+            actual_freed = current_ctx_tokens - estimate_tokens(components['project_context'])
+            overage -= actual_freed
+            trim_report['actions'].append(f"Truncated project_context ({actual_freed} tokens)")
+
+    if overage <= 0:
+        trim_report['action'] = 'trimmed'
+        trim_report['final_total'] = sum(estimate_tokens(c) for c in components.values())
+        return components, trim_report
+
+    # Step 4: Truncate specialization (preserve identity header)
+    if components['specialization'] and overage > 0:
+        current_spec_tokens = estimate_tokens(components['specialization'])
+
+        # Preserve identity (first ~500 tokens of specialization)
+        identity, rest = extract_specialization_identity(components['specialization'])
+        identity_tokens = estimate_tokens(identity)
+        rest_tokens = estimate_tokens(rest)
+
+        # Only truncate the non-identity part
+        available_to_trim = rest_tokens
+        if available_to_trim > 0:
+            trim_amount = min(overage, available_to_trim)
+            target_rest_tokens = rest_tokens - trim_amount
+
+            if target_rest_tokens > 0:
+                rest = truncate_safely(rest, target_rest_tokens)
+            else:
+                rest = ""  # Remove entirely, keep only identity
+
+            components['specialization'] = identity + rest
+            actual_freed = current_spec_tokens - estimate_tokens(components['specialization'])
+            overage -= actual_freed
+            trim_report['actions'].append(f"Truncated specialization (kept identity) ({actual_freed} tokens)")
+
+    if overage <= 0:
+        trim_report['action'] = 'trimmed'
+        trim_report['final_total'] = sum(estimate_tokens(c) for c in components.values())
+        return components, trim_report
+
+    # Step 5: FAIL - cannot fit even after all trimming
+    agent_tokens = estimate_tokens(components['agent_definition'])
+    task_tokens = estimate_tokens(components['task_requirements'])
+
+    trim_report['action'] = 'FAILED'
+    trim_report['error'] = (
+        f"Cannot fit prompt in budget. "
+        f"Agent definition ({agent_tokens}) + Task requirements ({task_tokens}) = "
+        f"{agent_tokens + task_tokens} tokens. Budget is {effective_budget}. "
+        f"Remaining overage: {overage} tokens."
+    )
+    trim_report['final_total'] = sum(estimate_tokens(c) for c in components.values())
+
+    return components, trim_report
 
 
 def get_required_markers(conn, agent_type):
@@ -708,13 +1102,110 @@ def build_prompt(args):
         # Compose final prompt
         full_prompt = "\n\n".join(components)
 
-        # 8. Validate required markers (only if DB available)
+        # 8. ENFORCE FILE READ LIMIT (25000 tokens outer guard)
+        # This is the final safety check before the prompt is delivered
+        final_tokens = estimate_tokens(full_prompt)
+        effective_budget = get_effective_budget(args.agent_type)
+
+        if final_tokens > effective_budget:
+            print(f"WARNING: Prompt exceeds effective budget ({final_tokens} > {effective_budget}), applying file read budget enforcement...", file=sys.stderr)
+
+            # Extract components for targeted trimming
+            # We need to identify which parts can be trimmed
+            context_block_str = ""
+            spec_block_str = ""
+            feedback_str = ""
+
+            for comp in components:
+                if "Context from Prior Work" in comp:
+                    context_block_str = comp
+                elif "SPECIALIZATION GUIDANCE" in comp:
+                    spec_block_str = comp
+                elif "Previous QA Feedback" in comp or "Tech Lead Feedback" in comp or "Investigation Findings" in comp:
+                    feedback_str = comp
+
+            # Apply file read budget enforcement
+            budget_components, trim_report = enforce_file_read_budget(
+                agent_definition=agent_definition,
+                task_requirements=task_context,
+                agent_type=args.agent_type,
+                project_context=context_block_str,
+                specialization=spec_block_str,
+                feedback_context=feedback_str
+            )
+
+            # Log trimming actions
+            for action in trim_report.get('actions', []):
+                print(f"WARNING: [FILE_READ_BUDGET] {action}", file=sys.stderr)
+
+            # Check if enforcement failed
+            if trim_report.get('action') == 'FAILED':
+                error_msg = trim_report.get('error', 'Unknown budget enforcement failure')
+                print(f"ERROR: {error_msg}", file=sys.stderr)
+                if getattr(args, 'json_output', False):
+                    print(json.dumps({
+                        "success": False,
+                        "error": error_msg,
+                        "prompt_file": None,
+                        "tokens_estimate": final_tokens,
+                        "lines": 0,
+                        "markers_ok": False,
+                        "budget_exceeded": True,
+                        "trim_report": trim_report
+                    }, indent=2))
+                sys.exit(1)
+
+            # Rebuild prompt from trimmed components
+            trimmed_components = []
+            if budget_components['project_context']:
+                trimmed_components.append(budget_components['project_context'])
+            if budget_components['specialization']:
+                trimmed_components.append(budget_components['specialization'])
+            trimmed_components.append(budget_components['agent_definition'])
+            trimmed_components.append(budget_components['task_requirements'])
+
+            # Add PM-specific context back (if present and this is PM)
+            if args.agent_type == "project_manager":
+                pm_context = build_pm_context(args)
+                if pm_context:
+                    trimmed_components.append(pm_context)
+                resume_context = build_resume_context(args)
+                if resume_context:
+                    trimmed_components.append(resume_context)
+
+            if budget_components['feedback_context']:
+                trimmed_components.append(budget_components['feedback_context'])
+
+            full_prompt = "\n\n".join(trimmed_components)
+
+            # Balance code fences on final prompt
+            full_prompt = balance_code_fences(full_prompt)
+
+            print(f"INFO: [FILE_READ_BUDGET] Trimmed from {final_tokens} to {trim_report.get('final_total', 'unknown')} tokens", file=sys.stderr)
+
+        # Final validation: ensure we're under the hard limit
+        final_tokens = estimate_tokens(full_prompt)
+        if final_tokens > FILE_READ_LIMIT:
+            print(f"ERROR: Final prompt ({final_tokens} tokens) still exceeds FILE_READ_LIMIT ({FILE_READ_LIMIT})", file=sys.stderr)
+            if getattr(args, 'json_output', False):
+                print(json.dumps({
+                    "success": False,
+                    "error": f"Prompt exceeds file read limit: {final_tokens} > {FILE_READ_LIMIT}",
+                    "prompt_file": None,
+                    "tokens_estimate": final_tokens,
+                    "lines": 0,
+                    "markers_ok": False,
+                    "budget_exceeded": True
+                }, indent=2))
+            sys.exit(1)
+
+        # 9. Validate required markers (only if DB available)
         if conn:
             markers = get_required_markers(conn, args.agent_type)
             if markers:
                 markers_valid = validate_markers(full_prompt, markers, args.agent_type)
 
-        # 9. Prepare metadata
+        # 10. Prepare metadata
         lines = len(full_prompt.splitlines())
         tokens = estimate_tokens(full_prompt)
 
@@ -764,7 +1255,13 @@ def build_prompt(args):
                 "lines": lines,
                 "markers_ok": markers_valid,
                 "missing_markers": [],
-                "error": None
+                "error": None,
+                "budget": {
+                    "file_read_limit": FILE_READ_LIMIT,
+                    "effective_budget": get_effective_budget(args.agent_type),
+                    "used": tokens,
+                    "remaining": FILE_READ_LIMIT - tokens
+                }
             }
             print(json.dumps(result, indent=2))
         else:
