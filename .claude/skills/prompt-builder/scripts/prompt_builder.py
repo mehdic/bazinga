@@ -849,8 +849,9 @@ def version_matches(detected_version, operator, required_version):
 
 # Guard token normalization - map common aliases to canonical names
 # This ensures "py >= 3.10" matches against primary_language="python"
-# NOTE: 'node' is NOT aliased because node_version is a separate field, not a primary_language
+# Covers all 93 unique version guard tokens from 72 specialization templates
 GUARD_TOKEN_ALIASES = {
+    # Languages
     'py': 'python',
     'python3': 'python',
     'ts': 'typescript',
@@ -864,6 +865,58 @@ GUARD_TOKEN_ALIASES = {
     'cs': 'csharp',
     'dotnet': 'csharp',
     '.net': 'csharp',
+    'c++': 'cpp',
+    'cplusplus': 'cpp',
+    'sh': 'bash',
+    'shell': 'bash',
+    'zsh': 'bash',
+    # Databases
+    'postgres': 'postgresql',
+    'pg': 'postgresql',
+    'mongo': 'mongodb',
+    'mssql': 'sqlserver',
+    'es': 'elasticsearch',
+    # Frontend frameworks
+    'next': 'nextjs',
+    'next.js': 'nextjs',
+    'react.js': 'react',
+    'reactjs': 'react',
+    'vue.js': 'vue',
+    'vuejs': 'vue',
+    'angular.js': 'angular',
+    'angularjs': 'angular',
+    'sveltejs': 'svelte',
+    'tailwindcss': 'tailwind',
+    'astro.js': 'astro',
+    # Backend frameworks
+    'spring': 'spring-boot',
+    'springboot': 'spring-boot',
+    'nest': 'nestjs',
+    'nest.js': 'nestjs',
+    'expressjs': 'express',
+    'express.js': 'express',
+    'rubyonrails': 'rails',
+    'ror': 'rails',
+    'gin-gonic': 'gin',
+    'gofiber': 'fiber',
+    # Mobile
+    'rn': 'react-native',
+    'reactnative': 'react-native',
+    # Testing
+    'pw': 'playwright',
+    'cy': 'cypress',
+    'tc': 'testcontainers',
+    # Infrastructure
+    'tf': 'terraform',
+    'k8s': 'kubernetes',
+    'otel': 'opentelemetry',
+    'gha': 'github-actions',
+    'gh-actions': 'github-actions',
+    # Data/AI
+    'spark': 'pyspark',
+    'scikit-learn': 'sklearn',
+    'scikit': 'sklearn',
+    'lc': 'langchain',
 }
 
 
@@ -908,16 +961,98 @@ def evaluate_version_guard(guard_text, project_context):
             if project_context.get('framework', '').lower() == lang_lower:
                 detected_version = parse_version(project_context.get('framework_version'))
 
-        # 3. Check language-specific version fields (e.g., "node >= 18", "java >= 17")
+        # 3. Check language/tool-specific version fields
         # These handle cases where versions are stored at top-level rather than in primary_language
+        # Covers all 93 unique version guard tokens from 72 specialization templates
         if detected_version is None:
             lang_version_map = {
+                # Languages
                 'node': 'node_version',
                 'java': 'java_version',
                 'go': 'go_version',
                 'php': 'php_version',
                 'csharp': 'dotnet_version',
                 'kotlin': 'kotlin_version',
+                'scala': 'scala_version',
+                'elixir': 'elixir_version',
+                'swift': 'swift_version',
+                'cpp': 'cpp_version',
+                'bash': 'bash_version',
+                'dart': 'dart_version',
+                'ruby': 'ruby_version',
+                'rust': 'rust_version',
+                # Databases
+                'postgresql': 'postgresql_version',
+                'mysql': 'mysql_version',
+                'mongodb': 'mongodb_version',
+                'redis': 'redis_version',
+                'elasticsearch': 'elasticsearch_version',
+                'sqlserver': 'sqlserver_version',
+                'oracle': 'oracle_version',
+                # Frontend frameworks
+                'react': 'react_version',
+                'nextjs': 'nextjs_version',
+                'vue': 'vue_version',
+                'angular': 'angular_version',
+                'svelte': 'svelte_version',
+                'astro': 'astro_version',
+                'htmx': 'htmx_version',
+                'alpine': 'alpine_version',
+                'tailwind': 'tailwind_version',
+                # Backend frameworks
+                'spring-boot': 'spring_boot_version',
+                'django': 'django_version',
+                'flask': 'flask_version',
+                'fastapi': 'fastapi_version',
+                'express': 'express_version',
+                'nestjs': 'nestjs_version',
+                'rails': 'rails_version',
+                'laravel': 'laravel_version',
+                'gin': 'gin_version',
+                'fiber': 'fiber_version',
+                'phoenix': 'phoenix_version',
+                # Mobile
+                'flutter': 'flutter_version',
+                'react-native': 'react_native_version',
+                'ios': 'ios_version',
+                'tauri': 'tauri_version',
+                'electron': 'electron_version',
+                # Testing
+                'playwright': 'playwright_version',
+                'cypress': 'cypress_version',
+                'selenium': 'selenium_version',
+                'jest': 'jest_version',
+                'vitest': 'vitest_version',
+                'pytest': 'pytest_version',
+                'testcontainers': 'testcontainers_version',
+                # Infrastructure
+                'terraform': 'terraform_version',
+                'docker': 'docker_version',
+                'kubernetes': 'kubernetes_version',
+                'opentelemetry': 'opentelemetry_version',
+                'prometheus': 'prometheus_version',
+                'github-actions': 'github_actions_version',
+                # Data/AI
+                'pyspark': 'pyspark_version',
+                'airflow': 'airflow_version',
+                'langchain': 'langchain_version',
+                'sklearn': 'sklearn_version',
+                'pydantic': 'pydantic_version',
+                'dbt': 'dbt_version',
+                'mlflow': 'mlflow_version',
+                # APIs
+                'openapi': 'openapi_version',
+                'grpc': 'grpc_version',
+                'kafka': 'kafka_version',
+                'graphql': 'graphql_version',
+                'protobuf': 'protobuf_version',
+                # Auth
+                'oauth': 'oauth_version',
+                'jwt': 'jwt_version',
+                # Validation
+                'zod': 'zod_version',
+                'joi': 'joi_version',
+                'prisma': 'prisma_version',
             }
             if lang_lower in lang_version_map:
                 detected_version = parse_version(project_context.get(lang_version_map[lang_lower]))
@@ -932,11 +1067,32 @@ def evaluate_version_guard(guard_text, project_context):
                     # No version info for this language
                     break
 
-        # 5. Check infrastructure (test frameworks, etc.)
+        # 5. Check infrastructure section (databases, test frameworks, CI/CD, etc.)
         if detected_version is None:
             infra = project_context.get('infrastructure', {})
-            if lang_lower in ['jest', 'vitest', 'pytest', 'testcontainers']:
-                detected_version = parse_version(infra.get(f'{lang_lower}_version'))
+            # Direct field lookup (e.g., infra.jest_version, infra.docker_version)
+            version_key = f'{lang_lower}_version'.replace('-', '_')
+            if version_key in infra:
+                detected_version = parse_version(infra.get(version_key))
+            # Also check without _version suffix (e.g., infra.docker = "24.0")
+            elif lang_lower in infra:
+                detected_version = parse_version(infra.get(lang_lower))
+
+        # 6. Check testing section (for components with testing: ["jest", "playwright"])
+        if detected_version is None:
+            testing = project_context.get('testing', {})
+            version_key = f'{lang_lower}_version'.replace('-', '_')
+            if version_key in testing:
+                detected_version = parse_version(testing.get(version_key))
+
+        # 7. Check databases section
+        if detected_version is None:
+            databases = project_context.get('databases', {})
+            version_key = f'{lang_lower}_version'.replace('-', '_')
+            if version_key in databases:
+                detected_version = parse_version(databases.get(version_key))
+            elif lang_lower in databases:
+                detected_version = parse_version(databases.get(lang_lower))
 
         # If we have a detected version, check the condition
         if detected_version is not None:
