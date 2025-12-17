@@ -685,13 +685,27 @@ def get_component_version_context(project_context, component_path):
                 best_match_len = path_len
 
     if best_match:
-        return {
+        # Build context with all version-related fields from the component
+        # This ensures multiple specializations (python, fastapi, postgresql) all get their versions
+        context = {
             'primary_language': best_match.get('language'),
             'primary_language_version': best_match.get('language_version'),
             'framework': best_match.get('framework'),
             'framework_version': best_match.get('framework_version'),
-            'node_version': best_match.get('node_version'),
+            'database': best_match.get('database'),
         }
+
+        # Dynamically extract ALL *_version fields from the component
+        # This handles: node_version, database_version, pytest_version, playwright_version, etc.
+        for key, value in best_match.items():
+            if key.endswith('_version') and value is not None:
+                context[key] = value
+
+        # Also extract testing list for reference
+        if best_match.get('testing'):
+            context['testing'] = best_match.get('testing')
+
+        return context
 
     # No match - return global versions
     return {
