@@ -209,43 +209,57 @@ class BazingaDB:
 
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
-    def _validate_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> Tuple[bool, Optional[str]]:
-        """Validate specialization path for security (prevent path traversal).
+    def _normalize_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> Tuple[bool, str]:
+        """Normalize and validate specialization path.
+
+        Accepts either:
+        - Short path: "01-languages/python.md" -> auto-prefixed
+        - Full path: "bazinga/templates/specializations/01-languages/python.md"
 
         Args:
-            spec_path: Relative path to specialization file
+            spec_path: Path to specialization file (short or full)
             project_root: Project root directory (auto-detected if not provided)
 
         Returns:
-            Tuple of (is_valid, error_message)
+            Tuple of (is_valid, normalized_path_or_error_message)
         """
         try:
+            import re
+
+            # Validate path contains only safe characters first
+            if not re.match(r'^[a-zA-Z0-9/_.-]+$', spec_path):
+                return False, f"Path contains unsafe characters: {spec_path}"
+
+            # Block path traversal attempts
+            if '..' in spec_path:
+                return False, f"Path traversal not allowed: {spec_path}"
+
             # Auto-detect project root if not provided
             if project_root is None:
                 if _HAS_BAZINGA_PATHS:
                     project_root = get_project_root()
                 else:
-                    # Fallback: assume db_path is at PROJECT_ROOT/bazinga/bazinga.db
                     project_root = Path(self.db_path).parent.parent
 
-            # Define allowed base directory
+            # Define the specializations base
+            spec_base = "bazinga/templates/specializations/"
+
+            # Normalize: auto-prefix if not already a full path
+            if spec_path.startswith(spec_base):
+                normalized_path = spec_path
+            else:
+                normalized_path = spec_base + spec_path.lstrip('/')
+
+            # Verify the normalized path is within allowed directory
             allowed_base = (project_root / "bazinga" / "templates" / "specializations").resolve()
+            full_path = (project_root / normalized_path).resolve()
 
-            # Resolve the provided path (handles .., symlinks, etc.)
-            full_path = (project_root / spec_path).resolve()
-
-            # Check if resolved path is within allowed base
             try:
                 full_path.relative_to(allowed_base)
             except ValueError:
-                return False, f"Path must be relative from project root and within bazinga/templates/specializations/. Got: '{spec_path}'. Expected format: 'bazinga/templates/specializations/01-languages/python.md'"
+                return False, f"Path escapes allowed directory: {spec_path}"
 
-            # Validate path contains only safe characters (alphanumeric, -, _, /, .)
-            import re
-            if not re.match(r'^[a-zA-Z0-9/_.-]+$', spec_path):
-                return False, f"Path contains unsafe characters: {spec_path}"
-
-            return True, None
+            return True, normalized_path
 
         except Exception as e:
             return False, f"Path validation error: {e}"
@@ -1169,14 +1183,17 @@ class BazingaDB:
                         "success": False,
                         "error": "specializations must contain only strings"
                     }
-                # Validate paths for security (prevent path traversal)
+                # Normalize and validate paths (auto-prefix short paths)
+                normalized_specs = []
                 for spec_path in specializations:
-                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    is_valid, result = self._normalize_specialization_path(spec_path)
                     if not is_valid:
                         return {
                             "success": False,
-                            "error": f"Invalid specialization path: {error_msg}"
+                            "error": f"Invalid specialization path: {result}"
                         }
+                    normalized_specs.append(result)
+                specializations = normalized_specs
 
             # Validate item_count if provided
             if item_count is not None and (not isinstance(item_count, int) or item_count < 1):
@@ -1262,14 +1279,17 @@ class BazingaDB:
                         "success": False,
                         "error": "specializations must contain only strings"
                     }
-                # Validate paths for security (prevent path traversal)
+                # Normalize and validate paths (auto-prefix short paths)
+                normalized_specs = []
                 for spec_path in specializations:
-                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    is_valid, result = self._normalize_specialization_path(spec_path)
                     if not is_valid:
                         return {
                             "success": False,
-                            "error": f"Invalid specialization path: {error_msg}"
+                            "error": f"Invalid specialization path: {result}"
                         }
+                    normalized_specs.append(result)
+                specializations = normalized_specs
 
             conn = self._get_connection()
             updates = []
