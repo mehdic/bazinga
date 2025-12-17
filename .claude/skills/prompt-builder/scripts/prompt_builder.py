@@ -635,8 +635,175 @@ def validate_template_path(template_path):
         return None
 
 
+def strip_yaml_frontmatter(content):
+    """Strip YAML frontmatter from template content.
+
+    Frontmatter is metadata between --- markers at the start of a file.
+    It's used by the template system but shouldn't appear in agent prompts.
+    """
+    lines = content.split('\n')
+
+    # Check if content starts with frontmatter
+    if not lines or lines[0].strip() != '---':
+        return content
+
+    # Find the closing ---
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == '---':
+            # Return content after frontmatter, stripping leading whitespace
+            remaining = '\n'.join(lines[i+1:]).lstrip()
+            return remaining
+
+    # No closing --- found, return original
+    return content
+
+
+def parse_version(version_str):
+    """Parse version string into comparable tuple.
+
+    Handles formats: "3.10", "3.10.1", "1.8", "8" (Java 8 = 1.8)
+    """
+    if not version_str:
+        return None
+
+    # Normalize Java versions: "8" -> "1.8", but "11" stays "11"
+    version_str = str(version_str).strip()
+
+    try:
+        parts = version_str.split('.')
+        return tuple(int(p) for p in parts)
+    except (ValueError, AttributeError):
+        return None
+
+
+def version_matches(detected_version, operator, required_version):
+    """Check if detected version matches the requirement.
+
+    Args:
+        detected_version: Tuple like (3, 10) or (3, 10, 1)
+        operator: One of '>=', '>', '<=', '<', '=='
+        required_version: Tuple like (3, 10)
+
+    Returns:
+        True if condition is met, False otherwise
+    """
+    if detected_version is None or required_version is None:
+        return False
+
+    # Pad shorter version with zeros for comparison
+    max_len = max(len(detected_version), len(required_version))
+    d = detected_version + (0,) * (max_len - len(detected_version))
+    r = required_version + (0,) * (max_len - len(required_version))
+
+    if operator == '>=':
+        return d >= r
+    elif operator == '>':
+        return d > r
+    elif operator == '<=':
+        return d <= r
+    elif operator == '<':
+        return d < r
+    elif operator == '==':
+        return d == r
+    else:
+        return False
+
+
+def evaluate_version_guard(guard_text, project_context):
+    """Evaluate a version guard against project context.
+
+    Args:
+        guard_text: e.g., "python >= 3.10" or "python >= 3.7, python < 3.10"
+        project_context: Dict with version info
+
+    Returns:
+        True if all conditions are met (or no version detected = include all)
+        False if any condition fails
+    """
+    if not project_context:
+        return True  # No context = include everything
+
+    # Parse conditions (comma-separated for AND)
+    conditions = [c.strip() for c in guard_text.split(',')]
+
+    for condition in conditions:
+        # Parse: "python >= 3.10" or "jest >= 27"
+        match = re.match(r'(\w+)\s*(>=|>|<=|<|==)\s*([\d.]+)', condition)
+        if not match:
+            continue  # Skip unparseable conditions
+
+        lang, operator, version_str = match.groups()
+        required_version = parse_version(version_str)
+
+        # Get detected version from project_context
+        detected_version = None
+        lang_lower = lang.lower()
+
+        # Check primary language
+        if project_context.get('primary_language', '').lower() == lang_lower:
+            detected_version = parse_version(project_context.get('primary_language_version'))
+
+        # Check secondary languages
+        for sec_lang in project_context.get('secondary_languages', []):
+            if isinstance(sec_lang, dict) and sec_lang.get('name', '').lower() == lang_lower:
+                detected_version = parse_version(sec_lang.get('version'))
+                break
+            elif isinstance(sec_lang, str) and sec_lang.lower() == lang_lower:
+                # No version info for this language
+                break
+
+        # Check infrastructure (test frameworks, etc.)
+        infra = project_context.get('infrastructure', {})
+        if lang_lower in ['jest', 'vitest', 'pytest', 'testcontainers']:
+            detected_version = parse_version(infra.get(f'{lang_lower}_version'))
+
+        # If we have a detected version, check the condition
+        if detected_version is not None:
+            if not version_matches(detected_version, operator, required_version):
+                return False  # Condition failed
+        # If no version detected for this language, include content (conservative)
+
+    return True  # All conditions passed (or no version to check)
+
+
+def apply_version_guards(content, project_context):
+    """Apply version guards to filter content based on project versions.
+
+    Format: <!-- version: python >= 3.10 -->
+    Content after a guard is included/excluded based on version match.
+    Guards apply until the next guard or section boundary (---).
+    """
+    # Pattern to match version guards (use .+? not [^>]+? to allow >= operators)
+    guard_pattern = re.compile(r'<!--\s*version:\s*(.+?)\s*-->')
+
+    lines = content.split('\n')
+    result = []
+    include_current = True  # Start by including content
+
+    for line in lines:
+        # Check for version guard
+        match = guard_pattern.search(line)
+        if match:
+            guard_text = match.group(1)
+            include_current = evaluate_version_guard(guard_text, project_context)
+            # Don't include the guard comment itself in output
+            continue
+
+        # Section boundary resets to include
+        if line.strip() == '---':
+            include_current = True
+            result.append(line)
+            continue
+
+        # Include line if current section passes version check
+        if include_current:
+            result.append(line)
+
+    return '\n'.join(result)
+
+
 def read_template_with_version_guards(template_path, project_context):
-    """Read template file and apply version guards (with path validation)."""
+    """Read template file, strip frontmatter, and apply version guards."""
     # Validate path for security
     validated_path = validate_template_path(template_path)
     if validated_path is None:
@@ -651,9 +818,11 @@ def read_template_with_version_guards(template_path, project_context):
         print(f"WARNING: Failed to read template {template_path}: {e}", file=sys.stderr)
         return ""
 
-    # Simple version guard processing
-    # Format: <!-- version: LANG OPERATOR VERSION -->
-    # For now, include all content (version guards are a future enhancement)
+    # 1. Strip YAML frontmatter (metadata for template system, not for agents)
+    content = strip_yaml_frontmatter(content)
+
+    # 2. Apply version guards (filter content based on detected versions)
+    content = apply_version_guards(content, project_context)
 
     return content
 
