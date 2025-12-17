@@ -202,9 +202,11 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
 **Validation Logic:**
 ```
 IF about to call Task():
-  1. Run prompt-builder script with --output-file to save prompt to file
-  2. Verify PROMPT_FILE appears in stderr
-  3. Use Task() with instruction to read the prompt file first
+  1. Write params JSON file: bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json
+  2. Invoke Skill(command: "prompt-builder") - skill reads params file, outputs JSON
+  3. Parse JSON response: verify success=true, get prompt_file path
+  4. Read the prompt from prompt_file
+  5. Use Task() with the prompt content
 ```
 
 **If prompt-builder was NOT invoked:** STOP. Run prompt-builder first. Do NOT call Task() without it.
@@ -309,16 +311,28 @@ Resume Context: {context if resume scenario}
 
 **🚨 BEFORE INVOKING Task() TO SPAWN ANY AGENT, YOU MUST:**
 
-1. **Run prompt-builder** with `--output-file` to save prompt to file:
-   ```bash
-   python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-     --agent-type {agent_type} ... --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+1. **Write params file** to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+   ```json
+   {
+     "agent_type": "{agent_type}",
+     "session_id": "{session_id}",
+     "group_id": "{group_id}",
+     "task_title": "{title}",
+     "task_requirements": "{requirements}",
+     "branch": "{branch}",
+     "mode": "{simple|parallel}",
+     "testing_mode": "{full|minimal|disabled}",
+     "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+   }
    ```
-2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
-3. **Spawn agent** with file-based instruction:
+2. **Invoke prompt-builder skill**:
    ```
-   Task(..., prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+   Skill(command: "prompt-builder")
    ```
+   The skill reads the params file and outputs JSON with `prompt_file` path.
+3. **Parse JSON response**: verify `success: true`, get `prompt_file` path
+4. **Read the prompt** from the `prompt_file` path
+5. **Spawn agent** with the prompt content in Task()
 
 **🚫 FORBIDDEN: Spawning any agent WITHOUT going through prompt-builder.**
 
@@ -327,9 +341,8 @@ Resume Context: {context if resume scenario}
 - Builds specialization blocks from DB + template files
 - Builds context blocks from prior agent reasoning
 - Validates required markers are present
-- Saves the complete, verified prompt to a file
-
-**File-based delivery ensures the spawned agent (even haiku) receives the complete 1400+ line prompt.**
+- Saves the complete, verified prompt to output_file
+- Returns JSON with success status and prompt_file path
 
 ---
 
@@ -2036,31 +2049,40 @@ ELSE IF PM chose "parallel":
 - PM stores specializations via `bazinga-db create-task-group --specializations '[...]'`
 
 **Phase 2: Orchestrator Prompt Building (at agent spawn)**
-1. Run prompt-builder with `--output-file` to save prompt to file
-2. Verify PROMPT_FILE appears in stderr
-3. Spawn agent with instruction to read the file first
+1. Write params JSON file with agent config and output_file path
+2. Invoke `Skill(command: "prompt-builder")` - skill reads params file
+3. Parse JSON response, verify success, get prompt_file
+4. Read prompt from file and spawn agent with prompt content
 
 ### Process (at agent spawn)
 
-**Step 1: Run prompt-builder with file output**
-```bash
-python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-  --agent-type {developer|senior_software_engineer|qa_expert|tech_lead|project_manager|investigator|requirements_engineer} \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --task-title "{task title}" \
-  --task-requirements "{requirements}" \
-  --branch "{branch}" \
-  --mode {simple|parallel} \
-  --testing-mode {full|minimal|disabled} \
-  --model {haiku|sonnet|opus} \
-  --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+**Step 1: Write params file**
+```json
+// bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json
+{
+  "agent_type": "{agent_type}",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "{task title}",
+  "task_requirements": "{requirements}",
+  "branch": "{branch}",
+  "mode": "{simple|parallel}",
+  "testing_mode": "{full|minimal|disabled}",
+  "model": "{haiku|sonnet|opus}",
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+}
 ```
 
-**Step 2: Verify file was created**
-Check stderr for: `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
+**Step 2: Invoke prompt-builder skill**
+```
+Skill(command: "prompt-builder")
+```
+The skill reads the params file and outputs JSON with `prompt_file` path.
 
-**Step 3: Spawn agent with file-based instructions**
+**Step 3: Parse JSON response**
+Verify `success: true` and get `prompt_file` path from JSON output.
+
+**Step 4: Spawn agent with prompt content**
 ```
 Task(
   subagent_type: "general-purpose",
@@ -2114,20 +2136,12 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 
 **If Read fails:** Output `❌ Template load failed | phase_simple.md` and STOP.
 
-**🚨 SPAWN SEQUENCE (FILE-BASED PROMPT):**
+**🚨 SPAWN SEQUENCE (PARAMS-FILE + JSON):**
 
-1. **Run prompt-builder** with `--output-file` to save prompt to file:
-   ```bash
-   python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-     --agent-type {agent_type} --session-id "{session_id}" ... \
-     --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
-   ```
-2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
-3. **Spawn agent** with file-based instruction:
-   ```
-   Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
-        prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
-   ```
+1. **Write params file** with agent config to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`
+2. **Run prompt-builder** with `--params-file` (outputs JSON to stdout)
+3. **Parse JSON response**, verify `success: true`, get `prompt_file` path
+4. **Read prompt** from `prompt_file`, spawn agent with prompt content
 
 **🔴 CRITICAL:** See `phase_simple.md` for complete spawn sequences with all parameters.
 
@@ -2147,20 +2161,27 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 
 **🚨 SPAWN SEQUENCE (FILE-BASED PROMPT) - FOR EACH GROUP:**
 
-1. **Run prompt-builder** with `--output-file` to save prompt to file:
-   ```bash
-   python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-     --agent-type {agent_type} --session-id "{session_id}" ... \
-     --output-file "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+1. **Write params JSON file:**
    ```
-2. **Check stderr** for `PROMPT_FILE=bazinga/prompts/{session_id}/{agent_type}_{group_id}.md`
-3. **Spawn agent** with file-based instruction:
+   bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json
+   ```
+   Include: agent_type, session_id, group_id, task_title, task_requirements, branch, mode, testing_mode, model, output_file
+
+2. **Invoke prompt-builder skill:**
+   ```
+   Skill(command: "prompt-builder")
+   ```
+   The skill reads the params file and outputs JSON: `{success, prompt_file, tokens_estimate, ...}`
+
+3. **Verify success and spawn agent:**
+   - Parse JSON response, verify `success=true`
+   - Spawn with file-based instruction:
    ```
    Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
-        prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+        prompt="FIRST: Read {prompt_file} which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
    ```
 
-**For parallel spawns:** Repeat steps 1-3 for each group, creating separate prompt files. You can call multiple Task() tools in the same message.
+**For parallel spawns:** Write params files for each group, invoke prompt-builder for each, then spawn all agents. You can call multiple Task() tools in the same message.
 
 **🔴 CRITICAL:** See `phase_parallel.md` for complete spawn sequences with all parameters.
 
@@ -2262,11 +2283,13 @@ Skill(command: "bazinga-db") → get-task-groups {session_id}
 
 ### After Prompt-Builder Invocation
 
-Verify prompt was built successfully:
-- Check prompt-builder output includes full agent definition (~1400+ lines)
-- Check metadata in stderr shows `lines=` and `tokens_estimate=`
+Verify prompt was built successfully by checking the JSON response:
+- `success: true` - build completed without errors
+- `lines: 1400+` - full agent definition included
+- `tokens_estimate: 10000+` - appropriate size for agent type
+- `markers_ok: true` - required markers present
 
-**If prompt seems short:** Prompt-builder may have failed. Check stderr for errors.
+**If success=false:** Check `error` field in JSON response. Re-invoke prompt-builder after fixing the issue.
 
 ### Verification Gate Summary
 

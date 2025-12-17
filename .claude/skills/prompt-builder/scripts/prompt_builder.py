@@ -13,21 +13,23 @@ Then reads from filesystem:
 - Agent definition files (agents/*.md)
 - Specialization templates (bazinga/templates/specializations/*.md)
 
-Usage:
-    python3 .claude/skills/prompt-builder/scripts/prompt_builder.py \
-        --agent-type developer \
-        --session-id "bazinga_xxx" \
-        --group-id "AUTH" \
-        --task-title "Implement auth" \
-        --task-requirements "Create login endpoint" \
-        --branch "main" \
-        --mode "parallel" \
-        --testing-mode "full"
+Usage (params-file mode - RECOMMENDED for orchestrator):
+    python3 prompt_builder.py --params-file "bazinga/prompts/{session}/params.json"
 
-Output:
-    Complete prompt to stdout (only on success)
-    Metadata to stderr
-    Exit code 0 on success, 1 on validation failure
+    The params file contains all configuration as JSON.
+    Output: JSON to stdout with {success, prompt_file, tokens_estimate, ...}
+    The prompt itself is saved to the output_file path specified in params.
+
+Usage (CLI mode - for manual testing):
+    python3 prompt_builder.py --agent-type developer --session-id "bazinga_xxx" \\
+        --branch "main" --mode "simple" --testing-mode "full"
+
+    Output: Raw prompt to stdout (backward compatibility)
+    Add --json-output for JSON response instead.
+
+Exit codes:
+    0 = success
+    1 = validation failure or error
 """
 
 import argparse

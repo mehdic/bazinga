@@ -209,16 +209,18 @@ class BazingaDB:
 
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
-    def _normalize_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> Tuple[bool, str]:
+    def _normalize_specialization_path(self, spec_path: str, project_root: Optional[Path] = None, verify_exists: bool = False) -> Tuple[bool, str]:
         """Normalize and validate specialization path.
 
         Accepts either:
         - Short path: "01-languages/python.md" -> auto-prefixed
+        - Medium path: "specializations/01-languages/python.md" -> normalized
         - Full path: "bazinga/templates/specializations/01-languages/python.md"
 
         Args:
-            spec_path: Path to specialization file (short or full)
+            spec_path: Path to specialization file (short, medium, or full)
             project_root: Project root directory (auto-detected if not provided)
+            verify_exists: If True, verify the file actually exists (optional)
 
         Returns:
             Tuple of (is_valid, normalized_path_or_error_message)
@@ -263,6 +265,10 @@ class BazingaDB:
                 full_path.relative_to(allowed_base)
             except ValueError:
                 return False, f"Path escapes allowed directory: {spec_path}"
+
+            # Optional file existence check
+            if verify_exists and not full_path.exists():
+                return False, f"File not found: {normalized_path}"
 
             return True, normalized_path
 

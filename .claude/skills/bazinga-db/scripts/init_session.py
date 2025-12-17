@@ -85,7 +85,7 @@ def ensure_config_seeded(db_path: Path) -> bool:
 
     # Check if config is already seeded by checking BOTH workflow_transitions AND agent_markers
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = sqlite3.connect(str(db_path), timeout=5.0)  # 5s busy timeout for concurrency
         cursor = conn.cursor()
 
         # Check transitions count
@@ -155,7 +155,7 @@ def verify_ready(db_path: Path) -> dict:
         return status
 
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = sqlite3.connect(str(db_path), timeout=5.0)  # 5s busy timeout for concurrency
         cursor = conn.cursor()
 
         cursor.execute("SELECT COUNT(*) FROM workflow_transitions")

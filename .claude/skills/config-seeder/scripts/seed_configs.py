@@ -219,15 +219,18 @@ def main():
             print("Run init_db.py first to create the database, or use --auto-init-db.", file=sys.stderr)
             sys.exit(1)
 
-    conn = sqlite3.connect(args.db)
+    # CONCURRENCY NOTE: Using timeout=5.0 (5 second busy timeout) ensures that if
+    # multiple processes try to seed simultaneously, they will wait rather than
+    # fail immediately with "database is locked" errors.
+    conn = sqlite3.connect(args.db, timeout=5.0)
 
     # Wrap all seeding in a single transaction for atomicity
     # If any seeding fails, rollback all changes
     #
-    # CONCURRENCY NOTE: Using BEGIN IMMEDIATE to acquire write lock immediately.
+    # Using BEGIN IMMEDIATE to acquire write lock immediately.
     # This ensures that if multiple processes try to seed simultaneously:
     # - One process acquires the lock and completes
-    # - Other processes wait (up to SQLite's busy_timeout, default 5s)
+    # - Other processes wait (up to 5s from timeout above)
     # - After lock release, subsequent processes will see the seeded data and
     #   their DELETE + INSERT will be a no-op (same data rewritten)
     # This is safe because config data is idempotent.
