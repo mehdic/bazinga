@@ -1258,7 +1258,8 @@ class BazingaDB:
                          item_count: Optional[int] = None,
                          security_sensitive: Optional[int] = None,
                          qa_attempts: Optional[int] = None,
-                         tl_review_attempts: Optional[int] = None) -> Dict[str, Any]:
+                         tl_review_attempts: Optional[int] = None,
+                         component_path: Optional[str] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -1275,6 +1276,7 @@ class BazingaDB:
             security_sensitive: Whether this group has security-sensitive code (0 or 1)
             qa_attempts: Number of QA test attempts
             tl_review_attempts: Number of Tech Lead review attempts
+            component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1339,6 +1341,9 @@ class BazingaDB:
             if tl_review_attempts is not None:
                 updates.append("tl_review_attempts = ?")
                 params.append(tl_review_attempts)
+            if component_path is not None:
+                updates.append("component_path = ?")
+                params.append(component_path)
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
