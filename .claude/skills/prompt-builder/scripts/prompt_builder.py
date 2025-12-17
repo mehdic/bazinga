@@ -659,29 +659,26 @@ def read_template_with_version_guards(template_path, project_context):
 
 
 def build_specialization_block(conn, session_id, group_id, agent_type, model="sonnet"):
-    """Build the specialization block from templates."""
+    """Build the specialization block from templates.
+
+    Note: No per-model budget limits here. The global trim_to_budget() handles
+    trimming if the overall prompt exceeds limits. This ensures specialization
+    templates are always included and trimmed intelligently at the prompt level.
+    """
     spec_paths = get_task_group_specializations(conn, session_id, group_id)
 
     if not spec_paths:
         return ""  # No specializations for this task
 
     project_context = get_project_context()
-    budget = TOKEN_BUDGETS.get(model, TOKEN_BUDGETS["sonnet"])
 
-    # Collect template content
+    # Collect ALL template content - global budget trimming handles limits
     templates_content = []
-    total_tokens = 0
 
     for path in spec_paths:
         content = read_template_with_version_guards(path, project_context)
         if content:
-            tokens = estimate_tokens(content)
-            if total_tokens + tokens <= budget["soft"]:
-                templates_content.append(content)
-                total_tokens += tokens
-            else:
-                # Over budget - stop adding
-                break
+            templates_content.append(content)
 
     if not templates_content:
         return ""
@@ -957,8 +954,11 @@ Do NOT reduce scope without explicit user approval.
 # GLOBAL BUDGET ENFORCEMENT
 # =============================================================================
 
-def enforce_global_budget(components, model="sonnet"):
+def enforce_global_budget(components, model="sonnet", agent_type="developer"):
     """Enforce global token budget by trimming lowest-priority sections.
+
+    Uses the actual FILE_READ_LIMIT (default 25000 tokens) with safety margin,
+    NOT the per-model specialization budgets which are much smaller.
 
     Priority order (highest to lowest):
     1. Agent definition (NEVER trim)
@@ -971,8 +971,8 @@ def enforce_global_budget(components, model="sonnet"):
     Returns:
         tuple: (trimmed_components, trimmed_sections_log)
     """
-    budget = TOKEN_BUDGETS.get(model, TOKEN_BUDGETS["sonnet"])
-    hard_limit = budget["hard"]
+    # Use actual global budget, not per-model specialization limits
+    hard_limit = get_effective_budget(agent_type)
 
     # Calculate total tokens
     total_tokens = sum(estimate_tokens(c) for c in components)
@@ -1097,7 +1097,7 @@ def build_prompt(args):
             components.append(feedback_context)
 
         # 7. Enforce global budget - trim lowest-priority sections if over hard limit
-        components, trimmed_sections = enforce_global_budget(components, model)
+        components, trimmed_sections = enforce_global_budget(components, model, args.agent_type)
         if trimmed_sections:
             for trim_msg in trimmed_sections:
                 print(f"WARNING: {trim_msg}", file=sys.stderr)
