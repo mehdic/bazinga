@@ -788,7 +788,7 @@ def install_analysis_tools(target_dir: Path, language: str, force: bool = False)
             "advanced": ["semgrep"],
             "package_manager": "pip",
             "check_command": lambda t: check_command_exists(t),
-            "install_cmd": lambda tools: ["pip", "install"] + tools,
+            "install_cmd": lambda tools: [sys.executable, "-m", "pip", "install"] + tools,
         },
         "javascript": {
             "core": ["jest", "eslint"],
@@ -1805,8 +1805,9 @@ def update_cli(branch: Optional[str] = None) -> bool:
     """
     try:
         # Try pip first (for pip installs and editable installs)
+        # Use sys.executable -m pip to ensure we use the correct Python environment
         result = subprocess.run(
-            ["pip", "show", "bazinga-cli"],
+            [sys.executable, "-m", "pip", "show", "bazinga-cli"],
             capture_output=True,
             text=True,
             check=False
@@ -1914,7 +1915,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                 if was_updated:
                     console.print("  [dim]Reinstalling CLI...[/dim]")
                     install_result = subprocess.run(
-                        ["pip", "install", "-e", str(bazinga_repo), "--quiet"],
+                        [sys.executable, "-m", "pip", "install", "-e", str(bazinga_repo), "--quiet"],
                         capture_output=True,
                         text=True,
                         check=False
@@ -1933,7 +1934,7 @@ def update_cli(branch: Optional[str] = None) -> bool:
                 else:
                     console.print("  [dim]Upgrading from git repository...[/dim]")
                 upgrade_result = subprocess.run(
-                    ["pip", "install", "--upgrade", git_url],
+                    [sys.executable, "-m", "pip", "install", "--upgrade", git_url],
                     capture_output=True,
                     text=True,
                     check=False
