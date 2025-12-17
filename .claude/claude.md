@@ -1118,6 +1118,107 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 
 ---
 
+## 🧪 Prompt Builder Testing
+
+**When the user says "test the prompt builder", "test prompt building", or "run prompt builder tests":**
+
+Execute the comprehensive test suite and provide a complete report.
+
+### Quick Test Command
+
+```bash
+# Run all version guard tests with verbose output
+python -m pytest tests/test_version_guards.py -v --tb=short 2>&1
+```
+
+### What This Tests
+
+The test suite (`tests/test_version_guards.py`) validates **205 test cases** covering:
+
+| Test Class | Tests | Coverage |
+|------------|-------|----------|
+| `TestParseVersion` | 9 | Version string parsing (major.minor, patches, edge cases) |
+| `TestVersionMatches` | 7 | Comparison operators (`>=`, `>`, `<=`, `<`, `==`) |
+| `TestGuardTokenAliases` | 17 | All 60+ aliases (languages, DBs, frameworks) |
+| `TestEvaluateVersionGuard` | 35+ | Guard evaluation against all context fields |
+| `TestApplyVersionGuards` | 6 | Content filtering with version guards |
+| `TestGetComponentVersionContext` | 8 | Component version extraction, longest-prefix match |
+| `TestInferComponentFromSpecializations` | 7 | Component inference from specialization paths |
+| `TestStripYamlFrontmatter` | 4 | YAML frontmatter handling |
+| `TestValidateTemplatePath` | 2 | Security validation (path traversal) |
+| `TestMultiSpecializationIntegration` | 3 | Multi-specialization scenarios |
+| `TestAll93GuardTokens` | 70+ | Every guard token from 72 specializations |
+| `TestEdgeCases` | 13 | Error handling, edge cases, malformed input |
+
+### Report Format
+
+After running tests, provide a report with:
+
+```
+## Prompt Builder Test Report
+
+**Date:** {current date}
+**Total Tests:** 205
+**Passed:** {count}
+**Failed:** {count}
+**Duration:** {time}
+
+### Summary
+{Pass/Fail status with any notable issues}
+
+### Failed Tests (if any)
+| Test | Error |
+|------|-------|
+| {test_name} | {error message} |
+
+### Coverage Areas Validated
+- ✅ Version parsing (None, empty, invalid, numeric)
+- ✅ Version comparison (all operators)
+- ✅ Guard token aliases (60+ aliases)
+- ✅ All 93 version guard tokens from 72 specializations
+- ✅ Multi-specialization support (unified context)
+- ✅ Monorepo component version extraction
+- ✅ Edge cases and error handling
+```
+
+### Additional Commands
+
+```bash
+# Run specific test class
+python -m pytest tests/test_version_guards.py::TestAll93GuardTokens -v
+
+# Run with coverage
+python -m pytest tests/test_version_guards.py --cov=.claude/skills/prompt-builder/scripts --cov-report=term-missing
+
+# Run just edge case tests
+python -m pytest tests/test_version_guards.py::TestEdgeCases -v
+```
+
+### Expected Results
+
+| Metric | Expected |
+|--------|----------|
+| Total tests | 205 |
+| Pass rate | 100% |
+| Duration | < 2 seconds |
+
+### If Tests Fail
+
+1. **Check the error message** - Most failures indicate a regression in prompt_builder.py
+2. **Identify the failing function** - Test class names map to functions (e.g., `TestParseVersion` → `parse_version()`)
+3. **Review recent changes** to `.claude/skills/prompt-builder/scripts/prompt_builder.py`
+4. **Fix the issue** and re-run tests until all pass
+
+### Files Involved
+
+| File | Purpose |
+|------|---------|
+| `tests/test_version_guards.py` | 205 unit tests |
+| `.claude/skills/prompt-builder/scripts/prompt_builder.py` | Code under test |
+| `bazinga/templates/specializations/**/*.md` | 72 templates with version guards |
+
+---
+
 ## 🔴 CRITICAL: Dashboard-Schema Synchronization
 
 **When modifying the database schema (bazinga-db skill), the dashboard MUST be updated to match.**
