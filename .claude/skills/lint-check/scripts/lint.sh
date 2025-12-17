@@ -289,7 +289,8 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Create final report with metadata
 if command_exists "jq"; then
-    jq ". + {\"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"tool\": \"$TOOL\"}" \
+    # Wrap results in object to handle both array and object inputs
+    jq "{\"results\": ., \"timestamp\": \"$TIMESTAMP\", \"language\": \"$LANG\", \"tool\": \"$TOOL\"}" \
         bazinga/lint_results_raw.json > $OUTPUT_FILE
 else
     # Fallback if jq not available
@@ -321,12 +322,23 @@ python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
     "$SKILL_OUTPUT" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
 
 # Display summary if jq available
+# Note: Results are wrapped in {"results": ...} by the jq command above
 if command_exists "jq" && [ "$TOOL" != "none" ]; then
     if [ "$LANG" = "python" ] && [ "$TOOL" = "ruff" ]; then
-        ISSUE_COUNT=$(jq '. | length' $OUTPUT_FILE 2>/dev/null || echo "0")
+        # Ruff results are in .results array after wrapping
+        ISSUE_COUNT=$(jq '.results | length // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
         echo "📊 Issues found: $ISSUE_COUNT"
     elif [ "$LANG" = "go" ]; then
-        ISSUE_COUNT=$(jq '.Issues | length // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
+        # golangci-lint results are in .results.Issues after wrapping
+        ISSUE_COUNT=$(jq '.results.Issues | length // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
+        echo "📊 Issues found: $ISSUE_COUNT"
+    elif [ "$LANG" = "javascript" ] || [ "$LANG" = "typescript" ]; then
+        # ESLint results are in .results array after wrapping
+        ISSUE_COUNT=$(jq '[.results[].messages | length] | add // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
+        echo "📊 Issues found: $ISSUE_COUNT"
+    elif [ "$LANG" = "ruby" ]; then
+        # RuboCop results are in .results.offenses after wrapping
+        ISSUE_COUNT=$(jq '.results.files | map(.offenses | length) | add // 0' $OUTPUT_FILE 2>/dev/null || echo "0")
         echo "📊 Issues found: $ISSUE_COUNT"
     fi
 fi

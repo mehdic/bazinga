@@ -1,0 +1,246 @@
+{
+  "_version": "1.0.0",
+  "_description": "Deterministic workflow state machine for BAZINGA orchestration",
+
+  "developer": {
+    "READY_FOR_QA": {
+      "next_agent": "qa_expert",
+      "action": "spawn",
+      "include_context": ["dev_output", "files_changed", "test_results"]
+    },
+    "READY_FOR_REVIEW": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["dev_output", "files_changed"]
+    },
+    "BLOCKED": {
+      "next_agent": "investigator",
+      "action": "spawn",
+      "include_context": ["blocker_details"],
+      "fallback_agent": "tech_lead"
+    },
+    "PARTIAL": {
+      "next_agent": "developer",
+      "action": "respawn",
+      "include_context": ["partial_work", "remaining_tasks"]
+    },
+    "INCOMPLETE": {
+      "next_agent": "developer",
+      "action": "respawn",
+      "include_context": ["partial_work", "remaining_tasks"]
+    },
+    "ESCALATE_SENIOR": {
+      "next_agent": "senior_software_engineer",
+      "action": "spawn",
+      "include_context": ["dev_output", "escalation_reason"]
+    },
+    "NEEDS_TECH_LEAD_VALIDATION": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["validation_request", "uncertainty_details"]
+    }
+  },
+
+  "senior_software_engineer": {
+    "READY_FOR_QA": {
+      "next_agent": "qa_expert",
+      "action": "spawn",
+      "include_context": ["dev_output", "files_changed", "test_results"]
+    },
+    "READY_FOR_REVIEW": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["dev_output", "files_changed"]
+    },
+    "BLOCKED": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["blocker_details"]
+    },
+    "NEEDS_TECH_LEAD_VALIDATION": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["validation_request"]
+    }
+  },
+
+  "qa_expert": {
+    "PASS": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["qa_report", "test_results", "coverage"]
+    },
+    "FAIL": {
+      "next_agent": "developer",
+      "action": "respawn",
+      "include_context": ["qa_failures", "failing_tests"],
+      "escalation_check": true
+    },
+    "FAIL_ESCALATE": {
+      "next_agent": "senior_software_engineer",
+      "action": "spawn",
+      "include_context": ["qa_report", "challenge_level", "escalation_reason"]
+    },
+    "PARTIAL": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["qa_report", "partial_results"]
+    },
+    "BLOCKED": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["blocker_details"]
+    },
+    "FLAKY": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["flaky_test_details", "qa_report"]
+    }
+  },
+
+  "tech_lead": {
+    "APPROVED": {
+      "next_agent": "developer",
+      "action": "spawn_merge",
+      "then": "check_phase",
+      "include_context": ["approval_notes"]
+    },
+    "CHANGES_REQUESTED": {
+      "next_agent": "developer",
+      "action": "respawn",
+      "include_context": ["tl_feedback", "required_changes"],
+      "escalation_check": true
+    },
+    "SPAWN_INVESTIGATOR": {
+      "next_agent": "investigator",
+      "action": "spawn",
+      "include_context": ["investigation_scope"]
+    },
+    "ESCALATE_TO_OPUS": {
+      "next_agent": "tech_lead",
+      "action": "respawn",
+      "model_override": "opus",
+      "include_context": ["escalation_reason", "original_review"]
+    },
+    "UNBLOCKING_GUIDANCE_PROVIDED": {
+      "next_agent": "_return_to_blocked",
+      "action": "spawn",
+      "include_context": ["guidance", "unblocking_steps"]
+    },
+    "ARCHITECTURAL_DECISION_MADE": {
+      "next_agent": "developer",
+      "action": "spawn",
+      "include_context": ["decision", "implementation_guidance"]
+    }
+  },
+
+  "project_manager": {
+    "PLANNING_COMPLETE": {
+      "next_agent": "developer",
+      "action": "spawn_batch",
+      "max_parallel": 4,
+      "include_context": ["task_groups"]
+    },
+    "CONTINUE": {
+      "next_agent": "developer",
+      "action": "spawn_batch",
+      "max_parallel": 4,
+      "include_context": ["pending_groups"]
+    },
+    "BAZINGA": {
+      "next_agent": null,
+      "action": "validate_then_end",
+      "include_context": ["completion_summary"]
+    },
+    "NEEDS_CLARIFICATION": {
+      "next_agent": null,
+      "action": "pause_for_user",
+      "include_context": ["clarification_question"]
+    },
+    "INVESTIGATION_NEEDED": {
+      "next_agent": "investigator",
+      "action": "spawn",
+      "include_context": ["investigation_request"]
+    },
+    "INVESTIGATION_ONLY": {
+      "next_agent": null,
+      "action": "end_session",
+      "include_context": ["investigation_answers"]
+    }
+  },
+
+  "investigator": {
+    "ROOT_CAUSE_FOUND": {
+      "next_agent": "developer",
+      "action": "spawn",
+      "include_context": ["root_cause", "fix_guidance"]
+    },
+    "INCOMPLETE": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["partial_findings", "next_steps"]
+    },
+    "BLOCKED": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["blocker_details"]
+    },
+    "EXHAUSTED": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["hypotheses_tested", "recommendations"]
+    },
+    "WAITING_FOR_RESULTS": {
+      "next_agent": "developer",
+      "action": "spawn",
+      "include_context": ["diagnostic_request"]
+    }
+  },
+
+  "requirements_engineer": {
+    "READY_FOR_REVIEW": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["research_deliverable"],
+      "bypass_qa": true
+    },
+    "BLOCKED": {
+      "next_agent": "investigator",
+      "action": "spawn",
+      "include_context": ["blocker_details"]
+    },
+    "PARTIAL": {
+      "next_agent": "requirements_engineer",
+      "action": "respawn",
+      "include_context": ["partial_research"]
+    }
+  },
+
+  "_special_rules": {
+    "testing_mode_disabled": {
+      "description": "When testing_mode=disabled, skip QA entirely",
+      "affected_statuses": ["READY_FOR_QA"],
+      "override_next_agent": "tech_lead"
+    },
+    "testing_mode_minimal": {
+      "description": "When testing_mode=minimal, skip QA Expert",
+      "affected_statuses": ["READY_FOR_QA"],
+      "override_next_agent": "tech_lead"
+    },
+    "escalation_after_failures": {
+      "description": "After 2 failures, escalate to SSE",
+      "threshold": 2,
+      "escalation_agent": "senior_software_engineer"
+    },
+    "security_sensitive": {
+      "description": "Security tasks always use SSE + mandatory TL review",
+      "force_agent": "senior_software_engineer",
+      "mandatory_review": true
+    },
+    "research_tasks": {
+      "description": "Research tasks go to RE, max 2 parallel",
+      "agent": "requirements_engineer",
+      "max_parallel": 2
+    }
+  }
+}

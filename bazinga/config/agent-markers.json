@@ -1,0 +1,92 @@
+{
+  "_version": "1.0.0",
+  "_description": "Required markers that MUST be present in agent prompts for validation",
+
+  "developer": {
+    "required": [
+      "NO DELEGATION",
+      "READY_FOR_QA",
+      "READY_FOR_REVIEW",
+      "BLOCKED",
+      "ESCALATE_SENIOR"
+    ],
+    "workflow_markers": [
+      "Developer → QA",
+      "Developer → Tech Lead"
+    ]
+  },
+
+  "senior_software_engineer": {
+    "required": [
+      "NO DELEGATION",
+      "READY_FOR_QA",
+      "READY_FOR_REVIEW",
+      "BLOCKED"
+    ],
+    "workflow_markers": [
+      "SSE → QA",
+      "SSE → Tech Lead"
+    ]
+  },
+
+  "qa_expert": {
+    "required": [
+      "PASS",
+      "FAIL",
+      "BLOCKED",
+      "Challenge Level"
+    ],
+    "workflow_markers": [
+      "QA → Tech Lead",
+      "QA → Developer"
+    ]
+  },
+
+  "tech_lead": {
+    "required": [
+      "APPROVED",
+      "CHANGES_REQUESTED",
+      "SPAWN_INVESTIGATOR"
+    ],
+    "workflow_markers": [
+      "Tech Lead → PM",
+      "Tech Lead → Developer"
+    ]
+  },
+
+  "project_manager": {
+    "required": [
+      "BAZINGA",
+      "SCOPE IS IMMUTABLE",
+      "CONTINUE",
+      "NEEDS_CLARIFICATION",
+      "PLANNING_COMPLETE"
+    ],
+    "workflow_markers": [
+      "PM → Developer",
+      "only YOU decide when the entire project is complete"
+    ]
+  },
+
+  "investigator": {
+    "required": [
+      "ROOT_CAUSE_FOUND",
+      "BLOCKED"
+    ],
+    "workflow_markers": [
+      "Investigator → Developer",
+      "Investigator → Tech Lead"
+    ]
+  },
+
+  "requirements_engineer": {
+    "required": [
+      "READY_FOR_REVIEW",
+      "BLOCKED"
+    ],
+    "workflow_markers": [
+      "RE → Tech Lead",
+      "bypasses QA"
+    ]
+  }
+}

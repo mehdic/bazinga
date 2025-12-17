@@ -209,43 +209,68 @@ class BazingaDB:
 
         return any(corruption in error_msg for corruption in self.CORRUPTION_ERRORS)
 
-    def _validate_specialization_path(self, spec_path: str, project_root: Optional[Path] = None) -> Tuple[bool, Optional[str]]:
-        """Validate specialization path for security (prevent path traversal).
+    def _normalize_specialization_path(self, spec_path: str, project_root: Optional[Path] = None, verify_exists: bool = False) -> Tuple[bool, str]:
+        """Normalize and validate specialization path.
+
+        Accepts either:
+        - Short path: "01-languages/python.md" -> auto-prefixed
+        - Medium path: "specializations/01-languages/python.md" -> normalized
+        - Full path: "bazinga/templates/specializations/01-languages/python.md"
 
         Args:
-            spec_path: Relative path to specialization file
+            spec_path: Path to specialization file (short, medium, or full)
             project_root: Project root directory (auto-detected if not provided)
+            verify_exists: If True, verify the file actually exists (optional)
 
         Returns:
-            Tuple of (is_valid, error_message)
+            Tuple of (is_valid, normalized_path_or_error_message)
         """
         try:
+            import re
+
+            # Validate path contains only safe characters first
+            if not re.match(r'^[a-zA-Z0-9/_.-]+$', spec_path):
+                return False, f"Path contains unsafe characters: {spec_path}"
+
+            # Block path traversal attempts
+            if '..' in spec_path:
+                return False, f"Path traversal not allowed: {spec_path}"
+
             # Auto-detect project root if not provided
             if project_root is None:
                 if _HAS_BAZINGA_PATHS:
                     project_root = get_project_root()
                 else:
-                    # Fallback: assume db_path is at PROJECT_ROOT/bazinga/bazinga.db
                     project_root = Path(self.db_path).parent.parent
 
-            # Define allowed base directory
+            # Define the specializations base
+            spec_base = "bazinga/templates/specializations/"
+
+            # Normalize: auto-prefix if not already a full path
+            if spec_path.startswith(spec_base):
+                # Already full path
+                normalized_path = spec_path
+            elif spec_path.startswith("specializations/"):
+                # Handle "specializations/01-languages/..." -> strip "specializations/" and prefix
+                normalized_path = spec_base + spec_path[len("specializations/"):]
+            else:
+                # Short path like "01-languages/python.md" -> auto-prefix
+                normalized_path = spec_base + spec_path.lstrip('/')
+
+            # Verify the normalized path is within allowed directory
             allowed_base = (project_root / "bazinga" / "templates" / "specializations").resolve()
+            full_path = (project_root / normalized_path).resolve()
 
-            # Resolve the provided path (handles .., symlinks, etc.)
-            full_path = (project_root / spec_path).resolve()
-
-            # Check if resolved path is within allowed base
             try:
                 full_path.relative_to(allowed_base)
             except ValueError:
                 return False, f"Path escapes allowed directory: {spec_path}"
 
-            # Validate path contains only safe characters (alphanumeric, -, _, /, .)
-            import re
-            if not re.match(r'^[a-zA-Z0-9/_.-]+$', spec_path):
-                return False, f"Path contains unsafe characters: {spec_path}"
+            # Optional file existence check
+            if verify_exists and not full_path.exists():
+                return False, f"File not found: {normalized_path}"
 
-            return True, None
+            return True, normalized_path
 
         except Exception as e:
             return False, f"Path validation error: {e}"
@@ -1141,16 +1166,18 @@ class BazingaDB:
     def create_task_group(self, group_id: str, session_id: str, name: str,
                          status: str = 'pending', assigned_to: Optional[str] = None,
                          specializations: Optional[List[str]] = None,
-                         item_count: Optional[int] = None) -> Dict[str, Any]:
+                         item_count: Optional[int] = None,
+                         component_path: Optional[str] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to/specializations/item_count are updated -
-        preserving revision_count, last_review_status, and created_at.
+        already exists, only name/status/assigned_to/specializations/item_count/component_path
+        are updated - preserving revision_count, last_review_status, and created_at.
 
         Args:
             specializations: List of specialization file paths for this group
             item_count: Number of discrete tasks/items in this group (for progress tracking)
+            component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1169,14 +1196,17 @@ class BazingaDB:
                         "success": False,
                         "error": "specializations must contain only strings"
                     }
-                # Validate paths for security (prevent path traversal)
+                # Normalize and validate paths (auto-prefix short paths)
+                normalized_specs = []
                 for spec_path in specializations:
-                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    is_valid, result = self._normalize_specialization_path(spec_path)
                     if not is_valid:
                         return {
                             "success": False,
-                            "error": f"Invalid specialization path: {error_msg}"
+                            "error": f"Invalid specialization path: {result}"
                         }
+                    normalized_specs.append(result)
+                specializations = normalized_specs
 
             # Validate item_count if provided
             if item_count is not None and (not isinstance(item_count, int) or item_count < 1):
@@ -1191,16 +1221,17 @@ class BazingaDB:
             # Use ON CONFLICT for true upsert - preserves existing metadata
             # COALESCE for status: INSERT uses 'pending' default, UPDATE preserves existing if None passed
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count)
-                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1))
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count, component_path)
+                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1), ?)
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
                     status = COALESCE(excluded.status, task_groups.status),
                     assigned_to = COALESCE(excluded.assigned_to, task_groups.assigned_to),
                     specializations = COALESCE(excluded.specializations, task_groups.specializations),
                     item_count = COALESCE(excluded.item_count, task_groups.item_count),
+                    component_path = COALESCE(excluded.component_path, task_groups.component_path),
                     updated_at = CURRENT_TIMESTAMP
-            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count))
+            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count, component_path))
             conn.commit()
 
             # Fetch and return the saved record
@@ -1223,7 +1254,12 @@ class BazingaDB:
                          assigned_to: Optional[str] = None, revision_count: Optional[int] = None,
                          last_review_status: Optional[str] = None,
                          auto_create: bool = True, name: Optional[str] = None,
-                         specializations: Optional[List[str]] = None) -> Dict[str, Any]:
+                         specializations: Optional[List[str]] = None,
+                         item_count: Optional[int] = None,
+                         security_sensitive: Optional[int] = None,
+                         qa_attempts: Optional[int] = None,
+                         tl_review_attempts: Optional[int] = None,
+                         component_path: Optional[str] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -1236,6 +1272,11 @@ class BazingaDB:
             auto_create: If True and group doesn't exist, create it (default: True)
             name: Name for auto-creation (defaults to group_id if not provided)
             specializations: List of specialization file paths for this group
+            item_count: Number of discrete tasks/items in this group
+            security_sensitive: Whether this group has security-sensitive code (0 or 1)
+            qa_attempts: Number of QA test attempts
+            tl_review_attempts: Number of Tech Lead review attempts
+            component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1254,14 +1295,17 @@ class BazingaDB:
                         "success": False,
                         "error": "specializations must contain only strings"
                     }
-                # Validate paths for security (prevent path traversal)
+                # Normalize and validate paths (auto-prefix short paths)
+                normalized_specs = []
                 for spec_path in specializations:
-                    is_valid, error_msg = self._validate_specialization_path(spec_path)
+                    is_valid, result = self._normalize_specialization_path(spec_path)
                     if not is_valid:
                         return {
                             "success": False,
-                            "error": f"Invalid specialization path: {error_msg}"
+                            "error": f"Invalid specialization path: {result}"
                         }
+                    normalized_specs.append(result)
+                specializations = normalized_specs
 
             conn = self._get_connection()
             updates = []
@@ -1285,6 +1329,21 @@ class BazingaDB:
             if specializations is not None:
                 updates.append("specializations = ?")
                 params.append(json.dumps(specializations))
+            if item_count is not None:
+                updates.append("item_count = ?")
+                params.append(item_count)
+            if security_sensitive is not None:
+                updates.append("security_sensitive = ?")
+                params.append(security_sensitive)
+            if qa_attempts is not None:
+                updates.append("qa_attempts = ?")
+                params.append(qa_attempts)
+            if tl_review_attempts is not None:
+                updates.append("tl_review_attempts = ?")
+                params.append(tl_review_attempts)
+            if component_path is not None:
+                updates.append("component_path = ?")
+                params.append(component_path)
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
@@ -2951,11 +3010,11 @@ STATE OPERATIONS:
   get-state <session> <type>                  Get latest state snapshot
 
 TASK GROUP OPERATIONS:
-  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON]
-                                              Create task group with optional specializations
-  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON]
-                                              Update task group (specializations as JSON array)
-  get-task-groups <session> [status]          Get task groups (includes specializations)
+  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON] [--component-path PATH]
+                                              Create task group with optional specializations and component path
+  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON] [--component-path PATH]
+                                              Update task group (specializations as JSON array, component_path for version context)
+  get-task-groups <session> [status]          Get task groups (includes specializations and component_path)
 
 TOKEN OPERATIONS:
   log-tokens <session> <agent> <tokens> [agent_id]
@@ -3288,13 +3347,21 @@ def main():
             status = cmd_args[1]
             db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
-            # Parse --specializations and --item_count flags first, then extract positional args
+            # Parse --specializations, --item_count, --component-path flags first, then extract positional args
             specializations = None
             item_count = None
+            component_path = None
             positional_args = []
             i = 0
             while i < len(cmd_args):
-                if cmd_args[i] == '--specializations' and i + 1 < len(cmd_args):
+                arg = cmd_args[i]
+                # Normalize dashes to underscores in flag NAME only (preserve leading --)
+                # e.g., '--item-count' -> '--item_count', '--component-path' -> '--component_path'
+                if arg.startswith('--'):
+                    arg_normalized = '--' + arg[2:].replace('-', '_')
+                else:
+                    arg_normalized = arg
+                if arg_normalized == '--specializations' and i + 1 < len(cmd_args):
                     try:
                         specializations = json.loads(cmd_args[i + 1])
                         if not isinstance(specializations, list):
@@ -3307,7 +3374,7 @@ def main():
                         print(json.dumps({"success": False, "error": f"Invalid JSON for --specializations: {e}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                     i += 2  # Skip flag and value
-                elif cmd_args[i] == '--item_count' and i + 1 < len(cmd_args):
+                elif arg_normalized == '--item_count' and i + 1 < len(cmd_args):
                     try:
                         item_count = int(cmd_args[i + 1])
                         if item_count < 1:
@@ -3316,6 +3383,9 @@ def main():
                     except ValueError:
                         print(json.dumps({"success": False, "error": "--item_count must be a valid integer"}, indent=2), file=sys.stderr)
                         sys.exit(1)
+                    i += 2  # Skip flag and value
+                elif arg_normalized == '--component_path' and i + 1 < len(cmd_args):
+                    component_path = cmd_args[i + 1]
                     i += 2  # Skip flag and value
                 else:
                     positional_args.append(cmd_args[i])
@@ -3334,7 +3404,7 @@ def main():
             # Default to None so upsert preserves existing status; INSERT defaults to 'pending'
             status = positional_args[3] if len(positional_args) > 3 else None
             assigned_to = positional_args[4] if len(positional_args) > 4 else None
-            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count)
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count, component_path)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             # Validate minimum args
@@ -3345,9 +3415,12 @@ def main():
             session_id = cmd_args[1]
             kwargs = {}
             # Allowlist of valid flags
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count"}
+            # v14: Added security_sensitive, qa_attempts, tl_review_attempts for escalation tracking
+            # v15: Added component_path for version-specific prompt building
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
+                key = key.replace('-', '_')  # Normalize dashes to underscores (--assigned-to → assigned_to)
                 # Validate flag is in allowlist
                 if key not in valid_flags:
                     print(json.dumps({"success": False, "error": f"Unknown flag --{key}. Valid flags: {', '.join(sorted(valid_flags))}"}, indent=2), file=sys.stderr)
@@ -3356,13 +3429,16 @@ def main():
                     print(json.dumps({"success": False, "error": f"Missing value for --{key}"}, indent=2), file=sys.stderr)
                     sys.exit(1)
                 value = cmd_args[i + 1]
-                # Convert revision_count and item_count to int if present
-                if key == 'revision_count' or key == 'item_count':
+                # Convert integer flags
+                if key in ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts'):
                     try:
                         value = int(value)
                     except ValueError:
                         print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
+                # Convert security_sensitive to int (0 or 1)
+                elif key == 'security_sensitive':
+                    value = 1 if value.lower() in ('true', '1', 'yes') else 0
                 # Convert auto_create to bool
                 elif key == 'auto_create':
                     value = value.lower() in ('true', '1', 'yes')

@@ -24,6 +24,9 @@ This document provides complete reference documentation for the BAZINGA database
 | `model_config` | Agent model assignments | Dynamic model selection |
 | `context_packages` | Inter-agent context | Research, failures, decisions, handoffs |
 | `context_package_consumers` | Consumer tracking | Join table for per-agent consumption |
+| `workflow_transitions` | Deterministic routing | State machine for agent workflow |
+| `agent_markers` | Prompt validation | Required markers per agent type |
+| `workflow_special_rules` | Routing rules | Testing mode, escalation, security rules |
 
 ---
 
@@ -705,3 +708,124 @@ sqlite3 bazinga.db "VACUUM"
 ```bash
 sqlite3 bazinga.db "PRAGMA integrity_check"
 ```
+
+---
+
+## Deterministic Orchestration Tables (v13)
+
+These tables support the deterministic prompt building and workflow routing system.
+
+### workflow_transitions
+
+Stores state machine transitions for deterministic workflow routing. Seeded from `bazinga/config/transitions.json` at session start.
+
+```sql
+CREATE TABLE workflow_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    current_agent TEXT NOT NULL,
+    response_status TEXT NOT NULL,
+    next_agent TEXT,
+    action TEXT NOT NULL,
+    include_context TEXT,  -- JSON array of context types to include
+    escalation_check INTEGER DEFAULT 0,  -- 1 to check revision count for escalation
+    model_override TEXT,  -- Override model for next agent
+    fallback_agent TEXT,  -- Fallback if primary agent unavailable
+    bypass_qa INTEGER DEFAULT 0,  -- 1 to skip QA (e.g., RE tasks)
+    max_parallel INTEGER,  -- Max parallel spawns for batch actions
+    then_action TEXT,  -- Action after primary (e.g., 'check_phase')
+    UNIQUE(current_agent, response_status)
+)
+
+-- Indexes
+CREATE INDEX idx_wt_agent ON workflow_transitions(current_agent);
+```
+
+**Columns:**
+- `current_agent`: Agent that produced the response (developer, qa_expert, tech_lead, etc.)
+- `response_status`: Status code from agent (READY_FOR_QA, PASS, APPROVED, etc.)
+- `next_agent`: Agent to spawn next (NULL for end states)
+- `action`: Action type (`spawn`, `respawn`, `spawn_batch`, `validate_then_end`, `pause_for_user`, `end_session`)
+- `include_context`: JSON array of context types to pass (e.g., `["dev_output", "test_results"]`)
+- `escalation_check`: If 1, check revision_count against escalation threshold
+- `model_override`: Override model (e.g., `opus` for escalation)
+- `fallback_agent`: Alternative agent if primary unavailable
+- `bypass_qa`: If 1, skip QA Expert (for RE tasks)
+- `max_parallel`: Maximum parallel spawns for `spawn_batch`
+- `then_action`: Secondary action (e.g., `check_phase` after merge)
+
+**Usage Example:**
+```python
+# Get next transition (called by workflow_router.py)
+transition = db.get_transition('developer', 'READY_FOR_QA')
+# Returns: {'next_agent': 'qa_expert', 'action': 'spawn', ...}
+```
+
+---
+
+### agent_markers
+
+Stores required markers that MUST be present in agent prompts. Seeded from `bazinga/config/agent-markers.json` at session start.
+
+```sql
+CREATE TABLE agent_markers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_type TEXT NOT NULL UNIQUE,
+    required_markers TEXT NOT NULL,  -- JSON array of required strings
+    workflow_markers TEXT  -- JSON array of workflow-related strings
+)
+```
+
+**Columns:**
+- `agent_type`: Type of agent (developer, qa_expert, tech_lead, etc.)
+- `required_markers`: JSON array of strings that MUST appear in prompt
+- `workflow_markers`: JSON array of workflow-related strings (informational)
+
+**Usage Example:**
+```python
+# Get markers for validation (called by prompt_builder.py)
+markers = db.get_markers('developer')
+# Returns: {'required': ['NO DELEGATION', 'READY_FOR_QA', ...], 'workflow': [...]}
+
+# Validate prompt contains all markers
+missing = [m for m in markers['required'] if m not in prompt]
+if missing:
+    raise ValueError(f"Prompt missing markers: {missing}")
+```
+
+---
+
+### workflow_special_rules
+
+Stores special routing rules (testing mode, escalation, security). Seeded from `transitions.json` `_special_rules` at session start.
+
+```sql
+CREATE TABLE workflow_special_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    config TEXT NOT NULL  -- JSON object with rule configuration
+)
+```
+
+**Columns:**
+- `rule_name`: Unique rule identifier (e.g., `testing_mode_disabled`, `escalation_after_failures`)
+- `description`: Human-readable description
+- `config`: JSON object with rule-specific configuration
+
+**Usage Example:**
+```python
+# Get escalation rule (called by workflow_router.py)
+rule = db.get_special_rule('escalation_after_failures')
+# Returns: {'threshold': 2, 'escalation_agent': 'senior_software_engineer'}
+
+# Check if escalation needed
+if revision_count >= rule['threshold']:
+    next_agent = rule['escalation_agent']
+```
+
+**Available Rules:**
+- `testing_mode_disabled`: Skip QA entirely when testing is disabled
+- `testing_mode_minimal`: Skip QA Expert when testing is minimal
+- `escalation_after_failures`: Escalate to SSE after N failures
+- `security_sensitive`: Force SSE + mandatory TL review for security tasks
+- `research_tasks`: Route to RE with limited parallelism

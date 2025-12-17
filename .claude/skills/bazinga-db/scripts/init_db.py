@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 15
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1081,6 +1081,204 @@ def init_database(db_path: str) -> None:
             current_version = 12
             print("✓ Migration to v12 complete (skill_outputs UNIQUE constraint)")
 
+        # v12 → v13: Deterministic orchestration tables
+        if current_version == 12:
+            print("\n--- Migrating v12 → v13 (deterministic orchestration) ---")
+
+            try:
+                cursor.execute("BEGIN IMMEDIATE")
+
+                # Create workflow_transitions table (seeded from transitions.json)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS workflow_transitions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        current_agent TEXT NOT NULL,
+                        response_status TEXT NOT NULL,
+                        next_agent TEXT,
+                        action TEXT NOT NULL,
+                        include_context TEXT,
+                        escalation_check INTEGER DEFAULT 0,
+                        model_override TEXT,
+                        fallback_agent TEXT,
+                        bypass_qa INTEGER DEFAULT 0,
+                        max_parallel INTEGER,
+                        then_action TEXT,
+                        UNIQUE(current_agent, response_status)
+                    )
+                """)
+                # Add index for performance (matches fresh DB path)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_wt_agent
+                    ON workflow_transitions(current_agent)
+                """)
+                print("   ✓ Created workflow_transitions table with index")
+
+                # Create agent_markers table (seeded from agent-markers.json)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS agent_markers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        agent_type TEXT NOT NULL UNIQUE,
+                        required_markers TEXT NOT NULL,
+                        workflow_markers TEXT
+                    )
+                """)
+                print("   ✓ Created agent_markers table")
+
+                # Create workflow_special_rules table (seeded from transitions.json _special_rules)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS workflow_special_rules (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        rule_name TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        config TEXT NOT NULL
+                    )
+                """)
+                print("   ✓ Created workflow_special_rules table")
+
+                # Verify integrity
+                integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                if integrity != "ok":
+                    raise sqlite3.IntegrityError(f"Migration v12→v13: Integrity check failed: {integrity}")
+
+                conn.commit()
+                print("   ✓ Migration transaction committed")
+
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                print(f"   ✗ v12→v13 migration failed, rolled back: {e}")
+                raise
+
+            current_version = 13
+            print("✓ Migration to v13 complete (deterministic orchestration tables)")
+
+        # v13 → v14: Add escalation tracking columns to task_groups
+        if current_version == 13:
+            print("\n--- Migrating v13 → v14 (escalation tracking columns) ---")
+
+            # Check if task_groups table exists (may not exist in fresh DBs during sequential migration)
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ task_groups table will be created with new columns")
+            else:
+                try:
+                    # Add security_sensitive column
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN security_sensitive INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.security_sensitive")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.security_sensitive already exists")
+                        else:
+                            raise
+
+                    # Add qa_attempts column for QA failure escalation
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN qa_attempts INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.qa_attempts")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.qa_attempts already exists")
+                        else:
+                            raise
+
+                    # Add tl_review_attempts column for TL review loop tracking
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN tl_review_attempts INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.tl_review_attempts")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.tl_review_attempts already exists")
+                        else:
+                            raise
+
+                    conn.commit()
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v13→v14 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 14
+            print("✓ Migration to v14 complete (escalation tracking columns)")
+
+        # v14 → v15: Add component_path for version-specific prompt building
+        if current_version == 14:
+            print("\n--- Migrating v14 → v15 (component_path for version context) ---")
+
+            # Check if task_groups table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ task_groups table will be created with component_path column")
+            else:
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Add component_path column for monorepo component binding
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN component_path TEXT")
+                        print("   ✓ Added task_groups.component_path")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.component_path already exists")
+                        else:
+                            raise
+
+                    # Verify integrity before commit
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v14→v15: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                    # WAL checkpoint for clean state
+                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                    if checkpoint_result:
+                        busy, log_frames, checkpointed = checkpoint_result
+                        if busy:
+                            for retry in range(3):
+                                time.sleep(0.5 * (retry + 1))
+                                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                                if checkpoint_result and not checkpoint_result[0]:
+                                    print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                    break
+                            else:
+                                print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+
+                    # Post-commit integrity verification
+                    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if post_integrity != "ok":
+                        print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+
+                    # Refresh query planner statistics
+                    cursor.execute("ANALYZE task_groups;")
+                    print("   ✓ WAL checkpoint completed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v14→v15 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 15
+            print("✓ Migration to v15 complete (component_path for version context)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
@@ -1185,6 +1383,8 @@ def init_database(db_path: str) -> None:
     # Task groups table (normalized from pm_state.json)
     # PRIMARY KEY: Composite (id, session_id) allows same group ID across sessions
     # Extended in v9 to support item_count for progress tracking
+    # Extended in v14 to support security_sensitive, qa_attempts, tl_review_attempts
+    # Extended in v15 to support component_path for version-specific prompt building
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT NOT NULL,
@@ -1204,6 +1404,10 @@ def init_database(db_path: str) -> None:
             context_references TEXT,
             specializations TEXT,
             item_count INTEGER DEFAULT 1,
+            security_sensitive INTEGER DEFAULT 0,
+            qa_attempts INTEGER DEFAULT 0,
+            tl_review_attempts INTEGER DEFAULT 0,
+            component_path TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),
@@ -1428,6 +1632,49 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_consumption_session ON consumption_scope(session_id, group_id, agent_type)")
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_consumption_unique ON consumption_scope(session_id, group_id, agent_type, iteration, package_id)")
     print("✓ Created consumption_scope table with indexes")
+
+    # Workflow transitions table (seeded from bazinga/config/transitions.json)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workflow_transitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            current_agent TEXT NOT NULL,
+            response_status TEXT NOT NULL,
+            next_agent TEXT,
+            action TEXT NOT NULL,
+            include_context TEXT,
+            escalation_check INTEGER DEFAULT 0,
+            model_override TEXT,
+            fallback_agent TEXT,
+            bypass_qa INTEGER DEFAULT 0,
+            max_parallel INTEGER,
+            then_action TEXT,
+            UNIQUE(current_agent, response_status)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_wt_agent ON workflow_transitions(current_agent)")
+    print("✓ Created workflow_transitions table with indexes")
+
+    # Agent markers table (seeded from bazinga/config/agent-markers.json)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_markers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_type TEXT NOT NULL UNIQUE,
+            required_markers TEXT NOT NULL,
+            workflow_markers TEXT
+        )
+    """)
+    print("✓ Created agent_markers table")
+
+    # Workflow special rules table (seeded from transitions.json _special_rules)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workflow_special_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule_name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            config TEXT NOT NULL
+        )
+    """)
+    print("✓ Created workflow_special_rules table")
 
     # Record schema version for new databases
     current_version = get_schema_version(cursor)

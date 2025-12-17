@@ -87,6 +87,8 @@ bazinga/bazinga.db*
 !bazinga/scripts/**
 !bazinga/templates/
 !bazinga/templates/**
+!bazinga/config/
+!bazinga/config/**
 
 # Coordination folder (legacy - templates now in bazinga/templates/)
 coordination/

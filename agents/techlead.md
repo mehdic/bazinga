@@ -611,7 +611,7 @@ For EACH critical/high severity issue:
 
 **If UNCERTAIN:**
   → Request Developer provide security justification
-  → Or request Investigator to analyze (via INVESTIGATION_IN_PROGRESS status)
+  → Or request Investigator to analyze (via SPAWN_INVESTIGATOR status)
 ```
 
 ---
@@ -663,7 +663,7 @@ Report to Orchestrator:
 **Expected Iterations:** [Estimate: 2-4]
 **Suggested Skills for Investigator:** [List: codebase-analysis, pattern-miner, etc.]
 
-Status: INVESTIGATION_IN_PROGRESS
+Status: SPAWN_INVESTIGATOR
 Next Step: Orchestrator will spawn Investigator agent with this context."
 ```
 
@@ -772,7 +772,7 @@ Analyze the issue:
 │  → Follow framework steps, then continue to Step 3
 │
 └─ Meets ≥2 Investigator Criteria (see Framework 6)
-   → REPORT to Orchestrator: INVESTIGATION_IN_PROGRESS
+   → REPORT to Orchestrator: SPAWN_INVESTIGATOR
    → Provide problem summary, hypothesis matrix, suggested skills
    → DO NOT continue to Step 3 (Orchestrator will spawn Investigator)
 ```

@@ -59,6 +59,7 @@ packages = ["src/bazinga_cli"]
 "bazinga/challenge_levels.json" = "bazinga_cli/bazinga/challenge_levels.json"
 "bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
 "bazinga/templates" = "bazinga_cli/bazinga/templates"
+"bazinga/config" = "bazinga_cli/bazinga/config"
 
 [tool.hatch.build.targets.wheel.shared-data]
 "agents" = "share/bazinga_cli/agents"

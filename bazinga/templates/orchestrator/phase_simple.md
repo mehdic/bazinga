@@ -18,9 +18,7 @@
 
 2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
 
-**This enables graduated token zones in context-assembler.** Without tracking, zone detection always defaults to "Normal" and graduated budget management won't activate.
-
-**State persistence:** total_spawns is stored in session state via bazinga-db, incremented after each spawn, and passed to context-assembler for zone detection.
+**Note:** The prompt-builder script applies token budgets automatically based on model tier (haiku=900, sonnet=1800, opus=2400). The spawn counter is tracked for metrics and debugging purposes.
 
 ---
 
@@ -43,180 +41,58 @@
 
 **🔴 Research Rejection Routing:** If Tech Lead requests changes on a research task, route back to Requirements Engineer (not Developer). Research deliverables need RE's context and tools, not code-focused Developer.
 
-### SPAWN IMPLEMENTATION AGENT (TWO-TURN SEQUENCE)
+### SPAWN IMPLEMENTATION AGENT (DETERMINISTIC PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED**
+**🔴 SINGLE-STEP PROMPT BUILDING**
 
 This section handles spawning Developer, SSE, or RE based on PM's `initial_tier` decision.
 
-**TURN 1: Invoke Both Skills**
+**Step 1: Write params file**
 
-**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
-
-IF context-assembler ENABLED:
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: {agent_type}  // developer, senior_software_engineer, or requirements_engineer
-- Model: {MODEL_CONFIG[agent_type]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {iteration_count}
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
-→ Verify: Contains `## Context for {agent_type}` or zone/packages metadata
-
-**Reasoning Auto-Inclusion Rules (handled by context-assembler):**
-| Agent Type | Iteration | Reasoning Included? | Level |
-|------------|-----------|---------------------|-------|
-| `developer` | 0 (initial) | **NO** | - |
-| `developer` | > 0 (retry) | **YES** | medium (800 tokens) |
-| `senior_software_engineer` | any | **YES** | medium (800 tokens) |
-| `requirements_engineer` | any | **YES** | medium (800 tokens) |
-
-**Note:** `estimated_token_usage` = `total_spawns * 15000`. If not tracked yet, pass 0.
-
-IF context-assembler DISABLED or returns empty:
-→ Output warning: `⚠️ Context assembly empty | Proceeding without prior reasoning`
-→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
-
-**B. Specialization Loading:**
-
-Check `bazinga/skills_config.json` → `specializations.enabled` and `enabled_agents`:
-
-IF specializations ENABLED for this agent type:
-```
-[SPEC_CTX_START group={group_id} agent={agent_type}]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: {agent_type}
-Model: {MODEL_CONFIG[agent_type]}
-Specialization Paths: {specializations from task_group or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-→ Verify: Contains `[SPECIALIZATION_BLOCK_START]`
-
-IF specializations DISABLED:
-→ Set `{SPEC_BLOCK}` = "" (empty)
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked (or explicitly disabled in skills_config)?
-- [ ] Specialization-loader invoked (or explicitly disabled)?
-- [ ] Both skills returned valid output (or empty with warning)?
-
-END TURN 1 (wait for skill responses)
-
----
-
-**TURN 2: Compose & Spawn**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-
-```
-task_title = task_group["title"]
-task_requirements = task_group["requirements"]
-branch = task_group["branch"] or session_branch
-group_id = task_group["group_id"]
-agent_type = task_group["initial_tier"]  // developer, senior_software_engineer, or requirements_engineer
-
-// 🔴 MANDATORY: Read the FULL agent file
-// NOTE: tech_lead maps to techlead.md (no underscore), all others use {agent_type}.md
-AGENT_FILE_MAP = {
-  "developer": "agents/developer.md",
-  "senior_software_engineer": "agents/senior_software_engineer.md",
-  "requirements_engineer": "agents/requirements_engineer.md",
-  "qa_expert": "agents/qa_expert.md",
-  "tech_lead": "agents/techlead.md",  // NOTE: no underscore!
-  "investigator": "agents/investigator.md"
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+```json
+{
+  "agent_type": "{agent_type}",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "{task_title}",
+  "task_requirements": "{task_requirements}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[agent_type]}",
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
 }
-IF agent_type NOT IN AGENT_FILE_MAP:
-    ❌ Unknown agent type: {agent_type} | Cannot spawn without agent file | Cannot proceed - check AGENT_FILE_MAP
-agent_file_path = AGENT_FILE_MAP[agent_type]
-agent_definition = Read(agent_file_path)  // Full 1400+ lines of agent instructions
-IF Read fails OR agent_definition is empty:
-    ⚠️ Agent file read failed | {agent_file_path} | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_context = """
----
-
-## Current Task Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Simple
-**BRANCH:** {branch}
-
-**TASK:** {task_title}
-
-**REQUIREMENTS:**
-{task_requirements}
-
-**COMMIT TO:** {branch}
-**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = agent_definition + task_context
 ```
 
-**D. Compose Full Prompt**:
-```
-prompt =
-  {CONTEXT_BLOCK}  // Prior reasoning + packages (from context-assembler)
-  +
-  {SPEC_BLOCK}     // Tech identity (from specialization-loader)
-  +
-  base_prompt      // Full agent file + task context
-```
+**Step 2: Invoke prompt-builder skill**
 
-**E. Spawn Agent:**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result**
+
+Skill returns JSON. Check:
+- `success` is `true`
+- `prompt_file` is non-empty
+- `markers_ok` is `true`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 2: Spawn Agent with file-based instructions**
 
 Output summary:
 ```
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
    **Task:** {task_title}
    **Branch:** {branch}
-   **Specializations:** {status}
-   **Context:** {status}
+   **Prompt file:** bazinga/prompts/{session_id}/{agent_type}_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type}: {task_title[:90]}", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type}: {task_title[:90]}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file. The file contains your full agent definition, context, and task requirements.\n\nDo NOT proceed without reading the file first.")`
 
-**🔴 SELF-CHECK (Turn 2):**
-- ✅ Did I extract CONTEXT_BLOCK from context-assembler output?
-- ✅ Did I extract SPEC_BLOCK from specialization-loader output?
-- ✅ Does this message contain `Task()`?
-- ✅ Is Task() called with combined prompt (context + spec + base)?
-
----
-
-**🔴🔴🔴 SILENT PROCESSING - DO NOT PRINT BLOCKS 🔴🔴🔴**
-
-Process skill outputs SILENTLY:
-1. **INTERNALLY** extract CONTEXT_BLOCK and SPEC_BLOCK
-2. **INTERNALLY** build full prompt
-3. **OUTPUT** only brief capsule (shown above)
-4. **CALL** `Task()` with full prompt
-
-**🔴 FORBIDDEN - DO NOT OUTPUT:**
-- ❌ The context block content
-- ❌ The specialization block content
-- ❌ The full prompt content
-- ❌ Any "here's what I'm sending..." preview
-
-**✅ CORRECT (capsule only, Task called):**
-```
-📝 **Developer Prompt** | Group: main | Model: haiku
-   **Task:** Implement OAuth login
-   **Specializations:** ✓ (3 templates)
-   **Context:** ✓ (2 packages)
-
-Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Developer: Implement OAuth login", prompt=FULL_PROMPT)
-```
+**🔴 SELF-CHECK:**
+- ✅ Did prompt-builder create the file successfully?
+- ✅ Does Task() prompt instruct agent to read the file FIRST?
+- ✅ Is the prompt file path correct?
 
 **🔴 Follow PM's tier decision. DO NOT override for initial spawn.**
 
@@ -293,179 +169,75 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-
 - **Do NOT stop for user input**
 - **IMMEDIATELY spawn Investigator using unified two-turn sequence:**
 
-#### SPAWN INVESTIGATOR (TWO-TURN SEQUENCE)
+#### SPAWN INVESTIGATOR (SKILL-BASED PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED**
+**Step 1: Write params file**
 
-**TURN 1: Invoke Both Skills**
-
-**A. Context Assembly:**
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: investigator
-- Model: {MODEL_CONFIG["investigator"]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: 0
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
-
-**Note:** Reasoning is **automatically included** for Investigator at medium level (800 tokens). Investigator receives Developer's reasoning for debugging context.
-
-**B. Specialization Loading:**
-```
-[SPEC_CTX_START group={group_id} agent=investigator]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: investigator
-Model: {MODEL_CONFIG["investigator"]}
-Specialization Paths: {specializations from task_group or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked?
-- [ ] Specialization-loader invoked?
-
-END TURN 1
-
----
-
-**TURN 2: Compose & Spawn Investigator**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL Investigator agent file
-investigator_definition = Read("agents/investigator.md")  // Full agent instructions
-IF Read fails OR investigator_definition is empty:
-    ⚠️ Agent file read failed | agents/investigator.md | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_context = """
----
-
-## Current Investigation Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-
-**BLOCKER:** {blocker_description}
-**Evidence from Developer:** {developer_evidence}
-
-**INVESTIGATE AND REPORT:** ROOT_CAUSE_FOUND or BLOCKED when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = investigator_definition + task_context
+Write to `bazinga/prompts/{session_id}/params_investigator_{group_id}.json`:
+```json
+{
+  "agent_type": "investigator",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Investigate: {blocker_description[:60]}",
+  "task_requirements": "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"investigator\"]}",
+  "output_file": "bazinga/prompts/{session_id}/investigator_{group_id}.md"
+}
 ```
 
-**D. Compose Full Prompt & Spawn**:
-```
-prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
-```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt={prompt})`
+**Step 2: Invoke prompt-builder skill**
 
-After Investigator provides solution, spawn Developer again with resolution using the unified sequence above.
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Investigator with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["investigator"], description="Investigator: {blocker[:60]}", prompt="FIRST: Read bazinga/prompts/{session_id}/investigator_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+
+After Investigator provides solution, spawn Developer again with resolution using the prompt-builder sequence above.
 
 ---
 
 **IF Developer reports ESCALATE_SENIOR:**
 
-#### SPAWN SSE ON ESCALATION (TWO-TURN SEQUENCE)
+#### SPAWN SSE ON ESCALATION (SKILL-BASED PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED**
+**Step 1: Write params file**
 
-**TURN 1: Invoke Both Skills**
-
-**A. Context Assembly:**
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: senior_software_engineer
-- Model: {MODEL_CONFIG["senior_software_engineer"]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: 0
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
-
-**Note:** Reasoning is **automatically included** for SSE at medium level (800 tokens). SSE receives Developer's reasoning to understand what was tried.
-
-**B. Specialization Loading:**
-```
-[SPEC_CTX_START group={group_id} agent=senior_software_engineer]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: senior_software_engineer
-Model: {MODEL_CONFIG["senior_software_engineer"]}
-Specialization Paths: {specializations from task_group or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked?
-- [ ] Specialization-loader invoked?
-
-END TURN 1
-
----
-
-**TURN 2: Compose & Spawn SSE**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL SSE agent file
-sse_definition = Read("agents/senior_software_engineer.md")  // Full agent instructions
-IF Read fails OR sse_definition is empty:
-    ⚠️ Agent file read failed | agents/senior_software_engineer.md | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_context = """
----
-
-## Escalation Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Simple
-**BRANCH:** {branch}
-
-**ORIGINAL TASK:** {original_task}
-**DEVELOPER'S ATTEMPT:** {developer_attempt}
-**ESCALATION REASON:** {escalation_reason}
-
-**COMMIT TO:** {branch}
-**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = sse_definition + task_context
+Write to `bazinga/prompts/{session_id}/params_senior_software_engineer_{group_id}.json`:
+```json
+{
+  "agent_type": "senior_software_engineer",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Escalation: {original_task[:60]}",
+  "task_requirements": "ORIGINAL TASK: {original_task}\nDEVELOPER'S ATTEMPT: {developer_attempt}\nESCALATION REASON: {escalation_reason}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"senior_software_engineer\"]}",
+  "output_file": "bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md"
+}
 ```
 
-**D. Compose Full Prompt & Spawn**:
-```
-prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
-```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt={prompt})`
+**Step 2: Invoke prompt-builder skill**
 
----
+→ `Skill(command: "prompt-builder")`
 
-**🔴 LAYER 2 SELF-CHECK (STEP-LEVEL FAIL-SAFE):**
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
 
-Before moving to the next group or ending your message, verify:
-1. ✅ Did I invoke BOTH context-assembler AND specialization-loader in Turn 1?
-2. ✅ Did I spawn Task() in Turn 2?
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
 
-**IF NO:** You violated the workflow. Complete the spawn sequence NOW.
+**Step 4: Spawn SSE with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["senior_software_engineer"], description="SSE {group_id}: escalation", prompt="FIRST: Read bazinga/prompts/{session_id}/senior_software_engineer_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 ---
 
@@ -479,95 +251,37 @@ Before moving to the next group or ending your message, verify:
   ```
   Invoke: `Skill(command: "bazinga-db")`
 
-#### SPAWN DEVELOPER RETRY (TWO-TURN SEQUENCE)
+#### SPAWN DEVELOPER RETRY (SKILL-BASED PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED**
+**Step 1: Write params file**
 
-**TURN 1: Invoke Both Skills**
-
-**A. Context Assembly:**
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: developer
-- Model: {MODEL_CONFIG["developer"]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {revision_count + 1}  // > 0 triggers reasoning inclusion
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
-
-**Note:** Reasoning is **automatically included** for developer retries (iteration > 0) at medium level (800 tokens).
-
-**B. Specialization Loading:**
-```
-[SPEC_CTX_START group={group_id} agent=developer]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: developer
-Model: {MODEL_CONFIG["developer"]}
-Specialization Paths: {specializations from task_group or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked with Iteration > 0?
-- [ ] Specialization-loader invoked?
-
-END TURN 1
-
----
-
-**TURN 2: Compose & Spawn Developer**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL Developer agent file
-dev_definition = Read("agents/developer.md")  // Full agent instructions
-IF Read fails OR dev_definition is empty:
-    ⚠️ Agent file read failed | agents/developer.md | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_context = """
----
-
-## Continuation Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Simple
-**BRANCH:** {branch}
-**ITERATION:** {revision_count + 1}
-
-**WORK COMPLETED SO FAR:**
-{summary_of_completed_work}
-
-**REMAINING GAPS/ISSUES:**
-{specific_gaps_and_issues}
-
-**REQUIREMENTS:**
-{user_completion_requirements}
-
-**CONCRETE NEXT STEPS:**
-{next_steps}
-
-**COMMIT TO:** {branch}
-**REPORT STATUS:** READY_FOR_QA or BLOCKED when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = dev_definition + task_context
+Write to `bazinga/prompts/{session_id}/params_developer_{group_id}_retry.json`:
+```json
+{
+  "agent_type": "developer",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Continuation: {task_title}",
+  "task_requirements": "WORK COMPLETED SO FAR: {summary_of_completed_work}\n\nREMAINING GAPS/ISSUES: {specific_gaps_and_issues}\n\nCONCRETE NEXT STEPS: {next_steps}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"developer\"]}",
+  "output_file": "bazinga/prompts/{session_id}/developer_{group_id}_retry.md"
+}
 ```
 
-**D. Compose Full Prompt & Spawn**:
-```
-prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
-```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt={prompt})`
+**Step 2: Invoke prompt-builder skill**
+
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Developer with file-based instructions**
+
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], description="Dev {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/{session_id}/developer_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 ---
 
@@ -588,112 +302,43 @@ prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
 ✅ Testing | Running tests + coverage analysis
 ```
 
-### SPAWN QA EXPERT (TWO-TURN SEQUENCE)
+### SPAWN QA EXPERT (SKILL-BASED PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED**
+**Step 1: Write params file**
 
-**TURN 1: Invoke Both Skills**
-
-**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
-
-IF context-assembler ENABLED:
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: qa_expert
-- Model: {MODEL_CONFIG["qa_expert"]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {iteration_count}
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
-→ Verify: Contains `## Context for qa_expert` or zone/packages metadata
-
-**Note:** Reasoning is **automatically included** for `qa_expert` at medium level (800 tokens). Prior Developer reasoning provides handoff continuity.
-
-IF context-assembler DISABLED or returns empty:
-→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
-
-**B. Specialization Loading:**
-```
-[SPEC_CTX_START group={group_id} agent=qa_expert]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: qa_expert
-Model: {MODEL_CONFIG["qa_expert"]}
-Specialization Paths: {specializations from PM or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-→ Verify: Contains `[SPECIALIZATION_BLOCK_START]`
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked (or explicitly disabled in skills_config)?
-- [ ] Specialization-loader invoked?
-- [ ] Both skills returned valid output?
-
-END TURN 1 (wait for skill responses)
-
----
-
-**TURN 2: Compose & Spawn**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL QA Expert agent file
-qa_definition = Read("agents/qa_expert.md")  // Full agent instructions
-IF Read fails OR qa_definition is empty:
-    ⚠️ Agent file read failed | agents/qa_expert.md | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_context = """
----
-
-## Current Task Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Simple
-
-**TASK:** Validate {dev_task_title}
-**Developer Changes:** {files_changed}
-**Challenge Level:** {level}/5
-
-**REPORT STATUS:** PASS, FAIL, or BLOCKED when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = qa_definition + task_context
+Write to `bazinga/prompts/{session_id}/params_qa_expert_{group_id}.json`:
+```json
+{
+  "agent_type": "qa_expert",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Validate: {dev_task_title}",
+  "task_requirements": "Developer Changes: {files_changed}\nChallenge Level: {level}/5",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"qa_expert\"]}",
+  "output_file": "bazinga/prompts/{session_id}/qa_expert_{group_id}.md"
+}
 ```
 
-**D. Compose Full Prompt**:
-```
-prompt =
-  {CONTEXT_BLOCK}  // Prior reasoning + packages
-  +
-  {SPEC_BLOCK}     // Tech identity
-  +
-  base_prompt      // Full agent file + task context
-```
+**Step 2: Invoke prompt-builder skill**
 
-**E. Spawn QA:**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn QA Expert with file-based instructions**
 
 Output summary:
 ```
 📝 **QA Expert Prompt** | Group: {group_id} | Model: {model}
    **Task:** Validate {dev_task_title} | **Challenge Level:** {level}/5
-   **Specializations:** {status}
-   **Context Packages:** {count if any}
+   **Prompt file:** bazinga/prompts/{session_id}/qa_expert_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
-
-**🔴 SELF-CHECK (QA Spawn):**
-- ✅ Did I query context packages for qa_expert?
-- ✅ Does base_prompt include context packages (if any)?
-- ✅ Is Task() called with spec_block + base_prompt?
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["qa_expert"], description="QA {group}: tests", prompt="FIRST: Read bazinga/prompts/{session_id}/qa_expert_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 
 **AFTER receiving the QA Expert's response:**
@@ -728,27 +373,27 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 - Do NOT stop for user input
 
 **IF QA requests changes:**
-- **IMMEDIATELY spawn new developer Task using unified two-turn sequence**
+- **IMMEDIATELY spawn new developer Task using prompt-builder**
 - Track revision count in database (increment by 1)
-- Use "SPAWN DEVELOPER RETRY (TWO-TURN SEQUENCE)" from Step 2A.3 above
-- Include QA feedback and failed tests in base prompt
+- Use "SPAWN DEVELOPER RETRY (DETERMINISTIC PROMPT)" from Step 2A.3 above
+- Include QA feedback and failed tests via --qa-feedback parameter
 
 **IF revision count >= 1 OR QA reports challenge level 3+ failure:**
 - Escalate to SSE with QA's challenge level findings
-- Use "SPAWN SSE ON ESCALATION (TWO-TURN SEQUENCE)" from Step 2A.3 above
+- Use "SPAWN SSE ON ESCALATION (DETERMINISTIC PROMPT)" from Step 2A.3 above
 
 **IF QA reports ESCALATE_SENIOR explicitly:**
-- Use "SPAWN SSE ON ESCALATION (TWO-TURN SEQUENCE)" from Step 2A.3 above
+- Use "SPAWN SSE ON ESCALATION (DETERMINISTIC PROMPT)" from Step 2A.3 above
 
 **🔴 SECURITY OVERRIDE:** If PM marked task as `security_sensitive: true`:
 - ALWAYS spawn Senior Software Engineer for fixes (never regular Developer)
 - Security tasks bypass normal revision count escalation - SSE from the start
-- Use "SPAWN SSE ON ESCALATION (TWO-TURN SEQUENCE)" from Step 2A.3 above
+- Use "SPAWN SSE ON ESCALATION (DETERMINISTIC PROMPT)" from Step 2A.3 above
 
 **IF Senior Software Engineer also fails (revision >= 2 after Senior Eng):**
-- Spawn Tech Lead for guidance using Tech Lead unified sequence below
+- Spawn Tech Lead for guidance using Tech Lead sequence below
 
-**🔴 CRITICAL:** SPAWN the Task using unified sequence - don't write "Fix the QA issues" and stop
+**🔴 CRITICAL:** SPAWN the Task using prompt-builder - don't write "Fix the QA issues" and stop
 
 ### Step 2A.6: Spawn Tech Lead for Review
 
@@ -757,116 +402,43 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 👔 Reviewing | Security scan + lint check + architecture analysis
 ```
 
-### SPAWN TECH LEAD (TWO-TURN SEQUENCE)
+### SPAWN TECH LEAD (SKILL-BASED PROMPT)
 
-**🔴 PRE-SPAWN CHECKLIST - BOTH SKILLS REQUIRED**
+**Step 1: Write params file**
 
-**TURN 1: Invoke Both Skills**
-
-**A. Context Assembly** (check `skills_config.json` → `context_engineering.enable_context_assembler`):
-
-IF context-assembler ENABLED:
-```
-Assemble context for agent spawn:
-- Session: {session_id}
-- Group: {group_id}
-- Agent: tech_lead
-- Model: {MODEL_CONFIG["tech_lead"]}
-- Current Tokens: {estimated_token_usage}
-- Iteration: {iteration_count}
-```
-Then invoke: `Skill(command: "context-assembler")`
-→ Capture output as `{CONTEXT_BLOCK}`
-→ Verify: Contains `## Context for tech_lead` or zone/packages metadata
-
-**Note:** Reasoning is **automatically included** for `tech_lead` at medium level (800 tokens). Prior Developer and QA reasoning provides review continuity.
-
-IF context-assembler DISABLED or returns empty:
-→ Set `{CONTEXT_BLOCK}` = "" (empty, non-blocking)
-
-**B. Specialization Loading:**
-```
-[SPEC_CTX_START group={group_id} agent=tech_lead]
-Session ID: {session_id}
-Group ID: {group_id}
-Agent Type: tech_lead
-Model: {MODEL_CONFIG["tech_lead"]}
-Specialization Paths: {specializations from PM or project_context.json}
-Testing Mode: {testing_mode}
-[SPEC_CTX_END]
-```
-Then invoke: `Skill(command: "specialization-loader")`
-→ Capture output as `{SPEC_BLOCK}`
-→ Verify: Contains `[SPECIALIZATION_BLOCK_START]`
-
-**✅ TURN 1 SELF-CHECK:**
-- [ ] Context-assembler invoked (or explicitly disabled in skills_config)?
-- [ ] Specialization-loader invoked?
-- [ ] Both skills returned valid output?
-
-END TURN 1 (wait for skill responses)
-
----
-
-**TURN 2: Compose & Spawn**
-
-**C. Read Agent File & Build Prompt** (internal, DO NOT OUTPUT):
-```
-// 🔴 MANDATORY: Read the FULL Tech Lead agent file
-tl_definition = Read("agents/techlead.md")  // Full agent instructions
-IF Read fails OR tl_definition is empty:
-    ⚠️ Agent file read failed | agents/techlead.md | Cannot proceed - spawn aborted
-
-// Build task context to append
-task_context = """
----
-
-## Current Task Assignment
-
-**SESSION:** {session_id}
-**GROUP:** {group_id}
-**MODE:** Simple
-
-**TASK:** Review {task_title}
-**QA Result:** {qa_result}
-**Coverage:** {coverage_pct}%
-**Files Changed:** {files_list}
-
-**REPORT STATUS:** APPROVED, CHANGES_REQUESTED, or SPAWN_INVESTIGATOR when complete
-"""
-
-// Combine: Full agent definition + Task context
-base_prompt = tl_definition + task_context
+Write to `bazinga/prompts/{session_id}/params_tech_lead_{group_id}.json`:
+```json
+{
+  "agent_type": "tech_lead",
+  "session_id": "{session_id}",
+  "group_id": "{group_id}",
+  "task_title": "Review: {task_title}",
+  "task_requirements": "QA Result: {qa_result}\nCoverage: {coverage_pct}%\nFiles Changed: {files_list}",
+  "branch": "{branch}",
+  "mode": "simple",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"tech_lead\"]}",
+  "output_file": "bazinga/prompts/{session_id}/tech_lead_{group_id}.md"
+}
 ```
 
-**D. Compose Full Prompt**:
-```
-prompt =
-  {CONTEXT_BLOCK}  // Prior reasoning + packages
-  +
-  {SPEC_BLOCK}     // Tech identity
-  +
-  base_prompt      // Full agent file + task context
-```
+**Step 2: Invoke prompt-builder skill**
 
-**E. Spawn Tech Lead:**
+→ `Skill(command: "prompt-builder")`
+
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
+
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn Tech Lead with file-based instructions**
 
 Output summary:
 ```
 📝 **Tech Lead Prompt** | Group: {group_id} | Model: {model}
    **Task:** Review {task_title} | **QA:** {result} | **Coverage:** {pct}%
-   **Specializations:** {status}
-   **Context Packages:** {count if any}
-   **Reasoning Entries:** {count if any}
+   **Prompt file:** bazinga/prompts/{session_id}/tech_lead_{group_id}.md
 ```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt={CONTEXT_BLOCK + SPEC_BLOCK + base_prompt})`
-
-**🔴 SELF-CHECK (TL Spawn):**
-- ✅ Did I query context packages for tech_lead?
-- ✅ Did I query reasoning from implementation agents?
-- ✅ Does base_prompt include context packages (if any)?
-- ✅ Does base_prompt include reasoning (if any)?
-- ✅ Is Task() called with spec_block + base_prompt?
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["tech_lead"], description="TL {group}: review", prompt="FIRST: Read bazinga/prompts/{session_id}/tech_lead_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 
 **AFTER receiving the Tech Lead's response:**
@@ -1056,17 +628,16 @@ Task(
 - If code issues → Spawn Developer (or SSE based on revision count) with Tech Lead's code feedback
 - If test issues → Spawn QA Expert with Tech Lead's test feedback
 
-**🔴 MANDATORY: Use TWO-TURN spawn sequence with full agent file:**
+**🔴 MANDATORY: Use prompt-builder to build complete prompts:**
 
 For code issues (Developer/SSE):
-- Use Step 2A.2 (TWO-TURN SPAWN SEQUENCE) with agent_type based on revision count
-- Include Tech Lead's feedback in task_context
-- MUST Read(agents/developer.md) or Read(agents/senior_software_engineer.md) first
+- Use prompt-builder with agent_type based on revision count
+- Include Tech Lead's feedback via --tl-feedback parameter
+- prompt-builder will read agent file and validate markers automatically
 
 For test issues (QA Expert):
-- Use Step 2A.4 (QA spawn sequence)
-- Include Tech Lead's test feedback
-- MUST Read(agents/qa_expert.md) first
+- Use prompt-builder with agent_type=qa_expert
+- Include Tech Lead's test feedback via --tl-feedback parameter
 
 **Track revision count in database (increment by 1)**
 
@@ -1080,7 +651,7 @@ For test issues (QA Expert):
 - On failure, escalate directly to Tech Lead (skip revision count check)
 - Security tasks CANNOT be simplified by PM - must be completed by SSE
 
-**🔴 CRITICAL:** Use TWO-TURN spawn sequence - DO NOT create custom prompts
+**🔴 CRITICAL:** Use prompt-builder skill - DO NOT create custom prompts
 
 **IF Tech Lead requests investigation:**
 - Already handled in Step 2A.6b
@@ -1143,38 +714,37 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 **FIRST:** Output §Technical Review Summary from `message_templates.md` (aggregate all Tech Lead responses).
 **Skip if:** Only one group (already shown in individual review).
 
-**THEN:** Build PM prompt using TWO-TURN spawn sequence:
+**THEN:** Build PM prompt using prompt-builder skill:
 
-**TURN 1: Invoke Skills**
-- Invoke context-assembler (if enabled)
-- Invoke specialization-loader with agent_type=project_manager
+**Step 1: Write params file**
 
-**TURN 2: Build Prompt & Spawn**
+Write to `bazinga/prompts/{session_id}/params_project_manager_final.json`:
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "global",
+  "task_title": "Final Assessment",
+  "task_requirements": "Implementation Summary: {implementation_summary}\n\nQuality Metrics: {quality_metrics}\n\nAssess if all success criteria are met and decide: BAZINGA or CONTINUE",
+  "branch": "{branch}",
+  "mode": "{mode}",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"project_manager\"]}",
+  "output_file": "bazinga/prompts/{session_id}/project_manager_final.md"
+}
 ```
-// 🔴 MANDATORY: Read the FULL PM agent file
-pm_definition = Read("agents/project_manager.md")
-IF Read fails OR pm_definition is empty:
-    ⚠️ Agent file read failed | agents/project_manager.md | Cannot proceed - spawn aborted
 
-task_context = """
-## Final Assessment Task
+**Step 2: Invoke prompt-builder skill**
 
-**SESSION:** {session_id}
-**MODE:** {mode}
+→ `Skill(command: "prompt-builder")`
 
-**Implementation Summary:**
-{implementation_summary}
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
 
-**Quality Metrics:**
-{quality_metrics}
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
 
-**Your Task:** Assess if all success criteria are met and decide: BAZINGA or CONTINUE
-"""
+**Step 4: Spawn PM with file-based instructions**
 
-base_prompt = pm_definition + task_context
-prompt = {CONTEXT_BLOCK} + {SPEC_BLOCK} + base_prompt
-```
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt={prompt})`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM final assessment", prompt="FIRST: Read bazinga/prompts/{session_id}/project_manager_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
 
 **AFTER PM response:** Parse using `response_parsing.md` §PM Response Parsing. Construct output capsule:
 - **BAZINGA:** §Completion template (groups, tests, criteria)
@@ -1265,9 +835,8 @@ Prior agents' documented decision progression:
 ```
 
 - **🔴 Use Step 2A.6b (SPAWN INVESTIGATOR sequence)** which includes:
-  * TWO-TURN spawn sequence with full agent file reading
-  * Read(agents/investigator.md) for full ~1400 lines of agent instructions
-  * CONTEXT_BLOCK + SPEC_BLOCK + investigator_definition + task_context
+  * Invoke prompt-builder skill with agent_type=investigator
+  * prompt-builder reads agent file, builds context, and validates markers
   * Context includes: Session ID, Group ID, Branch, Problem description, Evidence, Reasoning Timeline
 - After Investigator response: Route to Tech Lead for validation (Step 2A.6c)
 - Continue workflow automatically (Investigator→Tech Lead→Developer→QA→Tech Lead→PM)
@@ -1292,30 +861,42 @@ Prior agents' documented decision progression:
 3. **DO NOT** ask "Would you like me to continue?"
 4. **MUST** spawn PM immediately
 
-### Mandatory PM Spawn Prompt:
+### Mandatory PM Spawn (SKILL-BASED PROMPT):
 
+**Step 1: Write params file**
+
+Write to `bazinga/prompts/{session_id}/params_project_manager_phase_{N}.json`:
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "global",
+  "task_title": "Phase {N} Assessment",
+  "task_requirements": "Phase {N} complete. All groups approved and merged: {group_list}.\n\nQuery database for Original_Scope and compare to completed work:\n- Original estimated items: {Original_Scope.estimated_items}\n- Completed items: {sum of completed group item_counts}\n\nBased on this comparison, you MUST either:\n- Assign next phase groups (if work remains from Original_Scope), OR\n- Send BAZINGA (if ALL original tasks from scope are complete)\n\nDO NOT ask for permission. Make the decision based on scope comparison.",
+  "branch": "{branch}",
+  "mode": "{mode}",
+  "testing_mode": "{testing_mode}",
+  "model": "{MODEL_CONFIG[\"project_manager\"]}",
+  "output_file": "bazinga/prompts/{session_id}/project_manager_phase_{N}.md"
+}
 ```
-Phase {N} complete. All groups approved and merged: {group_list}.
 
-Query database for Original_Scope and compare to completed work:
-- Original estimated items: {Original_Scope.estimated_items}
-- Completed items: {sum of completed group item_counts}
+**Step 2: Invoke prompt-builder skill**
 
-Based on this comparison, you MUST either:
-- Assign next phase groups (if work remains from Original_Scope), OR
-- Send BAZINGA (if ALL original tasks from scope are complete)
+→ `Skill(command: "prompt-builder")`
 
-DO NOT ask for permission. Make the decision based on scope comparison.
-```
+**Step 3: Verify JSON result** - Check `success`, `prompt_file`, `markers_ok`
 
-### Spawn Command:
+**IF any check fails:** Output `❌ Prompt build failed | {error}` → STOP
+
+**Step 4: Spawn PM with file-based instructions**
 
 ```
 Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["project_manager"],
   description: "PM: Phase {N} complete - assess scope",
-  prompt: [PM prompt above]
+  prompt: "FIRST: Read bazinga/prompts/{session_id}/project_manager_phase_{N}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
 )
 ```
 
