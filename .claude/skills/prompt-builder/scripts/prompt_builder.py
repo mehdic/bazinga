@@ -601,6 +601,28 @@ def get_task_group_specializations(conn, session_id, group_id):
         return []
 
 
+def get_task_group_component_path(conn, session_id, group_id):
+    """Get component_path from task_groups table.
+
+    The component_path identifies which monorepo component this task group
+    belongs to (e.g., 'frontend/', 'backend/'). This is used to look up
+    version-specific context from project_context.json.
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT component_path FROM task_groups WHERE session_id = ? AND id = ?",
+            (session_id, group_id)
+        )
+        row = cursor.fetchone()
+        if row and row[0]:
+            return row[0]
+        return None
+    except sqlite3.OperationalError as e:
+        print(f"WARNING: DB query failed (task_groups.component_path): {e}", file=sys.stderr)
+        return None
+
+
 def get_project_context():
     """Read project_context.json for version guards."""
     context_path = PROJECT_ROOT / "bazinga" / "project_context.json"
@@ -609,6 +631,106 @@ def get_project_context():
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
+
+
+def get_component_version_context(project_context, component_path):
+    """Get version context for a specific component using longest-prefix matching.
+
+    For monorepos, different components may use different language versions.
+    This function finds the matching component in project_context.json and
+    returns its version information.
+
+    Args:
+        project_context: Parsed project_context.json
+        component_path: Path like 'frontend/' or 'backend/api/'
+
+    Returns:
+        Dict with version fields, or empty dict if no match
+    """
+    if not project_context or not component_path:
+        # Fallback to global versions if no component specified
+        return {
+            'primary_language': project_context.get('primary_language'),
+            'primary_language_version': project_context.get('primary_language_version'),
+        }
+
+    components = project_context.get('components', [])
+    if not components:
+        return {
+            'primary_language': project_context.get('primary_language'),
+            'primary_language_version': project_context.get('primary_language_version'),
+        }
+
+    # Normalize component_path for matching (ensure trailing slash consistency)
+    normalized_path = component_path.rstrip('/') + '/' if component_path != './' else './'
+
+    # Longest prefix match - prefer 'backend/api/' over 'backend/'
+    best_match = None
+    best_match_len = 0
+
+    for comp in components:
+        comp_path = comp.get('path', '')
+        # Normalize stored path
+        comp_normalized = comp_path.rstrip('/') + '/' if comp_path and comp_path != './' else comp_path
+
+        # Check if component_path starts with this component's path
+        if normalized_path.startswith(comp_normalized) or comp_normalized == './':
+            path_len = len(comp_normalized)
+            if path_len > best_match_len:
+                best_match = comp
+                best_match_len = path_len
+
+    if best_match:
+        return {
+            'primary_language': best_match.get('language'),
+            'primary_language_version': best_match.get('language_version'),
+            'framework': best_match.get('framework'),
+            'framework_version': best_match.get('framework_version'),
+            'node_version': best_match.get('node_version'),
+        }
+
+    # No match - return global versions
+    return {
+        'primary_language': project_context.get('primary_language'),
+        'primary_language_version': project_context.get('primary_language_version'),
+    }
+
+
+def infer_component_from_specializations(spec_paths, project_context):
+    """Infer component_path from specialization paths when PM didn't set it.
+
+    If a specialization path includes a component-specific prefix (e.g.,
+    'bazinga/templates/specializations/01-languages/python.md'), we can try
+    to match it to a component in project_context.json based on language.
+
+    This is a fallback when component_path is not explicitly set.
+
+    Args:
+        spec_paths: List of specialization template paths
+        project_context: Parsed project_context.json
+
+    Returns:
+        Inferred component_path or None
+    """
+    if not spec_paths or not project_context:
+        return None
+
+    components = project_context.get('components', [])
+    if not components:
+        return None
+
+    # Extract language from specialization paths (e.g., 'python.md' -> 'python')
+    for spec_path in spec_paths:
+        path_lower = spec_path.lower()
+        if '01-languages/' in path_lower:
+            # Extract language name from filename
+            filename = spec_path.split('/')[-1].replace('.md', '')
+            for comp in components:
+                if comp.get('language', '').lower() == filename.lower():
+                    return comp.get('path')
+
+    # No inference possible
+    return None
 
 
 def validate_template_path(template_path):
@@ -709,6 +831,19 @@ def version_matches(detected_version, operator, required_version):
         return False
 
 
+# Guard token normalization - map common aliases to canonical names
+# This ensures "py >= 3.10" matches against primary_language="python"
+GUARD_TOKEN_ALIASES = {
+    'py': 'python',
+    'python3': 'python',
+    'ts': 'typescript',
+    'js': 'javascript',
+    'node': 'nodejs',
+    'rb': 'ruby',
+    'rs': 'rust',
+}
+
+
 def evaluate_version_guard(guard_text, project_context):
     """Evaluate a version guard against project context.
 
@@ -735,9 +870,11 @@ def evaluate_version_guard(guard_text, project_context):
         lang, operator, version_str = match.groups()
         required_version = parse_version(version_str)
 
+        # Normalize guard token (e.g., "py" -> "python", "ts" -> "typescript")
+        lang_lower = GUARD_TOKEN_ALIASES.get(lang.lower(), lang.lower())
+
         # Get detected version from project_context
         detected_version = None
-        lang_lower = lang.lower()
 
         # Check primary language
         if project_context.get('primary_language', '').lower() == lang_lower:
@@ -833,6 +970,10 @@ def build_specialization_block(conn, session_id, group_id, agent_type, model="so
     Note: No per-model budget limits here. The global trim_to_budget() handles
     trimming if the overall prompt exceeds limits. This ensures specialization
     templates are always included and trimmed intelligently at the prompt level.
+
+    For monorepos, uses component_path to look up version-specific context,
+    enabling version guards like <!-- version: python >= 3.10 --> to filter
+    content based on the component's actual language version.
     """
     spec_paths = get_task_group_specializations(conn, session_id, group_id)
 
@@ -841,11 +982,30 @@ def build_specialization_block(conn, session_id, group_id, agent_type, model="so
 
     project_context = get_project_context()
 
+    # Get component_path for version context lookup
+    component_path = get_task_group_component_path(conn, session_id, group_id)
+
+    # Fallback: infer component from specialization paths if PM didn't set it
+    if not component_path:
+        component_path = infer_component_from_specializations(spec_paths, project_context)
+
+    # Get component-specific version context (uses longest-prefix matching)
+    # This enables different language versions for frontend/ vs backend/ in monorepos
+    version_context = get_component_version_context(project_context, component_path)
+
+    # Merge version context into project_context for version guard evaluation
+    # Component-specific versions override global versions
+    effective_context = dict(project_context)
+    if version_context:
+        for key, value in version_context.items():
+            if value is not None:
+                effective_context[key] = value
+
     # Collect ALL template content - global budget trimming handles limits
     templates_content = []
 
     for path in spec_paths:
-        content = read_template_with_version_guards(path, project_context)
+        content = read_template_with_version_guards(path, effective_context)
         if content:
             templates_content.append(content)
 

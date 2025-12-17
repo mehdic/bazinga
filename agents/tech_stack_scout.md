@@ -53,6 +53,44 @@ When spawned, analyze the project and output a comprehensive `bazinga/project_co
 - Even if detection is incomplete, write a partial result with `confidence: "low"`
 - **DO NOT complete without writing this file**
 
+### Step 0: Detect Language/Framework Versions
+
+**🔴 CRITICAL: Detect versions for each component.** This enables version-specific guidance in agent prompts.
+
+**Check version-specific files FIRST (highest confidence):**
+
+| File | Language | Parse |
+|------|----------|-------|
+| `.python-version` | Python | Full content → "3.11" |
+| `.nvmrc`, `.node-version` | Node.js | Full content → "18" |
+| `.ruby-version` | Ruby | Full content |
+| `.go-version` | Go | Full content |
+
+**Then check config files (medium confidence):**
+
+| File | Field | Language/Framework |
+|------|-------|---------------------|
+| `pyproject.toml` | `project.requires-python` | Python |
+| `pyproject.toml` | `tool.poetry.dependencies.python` | Python |
+| `package.json` | `engines.node` | Node.js |
+| `package.json` | `devDependencies.typescript` | TypeScript |
+| `package.json` | `dependencies.react` | React |
+| `package.json` | `dependencies.vue` | Vue |
+| `package.json` | `dependencies.@angular/core` | Angular |
+| `go.mod` | `go X.Y` directive | Go |
+| `Cargo.toml` | `rust-version` | Rust |
+
+**Version Normalization Rules:**
+- `">=3.10"` → `"3.10"` (extract minimum)
+- `"^3.11"` → `"3.11"` (extract base)
+- `"~18.2.0"` → `"18.2"` (extract base)
+- `"3.11.4"` → `"3.11"` (major.minor only)
+- For ranges like `">=3.10,<4.0"` → use minimum `"3.10"`
+
+**Output:** Store detected versions in `components[].language_version` and `components[].framework_version`.
+
+---
+
 ### Step 1: Detect Package Managers and Dependencies
 
 **Check for these files (in order):**
@@ -161,11 +199,13 @@ Write(
 
 ```json
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "detected_at": "2025-12-04T12:00:00Z",
   "confidence": "high",
 
   "primary_language": "typescript",
+  "primary_language_version": "5.0",
+
   "secondary_languages": ["python", "sql"],
 
   "structure": "monorepo",
@@ -174,7 +214,10 @@ Write(
       "path": "frontend/",
       "type": "frontend",
       "language": "typescript",
+      "language_version": "5.0",
+      "node_version": "18",
       "framework": "nextjs",
+      "framework_version": "14.0.0",
       "testing": ["jest", "playwright"],
       "suggested_specializations": [
         "bazinga/templates/specializations/01-languages/typescript.md",
@@ -189,7 +232,9 @@ Write(
       "path": "backend/",
       "type": "backend",
       "language": "python",
+      "language_version": "3.11",
       "framework": "fastapi",
+      "framework_version": "0.104.0",
       "database": "postgresql",
       "testing": ["pytest"],
       "suggested_specializations": [
@@ -217,6 +262,8 @@ Write(
     "Detected monorepo structure via multiple package.json files",
     "Next.js 14 detected in frontend/ via package.json",
     "FastAPI detected in backend/ via pyproject.toml",
+    "Python 3.11 detected from backend/.python-version",
+    "TypeScript 5.0 detected from frontend/package.json devDependencies",
     "GitHub Actions workflows found in .github/workflows/"
   ]
 }
@@ -226,11 +273,13 @@ Write(
 
 ```json
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "detected_at": "2025-12-04T12:00:00Z",
   "confidence": "high",
 
   "primary_language": "typescript",
+  "primary_language_version": "5.0",
+
   "secondary_languages": [],
 
   "structure": "simple",
@@ -239,7 +288,10 @@ Write(
       "path": "./",
       "type": "fullstack",
       "language": "typescript",
+      "language_version": "5.0",
+      "node_version": "20",
       "framework": "nextjs",
+      "framework_version": "14.0.0",
       "database": "prisma",
       "testing": ["jest"],
       "suggested_specializations": [
@@ -249,7 +301,8 @@ Write(
       ],
       "evidence": [
         {"file": "package.json", "key": "next", "version": "14.0.0"},
-        {"file": "package.json", "key": "@prisma/client", "version": "5.0.0"}
+        {"file": "package.json", "key": "@prisma/client", "version": "5.0.0"},
+        {"file": ".nvmrc", "key": "node", "version": "20"}
       ]
     }
   ],
@@ -265,7 +318,9 @@ Write(
 
   "detection_notes": [
     "Simple Next.js project with Prisma ORM",
-    "Full-stack framework (Next.js handles both frontend and API routes)"
+    "Full-stack framework (Next.js handles both frontend and API routes)",
+    "TypeScript 5.0 detected from package.json devDependencies",
+    "Node.js 20 detected from .nvmrc"
   ]
 }
 ```

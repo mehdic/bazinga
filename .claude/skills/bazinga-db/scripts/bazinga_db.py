@@ -1166,16 +1166,18 @@ class BazingaDB:
     def create_task_group(self, group_id: str, session_id: str, name: str,
                          status: str = 'pending', assigned_to: Optional[str] = None,
                          specializations: Optional[List[str]] = None,
-                         item_count: Optional[int] = None) -> Dict[str, Any]:
+                         item_count: Optional[int] = None,
+                         component_path: Optional[str] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to/specializations/item_count are updated -
-        preserving revision_count, last_review_status, and created_at.
+        already exists, only name/status/assigned_to/specializations/item_count/component_path
+        are updated - preserving revision_count, last_review_status, and created_at.
 
         Args:
             specializations: List of specialization file paths for this group
             item_count: Number of discrete tasks/items in this group (for progress tracking)
+            component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1219,16 +1221,17 @@ class BazingaDB:
             # Use ON CONFLICT for true upsert - preserves existing metadata
             # COALESCE for status: INSERT uses 'pending' default, UPDATE preserves existing if None passed
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count)
-                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1))
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count, component_path)
+                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1), ?)
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
                     status = COALESCE(excluded.status, task_groups.status),
                     assigned_to = COALESCE(excluded.assigned_to, task_groups.assigned_to),
                     specializations = COALESCE(excluded.specializations, task_groups.specializations),
                     item_count = COALESCE(excluded.item_count, task_groups.item_count),
+                    component_path = COALESCE(excluded.component_path, task_groups.component_path),
                     updated_at = CURRENT_TIMESTAMP
-            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count))
+            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count, component_path))
             conn.commit()
 
             # Fetch and return the saved record
@@ -3002,11 +3005,11 @@ STATE OPERATIONS:
   get-state <session> <type>                  Get latest state snapshot
 
 TASK GROUP OPERATIONS:
-  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON]
-                                              Create task group with optional specializations
-  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON]
-                                              Update task group (specializations as JSON array)
-  get-task-groups <session> [status]          Get task groups (includes specializations)
+  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON] [--component-path PATH]
+                                              Create task group with optional specializations and component path
+  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON] [--component-path PATH]
+                                              Update task group (specializations as JSON array, component_path for version context)
+  get-task-groups <session> [status]          Get task groups (includes specializations and component_path)
 
 TOKEN OPERATIONS:
   log-tokens <session> <agent> <tokens> [agent_id]
@@ -3339,15 +3342,16 @@ def main():
             status = cmd_args[1]
             db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
-            # Parse --specializations and --item_count flags first, then extract positional args
+            # Parse --specializations, --item_count, --component-path flags first, then extract positional args
             specializations = None
             item_count = None
+            component_path = None
             positional_args = []
             i = 0
             while i < len(cmd_args):
                 arg = cmd_args[i]
                 # Normalize dashes to underscores in flag NAME only (preserve leading --)
-                # e.g., '--item-count' -> '--item_count', '--specializations' stays same
+                # e.g., '--item-count' -> '--item_count', '--component-path' -> '--component_path'
                 if arg.startswith('--'):
                     arg_normalized = '--' + arg[2:].replace('-', '_')
                 else:
@@ -3375,6 +3379,9 @@ def main():
                         print(json.dumps({"success": False, "error": "--item_count must be a valid integer"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                     i += 2  # Skip flag and value
+                elif arg_normalized == '--component_path' and i + 1 < len(cmd_args):
+                    component_path = cmd_args[i + 1]
+                    i += 2  # Skip flag and value
                 else:
                     positional_args.append(cmd_args[i])
                     i += 1
@@ -3392,7 +3399,7 @@ def main():
             # Default to None so upsert preserves existing status; INSERT defaults to 'pending'
             status = positional_args[3] if len(positional_args) > 3 else None
             assigned_to = positional_args[4] if len(positional_args) > 4 else None
-            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count)
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count, component_path)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             # Validate minimum args
@@ -3404,7 +3411,8 @@ def main():
             kwargs = {}
             # Allowlist of valid flags
             # v14: Added security_sensitive, qa_attempts, tl_review_attempts for escalation tracking
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts"}
+            # v15: Added component_path for version-specific prompt building
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 key = key.replace('-', '_')  # Normalize dashes to underscores (--assigned-to → assigned_to)

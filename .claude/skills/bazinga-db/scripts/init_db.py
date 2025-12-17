@@ -28,7 +28,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1211,6 +1211,74 @@ def init_database(db_path: str) -> None:
             current_version = 14
             print("✓ Migration to v14 complete (escalation tracking columns)")
 
+        # v14 → v15: Add component_path for version-specific prompt building
+        if current_version == 14:
+            print("\n--- Migrating v14 → v15 (component_path for version context) ---")
+
+            # Check if task_groups table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ task_groups table will be created with component_path column")
+            else:
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Add component_path column for monorepo component binding
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN component_path TEXT")
+                        print("   ✓ Added task_groups.component_path")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.component_path already exists")
+                        else:
+                            raise
+
+                    # Verify integrity before commit
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v14→v15: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                    # WAL checkpoint for clean state
+                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                    if checkpoint_result:
+                        busy, log_frames, checkpointed = checkpoint_result
+                        if busy:
+                            for retry in range(3):
+                                time.sleep(0.5 * (retry + 1))
+                                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                                if checkpoint_result and not checkpoint_result[0]:
+                                    print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                    break
+                            else:
+                                print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+
+                    # Post-commit integrity verification
+                    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if post_integrity != "ok":
+                        print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+
+                    # Refresh query planner statistics
+                    cursor.execute("ANALYZE task_groups;")
+                    print("   ✓ WAL checkpoint completed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v14→v15 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 15
+            print("✓ Migration to v15 complete (component_path for version context)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
@@ -1316,6 +1384,7 @@ def init_database(db_path: str) -> None:
     # PRIMARY KEY: Composite (id, session_id) allows same group ID across sessions
     # Extended in v9 to support item_count for progress tracking
     # Extended in v14 to support security_sensitive, qa_attempts, tl_review_attempts
+    # Extended in v15 to support component_path for version-specific prompt building
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT NOT NULL,
@@ -1338,6 +1407,7 @@ def init_database(db_path: str) -> None:
             security_sensitive INTEGER DEFAULT 0,
             qa_attempts INTEGER DEFAULT 0,
             tl_review_attempts INTEGER DEFAULT 0,
+            component_path TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),

@@ -126,14 +126,22 @@ Read(file_path: "bazinga/project_context.json")
 FOR each task_group:
   specializations = []
   target_paths = extract file paths from task description
+  matched_component_path = null  # Track matched component for version lookup
 
   FOR each component in project_context.components:
     IF target_path starts with component.path:
+      # Longest prefix match - prefer "backend/api/" over "backend/"
+      IF matched_component_path is null OR len(component.path) > len(matched_component_path):
+        matched_component_path = component.path
       specializations.extend(component.suggested_specializations)
 
+  # Store matched component path for version context in prompt builder
+  task_group.component_path = matched_component_path
   # Deduplicate preserving order
   task_group.specializations = list(dict.fromkeys(specializations))
 ```
+
+**Why component_path matters:** The prompt builder uses this to look up language/framework versions from `project_context.json`, enabling version-specific guidance (e.g., Python 3.11 patterns, not 2.7).
 
 ### Step 3.5.3: Include in Task Group Definition
 
@@ -143,8 +151,11 @@ FOR each task_group:
 - **Complexity:** 5 (MEDIUM)
 - **Initial Tier:** Developer
 - **Target Path:** frontend/src/pages/login.tsx
+- **Component Path:** frontend/
 - **Specializations:** ["bazinga/templates/specializations/01-languages/typescript.md", ...]
 ```
+
+**Component Path:** The monorepo component this task group belongs to (for version lookup).
 
 ### Step 3.5.4: Store via bazinga-db (CANONICAL TEMPLATE)
 
@@ -158,23 +169,26 @@ Status: pending
 Complexity: 5
 Initial Tier: Developer
 Item_Count: [number of tasks]
+--component-path 'frontend/'
 --specializations '["path/to/template1.md", "path/to/template2.md"]'
 ```
 
 **Required fields:**
 - `Item_Count` - Number of discrete tasks (for progress tracking)
+- `--component-path` - Monorepo component path for version lookup (use `./` for simple projects)
 - `--specializations` - Technology paths (NEVER empty)
 
 **VALIDATION GATE:**
 ```
 IMMEDIATE SELF-CHECK after creating each task group:
 1. Does it include Item_Count?
-2. Does it include --specializations with non-empty array?
+2. Does it include --component-path?
+3. Does it include --specializations with non-empty array?
 
 IF missing → IMMEDIATELY invoke bazinga-db update-task-group
 ```
 
-**DO NOT proceed to Step 5 until ALL task groups have non-empty specializations.**
+**DO NOT proceed to Step 5 until ALL task groups have component_path and non-empty specializations.**
 
 ---
 
