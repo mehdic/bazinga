@@ -88,12 +88,13 @@ AGENT_FILE_MAP = {
 SPECIALIZATIONS_BASE = PROJECT_ROOT / "bazinga" / "templates" / "specializations"
 
 # Minimum lines expected in each agent file (sanity check)
+# Note: project_manager is a kernel file (~350 lines) that references templates
 MIN_AGENT_LINES = {
     "developer": 1000,
     "senior_software_engineer": 1200,
     "qa_expert": 800,
     "tech_lead": 600,
-    "project_manager": 1800,
+    "project_manager": 300,  # Kernel file - details in bazinga/templates/pm_*.md
     "investigator": 400,
     "requirements_engineer": 500,
 }
