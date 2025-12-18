@@ -118,11 +118,25 @@ if (-not (Test-Path "bazinga\skills_config.json")) {
     Write-Host "✓ skills_config.json already exists" -ForegroundColor Gray
 }
 
+# Migrate legacy message files (renamed in tech_lead consistency fix)
+$LEGACY_MESSAGE_FILES = @{
+    "bazinga\messages\qa_to_techlead.json" = "bazinga\messages\qa_to_tech_lead.json"
+    "bazinga\messages\techlead_to_dev.json" = "bazinga\messages\tech_lead_to_dev.json"
+}
+
+foreach ($legacy_file in $LEGACY_MESSAGE_FILES.Keys) {
+    $new_file = $LEGACY_MESSAGE_FILES[$legacy_file]
+    if ((Test-Path $legacy_file) -and (-not (Test-Path $new_file))) {
+        Write-Host "⚠️  Migrating legacy file: $legacy_file → $new_file" -ForegroundColor Yellow
+        Move-Item -Path $legacy_file -Destination $new_file
+    }
+}
+
 # Initialize message files
 $MESSAGE_FILES = @(
     "bazinga\messages\dev_to_qa.json",
-    "bazinga\messages\qa_to_techlead.json",
-    "bazinga\messages\techlead_to_dev.json"
+    "bazinga\messages\qa_to_tech_lead.json",
+    "bazinga\messages\tech_lead_to_dev.json"
 )
 
 foreach ($msg_file in $MESSAGE_FILES) {
@@ -184,8 +198,8 @@ Write-Host "   ├── orchestrator_state.json"
 Write-Host "   ├── skills_config.json"
 Write-Host "   └── messages\"
 Write-Host "       ├── dev_to_qa.json"
-Write-Host "       ├── qa_to_techlead.json"
-Write-Host "       └── techlead_to_dev.json"
+Write-Host "       ├── qa_to_tech_lead.json"
+Write-Host "       └── tech_lead_to_dev.json"
 Write-Host ""
 Write-Host "   docs\"
 Write-Host "   └── orchestration-log.md"

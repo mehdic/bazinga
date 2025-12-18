@@ -80,10 +80,16 @@ AGENT_FILE_NAMES = {
     "developer": "developer.md",
     "senior_software_engineer": "senior_software_engineer.md",
     "qa_expert": "qa_expert.md",
-    "tech_lead": "techlead.md",
+    "tech_lead": "tech_lead.md",
     "project_manager": "project_manager.md",
     "investigator": "investigator.md",
     "requirements_engineer": "requirements_engineer.md",
+}
+
+# Legacy filename aliases for backward compatibility
+# Projects installed before the tech_lead rename may have the old filename
+LEGACY_AGENT_ALIASES = {
+    "tech_lead": "techlead.md",  # Pre-rename: techlead.md → tech_lead.md
 }
 
 # Agent directories to search (in order of preference)
@@ -567,6 +573,9 @@ def read_agent_file(agent_type):
     Searches for agent files in multiple directories to support both:
     - Dev mode: agents/ at repo root (bazinga repo)
     - Installed mode: .claude/agents/ (client projects after `bazinga install`)
+
+    Also checks legacy filename aliases for backward compatibility with
+    projects installed before file renames.
     """
     file_name = AGENT_FILE_NAMES.get(agent_type)
     if not file_name:
@@ -574,20 +583,32 @@ def read_agent_file(agent_type):
         print(f"Valid types: {list(AGENT_FILE_NAMES.keys())}", file=sys.stderr)
         sys.exit(1)
 
+    # Build list of filenames to try (primary + legacy alias if exists)
+    filenames_to_try = [file_name]
+    legacy_name = LEGACY_AGENT_ALIASES.get(agent_type)
+    if legacy_name:
+        filenames_to_try.append(legacy_name)
+
     # Search for agent file in all configured directories
     searched_paths = []
     for agent_dir in AGENT_DIRECTORIES:
-        path = PROJECT_ROOT / agent_dir / file_name
-        searched_paths.append(str(path))
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
-            lines = len(content.splitlines())
+        for fname in filenames_to_try:
+            path = PROJECT_ROOT / agent_dir / fname
+            searched_paths.append(str(path))
+            if path.exists():
+                # Warn if using legacy filename
+                if fname != file_name:
+                    print(f"WARNING: Using legacy filename '{fname}' for {agent_type}. "
+                          f"Consider renaming to '{file_name}'.", file=sys.stderr)
 
-            min_lines = MIN_AGENT_LINES.get(agent_type, 400)
-            if lines < min_lines:
-                print(f"WARNING: Agent file {path} has only {lines} lines (expected {min_lines}+)", file=sys.stderr)
+                content = path.read_text(encoding="utf-8")
+                lines = len(content.splitlines())
 
-            return content
+                min_lines = MIN_AGENT_LINES.get(agent_type, 400)
+                if lines < min_lines:
+                    print(f"WARNING: Agent file {path} has only {lines} lines (expected {min_lines}+)", file=sys.stderr)
+
+                return content
 
     # Not found in any directory
     print(f"ERROR: Agent file not found for type '{agent_type}'", file=sys.stderr)

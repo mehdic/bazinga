@@ -67,7 +67,7 @@ Implement the assigned task.
         (project_root / "agents" / "developer.md").write_text(agent_content)
         (project_root / "agents" / "project_manager.md").write_text(agent_content)
         (project_root / "agents" / "qa_expert.md").write_text(agent_content)
-        (project_root / "agents" / "techlead.md").write_text(agent_content)
+        (project_root / "agents" / "tech_lead.md").write_text(agent_content)
         (project_root / "agents" / "senior_software_engineer.md").write_text(agent_content)
         (project_root / "agents" / "investigator.md").write_text(agent_content)
         (project_root / "agents" / "requirements_engineer.md").write_text(agent_content)

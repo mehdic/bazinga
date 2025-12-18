@@ -2219,7 +2219,7 @@ Session ID: {session_id}, Agent Type: {agent_type}, Content: {response}, Iterati
 ```
 Then invoke: `Skill(command: "bazinga-db")` — **MANDATORY** (skipping causes silent failure)
 
-**Agent IDs:** pm_main, pm_final | developer_main, developer_group_{X} | qa_main, qa_group_{X} | techlead_main, techlead_group_{X} | investigator_{N}
+**Agent IDs:** pm_main, pm_final | developer_main, developer_group_{X} | qa_main, qa_group_{X} | tech_lead_main, tech_lead_group_{X} | investigator_{N}
 
 **Error handling:** Init fails → STOP. Workflow logging fails → WARN, continue.
 

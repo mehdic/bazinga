@@ -277,7 +277,7 @@ No changes to developer.md needed - it's template-driven.
 
 ---
 
-### 4.3 Tech Lead (`agents/techlead.md`)
+### 4.3 Tech Lead (`agents/tech_lead.md`)
 
 **Current:** Already receives skills config from orchestrator
 
@@ -286,7 +286,7 @@ No changes to developer.md needed - it's template-driven.
 **Section: Skills invocation**
 
 Currently orchestrator builds tech lead prompt with skills.
-No changes to techlead.md needed - it's template-driven.
+No changes to tech_lead.md needed - it's template-driven.
 
 **Impact:** NONE - Already dynamic ✅
 

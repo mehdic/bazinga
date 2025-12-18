@@ -106,7 +106,7 @@ bazinga/
 │   ├── project_manager.md
 │   ├── developer.md
 │   ├── qa_expert.md
-│   ├── techlead.md
+│   ├── tech_lead.md
 │   └── investigator.md
 ├── .claude/
 │   ├── commands/                    # Slash commands (generated)

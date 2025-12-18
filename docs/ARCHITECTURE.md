@@ -355,7 +355,7 @@ ELSE IF tests_flaky:
 
 ### Tech Lead
 
-**File**: `agents/techlead.md`
+**File**: `agents/tech_lead.md`
 
 **Role**: Quality reviewer and technical authority
 
