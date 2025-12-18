@@ -205,8 +205,8 @@ IF about to call Task():
   1. Write params JSON file: bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json
   2. Invoke Skill(command: "prompt-builder") - skill reads params file, outputs JSON
   3. Parse JSON response: verify success=true, get prompt_file path
-  4. Read the prompt from prompt_file
-  5. Use Task() with the prompt content
+  4. Spawn agent with file-reference instruction (DO NOT read the file into orchestrator context)
+     Task(prompt="FIRST: Read {prompt_file}... THEN: Execute ALL instructions...")
 ```
 
 **If prompt-builder was NOT invoked:** STOP. Run prompt-builder first. Do NOT call Task() without it.
@@ -331,8 +331,9 @@ Resume Context: {context if resume scenario}
    ```
    The skill reads the params file and outputs JSON with `prompt_file` path.
 3. **Parse JSON response**: verify `success: true`, get `prompt_file` path
-4. **Read the prompt** from the `prompt_file` path
-5. **Spawn agent** with the prompt content in Task()
+4. **Spawn agent** with file-reference instruction: `Task(prompt="FIRST: Read {prompt_file}... THEN: Execute ALL instructions...")`
+
+**🔴 DO NOT read the prompt file into orchestrator context - agent reads it in its own isolated context**
 
 **🚫 FORBIDDEN: Spawning any agent WITHOUT going through prompt-builder.**
 
@@ -1063,19 +1064,7 @@ Display:
 | `PLANNING_COMPLETE` | New work added → Jump to Step 1.4, then Phase 2 |
 | `NEEDS_CLARIFICATION` | Surface question to user |
 
-**🔴🔴🔴 INTENT WITHOUT ACTION BUG PREVENTION 🔴🔴🔴**
-
-In resume scenarios, the most common bug is:
-- PM responds with CONTINUE
-- Orchestrator says "Now let me spawn the developer..."
-- Orchestrator ends message WITHOUT calling any tool
-- Workflow hangs
-
-**RULE:** When PM says CONTINUE, you MUST start the spawn sequence IMMEDIATELY:
-1. Call `Skill(command: "prompt-builder")` with agent parameters
-2. Then call `Task()` with the built prompt
-
-The key is: SOME tool call must happen NOW. Don't just write text describing what you will do.
+**🔴 INTENT WITHOUT ACTION:** If PM says CONTINUE, call `Skill(command: "prompt-builder")` + `Task()` NOW. Don't just describe it.
 
 ---
 
@@ -1766,16 +1755,7 @@ Before continuing to Step 1.3a, verify:
 - `NEEDS_CLARIFICATION` - PM needs user input before planning
 - `INVESTIGATION_ONLY` - Investigation-only request; no implementation needed
 
-**🔴🔴🔴 CRITICAL: INTENT WITHOUT ACTION IS A BUG 🔴🔴🔴**
-
-**The orchestrator stopping bug happens when you:**
-- Say "Now let me spawn..." or "I will spawn..." (intent)
-- But DON'T call any tool in the same turn (no action)
-
-**RULE:** If you write "spawn", "route", "invoke", "call" → you MUST call SOME tool in the SAME turn:
-- Call `Skill(command: "prompt-builder")` to build the prompt
-- Then call `Task()` with the built prompt
-- Saying you will do something is NOT doing it. The tool call must happen NOW.
+**🔴 INTENT WITHOUT ACTION:** If you write "spawn" → call `Skill(command: "prompt-builder")` + `Task()` NOW.
 
 ---
 
@@ -2052,7 +2032,7 @@ ELSE IF PM chose "parallel":
 1. Write params JSON file with agent config and output_file path
 2. Invoke `Skill(command: "prompt-builder")` - skill reads params file
 3. Parse JSON response, verify success, get prompt_file
-4. Read prompt from file and spawn agent with prompt content
+4. Spawn agent with file-reference instruction (DO NOT read file into orchestrator context)
 
 ### Process (at agent spawn)
 
@@ -2082,7 +2062,9 @@ The skill reads the params file and outputs JSON with `prompt_file` path.
 **Step 3: Parse JSON response**
 Verify `success: true` and get `prompt_file` path from JSON output.
 
-**Step 4: Spawn agent with prompt content**
+**Step 4: Spawn agent with file-reference instruction**
+
+**🔴 CRITICAL: DO NOT read the prompt file. Pass only the file-reference instruction.**
 ```
 Task(
   subagent_type: "general-purpose",
@@ -2141,9 +2123,20 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 1. **Write params file** with agent config to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`
 2. **Run prompt-builder** with `--params-file` (outputs JSON to stdout)
 3. **Parse JSON response**, verify `success: true`, get `prompt_file` path
-4. **Read prompt** from `prompt_file`, spawn agent with prompt content
+4. **Spawn agent** with file-reference instruction (DO NOT read file into orchestrator context)
 
 **🔴 CRITICAL:** See `phase_simple.md` for complete spawn sequences with all parameters.
+
+### 🔴 CRITICAL: File Reference vs Content Passing
+
+**NEVER read the prompt file into orchestrator context.**
+
+| Approach | Tokens | Correct? |
+|----------|--------|----------|
+| Read file, pass content | ~10,700/agent | ❌ WRONG |
+| Pass file-reference instruction | ~50/agent | ✅ CORRECT |
+
+**Agent reads file in its OWN isolated context. Orchestrator stays minimal.**
 
 ---
 
