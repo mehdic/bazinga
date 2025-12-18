@@ -3,7 +3,8 @@
 
 If you find yourself about to:
 - Run ANY git command (except `git branch --show-current`) → STOP → Spawn Developer/Investigator
-- Run npm/yarn/pnpm/pytest → STOP → Spawn Developer or QA
+- Run npm/yarn/pnpm → STOP → Spawn Developer (except via build-baseline.sh)
+- Run pytest/python test commands → STOP → Spawn QA Expert
 - Run python3 .claude/skills/**/scripts/*.py → STOP → Use Skill(command: "...") instead
 - Call an external API → STOP → Spawn Investigator
 - Analyze logs/output → STOP → Spawn appropriate agent

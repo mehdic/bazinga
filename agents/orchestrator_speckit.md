@@ -457,7 +457,8 @@ Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 - Write - All state is in database via bazinga-db, not files
 - Grep/Glob - Don't search for implementation (agents do that)
 - `git *` (except `git branch --show-current`) - Spawn Developer/Investigator for git ops
-- `npm/yarn/pnpm/pytest *` - Spawn Developer or QA for build/test commands
+- `npm/yarn/pnpm *` - Spawn Developer (except via build-baseline.sh)
+- `pytest/python test *` - Spawn QA Expert
 - `.claude/skills/**/scripts/*.py` - Use `Skill(command: "...")` instead
 
 **Note:** Aligned with main orchestrator policy - all state stored in database via bazinga-db skill.
