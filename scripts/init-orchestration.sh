@@ -246,6 +246,20 @@ else
     echo "✓ testing_config.json already exists"
 fi
 
+# Migrate legacy message files (renamed in tech_lead consistency fix)
+declare -A LEGACY_MESSAGE_FILES=(
+    ["bazinga/messages/qa_to_techlead.json"]="bazinga/messages/qa_to_tech_lead.json"
+    ["bazinga/messages/techlead_to_dev.json"]="bazinga/messages/tech_lead_to_dev.json"
+)
+
+for legacy_file in "${!LEGACY_MESSAGE_FILES[@]}"; do
+    new_file="${LEGACY_MESSAGE_FILES[$legacy_file]}"
+    if [ -f "$legacy_file" ] && [ ! -f "$new_file" ]; then
+        echo "⚠️  Migrating legacy file: $legacy_file → $new_file"
+        mv "$legacy_file" "$new_file"
+    fi
+done
+
 # Initialize message files
 MESSAGE_FILES=(
     "bazinga/messages/dev_to_qa.json"

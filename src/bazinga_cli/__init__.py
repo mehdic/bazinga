@@ -1726,18 +1726,30 @@ def check():
     if bazinga_installed:
         checks.append(("BAZINGA Setup", True, "Found in current directory"))
 
-        # Check for required agents
+        # Check for required agents (with legacy alias support)
+        # tech_lead.md was renamed from techlead.md - accept either for backward compatibility
         required_agents = [
             "orchestrator.md",
             "project_manager.md",
             "developer.md",
             "qa_expert.md",
-            "tech_lead.md",
+            ("tech_lead.md", "techlead.md"),  # Primary, legacy alias
             "investigator.md",
             "requirements_engineer.md",
         ]
+
+        def agent_exists(agent_spec):
+            """Check if agent file exists, supporting legacy aliases."""
+            if isinstance(agent_spec, tuple):
+                return any((agents_dir / name).exists() for name in agent_spec)
+            return (agents_dir / agent_spec).exists()
+
+        def agent_name(agent_spec):
+            """Get display name for agent (primary name only)."""
+            return agent_spec[0] if isinstance(agent_spec, tuple) else agent_spec
+
         missing_agents = [
-            agent for agent in required_agents if not (agents_dir / agent).exists()
+            agent_name(agent) for agent in required_agents if not agent_exists(agent)
         ]
 
         if missing_agents:
