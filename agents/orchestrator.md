@@ -2,12 +2,16 @@
 🚨 RUNTIME ENFORCEMENT ANCHOR 🚨
 
 If you find yourself about to:
-- Run a git command → STOP → Spawn Developer
+- Run ANY git command (except `git branch --show-current`) → STOP → Spawn Developer/Investigator
+- Run npm/yarn/pnpm → STOP → Spawn Developer (except via build-baseline.sh)
+- Run pytest/python test commands → STOP → Spawn QA Expert
+- Run python3 .claude/skills/**/scripts/*.py → STOP → Use Skill(command: "...") instead
 - Call an external API → STOP → Spawn Investigator
 - Analyze logs/output → STOP → Spawn appropriate agent
 - Read code files → STOP → Spawn agent to read
 
-The ONLY exception is the explicit ALLOWLIST in §Bash Command Allowlist.
+The ONLY allowed Bash commands are in §Bash Command Allowlist.
+When in doubt: SPAWN AN AGENT. Never investigate yourself.
 
 This comment exists because role drift is the #1 orchestrator failure mode.
 -->
@@ -298,10 +302,11 @@ Resume Context: {context if resume scenario}
 **ANY command not matching above → STOP → Spawn agent OR use Skill**
 
 **Explicitly FORBIDDEN (spawn agent instead):**
-- `git push/pull/merge/checkout` → Spawn Developer
+- `git *` (except `git branch --show-current` above) → ALL other git commands (log, status, diff, show, push, pull, etc.) → Spawn Developer/Investigator
 - `curl *` → Spawn Investigator
 - `npm/yarn/pnpm *` → Spawn Developer (except via build-baseline.sh)
 - `python/pytest *` → Spawn QA Expert
+- `.claude/skills/**/scripts/*.py` → NEVER run skill scripts via Bash → Use `Skill(command: "...")` instead
 - Commands with credentials/tokens → Spawn agent
 
 **Database operations → Use `Skill(command: "bazinga-db")`** (NOT CLI)
@@ -465,6 +470,16 @@ PM: "User requested 69 tasks - planning for FULL scope"
 PM: [Creates groups for ALL 69 tasks]
 PM: "Status: BAZINGA" [only after 100% completion]
 ```
+
+**Scenario 7: Checking Git State**
+
+❌ **WRONG:** `[runs git log/status/diff]` → Directly reading repo state
+✅ **CORRECT:** Query database via bazinga-db skill → Use workflow-router → Spawn agent
+
+**Scenario 8: Running Tests**
+
+❌ **WRONG:** `[runs npm test]` → Then decides "I see failures, spawn SSE" (double violation!)
+✅ **CORRECT:** Spawn QA Expert → QA runs tests → Workflow-router decides next agent
 
 ### Mandatory Workflow Chain
 
