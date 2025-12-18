@@ -220,8 +220,8 @@ IF about to call Task():
   1. Write params JSON file: bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json
   2. Invoke Skill(command: "prompt-builder") - skill reads params file, outputs JSON
   3. Parse JSON response: verify success=true, get prompt_file path
-  4. Read the prompt from prompt_file
-  5. Use Task() with the prompt content
+  4. Spawn agent with file-reference instruction (DO NOT read the file into orchestrator context)
+     Task(prompt="FIRST: Read {prompt_file}... THEN: Execute ALL instructions...")
 ```
 
 **If prompt-builder was NOT invoked:** STOP. Run prompt-builder first. Do NOT call Task() without it.
@@ -346,8 +346,9 @@ Resume Context: {context if resume scenario}
    ```
    The skill reads the params file and outputs JSON with `prompt_file` path.
 3. **Parse JSON response**: verify `success: true`, get `prompt_file` path
-4. **Read the prompt** from the `prompt_file` path
-5. **Spawn agent** with the prompt content in Task()
+4. **Spawn agent** with file-reference instruction: `Task(prompt="FIRST: Read {prompt_file}... THEN: Execute ALL instructions...")`
+
+**🔴 DO NOT read the prompt file into orchestrator context - agent reads it in its own isolated context**
 
 **🚫 FORBIDDEN: Spawning any agent WITHOUT going through prompt-builder.**
 
@@ -2067,7 +2068,7 @@ ELSE IF PM chose "parallel":
 1. Write params JSON file with agent config and output_file path
 2. Invoke `Skill(command: "prompt-builder")` - skill reads params file
 3. Parse JSON response, verify success, get prompt_file
-4. Read prompt from file and spawn agent with prompt content
+4. Spawn agent with file-reference instruction (DO NOT read file into orchestrator context)
 
 ### Process (at agent spawn)
 
@@ -2097,7 +2098,9 @@ The skill reads the params file and outputs JSON with `prompt_file` path.
 **Step 3: Parse JSON response**
 Verify `success: true` and get `prompt_file` path from JSON output.
 
-**Step 4: Spawn agent with prompt content**
+**Step 4: Spawn agent with file-reference instruction**
+
+**🔴 CRITICAL: DO NOT read the prompt file. Pass only the file-reference instruction.**
 ```
 Task(
   subagent_type: "general-purpose",
@@ -2156,9 +2159,40 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 1. **Write params file** with agent config to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`
 2. **Run prompt-builder** with `--params-file` (outputs JSON to stdout)
 3. **Parse JSON response**, verify `success: true`, get `prompt_file` path
-4. **Read prompt** from `prompt_file`, spawn agent with prompt content
+4. **Spawn agent** with file-reference instruction (DO NOT read file into orchestrator context)
 
 **🔴 CRITICAL:** See `phase_simple.md` for complete spawn sequences with all parameters.
+
+### 🔴 CRITICAL: File Reference vs Content Passing
+
+**NEVER read the prompt file into orchestrator context.**
+
+| Approach | Tokens | Correct? |
+|----------|--------|----------|
+| Read file, pass content | ~10,700/agent | ❌ WRONG |
+| Pass file-reference instruction | ~50/agent | ✅ CORRECT |
+
+**Why this matters:**
+- Developer prompt: ~10,700 tokens
+- 4 parallel developers: ~42,800 tokens
+- This alone consumes 21% of 200K context!
+
+**The spawned agent reads the file in its OWN isolated context.**
+**Orchestrator context stays minimal.**
+
+**WRONG (causes context exhaustion):**
+```python
+# DON'T DO THIS:
+prompt_content = Read(prompt_file)  # 10,700 tokens loaded!
+Task(prompt=prompt_content)         # Passed to Task, stays in context
+```
+
+**CORRECT (context efficient):**
+```python
+# DO THIS:
+Task(prompt="FIRST: Read {prompt_file}...")  # Only 50 tokens!
+# Agent reads file in its own isolated context
+```
 
 ---
 
