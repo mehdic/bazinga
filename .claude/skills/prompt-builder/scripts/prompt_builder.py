@@ -1865,7 +1865,7 @@ Debug mode:
 
     # Required arguments (not required if using --params-file)
     parser.add_argument("--agent-type", required=not using_params_file,
-                        choices=list(AGENT_FILE_MAP.keys()),
+                        choices=list(AGENT_FILE_NAMES.keys()),
                         help="Type of agent to build prompt for")
     parser.add_argument("--session-id", required=not using_params_file,
                         help="Session identifier")
