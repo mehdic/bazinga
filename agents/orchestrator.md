@@ -1079,19 +1079,7 @@ Display:
 | `PLANNING_COMPLETE` | New work added → Jump to Step 1.4, then Phase 2 |
 | `NEEDS_CLARIFICATION` | Surface question to user |
 
-**🔴🔴🔴 INTENT WITHOUT ACTION BUG PREVENTION 🔴🔴🔴**
-
-In resume scenarios, the most common bug is:
-- PM responds with CONTINUE
-- Orchestrator says "Now let me spawn the developer..."
-- Orchestrator ends message WITHOUT calling any tool
-- Workflow hangs
-
-**RULE:** When PM says CONTINUE, you MUST start the spawn sequence IMMEDIATELY:
-1. Call `Skill(command: "prompt-builder")` with agent parameters
-2. Then call `Task()` with the built prompt
-
-The key is: SOME tool call must happen NOW. Don't just write text describing what you will do.
+**🔴 INTENT WITHOUT ACTION:** If PM says CONTINUE, call `Skill(command: "prompt-builder")` + `Task()` NOW. Don't just describe it.
 
 ---
 
@@ -1782,16 +1770,7 @@ Before continuing to Step 1.3a, verify:
 - `NEEDS_CLARIFICATION` - PM needs user input before planning
 - `INVESTIGATION_ONLY` - Investigation-only request; no implementation needed
 
-**🔴🔴🔴 CRITICAL: INTENT WITHOUT ACTION IS A BUG 🔴🔴🔴**
-
-**The orchestrator stopping bug happens when you:**
-- Say "Now let me spawn..." or "I will spawn..." (intent)
-- But DON'T call any tool in the same turn (no action)
-
-**RULE:** If you write "spawn", "route", "invoke", "call" → you MUST call SOME tool in the SAME turn:
-- Call `Skill(command: "prompt-builder")` to build the prompt
-- Then call `Task()` with the built prompt
-- Saying you will do something is NOT doing it. The tool call must happen NOW.
+**🔴 INTENT WITHOUT ACTION:** If you write "spawn" → call `Skill(command: "prompt-builder")` + `Task()` NOW.
 
 ---
 
@@ -2172,27 +2151,7 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 | Read file, pass content | ~10,700/agent | ❌ WRONG |
 | Pass file-reference instruction | ~50/agent | ✅ CORRECT |
 
-**Why this matters:**
-- Developer prompt: ~10,700 tokens
-- 4 parallel developers: ~42,800 tokens
-- This alone consumes 21% of 200K context!
-
-**The spawned agent reads the file in its OWN isolated context.**
-**Orchestrator context stays minimal.**
-
-**WRONG (causes context exhaustion):**
-```python
-# DON'T DO THIS:
-prompt_content = Read(prompt_file)  # 10,700 tokens loaded!
-Task(prompt=prompt_content)         # Passed to Task, stays in context
-```
-
-**CORRECT (context efficient):**
-```python
-# DO THIS:
-Task(prompt="FIRST: Read {prompt_file}...")  # Only 50 tokens!
-# Agent reads file in its own isolated context
-```
+**Agent reads file in its OWN isolated context. Orchestrator stays minimal.**
 
 ---
 
