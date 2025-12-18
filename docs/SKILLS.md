@@ -972,7 +972,7 @@ This helps you decide what Skills are worth the time for your workflow.
 ## Next Steps
 
 - **Quick start**: Run `/bazinga.configure-skills` and select a preset
-- **Learn more**: See agent documentation (`agents/developer.md`, `agents/techlead.md`, etc.)
+- **Learn more**: See agent documentation (`agents/developer.md`, `agents/tech_lead.md`, etc.)
 - **Integration**: See how orchestrator uses Skills in `agents/orchestrator.md`
 - **Examples**: See `examples/EXAMPLES.md` for real workflow examples
 

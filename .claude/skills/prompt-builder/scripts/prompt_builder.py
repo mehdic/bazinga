@@ -80,7 +80,7 @@ AGENT_FILE_NAMES = {
     "developer": "developer.md",
     "senior_software_engineer": "senior_software_engineer.md",
     "qa_expert": "qa_expert.md",
-    "tech_lead": "techlead.md",
+    "tech_lead": "tech_lead.md",
     "project_manager": "project_manager.md",
     "investigator": "investigator.md",
     "requirements_engineer": "requirements_engineer.md",

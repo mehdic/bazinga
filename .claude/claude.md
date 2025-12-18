@@ -166,7 +166,7 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 
 ## Project Structure
 
-- `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, techlead, developer)
+- `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, tech_lead, developer)
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
 - `bazinga/` - State files for orchestration (created during runs)

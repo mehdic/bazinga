@@ -121,8 +121,8 @@ if (-not (Test-Path "bazinga\skills_config.json")) {
 # Initialize message files
 $MESSAGE_FILES = @(
     "bazinga\messages\dev_to_qa.json",
-    "bazinga\messages\qa_to_techlead.json",
-    "bazinga\messages\techlead_to_dev.json"
+    "bazinga\messages\qa_to_tech_lead.json",
+    "bazinga\messages\tech_lead_to_dev.json"
 )
 
 foreach ($msg_file in $MESSAGE_FILES) {
@@ -184,8 +184,8 @@ Write-Host "   ├── orchestrator_state.json"
 Write-Host "   ├── skills_config.json"
 Write-Host "   └── messages\"
 Write-Host "       ├── dev_to_qa.json"
-Write-Host "       ├── qa_to_techlead.json"
-Write-Host "       └── techlead_to_dev.json"
+Write-Host "       ├── qa_to_tech_lead.json"
+Write-Host "       └── tech_lead_to_dev.json"
 Write-Host ""
 Write-Host "   docs\"
 Write-Host "   └── orchestration-log.md"

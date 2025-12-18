@@ -14,7 +14,7 @@ After **EVERY agent response** (PM, Developer, QA, Tech Lead):
 bazinga-db, please log this [agent_type] interaction:
 
 Session ID: [current session_id from init]
-Agent Type: [any agent type - common: pm, developer, qa_expert, techlead, orchestrator, investigator]
+Agent Type: [any agent type - common: pm, developer, qa_expert, tech_lead, orchestrator, investigator]
 Content: [Full agent response text - preserve all formatting]
 Iteration: [current iteration number]
 Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, investigator_1, etc.]

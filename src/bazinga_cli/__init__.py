@@ -1732,7 +1732,7 @@ def check():
             "project_manager.md",
             "developer.md",
             "qa_expert.md",
-            "techlead.md",
+            "tech_lead.md",
             "investigator.md",
             "requirements_engineer.md",
         ]

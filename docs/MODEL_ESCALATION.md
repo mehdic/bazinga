@@ -92,12 +92,12 @@ The orchestrator uses the `model` parameter when spawning the Tech Lead:
 
 **Revision 1-2 (Sonnet 4.5):**
 ```
-@techlead [standard review prompt]
+@tech_lead [standard review prompt]
 ```
 
 **Revision 3+ (Opus):**
 ```
-@techlead model=opus [enhanced review prompt]
+@tech_lead model=opus [enhanced review prompt]
 ```
 
 ### Step 4: Enhanced Prompt for Persistent Issues
@@ -323,7 +323,7 @@ Reading group_status.json...
 Current revision_count: 3
 Escalating to Opus for deep analysis.
 
-@techlead model=opus
+@tech_lead model=opus
 ## Enhanced Review for Persistent Issues
 
 This code has gone through 3 revisions. Look for:

@@ -333,7 +333,7 @@ Can't find what you need? Try:
 
 - **[../README.md](../README.md)** - Project overview and quick start
 - **[../examples/EXAMPLES.md](../examples/EXAMPLES.md)** - Usage examples and workflows
-- **[../agents/](../agents/)** - Agent definition files (developer.md, techlead.md, etc.)
+- **[../agents/](../agents/)** - Agent definition files (developer.md, tech_lead.md, etc.)
 - **[../scripts/](../scripts/)** - Utility scripts and initialization
 - **[../config/](../config/)** - Configuration files
 
