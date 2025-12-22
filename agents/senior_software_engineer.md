@@ -1034,17 +1034,29 @@ Before logging, ask yourself:
 
 ```
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_developer.json",
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_senior_software_engineer.json",
   content: """
 {
-  "from_agent": "developer",
+  "from_agent": "senior_software_engineer",
   "to_agent": "{qa_expert OR tech_lead}",
   "timestamp": "{ISO timestamp}",
   "session_id": "{SESSION_ID}",
   "group_id": "{GROUP_ID}",
 
-  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED}",
+  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED OR ROOT_CAUSE_FOUND}",
   "summary": "{One sentence description}",
+
+  "escalation_context": {
+    "original_agent": "developer",
+    "failure_reason": "Why the developer failed",
+    "challenge_level": "Level 4 Security (if applicable)"
+  },
+
+  "root_cause_analysis": {
+    "symptoms": "What appeared to be wrong",
+    "actual_cause": "The real root cause",
+    "why_missed": "Why developer missed this"
+  },
 
   "implementation": {
     "files_created": ["path/to/file1.py", "path/to/file2.py"],
@@ -1062,6 +1074,11 @@ Write(
     "failing": {N},
     "coverage": "{N}%",
     "types": ["unit", "integration", "contract", "e2e"]
+  },
+
+  "validation": {
+    "build": "PASS",
+    "previous_failures": "NOW PASSING"
   },
 
   "branch": "{your_branch_name}",
@@ -1083,13 +1100,24 @@ Write(
 )
 ```
 
+**Also write the implementation alias** (same content, different filename - QA reads this):
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
+  content: <same content as above>
+)
+```
+
+This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
+
 **If tests are failing**, also write a test failures artifact BEFORE the handoff file:
 
 ```
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md",
   content: """
-# Test Failures - Developer Report
+# Test Failures - SSE Report
 
 ## Failing Tests
 
@@ -1102,44 +1130,6 @@ Write(
 {paste full test run output here}
 """
 )
-```
-
-
-
-### SSE-Specific Handoff Fields
-
-When writing your handoff file, include additional SSE-specific fields:
-
-```json
-{
-  "from_agent": "senior_software_engineer",
-  "to_agent": "{qa_expert OR tech_lead}",
-  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED OR ROOT_CAUSE_FOUND}",
-
-  "escalation_context": {
-    "original_agent": "developer",
-    "failure_reason": "Why the developer failed",
-    "challenge_level": "Level 4 Security (if applicable)"
-  },
-
-  "root_cause_analysis": {
-    "symptoms": "What appeared to be wrong",
-    "actual_cause": "The real root cause",
-    "why_missed": "Why developer missed this"
-  },
-
-  "fix_applied": {
-    "description": "Technical description of fix",
-    "files_modified": ["path/to/file.py"],
-    "key_changes": ["Change 1", "Change 2"]
-  },
-
-  "validation": {
-    "build": "PASS",
-    "tests": {"passed": 15, "failed": 0},
-    "previous_failures": "NOW PASSING"
-  }
-}
 ```
 
 ### SSE Status Codes

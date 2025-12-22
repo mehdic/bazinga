@@ -355,19 +355,27 @@ cat bazinga/test_patterns.json
 ## END_MODIFY
 
 # =============================================================================
-# MODIFY: Handoff Format (Add Escalation Context for SSE)
+# REPLACE: Handoff Filename (Change from developer to senior_software_engineer)
 # =============================================================================
-## MODIFY: 5. Write Handoff File (MANDATORY)
+## REPLACE: 5. Write Handoff File (MANDATORY)
 
-### SSE-Specific Handoff Fields
+### 5. Write Handoff File (MANDATORY)
 
-When writing your handoff file, include additional SSE-specific fields:
+**Before your final response, you MUST write a handoff file** containing all details for the next agent.
 
-```json
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_senior_software_engineer.json",
+  content: """
 {
   "from_agent": "senior_software_engineer",
   "to_agent": "{qa_expert OR tech_lead}",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
+
   "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED OR ROOT_CAUSE_FOUND}",
+  "summary": "{One sentence description}",
 
   "escalation_context": {
     "original_agent": "developer",
@@ -381,18 +389,78 @@ When writing your handoff file, include additional SSE-specific fields:
     "why_missed": "Why developer missed this"
   },
 
-  "fix_applied": {
-    "description": "Technical description of fix",
-    "files_modified": ["path/to/file.py"],
-    "key_changes": ["Change 1", "Change 2"]
+  "implementation": {
+    "files_created": ["path/to/file1.py", "path/to/file2.py"],
+    "files_modified": ["path/to/existing.py"],
+    "key_changes": [
+      "Change 1 description",
+      "Change 2 description",
+      "Change 3 description"
+    ]
+  },
+
+  "tests": {
+    "total": {N},
+    "passing": {N},
+    "failing": {N},
+    "coverage": "{N}%",
+    "types": ["unit", "integration", "contract", "e2e"]
   },
 
   "validation": {
     "build": "PASS",
-    "tests": {"passed": 15, "failed": 0},
     "previous_failures": "NOW PASSING"
+  },
+
+  "branch": "{your_branch_name}",
+
+  "concerns": [
+    "Any concern for tech lead review",
+    "Any questions"
+  ],
+
+  "tech_debt_logged": {true OR false},
+
+  "testing_mode": "{full OR minimal OR disabled}",
+
+  "artifacts": {
+    "test_failures": "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md"
   }
 }
+"""
+)
+```
+
+**Also write the implementation alias** (same content, different filename - QA reads this):
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
+  content: <same content as above>
+)
+```
+
+This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
+
+**If tests are failing**, also write a test failures artifact BEFORE the handoff file:
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md",
+  content: """
+# Test Failures - SSE Report
+
+## Failing Tests
+
+### Test 1: {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Root Cause:** {analysis}
+
+## Full Test Output
+{paste full test run output here}
+"""
+)
 ```
 
 ### SSE Status Codes
@@ -403,7 +471,7 @@ When writing your handoff file, include additional SSE-specific fields:
 | `READY_FOR_REVIEW` | Fix complete, minimal/no tests |
 | `BLOCKED` | Cannot proceed without help |
 | `ROOT_CAUSE_FOUND` | Identified cause, need PM decision |
-## END_MODIFY
+## END_REPLACE
 
 # =============================================================================
 # REPLACE: How to Save Reasoning (Complete replacement with correct agent_type)

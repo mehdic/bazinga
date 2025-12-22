@@ -1504,9 +1504,31 @@ def build_handoff_context(args):
     Injects the path where the prior agent wrote their detailed handoff file,
     allowing the next agent to read full context from the file instead of
     receiving it inline (which would bloat orchestrator context).
+
+    Only includes the handoff section if the file actually exists.
     """
     if not args.prior_handoff_file:
         return ""
+
+    # Validate path format (security check)
+    if not args.prior_handoff_file.startswith("bazinga/artifacts/"):
+        print(f"⚠️ Warning: prior_handoff_file path doesn't match expected pattern: {args.prior_handoff_file}", file=sys.stderr)
+        return ""
+
+    # Check if the handoff file exists
+    if not os.path.exists(args.prior_handoff_file):
+        print(f"⚠️ Warning: prior_handoff_file does not exist: {args.prior_handoff_file}", file=sys.stderr)
+        return f"""
+## ⚠️ PRIOR AGENT HANDOFF (FILE NOT FOUND)
+
+**Expected File:** `{args.prior_handoff_file}`
+
+The prior agent's handoff file was not found. This may indicate:
+- The prior agent didn't write their handoff file
+- The file path is incorrect
+
+Proceed with caution using the context provided by the orchestrator.
+"""
 
     return f"""
 ## PRIOR AGENT HANDOFF (READ THIS FILE)

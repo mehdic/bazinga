@@ -86,11 +86,18 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 |-------|------------------------|
 | Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR |
 | Developer (Merge Task) | MERGE_SUCCESS, MERGE_CONFLICT, MERGE_TEST_FAILURE |
-| QA Expert | PASS, FAIL, PARTIAL, BLOCKED, ESCALATE_SENIOR |
-| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
+| SSE | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, ROOT_CAUSE_FOUND |
+| QA Expert | PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY |
+| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, UNBLOCKING_GUIDANCE |
 | PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
-| Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
+| Investigator | ROOT_CAUSE_FOUND, INVESTIGATION_INCOMPLETE, BLOCKED, EXHAUSTED |
 | Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
+
+**Status Code Mappings:**
+- `FAIL_ESCALATE` → Escalate to SSE (Level 3+ security/chaos failures)
+- `FLAKY` → Route to Tech Lead (intermittent test failures)
+- `UNBLOCKING_GUIDANCE` → Tech Lead provides guidance, route back to Developer
+- `INVESTIGATION_INCOMPLETE` / `EXHAUSTED` → Route to PM for decision
 
 **🔴 RE ROUTING:** Requirements Engineer outputs READY_FOR_REVIEW → bypasses QA → routes directly to Tech Lead (research deliverables don't need testing).
 

@@ -83,12 +83,12 @@ Be honest about your limitations. Use `ESCALATE_SENIOR` for **explicit escalatio
 
 This triggers **immediate** escalation to Senior Software Engineer (SSE tier) without retry.
 
-### When You Should Report INCOMPLETE
+### When You Should Report PARTIAL
 
-Use `INCOMPLETE` for **partial work that you can continue**:
+Use `PARTIAL` for **partial work that you can continue**:
 
 ```markdown
-**Status:** INCOMPLETE
+**Status:** PARTIAL
 **Reason:** "Partial implementation - need more context"
 
 **Completed:**
@@ -977,6 +977,17 @@ Write(
 """
 )
 ```
+
+**Also write the implementation alias** (same content, different filename - QA reads this):
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
+  content: <same content as above>
+)
+```
+
+This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
 
 **If tests are failing**, also write a test failures artifact BEFORE the handoff file:
 
