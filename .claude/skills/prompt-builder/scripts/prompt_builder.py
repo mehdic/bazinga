@@ -1505,41 +1505,53 @@ def build_handoff_context(args):
     allowing the next agent to read full context from the file instead of
     receiving it inline (which would bloat orchestrator context).
 
-    Only includes the handoff section if the file actually exists.
+    Returns empty string if file doesn't exist or path is invalid.
     """
     if not args.prior_handoff_file:
         return ""
 
-    # Validate path format (security check)
-    if not args.prior_handoff_file.startswith("bazinga/artifacts/"):
-        print(f"⚠️ Warning: prior_handoff_file path doesn't match expected pattern: {args.prior_handoff_file}", file=sys.stderr)
+    # Security: Normalize path and validate it resolves under bazinga/artifacts/
+    try:
+        # Normalize to remove ../ traversal attempts
+        normalized = os.path.normpath(args.prior_handoff_file)
+
+        # Must still start with bazinga/artifacts/ after normalization
+        if not normalized.startswith("bazinga/artifacts/"):
+            print(f"⚠️ Warning: prior_handoff_file path escapes allowed directory: {args.prior_handoff_file}", file=sys.stderr)
+            return ""
+
+        # Additional check: ensure it matches expected pattern {session}/{group}/handoff_{agent}.json
+        # or {session}/handoff_{agent}.json for PM (session-scoped)
+        parts = normalized.split("/")
+        if len(parts) < 3:
+            print(f"⚠️ Warning: prior_handoff_file path too short: {args.prior_handoff_file}", file=sys.stderr)
+            return ""
+
+        # Check filename pattern
+        filename = parts[-1]
+        if not (filename.startswith("handoff_") and filename.endswith(".json")):
+            print(f"⚠️ Warning: prior_handoff_file doesn't match handoff_*.json pattern: {args.prior_handoff_file}", file=sys.stderr)
+            return ""
+
+    except Exception as e:
+        print(f"⚠️ Warning: Error validating prior_handoff_file path: {e}", file=sys.stderr)
         return ""
 
-    # Check if the handoff file exists
-    if not os.path.exists(args.prior_handoff_file):
-        print(f"⚠️ Warning: prior_handoff_file does not exist: {args.prior_handoff_file}", file=sys.stderr)
-        return f"""
-## ⚠️ PRIOR AGENT HANDOFF (FILE NOT FOUND)
-
-**Expected File:** `{args.prior_handoff_file}`
-
-The prior agent's handoff file was not found. This may indicate:
-- The prior agent didn't write their handoff file
-- The file path is incorrect
-
-Proceed with caution using the context provided by the orchestrator.
-"""
+    # Check if the handoff file exists - if not, just log and return empty
+    if not os.path.exists(normalized):
+        print(f"⚠️ Warning: prior_handoff_file does not exist: {normalized}", file=sys.stderr)
+        return ""
 
     return f"""
 ## PRIOR AGENT HANDOFF (READ THIS FILE)
 
-**Handoff File:** `{args.prior_handoff_file}`
+**Handoff File:** `{normalized}`
 
 ⚠️ **MANDATORY:** Read this file FIRST to get full context from the prior agent.
 The file contains detailed information that was NOT included in the orchestrator message to save context space.
 
 ```
-Read: {args.prior_handoff_file}
+Read: {normalized}
 ```
 """
 
@@ -1595,9 +1607,10 @@ def enforce_global_budget(components, model="sonnet", agent_type="developer"):
     1. Agent definition (NEVER trim)
     2. Task context (NEVER trim)
     3. PM context (NEVER trim if PM)
-    4. Context block (trim if needed)
-    5. Specialization block (trim if needed)
-    6. Feedback context (trim first)
+    4. Handoff context (NEVER trim - critical for CRP)
+    5. Context block (trim if needed)
+    6. Specialization block (trim if needed)
+    7. Feedback context (trim first)
 
     Returns:
         tuple: (trimmed_components, trimmed_sections_log)
@@ -1621,6 +1634,9 @@ def enforce_global_budget(components, model="sonnet", agent_type="developer"):
         if "Current Task Assignment" in comp:
             result.append(comp)
         elif "## RESUME CONTEXT" in comp or "## PM STATE" in comp:
+            result.append(comp)
+        # Handoff section - never trim (critical for CRP)
+        elif "PRIOR AGENT HANDOFF" in comp:
             result.append(comp)
         # Agent definition - never trim (identified by size)
         elif estimate_tokens(comp) > 500 and "SPECIALIZATION GUIDANCE" not in comp and "Context from Prior Work" not in comp:

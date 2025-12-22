@@ -971,7 +971,7 @@ Write(
   "testing_mode": "{full OR minimal OR disabled}",
 
   "artifacts": {
-    "test_failures": "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md"
+    "test_failures": "{null if tests.failing == 0, else 'bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md'}"
   }
 }
 """

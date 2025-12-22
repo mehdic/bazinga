@@ -96,9 +96,13 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 
 **Parsing:** Extract `status` for routing, `summary[0]` for capsule. Full details are in handoff file.
 
-**Handoff file location:** `bazinga/artifacts/{session_id}/{group_id}/handoff_{agent}.json`
+**Handoff file locations:**
+- **Group-scoped (Dev/QA/TL):** `bazinga/artifacts/{session_id}/{group_id}/handoff_{agent}.json`
+- **Session-scoped (PM):** `bazinga/artifacts/{session_id}/handoff_project_manager.json` (no group directory)
+- **Implementation alias:** `bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json` (written by Developer OR SSE)
 
 **When routing to next agent:** Set `prior_handoff_file` in params to previous agent's handoff file.
+**Note:** PM handoff is session-scoped (no group_id in path). When spawning PM, omit `prior_handoff_file` or use session-scoped path.
 
 **Micro-summary (mission-critical statuses):**
 | Agent | Key Statuses to Extract |

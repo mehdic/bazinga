@@ -181,7 +181,13 @@ Do NOT proceed without reading the file first."
 | `tl_feedback` | No | `Needs refactoring` | For developer retry after TL review |
 | `pm_state` | No | `{...json...}` | PM state for resume spawns |
 | `resume_context` | No | `Resuming after...` | Context for PM resume |
-| `prior_handoff_file` | No | `bazinga/artifacts/.../handoff_developer.json` | CRP: Prior agent's handoff file |
+| `prior_handoff_file` | No | `bazinga/artifacts/.../handoff_developer.json` | CRP: Prior agent's handoff file (see behavior below) |
+
+**`prior_handoff_file` Behavior:**
+- If path is valid and file exists: Handoff section added with instruction to read file
+- If path is invalid (traversal attempt, wrong pattern): Warning logged, section omitted
+- If path is valid but file doesn't exist: Warning logged, section omitted (agent proceeds without prior context)
+- Path validation: Must start with `bazinga/artifacts/`, match `handoff_*.json` pattern, no path traversal (`../`)
 
 ## What the Script Does Internally
 
