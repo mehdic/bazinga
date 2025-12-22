@@ -1168,11 +1168,12 @@ class BazingaDB:
                          specializations: Optional[List[str]] = None,
                          item_count: Optional[int] = None,
                          component_path: Optional[str] = None,
-                         initial_tier: Optional[str] = None) -> Dict[str, Any]:
+                         initial_tier: Optional[str] = None,
+                         complexity: Optional[int] = None) -> Dict[str, Any]:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to/specializations/item_count/component_path
+        already exists, only name/status/assigned_to/specializations/item_count/component_path/complexity
         are updated - preserving revision_count, last_review_status, and created_at.
 
         Args:
@@ -1180,6 +1181,7 @@ class BazingaDB:
             item_count: Number of discrete tasks/items in this group (for progress tracking)
             component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
             initial_tier: Starting agent tier ('Developer' or 'Senior Software Engineer')
+            complexity: Task complexity score (1-10). 1-3=Low, 4-6=Medium, 7-10=High
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1225,14 +1227,22 @@ class BazingaDB:
                     "error": f"initial_tier must be one of {valid_tiers}, got '{initial_tier}'"
                 }
 
+            # Validate complexity if provided (must be 1-10)
+            if complexity is not None:
+                if not isinstance(complexity, int) or not 1 <= complexity <= 10:
+                    return {
+                        "success": False,
+                        "error": f"complexity must be an integer between 1 and 10, got '{complexity}'"
+                    }
+
             conn = self._get_connection()
             # Serialize specializations to JSON (preserve [] vs None distinction)
             specs_json = json.dumps(specializations) if specializations is not None else None
             # Use ON CONFLICT for true upsert - preserves existing metadata
             # COALESCE for status: INSERT uses 'pending' default, UPDATE preserves existing if None passed
             conn.execute("""
-                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count, component_path, initial_tier)
-                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1), ?, COALESCE(?, 'Developer'))
+                INSERT INTO task_groups (id, session_id, name, status, assigned_to, specializations, item_count, component_path, initial_tier, complexity)
+                VALUES (?, ?, ?, COALESCE(?, 'pending'), ?, ?, COALESCE(?, 1), ?, COALESCE(?, 'Developer'), ?)
                 ON CONFLICT(id, session_id) DO UPDATE SET
                     name = excluded.name,
                     status = COALESCE(excluded.status, task_groups.status),
@@ -1241,8 +1251,9 @@ class BazingaDB:
                     item_count = COALESCE(excluded.item_count, task_groups.item_count),
                     component_path = COALESCE(excluded.component_path, task_groups.component_path),
                     initial_tier = COALESCE(excluded.initial_tier, task_groups.initial_tier),
+                    complexity = COALESCE(excluded.complexity, task_groups.complexity),
                     updated_at = CURRENT_TIMESTAMP
-            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count, component_path, initial_tier))
+            """, (group_id, session_id, name, status, assigned_to, specs_json, item_count, component_path, initial_tier, complexity))
             conn.commit()
 
             # Fetch and return the saved record
@@ -1271,7 +1282,8 @@ class BazingaDB:
                          qa_attempts: Optional[int] = None,
                          tl_review_attempts: Optional[int] = None,
                          component_path: Optional[str] = None,
-                         initial_tier: Optional[str] = None) -> Dict[str, Any]:
+                         initial_tier: Optional[str] = None,
+                         complexity: Optional[int] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -1290,6 +1302,7 @@ class BazingaDB:
             tl_review_attempts: Number of Tech Lead review attempts
             component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
             initial_tier: Starting agent tier ('Developer' or 'Senior Software Engineer')
+            complexity: Task complexity score (1-10). 1-3=Low, 4-6=Medium, 7-10=High
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1366,6 +1379,14 @@ class BazingaDB:
                     }
                 updates.append("initial_tier = ?")
                 params.append(initial_tier)
+            if complexity is not None:
+                if not isinstance(complexity, int) or not 1 <= complexity <= 10:
+                    return {
+                        "success": False,
+                        "error": f"complexity must be an integer between 1 and 10, got '{complexity}'"
+                    }
+                updates.append("complexity = ?")
+                params.append(complexity)
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
@@ -3369,11 +3390,12 @@ def main():
             status = cmd_args[1]
             db.update_session_status(session_id, status)
         elif cmd == 'create-task-group':
-            # Parse --specializations, --item_count, --component-path, --initial_tier flags first, then extract positional args
+            # Parse --specializations, --item_count, --component-path, --initial_tier, --complexity flags first, then extract positional args
             specializations = None
             item_count = None
             component_path = None
             initial_tier = None
+            complexity = None
             positional_args = []
             i = 0
             while i < len(cmd_args):
@@ -3417,6 +3439,16 @@ def main():
                         print(json.dumps({"success": False, "error": f"--initial_tier must be one of {valid_tiers}, got '{initial_tier}'"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                     i += 2  # Skip flag and value
+                elif arg_normalized == '--complexity' and i + 1 < len(cmd_args):
+                    try:
+                        complexity = int(cmd_args[i + 1])
+                        if not 1 <= complexity <= 10:
+                            print(json.dumps({"success": False, "error": "--complexity must be between 1 and 10"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                    except ValueError:
+                        print(json.dumps({"success": False, "error": "--complexity must be a valid integer"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                    i += 2  # Skip flag and value
                 else:
                     positional_args.append(cmd_args[i])
                     i += 1
@@ -3434,7 +3466,7 @@ def main():
             # Default to None so upsert preserves existing status; INSERT defaults to 'pending'
             status = positional_args[3] if len(positional_args) > 3 else None
             assigned_to = positional_args[4] if len(positional_args) > 4 else None
-            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count, component_path, initial_tier)
+            result = db.create_task_group(group_id, session_id, name, status, assigned_to, specializations, item_count, component_path, initial_tier, complexity)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-task-group':
             # Validate minimum args
@@ -3448,7 +3480,7 @@ def main():
             # v14: Added security_sensitive, qa_attempts, tl_review_attempts for escalation tracking
             # v15: Added component_path for version-specific prompt building
             # v16: Added initial_tier for PM-assigned starting tier
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier"}
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier", "complexity"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 key = key.replace('-', '_')  # Normalize dashes to underscores (--assigned-to → assigned_to)
@@ -3461,9 +3493,13 @@ def main():
                     sys.exit(1)
                 value = cmd_args[i + 1]
                 # Convert integer flags
-                if key in ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts'):
+                if key in ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts', 'complexity'):
                     try:
                         value = int(value)
+                        # Validate complexity range
+                        if key == 'complexity' and not 1 <= value <= 10:
+                            print(json.dumps({"success": False, "error": "--complexity must be between 1 and 10"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
                     except ValueError:
                         print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
                         sys.exit(1)

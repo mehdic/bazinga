@@ -203,14 +203,14 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state \
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-task-group \
   "<group_id>" "<session_id>" "<name>" [status] [assigned_to] \
   [--specializations '<json_array>'] [--item_count N] [--initial_tier "<tier>"] \
-  [--component_path "<path>"]
+  [--component_path "<path>"] [--complexity N]
 ```
 
 **Example (correct):**
 ```bash
 python3 .../bazinga_db.py --quiet create-task-group "CALC" "bazinga_xxx" "Calculator Implementation" \
   --specializations '["bazinga/templates/specializations/01-languages/python.md"]' \
-  --item_count 6 --initial_tier "Developer"
+  --item_count 6 --initial_tier "Developer" --complexity 5
 ```
 
 Parameters:
@@ -221,6 +221,7 @@ Parameters:
 - `item_count`: Number of discrete tasks/items in this group (used for progress tracking)
 - `initial_tier`: Starting agent tier (`"Developer"` or `"Senior Software Engineer"`)
 - `component_path`: Monorepo component path (e.g., `"frontend/"`, `"backend/"`) for version lookup
+- `complexity`: Task complexity score (1-10). 1-3=Low (Developer), 4-6=Medium (SSE), 7-10=High (SSE)
 
 **Update task group:**
 
@@ -231,7 +232,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-grou
   "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"] \
   [--specializations '<json_array>'] [--item_count N] [--initial_tier "<tier>"] \
   [--component_path "<path>"] [--qa_attempts N] [--tl_review_attempts N] \
-  [--security_sensitive 0|1]
+  [--security_sensitive 0|1] [--complexity N]
 ```
 
 **Example (correct):**
