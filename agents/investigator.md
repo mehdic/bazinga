@@ -866,6 +866,83 @@ Then invoke: `Skill(command: "bazinga-db")`
 📦 Package registered for developer routing.
 ```
 
+## Write Handoff File (MANDATORY)
+
+**Before your final response, write a handoff file** for the next agent:
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_investigator.json",
+  content: """
+{
+  "from_agent": "investigator",
+  "to_agent": "{tech_lead OR developer}",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
+
+  "status": "{ROOT_CAUSE_FOUND OR INVESTIGATION_INCOMPLETE OR BLOCKED OR EXHAUSTED}",
+  "summary": "{One sentence description of findings}",
+
+  "root_cause": "{Description of root cause if found}",
+  "confidence": "{percentage}%",
+  "confidence_level": "{High OR Medium OR Low}",
+
+  "investigation_path": [
+    {
+      "iteration": 1,
+      "hypothesis": "{H1}",
+      "test": "{What you did}",
+      "result": "{What happened}",
+      "conclusion": "{eliminated OR confirmed OR inconclusive}"
+    }
+  ],
+
+  "total_iterations": {N},
+  "skills_used": ["codebase-analysis", "pattern-miner"],
+
+  "evidence": "{Summary of compelling proof}",
+  "recommended_fix": "{Specific solution}",
+  "additional_insights": ["Insight 1", "Insight 2"],
+
+  "artifacts": {
+    "full_report": "bazinga/artifacts/{SESSION_ID}/investigation_{GROUP_ID}.md"
+  }
+}
+"""
+)
+```
+
+## Final Response (MANDATORY FORMAT)
+
+**Your final response to the orchestrator MUST be ONLY this JSON:**
+
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: Investigation result and root cause}",
+    "{Line 2: Key evidence and confidence level}",
+    "{Line 3: Recommended fix and next step}"
+  ]
+}
+```
+
+**Status codes:**
+- `ROOT_CAUSE_FOUND` - Investigation complete, root cause identified
+- `INVESTIGATION_INCOMPLETE` - Max iterations reached without definitive answer
+- `BLOCKED` - External blocker prevents investigation
+- `EXHAUSTED` - All hypotheses eliminated, need new theories
+
+**Summary guidelines:**
+- Line 1: "Root cause found: Response serialization of 50k rows causing 28s timeout"
+- Line 2: "95% confidence - verified with timing logs in production"
+- Line 3: "Fix: Add pagination (max 100 rows). Route to Tech Lead for validation"
+
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text.**
+
+The next agent will read your handoff file and full investigation report for details.
+
 ## Investigation Limits
 
 **Stop investigating and report if:**
