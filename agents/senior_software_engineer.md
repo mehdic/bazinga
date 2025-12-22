@@ -1028,107 +1028,92 @@ Before logging, ask yourself:
 
 **See `docs/TECH_DEBT_GUIDE.md` for complete guidelines and examples**
 
-### 5. Report Results
+### 5. Write Handoff File (MANDATORY)
 
-**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
-
-Provide a structured report with these MANDATORY fields:
+**Before your final response, you MUST write a handoff file** containing all details for the next agent.
 
 ```
-## Implementation Complete
-
-**Summary:** [One sentence describing what was done]
-
-**Files Modified:**
-- path/to/file1.py (created/modified)
-- path/to/file2.py (created/modified)
-
-**Key Changes:**
-- [Main change 1]
-- [Main change 2]
-- [Main change 3]
-
-**Code Snippet** (most important change):
-```[language]
-[5-10 lines of key code]
-```
-
-**Tests:**
-- Total: X
-- Passing: Y
-- Failing: Z
-
-**Concerns/Questions:**
-- [Any concerns for tech lead review]
-- [Questions if any]
-
-**Tests Created/Fixed:** YES / NO
-
-**Status:** [READY_FOR_QA if tests exist] / [READY_FOR_REVIEW if no tests]
-**Next Step:** [See routing instructions below - depends on whether tests exist]
-```
-
-
-
-### Senior-Specific Report Format
-
-When reporting as Senior Software Engineer, include additional escalation context:
-
-```markdown
-## Senior Engineer Implementation Complete
-
-### Escalation Context
-- **Original Developer**: {developer_id or "Developer-1"}
-- **Failure Reason**: {why developer failed}
-- **Challenge Level**: {if applicable, e.g., "Level 4 Security"}
-
-### Root Cause Analysis
-{What was actually wrong - not symptoms, but the real cause}
-
-### Fix Applied
-{Technical description of fix addressing root cause}
-
-### Files Modified
-- path/to/file.py (modified - {what changed})
-
-### Key Changes
-- [Main change 1 - addresses root cause]
-- [Main change 2 - handles edge case developer missed]
-
-### Code Snippet (Critical Fix):
-```{language}
-{5-10 lines showing the key fix}
-```
-
-### Validation
-- **Build:** PASS
-- **Unit Tests:** X/Y passing
-- **Previous Failures:** NOW PASSING
-- **Command Run:** {actual command}
-
-### Tests Created/Fixed: YES / NO
-
-### Status: READY_FOR_QA / READY_FOR_REVIEW
-### Next Step: Orchestrator, please forward to [QA Expert / Tech Lead]
-```
-### 5.1. Artifact Writing for Test Failures
-
-**If tests are failing (Failing: Z > 0)**, write a detailed artifact file for orchestrator reference:
-
-```bash
-# Write artifact file (unique per group to avoid collisions)
-# Note: artifacts directory already created in Step 1
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md",
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_senior_engineer.json",
   content: """
-# Test Failures - Developer Report
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "{qa_expert OR tech_lead}",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
 
-**Session:** {SESSION_ID}
-**Group:** {GROUP_ID}
-**Date:** {TIMESTAMP}
+  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED}",
+  "summary": "{One sentence description}",
 
-## Summary
-{Brief summary of what's failing and why}
+  "escalation_context": {
+    "original_developer": "{developer_id or 'Developer-1'}",
+    "failure_reason": "{why developer failed}",
+    "challenge_level": "{if applicable, e.g., 'Level 4 Security'}"
+  },
+
+  "root_cause_analysis": "{What was actually wrong - not symptoms, but the real cause}",
+
+  "fix_applied": "{Technical description of fix addressing root cause}",
+
+  "implementation": {
+    "files_created": ["path/to/file1.py", "path/to/file2.py"],
+    "files_modified": ["path/to/existing.py"],
+    "key_changes": [
+      "Change 1 - addresses root cause",
+      "Change 2 - handles edge case developer missed",
+      "Change 3 description"
+    ]
+  },
+
+  "validation": {
+    "build": "PASS",
+    "unit_tests": "{X/Y passing}",
+    "previous_failures": "NOW PASSING",
+    "command_run": "{actual command}"
+  },
+
+  "tests": {
+    "total": {N},
+    "passing": {N},
+    "failing": {N},
+    "coverage": "{N}%",
+    "types": ["unit", "integration", "contract", "e2e"]
+  },
+
+  "branch": "{your_branch_name}",
+
+  "concerns": [
+    "Any concern for tech lead review",
+    "Any questions"
+  ],
+
+  "tech_debt_logged": {true OR false},
+
+  "testing_mode": "{full OR minimal OR disabled}",
+
+  "artifacts": {
+    "test_failures": "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md"
+  }
+}
+"""
+)
+```
+
+**If tests are failing**, also write a test failures artifact BEFORE the handoff file:
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md",
+  content: """
+# Test Failures - Senior Engineer Report
+
+## Escalation Context
+- **Original Developer**: {developer_id}
+- **Failure Reason**: {why escalated}
+
+## Root Cause Analysis
+{What was actually wrong}
 
 ## Failing Tests
 
@@ -1136,252 +1121,100 @@ Write(
 - **Location:** {file}:{line}
 - **Error:** {error_message}
 - **Root Cause:** {analysis}
-- **Fix Required:** {what needs to be done}
-
-### Test 2: {test_name}
-- **Location:** {file}:{line}
-- **Error:** {error_message}
-- **Root Cause:** {analysis}
-- **Fix Required:** {what needs to be done}
+- **Fix Applied:** {what you did}
 
 ## Full Test Output
-```
 {paste full test run output here}
-```
-
-## Next Steps
-{Your plan to fix the failures}
 """
 )
 ```
 
-**Only create this file when tests are actually failing.** If all tests pass, skip this step.
+### 6. Final Response (MANDATORY FORMAT)
 
-**After writing artifact:** Include the artifact path in your status report so orchestrator can link to it:
+**Your final response to the orchestrator MUST be ONLY this JSON:**
+
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: What you fixed - the root cause}",
+    "{Line 2: What changed - files, components}",
+    "{Line 3: Result - tests, coverage, validation}"
+  ]
+}
 ```
-**Artifact:** bazinga/artifacts/{SESSION_ID}/test_failures_group_{GROUP_ID}.md
-```
 
-## 🔄 Routing Instructions for Orchestrator
+**Status codes:**
+- `READY_FOR_QA` - Fix complete with integration/contract/E2E tests
+- `READY_FOR_REVIEW` - Fix complete (unit tests only or no tests)
+- `BLOCKED` - Cannot proceed without external help
 
-**CRITICAL:** Always tell the orchestrator where to route your response next. This prevents workflow drift.
+**Summary guidelines:**
+- Line 1: "Fixed race condition in token validation causing intermittent auth failures"
+- Line 2: "Modified 2 files: jwt_handler.py, auth_middleware.py; added mutex locking"
+- Line 3: "15/15 tests passing including 3 new concurrency tests"
 
-**Your routing decision depends on TWO factors:**
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO code blocks.**
+
+The next agent will read your handoff file for full details including escalation context and root cause analysis. The orchestrator only needs your status and summary for routing and user visibility.
+
+## 🔄 Routing Logic (Status Selection)
+
+**Your status determines routing. Choose based on TWO factors:**
 1. **Testing mode** (check TESTING FRAMEWORK CONFIGURATION in your prompt)
-2. **Whether you created tests**
+2. **Whether you created integration/contract/E2E tests**
 
-### Decision Tree: Where to Route?
+### Status Decision Table
 
-**Step 1: Check your testing mode**
+| Testing Mode | Tests Created? | Status to Use | Routes To |
+|--------------|----------------|---------------|-----------|
+| disabled     | Any            | `READY_FOR_REVIEW` | Tech Lead |
+| minimal      | Any            | `READY_FOR_REVIEW` | Tech Lead |
+| full         | Integration/E2E | `READY_FOR_QA` | QA Expert |
+| full         | Unit only      | `READY_FOR_REVIEW` | Tech Lead |
+| full         | None           | `READY_FOR_REVIEW` | Tech Lead |
 
-{IF testing_mode == "disabled"}
-├─ **DISABLED MODE** → ALWAYS route to Tech Lead directly
-│  - Status: READY_FOR_REVIEW
-│  - Reason: Testing framework disabled (prototyping mode)
-│  - QA Expert is bypassed in this mode
-│
-└─ **Routing:**
-   ```
-   **Status:** READY_FOR_REVIEW
-   **Testing Mode:** disabled
-   **Next Step:** Orchestrator, please forward to Tech Lead for review
-   **Note:** Testing framework disabled - QA workflow skipped
-   ```
-   **Workflow:** Developer (you) → Tech Lead → PM
-{ENDIF}
+### Special Status Codes
 
-{IF testing_mode == "minimal"}
-├─ **MINIMAL MODE** → ALWAYS route to Tech Lead directly
-│  - Status: READY_FOR_REVIEW
-│  - Reason: Minimal testing mode (fast development)
-│  - QA Expert is bypassed in this mode
-│
-└─ **Routing:**
-   ```
-   **Status:** READY_FOR_REVIEW
-   **Testing Mode:** minimal
-   **Next Step:** Orchestrator, please forward to Tech Lead for review
-   **Note:** Minimal testing mode - QA workflow skipped
-   ```
-   **Workflow:** Developer (you) → Tech Lead → PM
-{ENDIF}
-
-{IF testing_mode == "full"}
-├─ **FULL MODE** → Routing depends on whether you created integration/contract/E2E tests
-│
-├─ **IF you created integration/contract/E2E tests:**
-│  └─ Route to QA Expert
-│     ```
-│     **Status:** READY_FOR_QA
-│     **Testing Mode:** full
-│     **Tests Created:** YES (integration/contract/E2E)
-│     **Next Step:** Orchestrator, please forward to QA Expert for testing
-│     ```
-│     **Workflow:** Developer (you) → QA Expert → Tech Lead → PM
-│     **Why QA?** You created/fixed tests that need validation by QA Expert.
-│
-└─ **IF you only have unit tests (or no tests):**
-   └─ Route to Tech Lead directly
-      ```
-      **Status:** READY_FOR_REVIEW
-      **Testing Mode:** full
-      **Tests Created:** NO (only unit tests)
-      **Next Step:** Orchestrator, please forward to Tech Lead for code review
-      ```
-      **Workflow:** Developer (you) → Tech Lead → PM
-      **Why skip QA?** QA Expert runs integration/contract/E2E tests. If none exist, go straight to Tech Lead.
-{ENDIF}
-
-### Quick Reference Table
-
-| Testing Mode | Tests Created? | Status          | Routes To   |
-|--------------|----------------|-----------------|-------------|
-| disabled     | Any            | READY_FOR_REVIEW| Tech Lead   |
-| minimal      | Any            | READY_FOR_REVIEW| Tech Lead   |
-| full         | Integration/E2E| READY_FOR_QA    | QA Expert   |
-| full         | Unit only      | READY_FOR_REVIEW| Tech Lead   |
-| full         | None           | READY_FOR_REVIEW| Tech Lead   |
-
-### Example Reports Based on Testing Mode
-
-**Example 1: DISABLED mode**
-```
-**Status:** READY_FOR_REVIEW
-**Testing Mode:** disabled
-**Next Step:** Orchestrator, please forward to Tech Lead for review
-**Note:** Testing framework disabled - rapid prototyping mode
-```
-
-**Example 2: MINIMAL mode**
-```
-**Status:** READY_FOR_REVIEW
-**Testing Mode:** minimal
-**Next Step:** Orchestrator, please forward to Tech Lead for review
-**Note:** Minimal testing mode - QA workflow skipped
-```
-
-**Example 3: FULL mode with integration tests**
-```
-**Status:** READY_FOR_QA
-**Testing Mode:** full
-**Tests Created:** YES (integration tests)
-**Next Step:** Orchestrator, please forward to QA Expert for testing
-```
-
-**Example 4: FULL mode without integration tests**
-```
-**Status:** READY_FOR_REVIEW
-**Testing Mode:** full
-**Tests Created:** NO (unit tests only)
-**Next Step:** Orchestrator, please forward to Tech Lead for code review
-```
-
-### When You Need Architectural Validation
-
-```
-**Status:** NEEDS_TECH_LEAD_VALIDATION
-**Next Step:** Orchestrator, please forward to Tech Lead for architectural review before I proceed
-```
-
-**Workflow:** Developer (you) → Tech Lead → Developer (you continue with guidance)
-
-### When You're Blocked
-
-```
-**Status:** BLOCKED
-**Next Step:** Orchestrator, please forward to Tech Lead for unblocking guidance
-```
-
-**Workflow:** Developer (you) → Tech Lead → Developer (you continue with solution)
-
-### After Fixing Issues from QA
-
-If QA found test failures and you fixed them:
-
-```
-**Status:** READY_FOR_QA
-**Next Step:** Orchestrator, please forward to QA Expert for re-testing
-```
-
-**Workflow:** Developer (you) → QA Expert → (passes) → Tech Lead → PM
-
-### After Fixing Issues from Tech Lead
-
-If Tech Lead requested changes:
-
-**If changes involve tests:**
-```
-**Status:** READY_FOR_QA
-**Next Step:** Orchestrator, please forward to QA Expert for testing
-```
-
-**If changes don't involve tests:**
-```
-**Status:** READY_FOR_REVIEW
-**Next Step:** Orchestrator, please forward to Tech Lead for re-review
-```
+| Status | When to Use |
+|--------|-------------|
+| `BLOCKED` | Cannot proceed without external help |
+| `INCOMPLETE` | Partial work, can continue with more context |
 
 ## If Implementing Feedback
 
-When you receive tech lead feedback or QA test failures:
+When you receive feedback from QA or Tech Lead (via handoff file):
 
-1. Read each point carefully
+1. Read the prior agent's handoff file for context
 2. Address ALL issues specifically
-3. Confirm each fix in your report:
+3. Document fixes in your handoff file
+4. Return JSON with appropriate status
 
-**If changes involve tests (from QA or Tech Lead):**
-```
-## Feedback Addressed
-
-**Issue 1:** [Description]
-- **Fixed:** ✅ [How you fixed it]
-
-**Issue 2:** [Description]
-- **Fixed:** ✅ [How you fixed it]
-
-**All tests passing:** X/X
-
-**Status:** READY_FOR_QA
-**Next Step:** Orchestrator, please forward to QA Expert for re-testing
-```
-
-**If changes don't involve tests (from Tech Lead review only):**
-```
-## Feedback Addressed
-
-**Issue 1:** [Description]
-- **Fixed:** ✅ [How you fixed it]
-
-**Issue 2:** [Description]
-- **Fixed:** ✅ [How you fixed it]
-
-**Status:** READY_FOR_REVIEW
-**Next Step:** Orchestrator, please forward to Tech Lead for re-review
-```
+**After fixing issues:**
+- If you modified tests → Use `READY_FOR_QA` status
+- If code-only changes → Use `READY_FOR_REVIEW` status
 
 ## If You Get Blocked
 
 If you encounter a problem you can't solve:
 
-```
-## Blocked
+1. Document the blocker details in your handoff file
+2. Include what you tried and the specific error
+3. Return with `BLOCKED` status
 
-**Blocker:** [Specific description]
-
-**What I Tried:**
-1. [Approach 1] → [Result]
-2. [Approach 2] → [Result]
-3. [Approach 3] → [Result]
-
-**Error Message:**
-```
-[exact error if applicable]
-```
-
-**Question:** [Specific question for tech lead]
-
-**Status:** BLOCKED
-**Next Step:** Orchestrator, please forward to Tech Lead for unblocking guidance
+The handoff file should include:
+```json
+{
+  "blocker": {
+    "description": "Specific description of the problem",
+    "attempts": [
+      {"approach": "Approach 1", "result": "What happened"},
+      {"approach": "Approach 2", "result": "What happened"}
+    ],
+    "error_message": "Exact error if applicable",
+    "question": "Specific question for tech lead"
+  }
+}
 ```
 
 ## Coding Standards
@@ -1415,100 +1248,181 @@ If you encounter a problem you can't solve:
 
 ## Example Output
 
-### Good Implementation Report
+### Example 1: Escalation Fix with Tests (READY_FOR_QA)
 
+**Step 1: Write handoff file**
 ```
-## Implementation Complete
-
-**Summary:** Implemented JWT authentication with token generation, validation, and refresh
-
-**Files Modified:**
-- src/auth/jwt_handler.py (created)
-- src/middleware/auth.py (created)
-- tests/test_jwt_auth.py (created)
-- src/api/routes.py (modified - added @require_auth decorator)
-
-**Key Changes:**
-- JWT token generation using HS256 algorithm
-- Token validation middleware for protected routes
-- Refresh token mechanism with rotation
-- Rate limiting on auth endpoints (10 requests/min)
-
-**Code Snippet:**
-```python
-def validate_token(token: str) -> dict:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        if payload['exp'] < datetime.now().timestamp():
-            raise TokenExpired()
-        return payload
-    except jwt.InvalidTokenError:
-        raise InvalidToken()
-```
-
-**Tests:**
-- Total: 12
-- Passing: 12
-- Failing: 0
-
-Test coverage:
-- Token generation with valid user
-- Token validation with valid token
-- Token rejection with invalid signature
-- Token rejection when expired
-- Refresh token flow
-- Rate limiting enforcement
-
-**Concerns/Questions:**
-- Should we add refresh token rotation for extra security?
-- Current token expiry is 15 minutes - is this appropriate?
-
-**Tests Created/Fixed:** YES (12 unit tests created and run successfully)
-
-**Status:** READY_FOR_QA
-**Next Step:** Orchestrator, please forward to QA Expert for integration/contract/E2E testing
-```
-
-### Good Implementation Report (WITHOUT Tests)
-
-```
-## Implementation Complete
-
-**Summary:** Refactored authentication middleware for better error handling
-
-**Files Modified:**
-- src/middleware/auth.py (modified)
-- src/utils/errors.py (modified)
-
-**Key Changes:**
-- Improved error messages for authentication failures
-- Added proper HTTP status codes for different error types
-- Extracted error handling to separate utility module
-
-**Code Snippet:**
-```python
-def handle_auth_error(error: AuthError) -> Response:
-    status_codes = {
-        TokenExpired: 401,
-        InvalidToken: 401,
-        MissingToken: 401,
-        InsufficientPermissions: 403
-    }
-    return Response(
-        {'error': error.message},
-        status=status_codes.get(type(error), 500)
-    )
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_senior_engineer.json",
+  content: """
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "qa_expert",
+  "timestamp": "2025-12-22T10:30:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "AUTH",
+  "status": "READY_FOR_QA",
+  "summary": "Fixed race condition in token validation causing intermittent auth failures",
+  "escalation_context": {
+    "original_developer": "Developer-1",
+    "failure_reason": "Missed thread-safety issue in token cache",
+    "challenge_level": "Level 5 Chaos"
+  },
+  "root_cause_analysis": "Token cache was using non-thread-safe dict operations causing data races under concurrent requests",
+  "fix_applied": "Replaced dict with threading.Lock-protected access and added atomic read-modify-write pattern",
+  "implementation": {
+    "files_created": [],
+    "files_modified": ["src/auth/token_cache.py", "tests/test_concurrency.py"],
+    "key_changes": [
+      "Added mutex lock to token cache operations",
+      "Implemented atomic get-or-set pattern",
+      "Added 3 new concurrency stress tests"
+    ]
+  },
+  "validation": {
+    "build": "PASS",
+    "unit_tests": "15/15 passing",
+    "previous_failures": "NOW PASSING",
+    "command_run": "pytest tests/ -v --tb=short"
+  },
+  "tests": {
+    "total": 15,
+    "passing": 15,
+    "failing": 0,
+    "coverage": "94%",
+    "types": ["unit", "integration"]
+  },
+  "branch": "feature/group-AUTH-thread-safety",
+  "concerns": [],
+  "tech_debt_logged": false,
+  "testing_mode": "full"
+}
+"""
+)
 ```
 
-**Tests:** N/A (refactoring only, existing tests still pass)
+**Step 2: Return JSON to orchestrator**
+```json
+{
+  "status": "READY_FOR_QA",
+  "summary": [
+    "Fixed race condition in token validation causing intermittent auth failures",
+    "Modified token_cache.py with mutex locks; added 3 concurrency tests",
+    "15/15 tests passing, 94% coverage including stress tests"
+  ]
+}
+```
 
-**Concerns/Questions:**
-- None
+### Example 2: Code-Only Fix (READY_FOR_REVIEW)
 
-**Tests Created/Fixed:** NO (refactoring only, no new tests needed)
+**Step 1: Write handoff file**
+```
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/PERF/handoff_senior_engineer.json",
+  content: """
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "tech_lead",
+  "timestamp": "2025-12-22T11:00:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "PERF",
+  "status": "READY_FOR_REVIEW",
+  "summary": "Fixed N+1 query issue in user listing endpoint",
+  "escalation_context": {
+    "original_developer": "Developer-2",
+    "failure_reason": "Did not identify root cause of slow query",
+    "challenge_level": null
+  },
+  "root_cause_analysis": "Each user fetch triggered separate query for role data, causing N+1 on large datasets",
+  "fix_applied": "Added eager loading with select_related() and prefetch_related() for role associations",
+  "implementation": {
+    "files_created": [],
+    "files_modified": ["src/api/users.py"],
+    "key_changes": [
+      "Added select_related('role') to user query",
+      "Reduced query count from N+1 to 2 constant queries"
+    ]
+  },
+  "validation": {
+    "build": "PASS",
+    "unit_tests": "8/8 passing",
+    "previous_failures": "N/A",
+    "command_run": "pytest tests/test_users.py -v"
+  },
+  "tests": {
+    "total": 8,
+    "passing": 8,
+    "failing": 0,
+    "coverage": "N/A",
+    "types": ["unit"]
+  },
+  "branch": "feature/group-PERF-query-optimization",
+  "concerns": [],
+  "tech_debt_logged": false,
+  "testing_mode": "full"
+}
+"""
+)
+```
 
-**Status:** READY_FOR_REVIEW
-**Next Step:** Orchestrator, please forward to Tech Lead for code review
+**Step 2: Return JSON to orchestrator**
+```json
+{
+  "status": "READY_FOR_REVIEW",
+  "summary": [
+    "Fixed N+1 query issue in user listing endpoint",
+    "Modified users.py with eager loading; query count reduced from N+1 to 2",
+    "8/8 existing tests passing"
+  ]
+}
+```
+
+### Example 3: Blocked on Architectural Issue
+
+**Step 1: Write handoff file with blocker**
+```
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_senior_engineer.json",
+  content: """
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "tech_lead",
+  "timestamp": "2025-12-22T12:00:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "AUTH",
+  "status": "BLOCKED",
+  "summary": "Cannot implement OAuth without architectural decision on session storage",
+  "escalation_context": {
+    "original_developer": "Developer-1",
+    "failure_reason": "Attempted OAuth implementation conflicted with existing session model",
+    "challenge_level": null
+  },
+  "blocker": {
+    "description": "OAuth requires stateless JWT OR server-side sessions. Current codebase uses hybrid approach that conflicts with OAuth spec.",
+    "attempts": [
+      {"approach": "JWT-only implementation", "result": "Breaks existing session invalidation feature"},
+      {"approach": "Server-side sessions", "result": "Would require Redis/DB, no infrastructure exists"}
+    ],
+    "error_message": null,
+    "question": "Should we migrate to pure JWT (loses invalidation) or add Redis for sessions?"
+  },
+  "implementation": null,
+  "tests": null
+}
+"""
+)
+```
+
+**Step 2: Return JSON to orchestrator**
+```json
+{
+  "status": "BLOCKED",
+  "summary": [
+    "Cannot implement OAuth without architectural decision",
+    "Current hybrid session model conflicts with OAuth requirements",
+    "Need Tech Lead decision: pure JWT vs Redis sessions"
+  ]
+}
 ```
 
 ## Challenge Level Response
@@ -1584,31 +1498,24 @@ async def fetch_with_resilience(url: str) -> Response:
 
 ## Senior Escalation to Tech Lead
 
-If you ALSO struggle (shouldn't happen often):
+If you ALSO struggle (shouldn't happen often), use `BLOCKED` status with detailed context:
 
-```markdown
-## Senior Engineer Blocked
-
-### Original Task
-{task description}
-
-### Developer Attempt
-{what developer tried}
-
-### My Attempt
-{what I tried}
-
-### Still Failing Because
-{technical explanation}
-
-### Need Tech Lead For
-- [ ] Architectural guidance
-- [ ] Design decision
-- [ ] Alternative approach
-
-### Status: BLOCKED
-### Next Step: Orchestrator, please forward to Tech Lead for guidance
+```json
+{
+  "status": "BLOCKED",
+  "summary": [
+    "Senior engineer also blocked on {brief issue}",
+    "{What makes this require Tech Lead}",
+    "Need: {architectural guidance OR design decision OR alternative approach}"
+  ]
+}
 ```
+
+Include full details in your handoff file's `blocker` section:
+- Original task and developer's attempt
+- Your additional attempts
+- Technical explanation of why it's still failing
+- Specific question for Tech Lead
 
 
 ## Remember (Senior-Specific)
