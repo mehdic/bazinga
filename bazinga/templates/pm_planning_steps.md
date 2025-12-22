@@ -193,14 +193,22 @@ IMMEDIATE SELF-CHECK after creating each task group:
 3. Does it include --item_count?
 4. Does it include --component-path?
 5. Does it include --specializations with non-empty array?
-6. CONSISTENCY CHECK: If initial_tier = "Senior Software Engineer", complexity MUST be >= 4
-   (SSE tier implies medium-high complexity; auto-bump to 4 if lower)
+6. TIER-COMPLEXITY CONSISTENCY (BIDIRECTIONAL):
+   a. If complexity >= 4 → initial_tier MUST be "Senior Software Engineer"
+   b. If complexity <= 3 → initial_tier MUST be "Developer"
+   c. If mismatch → FIX the initial_tier to match complexity score
 
 IF any missing OR consistency violated → IMMEDIATELY invoke bazinga-db update-task-group
 ```
 
-**Policy reminder:** Complexity 1-3 = Low (Developer tier), 4-6 = Medium (SSE), 7-10 = High (SSE).
-If you assign SSE tier but complexity < 4, bump complexity to 4 for policy consistency.
+**Policy reminder (STRICT MAPPING):**
+| Complexity | Required Tier |
+|------------|---------------|
+| 1-3 | Developer |
+| 4-6 | Senior Software Engineer |
+| 7-10 | Senior Software Engineer |
+
+**The complexity score DETERMINES the tier. Do not override.**
 
 **DO NOT proceed to Step 5 until ALL task groups have complexity, initial_tier, item_count, component_path, and non-empty specializations.**
 
