@@ -92,10 +92,15 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
    FOR each task_group:
      needs_specializations = task_group.specializations is null OR empty
      needs_item_count = task_group.item_count is null OR 0
+     needs_complexity = task_group.complexity is null
    ```
 
 3. **Backfill missing fields:**
-   Read `bazinga/project_context.json`, derive specializations using mapping table in task classification reference.
+   - **Specializations:** Read `bazinga/project_context.json`, derive using mapping table in task classification reference.
+   - **Complexity:** Derive from initial_tier:
+     - If initial_tier = "Senior Software Engineer" → set complexity = 4 (minimum SSE threshold)
+     - If initial_tier = "Developer" → set complexity = 2 (default low)
+     - Log: `📋 Backfilled complexity={N} based on initial_tier`
 
 4. **Update with ONLY missing fields** (don't overwrite good values)
 
@@ -166,29 +171,33 @@ Group ID: A
 Session ID: [session_id]
 Name: Implement Login UI
 Status: pending
-Complexity: 5
-Initial Tier: Developer
-Item_Count: [number of tasks]
+--complexity 5
+--initial_tier "Developer"
+--item_count [number of tasks]
 --component-path 'frontend/'
 --specializations '["path/to/template1.md", "path/to/template2.md"]'
 ```
 
 **Required fields:**
-- `Item_Count` - Number of discrete tasks (for progress tracking)
+- `--complexity` - Task complexity score (1-10). 1-3=Low (Developer), 4-6=Medium (SSE), 7-10=High (SSE)
+- `--initial_tier` - Starting agent tier (`"Developer"` or `"Senior Software Engineer"`)
+- `--item_count` - Number of discrete tasks (for progress tracking)
 - `--component-path` - Monorepo component path for version lookup (use `./` for simple projects)
 - `--specializations` - Technology paths (NEVER empty)
 
 **VALIDATION GATE:**
 ```
 IMMEDIATE SELF-CHECK after creating each task group:
-1. Does it include Item_Count?
-2. Does it include --component-path?
-3. Does it include --specializations with non-empty array?
+1. Does it include --complexity (1-10)?
+2. Does it include --initial_tier?
+3. Does it include --item_count?
+4. Does it include --component-path?
+5. Does it include --specializations with non-empty array?
 
-IF missing → IMMEDIATELY invoke bazinga-db update-task-group
+IF any missing → IMMEDIATELY invoke bazinga-db update-task-group
 ```
 
-**DO NOT proceed to Step 5 until ALL task groups have component_path and non-empty specializations.**
+**DO NOT proceed to Step 5 until ALL task groups have complexity, initial_tier, item_count, component_path, and non-empty specializations.**
 
 ---
 

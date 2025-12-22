@@ -16,7 +16,7 @@ For each task group, classify the type FIRST:
 - Explicit `[R]` marker in task name (preferred)
 - Task name contains: "research", "evaluate", "select", "compare"
 - Task produces: decision document, comparison matrix, recommendation
-- **DB Initial Tier:** `developer` (DB constraint - Orchestrator reads `Type: research` and spawns RE instead)
+- **DB Initial Tier:** `"Developer"` (DB constraint - Orchestrator reads `Type: research` and spawns RE instead)
 - **Agent Spawned:** Requirements Engineer (RE tier)
 - **Execution Phase:** 1 (before implementation)
 - **NOTE:** "investigation" and "analyze" are NOT research keywords - too generic, causes misrouting
@@ -25,7 +25,7 @@ For each task group, classify the type FIRST:
 - Task name contains: "design", "architecture", "API design", "schema design", "data model"
 - Task produces: design document, architecture decision record (ADR)
 - **Type:** `research` (use same flow as research tasks)
-- **DB Initial Tier:** `developer` (DB constraint - Orchestrator spawns RE based on Type)
+- **DB Initial Tier:** `"Developer"` (DB constraint - Orchestrator spawns RE based on Type)
 - **Agent Spawned:** Requirements Engineer (RE tier)
 - **Execution Phase:** 1 (before implementation)
 - **Tech Lead Validation:** MANDATORY (architecture decisions require TL approval)
@@ -34,7 +34,7 @@ For each task group, classify the type FIRST:
 **Implementation Tasks** (`type: implementation`):
 - Default for all other tasks
 - Task requires: code writing, test creation, file modifications
-- **Initial Tier:** developer OR senior_software_engineer (use complexity scoring)
+- **Initial Tier:** `"Developer"` OR `"Senior Software Engineer"` (use complexity scoring)
 - **Execution Phase:** 2+ (after research completes)
 
 **Detection Priority:**
@@ -47,7 +47,7 @@ For each task group, classify the type FIRST:
 ```markdown
 **Group R1:** OAuth Provider Research [R]
 - **Type:** research
-- **Initial Tier:** developer  ← DB value (Orchestrator overrides to spawn RE)
+- **Initial Tier:** "Developer"  ← DB value (Orchestrator overrides to spawn RE)
 - **Execution Phase:** 1
 - **Deliverable:** Provider comparison matrix with recommendation
 - **Success Criteria:** Decision on OAuth provider with pros/cons
@@ -55,7 +55,7 @@ For each task group, classify the type FIRST:
 **Group A:** Implement OAuth Integration
 - **Type:** implementation
 - **Complexity:** 7 (HIGH)
-- **Initial Tier:** senior_software_engineer
+- **Initial Tier:** "Senior Software Engineer"
 - **Execution Phase:** 2
 - **Depends On:** R1 (research must complete first)
 - **Research Reference:** bazinga/artifacts/{SESSION_ID}/research_group_R1.md
@@ -70,7 +70,7 @@ For each task group, classify the type FIRST:
 **Important Clarifications:**
 1. **Execution Phase ≠ Orchestrator Workflow Phase**: "Phase 1" here means task execution order, NOT orchestrator's internal workflow phases
 2. **Metadata is markdown-only**: `Type`, `Security Sensitive`, `Execution Phase` fields are for task description markdown ONLY - do NOT pass these as database columns
-3. **DB initial_tier constraint**: Database only accepts `developer` or `senior_software_engineer`. For research tasks, use `developer` as DB value - Orchestrator reads `Type: research` and spawns RE instead
+3. **DB initial_tier constraint**: Database accepts `"Developer"` or `"Senior Software Engineer"` (title case). For research tasks, use `"Developer"` as DB value - Orchestrator reads `Type: research` and spawns RE instead
 
 **Artifact Path Handoff:**
 When creating Phase 2+ implementation groups that depend on Phase 1 research:
@@ -91,7 +91,7 @@ When creating Phase 2+ implementation groups that depend on Phase 1 research:
 **Security Tasks** (`security_sensitive: true`):
 - Task name contains: "auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "jwt", "oauth", "saml", "sso", "bearer", "credential"
 - Task involves: user data, credentials, access control, session management
-- **Initial Tier:** senior_software_engineer (ALWAYS - overrides complexity scoring)
+- **Initial Tier:** `"Senior Software Engineer"` (ALWAYS - overrides complexity scoring)
 - **Tech Lead Review:** MANDATORY (even after QA passes)
 - **Note:** "token" removed (too generic - matches CSRF token, string token). Use "bearer", "credential" instead.
 
@@ -99,7 +99,7 @@ When creating Phase 2+ implementation groups that depend on Phase 1 research:
 ```
 IF task_name contains security keywords OR task touches auth/security files:
   → security_sensitive: true
-  → initial_tier: senior_software_engineer (force SSE, ignore complexity score)
+  → initial_tier: "Senior Software Engineer" (force SSE, ignore complexity score)
 ```
 
 **Task Group Format with Security Flag:**
@@ -107,7 +107,7 @@ IF task_name contains security keywords OR task touches auth/security files:
 **Group AUTH:** Implement JWT Authentication
 - **Type:** implementation
 - **Security Sensitive:** true  ← Forces SSE + mandatory TL review
-- **Initial Tier:** senior_software_engineer (forced by security flag)
+- **Initial Tier:** "Senior Software Engineer" (forced by security flag)
 - **Execution Phase:** 2
 ```
 
