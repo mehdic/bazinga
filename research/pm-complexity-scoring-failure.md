@@ -3,7 +3,7 @@
 **Date:** 2025-12-22
 **Context:** Task groups created with `complexity=None` despite PM templates requiring complexity scoring
 **Decision:** Add --complexity to bazinga-db CLI + enforcement gates
-**Status:** Reviewed - Awaiting User Approval
+**Status:** Implemented (Phase 1 complete)
 **Reviewed by:** OpenAI GPT-5
 
 ---
