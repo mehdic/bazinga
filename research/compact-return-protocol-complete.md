@@ -159,22 +159,41 @@ The orchestrator doesn't NEED most of the returned data. It only needs:
 
 The "files_modified" and "test counts" are only needed by the NEXT agent, not the orchestrator.
 
-### Ultra-Minimal Flow
+### Ultra-Minimal Flow (With User Visibility)
 
 ```
 Developer completes:
 1. Writes everything to artifact file: bazinga/artifacts/{session}/{group}/handoff_dev.json
-2. Returns to orchestrator: {"status": "READY_FOR_QA"}  ← MINIMAL (~50 tokens)
+2. Returns to orchestrator:
+   {
+     "status": "READY_FOR_QA",
+     "summary": [
+       "Implemented JWT authentication with token generation and validation",
+       "Created 3 files: jwt_handler.py, auth_middleware.py, test_jwt.py",
+       "All 15 tests passing with 92% coverage"
+     ]
+   }
+   ← ~100-150 tokens
 
 Orchestrator receives:
 1. Parses status → READY_FOR_QA
-2. Routes to QA Expert
-3. Prompt-builder tells QA: "Read your context from bazinga/artifacts/.../handoff_dev.json"
+2. Prints summary to user (visibility!)
+3. Routes to QA Expert
+4. Prompt-builder tells QA: "Read your context from bazinga/artifacts/.../handoff_dev.json"
 
 QA Expert:
 1. Reads handoff_dev.json in its OWN isolated context
-2. Has all the info it needs (files, test counts, summary, etc.)
+2. Has all the info it needs (files, test counts, details, etc.)
 ```
+
+### Why 3-Line Summary?
+
+The user needs visibility into what agents accomplished. The 3-line summary:
+- Line 1: What was done (the main accomplishment)
+- Line 2: What changed (files, components affected)
+- Line 3: Result (tests, quality metrics, status)
+
+This gives the user meaningful progress updates without bloating context.
 
 ### Token Impact Comparison
 
@@ -182,9 +201,9 @@ QA Expert:
 |----------|-----------------|-----------------|----------------------------------|
 | **Current** | ~25,000 | ~100,000 | ~300,000 (OVERFLOW) |
 | **CRP (JSON)** | ~400 | ~1,600 | ~4,800 |
-| **Ultra-Minimal** | ~50 | ~200 | ~600 |
+| **Ultra-Minimal + Summary** | ~150 | ~600 | ~1,800 |
 
-**Ultra-minimal is 500x better than current!**
+**Still 99% reduction, but user sees progress!**
 
 ---
 
@@ -207,13 +226,20 @@ QA Expert:
 | **Test Results (detailed)** | `bazinga/artifacts/{session}/tests/{group}.md` | `Write()` tool | Before final response |
 | **Review Feedback (detailed)** | `bazinga/artifacts/{session}/reviews/{group}.md` | `Write()` tool | Before final response |
 
-#### What Returns to Orchestrator (Minimal):
+#### What Returns to Orchestrator (Minimal + Summary):
 
 ```json
-{"status": "READY_FOR_QA"}
+{
+  "status": "READY_FOR_QA",
+  "summary": [
+    "Implemented JWT authentication with token generation and validation",
+    "Created 3 files: jwt_handler.py, auth_middleware.py, test_jwt.py",
+    "All 15 tests passing with 92% coverage"
+  ]
+}
 ```
 
-**That's it. ~50 tokens.**
+**~100-150 tokens. Orchestrator prints summary to user for visibility.**
 
 ### Complete Handoff Chain
 
@@ -345,15 +371,32 @@ Or with changes requested (even more verbose with code examples).
 
 **Estimated tokens: 3,000-6,000 per response**
 
-### New Ultra-Minimal Formats
+### New Ultra-Minimal Formats (With User Visibility)
 
 #### All Agents - Final Response:
 
 ```json
-{"status": "STATUS_CODE"}
+{
+  "status": "STATUS_CODE",
+  "summary": [
+    "Line 1: What was accomplished (main action)",
+    "Line 2: What changed (files, components)",
+    "Line 3: Result (metrics, quality, next step)"
+  ]
+}
 ```
 
-**Estimated tokens: ~50**
+**Estimated tokens: ~100-150**
+
+**Summary Guidelines by Agent:**
+
+| Agent | Line 1 (What) | Line 2 (Changed) | Line 3 (Result) |
+|-------|---------------|------------------|-----------------|
+| Developer | "Implemented X feature" | "Created/modified N files: list" | "N tests passing, N% coverage" |
+| QA Expert | "Tested X implementation" | "Ran integration/contract/E2E tests" | "N/N tests passed, quality: good" |
+| Tech Lead | "Reviewed X implementation" | "Checked security, architecture, tests" | "Approved/Changes requested: reason" |
+| PM | "Analyzed/tracked X" | "N groups complete, M remaining" | "Proceeding with phase N / BAZINGA" |
+| Investigator | "Investigated X issue" | "Analyzed N files, found root cause" | "Solution: brief description" |
 
 #### All Agents - Handoff File (written before final response):
 
@@ -492,6 +535,58 @@ bazinga/artifacts/{session_id}/
     "review_details": "path/to/review.md"
   }
 }
+```
+
+---
+
+## Orchestrator Summary Display
+
+When the orchestrator receives an agent response, it prints the summary to the user using the existing capsule format:
+
+### Format
+
+```
+🔨 Group {id} [{agent}] | {summary[0]} | {summary[1]} | {summary[2]} → {next_step}
+```
+
+### Examples
+
+**Developer completes:**
+```
+🔨 Group AUTH [Developer] | Implemented JWT authentication | Created 3 files: jwt_handler.py, auth_middleware.py, test_jwt.py | 15 tests passing, 92% coverage → QA Expert
+```
+
+**QA passes:**
+```
+✅ Group AUTH [QA] | Tested JWT implementation | Ran 25 integration/contract/E2E tests | 25/25 passed, quality excellent → Tech Lead
+```
+
+**Tech Lead approves:**
+```
+👔 Group AUTH [TL] | Reviewed JWT implementation | Checked security, architecture, coverage | Approved, ready for merge → PM
+```
+
+### Implementation in Orchestrator
+
+The orchestrator's response parsing section should:
+
+1. Parse the JSON response
+2. Extract status and summary array
+3. Format as capsule using message_templates.md
+4. Print to user
+5. Route based on status
+
+```python
+# Pseudo-code for orchestrator
+response = parse_json(agent_response)
+status = response["status"]
+summary = response["summary"]
+
+# Print to user
+print(f"🔨 Group {group_id} [{agent}] | {summary[0]} | {summary[1]} | {summary[2]} → {next_agent}")
+
+# Route based on status
+route_to_next_agent(status)
 ```
 
 ---
@@ -732,6 +827,9 @@ This file contains:
 | Adaptive parallelism | ❌ NO | Added complexity not needed |
 | Response-size guardrail | ❌ NO | Too late once response received |
 | Ultra-minimal orchestrator | ✅ YES | Orchestrator only needs status |
+| Include 3-line summary in return | ✅ YES | User needs visibility of agent work |
+| Prompt-builder injects handoff path | ✅ YES (Option A) | Automatic, reliable, centralized |
+| Orchestrator prints summary to user | ✅ YES | User visibility without context bloat |
 
 ---
 
@@ -747,10 +845,53 @@ This file contains:
 
 ---
 
-## Next Steps
+## Next Steps (Implementation Order)
 
-1. **Update agent files** - Add handoff protocol section to all 7 agents
-2. **Update prompt-builder** - Inject handoff path for next agent
-3. **Update response_parsing.md** - Simplify to JSON status parsing
-4. **Test with integration test** - Verify parallel mode works without overflow
-5. **Document artifact cleanup** - Add cleanup for old artifacts
+### Phase 1: Agent Files (7 files)
+
+Update each agent with:
+1. "Write Handoff File" section (before final response)
+2. "Final Response Format" section (JSON with status + 3-line summary)
+3. "Read Prior Handoff" section (for agents that receive from prior agent)
+
+Order of implementation:
+1. `agents/developer.md` - Most complex, sets the pattern
+2. `agents/senior_software_engineer.md` - Similar to developer
+3. `agents/qa_expert.md` - Receives from developer
+4. `agents/tech_lead.md` - Receives from QA
+5. `agents/project_manager.md` - Receives from TL, sends BAZINGA
+6. `agents/investigator.md` - Special case for debugging
+7. `agents/requirements_engineer.md` - Research agent
+
+### Phase 2: Prompt Builder
+
+Update `.claude/skills/prompt-builder/scripts/prompt_builder.py`:
+1. Add `get_previous_agent()` function to determine agent chain
+2. Update `build_task_context()` to inject handoff path
+3. Add handoff path to spawned agent's prompt
+
+### Phase 3: Response Parsing
+
+Update `bazinga/templates/response_parsing.md`:
+1. Change all agent sections to parse JSON format
+2. Extract status and summary array
+3. Document capsule construction from summary
+
+### Phase 4: Orchestrator
+
+Update `agents/orchestrator.md` (and rebuild slash command):
+1. Update response parsing instructions to use JSON
+2. Add summary display using capsule format
+3. Update routing to use status from JSON
+
+### Phase 5: Testing
+
+1. Run integration test with simple-calculator-spec
+2. Verify parallel mode works without context overflow
+3. Verify user sees summaries in terminal
+4. Verify handoff files are created and read correctly
+
+### Phase 6: Cleanup
+
+1. Add artifact cleanup to session end
+2. Document handoff file retention policy
