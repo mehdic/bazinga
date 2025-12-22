@@ -118,11 +118,24 @@ python3 $DB_SCRIPT --db $DB_PATH get-state \
 
 ### Create Task Group
 ```bash
+# Basic creation
 python3 $DB_SCRIPT --db $DB_PATH create-task-group \
   "group_a" \
   "bazinga_123" \
   "Authentication Implementation" \
   "pending"
+
+# Full creation with all PM fields
+python3 $DB_SCRIPT --db $DB_PATH create-task-group \
+  "group_a" \
+  "bazinga_123" \
+  "Authentication Implementation" \
+  "pending" \
+  --complexity 7 \
+  --initial_tier "Senior Software Engineer" \
+  --item_count 5 \
+  --component-path "backend/auth/" \
+  --specializations '["bazinga/templates/specializations/01-languages/python.md"]'
 ```
 
 ### Update Task Group Status
@@ -132,6 +145,12 @@ python3 $DB_SCRIPT --db $DB_PATH update-task-group \
   "bazinga_123" \
   --status "completed" \
   --last_review_status "APPROVED"
+
+# Update complexity score
+python3 $DB_SCRIPT --db $DB_PATH update-task-group \
+  "group_a" \
+  "bazinga_123" \
+  --complexity 5
 ```
 
 ### Increment Revision Count

@@ -3053,10 +3053,14 @@ STATE OPERATIONS:
   get-state <session> <type>                  Get latest state snapshot
 
 TASK GROUP OPERATIONS:
-  create-task-group <group_id> <session> <name> [status] [assigned_to] [--specializations JSON] [--component-path PATH]
-                                              Create task group with optional specializations and component path
-  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--specializations JSON] [--component-path PATH]
-                                              Update task group (specializations as JSON array, component_path for version context)
+  create-task-group <group_id> <session> <name> [status] [assigned_to]
+                    [--specializations JSON] [--component-path PATH] [--initial_tier TIER]
+                    [--item_count N] [--complexity N]
+                                              Create task group with specializations, complexity (1-10), initial tier
+  update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--complexity N]
+                    [--specializations JSON] [--component-path PATH] [--initial_tier TIER]
+                    [--item_count N] [--revision_count N] [--security_sensitive 0|1]
+                                              Update task group fields
   get-task-groups <session> [status]          Get task groups (includes specializations and component_path)
 
 TOKEN OPERATIONS:

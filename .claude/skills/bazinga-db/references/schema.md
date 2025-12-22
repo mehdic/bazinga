@@ -288,24 +288,29 @@ OR test_failure (tests failed after merge → dev fixes tests)
 
 **Usage Example:**
 ```python
-# Create task group with specializations
+# Create task group with full PM fields
 db.create_task_group(
     'group_a', 'bazinga_123', 'Authentication',
     status='pending',
+    complexity=7,  # 1-3=Low (Dev), 4-6=Medium (SSE), 7-10=High (SSE)
+    initial_tier='Senior Software Engineer',
+    item_count=5,
+    component_path='backend/auth/',
     specializations=['bazinga/templates/specializations/01-languages/typescript.md']
 )
 
-# Update task group with specializations (requires session_id for composite key)
+# Update task group with complexity (requires session_id for composite key)
 db.update_task_group(
     'group_a', 'bazinga_123',
     status='completed',
+    complexity=5,
     last_review_status='APPROVED',
     specializations=['bazinga/templates/specializations/03-frameworks-backend/express.md']
 )
 
-# Get task groups (includes specializations)
+# Get task groups (includes specializations, complexity, initial_tier)
 groups = db.get_task_groups('bazinga_123', status='in_progress')
-# Returns: [{'id': 'group_a', 'specializations': '[...]', ...}]
+# Returns: [{'id': 'group_a', 'complexity': 7, 'initial_tier': 'Senior Software Engineer', ...}]
 ```
 
 ---
