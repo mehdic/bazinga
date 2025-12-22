@@ -1077,7 +1077,7 @@ Optional:
 ## References
 
 - Current orchestrator: `.claude/commands/bazinga.orchestrate.md`
-- Phase templates: `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md`
+- Phase templates: `templates/orchestrator/phase_simple.md`, `phase_parallel.md`
 - Agent definitions: `agents/*.md`
-- Response parsing: `bazinga/templates/response_parsing.md`
+- Response parsing: `templates/response_parsing.md`
 - Specialization loader: `.claude/skills/specialization-loader/SKILL.md`

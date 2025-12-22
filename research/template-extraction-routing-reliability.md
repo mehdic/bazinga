@@ -11,8 +11,8 @@
 ## Problem Statement
 
 We extracted ~7.4KB of content from `agents/orchestrator.md` to external templates:
-- `bazinga/templates/merge_workflow.md` (~5KB) - Contains merge task routing logic
-- `bazinga/templates/batch_processing.md` (~3.5KB) - Contains batch processing rules
+- `templates/merge_workflow.md` (~5KB) - Contains merge task routing logic
+- `templates/batch_processing.md` (~3.5KB) - Contains batch processing rules
 
 **Core question:** Will the orchestrator reliably follow routing instructions that are read from external files mid-workflow, as opposed to instructions inline in the system prompt?
 
@@ -43,7 +43,7 @@ The orchestrator now has MANDATORY references:
 
 **⚠️ YOU MUST READ AND FOLLOW the merge workflow template. This is NOT optional.**
 
-Read(file_path: "bazinga/templates/merge_workflow.md")
+Read(file_path: "templates/merge_workflow.md")
 
 **After reading the template, you MUST:**
 1. Build the merge prompt using the template's prompt structure
@@ -51,7 +51,7 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 3. Handle the response according to the template's status routing rules
 4. Apply escalation rules for repeated failures
 
-**DO NOT proceed without reading and applying `bazinga/templates/merge_workflow.md`.**
+**DO NOT proceed without reading and applying `templates/merge_workflow.md`.**
 ```
 
 ---
@@ -123,7 +123,7 @@ The merge step is a discrete subtask that receives focused attention.
 
 ### Pattern 2: Investigation Loop (HYBRID)
 ```markdown
-📋 Full investigation loop procedure: bazinga/templates/investigation_loop.md (v1.0)
+📋 Full investigation loop procedure: templates/investigation_loop.md (v1.0)
 ```
 - References external template BUT...
 - Exit codes are DUPLICATED in orchestrator:
@@ -181,7 +181,7 @@ Keep routing logic in BOTH places:
 ```markdown
 ### Step 2A.7a: Spawn Developer for Merge
 
-🔴 MANDATORY: Load and follow `bazinga/templates/merge_workflow.md`
+🔴 MANDATORY: Load and follow `templates/merge_workflow.md`
 
 **Status Routing (from template):**
 | Status | Action |

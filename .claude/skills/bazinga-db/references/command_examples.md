@@ -135,7 +135,7 @@ python3 $DB_SCRIPT --db $DB_PATH create-task-group \
   --initial_tier "Senior Software Engineer" \
   --item_count 5 \
   --component-path "backend/auth/" \
-  --specializations '["bazinga/templates/specializations/01-languages/python.md"]'
+  --specializations '["templates/specializations/01-languages/python.md"]'
 ```
 
 ### Update Task Group Status

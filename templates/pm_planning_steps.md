@@ -157,7 +157,7 @@ FOR each task_group:
 - **Initial Tier:** Developer
 - **Target Path:** frontend/src/pages/login.tsx
 - **Component Path:** frontend/
-- **Specializations:** ["bazinga/templates/specializations/01-languages/typescript.md", ...]
+- **Specializations:** ["templates/specializations/01-languages/typescript.md", ...]
 ```
 
 **Component Path:** The monorepo component this task group belongs to (for version lookup).

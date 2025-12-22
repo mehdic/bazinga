@@ -217,8 +217,8 @@ If issues occur:
 
 | File | Changes |
 |------|---------|
-| `bazinga/templates/orchestrator/phase_simple.md` | PART A template, FULL_PROMPT example, self-checks |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Same changes for parallel mode |
+| `templates/orchestrator/phase_simple.md` | PART A template, FULL_PROMPT example, self-checks |
+| `templates/orchestrator/phase_parallel.md` | Same changes for parallel mode |
 
 ## Commits in This Fix
 
@@ -239,8 +239,8 @@ If issues occur:
 
 - `research/specialization-loading-implementation-review.md` - Prior ultrathink on specializations
 - `research/context-package-final-review.md` - Context package system design
-- `bazinga/templates/orchestrator/phase_simple.md` - Simple mode template
-- `bazinga/templates/orchestrator/phase_parallel.md` - Parallel mode template
+- `templates/orchestrator/phase_simple.md` - Simple mode template
+- `templates/orchestrator/phase_parallel.md` - Parallel mode template
 
 ---
 

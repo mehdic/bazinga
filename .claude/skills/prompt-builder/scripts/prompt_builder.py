@@ -11,7 +11,7 @@ It queries the database for:
 
 Then reads from filesystem:
 - Agent definition files (agents/*.md)
-- Specialization templates (bazinga/templates/specializations/*.md)
+- Specialization templates (templates/specializations/*.md)
 
 Usage (params-file mode - RECOMMENDED for orchestrator):
     python3 prompt_builder.py --params-file "bazinga/prompts/{session}/params.json"
@@ -110,7 +110,7 @@ MIN_AGENT_LINES = {
     "senior_software_engineer": 1200,
     "qa_expert": 800,
     "tech_lead": 600,
-    "project_manager": 300,  # Kernel file - details in bazinga/templates/pm_*.md
+    "project_manager": 300,  # Kernel file - details in templates/pm_*.md
     "investigator": 400,
     "requirements_engineer": 500,
 }
@@ -760,7 +760,7 @@ def infer_component_from_specializations(spec_paths, project_context):
     """Infer component_path from specialization paths when PM didn't set it.
 
     If a specialization path includes a component-specific prefix (e.g.,
-    'bazinga/templates/specializations/01-languages/python.md'), we can try
+    'templates/specializations/01-languages/python.md'), we can try
     to match it to a component in project_context.json based on language or framework.
 
     This is a fallback when component_path is not explicitly set.

@@ -209,7 +209,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-task-grou
 **Example (correct):**
 ```bash
 python3 .../bazinga_db.py --quiet create-task-group "CALC" "bazinga_xxx" "Calculator Implementation" \
-  --specializations '["bazinga/templates/specializations/01-languages/python.md"]' \
+  --specializations '["templates/specializations/01-languages/python.md"]' \
   --item_count 6 --initial_tier "Developer" --complexity 5
 ```
 
@@ -217,7 +217,7 @@ Parameters:
 - `group_id`: Task group identifier (e.g., "CALC", "AUTH", "API")
 - `session_id`: Session identifier (e.g., "bazinga_20251216_123456")
 - `name`: Human-readable task group name
-- `specializations`: JSON array of specialization file paths (e.g., `'["bazinga/templates/specializations/01-languages/typescript.md"]'`)
+- `specializations`: JSON array of specialization file paths (e.g., `'["templates/specializations/01-languages/typescript.md"]'`)
 - `item_count`: Number of discrete tasks/items in this group (used for progress tracking)
 - `initial_tier`: Starting agent tier (`"Developer"` or `"Senior Software Engineer"`)
 - `component_path`: Monorepo component path (e.g., `"frontend/"`, `"backend/"`) for version lookup

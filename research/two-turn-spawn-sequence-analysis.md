@@ -356,6 +356,6 @@ Based on the failure modes:
 ## References
 
 - `research/specialization-loading-failure-analysis.md` - Original problem analysis
-- `bazinga/templates/orchestrator/phase_simple.md` - 2-turn implementation
+- `templates/orchestrator/phase_simple.md` - 2-turn implementation
 - `.claude/skills/specialization-loader/SKILL.md` - Skill definition
 - `tmp/ultrathink-reviews/openai-review.md` - Full OpenAI review

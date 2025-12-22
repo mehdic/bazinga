@@ -64,27 +64,27 @@ This prompted a deep investigation into:
    - ✅ Packages `.claude/templates/` in distribution (pyproject.toml line 63)
    - ✅ Template file exists in source (verified)
    - ❌ **CRITICAL GAP:** CLI never copies `.claude/templates/` directory to client projects
-   - Only copies `bazinga/templates/` (markdown files)
+   - Only copies `templates/` (markdown files)
 
 2. **Init script creates structure:**
    - ✅ Creates `bazinga/` folder structure
    - ✅ Creates state JSON files
    - ✅ Creates database
-   - ✅ Copies `bazinga/templates/` from coordination/templates
+   - ✅ Copies `templates/` from coordination/templates
    - ❌ Does NOT create `bazinga/artifacts/{SESSION_ID}/` (by design - runtime creation)
    - ❌ Does NOT create `.claude/templates/` (missing feature)
 
 3. **Template file location confusion:**
    - Template packaged: `.claude/templates/project_context.template.json`
    - Orchestrator expects: `.claude/templates/project_context.template.json`
-   - CLI copies: Only `bazinga/templates/*.md` files
+   - CLI copies: Only `templates/*.md` files
    - **Result:** Template never reaches client projects
 
 ### Phase 2: Root Cause Analysis
 
 **Error 1 Root Cause:**
 - BAZINGA CLI packaging includes template but never copies it during init/update
-- `copy_templates()` method (line 251-289) only handles `bazinga/templates/*.md`
+- `copy_templates()` method (line 251-289) only handles `templates/*.md`
 - No code exists to copy `.claude/templates/` directory
 - Orchestrator assumes template exists but it doesn't
 
@@ -587,7 +587,7 @@ git diff HEAD~1 HEAD --stat
 **Problem:** CLI packages template but never copies it
 
 **Why This Happened:**
-- `copy_templates()` method only handles `bazinga/templates/*.md`
+- `copy_templates()` method only handles `templates/*.md`
 - No code for `.claude/templates/` directory
 - Packaging vs installation logic separation
 

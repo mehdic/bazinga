@@ -450,27 +450,27 @@ else
 fi
 
 # Copy templates to bazinga folder if not present
-if [ ! -d "bazinga/templates" ]; then
+if [ ! -d "templates" ]; then
     echo ""
-    echo "📝 Copying templates to bazinga/templates..."
+    echo "📝 Copying templates to templates..."
 
-    # Check both bazinga/templates and coordination/templates in source
-    if [ -d "bazinga/templates" ]; then
-        echo "✓ Templates already exist in bazinga/templates"
+    # Check both templates and coordination/templates in source
+    if [ -d "templates" ]; then
+        echo "✓ Templates already exist in templates"
     elif [ -d "coordination/templates" ]; then
-        mkdir -p bazinga/templates
-        cp coordination/templates/*.md bazinga/templates/ 2>/dev/null
+        mkdir -p templates
+        cp coordination/templates/*.md templates/ 2>/dev/null
         if [ $? -eq 0 ]; then
             echo "✅ Templates copied from coordination/templates"
         else
             echo "⚠️  Warning: Could not copy templates"
         fi
     else
-        echo "⚠️  Warning: No templates found (looking for bazinga/templates or coordination/templates)"
+        echo "⚠️  Warning: No templates found (looking for templates or coordination/templates)"
         echo "   Templates will be used from bazinga CLI installation"
     fi
 else
-    echo "✓ bazinga/templates already exists"
+    echo "✓ templates already exists"
 fi
 
 echo ""

@@ -540,7 +540,7 @@ class TestDatabaseIntegration:
             UPDATE task_groups
             SET specializations = ?
             WHERE id = 'TEST_GROUP'
-        """, (json.dumps(["bazinga/templates/specializations/python.md"]),))
+        """, (json.dumps(["templates/specializations/python.md"]),))
         conn.commit()
         conn.close()
 

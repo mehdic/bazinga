@@ -39,7 +39,7 @@ Session Context
 ```markdown
 **🔴 Spawn with Specializations:**
 
-Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+Read and follow `templates/orchestrator/spawn_with_specializations.md` with:
 - session_id: {session_id}
 - group_id: {group_id}
 ...
@@ -54,7 +54,7 @@ Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` w
 The orchestrator is a Claude agent processing markdown templates. When it encounters:
 
 ```markdown
-Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md`
+Read and follow `templates/orchestrator/spawn_with_specializations.md`
 ```
 
 Claude interprets this as **documentation** (a note about what file exists), not as an **executable instruction** (like `Skill(command: "...")` or `Task(...)`).
@@ -126,7 +126,7 @@ Replace the "Read and follow" pattern with **inlined executable steps**:
 ```markdown
 **🔴 Spawn with Specializations:**
 
-Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+Read and follow `templates/orchestrator/spawn_with_specializations.md` with:
 - session_id: {session_id}
 - ...
 ```
@@ -171,14 +171,14 @@ Task(subagent_type="general-purpose", model={model}, description=desc, prompt=[s
 
 | File | Change |
 |------|--------|
-| `bazinga/templates/orchestrator/phase_simple.md` | Replace 8 "Read and follow" blocks with inlined steps |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Replace parallel spawn section with inlined steps |
-| `bazinga/templates/merge_workflow.md` | Replace 3 spawn points with inlined steps |
+| `templates/orchestrator/phase_simple.md` | Replace 8 "Read and follow" blocks with inlined steps |
+| `templates/orchestrator/phase_parallel.md` | Replace parallel spawn section with inlined steps |
+| `templates/merge_workflow.md` | Replace 3 spawn points with inlined steps |
 
 **DELETE (no longer needed):**
 | File | Reason |
 |------|--------|
-| `bazinga/templates/orchestrator/spawn_with_specializations.md` | Redundant - steps are now inlined |
+| `templates/orchestrator/spawn_with_specializations.md` | Redundant - steps are now inlined |
 
 ---
 

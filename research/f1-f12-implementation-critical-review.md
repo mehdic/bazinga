@@ -592,8 +592,8 @@ Revised approach: 2 new columns, 2 generic commands
 ### CRITICAL ISSUE #2: Progress Tracking Still Broken
 
 **Problem:** Templates require `increment-session-progress` and `sessions.completed_items_count`:
-- `bazinga/templates/orchestrator/phase_simple.md:716-733`
-- `bazinga/templates/orchestrator/phase_parallel.md:327-336`
+- `templates/orchestrator/phase_simple.md:716-733`
+- `templates/orchestrator/phase_parallel.md:327-336`
 
 **But:**
 - Schema v9 does NOT add `sessions.completed_items_count` column

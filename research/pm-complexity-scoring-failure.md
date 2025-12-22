@@ -142,11 +142,11 @@ Missing domain-specific terms that should trigger SSE:
 ### Part 2: Update PM Templates (if needed)
 
 Verify PM templates use correct CLI syntax:
-- `bazinga/templates/pm_planning_steps.md` - check Step 3.5.4 format
+- `templates/pm_planning_steps.md` - check Step 3.5.4 format
 
 ### Part 3: Add Domain-Specific Security Keywords (Separate PR)
 
-Add to `bazinga/model_selection.json` and `bazinga/templates/pm_task_classification.md`:
+Add to `bazinga/model_selection.json` and `templates/pm_task_classification.md`:
 - Healthcare markers
 - Financial markers
 - Privacy markers
@@ -388,7 +388,7 @@ Status: pending
 --initial_tier "Developer"
 --item_count 3
 --component_path 'frontend/'
---specializations '["bazinga/templates/specializations/01-languages/typescript.md"]'
+--specializations '["templates/specializations/01-languages/typescript.md"]'
 ```
 
 **pm_task_classification.md - Fix initial_tier casing:**
@@ -464,8 +464,8 @@ Parameters:
 ## References
 
 - PM Agent: `agents/project_manager.md`
-- PM Planning Steps: `bazinga/templates/pm_planning_steps.md`
-- PM Task Classification: `bazinga/templates/pm_task_classification.md`
+- PM Planning Steps: `templates/pm_planning_steps.md`
+- PM Task Classification: `templates/pm_task_classification.md`
 - bazinga-db CLI: `.claude/skills/bazinga-db/scripts/bazinga_db.py`
 - Database Schema: `.claude/skills/bazinga-db/scripts/init_db.py`
 - Session with issue: `bazinga_20251215_103357` (nurse management project)

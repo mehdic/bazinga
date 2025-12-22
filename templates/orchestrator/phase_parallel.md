@@ -278,7 +278,7 @@ FULL_PROMPT[group_id] =
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
+Use the Developer Response Parsing section from `templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
 - READY_FOR_QA/REVIEW: `🔨 Group {id} [{tier}/{model}] complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
@@ -294,7 +294,7 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 **🔴 CRITICAL: YOU MUST READ AND FOLLOW the batch processing template. This is NOT optional.**
 
 ```
-Read(file_path: "bazinga/templates/batch_processing.md")
+Read(file_path: "templates/batch_processing.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | batch_processing.md` and STOP.
@@ -305,7 +305,7 @@ Read(file_path: "bazinga/templates/batch_processing.md")
 3. Spawn ALL Tasks in ONE message block
 4. Verify enforcement checklist
 
-**This prevents the orchestrator stopping bug. DO NOT proceed without reading and applying `bazinga/templates/batch_processing.md`.**
+**This prevents the orchestrator stopping bug. DO NOT proceed without reading and applying `templates/batch_processing.md`.**
 
 **Quick Reference (full rules in template):**
 - ✅ Parse all → Build queue → Spawn all in ONE message
@@ -462,7 +462,7 @@ Task(subagent_type="general-purpose", model={model}, description="{agent_type} {
 **🔴 MANDATORY: Load and use merge workflow template:**
 
 ```
-Read(file_path: "bazinga/templates/merge_workflow.md")
+Read(file_path: "templates/merge_workflow.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | merge_workflow.md` and STOP.

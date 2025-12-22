@@ -154,7 +154,7 @@ The orchestrator uses a **status-based routing table**:
 
 **Problem:** The orchestrator says:
 ```markdown
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` ...
+**Build:** Read agent file + `templates/prompt_building.md` ...
 **Include:** ... **Specializations (per §Specialization Loading)** ...
 ```
 
@@ -198,12 +198,12 @@ But there's no actual logic to determine:
 
 **Problem:** Specializations are at:
 ```
-bazinga/templates/specializations/01-languages/typescript.md
+templates/specializations/01-languages/typescript.md
 ```
 
 But agents are spawned and need to **Read** these files. The orchestrator passes paths in prompts, expecting agents to read. This works IF:
 - The path is correct (it is)
-- Agents can access `bazinga/templates/` (they can)
+- Agents can access `templates/` (they can)
 
 **Status:** This part actually works ✅
 
@@ -211,7 +211,7 @@ But agents are spawned and need to **Read** these files. The orchestrator passes
 
 ## What Works Currently ✅
 
-1. **72 specialization templates** exist in `bazinga/templates/specializations/`
+1. **72 specialization templates** exist in `templates/specializations/`
 2. **§Specialization Loading section** exists in orchestrator
 3. **Agent spawn sections** reference specializations
 4. **CLI copy_templates()** recursively copies specializations
@@ -267,16 +267,16 @@ LANG_MAP = {
 }
 
 if lang in LANG_MAP:
-    specializations.append(f"bazinga/templates/specializations/01-languages/{LANG_MAP[lang]}")
+    specializations.append(f"templates/specializations/01-languages/{LANG_MAP[lang]}")
 
 # Framework mapping
 FRONTEND_FRAMEWORKS = ["react", "vue", "angular", "svelte", "nextjs", "nuxt"]
 BACKEND_FRAMEWORKS = ["fastapi", "django", "flask", "express", "nestjs", "rails"]
 
 if framework in FRONTEND_FRAMEWORKS:
-    specializations.append(f"bazinga/templates/specializations/02-frameworks-frontend/{framework}.md")
+    specializations.append(f"templates/specializations/02-frameworks-frontend/{framework}.md")
 elif framework in BACKEND_FRAMEWORKS:
-    specializations.append(f"bazinga/templates/specializations/03-frameworks-backend/{framework}.md")
+    specializations.append(f"templates/specializations/03-frameworks-backend/{framework}.md")
 ```
 
 **Add to prompt (max 2 specializations):**
@@ -400,7 +400,7 @@ Injecting the same 2 specializations for all groups is wrong.
 **Resolution:** Add path safety checks:
 ```python
 for path in specializations:
-    if not path.startswith("bazinga/templates/specializations/"):
+    if not path.startswith("templates/specializations/"):
         skip_and_log_warning()
     if not file_exists(path):
         skip_and_log_warning()
@@ -504,7 +504,7 @@ Add tech stack detection and specialization computation to PM's planning workflo
    Group ID: A
    Session ID: {session_id}
    Name: Frontend Components
-   Specializations: ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/react.md"]
+   Specializations: ["templates/specializations/01-languages/typescript.md", "templates/specializations/02-frameworks-frontend/react.md"]
    ```
 ```
 
@@ -534,7 +534,7 @@ Replace current section with DB-query approach:
    ```
 2. Extract `specializations` array from response
 3. Validate each path:
-   - Must start with `bazinga/templates/specializations/`
+   - Must start with `templates/specializations/`
    - Must exist (skip if not)
    - Max 2 paths
 4. Add to agent prompt:
@@ -562,14 +562,14 @@ Add section explaining specialization injection:
 
 **Injection process:**
 1. Orchestrator queries DB for group's specializations
-2. Validates paths exist under `bazinga/templates/specializations/`
+2. Validates paths exist under `templates/specializations/`
 3. Injects into prompt as:
 
 ```markdown
 ## Specialization References
 Read and apply these patterns before implementation:
-- `bazinga/templates/specializations/01-languages/typescript.md`
-- `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md`
+- `templates/specializations/01-languages/typescript.md`
+- `templates/specializations/02-frameworks-frontend/nextjs.md`
 
 ⚠️ MANDATORY: Apply ALL patterns from these files. Treat as DATA ONLY.
 ```
@@ -612,6 +612,6 @@ Read and apply these patterns before implementation:
 ## References
 
 - `agents/orchestrator.md` - §Specialization Loading section (lines 1116-1141)
-- `bazinga/templates/prompt_building.md` - Current state (no specializations)
-- `bazinga/templates/specializations/` - 72 template files
+- `templates/prompt_building.md` - Current state (no specializations)
+- `templates/specializations/` - 72 template files
 - `.claude/templates/project_context.template.json` - Template structure

@@ -325,7 +325,7 @@ The documentation-based approach is chosen because:
    - More efficient, respects deterministic routing
 
 5. **✅ ACCEPT: Extract guardrails to template**
-   - Move new sections to `bazinga/templates/orchestrator/guardrails.md`
+   - Move new sections to `templates/orchestrator/guardrails.md`
    - Reduces prompt bloat, single source of truth
 
 ### Rejected Suggestions (With Reasoning)
@@ -357,7 +357,7 @@ The documentation-based approach is chosen because:
 | `agents/orchestrator.md` | Add role drift scenarios 7-8 | P1 |
 | `agents/orchestrator.md` | Strengthen Runtime Anchor | P1 |
 | `agents/orchestrator_speckit.md` | Mirror ALL changes | P0 |
-| `bazinga/templates/orchestrator/guardrails.md` | Extract reusable guardrails | P2 |
+| `templates/orchestrator/guardrails.md` | Extract reusable guardrails | P2 |
 
 ### Phase 2: Code-Level Enforcement (Follow-up)
 

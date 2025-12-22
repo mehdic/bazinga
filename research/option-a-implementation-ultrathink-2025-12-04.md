@@ -31,7 +31,7 @@ These components remain unchanged:
 | Tech Stack Scout | `agents/tech_stack_scout.md` | 90% - Keep as-is |
 | PM Assignment | `agents/project_manager.md` | 100% - Keep as-is |
 | DB Schema v7 | `bazinga-db skill` | 100% - Keep as-is |
-| 72 Templates | `bazinga/templates/specializations/` | Need version guards |
+| 72 Templates | `templates/specializations/` | Need version guards |
 | project_context.json | Created by Scout | Keep as-is |
 
 **Tech Stack Scout stays because:**
@@ -636,7 +636,7 @@ The skill returns a composed markdown block (~1000-1800 tokens) with:
 
 ### Phase 6: Update prompt_building.md
 
-- [ ] Update `bazinga/templates/prompt_building.md` with new specialization block format
+- [ ] Update `templates/prompt_building.md` with new specialization block format
 - [ ] Remove old "agent reads files" approach
 
 ### Phase 7: Documentation
@@ -700,7 +700,7 @@ Trimming strategy:
 
 - Skill requires orchestrator to be updated
 - Skill reads project_context.json (created by Scout)
-- Skill reads templates from `bazinga/templates/specializations/`
+- Skill reads templates from `templates/specializations/`
 - No changes to PM, QA, Tech Lead, or Developer agents
 - No database schema changes needed
 

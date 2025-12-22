@@ -25,8 +25,8 @@ The bug can STILL occur for these agent types.
 ## What Was Implemented
 
 ### Files Modified:
-1. `bazinga/templates/orchestrator/phase_simple.md` - QA and TL spawn sections updated
-2. `bazinga/templates/orchestrator/phase_parallel.md` - QA/TL per-group spawn updated
+1. `templates/orchestrator/phase_simple.md` - QA and TL spawn sections updated
+2. `templates/orchestrator/phase_parallel.md` - QA/TL per-group spawn updated
 3. `agents/orchestrator.md` - Added PRE-TASK VALIDATION runtime guard
 
 ### Changes Made:
@@ -319,7 +319,7 @@ The implementation addressed the symptoms (QA and TL missing context) but not th
 
 **1. Centralized Spawn Template (ACCEPTED)**
 
-OpenAI suggests creating `bazinga/templates/orchestrator/spawn_with_specializations.md` as a single source of truth. This would:
+OpenAI suggests creating `templates/orchestrator/spawn_with_specializations.md` as a single source of truth. This would:
 - Eliminate duplication across agent spawn sections
 - Prevent drift when fixing one section but missing others
 - Make future updates atomic
@@ -376,7 +376,7 @@ Based on OpenAI review, updated priority order:
 
 - `research/unified-context-and-specialization-loading.md` - Original analysis
 - `research/reasoning-auto-enable-analysis.md` - Reasoning requirements
-- `bazinga/templates/orchestrator/phase_simple.md` - Simple mode template
-- `bazinga/templates/orchestrator/phase_parallel.md` - Parallel mode template
+- `templates/orchestrator/phase_simple.md` - Simple mode template
+- `templates/orchestrator/phase_parallel.md` - Parallel mode template
 - `agents/orchestrator.md` - Orchestrator agent definition
 - `tmp/ultrathink-reviews/combined-review.md` - OpenAI review feedback

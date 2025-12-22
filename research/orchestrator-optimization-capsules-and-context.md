@@ -26,9 +26,9 @@ This document critically evaluates these proposals.
 | File | Size | Lines |
 |------|------|-------|
 | `agents/orchestrator.md` | 100,366 bytes | 2,662 |
-| `bazinga/templates/message_templates.md` | 21,134 bytes | 688 |
-| `bazinga/templates/response_parsing.md` | 15,909 bytes | 500+ |
-| `bazinga/templates/prompt_building.md` | 5,185 bytes | 150+ |
+| `templates/message_templates.md` | 21,134 bytes | 688 |
+| `templates/response_parsing.md` | 15,909 bytes | 500+ |
+| `templates/prompt_building.md` | 5,185 bytes | 150+ |
 
 ### Template Loading Pattern
 
@@ -37,15 +37,15 @@ The orchestrator already loads templates at initialization (lines 673-680):
 ```markdown
 **⚠️ MANDATORY: Read templates that contain runtime instructions**
 
-Read(file_path: "bazinga/templates/message_templates.md")
-Read(file_path: "bazinga/templates/response_parsing.md")
-Read(file_path: "bazinga/templates/prompt_building.md")
+Read(file_path: "templates/message_templates.md")
+Read(file_path: "templates/response_parsing.md")
+Read(file_path: "templates/prompt_building.md")
 ```
 
 And references them throughout:
 - Line 59: "You loaded message templates... Use those exact formats"
-- Line 99: "Use `bazinga/templates/response_parsing.md` (loaded at init)"
-- Line 1284: "Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization)"
+- Line 99: "Use `templates/response_parsing.md` (loaded at init)"
+- Line 1284: "Use the Developer Response Parsing section from `templates/response_parsing.md` (loaded at initialization)"
 
 **This pattern already exists and works.**
 
@@ -202,8 +202,8 @@ If the goal is reducing orchestrator.md size, better targets exist:
 | Investigation Loop | 1600-1700 | 5KB | Already extracted to template |
 
 **Higher-impact extractions:**
-1. Merge-on-approval flow → `bazinga/templates/merge_workflow.md` (~8KB)
-2. Batch processing rules → `bazinga/templates/batch_processing.md` (~7KB)
+1. Merge-on-approval flow → `templates/merge_workflow.md` (~8KB)
+2. Batch processing rules → `templates/batch_processing.md` (~7KB)
 
 ---
 
@@ -309,8 +309,8 @@ Based on corrected understanding of the constraint:
 
 #### Priority 1: Extract Large Isolated Workflows (~15KB savings)
 These are self-contained and safe to extract:
-1. Merge-on-approval flow → `bazinga/templates/merge_workflow.md` (~8KB)
-2. Batch processing rules → `bazinga/templates/batch_processing.md` (~7KB)
+1. Merge-on-approval flow → `templates/merge_workflow.md` (~8KB)
+2. Batch processing rules → `templates/batch_processing.md` (~7KB)
 
 #### Priority 2: Consolidate Capsule Duplicates (~4KB savings)
 1. Keep ONE canonical capsule format definition at top of orchestrator.md
@@ -339,6 +339,6 @@ The original proposals were partially correct:
 ## References
 
 - `agents/orchestrator.md` - Main orchestrator file (100KB, 2662 lines)
-- `bazinga/templates/message_templates.md` - Capsule format canonical source (21KB)
-- `bazinga/templates/response_parsing.md` - Agent response parsing patterns (16KB)
-- `bazinga/templates/prompt_building.md` - Prompt building templates (5KB)
+- `templates/message_templates.md` - Capsule format canonical source (21KB)
+- `templates/response_parsing.md` - Agent response parsing patterns (16KB)
+- `templates/prompt_building.md` - Prompt building templates (5KB)

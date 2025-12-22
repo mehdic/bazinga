@@ -36,8 +36,8 @@ Task(
 | File | Lines | Status |
 |------|-------|--------|
 | `agents/orchestrator.md` | 223-224, 349, 2088, 2189 | Updated |
-| `bazinga/templates/orchestrator/phase_simple.md` | 90 | Already correct |
-| `bazinga/templates/orchestrator/phase_parallel.md` | 231-234 | Already correct |
+| `templates/orchestrator/phase_simple.md` | 90 | Already correct |
+| `templates/orchestrator/phase_parallel.md` | 231-234 | Already correct |
 
 ### Consistency Check
 

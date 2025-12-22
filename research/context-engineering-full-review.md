@@ -328,5 +328,5 @@ I underestimated the severity of several issues. The schema mismatches (`context
 - SKILL.md: `.claude/skills/context-assembler/SKILL.md`
 - init_db.py: `.claude/skills/bazinga-db/scripts/init_db.py`
 - bazinga_db.py: `.claude/skills/bazinga-db/scripts/bazinga_db.py`
-- phase_simple.md: `bazinga/templates/orchestrator/phase_simple.md`
-- phase_parallel.md: `bazinga/templates/orchestrator/phase_parallel.md`
+- phase_simple.md: `templates/orchestrator/phase_simple.md`
+- phase_parallel.md: `templates/orchestrator/phase_parallel.md`

@@ -79,7 +79,7 @@ if coverage_report:
 **Solution:** Replace with:
 ```
 Query each skill output from database and aggregate into skills_used list.
-See bazinga/templates/dashboard_schema.md for available fields.
+See templates/dashboard_schema.md for available fields.
 ```
 
 **Lines saved:** ~70
@@ -125,7 +125,7 @@ This pattern repeats 20+ times!
 ### 7. **Completion Report Generation** (Lines 2693-2858)
 **Problem:** 165 lines of detailed markdown template generation
 
-**Solution:** Move template to bazinga/templates/completion_report.md, reference it
+**Solution:** Move template to templates/completion_report.md, reference it
 
 **Lines saved:** ~165
 
@@ -149,7 +149,7 @@ This pattern repeats 20+ times!
    - Replace all detailed logging blocks with: "Log to DB (see Logging Pattern)"
 
 4. **Extract Report Templates** (~100 lines saved)
-   - Move completion report template to bazinga/templates/
+   - Move completion report template to templates/
    - Replace with: "Generate report using template"
 
 5. **Simplify Aggregation Logic** (~50 lines saved)
@@ -207,7 +207,7 @@ This pattern repeats 20+ times!
 ## Implementation Strategy
 
 ### Phase 1: Create Support Files
-1. Create `bazinga/templates/` directory
+1. Create `templates/` directory
 2. Extract templates:
    - `prompt_templates.md` - All agent prompt templates
    - `message_templates.md` - UI messages

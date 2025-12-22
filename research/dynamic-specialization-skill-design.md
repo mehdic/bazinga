@@ -615,7 +615,7 @@ BEFORE spawning, invoke specialization-loader skill:
 | `agents/developer.md` | No changes (identity comes from prompt) |
 | `agents/project_manager.md` | Ensure detected_technologies in project_context.json |
 | `.claude/skills/` | Add new specialization-loader skill |
-| `bazinga/templates/` | Move specialization templates here |
+| `templates/` | Move specialization templates here |
 
 ### What Stays the Same
 

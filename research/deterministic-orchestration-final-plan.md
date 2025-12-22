@@ -1977,11 +1977,11 @@ Parse JSON result and execute:
 | 4.1 | Add config seeding step | Step 0.3 in initialization | `agents/orchestrator.md` |
 | 4.2 | Update PM spawn (new session) | Use prompt-builder skill only | `agents/orchestrator.md` |
 | 4.3 | Update PM spawn (resume) | Use prompt-builder skill only | `agents/orchestrator.md` |
-| 4.4 | Update Developer spawn (simple) | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_simple.md` |
-| 4.5 | Update Developer spawn (parallel) | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_parallel.md` |
-| 4.6 | Update QA spawn | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
-| 4.7 | Update Tech Lead spawn | Use prompt-builder skill only | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
-| 4.8 | Add workflow-router calls | Replace all routing logic | `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
+| 4.4 | Update Developer spawn (simple) | Use prompt-builder skill only | `templates/orchestrator/phase_simple.md` |
+| 4.5 | Update Developer spawn (parallel) | Use prompt-builder skill only | `templates/orchestrator/phase_parallel.md` |
+| 4.6 | Update QA spawn | Use prompt-builder skill only | `templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
+| 4.7 | Update Tech Lead spawn | Use prompt-builder skill only | `templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
+| 4.8 | Add workflow-router calls | Replace all routing logic | `templates/orchestrator/phase_simple.md`, `phase_parallel.md` |
 | 4.9 | Remove old prompt composition | Clean up duplicated logic | Various |
 
 ### Phase 5: Testing
@@ -2000,7 +2000,7 @@ Parse JSON result and execute:
 
 | # | Task | Description | Files |
 |---|------|-------------|-------|
-| 6.1 | Update prompt_building.md | Remove old instructions | `bazinga/templates/prompt_building.md` |
+| 6.1 | Update prompt_building.md | Remove old instructions | `templates/prompt_building.md` |
 | 6.2 | Update claude.md | Add deterministic system docs | `.claude/claude.md` |
 | 6.3 | Remove old prompt composition code | Clean up templates | Various |
 | 6.4 | Update specialization-loader SKILL.md | Document that prompt-builder replaces it for spawns | `.claude/skills/specialization-loader/SKILL.md` |
@@ -2083,4 +2083,4 @@ If issues arise:
 - Initial deterministic design: `research/deterministic-orchestration-system.md`
 - Unified skill analysis: `research/unified-prompt-builder-skill.md`
 - Agent files: `agents/*.md`
-- Response parsing: `bazinga/templates/response_parsing.md`
+- Response parsing: `templates/response_parsing.md`

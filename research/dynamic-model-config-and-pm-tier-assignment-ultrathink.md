@@ -226,7 +226,7 @@ IF initial_tier = "Developer":
 | `agents/project_manager.md` | Update tier references (~2 occurrences) |
 | `bazinga/model_selection.json` | Rename key |
 | `bazinga/skills_config.json` | Update section name |
-| `bazinga/templates/response_parsing.md` | Update status descriptions |
+| `templates/response_parsing.md` | Update status descriptions |
 
 ### Implementation
 

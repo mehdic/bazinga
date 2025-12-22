@@ -103,7 +103,7 @@ Output summary:
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
+Use the Developer Response Parsing section from `templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL)
 - **Files** created/modified
 - **Tests** added (count)
@@ -347,7 +347,7 @@ Output summary:
 
 **Step 1: Parse response and output capsule to user**
 
-Use the QA Expert Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
+Use the QA Expert Response Parsing section from `templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
@@ -450,7 +450,7 @@ Output summary:
 
 **Step 1: Parse response and output capsule to user**
 
-Use the Tech Lead Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
+Use the Tech Lead Response Parsing section from `templates/response_parsing.md` (loaded at initialization) to extract:
 - **Decision** (APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS)
 - **Security issues** count
 - **Lint issues** count
@@ -475,7 +475,7 @@ Use the Tech Lead Response Parsing section from `bazinga/templates/response_pars
 
 **IF Tech Lead reports: INVESTIGATION_IN_PROGRESS**
 
-**📋 Full investigation loop procedure:** `bazinga/templates/investigation_loop.md` (v1.0)
+**📋 Full investigation loop procedure:** `templates/investigation_loop.md` (v1.0)
 
 **Entry Condition:** Tech Lead status = `INVESTIGATION_IN_PROGRESS`
 
@@ -492,7 +492,7 @@ Use the Tech Lead Response Parsing section from `bazinga/templates/response_pars
 
 Use the Read tool to read the complete investigation loop:
 ```
-Read(file_path: "bazinga/templates/investigation_loop.md")
+Read(file_path: "templates/investigation_loop.md")
 ```
 
 2. **Execute all steps** in the template (up to 5 iterations)
@@ -676,7 +676,7 @@ For test issues (QA Expert):
 **⚠️ YOU MUST READ AND FOLLOW the merge workflow template. This is NOT optional.**
 
 ```
-Read(file_path: "bazinga/templates/merge_workflow.md")
+Read(file_path: "templates/merge_workflow.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | merge_workflow.md` and STOP.
@@ -712,7 +712,7 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 **Escalation (from template):** 2nd fail → SSE, 3rd fail → TL, 4th+ → PM
 
-**DO NOT proceed without reading and applying `bazinga/templates/merge_workflow.md`.**
+**DO NOT proceed without reading and applying `templates/merge_workflow.md`.**
 
 ### Step 2A.8: Spawn PM for Final Check
 
@@ -851,7 +851,7 @@ Prior agents' documented decision progression:
 **IF PM sends NEEDS_CLARIFICATION:**
 - Follow clarification workflow from Step 1.3a (only case where you stop for user input)
 
-**IMPORTANT:** All agent prompts follow `bazinga/templates/prompt_building.md` (loaded at initialization).
+**IMPORTANT:** All agent prompts follow `templates/prompt_building.md` (loaded at initialization).
 
 ---
 

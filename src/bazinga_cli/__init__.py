@@ -91,7 +91,7 @@ class BazingaSetup:
         stale configs from previous installs in shared-data location.
 
         Args:
-            relative_path: Path relative to source (e.g., "bazinga/templates")
+            relative_path: Path relative to source (e.g., "templates")
 
         Returns:
             Resolved Path if found, None otherwise
@@ -340,7 +340,7 @@ class BazingaSetup:
 
     def copy_templates(self, target_dir: Path) -> bool:
         """
-        Copy coordination templates to target bazinga/templates directory.
+        Copy templates to target templates/ directory.
 
         Args:
             target_dir: Target directory for installation
@@ -348,14 +348,16 @@ class BazingaSetup:
         Returns:
             True if templates were copied successfully, False otherwise
         """
-        templates_dir = target_dir / "bazinga" / "templates"
+        templates_dir = target_dir / "templates"
         templates_dir.mkdir(parents=True, exist_ok=True)
 
         # Use helper for path resolution with legacy fallback
-        source_templates = self._get_config_source("bazinga/templates")
+        source_templates = self._get_config_source("templates")
         if not source_templates:
-            # Legacy fallback: coordination/templates
-            legacy_path = self._get_config_source("coordination/templates")
+            # Legacy fallback: bazinga/templates or coordination/templates
+            legacy_path = self._get_config_source("bazinga/templates")
+            if not legacy_path:
+                legacy_path = self._get_config_source("coordination/templates")
             if legacy_path:
                 source_templates = legacy_path
             else:

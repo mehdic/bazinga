@@ -1417,7 +1417,7 @@ WHERE session_id = ? AND criterion = ?;
 - `agents/orchestrator.md` - Orchestrator agent prompt
 - `.claude/commands/bazinga.orchestrate.md` - Generated slash command
 - `research/development-plan-management-strategy.md` - Plan persistence
-- `bazinga/templates/message_templates.md` - Capsule format
+- `templates/message_templates.md` - Capsule format
 
 ### Discussion History
 

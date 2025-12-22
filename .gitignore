@@ -86,12 +86,10 @@ bazinga/bazinga.db*
 !bazinga/testing_config.json
 !bazinga/scripts/
 !bazinga/scripts/**
-!bazinga/templates/
-!bazinga/templates/**
 !bazinga/config/
 !bazinga/config/**
 
-# Coordination folder (legacy - templates now in bazinga/templates/)
+# Coordination folder (legacy - templates now at root templates/)
 coordination/
 !coordination/templates/
 !coordination/templates/**

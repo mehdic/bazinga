@@ -375,7 +375,7 @@ PM reads `project_context.json` and uses it for:
 │  Step 2+: Orchestrator (at agent spawn)                         │
 │  ─────────────────────────────────────────────────────────────  │
 │  Queries: DB for group's specializations                        │
-│  Validates: Paths exist under bazinga/templates/specializations/│
+│  Validates: Paths exist under templates/specializations/│
 │  Injects: Into agent prompt                                     │
 │  Logs: To orchestration_logs for audit trail                    │
 └─────────────────────────────────────────────────────────────────┘
@@ -394,6 +394,6 @@ PM reads `project_context.json` and uses it for:
 
 ## References
 
-- `bazinga/templates/specializations/` - 72 specialization templates
+- `templates/specializations/` - 72 specialization templates
 - `research/specialization-workflow-state-ultrathink-2025-12-04.md` - Previous analysis
 - `agents/orchestrator.md` - Current orchestrator workflow

@@ -6,7 +6,7 @@ on:
       - 'agents/**'
       - '.claude/commands/**'
       - '.claude/skills/**'
-      - 'bazinga/templates/**'
+      - 'templates/**'
       - 'scripts/check-no-inline-sql.sh'
   push:
     branches:
@@ -16,7 +16,7 @@ on:
       - 'agents/**'
       - '.claude/commands/**'
       - '.claude/skills/**'
-      - 'bazinga/templates/**'
+      - 'templates/**'
       - 'scripts/check-no-inline-sql.sh'
 
 jobs:

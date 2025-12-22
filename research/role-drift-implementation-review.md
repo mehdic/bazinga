@@ -46,7 +46,7 @@ Implemented changes across 9 files to prevent two types of orchestrator role dri
 ### 🔴 CRITICAL ISSUE 1: Missing Merge Workflow Enhancement (Layer 2)
 
 **Plan stated:**
-> Enhance existing `bazinga/templates/merge_workflow.md` with explicit Developer spawn template with CI monitoring (60-second polling)
+> Enhance existing `templates/merge_workflow.md` with explicit Developer spawn template with CI monitoring (60-second polling)
 
 **Reality:**
 The merge_workflow.md file was NOT modified. The Developer merge task with 60-second CI polling was not added.
@@ -57,7 +57,7 @@ The merge_workflow.md file was NOT modified. The Developer merge task with 60-se
 - Orchestrator may still not spawn Developer correctly for merge tasks
 
 **Fix Required:**
-Add the enhanced Developer merge prompt to `bazinga/templates/merge_workflow.md`
+Add the enhanced Developer merge prompt to `templates/merge_workflow.md`
 
 ---
 
@@ -248,7 +248,7 @@ Use explicit rule: `Completed_Items == Total_Items` (100% required) unless BLOCK
 
 ### Must Fix Before Deployment
 
-1. **Add merge workflow enhancement to `bazinga/templates/merge_workflow.md`:**
+1. **Add merge workflow enhancement to `templates/merge_workflow.md`:**
 ```markdown
 ### Developer Merge Task with CI Monitoring
 
@@ -348,7 +348,7 @@ In project_manager.md Step 3, add requirement for each task group to include ite
 
 | Fix | File | Description |
 |-----|------|-------------|
-| F1 | `bazinga/templates/merge_workflow.md` | Add Developer merge prompt with 60s CI polling |
+| F1 | `templates/merge_workflow.md` | Add Developer merge prompt with 60s CI polling |
 | F2 | `agents/orchestrator.md` | Add Original_Scope to session creation (Path B Step 3) |
 | F3 | `.claude/skills/bazinga-db/SKILL.md` | Add schema support for original_scope, validator_verdicts |
 

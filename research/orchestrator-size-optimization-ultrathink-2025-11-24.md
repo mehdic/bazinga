@@ -186,9 +186,9 @@ Skill(command: "bazinga-db")
 
 **Implementation:**
 ```
-Create: bazinga/templates/shutdown_protocol.md
+Create: templates/shutdown_protocol.md
 Content: Full BAZINGA validation, tech debt checks, git ops, reporting
-Replace with: "Follow bazinga/templates/shutdown_protocol.md"
+Replace with: "Follow templates/shutdown_protocol.md"
 ```
 
 **Pros:**
@@ -219,7 +219,7 @@ Replace with: "Follow bazinga/templates/shutdown_protocol.md"
 
 **Implementation:**
 ```
-Create: bazinga/templates/investigation_loop.md
+Create: templates/investigation_loop.md
 Content: Investigation spawn, Tech Lead validation, evidence collection
 Replace with: "Follow investigation loop protocol (see investigation_loop.md)"
 ```
@@ -325,9 +325,9 @@ Skill(command: "bazinga-db")
 ## Generic Agent Spawn Pattern
 
 For ANY agent spawn:
-1. Build: Read agents/[agent].md + bazinga/templates/prompt_building.md
+1. Build: Read agents/[agent].md + templates/prompt_building.md
 2. Spawn: Task(subagent_type="general-purpose", description="[desc]", prompt="[built_prompt]")
-3. Parse: Use bazinga/templates/response_parsing.md (extract status, files, tests, etc.)
+3. Parse: Use templates/response_parsing.md (extract status, files, tests, etc.)
 4. Log: Use bazinga-db to log interaction (session_id, agent_type, content, iteration, agent_id)
 5. Route: Based on status (see routing table below)
 
@@ -382,7 +382,7 @@ Then for each agent:
 
 **Implementation:**
 ```
-Create: bazinga/templates/execution_workflow.md
+Create: templates/execution_workflow.md
 Content: Generic dev→qa→tech lead→pm flow
 Modes: Simple (sequential), Parallel (batched)
 ```
@@ -410,7 +410,7 @@ Modes: Simple (sequential), Parallel (batched)
 **⚠️ UPDATE:** Part B (logging compression) was NOT implemented - user requested keeping verbose logging for debugging visibility.
 
 **Actions:**
-1. ✅ Extract shutdown protocol to `bazinga/templates/shutdown_protocol.md` (493 lines saved)
+1. ✅ Extract shutdown protocol to `templates/shutdown_protocol.md` (493 lines saved)
 2. ❌ Compress database logging instructions - **REJECTED by user** (need verbose logging for tracking)
 
 **Total savings:** ~493 lines (~1,972 tokens)
@@ -429,7 +429,7 @@ Modes: Simple (sequential), Parallel (batched)
 **Extract Investigation Loop**
 
 **Actions:**
-1. Extract investigation loop to `bazinga/templates/investigation_loop.md` (125 lines saved)
+1. Extract investigation loop to `templates/investigation_loop.md` (125 lines saved)
 
 **Additional savings:** ~125 lines (~500 tokens)
 **New size:** 2,373 - 125 = 2,248 lines (~17,992 tokens)
@@ -489,7 +489,7 @@ Only if we need even more reduction (we won't).
 
 **1. Create template file**
 ```bash
-File: bazinga/templates/shutdown_protocol.md
+File: templates/shutdown_protocol.md
 Content: Lines 2396-2903 from current orchestrator.md
 Sections:
 - BAZINGA validation
@@ -507,7 +507,7 @@ Sections:
 
 When PM sends BAZINGA, execute shutdown protocol:
 
-Follow `bazinga/templates/shutdown_protocol.md` for complete shutdown procedure.
+Follow `templates/shutdown_protocol.md` for complete shutdown procedure.
 
 **Key steps (see template for details):**
 1. Verify ALL success criteria met

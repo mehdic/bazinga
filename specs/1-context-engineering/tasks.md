@@ -205,12 +205,12 @@
 
   **Solution - Part B: Replace Direct bazinga-db Calls**
 
-  Update `bazinga/templates/orchestrator/phase_simple.md`:
+  Update `templates/orchestrator/phase_simple.md`:
   - Lines 24-35: Replace bazinga-db context query with context-assembler invocation
   - Lines 604-616: Same for QA Expert spawn
   - Lines 743-755: Same for Tech Lead spawn
 
-  Update `bazinga/templates/orchestrator/phase_parallel.md`:
+  Update `templates/orchestrator/phase_parallel.md`:
   - Lines 163-174: Same pattern for parallel spawns
 
   **New Context Query Pattern** (replace existing):
@@ -230,8 +230,8 @@
   After orchestrator passes real `current_tokens`, remove the conservative cap from SKILL.md (lines 147-151) since zone detection will work properly.
 
   **Files to Modify**:
-  - `bazinga/templates/orchestrator/phase_simple.md` (3 locations)
-  - `bazinga/templates/orchestrator/phase_parallel.md` (1 location)
+  - `templates/orchestrator/phase_simple.md` (3 locations)
+  - `templates/orchestrator/phase_parallel.md` (1 location)
   - `agents/orchestrator.md` (add token tracking after spawns)
   - `.claude/skills/context-assembler/SKILL.md` (remove 2000 cap after integration)
 

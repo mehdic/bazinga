@@ -59,7 +59,7 @@ last_review_status TEXT CHECK(last_review_status IN ('APPROVED', 'CHANGES_REQUES
 
 ### 🔴 CRITICAL ISSUE #2: Response Parsing Template Not Updated
 
-**Location:** `bazinga/templates/response_parsing.md:187-191`
+**Location:** `templates/response_parsing.md:187-191`
 
 ```markdown
 **Expected status values:**
@@ -357,7 +357,7 @@ Route to PM with APPROVED + merged info
 | `agents/orchestrator.md` | Add merge step after Tech Lead APPROVED |
 | `agents/techlead.md` | REVERT - keep just APPROVED |
 | `agents/project_manager.md` | REVERT - remove merge-on-approval references |
-| `bazinga/templates/response_parsing.md` | No change (keep APPROVED) |
+| `templates/response_parsing.md` | No change (keep APPROVED) |
 | Database schema | No change (keep APPROVED/CHANGES_REQUESTED) |
 | Documentation | Update to explain orchestrator-controlled merge |
 

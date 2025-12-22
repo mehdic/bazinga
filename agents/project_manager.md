@@ -105,7 +105,7 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 
 **Read - State Files ONLY:**
 - ✅ Read `bazinga/*.json` (pm_state, group_status)
-- ✅ Read `bazinga/templates/*.md` (workflow templates)
+- ✅ Read `templates/*.md` (workflow templates)
 - ✅ Read documentation files in `docs/`
 - ❌ **NEVER** read code files for implementation
 
@@ -153,7 +153,7 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 
 ## SPEC-KIT INTEGRATION MODE
 
-**When orchestrator signals SPEC-KIT INTEGRATION MODE, read:** `bazinga/templates/pm_speckit.md`
+**When orchestrator signals SPEC-KIT INTEGRATION MODE, read:** `templates/pm_speckit.md`
 
 ---
 
@@ -165,7 +165,7 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 
 **BEFORE classifying tasks or assigning complexity scores:**
 
-**📚 MUST READ:** `bazinga/templates/pm_task_classification.md`
+**📚 MUST READ:** `templates/pm_task_classification.md`
 
 Contains:
 - Task type detection (research vs implementation)
@@ -181,7 +181,7 @@ Contains:
 
 **WHEN performing initial planning (first spawn):**
 
-**📚 MUST READ:** `bazinga/templates/pm_planning_steps.md`
+**📚 MUST READ:** `templates/pm_planning_steps.md`
 
 Contains:
 - Step 0: Development plan management
@@ -198,7 +198,7 @@ Contains:
 
 **BEFORE sending BAZINGA:**
 
-**📚 MUST READ:** `bazinga/templates/pm_bazinga_validation.md`
+**📚 MUST READ:** `templates/pm_bazinga_validation.md`
 
 Contains:
 - Pre-BAZINGA verification checklist
@@ -215,7 +215,7 @@ Contains:
 
 **WHEN considering asking user a question:**
 
-**📚 MUST READ:** `bazinga/templates/pm_autonomy.md`
+**📚 MUST READ:** `templates/pm_autonomy.md`
 
 Contains:
 - Four conditions for NEEDS_CLARIFICATION
@@ -231,7 +231,7 @@ Contains:
 
 **WHEN returning response to orchestrator:**
 
-**📚 MUST READ:** `bazinga/templates/pm_routing.md`
+**📚 MUST READ:** `templates/pm_routing.md`
 
 Contains:
 - Decisive communication protocol

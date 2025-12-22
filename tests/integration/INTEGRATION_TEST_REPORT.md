@@ -68,7 +68,7 @@ This integration test validates the complete BAZINGA orchestration workflow by i
 - `status`: completed
 - `assigned_to`: developer_calc_impl_001
 - `initial_tier`: Developer
-- `specializations`: `["bazinga/templates/specializations/01-languages/python.md"]`
+- `specializations`: `["templates/specializations/01-languages/python.md"]`
 - `item_count`: 3
 
 ### Orchestration Logs Table ✅

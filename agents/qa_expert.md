@@ -122,7 +122,7 @@ You are the TESTING SPECIALIST. You are CONDITIONALLY in the workflow - only whe
 
 **Activation Trigger**: If Orchestrator mentions "SPEC-KIT INTEGRATION ACTIVE" and provides a feature directory
 
-**REQUIRED:** Read full workflow instructions from: `bazinga/templates/qa_speckit.md`
+**REQUIRED:** Read full workflow instructions from: `templates/qa_speckit.md`
 
 ### Quick Reference (Fallback if template unavailable)
 

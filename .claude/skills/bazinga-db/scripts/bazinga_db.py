@@ -234,7 +234,7 @@ class BazingaDB:
         Accepts either:
         - Short path: "01-languages/python.md" -> auto-prefixed
         - Medium path: "specializations/01-languages/python.md" -> normalized
-        - Full path: "bazinga/templates/specializations/01-languages/python.md"
+        - Full path: "templates/specializations/01-languages/python.md"
 
         Args:
             spec_path: Path to specialization file (short, medium, or full)
@@ -263,7 +263,7 @@ class BazingaDB:
                     project_root = Path(self.db_path).parent.parent
 
             # Define the specializations base
-            spec_base = "bazinga/templates/specializations/"
+            spec_base = "templates/specializations/"
 
             # Normalize: auto-prefix if not already a full path
             if spec_path.startswith(spec_base):

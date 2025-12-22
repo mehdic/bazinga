@@ -62,7 +62,7 @@ Solution - Part A: Token Estimation in Orchestrator
 ```
 Solution - Part B: Replace Direct bazinga-db Calls
 
-Update `bazinga/templates/orchestrator/phase_simple.md`:
+Update `templates/orchestrator/phase_simple.md`:
 - Lines 24-35: Replace bazinga-db context query with context-assembler invocation
 - Lines 604-616: Same for QA Expert spawn
 - Lines 743-755: Same for Tech Lead spawn
@@ -324,5 +324,5 @@ OpenAI rates: **Medium-High** contingent on completing Part A/B/C and unifying D
 - Tasks: `specs/1-context-engineering/tasks.md`
 - Data Model: `specs/1-context-engineering/data-model.md`
 - SKILL.md: `.claude/skills/context-assembler/SKILL.md`
-- phase_simple.md: `bazinga/templates/orchestrator/phase_simple.md`
-- phase_parallel.md: `bazinga/templates/orchestrator/phase_parallel.md`
+- phase_simple.md: `templates/orchestrator/phase_simple.md`
+- phase_parallel.md: `templates/orchestrator/phase_parallel.md`

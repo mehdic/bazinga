@@ -169,8 +169,35 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, tech_lead, developer)
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
-- `bazinga/` - State files for orchestration (created during runs)
+- `templates/` - **SOURCE TEMPLATES** (agent prompts, specializations, workflow guides)
+- `bazinga/` - **RUNTIME STATE** (database, session artifacts, config JSONs)
 - `tmp/` - **GITIGNORED** - Temporary test artifacts (never commit)
+
+### 📁 Templates Directory Structure
+
+Templates are source files that live at the **root `templates/` folder** (NOT in `bazinga/`):
+
+```
+templates/                           # Source templates (tracked in git)
+├── specializations/                 # Technology-specific agent guidance
+│   ├── 01-languages/               # Python, TypeScript, Go, etc.
+│   ├── 02-frameworks-frontend/     # React, Vue, Next.js, etc.
+│   ├── 03-frameworks-backend/      # FastAPI, Express, Django, etc.
+│   └── ...                         # 13 categories total
+├── pm_*.md                         # Project Manager workflow templates
+├── developer_speckit.md            # Developer workflow
+├── qa_speckit.md                   # QA Expert workflow
+├── tech_lead_speckit.md            # Tech Lead workflow
+├── message_templates.md            # Output capsule formats
+├── response_parsing.md             # Agent response extraction
+└── orchestrator/                   # Phase execution templates
+```
+
+**Why this location:**
+- `templates/` = **source files** (versioned, static, installed to clients)
+- `bazinga/` = **runtime state** (database, session data, gitignored)
+
+Separating source from runtime prevents accidental gitignore conflicts and makes the codebase cleaner.
 
 ### ⚠️ tmp/ Directory is Gitignored
 
@@ -514,7 +541,7 @@ The bazinga CLI (`bazinga install` / `bazinga update`) copies files from two mec
 | `.claude/commands/` | `.claude/commands/` | `copy_commands()` | ✅ Yes |
 | `.claude/skills/` | `.claude/skills/` | `copy_skills()` | ✅ Yes |
 | `.claude/templates/` | `.claude/templates/` | shared-data | ✅ Yes |
-| `bazinga/templates/` | `bazinga/templates/` | force-include | ✅ Yes |
+| `templates/` | `templates/` | force-include | ✅ Yes |
 | `dashboard-v2/` | `bazinga/dashboard-v2/` | shared-data | ✅ Yes |
 | `bazinga/*.json` (configs) | `bazinga/` | force-include + `ALLOWED_CONFIG_FILES` | ❌ **NO - Manual** |
 
@@ -1261,7 +1288,7 @@ python -m pytest tests/test_version_guards.py::TestEdgeCases -v
 |------|---------|
 | `tests/test_version_guards.py` | 205 unit tests |
 | `.claude/skills/prompt-builder/scripts/prompt_builder.py` | Code under test |
-| `bazinga/templates/specializations/**/*.md` | 72 templates with version guards |
+| `templates/specializations/**/*.md` | 72 templates with version guards |
 
 ---
 
@@ -1334,7 +1361,7 @@ The dashboard should reference this version in comments for traceability.
 ### ❌ WRONG (What was done in failed tests)
 ```python
 # Just reading the raw template file
-Read: bazinga/templates/specializations/01-languages/python.md
+Read: templates/specializations/01-languages/python.md
 # Then spawning Developer...
 ```
 

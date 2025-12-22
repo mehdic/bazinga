@@ -56,7 +56,7 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 
 **UI Status Messages:**
 
-**Output:** Use `bazinga/templates/message_templates.md` for capsule format, rules, and examples.
+**Output:** Use `templates/message_templates.md` for capsule format, rules, and examples.
 **Format:** `[Emoji] [Action] | [Observation] | [Outcome] → [Next]` • Tier notation: `[SSE]`, `[Dev]`, `[TL]`, `[PM]`
 
 **Rich Context Blocks (exceptions to capsule-only):**
@@ -66,7 +66,7 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 
 ## 📊 Agent Response Parsing
 
-**Use `bazinga/templates/response_parsing.md`** (loaded at init) for extraction patterns and fallbacks.
+**Use `templates/response_parsing.md`** (loaded at init) for extraction patterns and fallbacks.
 
 ### CRP JSON Format (Primary)
 
@@ -142,7 +142,7 @@ Operation → Check result → If error: Output capsule with error
 
 ## 📁 File Paths
 
-**Structure:** `bazinga/bazinga.db`, `bazinga/skills_config.json`, `bazinga/testing_config.json`, `bazinga/artifacts/{session_id}/` (outputs), `bazinga/templates/` (prompts). **Rules:** Artifacts → `bazinga/artifacts/${SESSION_ID}/`, Skills → `bazinga/artifacts/${SESSION_ID}/skills/`, Never write to bazinga root.
+**Structure:** `bazinga/bazinga.db`, `bazinga/skills_config.json`, `bazinga/testing_config.json`, `bazinga/artifacts/{session_id}/` (outputs), `templates/` (prompts). **Rules:** Artifacts → `bazinga/artifacts/${SESSION_ID}/`, Skills → `bazinga/artifacts/${SESSION_ID}/skills/`, Never write to bazinga root.
 
 ---
 
@@ -197,7 +197,7 @@ Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool
   - `bazinga/skills_config.json` (skills configuration)
   - `bazinga/testing_config.json` (testing configuration)
   - `bazinga/project_context.json` (project tech stack - for specialization loading)
-  - `bazinga/templates/*.md` (orchestrator templates, message templates, etc.)
+  - `templates/*.md` (orchestrator templates, message templates, etc.)
   - `agents/*.md` (agent definition files - required before spawning agents)
 - ✅ **Bash** - ONLY for initialization commands (session ID, database check)
 
@@ -850,7 +850,7 @@ fi
 
 **Note:** Process dashboard startup silently - no user output needed. Just ensure it's running before continuing.
 
-**THEN display start message:** Use `bazinga/templates/message_templates.md` §Initialization Messages.
+**THEN display start message:** Use `templates/message_templates.md` §Initialization Messages.
 - **Simple:** `🚀 Starting orchestration | Session: {id}`
 - **Enhanced:** Full workflow overview (for spec files, multi-phase, 3+ requirements)
 
@@ -1217,7 +1217,7 @@ Display:
 
    **AFTER reading configs: IMMEDIATELY continue to step 5 (Store config in database). Do NOT stop.**
 
-   See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
+   See `templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
 
 5. **Load model configuration from database:**
 
@@ -1334,9 +1334,9 @@ Display:
    These templates are NOT documentation - they contain critical operational logic that must be loaded before orchestration begins.
 
    ```
-   Read(file_path: "bazinga/templates/message_templates.md")
-   Read(file_path: "bazinga/templates/response_parsing.md")
-   Read(file_path: "bazinga/templates/prompt_building.md")
+   Read(file_path: "templates/message_templates.md")
+   Read(file_path: "templates/response_parsing.md")
+   Read(file_path: "templates/prompt_building.md")
    ```
 
    **Verify all 3 templates loaded.** If ANY Read fails → Output `❌ Template load failed | [filename]` and STOP.
@@ -1710,7 +1710,7 @@ Check if PM response contains investigation section. Look for these headers (fuz
 
 **Step 2: Parse PM response and output capsule to user**
 
-Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
+Use the PM Response Parsing section from `templates/response_parsing.md` (loaded at initialization) to extract:
 - **Status** (PLANNING_COMPLETE, BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY, INVESTIGATION_NEEDED)
 - **Mode** (SIMPLE, PARALLEL)
 - **Task groups** (if mode decision)
@@ -2026,7 +2026,7 @@ Repeat for each task group found in the PM's response.
 
 Process internally (creating task groups from PM response - no user output needed for database sync).
 
-Use the PM response format examples from `bazinga/templates/message_templates.md` (loaded at initialization).
+Use the PM response format examples from `templates/message_templates.md` (loaded at initialization).
 
 ### Step 1.5: Route Based on Mode
 
@@ -2051,7 +2051,7 @@ ELSE IF PM chose "parallel":
 - Reads full agent definition files from `agents/*.md`
 - Queries DB for specializations (from task_groups.specializations)
 - Queries DB for context (reasoning, packages, error patterns)
-- Reads specialization templates from `bazinga/templates/specializations/`
+- Reads specialization templates from `templates/specializations/`
 - Applies token budgets per model
 - Validates required markers
 - Saves prompt to file and returns JSON with prompt_file path
@@ -2152,7 +2152,7 @@ If markers are missing, prompt-builder exits with error (prevents malformed agen
 **You MUST read the template. DO NOT spawn any agents without reading this template first.**
 
 ```
-Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
+Read(file_path: "templates/orchestrator/phase_simple.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | phase_simple.md` and STOP.
@@ -2186,7 +2186,7 @@ Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 **You MUST read the template. DO NOT spawn any agents without reading this template first.**
 
 ```
-Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
+Read(file_path: "templates/orchestrator/phase_parallel.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | phase_parallel.md` and STOP.
@@ -2397,7 +2397,7 @@ Skill(command: "bazinga-validator")
 
 **This is a SAFETY NET - even if you forget to invoke validator above, the shutdown protocol will catch it.**
 
-**See:** `bazinga/templates/shutdown_protocol.md` → Step 0: VALIDATOR GATE
+**See:** `templates/shutdown_protocol.md` → Step 0: VALIDATOR GATE
 
 ---
 
@@ -2409,7 +2409,7 @@ Skill(command: "bazinga-validator")
 
 Use the Read tool to read the complete shutdown protocol:
 ```
-Read(file_path: "bazinga/templates/shutdown_protocol.md")
+Read(file_path: "templates/shutdown_protocol.md")
 ```
 
 **Step 2: Execute all steps in the template sequentially**

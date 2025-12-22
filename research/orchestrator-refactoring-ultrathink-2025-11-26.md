@@ -52,13 +52,13 @@ The orchestrator.md file has grown to **26,666 tokens** (2,695 lines, 94KB), exc
 
 | Template | Lines | Status |
 |----------|-------|--------|
-| `bazinga/templates/shutdown_protocol.md` | 564 | In use (Read at runtime) |
-| `bazinga/templates/response_parsing.md` | 549 | Referenced but content duplicated |
-| `bazinga/templates/message_templates.md` | 685 | Referenced but examples inline |
-| `bazinga/templates/prompt_building.md` | 178 | Referenced but logic duplicated |
-| `bazinga/templates/pm_output_format.md` | 264 | Referenced |
-| `bazinga/templates/logging_pattern.md` | 93 | Referenced but expanded inline |
-| `bazinga/templates/completion_report.md` | 108 | Referenced |
+| `templates/shutdown_protocol.md` | 564 | In use (Read at runtime) |
+| `templates/response_parsing.md` | 549 | Referenced but content duplicated |
+| `templates/message_templates.md` | 685 | Referenced but examples inline |
+| `templates/prompt_building.md` | 178 | Referenced but logic duplicated |
+| `templates/pm_output_format.md` | 264 | Referenced |
+| `templates/logging_pattern.md` | 93 | Referenced but expanded inline |
+| `templates/completion_report.md` | 108 | Referenced |
 
 **Key insight:** Templates exist but orchestrator still contains verbose inline instructions that duplicate their content.
 
@@ -72,7 +72,7 @@ The orchestrator says "Use template X" but then includes 50-100 lines of inline 
 
 **Example - Response Parsing (lines 109-133):**
 ```markdown
-**⚠️ NOTE:** You loaded the complete parsing guide (`bazinga/templates/response_parsing.md`) during initialization.
+**⚠️ NOTE:** You loaded the complete parsing guide (`templates/response_parsing.md`) during initialization.
 
 **Quick Reference:**
 For each agent type, extract:
@@ -520,7 +520,7 @@ If aggressive refactoring is too risky, here's the minimum to get under 25K:
 - Previous analysis: `research/orchestrator-size-optimization-ultrathink-2025-11-24.md`
 - First analysis: `research/orchestrator_size_reduction_strategy.md`
 - Bloat analysis: `research/orchestrator-bloat-analysis.md`
-- Existing templates: `bazinga/templates/`
+- Existing templates: `templates/`
 
 ---
 

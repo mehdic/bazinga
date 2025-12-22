@@ -23,14 +23,14 @@ Templates have been **migrated from coordination/ to bazinga/**. Both folders ex
 - Client projects: Had no templates folder
 
 **After Migration:**
-- Templates in: `bazinga/templates/` (primary location)
-- Agents reference: `bazinga/templates/message_templates.md`
-- CLI: Copies templates to client `bazinga/templates/` during init/update
-- Client projects: Have complete `bazinga/templates/` folder
+- Templates in: `templates/` (primary location)
+- Agents reference: `templates/message_templates.md`
+- CLI: Copies templates to client `templates/` during init/update
+- Client projects: Have complete `templates/` folder
 
 ### Files Modified
 
-1. **bazinga/templates/** - Created with all template files
+1. **templates/** - Created with all template files
 2. **agents/orchestrator.md** - Updated references (2 locations)
 3. **.claude/commands/bazinga.orchestrate.md** - Rebuilt automatically
 4. **.gitignore** - Updated comments
@@ -189,7 +189,7 @@ Both folders exist intentionally and serve distinct purposes:
 ```bash
 mv coordination/templates bazinga/templates
 # Update all references in agents/*.md
-# Update .gitignore to whitelist bazinga/templates/
+# Update .gitignore to whitelist templates/
 ```
 
 **Downside:** Confusing to have tracked files inside ignored folder
