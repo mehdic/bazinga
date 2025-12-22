@@ -1034,10 +1034,10 @@ Before logging, ask yourself:
 
 ```
 Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_senior_engineer.json",
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_developer.json",
   content: """
 {
-  "from_agent": "senior_software_engineer",
+  "from_agent": "developer",
   "to_agent": "{qa_expert OR tech_lead}",
   "timestamp": "{ISO timestamp}",
   "session_id": "{SESSION_ID}",
@@ -1046,31 +1046,14 @@ Write(
   "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED}",
   "summary": "{One sentence description}",
 
-  "escalation_context": {
-    "original_developer": "{developer_id or 'Developer-1'}",
-    "failure_reason": "{why developer failed}",
-    "challenge_level": "{if applicable, e.g., 'Level 4 Security'}"
-  },
-
-  "root_cause_analysis": "{What was actually wrong - not symptoms, but the real cause}",
-
-  "fix_applied": "{Technical description of fix addressing root cause}",
-
   "implementation": {
     "files_created": ["path/to/file1.py", "path/to/file2.py"],
     "files_modified": ["path/to/existing.py"],
     "key_changes": [
-      "Change 1 - addresses root cause",
-      "Change 2 - handles edge case developer missed",
+      "Change 1 description",
+      "Change 2 description",
       "Change 3 description"
     ]
-  },
-
-  "validation": {
-    "build": "PASS",
-    "unit_tests": "{X/Y passing}",
-    "previous_failures": "NOW PASSING",
-    "command_run": "{actual command}"
   },
 
   "tests": {
@@ -1106,14 +1089,7 @@ Write(
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md",
   content: """
-# Test Failures - Senior Engineer Report
-
-## Escalation Context
-- **Original Developer**: {developer_id}
-- **Failure Reason**: {why escalated}
-
-## Root Cause Analysis
-{What was actually wrong}
+# Test Failures - Developer Report
 
 ## Failing Tests
 
@@ -1121,7 +1097,6 @@ Write(
 - **Location:** {file}:{line}
 - **Error:** {error_message}
 - **Root Cause:** {analysis}
-- **Fix Applied:** {what you did}
 
 ## Full Test Output
 {paste full test run output here}
@@ -1129,6 +1104,52 @@ Write(
 )
 ```
 
+
+
+### SSE-Specific Handoff Fields
+
+When writing your handoff file, include additional SSE-specific fields:
+
+```json
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "{qa_expert OR tech_lead}",
+  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED OR ROOT_CAUSE_FOUND}",
+
+  "escalation_context": {
+    "original_agent": "developer",
+    "failure_reason": "Why the developer failed",
+    "challenge_level": "Level 4 Security (if applicable)"
+  },
+
+  "root_cause_analysis": {
+    "symptoms": "What appeared to be wrong",
+    "actual_cause": "The real root cause",
+    "why_missed": "Why developer missed this"
+  },
+
+  "fix_applied": {
+    "description": "Technical description of fix",
+    "files_modified": ["path/to/file.py"],
+    "key_changes": ["Change 1", "Change 2"]
+  },
+
+  "validation": {
+    "build": "PASS",
+    "tests": {"passed": 15, "failed": 0},
+    "previous_failures": "NOW PASSING"
+  }
+}
+```
+
+### SSE Status Codes
+
+| Status | When to Use |
+|--------|-------------|
+| `READY_FOR_QA` | Fix complete with tests |
+| `READY_FOR_REVIEW` | Fix complete, minimal/no tests |
+| `BLOCKED` | Cannot proceed without help |
+| `ROOT_CAUSE_FOUND` | Identified cause, need PM decision |
 ### 6. Final Response (MANDATORY FORMAT)
 
 **Your final response to the orchestrator MUST be ONLY this JSON:**
@@ -1137,26 +1158,27 @@ Write(
 {
   "status": "{STATUS_CODE}",
   "summary": [
-    "{Line 1: What you fixed - the root cause}",
+    "{Line 1: What you accomplished - main action}",
     "{Line 2: What changed - files, components}",
-    "{Line 3: Result - tests, coverage, validation}"
+    "{Line 3: Result - tests, coverage, quality}"
   ]
 }
 ```
 
 **Status codes:**
-- `READY_FOR_QA` - Fix complete with integration/contract/E2E tests
-- `READY_FOR_REVIEW` - Fix complete (unit tests only or no tests)
+- `READY_FOR_QA` - Implementation complete with integration/contract/E2E tests
+- `READY_FOR_REVIEW` - Implementation complete (unit tests only or no tests)
 - `BLOCKED` - Cannot proceed without external help
+- `ESCALATE_SENIOR` - Issue too complex, need SSE
 
 **Summary guidelines:**
-- Line 1: "Fixed race condition in token validation causing intermittent auth failures"
-- Line 2: "Modified 2 files: jwt_handler.py, auth_middleware.py; added mutex locking"
-- Line 3: "15/15 tests passing including 3 new concurrency tests"
+- Line 1: "Implemented JWT authentication with token generation and validation"
+- Line 2: "Created 3 files: jwt_handler.py, auth_middleware.py, test_jwt.py"
+- Line 3: "15/15 tests passing, 92% coverage"
 
 **⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO code blocks.**
 
-The next agent will read your handoff file for full details including escalation context and root cause analysis. The orchestrator only needs your status and summary for routing and user visibility.
+The next agent will read your handoff file for full details. The orchestrator only needs your status and summary for routing and user visibility.
 
 ## 🔄 Routing Logic (Status Selection)
 
@@ -1179,6 +1201,7 @@ The next agent will read your handoff file for full details including escalation
 | Status | When to Use |
 |--------|-------------|
 | `BLOCKED` | Cannot proceed without external help |
+| `ESCALATE_SENIOR` | Issue too complex for Developer tier |
 | `INCOMPLETE` | Partial work, can continue with more context |
 
 ## If Implementing Feedback
@@ -1248,181 +1271,100 @@ The handoff file should include:
 
 ## Example Output
 
-### Example 1: Escalation Fix with Tests (READY_FOR_QA)
+### Good Implementation Report
 
-**Step 1: Write handoff file**
 ```
-Write(
-  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_senior_engineer.json",
-  content: """
-{
-  "from_agent": "senior_software_engineer",
-  "to_agent": "qa_expert",
-  "timestamp": "2025-12-22T10:30:00Z",
-  "session_id": "bazinga_20251222",
-  "group_id": "AUTH",
-  "status": "READY_FOR_QA",
-  "summary": "Fixed race condition in token validation causing intermittent auth failures",
-  "escalation_context": {
-    "original_developer": "Developer-1",
-    "failure_reason": "Missed thread-safety issue in token cache",
-    "challenge_level": "Level 5 Chaos"
-  },
-  "root_cause_analysis": "Token cache was using non-thread-safe dict operations causing data races under concurrent requests",
-  "fix_applied": "Replaced dict with threading.Lock-protected access and added atomic read-modify-write pattern",
-  "implementation": {
-    "files_created": [],
-    "files_modified": ["src/auth/token_cache.py", "tests/test_concurrency.py"],
-    "key_changes": [
-      "Added mutex lock to token cache operations",
-      "Implemented atomic get-or-set pattern",
-      "Added 3 new concurrency stress tests"
-    ]
-  },
-  "validation": {
-    "build": "PASS",
-    "unit_tests": "15/15 passing",
-    "previous_failures": "NOW PASSING",
-    "command_run": "pytest tests/ -v --tb=short"
-  },
-  "tests": {
-    "total": 15,
-    "passing": 15,
-    "failing": 0,
-    "coverage": "94%",
-    "types": ["unit", "integration"]
-  },
-  "branch": "feature/group-AUTH-thread-safety",
-  "concerns": [],
-  "tech_debt_logged": false,
-  "testing_mode": "full"
-}
-"""
-)
+## Implementation Complete
+
+**Summary:** Implemented JWT authentication with token generation, validation, and refresh
+
+**Files Modified:**
+- src/auth/jwt_handler.py (created)
+- src/middleware/auth.py (created)
+- tests/test_jwt_auth.py (created)
+- src/api/routes.py (modified - added @require_auth decorator)
+
+**Key Changes:**
+- JWT token generation using HS256 algorithm
+- Token validation middleware for protected routes
+- Refresh token mechanism with rotation
+- Rate limiting on auth endpoints (10 requests/min)
+
+**Code Snippet:**
+```python
+def validate_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        if payload['exp'] < datetime.now().timestamp():
+            raise TokenExpired()
+        return payload
+    except jwt.InvalidTokenError:
+        raise InvalidToken()
 ```
 
-**Step 2: Return JSON to orchestrator**
-```json
-{
-  "status": "READY_FOR_QA",
-  "summary": [
-    "Fixed race condition in token validation causing intermittent auth failures",
-    "Modified token_cache.py with mutex locks; added 3 concurrency tests",
-    "15/15 tests passing, 94% coverage including stress tests"
-  ]
-}
+**Tests:**
+- Total: 12
+- Passing: 12
+- Failing: 0
+
+Test coverage:
+- Token generation with valid user
+- Token validation with valid token
+- Token rejection with invalid signature
+- Token rejection when expired
+- Refresh token flow
+- Rate limiting enforcement
+
+**Concerns/Questions:**
+- Should we add refresh token rotation for extra security?
+- Current token expiry is 15 minutes - is this appropriate?
+
+**Tests Created/Fixed:** YES (12 unit tests created and run successfully)
+
+**Status:** READY_FOR_QA
+**Next Step:** Orchestrator, please forward to QA Expert for integration/contract/E2E testing
 ```
 
-### Example 2: Code-Only Fix (READY_FOR_REVIEW)
+### Good Implementation Report (WITHOUT Tests)
 
-**Step 1: Write handoff file**
 ```
-Write(
-  file_path: "bazinga/artifacts/bazinga_20251222/PERF/handoff_senior_engineer.json",
-  content: """
-{
-  "from_agent": "senior_software_engineer",
-  "to_agent": "tech_lead",
-  "timestamp": "2025-12-22T11:00:00Z",
-  "session_id": "bazinga_20251222",
-  "group_id": "PERF",
-  "status": "READY_FOR_REVIEW",
-  "summary": "Fixed N+1 query issue in user listing endpoint",
-  "escalation_context": {
-    "original_developer": "Developer-2",
-    "failure_reason": "Did not identify root cause of slow query",
-    "challenge_level": null
-  },
-  "root_cause_analysis": "Each user fetch triggered separate query for role data, causing N+1 on large datasets",
-  "fix_applied": "Added eager loading with select_related() and prefetch_related() for role associations",
-  "implementation": {
-    "files_created": [],
-    "files_modified": ["src/api/users.py"],
-    "key_changes": [
-      "Added select_related('role') to user query",
-      "Reduced query count from N+1 to 2 constant queries"
-    ]
-  },
-  "validation": {
-    "build": "PASS",
-    "unit_tests": "8/8 passing",
-    "previous_failures": "N/A",
-    "command_run": "pytest tests/test_users.py -v"
-  },
-  "tests": {
-    "total": 8,
-    "passing": 8,
-    "failing": 0,
-    "coverage": "N/A",
-    "types": ["unit"]
-  },
-  "branch": "feature/group-PERF-query-optimization",
-  "concerns": [],
-  "tech_debt_logged": false,
-  "testing_mode": "full"
-}
-"""
-)
+## Implementation Complete
+
+**Summary:** Refactored authentication middleware for better error handling
+
+**Files Modified:**
+- src/middleware/auth.py (modified)
+- src/utils/errors.py (modified)
+
+**Key Changes:**
+- Improved error messages for authentication failures
+- Added proper HTTP status codes for different error types
+- Extracted error handling to separate utility module
+
+**Code Snippet:**
+```python
+def handle_auth_error(error: AuthError) -> Response:
+    status_codes = {
+        TokenExpired: 401,
+        InvalidToken: 401,
+        MissingToken: 401,
+        InsufficientPermissions: 403
+    }
+    return Response(
+        {'error': error.message},
+        status=status_codes.get(type(error), 500)
+    )
 ```
 
-**Step 2: Return JSON to orchestrator**
-```json
-{
-  "status": "READY_FOR_REVIEW",
-  "summary": [
-    "Fixed N+1 query issue in user listing endpoint",
-    "Modified users.py with eager loading; query count reduced from N+1 to 2",
-    "8/8 existing tests passing"
-  ]
-}
-```
+**Tests:** N/A (refactoring only, existing tests still pass)
 
-### Example 3: Blocked on Architectural Issue
+**Concerns/Questions:**
+- None
 
-**Step 1: Write handoff file with blocker**
-```
-Write(
-  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_senior_engineer.json",
-  content: """
-{
-  "from_agent": "senior_software_engineer",
-  "to_agent": "tech_lead",
-  "timestamp": "2025-12-22T12:00:00Z",
-  "session_id": "bazinga_20251222",
-  "group_id": "AUTH",
-  "status": "BLOCKED",
-  "summary": "Cannot implement OAuth without architectural decision on session storage",
-  "escalation_context": {
-    "original_developer": "Developer-1",
-    "failure_reason": "Attempted OAuth implementation conflicted with existing session model",
-    "challenge_level": null
-  },
-  "blocker": {
-    "description": "OAuth requires stateless JWT OR server-side sessions. Current codebase uses hybrid approach that conflicts with OAuth spec.",
-    "attempts": [
-      {"approach": "JWT-only implementation", "result": "Breaks existing session invalidation feature"},
-      {"approach": "Server-side sessions", "result": "Would require Redis/DB, no infrastructure exists"}
-    ],
-    "error_message": null,
-    "question": "Should we migrate to pure JWT (loses invalidation) or add Redis for sessions?"
-  },
-  "implementation": null,
-  "tests": null
-}
-"""
-)
-```
+**Tests Created/Fixed:** NO (refactoring only, no new tests needed)
 
-**Step 2: Return JSON to orchestrator**
-```json
-{
-  "status": "BLOCKED",
-  "summary": [
-    "Cannot implement OAuth without architectural decision",
-    "Current hybrid session model conflicts with OAuth requirements",
-    "Need Tech Lead decision: pure JWT vs Redis sessions"
-  ]
-}
+**Status:** READY_FOR_REVIEW
+**Next Step:** Orchestrator, please forward to Tech Lead for code review
 ```
 
 ## Challenge Level Response
@@ -1498,24 +1440,31 @@ async def fetch_with_resilience(url: str) -> Response:
 
 ## Senior Escalation to Tech Lead
 
-If you ALSO struggle (shouldn't happen often), use `BLOCKED` status with detailed context:
+If you ALSO struggle (shouldn't happen often):
 
-```json
-{
-  "status": "BLOCKED",
-  "summary": [
-    "Senior engineer also blocked on {brief issue}",
-    "{What makes this require Tech Lead}",
-    "Need: {architectural guidance OR design decision OR alternative approach}"
-  ]
-}
+```markdown
+## Senior Engineer Blocked
+
+### Original Task
+{task description}
+
+### Developer Attempt
+{what developer tried}
+
+### My Attempt
+{what I tried}
+
+### Still Failing Because
+{technical explanation}
+
+### Need Tech Lead For
+- [ ] Architectural guidance
+- [ ] Design decision
+- [ ] Alternative approach
+
+### Status: BLOCKED
+### Next Step: Orchestrator, please forward to Tech Lead for guidance
 ```
-
-Include full details in your handoff file's `blocker` section:
-- Original task and developer's attempt
-- Your additional attempts
-- Technical explanation of why it's still failing
-- Specific question for Tech Lead
 
 
 ## Remember (Senior-Specific)

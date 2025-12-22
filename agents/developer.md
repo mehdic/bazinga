@@ -1120,146 +1120,100 @@ The handoff file should include:
 
 ## Example Output
 
-### Example 1: Implementation with Integration Tests (READY_FOR_QA)
+### Good Implementation Report
 
-**Step 1: Write handoff file**
 ```
-Write(
-  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_developer.json",
-  content: """
-{
-  "from_agent": "developer",
-  "to_agent": "qa_expert",
-  "timestamp": "2025-12-22T10:30:00Z",
-  "session_id": "bazinga_20251222",
-  "group_id": "AUTH",
-  "status": "READY_FOR_QA",
-  "summary": "Implemented JWT authentication with token generation and validation",
-  "implementation": {
-    "files_created": ["src/auth/jwt_handler.py", "src/middleware/auth.py", "tests/test_jwt_auth.py"],
-    "files_modified": ["src/api/routes.py"],
-    "key_changes": [
-      "JWT token generation using HS256 algorithm",
-      "Token validation middleware for protected routes",
-      "Refresh token mechanism with rotation"
-    ]
-  },
-  "tests": {
-    "total": 12,
-    "passing": 12,
-    "failing": 0,
-    "coverage": "92%",
-    "types": ["unit", "integration"]
-  },
-  "branch": "feature/group-AUTH-jwt-auth",
-  "concerns": ["Should we add refresh token rotation for extra security?"],
-  "tech_debt_logged": false,
-  "testing_mode": "full"
-}
-"""
-)
+## Implementation Complete
+
+**Summary:** Implemented JWT authentication with token generation, validation, and refresh
+
+**Files Modified:**
+- src/auth/jwt_handler.py (created)
+- src/middleware/auth.py (created)
+- tests/test_jwt_auth.py (created)
+- src/api/routes.py (modified - added @require_auth decorator)
+
+**Key Changes:**
+- JWT token generation using HS256 algorithm
+- Token validation middleware for protected routes
+- Refresh token mechanism with rotation
+- Rate limiting on auth endpoints (10 requests/min)
+
+**Code Snippet:**
+```python
+def validate_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        if payload['exp'] < datetime.now().timestamp():
+            raise TokenExpired()
+        return payload
+    except jwt.InvalidTokenError:
+        raise InvalidToken()
 ```
 
-**Step 2: Return JSON to orchestrator**
-```json
-{
-  "status": "READY_FOR_QA",
-  "summary": [
-    "Implemented JWT authentication with token generation and validation",
-    "Created 3 files: jwt_handler.py, auth_middleware.py, test_jwt.py",
-    "12/12 tests passing, 92% coverage"
-  ]
-}
+**Tests:**
+- Total: 12
+- Passing: 12
+- Failing: 0
+
+Test coverage:
+- Token generation with valid user
+- Token validation with valid token
+- Token rejection with invalid signature
+- Token rejection when expired
+- Refresh token flow
+- Rate limiting enforcement
+
+**Concerns/Questions:**
+- Should we add refresh token rotation for extra security?
+- Current token expiry is 15 minutes - is this appropriate?
+
+**Tests Created/Fixed:** YES (12 unit tests created and run successfully)
+
+**Status:** READY_FOR_QA
+**Next Step:** Orchestrator, please forward to QA Expert for integration/contract/E2E testing
 ```
 
-### Example 2: Refactoring without Tests (READY_FOR_REVIEW)
+### Good Implementation Report (WITHOUT Tests)
 
-**Step 1: Write handoff file**
 ```
-Write(
-  file_path: "bazinga/artifacts/bazinga_20251222/REFACTOR/handoff_developer.json",
-  content: """
-{
-  "from_agent": "developer",
-  "to_agent": "tech_lead",
-  "timestamp": "2025-12-22T11:00:00Z",
-  "session_id": "bazinga_20251222",
-  "group_id": "REFACTOR",
-  "status": "READY_FOR_REVIEW",
-  "summary": "Refactored authentication middleware for better error handling",
-  "implementation": {
-    "files_created": [],
-    "files_modified": ["src/middleware/auth.py", "src/utils/errors.py"],
-    "key_changes": [
-      "Improved error messages for authentication failures",
-      "Added proper HTTP status codes for different error types",
-      "Extracted error handling to separate utility module"
-    ]
-  },
-  "tests": {
-    "total": 0,
-    "passing": 0,
-    "failing": 0,
-    "coverage": "N/A",
-    "types": []
-  },
-  "branch": "feature/group-REFACTOR-error-handling",
-  "concerns": [],
-  "tech_debt_logged": false,
-  "testing_mode": "full"
-}
-"""
-)
+## Implementation Complete
+
+**Summary:** Refactored authentication middleware for better error handling
+
+**Files Modified:**
+- src/middleware/auth.py (modified)
+- src/utils/errors.py (modified)
+
+**Key Changes:**
+- Improved error messages for authentication failures
+- Added proper HTTP status codes for different error types
+- Extracted error handling to separate utility module
+
+**Code Snippet:**
+```python
+def handle_auth_error(error: AuthError) -> Response:
+    status_codes = {
+        TokenExpired: 401,
+        InvalidToken: 401,
+        MissingToken: 401,
+        InsufficientPermissions: 403
+    }
+    return Response(
+        {'error': error.message},
+        status=status_codes.get(type(error), 500)
+    )
 ```
 
-**Step 2: Return JSON to orchestrator**
-```json
-{
-  "status": "READY_FOR_REVIEW",
-  "summary": [
-    "Refactored authentication middleware for better error handling",
-    "Modified 2 files: auth.py, errors.py",
-    "Existing tests still passing"
-  ]
-}
-```
+**Tests:** N/A (refactoring only, existing tests still pass)
 
-### Example 3: Blocked
+**Concerns/Questions:**
+- None
 
-**Step 1: Write handoff file with blocker details**
-```
-Write(
-  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_developer.json",
-  content: """
-{
-  "from_agent": "developer",
-  "to_agent": "tech_lead",
-  "status": "BLOCKED",
-  "summary": "Cannot proceed - database connection issue",
-  "blocker": {
-    "description": "Cannot connect to test database",
-    "attempts": [
-      {"approach": "Checked connection string", "result": "String is correct"},
-      {"approach": "Verified DB is running", "result": "Container is up"}
-    ],
-    "error_message": "Connection refused: localhost:5432",
-    "question": "Is there a firewall or port mapping issue?"
-  }
-}
-"""
-)
-```
+**Tests Created/Fixed:** NO (refactoring only, no new tests needed)
 
-**Step 2: Return JSON to orchestrator**
-```json
-{
-  "status": "BLOCKED",
-  "summary": [
-    "Cannot proceed - database connection issue",
-    "Tried connection string and container verification",
-    "Need Tech Lead help with port/firewall configuration"
-  ]
-}
+**Status:** READY_FOR_REVIEW
+**Next Step:** Orchestrator, please forward to Tech Lead for code review
 ```
 
 ## Remember

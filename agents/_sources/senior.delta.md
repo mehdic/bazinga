@@ -355,51 +355,54 @@ cat bazinga/test_patterns.json
 ## END_MODIFY
 
 # =============================================================================
-# MODIFY: Report Format (Add Escalation Context)
+# MODIFY: Handoff Format (Add Escalation Context for SSE)
 # =============================================================================
-## MODIFY: 5. Report Results
+## MODIFY: 5. Write Handoff File (MANDATORY)
 
-### Senior-Specific Report Format
+### SSE-Specific Handoff Fields
 
-When reporting as Senior Software Engineer, include additional escalation context:
+When writing your handoff file, include additional SSE-specific fields:
 
-```markdown
-## Senior Engineer Implementation Complete
+```json
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "{qa_expert OR tech_lead}",
+  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED OR ROOT_CAUSE_FOUND}",
 
-### Escalation Context
-- **Original Developer**: {developer_id or "Developer-1"}
-- **Failure Reason**: {why developer failed}
-- **Challenge Level**: {if applicable, e.g., "Level 4 Security"}
+  "escalation_context": {
+    "original_agent": "developer",
+    "failure_reason": "Why the developer failed",
+    "challenge_level": "Level 4 Security (if applicable)"
+  },
 
-### Root Cause Analysis
-{What was actually wrong - not symptoms, but the real cause}
+  "root_cause_analysis": {
+    "symptoms": "What appeared to be wrong",
+    "actual_cause": "The real root cause",
+    "why_missed": "Why developer missed this"
+  },
 
-### Fix Applied
-{Technical description of fix addressing root cause}
+  "fix_applied": {
+    "description": "Technical description of fix",
+    "files_modified": ["path/to/file.py"],
+    "key_changes": ["Change 1", "Change 2"]
+  },
 
-### Files Modified
-- path/to/file.py (modified - {what changed})
-
-### Key Changes
-- [Main change 1 - addresses root cause]
-- [Main change 2 - handles edge case developer missed]
-
-### Code Snippet (Critical Fix):
-```{language}
-{5-10 lines showing the key fix}
+  "validation": {
+    "build": "PASS",
+    "tests": {"passed": 15, "failed": 0},
+    "previous_failures": "NOW PASSING"
+  }
+}
 ```
 
-### Validation
-- **Build:** PASS
-- **Unit Tests:** X/Y passing
-- **Previous Failures:** NOW PASSING
-- **Command Run:** {actual command}
+### SSE Status Codes
 
-### Tests Created/Fixed: YES / NO
-
-### Status: READY_FOR_QA / READY_FOR_REVIEW
-### Next Step: Orchestrator, please forward to [QA Expert / Tech Lead]
-```
+| Status | When to Use |
+|--------|-------------|
+| `READY_FOR_QA` | Fix complete with tests |
+| `READY_FOR_REVIEW` | Fix complete, minimal/no tests |
+| `BLOCKED` | Cannot proceed without help |
+| `ROOT_CAUSE_FOUND` | Identified cause, need PM decision |
 ## END_MODIFY
 
 # =============================================================================
