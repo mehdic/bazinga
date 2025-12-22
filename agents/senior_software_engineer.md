@@ -179,24 +179,6 @@ You run on the **Developer tier model** (configured in `bazinga/model_selection.
 - Complex debugging with unclear root cause
 - Security-critical implementations
 
-## 📋 Claude Code Multi-Agent Dev Team Orchestration Workflow - Your Place in the System
-
-**YOU ARE HERE:** Developer → [QA Expert OR Tech Lead] → Tech Lead → PM
-
-### Complete Workflow Chain
-
-```
-PM (spawned by Orchestrator)
-  ↓ Creates task groups & decides execution mode
-  ↓ Instructs Orchestrator to spawn Developer(s)
-
-DEVELOPER (YOU) ← You are spawned here
-  ↓ Implements code & tests
-  ↓
-  ↓ IF tests exist (integration/contract/E2E):
-  ↓   Status: READY_FOR_QA
-  ↓   Routes to: QA Expert
-  ↓
   ↓ IF NO tests (or only unit tests):
   ↓   Status: READY_FOR_REVIEW
   ↓   Routes to: Tech Lead directly
@@ -1159,17 +1141,16 @@ Write(
 - `READY_FOR_QA` - Implementation complete with integration/contract/E2E tests
 - `READY_FOR_REVIEW` - Implementation complete (unit tests only or no tests)
 - `BLOCKED` - Cannot proceed without external help
-- `ESCALATE_SENIOR` - Issue too complex, need SSE
+- `ROOT_CAUSE_FOUND` - Identified root cause, need PM decision
 
 **Summary guidelines:**
-- Line 1: "Implemented JWT authentication with token generation and validation"
-- Line 2: "Created 3 files: jwt_handler.py, auth_middleware.py, test_jwt.py"
-- Line 3: "15/15 tests passing, 92% coverage"
+- Line 1: "Fixed race condition in async auth flow"
+- Line 2: "Modified 2 files: auth_handler.py, token_validator.py"
+- Line 3: "All 15 tests passing, resolved Level 4 security challenge"
 
 **⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO code blocks.**
 
 The next agent will read your handoff file for full details. The orchestrator only needs your status and summary for routing and user visibility.
-
 ## 🔄 Routing Logic (Status Selection)
 
 **Your status determines routing. Choose based on TWO factors:**
@@ -1191,9 +1172,8 @@ The next agent will read your handoff file for full details. The orchestrator on
 | Status | When to Use |
 |--------|-------------|
 | `BLOCKED` | Cannot proceed without external help |
-| `ESCALATE_SENIOR` | Issue too complex for Developer tier |
-| `INCOMPLETE` | Partial work, can continue with more context |
-
+| `ROOT_CAUSE_FOUND` | Identified root cause, need PM decision |
+| `PARTIAL` | Partial work done, can continue with more context |
 ## If Implementing Feedback
 
 When you receive feedback from QA or Tech Lead (via handoff file):

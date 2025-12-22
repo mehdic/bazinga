@@ -191,9 +191,64 @@ Before implementing, verify:
 ## REMOVE: Escalation Awareness
 
 # =============================================================================
+# REMOVE: When to Report ESCALATE_SENIOR (SSE cannot escalate to itself)
+# =============================================================================
+## REMOVE: When You Should Report ESCALATE_SENIOR
+
+# =============================================================================
 # REMOVE: Original Ready? section (replaced by senior version in Remember)
 # =============================================================================
 ## REMOVE: Ready?
+
+# =============================================================================
+# REPLACE: Final Response (Remove ESCALATE_SENIOR for SSE)
+# =============================================================================
+## REPLACE: 6. Final Response (MANDATORY FORMAT)
+
+### 6. Final Response (MANDATORY FORMAT)
+
+**Your final response to the orchestrator MUST be ONLY this JSON:**
+
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: What you accomplished - main action}",
+    "{Line 2: What changed - files, components}",
+    "{Line 3: Result - tests, coverage, quality}"
+  ]
+}
+```
+
+**Status codes:**
+- `READY_FOR_QA` - Implementation complete with integration/contract/E2E tests
+- `READY_FOR_REVIEW` - Implementation complete (unit tests only or no tests)
+- `BLOCKED` - Cannot proceed without external help
+- `ROOT_CAUSE_FOUND` - Identified root cause, need PM decision
+
+**Summary guidelines:**
+- Line 1: "Fixed race condition in async auth flow"
+- Line 2: "Modified 2 files: auth_handler.py, token_validator.py"
+- Line 3: "All 15 tests passing, resolved Level 4 security challenge"
+
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO code blocks.**
+
+The next agent will read your handoff file for full details. The orchestrator only needs your status and summary for routing and user visibility.
+## END_REPLACE
+
+# =============================================================================
+# REPLACE: Special Status Codes (Remove ESCALATE_SENIOR for SSE)
+# =============================================================================
+## REPLACE: Special Status Codes
+
+### Special Status Codes
+
+| Status | When to Use |
+|--------|-------------|
+| `BLOCKED` | Cannot proceed without external help |
+| `ROOT_CAUSE_FOUND` | Identified root cause, need PM decision |
+| `PARTIAL` | Partial work done, can continue with more context |
+## END_REPLACE
 
 # =============================================================================
 # REPLACE: Context Packages (Add investigation type for Senior)

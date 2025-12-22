@@ -1062,7 +1062,7 @@ The next agent will read your handoff file for full details. The orchestrator on
 |--------|-------------|
 | `BLOCKED` | Cannot proceed without external help |
 | `ESCALATE_SENIOR` | Issue too complex for Developer tier |
-| `INCOMPLETE` | Partial work, can continue with more context |
+| `PARTIAL` | Partial work done, can continue with more context |
 
 ## If Implementing Feedback
 

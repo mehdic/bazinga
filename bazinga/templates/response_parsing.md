@@ -52,7 +52,7 @@
 | SSE | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `ROOT_CAUSE_FOUND` |
 | QA Expert | `PASS`, `FAIL`, `FAIL_ESCALATE`, `BLOCKED`, `FLAKY` |
 | Tech Lead | `APPROVED`, `CHANGES_REQUESTED`, `SPAWN_INVESTIGATOR`, `UNBLOCKING_GUIDANCE` |
-| PM | `PLANNING_COMPLETE`, `CONTINUE`, `IN_PROGRESS`, `BAZINGA`, `INVESTIGATION_NEEDED` |
+| PM | `PLANNING_COMPLETE`, `CONTINUE`, `BAZINGA`, `INVESTIGATION_NEEDED`, `NEEDS_CLARIFICATION`, `INVESTIGATION_ONLY` |
 | Investigator | `ROOT_CAUSE_FOUND`, `INVESTIGATION_INCOMPLETE`, `BLOCKED`, `EXHAUSTED` |
 | Requirements Engineer | `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL` |
 
@@ -92,7 +92,6 @@ If response is NOT valid JSON (for backwards compatibility), fall back to text p
 - `READY_FOR_REVIEW` - Implementation complete, only unit tests or no tests
 - `BLOCKED` - Cannot proceed without external help
 - `PARTIAL` - Some work done, more needed (same-tier continuation)
-- `INCOMPLETE` - Partial work, can continue (same-tier retry)
 - `ESCALATE_SENIOR` - Issue too complex, **immediate** Senior Software Engineer escalation
 
 **Information to extract:**
@@ -176,9 +175,10 @@ Files but no test count:
 
 **Expected status values:**
 - `PASS` - All tests passed
-- `FAIL` - Some tests failed
-- `PARTIAL` - Some tests couldn't run
-- `ESCALATE_SENIOR` - Challenge Level 3+ failure requiring Senior Engineer
+- `FAIL` - Some tests failed (Level 1-2 challenges)
+- `FAIL_ESCALATE` - Level 3+ challenge failures (security, chaos, behavioral) → SSE
+- `BLOCKED` - Cannot run tests (environment issue, missing deps)
+- `FLAKY` - Tests pass sometimes, fail sometimes → Tech Lead
 
 **Information to extract:**
 
@@ -261,8 +261,8 @@ Fail minimal:
 **Expected status values:**
 - `APPROVED` - Code quality approved
 - `CHANGES_REQUESTED` - Issues need fixing
-- `ESCALATE_TO_OPUS` - Complex issues, need better model
 - `SPAWN_INVESTIGATOR` - Complex problem needs investigation
+- `UNBLOCKING_GUIDANCE` - Provided guidance for blocked developer
 
 **Information to extract:**
 

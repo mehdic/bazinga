@@ -348,7 +348,7 @@ Output summary:
 **Step 1: Parse response and output capsule to user**
 
 Use the QA Expert Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
+- **Status** (PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
 - **Failed tests** (if any)
@@ -358,7 +358,8 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 - **PASS:** `✅ Group {id} tests passing | {tests}, {coverage}% | → Tech Lead`
 - **FAIL:** `⚠️ Group {id} QA failed | {failures} | Developer fixing`
 - **BLOCKED:** `⚠️ Group {id} blocked | {blocker} | Investigating`
-- **ESCALATE_SENIOR:** `🔺 Group {id} challenge failed | Level {N}: {reason} | → SSE`
+- **FAIL_ESCALATE:** `🔺 Group {id} challenge failed | Level {N}: {reason} | → SSE`
+- **FLAKY:** `⚠️ Group {id} flaky tests | {details} | → Tech Lead`
 
 **Step 3: Output capsule to user**
 
