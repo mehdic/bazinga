@@ -61,6 +61,7 @@ Thumbs.db
 
 # Temporary files (ultrathink reviews, test artifacts)
 tmp/
+artifacts/
 
 # Dashboard runtime files (created during testing in dev mode)
 dashboard.log
