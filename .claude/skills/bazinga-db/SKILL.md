@@ -203,7 +203,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state \
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet create-task-group \
   "<group_id>" "<session_id>" "<name>" [status] [assigned_to] \
   [--specializations '<json_array>'] [--item_count N] [--initial_tier "<tier>"] \
-  [--component_path "<path>"] [--complexity N]
+  [--component-path "<path>"] [--complexity N]
 ```
 
 **Example (correct):**
@@ -231,7 +231,7 @@ Parameters:
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
   "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"] \
   [--specializations '<json_array>'] [--item_count N] [--initial_tier "<tier>"] \
-  [--component_path "<path>"] [--qa_attempts N] [--tl_review_attempts N] \
+  [--component-path "<path>"] [--qa_attempts N] [--tl_review_attempts N] \
   [--security_sensitive 0|1] [--complexity N]
 ```
 

@@ -74,6 +74,25 @@ def scan_and_redact(text: str) -> Tuple[str, bool]:
             redacted = True
     return result, redacted
 
+
+def validate_complexity(complexity: Any) -> Optional[str]:
+    """Validate complexity value. Returns error message if invalid, None if valid.
+
+    Args:
+        complexity: Value to validate (should be int 1-10)
+
+    Returns:
+        Error message string if invalid, None if valid
+    """
+    if complexity is None:
+        return None  # None is valid (optional field)
+    if not isinstance(complexity, int):
+        return f"complexity must be an integer, got {type(complexity).__name__}"
+    if not 1 <= complexity <= 10:
+        return f"complexity must be between 1 and 10, got {complexity}"
+    return None
+
+
 # Cross-platform file locking
 # fcntl is Unix/Linux/macOS only; msvcrt is Windows only
 try:
@@ -1173,7 +1192,7 @@ class BazingaDB:
         """Create or update a task group (upsert - idempotent operation).
 
         Uses INSERT ... ON CONFLICT to handle duplicates gracefully. If the group
-        already exists, only name/status/assigned_to/specializations/item_count/component_path/complexity
+        already exists, only name/status/assigned_to/specializations/item_count/component_path/initial_tier/complexity
         are updated - preserving revision_count, last_review_status, and created_at.
 
         Args:
@@ -1228,12 +1247,9 @@ class BazingaDB:
                 }
 
             # Validate complexity if provided (must be 1-10)
-            if complexity is not None:
-                if not isinstance(complexity, int) or not 1 <= complexity <= 10:
-                    return {
-                        "success": False,
-                        "error": f"complexity must be an integer between 1 and 10, got '{complexity}'"
-                    }
+            complexity_error = validate_complexity(complexity)
+            if complexity_error:
+                return {"success": False, "error": complexity_error}
 
             conn = self._get_connection()
             # Serialize specializations to JSON (preserve [] vs None distinction)
@@ -1380,11 +1396,9 @@ class BazingaDB:
                 updates.append("initial_tier = ?")
                 params.append(initial_tier)
             if complexity is not None:
-                if not isinstance(complexity, int) or not 1 <= complexity <= 10:
-                    return {
-                        "success": False,
-                        "error": f"complexity must be an integer between 1 and 10, got '{complexity}'"
-                    }
+                complexity_error = validate_complexity(complexity)
+                if complexity_error:
+                    return {"success": False, "error": complexity_error}
                 updates.append("complexity = ?")
                 params.append(complexity)
 
@@ -3484,6 +3498,7 @@ def main():
             # v14: Added security_sensitive, qa_attempts, tl_review_attempts for escalation tracking
             # v15: Added component_path for version-specific prompt building
             # v16: Added initial_tier for PM-assigned starting tier
+            # v17: Added complexity for PM-assigned task complexity scoring (1-10)
             valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier", "complexity"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
