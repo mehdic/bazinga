@@ -1498,6 +1498,30 @@ def build_feedback_context(args):
     return feedback
 
 
+def build_handoff_context(args):
+    """Build handoff file path context for CRP (Compact Return Protocol).
+
+    Injects the path where the prior agent wrote their detailed handoff file,
+    allowing the next agent to read full context from the file instead of
+    receiving it inline (which would bloat orchestrator context).
+    """
+    if not args.prior_handoff_file:
+        return ""
+
+    return f"""
+## PRIOR AGENT HANDOFF (READ THIS FILE)
+
+**Handoff File:** `{args.prior_handoff_file}`
+
+⚠️ **MANDATORY:** Read this file FIRST to get full context from the prior agent.
+The file contains detailed information that was NOT included in the orchestrator message to save context space.
+
+```
+Read: {args.prior_handoff_file}
+```
+"""
+
+
 def build_pm_context(args):
     """Build special context for PM spawns."""
     if args.pm_state:
@@ -1681,7 +1705,12 @@ def build_prompt(args):
         if feedback_context:
             components.append(feedback_context)
 
-        # 7. Enforce global budget - trim lowest-priority sections if over hard limit
+        # 7. Build HANDOFF context (CRP - Compact Return Protocol)
+        handoff_context = build_handoff_context(args)
+        if handoff_context:
+            components.append(handoff_context)
+
+        # 8. Enforce global budget - trim lowest-priority sections if over hard limit
         components, trimmed_sections = enforce_global_budget(components, model, args.agent_type)
         if trimmed_sections:
             for trim_msg in trimmed_sections:
@@ -1690,7 +1719,7 @@ def build_prompt(args):
         # Compose final prompt
         full_prompt = "\n\n".join(components)
 
-        # 8. ENFORCE FILE READ LIMIT (25000 tokens outer guard)
+        # 9. ENFORCE FILE READ LIMIT (25000 tokens outer guard)
         # This is the final safety check before the prompt is delivered
         final_tokens = estimate_tokens(full_prompt)
         effective_budget = get_effective_budget(args.agent_type)
@@ -1923,6 +1952,8 @@ Debug mode:
                         help="Tech Lead feedback for developer changes")
     parser.add_argument("--investigation-findings", default="",
                         help="Investigation findings")
+    parser.add_argument("--prior-handoff-file", default="",
+                        help="Path to prior agent's handoff JSON file (CRP)")
 
     # PM-specific
     parser.add_argument("--pm-state", default="",

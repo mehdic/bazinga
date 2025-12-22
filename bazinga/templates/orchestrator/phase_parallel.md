@@ -407,9 +407,11 @@ Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
   "mode": "parallel",
   "testing_mode": "{testing_mode}",
   "model": "{MODEL_CONFIG[agent_type]}",
-  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_{prior_agent}.json"
 }
 ```
+**CRP:** `prior_handoff_file` - For QA: `handoff_developer.json`, For TL: `handoff_qa_expert.json`
 
 **Step 2: Invoke prompt-builder skill**
 

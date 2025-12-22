@@ -4,7 +4,78 @@
 
 **Principle:** Best-effort parsing. If specific information is missing, use general descriptions. Never fail because data isn't in expected format.
 
-## General Parsing Strategy
+---
+
+## 🆕 CRP JSON Format (Primary)
+
+**With Compact Return Protocol (CRP), all agents return a standardized JSON response:**
+
+```json
+{
+  "status": "READY_FOR_QA",
+  "summary": [
+    "Implemented calculator module with 4 operations",
+    "Created calculator.py, added 12 unit tests",
+    "All tests passing, ready for QA review"
+  ]
+}
+```
+
+**Parsing CRP responses:**
+
+1. **Parse JSON** - Response is pure JSON (no markdown wrapper)
+2. **Extract status** - Direct field access: `response["status"]`
+3. **Extract summary** - Array of 3 lines: `response["summary"]`
+4. **Construct capsule** - Combine status + summary lines
+
+**CRP Capsule Template:**
+
+```
+{emoji} Group {id} | {summary[0]} | {status} → {next_action}
+```
+
+**Example:**
+
+```
+🔨 Group A | Implemented calculator module with 4 operations | READY_FOR_QA → QA review
+```
+
+**Where to get full details:** Read the handoff file at `bazinga/artifacts/{session}/{group}/handoff_{agent}.json`
+
+**The handoff file contains all details** (files changed, test counts, coverage, etc.) while the JSON response keeps orchestrator context minimal.
+
+### CRP Status Codes by Agent
+
+| Agent | Status Codes |
+|-------|-------------|
+| Developer | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL`, `ESCALATE_SENIOR` |
+| SSE | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `ROOT_CAUSE_FOUND` |
+| QA Expert | `PASS`, `FAIL`, `FAIL_ESCALATE`, `BLOCKED`, `FLAKY` |
+| Tech Lead | `APPROVED`, `CHANGES_REQUESTED`, `SPAWN_INVESTIGATOR`, `UNBLOCKING_GUIDANCE` |
+| PM | `PLANNING_COMPLETE`, `CONTINUE`, `IN_PROGRESS`, `BAZINGA`, `INVESTIGATION_NEEDED` |
+| Investigator | `ROOT_CAUSE_FOUND`, `INVESTIGATION_INCOMPLETE`, `BLOCKED`, `EXHAUSTED` |
+| Requirements Engineer | `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL` |
+
+### CRP Emoji Map
+
+| Status Category | Emoji |
+|-----------------|-------|
+| Development complete | 🔨 |
+| Tests passing | ✅ |
+| Tests failing | ⚠️ |
+| Approved | ✅ |
+| Changes requested | ⚠️ |
+| Blocked/Escalation | 🔬 |
+| Planning | 📋 |
+| BAZINGA | 🎉 |
+
+---
+
+## Fallback: Legacy Text Format
+
+If response is NOT valid JSON (for backwards compatibility), fall back to text parsing below.
+
+## General Parsing Strategy (Legacy Text)
 
 1. **Read the full agent response** - Don't assume structure
 2. **Extract key fields** - Look for status, summary, file mentions, metrics

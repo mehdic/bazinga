@@ -318,9 +318,11 @@ Write to `bazinga/prompts/{session_id}/params_qa_expert_{group_id}.json`:
   "mode": "simple",
   "testing_mode": "{testing_mode}",
   "model": "{MODEL_CONFIG[\"qa_expert\"]}",
-  "output_file": "bazinga/prompts/{session_id}/qa_expert_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/qa_expert_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_developer.json"
 }
 ```
+**CRP:** `prior_handoff_file` points to Developer's handoff with implementation details.
 
 **Step 2: Invoke prompt-builder skill**
 
@@ -418,9 +420,11 @@ Write to `bazinga/prompts/{session_id}/params_tech_lead_{group_id}.json`:
   "mode": "simple",
   "testing_mode": "{testing_mode}",
   "model": "{MODEL_CONFIG[\"tech_lead\"]}",
-  "output_file": "bazinga/prompts/{session_id}/tech_lead_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/tech_lead_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_qa_expert.json"
 }
 ```
+**CRP:** `prior_handoff_file` points to QA's handoff with test results.
 
 **Step 2: Invoke prompt-builder skill**
 

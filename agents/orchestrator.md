@@ -87,6 +87,19 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 
 **Use `bazinga/templates/response_parsing.md`** (loaded at init) for extraction patterns and fallbacks.
 
+### CRP JSON Format (Primary)
+
+**All agents now return compact JSON responses:**
+```json
+{"status": "READY_FOR_QA", "summary": ["Line 1", "Line 2", "Line 3"]}
+```
+
+**Parsing:** Extract `status` for routing, `summary[0]` for capsule. Full details are in handoff file.
+
+**Handoff file location:** `bazinga/artifacts/{session_id}/{group_id}/handoff_{agent}.json`
+
+**When routing to next agent:** Set `prior_handoff_file` in params to previous agent's handoff file.
+
 **Micro-summary (mission-critical statuses):**
 | Agent | Key Statuses to Extract |
 |-------|------------------------|
@@ -342,9 +355,11 @@ Resume Context: {context if resume scenario}
      "branch": "{branch}",
      "mode": "{simple|parallel}",
      "testing_mode": "{full|minimal|disabled}",
-     "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+     "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md",
+     "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_{prior_agent}.json"
    }
    ```
+   **Note:** `prior_handoff_file` is only set when routing from one agent to another (e.g., Developer → QA).
 2. **Invoke prompt-builder skill**:
    ```
    Skill(command: "prompt-builder")
@@ -2079,9 +2094,11 @@ ELSE IF PM chose "parallel":
   "mode": "{simple|parallel}",
   "testing_mode": "{full|minimal|disabled}",
   "model": "{haiku|sonnet|opus}",
-  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_{prior_agent}.json"
 }
 ```
+**CRP: `prior_handoff_file`** - Path to the prior agent's handoff file. Set when routing Dev→QA, QA→TL, etc. Omit for initial spawns (PM, first Developer).
 
 **Step 2: Invoke prompt-builder skill**
 ```

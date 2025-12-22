@@ -71,6 +71,13 @@ Example: `bazinga/prompts/bazinga_20251217_120000/params_developer_CALC.json`
 }
 ```
 
+**Additional fields for CRP (Compact Return Protocol):**
+```json
+{
+  "prior_handoff_file": "bazinga/artifacts/bazinga_20251217_120000/CALC/handoff_developer.json"
+}
+```
+
 **Additional fields for PM spawns:**
 ```json
 {
@@ -174,6 +181,7 @@ Do NOT proceed without reading the file first."
 | `tl_feedback` | No | `Needs refactoring` | For developer retry after TL review |
 | `pm_state` | No | `{...json...}` | PM state for resume spawns |
 | `resume_context` | No | `Resuming after...` | Context for PM resume |
+| `prior_handoff_file` | No | `bazinga/artifacts/.../handoff_developer.json` | CRP: Prior agent's handoff file |
 
 ## What the Script Does Internally
 
