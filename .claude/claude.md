@@ -917,7 +917,33 @@ rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
 /bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
 ```
 
-**🔴 IMPORTANT:** Always run the ACTUAL orchestrator prompt. Never manually simulate orchestration steps - the orchestrator itself must handle specialization-loader invocation, agent spawning, and workflow routing. Manual simulation would become invalid when orchestrator logic changes.
+### 🔴 CRITICAL: Follow Orchestrator Code EXACTLY
+
+**You MUST follow EVERY step in the orchestrator prompt (`agents/orchestrator.md`) without skipping any:**
+
+1. **Step 0.5-PRE: Check for existing project_context.json**
+   ```bash
+   test -f bazinga/project_context.json && echo "exists" || echo "missing"
+   ```
+
+2. **Step 0.5: Spawn Tech Stack Scout** (if project_context.json missing)
+   - Build Scout prompt from `agents/tech_stack_scout.md`
+   - Spawn Scout with Task tool (sonnet model)
+   - Verify `bazinga/project_context.json` was created
+   - If Scout fails to write file, create fallback context per orchestrator instructions
+
+3. **Phase 1: Spawn PM** - Only AFTER project_context.json exists
+
+4. **All subsequent phases** - Follow orchestrator routing exactly
+
+**🔴 DO NOT:**
+- ❌ Skip Step 0.5-PRE or Step 0.5 (Tech Stack Scout)
+- ❌ Manually simulate agent responses
+- ❌ Take shortcuts to "speed up" the test
+- ❌ Assume project_context.json exists without checking
+- ❌ Go directly to PM spawn without tech stack detection
+
+**The integration test validates the COMPLETE workflow including tech stack detection.**
 
 ### If SlashCommand Tool Fails
 
@@ -925,6 +951,7 @@ If `/bazinga.orchestrate` cannot be invoked via the SlashCommand tool (e.g., "In
 
 1. **Read the orchestrator prompt:** `Read: .claude/commands/bazinga.orchestrate.md`
 2. **Execute its instructions** as your own - this IS the orchestrator
+3. **Follow EVERY step** including Step 0.5-PRE and Step 0.5
 
 The slash command essentially expands to the prompt in `.claude/commands/bazinga.orchestrate.md`. Reading and executing that file is functionally identical to what the slash command does. This ensures the test always runs the actual orchestrator logic, not manual steps.
 
@@ -1058,7 +1085,20 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapsh
 - Complete JSON with session, task_groups, success_criteria, reasoning_logs
 - All sections populated
 
-#### Step 8: Files Created Check
+#### Step 8: Project Context Check (CRITICAL)
+```bash
+# Verify Tech Stack Scout created project_context.json
+test -f bazinga/project_context.json && echo "✅ exists" || echo "❌ MISSING"
+cat bazinga/project_context.json | head -20
+```
+
+**Expected output:**
+- File exists at `bazinga/project_context.json`
+- Contains valid JSON with `schema_version`, `primary_language`, `components`, etc.
+
+**If missing:** Tech Stack Scout (Step 0.5) was skipped - this is a critical workflow failure!
+
+#### Step 9: Files Created Check
 ```bash
 ls -la tmp/simple-calculator-app/
 ```
@@ -1068,7 +1108,7 @@ ls -la tmp/simple-calculator-app/
 - `test_calculator.py` - Unit tests
 - `README.md` - Documentation
 
-#### Step 9: Tests Pass Check
+#### Step 10: Tests Pass Check
 ```bash
 # Use subshell to preserve CWD
 (cd tmp/simple-calculator-app && python -m pytest test_calculator.py -v --tb=short)
@@ -1078,7 +1118,7 @@ ls -la tmp/simple-calculator-app/
 - 70+ tests passed
 - No failures
 
-#### Step 10: Specialization Loader Invocation Check (CRITICAL)
+#### Step 11: Specialization Loader Invocation Check (CRITICAL)
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "<SESSION_ID>" "specialization-loader"
 ```
@@ -1101,6 +1141,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 | Success Criteria | `get-success-criteria` | 7 criteria |
 | Reasoning Entries | `get-reasoning` | 8 entries (2 per agent) |
 | Mandatory Phases | `check-mandatory-phases` | complete=true for all |
+| **🔴 Project Context** | `test -f bazinga/project_context.json` | **File exists with valid JSON** |
 | **Specialization** | `get-skill-output ... specialization-loader` | **3+ entries with composed_identity** |
 | Files | `ls tmp/simple-calculator-app/` | 3 files |
 | Tests | `pytest test_calculator.py` | All pass |
@@ -1111,7 +1152,12 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 
 2. **Incomplete Phases** - If `check-mandatory-phases` fails, agent skipped `understanding` or `completion` phase documentation.
 
-3. **🔴 Specialization Not Built** - If `get-skill-output ... specialization-loader` returns empty:
+3. **🔴 Missing project_context.json** - If file doesn't exist:
+   - Step 0.5-PRE was skipped (didn't check for existing context)
+   - Step 0.5 was skipped (didn't spawn Tech Stack Scout)
+   - **FIX:** Follow orchestrator workflow exactly - check/create project_context.json BEFORE PM spawn
+
+4. **🔴 Specialization Not Built** - If `get-skill-output ... specialization-loader` returns empty:
    - Orchestrator skipped the skill invocation
    - Agents received raw template text instead of composed blocks
    - **FIX:** Follow Manual Orchestration Workflow above - invoke skill before EACH agent spawn
