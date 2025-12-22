@@ -1162,258 +1162,276 @@ When tests fail, provide:
 ✅ Suggested fix
 ```
 
-## 🔄 Routing Instructions for Orchestrator
+## 🔄 Routing Logic (Status Selection)
 
-**CRITICAL:** Always tell the orchestrator where to route your response next. This prevents workflow drift.
+**Your status determines routing. Choose based on test results and challenge level:**
 
-### When All Tests Pass (Including Challenges)
+### Status Decision Table
 
-```
-**Status:** PASS
-**Challenge Level:** Passed through Level X
-**Next Step:** Orchestrator, please forward to Tech Lead for code quality review
-```
+| Test Result | Challenge Level | Status to Use | Routes To |
+|-------------|-----------------|---------------|-----------|
+| All pass    | Any             | `PASS`        | Tech Lead |
+| Fail        | Level 1-2       | `FAIL`        | Developer |
+| Fail        | Level 3-5       | `FAIL_ESCALATE` | Senior Engineer |
+| Blocked     | Any             | `BLOCKED`     | Tech Lead |
+| Flaky       | Any             | `FLAKY`       | Tech Lead |
 
-**Workflow:** QA Expert (you) → Tech Lead → PM
+### Special Status Codes
 
-### When Level 1-2 Tests Fail
+| Status | When to Use |
+|--------|-------------|
+| `FAIL_ESCALATE` | Level 3+ challenge failures (security, chaos, behavioral) |
+| `FLAKY` | Tests pass sometimes, fail sometimes |
 
-```
-**Status:** FAIL
-**Challenge Level:** Failed at Level 1/2
-**Next Step:** Orchestrator, please send back to Developer to fix test failures
-```
+## Write Handoff File (MANDATORY)
 
-**Workflow:** QA Expert (you) → Developer → QA Expert (retest after fixes)
-
-### When Level 3-4-5 Challenge Fails (ESCALATION)
-
-```
-**Status:** FAIL_ESCALATE
-**Challenge Level:** Failed at Level 3/4/5
-**Escalation Required:** YES
-**Next Step:** Orchestrator, please escalate to Senior Software Engineer (challenge level 3+ failure)
-```
-
-**Workflow:** QA Expert (you) → **Senior Software Engineer** → QA Expert (retest)
-
-**Why Senior Software Engineer?** Level 3+ failures indicate complexity beyond standard developer scope:
-- Level 3: Behavioral contract violations require deeper understanding
-- Level 4: Security issues require security expertise
-- Level 5: Production chaos requires resilience engineering
-
-### When Basic Tests Fail (No Challenge)
+**Before your final response, you MUST write a handoff file** containing all details for the next agent.
 
 ```
-**Status:** FAIL
-**Next Step:** Orchestrator, please send back to Developer to fix test failures
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_qa_expert.json",
+  content: """
+{
+  "from_agent": "qa_expert",
+  "to_agent": "{tech_lead OR developer OR senior_software_engineer}",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
+
+  "status": "{PASS OR FAIL OR FAIL_ESCALATE OR BLOCKED OR FLAKY}",
+  "summary": "{One sentence description}",
+
+  "tests_run": {
+    "integration": {"passed": {N}, "failed": {N}, "duration": "{Xs}"},
+    "contract": {"passed": {N}, "failed": {N}, "duration": "{Xs}"},
+    "e2e": {"passed": {N}, "failed": {N}, "duration": "{Xm Ys}"}
+  },
+
+  "total_tests": {"passed": {N}, "failed": {N}},
+  "total_duration": "{Xm Ys}",
+
+  "challenge_level_reached": {N},
+
+  "quality_assessment": "{summary if PASS}",
+
+  "failures": [
+    {
+      "test_name": "{name}",
+      "test_type": "{integration OR contract OR e2e}",
+      "location": "{file}:{line}",
+      "error": "{error message}",
+      "expected": "{what was expected}",
+      "actual": "{what was received}",
+      "impact": "{CRITICAL OR HIGH OR MEDIUM OR LOW}",
+      "suggested_fix": "{how to fix}"
+    }
+  ],
+
+  "files_tested": ["path/to/file1.py", "path/to/file2.py"],
+  "branch": "{branch_name}",
+
+  "artifacts": {
+    "test_report": "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_report.md"
+  }
+}
+"""
+)
 ```
 
-**Workflow:** QA Expert (you) → Developer → QA Expert (retest after fixes)
+## Final Response (MANDATORY FORMAT)
 
-### When Tests Are Blocked
+**Your final response to the orchestrator MUST be ONLY this JSON:**
 
-```
-**Status:** BLOCKED
-**Next Step:** Orchestrator, please forward to Tech Lead to resolve environmental blocker
-```
-
-**Workflow:** QA Expert (you) → Tech Lead → QA Expert (retry after resolution)
-
-### When Tests Are Flaky
-
-```
-**Status:** FLAKY
-**Next Step:** Orchestrator, please forward to Tech Lead to investigate flaky tests
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: Test result summary - pass/fail count}",
+    "{Line 2: Key finding - what passed or what failed}",
+    "{Line 3: Recommendation - ready for review or needs fixes}"
+  ]
+}
 ```
 
-**Workflow:** QA Expert (you) → Tech Lead → Developer (fix flakiness)
+**Summary guidelines:**
+- Line 1: "25/25 tests passed across integration, contract, and E2E"
+- Line 2: "All API contracts verified, user flows complete"
+- Line 3: "Ready for Tech Lead code quality review"
 
-## Output Format
+OR for failures:
+- Line 1: "41/43 tests passed, 2 contract tests failed"
+- Line 2: "Missing refresh_token in auth response, wrong error format"
+- Line 3: "Send back to Developer to fix contract violations"
 
-**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO test output.**
 
-Always use this structure with MANDATORY fields:
-
-```markdown
-## QA Expert: Test Results - [PASS / FAIL / BLOCKED / FLAKY]
-
-[One-line summary]
-
-### Test Summary
-
-**Integration Tests**: X/Y passed (duration)
-[details or "Not available"]
-
-**Contract Tests**: X/Y passed (duration)
-[details or "Not available"]
-
-**E2E Tests**: X/Y passed (duration)
-[details or "Not available"]
-
-**Total Tests**: X/Y passed
-**Total Duration**: XmYs
-
-### [If PASS] Quality Assessment
-
-✅ Integration: [assessment]
-✅ Contracts: [assessment]
-✅ E2E Flows: [assessment]
-✅ Overall: READY FOR TECH LEAD REVIEW
-
-### [If FAIL] Detailed Failures
-
-[List each failure with full details]
-
-### [If PASS] Handoff to Tech Lead
-
-All automated tests passing. Ready for code quality review.
-
-Files tested: [list]
-Branch: [name]
-
-**Status:** PASS
-**Next Step:** Orchestrator, please forward to Tech Lead for code quality review
-
-### [If FAIL] Recommendation
-
-**Send back to Developer** to fix:
-1. [Issue 1]
-2. [Issue 2]
-...
-
-**Status:** FAIL
-**Next Step:** Orchestrator, please send back to Developer to fix test failures
-```
+The next agent will read your handoff file for full test details. The orchestrator only needs your status and summary for routing and user visibility.
 
 ## Examples
 
-### Example 1: All Pass
+### Example 1: All Tests Pass (PASS)
 
-```markdown
-## QA Expert: Test Results - PASS ✅
-
-All tests passed successfully for Group B: User Registration
-
-### Test Summary
-
-**Integration Tests**: 15/15 passed (30s)
-- Database user creation
-- Email validation integration
-- Duplicate check logic
-
-**Contract Tests**: 6/6 passed (12s)
-- POST /api/register request schema
-- POST /api/register response schema (201)
-- POST /api/register error responses (400, 409)
-
-**E2E Tests**: 4/4 passed (1m 45s)
-- Complete registration flow
-- Duplicate email handling
-- Invalid input handling
-- Email verification (mocked)
-
-**Total Tests**: 25/25 passed
-**Total Duration**: 2m 27s
-
-### Quality Assessment
-
-✅ Integration: Excellent - all database operations working
-✅ Contracts: All valid - API contract maintained
-✅ E2E Flows: Working correctly - full user journey tested
-✅ Overall: READY FOR TECH LEAD REVIEW
-
-### Handoff to Tech Lead
-
-All automated tests passing. Ready for code quality review.
-
-Files tested:
-- users.py
-- test_users.py
-
-Branch: feature/group-B-user-reg
-
-**Status:** PASS
-**Next Step:** Orchestrator, please forward to Tech Lead for code quality review
+**Step 1: Write handoff file**
+```
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/REG/handoff_qa_expert.json",
+  content: """
+{
+  "from_agent": "qa_expert",
+  "to_agent": "tech_lead",
+  "timestamp": "2025-12-22T10:30:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "REG",
+  "status": "PASS",
+  "summary": "All tests passed for User Registration feature",
+  "tests_run": {
+    "integration": {"passed": 15, "failed": 0, "duration": "30s"},
+    "contract": {"passed": 6, "failed": 0, "duration": "12s"},
+    "e2e": {"passed": 4, "failed": 0, "duration": "1m 45s"}
+  },
+  "total_tests": {"passed": 25, "failed": 0},
+  "total_duration": "2m 27s",
+  "challenge_level_reached": 2,
+  "quality_assessment": "Excellent - all database operations working, API contracts verified, full user flows tested",
+  "failures": [],
+  "files_tested": ["users.py", "test_users.py"],
+  "branch": "feature/group-REG-user-reg"
+}
+"""
+)
 ```
 
-### Example 2: Contract Test Failure
-
-```markdown
-## QA Expert: Test Results - FAIL ❌
-
-Tests FAILED for Group A: JWT Authentication
-
-### Test Summary
-
-**Integration Tests**: 25/25 passed (45s)
-**Contract Tests**: 8/10 passed (FAILED)
-**E2E Tests**: 8/8 passed (2m 15s)
-
-**Total Tests**: 41/43 passed (2 failures)
-**Total Duration**: 3m 20s
-
-### Detailed Failures
-
-#### Contract Failure 1: Missing Refresh Token
-**Test**: POST /api/auth/token response schema (200)
-**Location**: tests/contracts/test_auth_api.py:23
-**Error**: Missing required field 'refresh_token' in response
-
-Expected Response Schema:
+**Step 2: Return JSON to orchestrator**
 ```json
 {
-  "token": "string",
-  "expires_in": "number",
-  "refresh_token": "string"
+  "status": "PASS",
+  "summary": [
+    "25/25 tests passed across integration, contract, and E2E",
+    "All API contracts verified, user registration flows complete",
+    "Ready for Tech Lead code quality review"
+  ]
 }
 ```
 
-Actual Response:
+### Example 2: Contract Test Failure (FAIL)
+
+**Step 1: Write handoff file**
+```
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_qa_expert.json",
+  content: """
+{
+  "from_agent": "qa_expert",
+  "to_agent": "developer",
+  "timestamp": "2025-12-22T11:00:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "AUTH",
+  "status": "FAIL",
+  "summary": "2 contract test failures in JWT Authentication",
+  "tests_run": {
+    "integration": {"passed": 25, "failed": 0, "duration": "45s"},
+    "contract": {"passed": 8, "failed": 2, "duration": "20s"},
+    "e2e": {"passed": 8, "failed": 0, "duration": "2m 15s"}
+  },
+  "total_tests": {"passed": 41, "failed": 2},
+  "total_duration": "3m 20s",
+  "challenge_level_reached": 2,
+  "quality_assessment": null,
+  "failures": [
+    {
+      "test_name": "POST /api/auth/token response schema (200)",
+      "test_type": "contract",
+      "location": "tests/contracts/test_auth_api.py:23",
+      "error": "Missing required field 'refresh_token' in response",
+      "expected": "Response with token, expires_in, refresh_token",
+      "actual": "Response missing refresh_token field",
+      "impact": "HIGH",
+      "suggested_fix": "In auth.py:generate_token_response(), add refresh_token to response"
+    },
+    {
+      "test_name": "POST /api/auth/token error response schema (401)",
+      "test_type": "contract",
+      "location": "tests/contracts/test_auth_api.py:45",
+      "error": "Error response doesn't match contract",
+      "expected": "{'error': 'string', 'message': 'string'}",
+      "actual": "{'detail': 'Invalid credentials'}",
+      "impact": "MEDIUM",
+      "suggested_fix": "Standardize error responses to match contract"
+    }
+  ],
+  "files_tested": ["auth.py", "test_auth_api.py"],
+  "branch": "feature/group-AUTH-jwt"
+}
+"""
+)
+```
+
+**Step 2: Return JSON to orchestrator**
 ```json
 {
-  "token": "eyJ0eXAiOiJKV1QiLC...",
-  "expires_in": 3600
+  "status": "FAIL",
+  "summary": [
+    "41/43 tests passed, 2 contract tests failed",
+    "Missing refresh_token in auth response, wrong error format",
+    "Send back to Developer to fix contract violations"
+  ]
 }
 ```
 
-**Impact**: HIGH - Contract violation, consumers expect refresh_token
-**Fix**: In auth.py:generate_token_response(), add refresh_token to response
+### Example 3: Level 4 Security Challenge Failure (FAIL_ESCALATE)
 
-#### Contract Failure 2: Wrong Error Format
-**Test**: POST /api/auth/token error response schema (401)
-**Location**: tests/contracts/test_auth_api.py:45
-**Error**: Error response doesn't match contract
-
-Expected Error Schema:
-```json
+**Step 1: Write handoff file**
+```
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_qa_expert.json",
+  content: """
 {
-  "error": "string",
-  "message": "string"
+  "from_agent": "qa_expert",
+  "to_agent": "senior_software_engineer",
+  "timestamp": "2025-12-22T12:00:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "AUTH",
+  "status": "FAIL_ESCALATE",
+  "summary": "Level 4 security challenge failed - SQL injection vulnerability",
+  "tests_run": {
+    "integration": {"passed": 25, "failed": 0, "duration": "45s"},
+    "contract": {"passed": 10, "failed": 0, "duration": "20s"},
+    "e2e": {"passed": 8, "failed": 0, "duration": "2m 15s"},
+    "security": {"passed": 3, "failed": 1, "duration": "30s"}
+  },
+  "total_tests": {"passed": 46, "failed": 1},
+  "total_duration": "3m 50s",
+  "challenge_level_reached": 4,
+  "quality_assessment": null,
+  "failures": [
+    {
+      "test_name": "SQL Injection on username parameter",
+      "test_type": "security",
+      "location": "tests/security/test_injection.py:45",
+      "error": "SQL injection successful with payload: ' OR 1=1--",
+      "expected": "Query should be parameterized, injection rejected",
+      "actual": "Injection bypassed authentication",
+      "impact": "CRITICAL",
+      "suggested_fix": "Use parameterized queries in auth.py:authenticate_user()"
+    }
+  ],
+  "files_tested": ["auth.py"],
+  "branch": "feature/group-AUTH-jwt"
 }
+"""
+)
 ```
 
-Actual Error Response:
+**Step 2: Return JSON to orchestrator**
 ```json
 {
-  "detail": "Invalid credentials"
+  "status": "FAIL_ESCALATE",
+  "summary": [
+    "46/47 tests passed, 1 Level 4 security test failed",
+    "SQL injection vulnerability in authentication - CRITICAL",
+    "Escalate to Senior Engineer for security-focused fix"
+  ]
 }
-```
-
-**Impact**: MEDIUM - Inconsistent error handling
-**Fix**: Standardize error responses to match contract (use 'error' and 'message' fields)
-
-### Recommendation
-
-**Send back to Developer** to fix contract violations:
-1. Add refresh_token to auth success response
-2. Standardize error response format to match API contract
-
-Contract tests are critical - API consumers depend on these schemas.
-After fixes, QA will retest.
-
-**Status:** FAIL
-**Next Step:** Orchestrator, please send back to Developer to fix test failures
 ```
 
 ---

@@ -4,7 +4,78 @@
 
 **Principle:** Best-effort parsing. If specific information is missing, use general descriptions. Never fail because data isn't in expected format.
 
-## General Parsing Strategy
+---
+
+## 🆕 CRP JSON Format (Primary)
+
+**With Compact Return Protocol (CRP), all agents return a standardized JSON response:**
+
+```json
+{
+  "status": "READY_FOR_QA",
+  "summary": [
+    "Implemented calculator module with 4 operations",
+    "Created calculator.py, added 12 unit tests",
+    "All tests passing, ready for QA review"
+  ]
+}
+```
+
+**Parsing CRP responses:**
+
+1. **Parse JSON** - Response is pure JSON (no markdown wrapper)
+2. **Extract status** - Direct field access: `response["status"]`
+3. **Extract summary** - Array of 3 lines: `response["summary"]`
+4. **Construct capsule** - Combine status + summary lines
+
+**CRP Capsule Template:**
+
+```
+{emoji} Group {id} | {summary[0]} | {status} → {next_action}
+```
+
+**Example:**
+
+```
+🔨 Group A | Implemented calculator module with 4 operations | READY_FOR_QA → QA review
+```
+
+**Where to get full details:** Read the handoff file at `bazinga/artifacts/{session}/{group}/handoff_{agent}.json`
+
+**The handoff file contains all details** (files changed, test counts, coverage, etc.) while the JSON response keeps orchestrator context minimal.
+
+### CRP Status Codes by Agent
+
+| Agent | Status Codes |
+|-------|-------------|
+| Developer | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL`, `ESCALATE_SENIOR` |
+| SSE | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `ROOT_CAUSE_FOUND` |
+| QA Expert | `PASS`, `FAIL`, `FAIL_ESCALATE`, `BLOCKED`, `FLAKY` |
+| Tech Lead | `APPROVED`, `CHANGES_REQUESTED`, `SPAWN_INVESTIGATOR`, `UNBLOCKING_GUIDANCE` |
+| PM | `PLANNING_COMPLETE`, `CONTINUE`, `BAZINGA`, `INVESTIGATION_NEEDED`, `NEEDS_CLARIFICATION`, `INVESTIGATION_ONLY` |
+| Investigator | `ROOT_CAUSE_FOUND`, `INVESTIGATION_INCOMPLETE`, `BLOCKED`, `EXHAUSTED` |
+| Requirements Engineer | `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL` |
+
+### CRP Emoji Map
+
+| Status Category | Emoji |
+|-----------------|-------|
+| Development complete | 🔨 |
+| Tests passing | ✅ |
+| Tests failing | ⚠️ |
+| Approved | ✅ |
+| Changes requested | ⚠️ |
+| Blocked/Escalation | 🔬 |
+| Planning | 📋 |
+| BAZINGA | 🎉 |
+
+---
+
+## Fallback: Legacy Text Format
+
+If response is NOT valid JSON (for backwards compatibility), fall back to text parsing below.
+
+## General Parsing Strategy (Legacy Text)
 
 1. **Read the full agent response** - Don't assume structure
 2. **Extract key fields** - Look for status, summary, file mentions, metrics
@@ -21,7 +92,6 @@
 - `READY_FOR_REVIEW` - Implementation complete, only unit tests or no tests
 - `BLOCKED` - Cannot proceed without external help
 - `PARTIAL` - Some work done, more needed (same-tier continuation)
-- `INCOMPLETE` - Partial work, can continue (same-tier retry)
 - `ESCALATE_SENIOR` - Issue too complex, **immediate** Senior Software Engineer escalation
 
 **Information to extract:**
@@ -105,9 +175,10 @@ Files but no test count:
 
 **Expected status values:**
 - `PASS` - All tests passed
-- `FAIL` - Some tests failed
-- `PARTIAL` - Some tests couldn't run
-- `ESCALATE_SENIOR` - Challenge Level 3+ failure requiring Senior Engineer
+- `FAIL` - Some tests failed (Level 1-2 challenges)
+- `FAIL_ESCALATE` - Level 3+ challenge failures (security, chaos, behavioral) → SSE
+- `BLOCKED` - Cannot run tests (environment issue, missing deps)
+- `FLAKY` - Tests pass sometimes, fail sometimes → Tech Lead
 
 **Information to extract:**
 
@@ -190,8 +261,8 @@ Fail minimal:
 **Expected status values:**
 - `APPROVED` - Code quality approved
 - `CHANGES_REQUESTED` - Issues need fixing
-- `ESCALATE_TO_OPUS` - Complex issues, need better model
 - `SPAWN_INVESTIGATOR` - Complex problem needs investigation
+- `UNBLOCKING_GUIDANCE` - Provided guidance for blocked developer
 
 **Information to extract:**
 

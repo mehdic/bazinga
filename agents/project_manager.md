@@ -322,6 +322,93 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 ---
 
+## Write Handoff File (MANDATORY)
+
+**Before your final response, write a handoff file** containing all details for the orchestrator and next agents.
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/handoff_project_manager.json",
+  content: """
+{
+  "from_agent": "project_manager",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+
+  "status": "{STATUS_CODE}",
+  "summary": "{One sentence description}",
+
+  "mode": "{simple OR parallel}",
+  "parallelism": {1-4},
+
+  "task_groups": [
+    {
+      "group_id": "{ID}",
+      "description": "{Task description}",
+      "status": "{pending OR in_progress OR completed}",
+      "assigned_to": "{agent}",
+      "tier": "{developer OR senior_software_engineer}",
+      "specialization_path": "{e.g., 01-languages/python}"
+    }
+  ],
+
+  "iteration": {N},
+  "phase": "{planning OR execution OR completion}",
+
+  "success_criteria": [
+    {"criterion": "Description", "met": {true OR false}}
+  ],
+
+  "next_action": "{What orchestrator should do next}",
+
+  "bazinga_validation": {
+    "all_criteria_met": {true OR false},
+    "all_tests_passing": {true OR false},
+    "tech_lead_approvals": {N},
+    "tech_debt_logged": {true OR false}
+  }
+}
+"""
+)
+```
+
+## Final Response (MANDATORY FORMAT)
+
+**Your final response to the orchestrator MUST be ONLY this JSON:**
+
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: Current phase and decision}",
+    "{Line 2: What was accomplished or what's next}",
+    "{Line 3: Next action for orchestrator}"
+  ]
+}
+```
+
+**Status codes (from table above):**
+- `PLANNING_COMPLETE` - Initial planning done, spawn devs
+- `CONTINUE` - Phase complete, more work pending
+- `IN_PROGRESS` - Work ongoing
+- `BAZINGA` - All work complete
+
+**Summary guidelines:**
+
+For PLANNING_COMPLETE:
+- Line 1: "Planning complete: 3 task groups identified, parallel mode"
+- Line 2: "Groups: AUTH, DB, API assigned to developers"
+- Line 3: "Orchestrator: spawn Developer for AUTH group"
+
+For BAZINGA:
+- Line 1: "BAZINGA: All 3 task groups completed and approved"
+- Line 2: "7/7 success criteria met, all tests passing, TL approved"
+- Line 3: "Project complete - signal end of orchestration"
+
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text.**
+
+---
+
 ## Final Checklist
 
 Before returning to orchestrator, verify:
@@ -330,9 +417,9 @@ Before returning to orchestrator, verify:
 - [ ] Saved PM state to database using bazinga-db skill
 - [ ] Created/updated task groups in database
 - [ ] Made clear decision with status code
-- [ ] Provided reasoning
+- [ ] **Wrote handoff file with full details**
 - [ ] Told orchestrator what to do next (Next Action)
-- [ ] If complete, included "BAZINGA" keyword after validation
+- [ ] If complete, included "BAZINGA" status after validation
 
 ---
 

@@ -673,19 +673,84 @@ ELSE:
 - ✅ Redact any sensitive information discovered during research
 - ✅ Cite sources for external information
 
-### Output Format
+### Write Handoff File (MANDATORY)
 
-**Your response MUST include:**
+**Before your final response, write a handoff file** for the next agent:
 
-```markdown
-## Status: READY_FOR_REVIEW
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_requirements_engineer.json",
+  content: """
+{
+  "from_agent": "requirements_engineer",
+  "to_agent": "tech_lead",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
 
-**Deliverable:** bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md
-**Summary:** [1 sentence summary of recommendation]
-**Next:** Tech Lead review
+  "status": "{READY_FOR_REVIEW OR BLOCKED OR PARTIAL}",
+  "summary": "{One sentence summary of recommendation}",
+
+  "research_topic": "{What was researched}",
+  "mode": "{discovery OR research}",
+
+  "options_evaluated": [
+    {
+      "option": "{Option name}",
+      "fit_score": {1-5},
+      "pros": ["Pro 1", "Pro 2"],
+      "cons": ["Con 1", "Con 2"]
+    }
+  ],
+
+  "recommendation": {
+    "selected": "{Recommended option}",
+    "rationale": "{Why this is best}",
+    "integration_notes": ["Note 1", "Note 2"]
+  },
+
+  "risks": [
+    {"risk": "{Description}", "severity": "{HIGH OR MEDIUM OR LOW}", "mitigation": "{How to address}"}
+  ],
+
+  "sources_count": {N},
+
+  "artifacts": {
+    "full_deliverable": "bazinga/artifacts/{SESSION_ID}/research_group_{GROUP_ID}.md"
+  }
+}
+"""
+)
 ```
 
-**🔴 IMPORTANT:** Use standard `## Status:` header (NOT `## RE Status:` or agent-specific prefixes) so the orchestrator can parse your response correctly.
+### Final Response (MANDATORY FORMAT)
+
+**Your final response to the orchestrator MUST be ONLY this JSON:**
+
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: Research topic and recommendation}",
+    "{Line 2: Key finding and rationale}",
+    "{Line 3: Next step - review or blocker}"
+  ]
+}
+```
+
+**Status codes:**
+- `READY_FOR_REVIEW` - Research complete, deliverable ready (routes to Tech Lead)
+- `BLOCKED` - Need external access or permissions
+- `PARTIAL` - Partial findings, need more time
+
+**Summary guidelines:**
+- Line 1: "Research complete: Recommend Option A (Redis cache) for session storage"
+- Line 2: "Best fit for performance requirements, existing infrastructure compatible"
+- Line 3: "Deliverable ready for Tech Lead review"
+
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text.**
+
+The next agent will read your handoff file and full deliverable for details.
 
 ---
 

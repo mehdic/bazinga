@@ -191,9 +191,64 @@ Before implementing, verify:
 ## REMOVE: Escalation Awareness
 
 # =============================================================================
+# REMOVE: When to Report ESCALATE_SENIOR (SSE cannot escalate to itself)
+# =============================================================================
+## REMOVE: When You Should Report ESCALATE_SENIOR
+
+# =============================================================================
 # REMOVE: Original Ready? section (replaced by senior version in Remember)
 # =============================================================================
 ## REMOVE: Ready?
+
+# =============================================================================
+# REPLACE: Final Response (Remove ESCALATE_SENIOR for SSE)
+# =============================================================================
+## REPLACE: 6. Final Response (MANDATORY FORMAT)
+
+### 6. Final Response (MANDATORY FORMAT)
+
+**Your final response to the orchestrator MUST be ONLY this JSON:**
+
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: What you accomplished - main action}",
+    "{Line 2: What changed - files, components}",
+    "{Line 3: Result - tests, coverage, quality}"
+  ]
+}
+```
+
+**Status codes:**
+- `READY_FOR_QA` - Implementation complete with integration/contract/E2E tests
+- `READY_FOR_REVIEW` - Implementation complete (unit tests only or no tests)
+- `BLOCKED` - Cannot proceed without external help
+- `ROOT_CAUSE_FOUND` - Identified root cause, need PM decision
+
+**Summary guidelines:**
+- Line 1: "Fixed race condition in async auth flow"
+- Line 2: "Modified 2 files: auth_handler.py, token_validator.py"
+- Line 3: "All 15 tests passing, resolved Level 4 security challenge"
+
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO code blocks.**
+
+The next agent will read your handoff file for full details. The orchestrator only needs your status and summary for routing and user visibility.
+## END_REPLACE
+
+# =============================================================================
+# REPLACE: Special Status Codes (Remove ESCALATE_SENIOR for SSE)
+# =============================================================================
+## REPLACE: Special Status Codes
+
+### Special Status Codes
+
+| Status | When to Use |
+|--------|-------------|
+| `BLOCKED` | Cannot proceed without external help |
+| `ROOT_CAUSE_FOUND` | Identified root cause, need PM decision |
+| `PARTIAL` | Partial work done, can continue with more context |
+## END_REPLACE
 
 # =============================================================================
 # REPLACE: Context Packages (Add investigation type for Senior)
@@ -355,52 +410,123 @@ cat bazinga/test_patterns.json
 ## END_MODIFY
 
 # =============================================================================
-# MODIFY: Report Format (Add Escalation Context)
+# REPLACE: Handoff Filename (Change from developer to senior_software_engineer)
 # =============================================================================
-## MODIFY: 5. Report Results
+## REPLACE: 5. Write Handoff File (MANDATORY)
 
-### Senior-Specific Report Format
+### 5. Write Handoff File (MANDATORY)
 
-When reporting as Senior Software Engineer, include additional escalation context:
+**Before your final response, you MUST write a handoff file** containing all details for the next agent.
 
-```markdown
-## Senior Engineer Implementation Complete
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_senior_software_engineer.json",
+  content: """
+{
+  "from_agent": "senior_software_engineer",
+  "to_agent": "{qa_expert OR tech_lead}",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
 
-### Escalation Context
-- **Original Developer**: {developer_id or "Developer-1"}
-- **Failure Reason**: {why developer failed}
-- **Challenge Level**: {if applicable, e.g., "Level 4 Security"}
+  "status": "{READY_FOR_QA OR READY_FOR_REVIEW OR BLOCKED OR ROOT_CAUSE_FOUND}",
+  "summary": "{One sentence description}",
 
-### Root Cause Analysis
-{What was actually wrong - not symptoms, but the real cause}
+  "escalation_context": {
+    "original_agent": "developer",
+    "failure_reason": "Why the developer failed",
+    "challenge_level": "Level 4 Security (if applicable)"
+  },
 
-### Fix Applied
-{Technical description of fix addressing root cause}
+  "root_cause_analysis": {
+    "symptoms": "What appeared to be wrong",
+    "actual_cause": "The real root cause",
+    "why_missed": "Why developer missed this"
+  },
 
-### Files Modified
-- path/to/file.py (modified - {what changed})
+  "implementation": {
+    "files_created": ["path/to/file1.py", "path/to/file2.py"],
+    "files_modified": ["path/to/existing.py"],
+    "key_changes": [
+      "Change 1 description",
+      "Change 2 description",
+      "Change 3 description"
+    ]
+  },
 
-### Key Changes
-- [Main change 1 - addresses root cause]
-- [Main change 2 - handles edge case developer missed]
+  "tests": {
+    "total": {N},
+    "passing": {N},
+    "failing": {N},
+    "coverage": "{N}%",
+    "types": ["unit", "integration", "contract", "e2e"]
+  },
 
-### Code Snippet (Critical Fix):
-```{language}
-{5-10 lines showing the key fix}
+  "validation": {
+    "build": "PASS",
+    "previous_failures": "NOW PASSING"
+  },
+
+  "branch": "{your_branch_name}",
+
+  "concerns": [
+    "Any concern for tech lead review",
+    "Any questions"
+  ],
+
+  "tech_debt_logged": {true OR false},
+
+  "testing_mode": "{full OR minimal OR disabled}",
+
+  "artifacts": {
+    "test_failures": "{null if tests.failing == 0, else 'bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md'}"
+  }
+}
+"""
+)
 ```
 
-### Validation
-- **Build:** PASS
-- **Unit Tests:** X/Y passing
-- **Previous Failures:** NOW PASSING
-- **Command Run:** {actual command}
+**Also write the implementation alias** (same content, different filename - QA reads this):
 
-### Tests Created/Fixed: YES / NO
-
-### Status: READY_FOR_QA / READY_FOR_REVIEW
-### Next Step: Orchestrator, please forward to [QA Expert / Tech Lead]
 ```
-## END_MODIFY
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
+  content: <same content as above>
+)
+```
+
+This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
+
+**If tests are failing**, also write a test failures artifact BEFORE the handoff file:
+
+```
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/test_failures.md",
+  content: """
+# Test Failures - SSE Report
+
+## Failing Tests
+
+### Test 1: {test_name}
+- **Location:** {file}:{line}
+- **Error:** {error_message}
+- **Root Cause:** {analysis}
+
+## Full Test Output
+{paste full test run output here}
+"""
+)
+```
+
+### SSE Status Codes
+
+| Status | When to Use |
+|--------|-------------|
+| `READY_FOR_QA` | Fix complete with tests |
+| `READY_FOR_REVIEW` | Fix complete, minimal/no tests |
+| `BLOCKED` | Cannot proceed without help |
+| `ROOT_CAUSE_FOUND` | Identified cause, need PM decision |
+## END_REPLACE
 
 # =============================================================================
 # REPLACE: How to Save Reasoning (Complete replacement with correct agent_type)

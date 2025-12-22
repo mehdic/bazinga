@@ -318,9 +318,11 @@ Write to `bazinga/prompts/{session_id}/params_qa_expert_{group_id}.json`:
   "mode": "simple",
   "testing_mode": "{testing_mode}",
   "model": "{MODEL_CONFIG[\"qa_expert\"]}",
-  "output_file": "bazinga/prompts/{session_id}/qa_expert_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/qa_expert_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json"
 }
 ```
+**CRP:** `prior_handoff_file` points to implementation alias (works for both Developer and SSE).
 
 **Step 2: Invoke prompt-builder skill**
 
@@ -346,7 +348,7 @@ Output summary:
 **Step 1: Parse response and output capsule to user**
 
 Use the QA Expert Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Status** (PASS, FAIL, PARTIAL, BLOCKED, FLAKY)
+- **Status** (PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY)
 - **Tests** passed/total
 - **Coverage** percentage
 - **Failed tests** (if any)
@@ -356,7 +358,8 @@ Use the QA Expert Response Parsing section from `bazinga/templates/response_pars
 - **PASS:** `✅ Group {id} tests passing | {tests}, {coverage}% | → Tech Lead`
 - **FAIL:** `⚠️ Group {id} QA failed | {failures} | Developer fixing`
 - **BLOCKED:** `⚠️ Group {id} blocked | {blocker} | Investigating`
-- **ESCALATE_SENIOR:** `🔺 Group {id} challenge failed | Level {N}: {reason} | → SSE`
+- **FAIL_ESCALATE:** `🔺 Group {id} challenge failed | Level {N}: {reason} | → SSE`
+- **FLAKY:** `⚠️ Group {id} flaky tests | {details} | → Tech Lead`
 
 **Step 3: Output capsule to user**
 
@@ -418,9 +421,11 @@ Write to `bazinga/prompts/{session_id}/params_tech_lead_{group_id}.json`:
   "mode": "simple",
   "testing_mode": "{testing_mode}",
   "model": "{MODEL_CONFIG[\"tech_lead\"]}",
-  "output_file": "bazinga/prompts/{session_id}/tech_lead_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/tech_lead_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_qa_expert.json"
 }
 ```
+**CRP:** `prior_handoff_file` points to QA's handoff with test results.
 
 **Step 2: Invoke prompt-builder skill**
 

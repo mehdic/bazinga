@@ -87,16 +87,40 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 
 **Use `bazinga/templates/response_parsing.md`** (loaded at init) for extraction patterns and fallbacks.
 
+### CRP JSON Format (Primary)
+
+**All agents now return compact JSON responses:**
+```json
+{"status": "READY_FOR_QA", "summary": ["Line 1", "Line 2", "Line 3"]}
+```
+
+**Parsing:** Extract `status` for routing, `summary[0]` for capsule. Full details are in handoff file.
+
+**Handoff file locations:**
+- **Group-scoped (Dev/QA/TL):** `bazinga/artifacts/{session_id}/{group_id}/handoff_{agent}.json`
+- **Session-scoped (PM):** `bazinga/artifacts/{session_id}/handoff_project_manager.json` (no group directory)
+- **Implementation alias:** `bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json` (written by Developer OR SSE)
+
+**When routing to next agent:** Set `prior_handoff_file` in params to previous agent's handoff file.
+**Note:** PM handoff is session-scoped (no group_id in path). When spawning PM, omit `prior_handoff_file` or use session-scoped path.
+
 **Micro-summary (mission-critical statuses):**
 | Agent | Key Statuses to Extract |
 |-------|------------------------|
 | Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR |
-| Developer (Merge Task) | MERGE_SUCCESS, MERGE_CONFLICT, MERGE_TEST_FAILURE |
-| QA Expert | PASS, FAIL, PARTIAL, BLOCKED, ESCALATE_SENIOR |
-| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, ESCALATE_TO_OPUS |
+| Developer (Merge Task) | MERGE_SUCCESS, MERGE_CONFLICT, MERGE_TEST_FAILURE, MERGE_BLOCKED |
+| SSE | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, ROOT_CAUSE_FOUND |
+| QA Expert | PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY |
+| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, UNBLOCKING_GUIDANCE |
 | PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
-| Investigator | ROOT_CAUSE_FOUND, NEED_DIAGNOSTIC, BLOCKED |
+| Investigator | ROOT_CAUSE_FOUND, INVESTIGATION_INCOMPLETE, BLOCKED, EXHAUSTED |
 | Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
+
+**Status Code Mappings:**
+- `FAIL_ESCALATE` → Escalate to SSE (Level 3+ security/chaos failures)
+- `FLAKY` → Route to Tech Lead (intermittent test failures)
+- `UNBLOCKING_GUIDANCE` → Tech Lead provides guidance, route back to Developer
+- `INVESTIGATION_INCOMPLETE` / `EXHAUSTED` → Route to PM for decision
 
 **🔴 RE ROUTING:** Requirements Engineer outputs READY_FOR_REVIEW → bypasses QA → routes directly to Tech Lead (research deliverables don't need testing).
 
@@ -342,9 +366,11 @@ Resume Context: {context if resume scenario}
      "branch": "{branch}",
      "mode": "{simple|parallel}",
      "testing_mode": "{full|minimal|disabled}",
-     "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+     "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md",
+     "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_{prior_agent}.json"
    }
    ```
+   **Note:** `prior_handoff_file` is only set when routing from one agent to another (e.g., Developer → QA).
 2. **Invoke prompt-builder skill**:
    ```
    Skill(command: "prompt-builder")
@@ -2079,9 +2105,11 @@ ELSE IF PM chose "parallel":
   "mode": "{simple|parallel}",
   "testing_mode": "{full|minimal|disabled}",
   "model": "{haiku|sonnet|opus}",
-  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md"
+  "output_file": "bazinga/prompts/{session_id}/{agent_type}_{group_id}.md",
+  "prior_handoff_file": "bazinga/artifacts/{session_id}/{group_id}/handoff_{prior_agent}.json"
 }
 ```
+**CRP: `prior_handoff_file`** - Path to the prior agent's handoff file. Set when routing Dev→QA, QA→TL, etc. Omit for initial spawns (PM, first Developer).
 
 **Step 2: Invoke prompt-builder skill**
 ```

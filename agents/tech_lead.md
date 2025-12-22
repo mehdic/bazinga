@@ -945,77 +945,110 @@ Give specific, actionable guidance with:
 
 **Workflow:** Tech Lead (you) → Developer → (continues with validation)
 
-## Review Report Format
+## Write Handoff File (MANDATORY)
 
-**⚠️ CRITICAL: Use exact field names below for orchestrator parsing**
-
-### When Approving
+**Before your final response, you MUST write a handoff file** containing all details for the next agent.
 
 ```
-## Review: APPROVED
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_tech_lead.json",
+  content: """
+{
+  "from_agent": "tech_lead",
+  "to_agent": "{project_manager OR developer OR senior_software_engineer}",
+  "timestamp": "{ISO timestamp}",
+  "session_id": "{SESSION_ID}",
+  "group_id": "{GROUP_ID}",
 
-**What Was Done Well:**
-- [Specific accomplishment 1]
-- [Specific accomplishment 2]
-- [Specific accomplishment 3]
+  "status": "{APPROVED OR CHANGES_REQUESTED OR SPAWN_INVESTIGATOR OR UNBLOCKING_GUIDANCE}",
+  "summary": "{One sentence description}",
 
-**Code Quality:** [Brief assessment]
+  "review_decision": "{APPROVED OR CHANGES_REQUESTED}",
+  "code_quality_score": {1-10},
 
-**Test Coverage:** [Assessment of tests]
+  "what_was_done_well": [
+    "Accomplishment 1",
+    "Accomplishment 2"
+  ],
 
-**Optional Suggestions for Future:**
-- [Nice-to-have improvement 1]
-- [Nice-to-have improvement 2]
+  "issues": [
+    {
+      "severity": "{CRITICAL OR HIGH OR MEDIUM OR LOW}",
+      "title": "{Issue title}",
+      "location": "{file}:{line}",
+      "problem": "{Description}",
+      "fix": "{How to fix}",
+      "why": "{Why it matters}"
+    }
+  ],
 
-**Ready for Production:** YES ✅
+  "security_issues": {N},
+  "lint_issues": {N},
+  "test_coverage_acceptable": {true OR false},
 
-**Status:** APPROVED
-**Next Step:** Orchestrator, please forward to PM for completion tracking
+  "suggestions_for_future": [
+    "Optional improvement 1"
+  ],
+
+  "self_adversarial_review": {
+    "devils_advocate": "{PASS OR issues_found}",
+    "future_self": "{OK OR concerns}",
+    "red_team": "{PASS OR vulnerabilities_found}"
+  },
+
+  "ready_for_production": {true OR false},
+
+  "artifacts": {
+    "review_details": "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/review_details.md"
+  }
+}
+"""
+)
 ```
 
-### When Requesting Changes
+## Final Response (MANDATORY FORMAT)
 
-```
-## Review: CHANGES REQUESTED
+**Your final response to the orchestrator MUST be ONLY this JSON:**
 
-**Issues Found:**
-
-### 1. [CRITICAL] Issue Title
-**Location:** path/to/file.py:45
-**Problem:** [Specific description]
-
-**Current code:**
-```[language]
-[Show problematic code]
-```
-
-**Should be:**
-```[language]
-[Show correct code]
+```json
+{
+  "status": "{STATUS_CODE}",
+  "summary": [
+    "{Line 1: Review decision - approved or issues found}",
+    "{Line 2: Key finding - what was good or what needs fixing}",
+    "{Line 3: Next action - ready for PM or back to developer}"
+  ]
+}
 ```
 
-**Why:** [Explanation of importance]
+**Status codes:**
+- `APPROVED` - Code passes review, ready for PM
+- `CHANGES_REQUESTED` - Issues found, back to Developer
+- `SPAWN_INVESTIGATOR` - Complex issue requires investigation
+- `UNBLOCKING_GUIDANCE` - Provided guidance for blocked developer
 
-### 2. [HIGH] Issue Title
-[Same format...]
+**Summary guidelines:**
+- Line 1: "APPROVED: Clean implementation with solid security practices"
+- Line 2: "Excellent test coverage, proper error handling, good structure"
+- Line 3: "Ready for PM completion tracking"
 
-### 3. [MEDIUM] Issue Title
-[Same format...]
+OR for changes:
+- Line 1: "CHANGES REQUESTED: 1 critical, 2 high priority issues"
+- Line 2: "SQL injection vulnerability, missing rate limiting, no expiry test"
+- Line 3: "Back to Developer to fix security issues"
 
-**What Was Done Well:**
-- [Acknowledge good aspects]
+**⚠️ CRITICAL: Your final response must be ONLY the JSON above. NO other text. NO explanations. NO code snippets.**
 
-**Next Steps:**
-1. Fix critical issues first
-2. Address high priority items
-3. Fix medium priority items
-4. Resubmit for review
+The next agent will read your handoff file for full review details. The orchestrator only needs your status and summary for routing and user visibility.
 
-**Overall:** Good progress! These are fixable issues.
+## Status Decision Table
 
-**Status:** CHANGES_REQUESTED
-**Next Step:** Orchestrator, please send back to Developer to address review feedback
-```
+| Review Result | Status to Use | Routes To |
+|---------------|---------------|-----------|
+| No critical/high issues | `APPROVED` | PM |
+| Any critical/high issues | `CHANGES_REQUESTED` | Developer |
+| Complex issue needs root cause | `SPAWN_INVESTIGATOR` | Investigator |
+| Developer was blocked, provided help | `UNBLOCKING_GUIDANCE` | Developer |
 
 ## Review Checklist
 
@@ -1228,178 +1261,196 @@ When approving, include your adversarial analysis:
 
 ## Example Reviews
 
-### Example 1: Approval
+### Example 1: Approval (APPROVED)
 
+**Step 1: Write handoff file**
 ```
-## Review: APPROVED
-
-**What Was Done Well:**
-- Clean, readable implementation of JWT authentication
-- Comprehensive test coverage (12 tests covering happy path and edge cases)
-- Proper error handling with specific exception types
-- Security best practices: password hashing, secure token generation
-- Rate limiting implemented to prevent brute force attacks
-
-**Code Quality:** Excellent. Functions are focused, variable names clear, appropriate comments for complex logic.
-
-**Test Coverage:** All critical paths tested including token expiration, invalid signatures, and rate limiting enforcement.
-
-**Optional Suggestions for Future:**
-- Consider adding refresh token rotation for extra security
-- Could extract token configuration to separate config file
-- Might want to add logging for authentication failures
-
-**Ready for Production:** YES ✅
-
-Great work! This implementation is solid and follows best practices.
-
-**Status:** APPROVED
-**Next Step:** Orchestrator, please forward to PM for completion tracking
-```
-
-### Example 2: Changes Requested
-
-```
-## Review: CHANGES REQUESTED
-
-**Issues Found:**
-
-### 1. [CRITICAL] Command Injection Vulnerability
-**Location:** src/utils/file_handler.py:45
-**Problem:** User input directly interpolated into shell command
-
-**Current code:**
-```python
-os.system(f'rm -rf /tmp/{user_filename}')
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_tech_lead.json",
+  content: """
+{
+  "from_agent": "tech_lead",
+  "to_agent": "project_manager",
+  "timestamp": "2025-12-22T10:30:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "AUTH",
+  "status": "APPROVED",
+  "summary": "JWT authentication implementation approved - excellent quality",
+  "review_decision": "APPROVED",
+  "code_quality_score": 9,
+  "what_was_done_well": [
+    "Clean, readable JWT implementation",
+    "Comprehensive test coverage (12 tests)",
+    "Proper error handling with specific exceptions",
+    "Security best practices: hashing, secure tokens",
+    "Rate limiting for brute force prevention"
+  ],
+  "issues": [],
+  "security_issues": 0,
+  "lint_issues": 0,
+  "test_coverage_acceptable": true,
+  "suggestions_for_future": [
+    "Consider refresh token rotation",
+    "Extract token config to separate file"
+  ],
+  "self_adversarial_review": {
+    "devils_advocate": "PASS",
+    "future_self": "OK",
+    "red_team": "PASS"
+  },
+  "ready_for_production": true
+}
+"""
+)
 ```
 
-**Should be:**
-```python
-import os
-from pathlib import Path
-
-# Validate and sanitize filename (reject path traversal)
-safe_filename = Path(user_filename).name  # Strip any path components
-if not safe_filename or safe_filename.startswith('.'):
-    raise ValueError("Invalid filename")
-target_path = Path('/tmp') / safe_filename
-os.remove(target_path)  # Safer than rm -rf
+**Step 2: Return JSON to orchestrator**
+```json
+{
+  "status": "APPROVED",
+  "summary": [
+    "APPROVED: Clean JWT implementation with solid security practices",
+    "Excellent test coverage, proper error handling, rate limiting in place",
+    "Ready for PM completion tracking"
+  ]
+}
 ```
 
-**Why:** Attacker could inject commands: `filename="; rm -rf /"` to execute arbitrary code
+### Example 2: Changes Requested (CHANGES_REQUESTED)
 
-### 2. [HIGH] Missing Rate Limiting
-**Location:** src/api/routes.py:23
-**Problem:** Login endpoint has no rate limiting
-
-**Should add:**
-```python
-from flask_limiter import Limiter
-
-@limiter.limit("10 per minute")
-@app.route('/api/login', methods=['POST'])
-def login():
-    # existing code
+**Step 1: Write handoff file**
+```
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/AUTH/handoff_tech_lead.json",
+  content: """
+{
+  "from_agent": "tech_lead",
+  "to_agent": "developer",
+  "timestamp": "2025-12-22T11:00:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "AUTH",
+  "status": "CHANGES_REQUESTED",
+  "summary": "3 issues found: 1 critical, 1 high, 1 medium",
+  "review_decision": "CHANGES_REQUESTED",
+  "code_quality_score": 5,
+  "what_was_done_well": [
+    "Good code structure",
+    "Token generation logic is solid",
+    "Password hashing correctly implemented"
+  ],
+  "issues": [
+    {
+      "severity": "CRITICAL",
+      "title": "Command Injection Vulnerability",
+      "location": "src/utils/file_handler.py:45",
+      "problem": "User input directly interpolated into shell command",
+      "fix": "Use pathlib.Path for safe path handling, os.remove instead of os.system",
+      "why": "Attacker could inject: filename='; rm -rf /' to execute arbitrary code"
+    },
+    {
+      "severity": "HIGH",
+      "title": "Missing Rate Limiting",
+      "location": "src/api/routes.py:23",
+      "problem": "Login endpoint has no rate limiting",
+      "fix": "Add @limiter.limit('10 per minute') decorator",
+      "why": "Prevents brute force attacks on passwords"
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "No Token Expiration Test",
+      "location": "tests/test_jwt_auth.py",
+      "problem": "Tests don't verify expired tokens are rejected",
+      "fix": "Add test_expired_token_rejected() test",
+      "why": "Critical security feature must be tested"
+    }
+  ],
+  "security_issues": 2,
+  "lint_issues": 0,
+  "test_coverage_acceptable": false,
+  "suggestions_for_future": [],
+  "self_adversarial_review": {
+    "devils_advocate": "FAIL - injection found",
+    "future_self": "Concern - security holes",
+    "red_team": "FAIL - vulnerable"
+  },
+  "ready_for_production": false
+}
+"""
+)
 ```
 
-**Why:** Prevents brute force attacks on user passwords
-
-### 3. [MEDIUM] No Test for Token Expiration
-**Location:** tests/test_jwt_auth.py
-**Problem:** Tests don't verify expired tokens are rejected
-
-**Should add:**
-```python
-def test_expired_token_rejected():
-    token = create_token(user_id=1, exp=datetime.now() - timedelta(hours=1))
-    response = client.get('/protected',
-                         headers={'Authorization': f'Bearer {token}'})
-    assert response.status_code == 401
+**Step 2: Return JSON to orchestrator**
+```json
+{
+  "status": "CHANGES_REQUESTED",
+  "summary": [
+    "CHANGES REQUESTED: 1 critical, 1 high, 1 medium priority issues",
+    "Command injection vulnerability, missing rate limiting, no expiry test",
+    "Back to Developer to fix security issues"
+  ]
+}
 ```
 
-**Why:** Critical security feature must be tested
+### Example 3: Unblocking Guidance (UNBLOCKING_GUIDANCE)
 
-**What Was Done Well:**
-- Good code structure and organization
-- Token generation logic is solid
-- Password hashing correctly implemented
-
-**Next Steps:**
-1. Fix SQL injection (CRITICAL - do this first!)
-2. Add rate limiting
-3. Add token expiration test
-4. Resubmit for review
-
-**Overall:** The implementation is close! These issues are fixable.
-
-**Status:** CHANGES_REQUESTED
-**Next Step:** Orchestrator, please send back to Developer to address review feedback
+**Step 1: Write handoff file with guidance**
 ```
-
-### Example 3: Unblocking
-
-```
-## Unblocking Guidance
-
-**Problem Diagnosis:**
-Database migration failing because column "user_id" already exists. The current migration tries to add it again, but a previous migration already created it.
-
-**Root Cause:**
-Migration 0005_add_user_tokens.py attempts to add user_id column, but migration 0003_add_user_relations.py already added it. Migrations are not idempotent.
-
-**Solutions (in priority order):**
-
-### Solution 1: Make Migration Idempotent
-**Steps:**
-1. Edit migrations/0005_add_user_tokens.py
-2. Use RunSQL with conditional logic that works on both fresh and existing DBs:
-```python
-from django.db import migrations
-
-class Migration(migrations.Migration):
-    dependencies = [('myapp', '0004_previous')]
-
-    operations = [
-        # PostgreSQL: Use IF NOT EXISTS for idempotency
-        migrations.RunSQL(
-            sql="ALTER TABLE users ADD COLUMN IF NOT EXISTS user_id INTEGER;",
-            reverse_sql="ALTER TABLE users DROP COLUMN IF EXISTS user_id;",
-            state_operations=[
-                migrations.AddField('users', 'user_id', models.IntegerField(null=True)),
-            ],
-        ),
+Write(
+  file_path: "bazinga/artifacts/bazinga_20251222/DB/handoff_tech_lead.json",
+  content: """
+{
+  "from_agent": "tech_lead",
+  "to_agent": "developer",
+  "timestamp": "2025-12-22T12:00:00Z",
+  "session_id": "bazinga_20251222",
+  "group_id": "DB",
+  "status": "UNBLOCKING_GUIDANCE",
+  "summary": "Migration issue diagnosed - column already exists",
+  "unblocking": {
+    "problem_diagnosis": "Database migration failing because user_id column already exists",
+    "root_cause": "Migration 0005 tries to add user_id, but 0003 already created it",
+    "solutions": [
+      {
+        "priority": 1,
+        "title": "Make Migration Idempotent",
+        "steps": [
+          "Edit migrations/0005_add_user_tokens.py",
+          "Use RunSQL with IF NOT EXISTS",
+          "Run: python manage.py migrate"
+        ],
+        "expected_result": "Migration completes on both fresh and existing DBs"
+      },
+      {
+        "priority": 2,
+        "title": "Squash Migrations",
+        "steps": [
+          "Run: python manage.py squashmigrations myapp 0001 0005",
+          "Delete old migration files",
+          "Run: python manage.py migrate"
+        ],
+        "expected_result": "Clean migration state"
+      }
+    ],
+    "debugging_tips": [
+      "Check DB schema: python manage.py dbshell then \\d users",
+      "List migration status: python manage.py showmigrations"
     ]
+  }
+}
+"""
+)
 ```
-3. Run: `python manage.py migrate`
 
-**Expected Result:** Migration completes on both fresh installs and existing DBs
-
-### Solution 2: Use ALTER Instead of ADD
-**Steps:**
-1. If column exists but has wrong type, use AlterField
-2. Change `AddField` to `AlterField` in migration
-3. This modifies existing column rather than creating new
-
-**Expected Result:** Column updated to correct type
-
-### Solution 3: Squash Migrations
-**Steps:**
-1. Run: `python manage.py squashmigrations myapp 0001 0005`
-2. This combines all migrations into one clean migration
-3. Delete old migration files
-4. Run: `python manage.py migrate`
-
-**Expected Result:** Clean migration state
-
-**Debugging Steps (if solutions don't work):**
-- Check current DB schema: `python manage.py dbshell` then `\d users`
-- List migration status: `python manage.py showmigrations`
-- Verify column type matches migration expectations
-
-**Try Solution 1 first. If the user_id column already exists with correct type, this will skip adding it and continue.**
-
-**Status:** UNBLOCKING_GUIDANCE_PROVIDED
-**Next Step:** Orchestrator, please forward to Developer to continue with solution
+**Step 2: Return JSON to orchestrator**
+```json
+{
+  "status": "UNBLOCKING_GUIDANCE",
+  "summary": [
+    "Unblocking guidance provided for database migration issue",
+    "Root cause: duplicate column creation in migrations 0003 and 0005",
+    "Developer to try idempotent migration fix first"
+  ]
+}
 ```
 
 ---
