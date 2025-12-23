@@ -451,7 +451,7 @@ def check_security_sensitive(conn, session_id, group_id):
 - `.claude/skills/prompt-builder/scripts/prompt_builder.py` (639 lines)
 - `.claude/skills/workflow-router/scripts/workflow_router.py` (270 lines)
 - `.claude/skills/config-seeder/scripts/seed_configs.py` (191 lines)
-- `bazinga/templates/orchestrator/phase_simple.md` (partial)
+- `templates/orchestrator/phase_simple.md` (partial)
 - `bazinga/config/transitions.json` (246 lines)
 - `bazinga/config/agent-markers.json` (92 lines)
 
@@ -464,7 +464,7 @@ def check_security_sensitive(conn, session_id, group_id):
 ```python
 def validate_template_path(template_path):
     """Validate that template path is safe (no path traversal)."""
-    ALLOWED_BASE = Path("bazinga/templates/specializations").resolve()
+    ALLOWED_BASE = Path("templates/specializations").resolve()
 
     if Path(template_path).is_absolute():
         return None

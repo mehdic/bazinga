@@ -12,10 +12,10 @@
 
 The BAZINGA orchestration system has:
 1. A fully designed `specialization-loader` skill (`.claude/skills/specialization-loader/SKILL.md`)
-2. 72+ specialization templates in `bazinga/templates/specializations/`
+2. 72+ specialization templates in `templates/specializations/`
 3. Detailed documentation in:
    - `agents/orchestrator.md` - §Specialization Loading (lines 1222-1330)
-   - `bazinga/templates/prompt_building.md` - Specialization Block Section (lines 88-191)
+   - `templates/prompt_building.md` - Specialization Block Section (lines 88-191)
 
 **Yet** the actual agent prompts being spawned show NO specialization content:
 
@@ -194,7 +194,7 @@ Mode: PARALLEL (4 concurrent SSEs)
 
 **In `phase_simple.md` line 100:**
 ```markdown
-**Build:** Read agent file + `bazinga/templates/prompt_building.md`
+**Build:** Read agent file + `templates/prompt_building.md`
 (testing_config + skills_config + **specializations** for tier).
 ```
 
@@ -301,7 +301,7 @@ The following 7-step flow is **APPROVED** and must be implemented:
 
 ### Architecture: Centralized Spawn Helper (Approved)
 
-Create `bazinga/templates/orchestrator/spawn_with_specializations.md` used by ALL spawn paths:
+Create `templates/orchestrator/spawn_with_specializations.md` used by ALL spawn paths:
 
 ```markdown
 ## §Spawn Agent with Specializations
@@ -451,7 +451,7 @@ FOR EACH agent in batch:
 
 ### Phase 1: Create Centralized Spawn Template
 
-1. **Create** `bazinga/templates/orchestrator/spawn_with_specializations.md`
+1. **Create** `templates/orchestrator/spawn_with_specializations.md`
    - Full implementation of 7-step flow above
    - Include fallback derivation logic (moved from PM)
    - Include parallel mode isolation rule
@@ -560,15 +560,15 @@ FOR EACH agent in batch:
 
 | File | Purpose | Est. Lines |
 |------|---------|------------|
-| `bazinga/templates/orchestrator/spawn_with_specializations.md` | Centralized spawn helper | ~150 lines |
+| `templates/orchestrator/spawn_with_specializations.md` | Centralized spawn helper | ~150 lines |
 
 ### Files to MODIFY (4 files)
 
 | File | Lines to Change | Change Type |
 |------|----------------|-------------|
 | `agents/project_manager.md` | 1502-1871 | DELETE ~370 lines (fallback mapping) |
-| `bazinga/templates/orchestrator/phase_simple.md` | 99-116, 200, 218, 234, 240, 289, 341, 410 | UPDATE spawn instructions |
-| `bazinga/templates/orchestrator/phase_parallel.md` | 183-209 | UPDATE parallel spawn |
+| `templates/orchestrator/phase_simple.md` | 99-116, 200, 218, 234, 240, 289, 341, 410 | UPDATE spawn instructions |
+| `templates/orchestrator/phase_parallel.md` | 183-209 | UPDATE parallel spawn |
 | `agents/orchestrator_speckit.md` | 120-150 | UPDATE to use centralized spawn |
 
 ---
@@ -637,7 +637,7 @@ When creating task groups:
 
 ```markdown
 **Group A:** Implement Login UI
-- **Specializations:** ["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]
+- **Specializations:** ["templates/specializations/01-languages/typescript.md", "templates/specializations/02-frameworks-frontend/nextjs.md"]
 ```
 
 **Step 3.5.4: Store via bazinga-db**
@@ -666,7 +666,7 @@ Group ID: A
 
 ## Phase 1: Create Centralized Spawn Template - DETAILED SPEC
 
-### NEW FILE: `bazinga/templates/orchestrator/spawn_with_specializations.md`
+### NEW FILE: `templates/orchestrator/spawn_with_specializations.md`
 
 **Full Content:**
 
@@ -778,26 +778,26 @@ IF specializations is null OR empty array:
 
 | Technology | Template Path |
 |------------|---------------|
-| typescript, ts | `bazinga/templates/specializations/01-languages/typescript.md` |
-| javascript, js | `bazinga/templates/specializations/01-languages/javascript.md` |
-| python, py | `bazinga/templates/specializations/01-languages/python.md` |
-| java | `bazinga/templates/specializations/01-languages/java.md` |
-| go, golang | `bazinga/templates/specializations/01-languages/go.md` |
-| rust | `bazinga/templates/specializations/01-languages/rust.md` |
-| react | `bazinga/templates/specializations/02-frameworks-frontend/react.md` |
-| nextjs, next.js | `bazinga/templates/specializations/02-frameworks-frontend/nextjs.md` |
-| vue | `bazinga/templates/specializations/02-frameworks-frontend/vue.md` |
-| angular | `bazinga/templates/specializations/02-frameworks-frontend/angular.md` |
-| express | `bazinga/templates/specializations/03-frameworks-backend/express.md` |
-| fastapi | `bazinga/templates/specializations/03-frameworks-backend/fastapi.md` |
-| django | `bazinga/templates/specializations/03-frameworks-backend/django.md` |
-| springboot, spring | `bazinga/templates/specializations/03-frameworks-backend/spring-boot.md` |
-| postgresql, postgres | `bazinga/templates/specializations/05-databases/postgresql.md` |
-| mongodb, mongo | `bazinga/templates/specializations/05-databases/mongodb.md` |
-| kubernetes, k8s | `bazinga/templates/specializations/06-infrastructure/kubernetes.md` |
-| docker | `bazinga/templates/specializations/06-infrastructure/docker.md` |
-| jest, vitest | `bazinga/templates/specializations/08-testing/jest-vitest.md` |
-| playwright, cypress | `bazinga/templates/specializations/08-testing/playwright-cypress.md` |
+| typescript, ts | `templates/specializations/01-languages/typescript.md` |
+| javascript, js | `templates/specializations/01-languages/javascript.md` |
+| python, py | `templates/specializations/01-languages/python.md` |
+| java | `templates/specializations/01-languages/java.md` |
+| go, golang | `templates/specializations/01-languages/go.md` |
+| rust | `templates/specializations/01-languages/rust.md` |
+| react | `templates/specializations/02-frameworks-frontend/react.md` |
+| nextjs, next.js | `templates/specializations/02-frameworks-frontend/nextjs.md` |
+| vue | `templates/specializations/02-frameworks-frontend/vue.md` |
+| angular | `templates/specializations/02-frameworks-frontend/angular.md` |
+| express | `templates/specializations/03-frameworks-backend/express.md` |
+| fastapi | `templates/specializations/03-frameworks-backend/fastapi.md` |
+| django | `templates/specializations/03-frameworks-backend/django.md` |
+| springboot, spring | `templates/specializations/03-frameworks-backend/spring-boot.md` |
+| postgresql, postgres | `templates/specializations/05-databases/postgresql.md` |
+| mongodb, mongo | `templates/specializations/05-databases/mongodb.md` |
+| kubernetes, k8s | `templates/specializations/06-infrastructure/kubernetes.md` |
+| docker | `templates/specializations/06-infrastructure/docker.md` |
+| jest, vitest | `templates/specializations/08-testing/jest-vitest.md` |
+| playwright, cypress | `templates/specializations/08-testing/playwright-cypress.md` |
 
 ### Step 4: Invoke Specialization Loader Skill
 
@@ -934,13 +934,13 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 ## Phase 2: Update Phase Templates - DETAILED SPEC
 
-### File: `bazinga/templates/orchestrator/phase_simple.md`
+### File: `templates/orchestrator/phase_simple.md`
 
 #### Change 1: Initial Developer Spawn (Lines 99-116)
 
 **BEFORE (line 99-116):**
 ```markdown
-**Build:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations** for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
+**Build:** Read agent file + `templates/prompt_building.md` (testing_config + skills_config + **specializations** for tier). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format, ✓ Specializations. **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
 📝 **{agent_type} Prompt** | Group: {group_id} | Model: {model}
 ...
@@ -950,7 +950,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 **AFTER:**
 ```markdown
-**Build Base Prompt:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format.
+**Build Base Prompt:** Read agent file + `templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=main, Mode=Simple, Session, Branch, Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate:** ✓ Skills, ✓ Workflow, ✓ Testing, ✓ Report format.
 
 **Show Prompt Summary:** Output structured summary (NOT full prompt):
 ```text
@@ -960,7 +960,7 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"],
 
 **🔴 Spawn with Specializations:**
 
-Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` with:
+Read and follow `templates/orchestrator/spawn_with_specializations.md` with:
 - session_id: {session_id}
 - group_id: {group_id}
 - agent_type: {developer|senior_software_engineer|requirements_engineer}
@@ -985,12 +985,12 @@ Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` w
 
 **BEFORE (line 218):**
 ```markdown
-2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**)
+2. Add configuration from `templates/prompt_building.md` (testing_config + skills_config + **specializations**)
 ```
 
 **AFTER:**
 ```markdown
-2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config)
+2. Add configuration from `templates/prompt_building.md` (testing_config + skills_config)
 3. **🔴 Follow §Spawn Agent with Specializations** before spawning
 ```
 
@@ -1020,12 +1020,12 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 **BEFORE (line 289):**
 ```markdown
-**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section + **specializations**), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`.
+**Build:** 1) Read `agents/qa_expert.md`, 2) Add config from `templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section + **specializations**), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes), **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format, ✓ Specializations. **Description:** `f"QA {group_id}: tests"`.
 ```
 
 **AFTER:**
 ```markdown
-**Build Base Prompt:** 1) Read `agents/qa_expert.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`.
+**Build Base Prompt:** 1) Read `agents/qa_expert.md`, 2) Add config from `templates/prompt_building.md` (testing_config.json + skills_config.json qa_expert section), 3) Include: Agent=QA Expert, Group={group_id}, Mode, Session, Skills/Testing source, Context (dev changes). **Validate:** ✓ Skills, ✓ Testing workflow, ✓ Framework, ✓ Report format. **Description:** `f"QA {group_id}: tests"`.
 ```
 
 **BEFORE (line 302):**
@@ -1042,12 +1042,12 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 **BEFORE (line 341):**
 ```markdown
-2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**)
+2. Add configuration from `templates/prompt_building.md` (testing_config + skills_config + **specializations**)
 ```
 
 **AFTER:**
 ```markdown
-2. Add configuration from `bazinga/templates/prompt_building.md` (testing_config + skills_config)
+2. Add configuration from `templates/prompt_building.md` (testing_config + skills_config)
 3. **🔴 Follow §Spawn Agent with Specializations** before spawning
 ```
 
@@ -1077,12 +1077,12 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 **BEFORE (line 410):**
 ```markdown
-**Build:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations.
+**Build:** 1) Read `agents/techlead.md`, 2) Add config from `templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section + **specializations**), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**, **Specializations (loaded via prompt_building.md)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks, ✓ Specializations.
 ```
 
 **AFTER:**
 ```markdown
-**Build Base Prompt:** 1) Read `agents/techlead.md`, 2) Add config from `bazinga/templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks.
+**Build Base Prompt:** 1) Read `agents/techlead.md`, 2) Add config from `templates/prompt_building.md` (testing_config.json + skills_config.json tech_lead section), 3) Include: Agent=Tech Lead, Group={group_id}, Mode, Session, Skills/Testing source, Context (impl+QA summary), **Implementation Reasoning (if any, max 5 entries, 300 chars each)**. **Validate:** ✓ Skills, ✓ Review workflow, ✓ Decision format, ✓ Frameworks.
 ```
 
 **BEFORE (line 423):**
@@ -1097,18 +1097,18 @@ Task(subagent_type="general-purpose", model=MODEL_CONFIG["developer"], descripti
 
 ---
 
-### File: `bazinga/templates/orchestrator/phase_parallel.md`
+### File: `templates/orchestrator/phase_parallel.md`
 
 #### Change 1: Parallel Developer Spawns (Lines 183-209)
 
 **BEFORE (lines 183-184):**
 ```markdown
-**Build PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config + **specializations**). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
+**Build PER GROUP:** Read agent file + `templates/prompt_building.md` (testing_config + skills_config + **specializations**). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**, **Specializations (loaded via prompt_building.md)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format, ✓ Specializations.
 ```
 
 **AFTER:**
 ```markdown
-**Build Base Prompt PER GROUP:** Read agent file + `bazinga/templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
+**Build Base Prompt PER GROUP:** Read agent file + `templates/prompt_building.md` (testing_config + skills_config). **Include:** Agent, Group=[A/B/C/D], Mode=Parallel, Session, Branch (group branch), Skills/Testing, Task from PM, **Context Packages (if any)**, **Reasoning Context (if any)**. **Validate EACH:** ✓ Skills, ✓ Workflow, ✓ Group branch, ✓ Testing, ✓ Report format.
 ```
 
 **BEFORE (lines 200-209):**
@@ -1168,7 +1168,7 @@ The spec-kit orchestrator spawns PM differently (with spec-kit artifacts). Speci
 When PM returns with task groups, spawn developers using the centralized spawn procedure:
 
 **🔴 For each developer spawn:**
-1. Read `bazinga/templates/orchestrator/spawn_with_specializations.md`
+1. Read `templates/orchestrator/spawn_with_specializations.md`
 2. Follow Steps 1-7 with appropriate parameters
 3. Ensure specializations from task_group are loaded
 ```
@@ -1186,7 +1186,7 @@ The spec-kit orchestrator at `agents/orchestrator_speckit.md` is a separate entr
 
 When spawning any agent (Developer, SSE, QA, Tech Lead), follow the centralized spawn procedure:
 
-**🔴 Required:** Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
+**🔴 Required:** Read and follow `templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
 
 This ensures spec-kit tasks get the same technology-specific patterns as regular orchestration.
 ```
@@ -1200,8 +1200,8 @@ This ensures spec-kit tasks get the same technology-specific patterns as regular
 | File | Before | After | Change |
 |------|--------|-------|--------|
 | `agents/project_manager.md` | ~23,556 tokens | ~20,500 tokens | **-3,056 tokens** |
-| `bazinga/templates/orchestrator/phase_simple.md` | ~4,200 tokens | ~4,400 tokens | +200 tokens |
-| `bazinga/templates/orchestrator/phase_parallel.md` | ~1,800 tokens | ~2,000 tokens | +200 tokens |
+| `templates/orchestrator/phase_simple.md` | ~4,200 tokens | ~4,400 tokens | +200 tokens |
+| `templates/orchestrator/phase_parallel.md` | ~1,800 tokens | ~2,000 tokens | +200 tokens |
 | `spawn_with_specializations.md` (NEW) | 0 | ~1,200 tokens | +1,200 tokens |
 | **NET CHANGE** | - | - | **-1,456 tokens** |
 
@@ -1266,9 +1266,9 @@ This ensures spec-kit tasks get the same technology-specific patterns as regular
 ## References
 
 - `agents/orchestrator.md` §Specialization Loading (lines 1222-1330)
-- `bazinga/templates/prompt_building.md` (lines 88-191)
-- `bazinga/templates/orchestrator/phase_simple.md`
-- `bazinga/templates/orchestrator/phase_parallel.md`
+- `templates/prompt_building.md` (lines 88-191)
+- `templates/orchestrator/phase_simple.md`
+- `templates/orchestrator/phase_parallel.md`
 - `.claude/skills/specialization-loader/SKILL.md`
 - `research/orchestrator-specialization-integration-ultrathink-2025-12-04.md`
 - `tmp/ultrathink-reviews/combined-review.md` (OpenAI GPT-5 review)

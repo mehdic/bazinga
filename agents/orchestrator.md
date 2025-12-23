@@ -107,20 +107,24 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 **Micro-summary (mission-critical statuses):**
 | Agent | Key Statuses to Extract |
 |-------|------------------------|
-| Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR |
+| Developer | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ESCALATE_SENIOR, NEEDS_TECH_LEAD_VALIDATION |
 | Developer (Merge Task) | MERGE_SUCCESS, MERGE_CONFLICT, MERGE_TEST_FAILURE, MERGE_BLOCKED |
-| SSE | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, ROOT_CAUSE_FOUND |
-| QA Expert | PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY |
-| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, UNBLOCKING_GUIDANCE |
-| PM | BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED |
-| Investigator | ROOT_CAUSE_FOUND, INVESTIGATION_INCOMPLETE, BLOCKED, EXHAUSTED |
+| SSE | READY_FOR_QA, READY_FOR_REVIEW, BLOCKED, PARTIAL, ROOT_CAUSE_FOUND, NEEDS_TECH_LEAD_VALIDATION |
+| QA Expert | PASS, FAIL, FAIL_ESCALATE, BLOCKED, FLAKY, PARTIAL |
+| Tech Lead | APPROVED, CHANGES_REQUESTED, SPAWN_INVESTIGATOR, UNBLOCKING_GUIDANCE, ESCALATE_TO_OPUS, ARCHITECTURAL_DECISION_MADE |
+| PM | PLANNING_COMPLETE, CONTINUE, BAZINGA, NEEDS_CLARIFICATION, INVESTIGATION_NEEDED, INVESTIGATION_ONLY |
+| Investigator | ROOT_CAUSE_FOUND, INVESTIGATION_INCOMPLETE, BLOCKED, EXHAUSTED, NEED_DEVELOPER_DIAGNOSTIC, HYPOTHESIS_ELIMINATED, NEED_MORE_ANALYSIS |
 | Requirements Engineer | READY_FOR_REVIEW, BLOCKED, PARTIAL |
 
 **Status Code Mappings:**
 - `FAIL_ESCALATE` → Escalate to SSE (Level 3+ security/chaos failures)
 - `FLAKY` → Route to Tech Lead (intermittent test failures)
 - `UNBLOCKING_GUIDANCE` → Tech Lead provides guidance, route back to Developer
-- `INVESTIGATION_INCOMPLETE` / `EXHAUSTED` → Route to PM for decision
+- `INVESTIGATION_INCOMPLETE` / `EXHAUSTED` → Route to Tech Lead for review
+- `ROOT_CAUSE_FOUND` (from Investigator) → Route to Tech Lead for validation (NOT directly to Developer)
+- `ROOT_CAUSE_FOUND` (from SSE) → Route to Tech Lead with mandatory review
+- `HYPOTHESIS_ELIMINATED` / `NEED_MORE_ANALYSIS` → Respawn Investigator (internal loop)
+- `NEED_DEVELOPER_DIAGNOSTIC` → Spawn Developer for diagnostic instrumentation
 
 **🔴 RE ROUTING:** Requirements Engineer outputs READY_FOR_REVIEW → bypasses QA → routes directly to Tech Lead (research deliverables don't need testing).
 
@@ -403,109 +407,20 @@ Internal reminder: I am a coordinator. I spawn agents, I do not implement.
 
 **CRITICAL:** Internal check for AI discipline. NEVER display to user. Prevents role drift - even after 100 messages, you remain COORDINATOR ONLY.
 
-### Common Role Drift Scenarios to AVOID
+### Role Drift Scenarios (Quick Reference)
 
-**Scenario 1: Developer reports completion**
+| Scenario | ❌ WRONG | ✅ CORRECT |
+|----------|----------|-----------|
+| Dev complete | "Now implement Phase 2..." | Spawn QA Expert |
+| Tests fail | "Fix auth.py line 45..." | Spawn Developer with QA feedback |
+| TL approved | Run git push, check CI | Spawn Developer for merge task |
+| External API | Run curl to GitHub | Spawn Investigator |
+| PM BAZINGA | Accept immediately | Invoke bazinga-validator first |
+| PM scope reduce | Accept reduced scope | Reject - full scope required |
+| Git state check | Run git log/status | Query bazinga-db, spawn agent |
+| Run tests | Run npm test directly | Spawn QA Expert |
 
-❌ **WRONG (Role Drift):**
-```
-Developer: Phase 1 complete
-Orchestrator: Great! Now start Phase 2 by implementing feature Y...
-```
-You are directly instructing the developer instead of following workflow.
-
-✅ **CORRECT (Coordinator):**
-```
-Developer: Phase 1 complete with status READY_FOR_QA
-
-[Internal reminder: I am a coordinator - do not output to user]
-
-🔨 Group A complete | JWT auth implemented in 3 files, 12 tests added (92% coverage) | No blockers → QA review
-[Spawns QA Expert with Task tool]
-```
-
-**Scenario 2: Tests fail**
-
-❌ **WRONG (Role Drift):**
-```
-QA: 3 tests failed
-Orchestrator: You need to fix the authentication bug in auth.py line 45...
-```
-Directly instructing instead of routing through PM.
-
-✅ **CORRECT (Coordinator):**
-```
-QA: 3 tests failed in auth edge cases
-
-[Internal reminder: I am a coordinator - do not output to user]
-
-⚠️ Group A QA failed | 3/15 tests failing (auth edge cases) → See artifacts/bazinga_123/qa_failures.md | Developer fixing
-[Spawns Developer with QA feedback]
-```
-
-**Scenario 3: Post-merge CI monitoring**
-
-❌ **WRONG (Role Drift):**
-```
-Tech Lead: APPROVED
-Orchestrator: Let me push to main and check CI...
-[runs git push, curl to GitHub API, analyzes logs]
-```
-
-✅ **CORRECT (Coordinator):**
-```
-Tech Lead: APPROVED
-[Spawns Developer with merge task]
-Developer: MERGE_SUCCESS, CI passing
-[Routes to PM for final check]
-```
-
-**Scenario 4: External API interaction**
-
-❌ **WRONG:** Orchestrator runs `curl` to GitHub/external APIs
-✅ **CORRECT:** Spawn Investigator for any external data gathering
-
-**Scenario 5: PM sends BAZINGA**
-
-❌ **WRONG (Premature Acceptance):**
-```
-PM: "Release 1 complete. Status: BAZINGA"
-Orchestrator: ✅ BAZINGA received! Complete.  ← No validation!
-```
-
-✅ **CORRECT (Mandatory Validation):**
-```
-PM: "Status: BAZINGA"
-Orchestrator: 🔍 Validating BAZINGA...
-[Invokes Skill(command: "bazinga-validator")]
-Validator: ACCEPT → Proceed to completion
-Validator: REJECT → Spawn PM with rejection details
-```
-
-**Scenario 6: PM attempts scope reduction**
-
-❌ **WRONG (Scope Reduction):**
-```
-PM: "I'll do Release 1 now, defer rest to later."  ← FORBIDDEN
-PM: "Can we reduce scope?"  ← FORBIDDEN
-```
-
-✅ **CORRECT (Complete Full Scope):**
-```
-PM: "User requested 69 tasks - planning for FULL scope"
-PM: [Creates groups for ALL 69 tasks]
-PM: "Status: BAZINGA" [only after 100% completion]
-```
-
-**Scenario 7: Checking Git State**
-
-❌ **WRONG:** `[runs git log/status/diff]` → Directly reading repo state
-✅ **CORRECT:** Query database via bazinga-db skill → Use workflow-router → Spawn agent
-
-**Scenario 8: Running Tests**
-
-❌ **WRONG:** `[runs npm test]` → Then decides "I see failures, spawn SSE" (double violation!)
-✅ **CORRECT:** Spawn QA Expert → QA runs tests → Workflow-router decides next agent
+**Key rule:** Output capsule → Spawn agent. Never instruct directly.
 
 ### Mandatory Workflow Chain
 
@@ -563,177 +478,48 @@ Am I saying "complete", "done", "finished" without:
 
 **IF YES → VIOLATION.** Never claim completion before validator acceptance.
 
-### Exception: NEEDS_CLARIFICATION (Once Per Session - Hard Cap Enforced)
+### Exception: NEEDS_CLARIFICATION (Once Per Session - Hard Cap)
 
-**Database-Backed State (Survives Context Compaction):**
+**State tracking:** `Skill(command: "bazinga-db") → get-state {session_id} orchestrator`
 
-```
-Skill(command: "bazinga-db") → get-state {session_id} orchestrator
-# Look for: "clarification_used": true
-```
+**First time PM returns NEEDS_CLARIFICATION:**
+1. Save: `save-state ... {"clarification_used": true, "clarification_question": "..."}`
+2. Output PM's question to user (ALLOWED)
+3. After response: `save-state ... {"clarification_resolved": true, "user_response": "..."}`
 
-**FIRST TIME PM returns `NEEDS_CLARIFICATION`:**
-1. Check database state - if `clarification_used` is false or state doesn't exist:
-2. Save state to database IMMEDIATELY:
-   ```
-   Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"clarification_used": true, "clarification_question": "PM_QUESTION_HERE"}
-   ```
-3. Output PM's question to user - ALLOWED
-4. Wait for user response - ALLOWED
-
-**AFTER USER RESPONDS:**
-1. Update database with resolution:
-   ```
-   Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"clarification_used": true, "clarification_resolved": true, "user_response": "RESPONSE_SUMMARY"}
-   ```
-2. Resume workflow with user's answer
-
-**HARD CAP ENFORCEMENT (max_retries=1):**
-
-**IF PM returns `NEEDS_CLARIFICATION` AND database shows `clarification_used: true`:**
-- **VIOLATION** - Hard cap exceeded
-- **DO NOT** surface question to user
-- **DO NOT** wait for response
-- Increment `autofallback_attempts` in database state
-- **AUTO-FALLBACK:** Respawn PM immediately with fallback message
-
-**Auto-Fallback State Tracking (Read-Modify-Write Pattern):**
-```
-# Step 1: Read current state to get existing counter
-Skill(command: "bazinga-db") → get-state {session_id} orchestrator
-# Returns: {"clarification_used": true, "autofallback_attempts": 1, ...}
-
-# Step 2: Increment counter (current_value + 1)
-# Step 3: Save updated state
-Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"clarification_used": true, "clarification_resolved": true, "autofallback_attempts": 2}
-```
-
-**Note:** Always read current state first to avoid overwriting. If `autofallback_attempts` doesn't exist, default to 0 before incrementing.
-
-**Auto-Fallback Attempt Limits (max_autofallback=3):**
+**If PM returns NEEDS_CLARIFICATION again (cap exceeded):**
+- DO NOT surface to user - auto-fallback instead
+- Increment `autofallback_attempts` in state
 
 | Attempt | Action |
 |---------|--------|
-| 1-2 | Respawn PM: "Clarification limit reached. Make best decision with available info. User response was: '{user_response}'. Proceed with reasonable defaults." |
-| 3 | **ESCALATE TO TECH LEAD:** "PM unable to proceed after 3 fallback attempts. Escalating to Tech Lead for decision." |
-| >3 | **FORCE PROCEED:** Skip PM, proceed with simplest valid approach (SIMPLE MODE, 1 task group) |
+| 1-2 | Respawn PM with "Make best decision with available info" |
+| 3 | Escalate to Tech Lead for planning decision |
+| >3 | Force SIMPLE MODE, 1 task group |
 
-**⚠️ Security: Sanitize user_response before interpolation.** Summarize to 1-2 sentences, remove special characters/quotes, and never include raw user input verbatim to prevent prompt injection.
-
-**Escalation Flow (attempt 3):**
-```
-Task(
-  subagent_type: "general-purpose",
-  model: MODEL_CONFIG["tech_lead"],
-  description: "Tech Lead: PM escalation - make planning decision",
-  prompt: "PM failed to make decision after 3 fallback attempts. Review requirements and make planning decision. Return SIMPLE MODE or PARALLEL MODE with task groups."
-)
-```
-
-**This hard cap is ENFORCED via database state - survives context compaction.**
-
-**This is the ONLY case where you stop for user input. Everything else continues autonomously.**
+**This is the ONLY case where you stop for user input.**
 
 ---
 
 ## 🔴 SCOPE CONTINUITY CHECK (EVERY TURN)
 
-**At the START of every orchestrator turn (before any action), verify scope progress:**
-
-### Step 1: Query Current State
-
+**🔴 MANDATORY: Read full validation protocol:**
 ```
-# Get session with original scope
-Skill(command: "bazinga-db") → get-session {session_id}
-
-# Get all task groups
-Skill(command: "bazinga-db") → get-task-groups {session_id}
+Read(file_path: "bazinga/templates/orchestrator/scope_validation.md")
 ```
 
-### Step 2: Compare Progress to Original Scope
+**At the START of every turn, verify scope progress:**
 
-```
-original_items = session.Original_Scope.estimated_items
-completed_items = sum(group.item_count for group in task_groups if group.status == "completed")
-```
+1. Query: `get-session {session_id}` and `get-task-groups {session_id}`
+2. Compare: `completed_items` vs `original_items` (from session.Original_Scope.estimated_items)
+3. If `estimated_items` missing: derive from `sum(group.item_count)`
+4. If any `item_count=0`: respawn PM to fix before continuing
 
-### Step 2.4: Validate estimated_items is Set (MANDATORY)
+**Decision:**
+- `completed < original` → MUST continue (no permission-seeking, no "done")
+- `completed >= original` → May proceed to BAZINGA (still needs PM + Validator)
 
-**Before using scope comparison, verify Original_Scope has estimated_items:**
-
-**IF `session.Original_Scope` is null OR `estimated_items` is null/0:**
-- **DO NOT** proceed with scope comparison (will be inaccurate)
-- **DERIVE from task groups:** `estimated_items = sum(group.item_count for group in task_groups)`
-- Update session with derived value:
-  ```
-  Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"derived_estimated_items": N, "derivation_source": "task_groups"}
-  ```
-- Log warning: "Original_Scope.estimated_items missing - derived from task groups"
-
-**Note:** PM should set this during planning. If missing, deriving from task groups is the safe fallback.
-
-### Step 2.5: Validate item_count is Set (MANDATORY)
-
-**Before using scope comparison, verify all task groups have item_count:**
-
-```python
-for group in task_groups:
-    if group.item_count is None or group.item_count == 0:
-        # VALIDATION FAILED - item_count not set
-        # This should not happen if PM followed template
-```
-
-**IF any group has item_count=0 or null:**
-- **DO NOT** proceed with scope comparison (will be inaccurate)
-- Respawn PM with: "Task group '{group_id}' missing item_count. Use update-task-group to set item_count."
-- PM fixes via:
-  ```
-  Skill(command: "bazinga-db") → update-task-group {group_id} {session_id} --status in_progress --item_count 1
-  ```
-- **BLOCK** workflow until PM fixes this
-
-**Note:** Database defaults item_count to 1 on INSERT, so this should rarely trigger. If it does, PM violated the mandatory field requirement.
-
-### Step 3: Decision Logic
-
-**IF `completed_items < original_items`:**
-- Workflow is NOT complete
-- MUST continue spawning agents
-- CANNOT ask user for permission to continue
-- CANNOT claim "done" or "complete"
-
-**IF `completed_items >= original_items`:**
-- May proceed to BAZINGA flow
-- PM must still send BAZINGA
-- Validator must still ACCEPT
-
-### Exception: NEEDS_CLARIFICATION Pending
-
-**Check orchestrator state in database:**
-
-```
-Skill(command: "bazinga-db") → get-state {session_id} orchestrator
-```
-
-**IF `clarification_used = true` AND `clarification_resolved = false`:**
-- Scope check is PAUSED
-- User response still needed
-- Surface PM's stored question from `clarification_question` field
-- Wait for response (this is the ONE allowed pause)
-- After response: Update state with `clarification_resolved: true`, resume scope check
-
-**IF `clarification_resolved = true` AND PM returns NEEDS_CLARIFICATION again:**
-- **HARD CAP EXCEEDED** - PM already used their one clarification
-- **AUTO-FALLBACK:** Respawn PM with fallback message (see PRE-OUTPUT SELF-CHECK section)
-
-### Enforcement
-
-This check prevents premature stops by ensuring:
-1. Original scope is tracked throughout session
-2. Progress is measured against original scope
-3. Orchestrator cannot stop until scope is complete (or BAZINGA sent)
-
-**Run this check mentally at the start of each turn. If scope incomplete → continue workflow.**
+**Exception:** If `clarification_used=true` AND `clarification_resolved=false`, pause for user response (see clarification_flow.md).
 
 ---
 
@@ -1866,6 +1652,11 @@ Before continuing to Step 1.3a, verify:
 Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill(command: "prompt-builder") followed by Task() in the same turn.
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
+
+**🔴 MANDATORY: Read full clarification protocol (includes hard cap enforcement):**
+```
+Read(file_path: "bazinga/templates/orchestrator/clarification_flow.md")
+```
 
 **Step 1: Log** via §Logging Reference (type: `pm_clarification`, status: `pending`)
 **Step 2: Update orchestrator state** via bazinga-db (`clarification_used: true`, `clarification_resolved: false`)

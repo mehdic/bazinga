@@ -180,8 +180,8 @@ But what if PM keeps returning NEEDS_CLARIFICATION?
 | File | Lines Added | Purpose |
 |------|-------------|---------|
 | `agents/orchestrator.md` | ~200 | Fixes 1, 3, 4, 5 |
-| `bazinga/templates/orchestrator/phase_simple.md` | ~50 | Fix 2 |
-| `bazinga/templates/orchestrator/phase_parallel.md` | ~57 | Fix 2 |
+| `templates/orchestrator/phase_simple.md` | ~50 | Fix 2 |
+| `templates/orchestrator/phase_parallel.md` | ~57 | Fix 2 |
 | `.claude/commands/bazinga.orchestrate.md` | ~250 | Auto-generated |
 
 ### Commit

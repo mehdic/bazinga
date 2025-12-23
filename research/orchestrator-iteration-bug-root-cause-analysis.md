@@ -464,7 +464,7 @@ Compress existing verbose sections:
 **Net impact:** -10,800 + 7,800 = -3,000 chars (would need 1,200 more chars)
 
 **Option B: Move to Reference Files**
-Create `bazinga/templates/parallel_mode_routing.md`:
+Create `templates/parallel_mode_routing.md`:
 - Move detailed parallel routing logic there
 - Keep only essential flow + "See parallel_mode_routing.md" references
 - Save ~15,000 chars
@@ -686,7 +686,7 @@ IF verification fails:
 
 - [ ] Review current orchestrator.md token count
 - [ ] Identify compression targets (Step 1.4, 2A prompts, etc.)
-- [ ] Create `bazinga/templates/parallel_mode_routing.md` reference file
+- [ ] Create `templates/parallel_mode_routing.md` reference file
 - [ ] Test compression on copy to ensure no logic loss
 
 ### Implementation (Order Matters)

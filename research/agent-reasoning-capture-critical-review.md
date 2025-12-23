@@ -371,4 +371,4 @@ Developer (iteration 2)
 - Original design: `research/agent-reasoning-capture-ultrathink.md`
 - Implementation commits: `a35bd87`, `4c53da0`, `7d6f8cd`
 - CLI source: `.claude/skills/bazinga-db/scripts/bazinga_db.py`
-- Templates: `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md`
+- Templates: `templates/orchestrator/phase_simple.md`, `phase_parallel.md`

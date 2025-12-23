@@ -108,11 +108,11 @@ def main():
         print("Changes summary:")
 
         # Count specific changes
-        parsing_changes = len(re.findall(r'bazinga/templates/response_parsing\.md', content)) - \
-                         len(re.findall(r'bazinga/templates/response_parsing\.md', original_content))
+        parsing_changes = len(re.findall(r'templates/response_parsing\.md', content)) - \
+                         len(re.findall(r'templates/response_parsing\.md', original_content))
         step_changes = content.count('§Step 1.4') - original_content.count('§Step 1.4')
-        logging_changes = content.count('bazinga/templates/logging_pattern.md') - \
-                         original_content.count('bazinga/templates/logging_pattern.md')
+        logging_changes = content.count('templates/logging_pattern.md') - \
+                         original_content.count('templates/logging_pattern.md')
 
         print(f"  - Response parsing: +{parsing_changes} template references")
         print(f"  - Task groups query: +{step_changes} §Step 1.4 references")

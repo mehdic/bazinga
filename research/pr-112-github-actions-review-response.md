@@ -68,7 +68,7 @@ The github-actions bot identified 3 substantive concerns about the PR's architec
 
 ### Verification: Git Safety Checks ARE Present
 
-**Location:** `bazinga/templates/shutdown_protocol.md` lines 246-394 (149 lines)
+**Location:** `templates/shutdown_protocol.md` lines 246-394 (149 lines)
 
 **Complete Git safety workflow:**
 
@@ -247,13 +247,13 @@ State Data: {
 **Before Review #6 (Copilot):**
 ```bash
 # Read capsule format templates
-cat bazinga/templates/message_templates.md
+cat templates/message_templates.md
 ```
 (Then note: "Use Read tool")
 
 **After:**
 ```
-Read(file_path: "bazinga/templates/message_templates.md")
+Read(file_path: "templates/message_templates.md")
 ```
 
 **Impact:** No more bash/Read ambiguity. All template reads use explicit `Read(file_path: "...")` syntax.
@@ -262,7 +262,7 @@ Read(file_path: "bazinga/templates/message_templates.md")
 
 **Before:**
 ```markdown
-1. **Read the full procedure:** Use Read tool → `bazinga/templates/investigation_loop.md`
+1. **Read the full procedure:** Use Read tool → `templates/investigation_loop.md`
 ```
 
 **After:**
@@ -271,7 +271,7 @@ Read(file_path: "bazinga/templates/message_templates.md")
 
 Use the Read tool to read the complete investigation loop:
 ```
-Read(file_path: "bazinga/templates/investigation_loop.md")
+Read(file_path: "templates/investigation_loop.md")
 ```
 ```
 
@@ -319,7 +319,7 @@ Read(file_path: "bazinga/templates/investigation_loop.md")
 ```markdown
 ### Changes
 1. Extracted shutdown protocol to template (commit abc123)
-   - File: bazinga/templates/shutdown_protocol.md (new)
+   - File: templates/shutdown_protocol.md (new)
    - Lines: 564 lines of shutdown logic
 2. Updated orchestrator to read template (commit def456)
    - File: agents/orchestrator.md
@@ -335,11 +335,11 @@ Read(file_path: "bazinga/templates/investigation_loop.md")
 
 # Verify all required templates exist
 templates=(
-  "bazinga/templates/message_templates.md"
-  "bazinga/templates/response_parsing.md"
-  "bazinga/templates/prompt_building.md"
-  "bazinga/templates/shutdown_protocol.md"
-  "bazinga/templates/investigation_loop.md"
+  "templates/message_templates.md"
+  "templates/response_parsing.md"
+  "templates/prompt_building.md"
+  "templates/shutdown_protocol.md"
+  "templates/investigation_loop.md"
 )
 
 for template in "${templates[@]}"; do
@@ -421,7 +421,7 @@ All concerns have been addressed:
 ## References
 
 - PR #112: https://github.com/mehdic/bazinga/pull/112
-- Shutdown protocol template: `bazinga/templates/shutdown_protocol.md` (lines 246-394)
+- Shutdown protocol template: `templates/shutdown_protocol.md` (lines 246-394)
 - Template verification: `agents/orchestrator.md` (lines 603-606)
 - Previous review analysis: `research/pr-112-review-analysis-ultrathink-2025-11-24.md`
 - Token measurements: Using characters ÷ 4 method (consistent with ultrathink doc)

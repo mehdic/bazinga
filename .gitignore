@@ -61,6 +61,7 @@ Thumbs.db
 
 # Temporary files (ultrathink reviews, test artifacts)
 tmp/
+artifacts/
 
 # Dashboard runtime files (created during testing in dev mode)
 dashboard.log
@@ -85,13 +86,8 @@ bazinga/bazinga.db*
 !bazinga/testing_config.json
 !bazinga/scripts/
 !bazinga/scripts/**
-!bazinga/templates/
-!bazinga/templates/**
-!bazinga/config/
-!bazinga/config/**
 
-# Coordination folder (legacy - templates now in bazinga/templates/)
-coordination/
-!coordination/templates/
-!coordination/templates/**
+# workflow/ folder is at root level (not inside bazinga/) - tracked by default
+# bazinga/config is a symlink -> ../workflow for dev mode compatibility
+
 test-results/

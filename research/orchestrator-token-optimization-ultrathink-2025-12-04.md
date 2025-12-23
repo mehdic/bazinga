@@ -10,7 +10,7 @@
 
 | Question | Decision |
 |----------|----------|
-| Use `bazinga/templates/orchestrator/` | ✅ YES |
+| Use `templates/orchestrator/` | ✅ YES |
 | Add CI gates | ❌ NO |
 | Compress prose | ❌ NO - Extract only |
 
@@ -19,8 +19,8 @@
 ## Implementation Complete (2025-12-04)
 
 **Files created:**
-- `bazinga/templates/orchestrator/phase_simple.md` (604 lines) - Phase 2A workflow
-- `bazinga/templates/orchestrator/phase_parallel.md` (349 lines) - Phase 2B workflow
+- `templates/orchestrator/phase_simple.md` (604 lines) - Phase 2A workflow
+- `templates/orchestrator/phase_parallel.md` (349 lines) - Phase 2B workflow
 
 **Files modified:**
 - `agents/orchestrator.md` - Reduced from 2390 → 1496 lines (37% reduction)

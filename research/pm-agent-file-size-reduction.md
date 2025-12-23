@@ -87,7 +87,7 @@ Some sections handle edge cases that may never occur:
 ```markdown
 ## SPEC-KIT INTEGRATION MODE
 
-**When orchestrator signals SPEC-KIT INTEGRATION MODE, read:** `bazinga/templates/pm_speckit.md`
+**When orchestrator signals SPEC-KIT INTEGRATION MODE, read:** `templates/pm_speckit.md`
 
 This template contains the full Spec-Kit integration workflow...
 ```
@@ -96,11 +96,11 @@ This template contains the full Spec-Kit integration workflow...
 
 | Section | Move To | Est. Savings |
 |---------|---------|--------------|
-| Task Classification details | `bazinga/templates/pm_task_classification.md` | ~1,200 tokens |
-| Complexity Scoring table | `bazinga/templates/pm_complexity_scoring.md` | ~500 tokens |
-| Autonomy Protocol details | `bazinga/templates/pm_autonomy.md` | ~2,000 tokens |
-| BAZINGA Validation paths | `bazinga/templates/pm_bazinga_validation.md` | ~2,000 tokens |
-| Phase 1 detailed steps | `bazinga/templates/pm_planning_steps.md` | ~4,000 tokens |
+| Task Classification details | `templates/pm_task_classification.md` | ~1,200 tokens |
+| Complexity Scoring table | `templates/pm_complexity_scoring.md` | ~500 tokens |
+| Autonomy Protocol details | `templates/pm_autonomy.md` | ~2,000 tokens |
+| BAZINGA Validation paths | `templates/pm_bazinga_validation.md` | ~2,000 tokens |
+| Phase 1 detailed steps | `templates/pm_planning_steps.md` | ~4,000 tokens |
 
 **Total potential savings: ~9,700 tokens (39%)**
 
@@ -197,7 +197,7 @@ State Data: {
 
 **After:**
 ```markdown
-State Data: See `bazinga/templates/pm_state_schema.json` for full schema.
+State Data: See `templates/pm_state_schema.json` for full schema.
 Required fields: session_id, mode, mode_reasoning, success_criteria[], task_groups[]
 ```
 
@@ -212,7 +212,7 @@ Required fields: session_id, mode, mode_reasoning, success_criteria[], task_grou
 
 **Keep simplified reference:**
 ```markdown
-**Edge Cases:** See `bazinga/templates/pm_edge_cases.md` for: orphaned plans, external blockers, clarification timeouts
+**Edge Cases:** See `templates/pm_edge_cases.md` for: orphaned plans, external blockers, clarification timeouts
 ```
 
 **Estimated savings: ~400 tokens (2%)**
@@ -225,10 +225,10 @@ Required fields: session_id, mode, mode_reasoning, success_criteria[], task_grou
 Apply Strategy 1 to move detailed procedures to reference files.
 
 **Files to create:**
-1. `bazinga/templates/pm_task_classification.md` - Task type detection, security flags
-2. `bazinga/templates/pm_complexity_scoring.md` - Scoring factors table
-3. `bazinga/templates/pm_planning_steps.md` - Detailed Phase 1 steps (3.5, 5.1-5.3)
-4. `bazinga/templates/pm_bazinga_validation.md` - Paths A/B/C details
+1. `templates/pm_task_classification.md` - Task type detection, security flags
+2. `templates/pm_complexity_scoring.md` - Scoring factors table
+3. `templates/pm_planning_steps.md` - Detailed Phase 1 steps (3.5, 5.1-5.3)
+4. `templates/pm_bazinga_validation.md` - Paths A/B/C details
 
 **Keep in main file:**
 - Core identity and role
@@ -261,19 +261,19 @@ Apply Strategy 5 to simplify rare edge cases.
 
 ### Phase 1: Create Reference Files (Safe)
 
-1. Create `bazinga/templates/pm_task_classification.md`
+1. Create `templates/pm_task_classification.md`
    - Move lines 120-234 (task type classification details)
    - Keep summary in main file
 
-2. Create `bazinga/templates/pm_complexity_scoring.md`
+2. Create `templates/pm_complexity_scoring.md`
    - Move lines 235-291 (scoring factors table)
    - Keep quick reference in main file
 
-3. Create `bazinga/templates/pm_planning_steps.md`
+3. Create `templates/pm_planning_steps.md`
    - Move lines 1281-1798 (detailed Step 3.5, Step 5)
    - Keep step overview in main file
 
-4. Create `bazinga/templates/pm_bazinga_validation.md`
+4. Create `templates/pm_bazinga_validation.md`
    - Move lines 903-1096 (Paths A/B/C details)
    - Keep validation summary in main file
 
@@ -282,7 +282,7 @@ Apply Strategy 5 to simplify rare edge cases.
 Replace moved content with references:
 ```markdown
 ### Task Classification
-**Read:** `bazinga/templates/pm_task_classification.md` for full classification rules.
+**Read:** `templates/pm_task_classification.md` for full classification rules.
 
 Quick reference:
 - `[R]` marker or research keywords → research type → spawn RE
@@ -471,9 +471,9 @@ Add automated checks in CI:
 #### 6. Shared Templates for De-duplication (NEW - from LLM review)
 
 Create shared templates used by multiple agents (PM, TL, SSE):
-- `bazinga/templates/shared/golden_rules.md` - autonomy, no-asking, continue until done
-- `bazinga/templates/shared/status_dictionary.md` - status codes all agents use
-- `bazinga/templates/shared/output_formats.md` - markdown formatting, structured responses
+- `templates/shared/golden_rules.md` - autonomy, no-asking, continue until done
+- `templates/shared/status_dictionary.md` - status codes all agents use
+- `templates/shared/output_formats.md` - markdown formatting, structured responses
 
 **Benefits:** Single source of truth, reduces drift, smaller per-agent files
 
@@ -534,7 +534,7 @@ The LLM review validated the core approach and added important safeguards (profi
 ## References
 
 - Current PM agent file: `agents/project_manager.md`
-- Spec-Kit template pattern: `bazinga/templates/pm_speckit.md`
+- Spec-Kit template pattern: `templates/pm_speckit.md`
 - Token budget implementation: `research/automated-token-budget-implementation.md`
 - Prompt builder: `.claude/skills/prompt-builder/scripts/prompt_builder.py`
 - LLM review: `tmp/ultrathink-reviews/combined-review.md`

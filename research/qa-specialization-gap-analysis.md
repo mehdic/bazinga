@@ -41,7 +41,7 @@ compatible_with: [developer, senior_software_engineer]
 
 The task group only had ONE specialization assigned:
 ```json
-"specializations": ["bazinga/templates/specializations/01-languages/python.md"]
+"specializations": ["templates/specializations/01-languages/python.md"]
 ```
 
 QA-compatible templates exist but were never assigned:
@@ -276,6 +276,6 @@ This is the minimal change that solves the immediate problem while preserving sy
 ## References
 
 - Specialization-loader skill: `.claude/skills/specialization-loader/SKILL.md`
-- Python template: `bazinga/templates/specializations/01-languages/python.md`
-- QA templates: `bazinga/templates/specializations/08-testing/*.md`
+- Python template: `templates/specializations/01-languages/python.md`
+- QA templates: `templates/specializations/08-testing/*.md`
 - Task group schema: `.claude/skills/bazinga-db/references/schema.md`

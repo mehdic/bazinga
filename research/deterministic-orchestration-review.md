@@ -58,8 +58,8 @@ All examples now reference prompt-builder correctly (lines 158, 173, 1824).
 ### 🔴 GAP 1: Phase Templates NOT Updated (SEVERITY: CRITICAL)
 
 **Location:**
-- `bazinga/templates/orchestrator/phase_simple.md` (1333 lines)
-- `bazinga/templates/orchestrator/phase_parallel.md` (915 lines)
+- `templates/orchestrator/phase_simple.md` (1333 lines)
+- `templates/orchestrator/phase_parallel.md` (915 lines)
 
 **Problem:** These templates still contain:
 - `Skill(command: "context-assembler")` - 13+ occurrences in phase_simple
@@ -155,13 +155,13 @@ This is hardcoded routing, NOT using workflow-router!
 
 **Pattern B (Old - in Phase 2A/2B sections):**
 ```markdown
-Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
+Read(file_path: "templates/orchestrator/phase_simple.md")
 [Then follow template which uses context-assembler + specialization-loader]
 ```
 
 The orchestrator says both:
 - Line 2132: "Invoke: `Skill(command: "prompt-builder")`"
-- Line 2124: "Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")"
+- Line 2124: "Read(file_path: "templates/orchestrator/phase_simple.md")"
 
 **Impact:** Unclear which pattern takes precedence. If templates are read, they override with old approach.
 
@@ -337,7 +337,7 @@ bazinga/
 
 ### Fix 1: Update Phase Templates (CRITICAL)
 
-**Files:** `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md`
+**Files:** `templates/orchestrator/phase_simple.md`, `phase_parallel.md`
 
 **Action:** Replace ALL occurrences of:
 - TWO-TURN SPAWN SEQUENCE → Single prompt-builder call
@@ -400,11 +400,11 @@ bazinga/
 
 After applying fixes, verify:
 
-- [ ] `grep -r "context-assembler" bazinga/templates/orchestrator/` returns 0 results
-- [ ] `grep -r "specialization-loader" bazinga/templates/orchestrator/` returns 0 results
-- [ ] `grep -r "TWO-TURN" bazinga/templates/orchestrator/` returns 0 results
-- [ ] `grep -c "prompt-builder" bazinga/templates/orchestrator/phase_simple.md` ≥ 8
-- [ ] `grep -c "workflow-router" bazinga/templates/orchestrator/phase_simple.md` ≥ 4
+- [ ] `grep -r "context-assembler" templates/orchestrator/` returns 0 results
+- [ ] `grep -r "specialization-loader" templates/orchestrator/` returns 0 results
+- [ ] `grep -r "TWO-TURN" templates/orchestrator/` returns 0 results
+- [ ] `grep -c "prompt-builder" templates/orchestrator/phase_simple.md` ≥ 8
+- [ ] `grep -c "workflow-router" templates/orchestrator/phase_simple.md` ≥ 4
 - [ ] Integration test passes with prompt metadata showing 1200+ lines for developer
 
 ---
@@ -459,7 +459,7 @@ OpenAI confirmed all critical gaps identified in this analysis and added additio
 ## Part 10: Updated Fix List (Post-Review)
 
 ### Fix 1: Update Phase Templates (CRITICAL) ✅ Confirmed
-- Files: `bazinga/templates/orchestrator/phase_simple.md`, `phase_parallel.md`
+- Files: `templates/orchestrator/phase_simple.md`, `phase_parallel.md`
 - Replace TWO-TURN with prompt-builder
 - **ADDITIONAL:** Preserve post-spawn token tracking logic
 
@@ -494,11 +494,11 @@ OpenAI confirmed all critical gaps identified in this analysis and added additio
 
 After applying fixes, verify:
 
-- [ ] `grep -r "context-assembler" bazinga/templates/orchestrator/` returns 0 results
-- [ ] `grep -r "specialization-loader" bazinga/templates/orchestrator/` returns 0 results
-- [ ] `grep -r "TWO-TURN" bazinga/templates/orchestrator/` returns 0 results
-- [ ] `grep -c "prompt-builder" bazinga/templates/orchestrator/phase_simple.md` ≥ 8
-- [ ] `grep -c "workflow-router" bazinga/templates/orchestrator/phase_simple.md` ≥ 4
+- [ ] `grep -r "context-assembler" templates/orchestrator/` returns 0 results
+- [ ] `grep -r "specialization-loader" templates/orchestrator/` returns 0 results
+- [ ] `grep -r "TWO-TURN" templates/orchestrator/` returns 0 results
+- [ ] `grep -c "prompt-builder" templates/orchestrator/phase_simple.md` ≥ 8
+- [ ] `grep -c "workflow-router" templates/orchestrator/phase_simple.md` ≥ 4
 - [ ] Scripts under `.claude/skills/*/scripts/` (not `bazinga/scripts/`)
 - [ ] Integration test passes with prompt metadata showing 1200+ lines for developer
 - [ ] Post-spawn token tracking preserved in templates
@@ -535,7 +535,7 @@ After applying fixes, verify:
 
 - Research plan: `research/deterministic-orchestration-final-plan.md`
 - Orchestrator: `agents/orchestrator.md`
-- Phase simple: `bazinga/templates/orchestrator/phase_simple.md`
-- Phase parallel: `bazinga/templates/orchestrator/phase_parallel.md`
+- Phase simple: `templates/orchestrator/phase_simple.md`
+- Phase parallel: `templates/orchestrator/phase_parallel.md`
 - Skill implementation guide: `research/skill-implementation-guide.md`
 - OpenAI review: `tmp/ultrathink-reviews/openai-review.md`

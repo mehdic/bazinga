@@ -51,7 +51,7 @@
 
 **Extraction Strategy:**
 ```
-Create: bazinga/templates/developer_prompt_template.md
+Create: templates/developer_prompt_template.md
 
 Content:
 - Base developer prompt structure
@@ -62,7 +62,7 @@ Content:
 - Report format
 
 Orchestrator Reference:
-"Build developer prompt following bazinga/templates/developer_prompt_template.md"
+"Build developer prompt following templates/developer_prompt_template.md"
 ```
 
 **Reduction:** ~1,100 lines (29% of total file)
@@ -81,7 +81,7 @@ Orchestrator Reference:
 
 **Extraction Strategy:**
 ```
-Create: bazinga/templates/agent_response_parsing.md
+Create: templates/agent_response_parsing.md
 
 Content:
 - All 5 agent parsing sections
@@ -91,7 +91,7 @@ Content:
 - Capsule construction templates
 
 Orchestrator Reference:
-"Parse agent responses using bazinga/templates/agent_response_parsing.md strategies"
+"Parse agent responses using templates/agent_response_parsing.md strategies"
 ```
 
 **Reduction:** ~400 lines (11% of total file)
@@ -109,7 +109,7 @@ Orchestrator Reference:
 
 **Extraction Strategy:**
 ```
-Create: bazinga/templates/techlead_prompt_template.md
+Create: templates/techlead_prompt_template.md
 
 Content:
 - Base tech lead prompt
@@ -119,7 +119,7 @@ Content:
 - Report format
 
 Orchestrator Reference:
-"Build Tech Lead prompt following bazinga/templates/techlead_prompt_template.md"
+"Build Tech Lead prompt following templates/techlead_prompt_template.md"
 ```
 
 **Reduction:** ~170 lines (5% of total file)
@@ -137,7 +137,7 @@ Orchestrator Reference:
 
 **Extraction Strategy:**
 ```
-Create: bazinga/templates/qa_prompt_template.md
+Create: templates/qa_prompt_template.md
 
 Content:
 - Base QA prompt structure
@@ -147,7 +147,7 @@ Content:
 - Report format with artifact instructions
 
 Orchestrator Reference:
-"Build QA prompt following bazinga/templates/qa_prompt_template.md"
+"Build QA prompt following templates/qa_prompt_template.md"
 ```
 
 **Reduction:** ~150 lines (4% of total file)
@@ -173,10 +173,10 @@ Every agent spawn follows same pattern:
 
 ### For ANY agent spawn, follow this sequence:
 
-1. **Output capsule:** Use template from bazinga/templates/message_templates.md
-2. **Build prompt:** Use bazinga/templates/{agent}_prompt_template.md
+1. **Output capsule:** Use template from templates/message_templates.md
+2. **Build prompt:** Use templates/{agent}_prompt_template.md
 3. **Spawn agent:** Task(subagent_type: "{agent}", prompt: "{built_prompt}")
-4. **Parse response:** Use bazinga/templates/agent_response_parsing.md
+4. **Parse response:** Use templates/agent_response_parsing.md
 5. **Construct capsule:** Based on parsed data + templates
 6. **Log interaction:** bazinga-db log-agent-interaction (status, summary, artifacts)
 7. **Route:** Continue to next workflow phase
@@ -241,11 +241,11 @@ Whenever you need to log an operation:
 Instead of:
 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-YOU MUST follow `bazinga/templates/prompt_building.md` EXACTLY.
+YOU MUST follow `templates/prompt_building.md` EXACTLY.
 DO NOT write custom prompts. DO NOT improvise. DO NOT skip this process.
 
 Use:
-🔴 MANDATORY: Follow bazinga/templates/developer_prompt_template.md (no shortcuts)
+🔴 MANDATORY: Follow templates/developer_prompt_template.md (no shortcuts)
 ```
 
 **Reduction:** ~40-50 lines by compacting warnings to single lines
@@ -258,11 +258,11 @@ Use:
 **Approach:** Extract all prompt templates and parsing logic to separate files
 
 **Files to Create:**
-1. `bazinga/templates/developer_prompt_template.md` (1,100 lines)
-2. `bazinga/templates/qa_prompt_template.md` (150 lines)
-3. `bazinga/templates/techlead_prompt_template.md` (170 lines)
-4. `bazinga/templates/agent_response_parsing.md` (400 lines)
-5. `bazinga/templates/workflow_patterns.md` (200 lines - generic spawn pattern)
+1. `templates/developer_prompt_template.md` (1,100 lines)
+2. `templates/qa_prompt_template.md` (150 lines)
+3. `templates/techlead_prompt_template.md` (170 lines)
+4. `templates/agent_response_parsing.md` (400 lines)
+5. `templates/workflow_patterns.md` (200 lines - generic spawn pattern)
 
 **Orchestrator Changes:**
 - Replace detailed sections with "Follow [template file]" references
@@ -345,13 +345,13 @@ Use:
 **Implementation Plan:**
 
 ### Phase 1: Extract Developer Prompt Building
-1. Create `bazinga/templates/developer_prompt_template.md`
+1. Create `templates/developer_prompt_template.md`
 2. Move lines 1478-2633 from orchestrator.md
 3. Replace with: "Build prompt following developer_prompt_template.md"
 4. Test: Verify developer spawns still work correctly
 
 ### Phase 2: Extract Agent Response Parsing
-1. Create `bazinga/templates/agent_response_parsing.md`
+1. Create `templates/agent_response_parsing.md`
 2. Move lines 80-486 from orchestrator.md
 3. Replace with: "Parse responses using agent_response_parsing.md"
 4. Test: Verify capsule construction still works
@@ -407,7 +407,7 @@ Before proceeding, please confirm:
 1. **Which option?** A (Maximum), B (Conservative), or C (Hybrid)?
 2. **Risk tolerance?** Comfortable with structural changes or prefer minimal risk?
 3. **Timeline?** Extract all at once or phase by phase with validation?
-4. **Template location?** `bazinga/templates/` or different folder?
+4. **Template location?** `templates/` or different folder?
 
 ---
 

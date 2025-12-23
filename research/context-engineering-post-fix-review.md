@@ -279,5 +279,5 @@ The context-engineering system is **substantially complete** (95%). The two rema
 - Tasks: `specs/1-context-engineering/tasks.md`
 - Data Model: `specs/1-context-engineering/data-model.md`
 - SKILL.md: `.claude/skills/context-assembler/SKILL.md`
-- phase_simple.md: `bazinga/templates/orchestrator/phase_simple.md`
+- phase_simple.md: `templates/orchestrator/phase_simple.md`
 - orchestrator.md: `agents/orchestrator.md`

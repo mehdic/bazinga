@@ -634,7 +634,7 @@ Do NOT proceed without reading this file first.
 
 | File | Changes Required |
 |------|------------------|
-| `bazinga/templates/response_parsing.md` | Simplify to status-only JSON parsing |
+| `templates/response_parsing.md` | Simplify to status-only JSON parsing |
 
 New parsing logic:
 ```markdown
@@ -872,7 +872,7 @@ Update `.claude/skills/prompt-builder/scripts/prompt_builder.py`:
 
 ### Phase 3: Response Parsing
 
-Update `bazinga/templates/response_parsing.md`:
+Update `templates/response_parsing.md`:
 1. Change all agent sections to parse JSON format
 2. Extract status and summary array
 3. Document capsule construction from summary

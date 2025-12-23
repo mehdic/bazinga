@@ -118,7 +118,7 @@ Embed the full algorithm in phase_parallel.md and phase_simple.md.
 
 ### Option B: Dedicated Specialization Workflow Template
 
-Create `bazinga/templates/orchestrator/specialization_workflow.md` that both phase templates reference.
+Create `templates/orchestrator/specialization_workflow.md` that both phase templates reference.
 
 **Pros:**
 - Single source of truth

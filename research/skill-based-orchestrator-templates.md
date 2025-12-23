@@ -176,8 +176,8 @@ Skill returns JSON. Check:
 |------|--------|
 | `.claude/skills/prompt-builder/scripts/prompt_builder.py` | Add `--params-file` mode, JSON output, mkdir |
 | `.claude/skills/prompt-builder/SKILL.md` | Update to read params file, return JSON |
-| `bazinga/templates/orchestrator/phase_simple.md` | Replace 8 python calls with skill pattern |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Replace 5 python calls with skill pattern |
+| `templates/orchestrator/phase_simple.md` | Replace 8 python calls with skill pattern |
+| `templates/orchestrator/phase_parallel.md` | Replace 5 python calls with skill pattern |
 
 ## Implementation Plan
 
@@ -222,6 +222,6 @@ This is the correct architectural approach. The file-based parameter handoff sol
 ## References
 
 - OpenAI Review: `tmp/ultrathink-reviews/openai-review.md`
-- Current templates: `bazinga/templates/orchestrator/phase_simple.md`
+- Current templates: `templates/orchestrator/phase_simple.md`
 - Skill: `.claude/skills/prompt-builder/SKILL.md`
 - Script: `.claude/skills/prompt-builder/scripts/prompt_builder.py`

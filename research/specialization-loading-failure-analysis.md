@@ -326,7 +326,7 @@ Session ID: {session_id}
 Group ID: main
 Agent Type: developer
 Model: haiku
-Specialization Paths: ["bazinga/templates/specializations/..."]
+Specialization Paths: ["templates/specializations/..."]
 [SPEC_CTX_END]
 ```
 
@@ -613,8 +613,8 @@ the specialization_block from Skill()'s response.
 2. (this commit) - fix: correct impossible tool dependency with 2-turn sequence
 
 **Files Modified:**
-- `bazinga/templates/orchestrator/phase_simple.md` - Two-turn spawn sequence
-- `bazinga/templates/orchestrator/phase_parallel.md` - Two-turn spawn sequence per group
+- `templates/orchestrator/phase_simple.md` - Two-turn spawn sequence
+- `templates/orchestrator/phase_parallel.md` - Two-turn spawn sequence per group
 - `agents/orchestrator.md` - Updated verification checkpoints, fixed CONTINUE fallback
 
 ---

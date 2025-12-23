@@ -831,8 +831,8 @@ For each challenge:
 | File | Changes Required | Lines Affected |
 |------|------------------|----------------|
 | `.claude/commands/bazinga.orchestrate.md` | Auto-generated, will reflect orchestrator changes | N/A |
-| `bazinga/templates/response_parsing.md` | Senior Engineer response parsing | ~50 lines |
-| `bazinga/templates/pm_output_format.md` | New status codes for escalation | ~30 lines |
+| `templates/response_parsing.md` | Senior Engineer response parsing | ~50 lines |
+| `templates/pm_output_format.md` | New status codes for escalation | ~30 lines |
 | `bazinga/skills_config.json` | Senior Engineer skill mappings | ~20 lines |
 | **NEW: `bazinga/configs/model_selection.json`** | Model assignment config | ~50 lines |
 | **NEW: `bazinga/configs/challenge_levels.json`** | Challenge level definitions | ~100 lines |

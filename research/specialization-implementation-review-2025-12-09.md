@@ -26,7 +26,7 @@ The specialization loading implementation has been verified against the approved
 
 **Verified content at `agents/project_manager.md:1558`:**
 ```markdown
-**🔴 FALLBACK NOTE:** If you cannot determine specializations from components, leave `specializations = []`. The orchestrator will handle fallback derivation from project_context.json when spawning agents. See: `bazinga/templates/orchestrator/spawn_with_specializations.md`
+**🔴 FALLBACK NOTE:** If you cannot determine specializations from components, leave `specializations = []`. The orchestrator will handle fallback derivation from project_context.json when spawning agents. See: `templates/orchestrator/spawn_with_specializations.md`
 ```
 
 ### Phase 1: Centralized Spawn Template ✅
@@ -87,7 +87,7 @@ The specialization loading implementation has been verified against the approved
 |-------|--------|
 | `skills_config.json` has `specializations.enabled: true` | ✅ Present |
 | `specialization-loader` skill exists | ✅ `.claude/skills/specialization-loader/SKILL.md` |
-| 72+ specialization templates exist | ✅ 72 files in `bazinga/templates/specializations/` |
+| 72+ specialization templates exist | ✅ 72 files in `templates/specializations/` |
 | Old "loaded via prompt_building" references removed | ✅ No matches found |
 | STRICT ADJACENCY RULE documented | ✅ Line 131 in spawn template |
 
@@ -154,10 +154,10 @@ The implementation follows the spec exactly. All critical components are in plac
 
 | File | Change Type | Impact |
 |------|-------------|--------|
-| `bazinga/templates/orchestrator/spawn_with_specializations.md` | NEW | Central spawn procedure |
-| `bazinga/templates/orchestrator/phase_simple.md` | MODIFIED | 8 spawn point references |
-| `bazinga/templates/orchestrator/phase_parallel.md` | MODIFIED | Parallel spawn with isolation |
-| `bazinga/templates/merge_workflow.md` | MODIFIED | 3 spawn points (conflict, test failure, blocked) |
+| `templates/orchestrator/spawn_with_specializations.md` | NEW | Central spawn procedure |
+| `templates/orchestrator/phase_simple.md` | MODIFIED | 8 spawn point references |
+| `templates/orchestrator/phase_parallel.md` | MODIFIED | Parallel spawn with isolation |
+| `templates/merge_workflow.md` | MODIFIED | 3 spawn points (conflict, test failure, blocked) |
 | `agents/orchestrator_speckit.md` | MODIFIED | Specialization section |
 | `agents/project_manager.md` | MODIFIED | Removed ~277 lines of fallback tables |
 

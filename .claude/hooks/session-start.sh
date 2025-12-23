@@ -1,7 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-# Only run in Claude Code Web environment
+# === DEV MODE SETUP (runs in both local and remote) ===
+# In dev mode (bazinga repo), templates are at root templates/
+# but agent files reference bazinga/templates/ (for installed mode compatibility)
+# Create symlink so both paths work
+if [ -d "templates" ] && [ -d "bazinga" ] && [ ! -e "bazinga/templates" ]; then
+  # We're in dev mode (bazinga repo) - create symlink
+  ln -s ../templates bazinga/templates 2>/dev/null || true
+  echo "🔗 Dev mode: Created bazinga/templates -> ../templates symlink"
+fi
+
+# Similarly, workflow configs are at root workflow/ in dev mode
+# but code references bazinga/config/ (for installed mode compatibility)
+if [ -d "workflow" ] && [ -d "bazinga" ] && [ ! -e "bazinga/config" ]; then
+  # We're in dev mode (bazinga repo) - create symlink
+  ln -s ../workflow bazinga/config 2>/dev/null || true
+  echo "🔗 Dev mode: Created bazinga/config -> ../workflow symlink"
+fi
+
+# Only run remaining setup in Claude Code Web environment
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi

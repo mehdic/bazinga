@@ -128,10 +128,10 @@ Verification Gate Summary:
 ### Check 1: Do referenced template files exist?
 
 **VERIFIED:**
-- `bazinga/templates/specializations/08-testing/qa-strategies.md` ✅ EXISTS
-- `bazinga/templates/specializations/08-testing/testing-patterns.md` ✅ EXISTS
-- `bazinga/templates/specializations/11-domains/code-review.md` ✅ EXISTS
-- `bazinga/templates/specializations/11-domains/research-analysis.md` ✅ EXISTS
+- `templates/specializations/08-testing/qa-strategies.md` ✅ EXISTS
+- `templates/specializations/08-testing/testing-patterns.md` ✅ EXISTS
+- `templates/specializations/11-domains/code-review.md` ✅ EXISTS
+- `templates/specializations/11-domains/research-analysis.md` ✅ EXISTS
 
 ### Check 2: Are template frontmatter compatible_with fields correct?
 
@@ -296,4 +296,4 @@ However:
 
 - Root cause analysis: `research/qa-specialization-gap-analysis.md`
 - Specialization-loader skill: `.claude/skills/specialization-loader/SKILL.md`
-- QA templates: `bazinga/templates/specializations/08-testing/`
+- QA templates: `templates/specializations/08-testing/`

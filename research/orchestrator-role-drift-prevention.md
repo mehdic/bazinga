@@ -163,7 +163,7 @@ PM: "Status: BAZINGA" [only after 100% completion]
 
 ### Layer 2: Enhanced Merge Workflow Template ✅ APPROVED
 
-**Enhance existing `bazinga/templates/merge_workflow.md`** (NOT create new file):
+**Enhance existing `templates/merge_workflow.md`** (NOT create new file):
 
 Add explicit Developer spawn template with CI monitoring (60-second polling):
 
@@ -478,11 +478,11 @@ Recommendation: Return to PM for full scope completion or explicit user approval
 |------|---------|------------|
 | `agents/orchestrator.md` | Add Scenario 3-6, §Bash Command Allowlist, §Policy-Gate, Runtime Comment, §Mandatory BAZINGA Validation | Type 1 + 2 |
 | `agents/project_manager.md` | Add §Scope Immutable, §PM BAZINGA Format | Type 2 |
-| `bazinga/templates/merge_workflow.md` | Add enhanced Developer merge prompt with 60s CI polling | Type 1 |
-| `bazinga/templates/orchestrator/phase_simple.md` | Add reference to §Policy-Gate | Type 1 |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Add reference to §Policy-Gate | Type 1 |
-| `bazinga/templates/response_parsing.md` | Add PM BAZINGA Completion Summary parsing | Type 2 |
-| `bazinga/templates/message_templates.md` | Add progress tracking to capsule format | Type 2 |
+| `templates/merge_workflow.md` | Add enhanced Developer merge prompt with 60s CI polling | Type 1 |
+| `templates/orchestrator/phase_simple.md` | Add reference to §Policy-Gate | Type 1 |
+| `templates/orchestrator/phase_parallel.md` | Add reference to §Policy-Gate | Type 1 |
+| `templates/response_parsing.md` | Add PM BAZINGA Completion Summary parsing | Type 2 |
+| `templates/message_templates.md` | Add progress tracking to capsule format | Type 2 |
 | `.claude/skills/bazinga-validator/SKILL.md` | Add §Scope Validation, log verdicts to DB | Type 2 |
 | `bazinga-db schema` | Add `original_scope`, `completed_items_count` fields | Type 2 |
 | **NEW:** `bazinga/scripts/build-baseline.sh` | Wrapper script for build baseline check | Type 1 |
@@ -504,8 +504,8 @@ Recommendation: Return to PM for full scope completion or explicit user approval
 10. **§Scope Immutable** → `agents/project_manager.md` (scope reduction FORBIDDEN)
 11. **original_scope field** → bazinga-db schema migration
 12. **§Scope Validation** → bazinga-validator skill
-13. **PM BAZINGA Format** → `agents/project_manager.md` + `bazinga/templates/response_parsing.md`
-14. **Progress Tracking** → `bazinga/templates/message_templates.md` + orchestrator state
+13. **PM BAZINGA Format** → `agents/project_manager.md` + `templates/response_parsing.md`
+14. **Progress Tracking** → `templates/message_templates.md` + orchestrator state
 
 ### Estimated Changes
 
@@ -587,7 +587,7 @@ When sending BAZINGA, you MUST include a Completion Summary section:
 [existing report content]
 ```
 
-**Update `bazinga/templates/response_parsing.md`:**
+**Update `templates/response_parsing.md`:**
 
 ```markdown
 ### PM BAZINGA Parsing
@@ -626,7 +626,7 @@ When PM sends BAZINGA, extract Completion Summary:
 - Add `completed_items_count` field to orchestrator state
 - Increment as groups complete
 
-**Step 3: Update capsule format in `bazinga/templates/message_templates.md`**
+**Step 3: Update capsule format in `templates/message_templates.md`**
 
 ```markdown
 ### Group Completion Capsule (with progress)
@@ -775,8 +775,8 @@ After implementation, monitor for:
 
 - Observed failure transcript (user-provided)
 - `agents/orchestrator.md` - Current orchestrator definition
-- `bazinga/templates/merge_workflow.md` - Existing merge workflow template
-- `bazinga/templates/orchestrator/phase_simple.md` - Simple mode template
-- `bazinga/templates/orchestrator/phase_parallel.md` - Parallel mode template
+- `templates/merge_workflow.md` - Existing merge workflow template
+- `templates/orchestrator/phase_simple.md` - Simple mode template
+- `templates/orchestrator/phase_parallel.md` - Parallel mode template
 - OpenAI GPT-5 review feedback
 - Post-implementation critical review (2025-12-09)

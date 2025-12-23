@@ -738,7 +738,7 @@ CREATE TABLE specialization_usage (
 ### Consensus Points (Critical Issues Identified)
 
 **1. Orchestrator Read-Permissions Conflict**
-The original plan relied on the orchestrator reading template files from `agents/_templates/`. However, BAZINGA's orchestrator is explicitly restricted from reading code/prompt files. It can only read state files under `bazinga/` and templates under `bazinga/templates/`.
+The original plan relied on the orchestrator reading template files from `agents/_templates/`. However, BAZINGA's orchestrator is explicitly restricted from reading code/prompt files. It can only read state files under `bazinga/` and templates under `templates/`.
 
 **Resolution**: Adopt the **PM-embedded specialization approach**. PM pastes curated specialization guidance inline in the task group description field. The orchestrator already includes PM task descriptions in developer prompts, avoiding the need for template file reads.
 

@@ -91,7 +91,7 @@ class BazingaSetup:
         stale configs from previous installs in shared-data location.
 
         Args:
-            relative_path: Path relative to source (e.g., "bazinga/templates")
+            relative_path: Path relative to source (e.g., "templates")
 
         Returns:
             Resolved Path if found, None otherwise
@@ -340,7 +340,10 @@ class BazingaSetup:
 
     def copy_templates(self, target_dir: Path) -> bool:
         """
-        Copy coordination templates to target bazinga/templates directory.
+        Copy templates to target bazinga/templates/ directory.
+
+        Templates are installed to bazinga/templates/ so that agent files
+        can reference them with consistent paths in both dev and installed modes.
 
         Args:
             target_dir: Target directory for installation
@@ -352,13 +355,11 @@ class BazingaSetup:
         templates_dir.mkdir(parents=True, exist_ok=True)
 
         # Use helper for path resolution with legacy fallback
-        source_templates = self._get_config_source("bazinga/templates")
+        source_templates = self._get_config_source("templates")
         if not source_templates:
-            # Legacy fallback: coordination/templates
-            legacy_path = self._get_config_source("coordination/templates")
-            if legacy_path:
-                source_templates = legacy_path
-            else:
+            # Legacy fallback: bazinga/templates
+            source_templates = self._get_config_source("bazinga/templates")
+            if not source_templates:
                 console.print("[yellow]⚠️  No templates found in source[/yellow]")
                 console.print("[dim]   Checked: package dir, shared-data, project root[/dim]")
                 console.print("[dim]   Hint: Update CLI with 'uv tool upgrade bazinga-cli' or reinstall[/dim]")
@@ -492,6 +493,8 @@ class BazingaSetup:
                 continue
 
         # Copy config subdirectory (transitions.json, agent-markers.json)
+        # Source: workflow/ (packaged as bazinga_cli/bazinga/config/ in wheel)
+        # Dev: bazinga/config is symlink -> ../workflow
         source_config_dir = source_bazinga / "config"
         if source_config_dir.exists() and source_config_dir.is_dir():
             target_config_dir = bazinga_dir / "config"

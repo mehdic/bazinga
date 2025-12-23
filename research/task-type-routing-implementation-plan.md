@@ -284,7 +284,7 @@ When saving success criteria for research groups, include:
 
 #### Step 3.4: Add RE Prompt Building
 
-**File:** `bazinga/templates/prompt_building.md`
+**File:** `templates/prompt_building.md`
 **Lines to add:** ~10
 **Risk:** LOW
 
@@ -419,7 +419,7 @@ You are now operating in **Research Mode** - your output will inform implementat
 
 #### Step 5.1: Update Response Parsing
 
-**File:** `bazinga/templates/response_parsing.md`
+**File:** `templates/response_parsing.md`
 **Lines to add:** ~10
 **Risk:** LOW
 

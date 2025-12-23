@@ -6,6 +6,36 @@ This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration syste
 
 ---
 
+## 🔴 CRITICAL: Template Path Rules (Dev vs Installed Mode)
+
+**When referencing template files, use the correct path based on whether the file is installed to clients:**
+
+### Installed Files → Use `bazinga/templates/`
+
+These files are copied to client projects by `bazinga install`. Templates will be at `bazinga/templates/` on clients:
+
+| Source | Installed To | Path in Code |
+|--------|--------------|--------------|
+| `agents/*.md` | `.claude/agents/` | `bazinga/templates/...` |
+| `.claude/skills/` | `.claude/skills/` | `bazinga/templates/...` |
+| `.claude/commands/` | `.claude/commands/` | `bazinga/templates/...` |
+| `templates/` | `bazinga/templates/` | `bazinga/templates/...` |
+
+### Dev-Only Files → Use `templates/`
+
+These files stay in the bazinga repo only. The symlink `bazinga/templates -> ../templates` makes both paths work, but use the source path for clarity:
+
+| File/Folder | Purpose | Path in Code |
+|-------------|---------|--------------|
+| `.claude/claude.md` | Repo documentation | `templates/...` |
+| `tests/*.py` | Test files | `templates/...` |
+| `scripts/*.py` | Build/dev scripts | `templates/...` |
+| `research/` | Historical docs | `templates/...` |
+
+**Why:** In dev mode, `templates/` is the actual source location. The symlink exists only to make installed-file paths work during development.
+
+---
+
 ## 🔴 CRITICAL: Git Branch Requirements (Claude Code Web)
 
 **When working in Claude Code Web environment:**
@@ -169,8 +199,89 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/agents/` - Agent definitions (orchestrator, project_manager, qa_expert, tech_lead, developer)
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
-- `bazinga/` - State files for orchestration (created during runs)
+- `templates/` - **SOURCE TEMPLATES** (agent prompts, specializations, workflow guides)
+- `workflow/` - **SOURCE WORKFLOW CONFIGS** (transitions.json, agent-markers.json)
+- `bazinga/` - **RUNTIME STATE** (database, session artifacts, config JSONs)
 - `tmp/` - **GITIGNORED** - Temporary test artifacts (never commit)
+
+### 📁 Workflow Config Directory Structure
+
+**🔴 CRITICAL: Dev Mode vs Installed Mode**
+
+Workflow configuration files follow the same symlink pattern as templates:
+
+| Mode | Source Location | Runtime Path | How It Works |
+|------|-----------------|--------------|--------------|
+| **Dev mode** (bazinga repo) | `workflow/` | `bazinga/config/...` | Symlink: `bazinga/config -> ../workflow` |
+| **Installed mode** (client project) | `bazinga/config/` | `bazinga/config/...` | Direct path match |
+
+**Files in workflow/ folder:**
+```
+workflow/                        # SOURCE configs (tracked in git)
+├── transitions.json             # State machine routing (v1.1.0)
+└── agent-markers.json           # Required agent output markers
+```
+
+**Dev mode symlink:**
+```bash
+# In bazinga repo:
+bazinga/config -> ../workflow
+```
+
+**Key principle:**
+- Code/scripts reference `bazinga/config/...` paths (works in both modes)
+- Source files live at `workflow/` (tracked in git at root level)
+- Packaged as `bazinga_cli/bazinga/config/` in wheel
+- Clients get files at `bazinga/config/` after install
+
+**pyproject.toml mapping:**
+```toml
+"workflow" = "bazinga_cli/bazinga/config"  # Source -> Package location
+```
+
+### 📁 Templates Directory Structure
+
+**🔴 CRITICAL: Dev Mode vs Installed Mode**
+
+Agent files reference templates at `bazinga/templates/...` for consistency across both modes:
+
+| Mode | Source Location | Agent Reference Path | How It Works |
+|------|-----------------|---------------------|--------------|
+| **Dev mode** (bazinga repo) | `templates/` | `bazinga/templates/...` | SessionStart hook creates symlink |
+| **Installed mode** (client project) | `bazinga/templates/` | `bazinga/templates/...` | Direct path match |
+
+**Dev mode symlink (created automatically by SessionStart hook):**
+```bash
+# In bazinga repo, the hook creates:
+bazinga/templates -> ../templates
+```
+
+**Template structure:**
+```
+templates/                           # SOURCE templates (tracked in git)
+├── specializations/                 # Technology-specific agent guidance
+│   ├── 01-languages/               # Python, TypeScript, Go, etc.
+│   ├── 02-frameworks-frontend/     # React, Vue, Next.js, etc.
+│   ├── 03-frameworks-backend/      # FastAPI, Express, Django, etc.
+│   └── ...                         # 13 categories total
+├── pm_*.md                         # Project Manager workflow templates
+├── developer_speckit.md            # Developer workflow
+├── qa_speckit.md                   # QA Expert workflow
+├── tech_lead_speckit.md            # Tech Lead workflow
+├── message_templates.md            # Output capsule formats
+├── response_parsing.md             # Agent response extraction
+└── orchestrator/                   # Phase execution templates
+```
+
+**Key principle:**
+- Agent files ALWAYS use `bazinga/templates/...` paths
+- In dev mode: symlink makes this work
+- In installed mode: templates are physically at `bazinga/templates/`
+
+**If symlink is missing in dev mode (should be auto-created by SessionStart hook):**
+```bash
+ln -s ../templates bazinga/templates
+```
 
 ### ⚠️ tmp/ Directory is Gitignored
 
@@ -514,7 +625,7 @@ The bazinga CLI (`bazinga install` / `bazinga update`) copies files from two mec
 | `.claude/commands/` | `.claude/commands/` | `copy_commands()` | ✅ Yes |
 | `.claude/skills/` | `.claude/skills/` | `copy_skills()` | ✅ Yes |
 | `.claude/templates/` | `.claude/templates/` | shared-data | ✅ Yes |
-| `bazinga/templates/` | `bazinga/templates/` | force-include | ✅ Yes |
+| `templates/` | `templates/` | force-include | ✅ Yes |
 | `dashboard-v2/` | `bazinga/dashboard-v2/` | shared-data | ✅ Yes |
 | `bazinga/*.json` (configs) | `bazinga/` | force-include + `ALLOWED_CONFIG_FILES` | ❌ **NO - Manual** |
 
@@ -1261,7 +1372,7 @@ python -m pytest tests/test_version_guards.py::TestEdgeCases -v
 |------|---------|
 | `tests/test_version_guards.py` | 205 unit tests |
 | `.claude/skills/prompt-builder/scripts/prompt_builder.py` | Code under test |
-| `bazinga/templates/specializations/**/*.md` | 72 templates with version guards |
+| `templates/specializations/**/*.md` | 72 templates with version guards |
 
 ---
 
@@ -1334,7 +1445,7 @@ The dashboard should reference this version in comments for traceability.
 ### ❌ WRONG (What was done in failed tests)
 ```python
 # Just reading the raw template file
-Read: bazinga/templates/specializations/01-languages/python.md
+Read: templates/specializations/01-languages/python.md
 # Then spawning Developer...
 ```
 

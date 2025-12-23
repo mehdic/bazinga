@@ -348,6 +348,6 @@ This is a **minimal effective change** that:
 ## References
 
 - `.claude/skills/context-assembler/SKILL.md` - Step 3.5 implementation
-- `bazinga/templates/orchestrator/phase_simple.md` - QA and TL spawn sections
-- `bazinga/templates/orchestrator/phase_parallel.md` - Parallel mode spawn sections
+- `templates/orchestrator/phase_simple.md` - QA and TL spawn sections
+- `templates/orchestrator/phase_parallel.md` - Parallel mode spawn sections
 - `research/reasoning-and-skill-output-gaps.md` - Prior analysis of reasoning storage gaps

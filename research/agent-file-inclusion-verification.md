@@ -25,18 +25,18 @@ We made four commits to fix the "SSE spawns subagents instead of implementing" b
 - After: `Read("agents/{agent_type}.md")` + task context appended
 
 **Files Modified:**
-- `bazinga/templates/orchestrator/phase_simple.md` (+168 lines, -75 lines)
-- `bazinga/templates/orchestrator/phase_parallel.md` (+49 lines, -22 lines)
+- `templates/orchestrator/phase_simple.md` (+168 lines, -75 lines)
+- `templates/orchestrator/phase_parallel.md` (+49 lines, -22 lines)
 
 ### Commit 4 (f225625) - Ultrathink Review Fixes
 
 **What we changed:**
 - Added explicit `AGENT_FILE_MAP` to handle file naming inconsistencies (tech_lead → techlead.md)
-- Updated orchestrator Read allowlist to include `agents/*.md` and `bazinga/templates/*.md`
+- Updated orchestrator Read allowlist to include `agents/*.md` and `templates/*.md`
 
 **Files Modified:**
-- `bazinga/templates/orchestrator/phase_simple.md` - Added AGENT_FILE_MAP
-- `bazinga/templates/orchestrator/phase_parallel.md` - Added AGENT_FILE_MAP in 2 locations
+- `templates/orchestrator/phase_simple.md` - Added AGENT_FILE_MAP
+- `templates/orchestrator/phase_parallel.md` - Added AGENT_FILE_MAP in 2 locations
 - `agents/orchestrator.md` - Updated Read allowlist
 
 ---

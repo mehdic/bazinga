@@ -9,7 +9,7 @@
 
 ## Problem Statement
 
-After implementing `force-include` in pyproject.toml to bundle `bazinga/*.json` configs and `bazinga/templates/` into the wheel, users on other machines still see:
+After implementing `force-include` in pyproject.toml to bundle `bazinga/*.json` configs and `templates/` into the wheel, users on other machines still see:
 ```
 7. Updating templates
   ⚠️  No templates found
@@ -22,9 +22,9 @@ After implementing `force-include` in pyproject.toml to bundle `bazinga/*.json` 
 
 ### What Was Checked
 
-1. **Source files exist**: `/home/user/bazinga/bazinga/templates/` and `*.json` files are present
+1. **Source files exist**: `/home/user/bazinga/templates/` and `*.json` files are present
 2. **Wheel contents are correct**: Built wheel contains:
-   - `bazinga_cli/bazinga/templates/*.md` (7 template files)
+   - `bazinga_cli/templates/*.md` (7 template files)
    - `bazinga_cli/bazinga/*.json` (3 config files)
 3. **Path resolution logic is correct**: `_get_config_source()` checks:
    - Package directory first (`Path(__file__).parent / relative_path`)

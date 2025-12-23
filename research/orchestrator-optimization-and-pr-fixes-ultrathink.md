@@ -31,7 +31,7 @@
 **Approach:** Extract shutdown protocol to external template
 
 **Implementation:**
-- Created `bazinga/templates/shutdown_protocol.md` (564 lines)
+- Created `templates/shutdown_protocol.md` (564 lines)
 - Replaced 564-line shutdown section with 32-line reference
 - Preserved all functionality and logic
 
@@ -553,7 +553,7 @@
 **2. Clearer Status Code Documentation**
 - ✅ What I did: Added all expected status codes to Step 1.3a
 - ⚠️ What could improve: Could create a status code reference table (all agents, all contexts)
-- **Future:** Consider adding `bazinga/templates/status_codes.md` reference
+- **Future:** Consider adding `templates/status_codes.md` reference
 
 **3. Testing Before Committing**
 - ⚠️ What I didn't do: Test orchestration with new shutdown reference
@@ -635,7 +635,7 @@
    - Recommended Phase 1 approach
 
 2. **f21b07e** - Extract shutdown protocol to template (Phase 1 size optimization)
-   - Created bazinga/templates/shutdown_protocol.md (564 lines)
+   - Created templates/shutdown_protocol.md (564 lines)
    - Reduced orchestrator: 2,903 → 2,373 lines (-530 lines)
    - Token reduction: 25,282 → 20,505 (-4,777 tokens, -18.9%)
 

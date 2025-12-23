@@ -14,16 +14,18 @@ You are the config-seeder skill. Your role is to seed JSON configuration files i
 ## Overview
 
 This skill seeds workflow configuration from JSON files into database tables:
-- `bazinga/config/transitions.json` → `workflow_transitions` table
-- `bazinga/config/agent-markers.json` → `agent_markers` table
+- `workflow/transitions.json` → `workflow_transitions` table
+- `workflow/agent-markers.json` → `agent_markers` table
 - `_special_rules` from transitions.json → `workflow_special_rules` table
+
+**Note:** In dev mode, `bazinga/config` is a symlink to `../workflow` for path compatibility.
 
 ## Prerequisites
 
 - Database must be initialized (`bazinga/bazinga.db` exists)
 - Config files must exist:
-  - `bazinga/config/transitions.json`
-  - `bazinga/config/agent-markers.json`
+  - `workflow/transitions.json` (source) or `bazinga/config/transitions.json` (symlink)
+  - `workflow/agent-markers.json` (source) or `bazinga/config/agent-markers.json` (symlink)
 
 ## When to Invoke This Skill
 
@@ -117,7 +119,7 @@ Return success/failure message. No structured output needed.
 
 | Error | Meaning |
 |-------|---------|
-| Config file not found | JSON files missing - check bazinga/config/ |
+| Config file not found | JSON files missing - check workflow/ (or bazinga/config/ symlink) |
 | Database not found | Run init_db.py first |
 | Insert failed | Database schema mismatch - run migration |
 

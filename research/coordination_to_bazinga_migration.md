@@ -54,7 +54,7 @@ bazinga/
 
 #### 4. orchestrator_size_reduction_strategy.md
 - Multiple references to `coordination/templates/` in proposed extraction plans
-- Should reference `bazinga/templates/` for future consistency
+- Should reference `templates/` for future consistency
 
 #### 5. coordination_vs_bazinga_analysis.md
 - Analysis document explaining the difference
@@ -85,7 +85,7 @@ bazinga/
 
 **Current:** Does NOT copy coordination/ folder
 
-**Required:** Add method to copy templates to bazinga/templates/
+**Required:** Add method to copy templates to templates/
 
 ```python
 def copy_templates(self, target_dir: Path) -> bool:
@@ -146,7 +146,7 @@ def copy_templates(self, target_dir: Path) -> bool:
 coordination/templates/message_templates.md
 
 # After
-bazinga/templates/message_templates.md
+templates/message_templates.md
 ```
 
 ---
@@ -162,14 +162,14 @@ coordination/
 **After:**
 ```gitignore
 coordination/
-bazinga/templates/  # Ignore templates (copied from coordination/)
+templates/  # Ignore templates (copied from coordination/)
 !coordination/templates/  # Keep coordination/templates in repo
 ```
 
 **Rationale:**
 - Keep coordination/templates/ in repo (source of truth)
-- Ignore bazinga/templates/ (copied during init)
-- Both bazinga/skills_config.json and bazinga/templates/ will exist
+- Ignore templates/ (copied during init)
+- Both bazinga/skills_config.json and templates/ will exist
 
 ---
 
@@ -194,7 +194,7 @@ fi
 ### Phase 6: Update Documentation
 
 **Files:**
-1. orchestrator_size_reduction_strategy.md - Update all `coordination/templates/` → `bazinga/templates/`
+1. orchestrator_size_reduction_strategy.md - Update all `coordination/templates/` → `templates/`
 2. coordination_vs_bazinga_analysis.md - Update to reflect new structure
 3. copilot_review_analysis.md - Optional (historical)
 4. critical_gap_analysis.md - Optional (historical)
@@ -208,7 +208,7 @@ fi
 ```bash
 # Create bazinga/templates in repo
 mkdir -p bazinga/templates
-cp coordination/templates/*.md bazinga/templates/
+cp coordination/templates/*.md templates/
 ```
 
 ### Step 2: Update references
@@ -234,7 +234,7 @@ cp coordination/templates/*.md bazinga/templates/
 
 ### Step 7: Test
 - Run init in test directory
-- Verify bazinga/templates/ exists
+- Verify templates/ exists
 - Verify orchestrator references work
 
 ---
@@ -249,7 +249,7 @@ cp coordination/templates/*.md bazinga/templates/
 ```bash
 # After updating bazinga CLI
 cd your-project
-bazinga update  # Will copy templates to bazinga/templates/
+bazinga update  # Will copy templates to templates/
 ```
 
 ---
@@ -257,10 +257,10 @@ bazinga update  # Will copy templates to bazinga/templates/
 ## ✅ Validation Checklist
 
 After changes:
-- [ ] bazinga/templates/ folder exists in repo
+- [ ] templates/ folder exists in repo
 - [ ] coordination/templates/ still exists (source of truth)
-- [ ] agents/orchestrator.md references bazinga/templates/
-- [ ] .claude/commands/bazinga.orchestrate.md references bazinga/templates/
+- [ ] agents/orchestrator.md references templates/
+- [ ] .claude/commands/bazinga.orchestrate.md references templates/
 - [ ] CLI copies templates during init
 - [ ] CLI copies templates during update
 - [ ] Init script copies templates

@@ -77,7 +77,7 @@ Added to orchestrator Step 1.3a:
 ### Review 3: Grammar Issues (P3) ✅ VALID
 
 **Reviewer:** Copilot
-**Location:** bazinga/templates/pm_output_format.md
+**Location:** templates/pm_output_format.md
 **Claim:** Missing articles ("an identical error", "the root cause", "an architectural issue")
 
 **Assessment:** **100% VALID - MINOR QUALITY ISSUE**
@@ -177,7 +177,7 @@ Added to orchestrator Step 1.3a:
 **Read message templates:**
 ```bash
 # Read capsule format templates (used for ALL user-facing output)
-cat bazinga/templates/message_templates.md
+cat templates/message_templates.md
 ```
 
 **Note:** Use Read tool for these files.
@@ -194,9 +194,9 @@ cat bazinga/templates/message_templates.md
 - Removed all bash `cat` examples
 - Replaced with explicit Read tool syntax:
   ```
-  Read(file_path: "bazinga/templates/message_templates.md")
-  Read(file_path: "bazinga/templates/response_parsing.md")
-  Read(file_path: "bazinga/templates/prompt_building.md")
+  Read(file_path: "templates/message_templates.md")
+  Read(file_path: "templates/response_parsing.md")
+  Read(file_path: "templates/prompt_building.md")
   ```
 - Matches the pattern used for shutdown_protocol and investigation_loop
 

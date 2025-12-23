@@ -48,12 +48,12 @@
 
 | Agent | Status Codes |
 |-------|-------------|
-| Developer | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL`, `ESCALATE_SENIOR` |
-| SSE | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `ROOT_CAUSE_FOUND` |
-| QA Expert | `PASS`, `FAIL`, `FAIL_ESCALATE`, `BLOCKED`, `FLAKY` |
-| Tech Lead | `APPROVED`, `CHANGES_REQUESTED`, `SPAWN_INVESTIGATOR`, `UNBLOCKING_GUIDANCE` |
+| Developer | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL`, `ESCALATE_SENIOR`, `NEEDS_TECH_LEAD_VALIDATION` |
+| SSE | `READY_FOR_QA`, `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL`, `ROOT_CAUSE_FOUND`, `NEEDS_TECH_LEAD_VALIDATION` |
+| QA Expert | `PASS`, `FAIL`, `FAIL_ESCALATE`, `BLOCKED`, `FLAKY`, `PARTIAL` |
+| Tech Lead | `APPROVED`, `CHANGES_REQUESTED`, `SPAWN_INVESTIGATOR`, `UNBLOCKING_GUIDANCE`, `ESCALATE_TO_OPUS`, `ARCHITECTURAL_DECISION_MADE` |
 | PM | `PLANNING_COMPLETE`, `CONTINUE`, `BAZINGA`, `INVESTIGATION_NEEDED`, `NEEDS_CLARIFICATION`, `INVESTIGATION_ONLY` |
-| Investigator | `ROOT_CAUSE_FOUND`, `INVESTIGATION_INCOMPLETE`, `BLOCKED`, `EXHAUSTED` |
+| Investigator | `ROOT_CAUSE_FOUND`, `INVESTIGATION_INCOMPLETE`, `BLOCKED`, `EXHAUSTED`, `NEED_DEVELOPER_DIAGNOSTIC`, `HYPOTHESIS_ELIMINATED`, `NEED_MORE_ANALYSIS` |
 | Requirements Engineer | `READY_FOR_REVIEW`, `BLOCKED`, `PARTIAL` |
 
 ### CRP Emoji Map
@@ -549,11 +549,13 @@ Clarification:
 ## Investigator Response Parsing
 
 **Expected status values:**
-- `ROOT_CAUSE_FOUND` - Problem identified
-- `NEED_DEVELOPER_DIAGNOSTIC` - Need code instrumentation
-- `HYPOTHESIS_ELIMINATED` - Ruled out a theory
-- `NEED_MORE_ANALYSIS` - Continuing investigation
-- `BLOCKED` - Cannot proceed
+- `ROOT_CAUSE_FOUND` - Problem identified, routes to Tech Lead for validation
+- `INVESTIGATION_INCOMPLETE` - Max iterations reached without definitive answer
+- `BLOCKED` - External blocker prevents investigation
+- `EXHAUSTED` - All hypotheses eliminated, need new theories
+- `NEED_DEVELOPER_DIAGNOSTIC` - Need code instrumentation (internal loop)
+- `HYPOTHESIS_ELIMINATED` - Ruled out a theory (internal loop)
+- `NEED_MORE_ANALYSIS` - Continuing investigation (internal loop)
 
 **Information to extract:**
 

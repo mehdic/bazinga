@@ -22,7 +22,7 @@ Name: Implement Login UI
 Status: pending
 Complexity: 5
 Initial Tier: Developer
---specializations '["bazinga/templates/specializations/01-languages/typescript.md", ...]'
+--specializations '["templates/specializations/01-languages/typescript.md", ...]'
 ```
 
 ### Template 2: Sub-step 5.3 (line 1922-1932)
@@ -183,7 +183,7 @@ Status: pending
 Complexity: 5
 Initial Tier: Developer
 Item_Count: [number of discrete tasks/items]  <-- ADD THIS
---specializations '["bazinga/templates/specializations/01-languages/typescript.md", ...]'
+--specializations '["templates/specializations/01-languages/typescript.md", ...]'
 ```
 
 **Pros:**

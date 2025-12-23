@@ -122,7 +122,7 @@ project/
 | # | File | Purpose | Changes |
 |---|------|---------|---------|
 | 1 | `agents/tech_stack_scout.md` | Version detection | Add version detection logic per component |
-| 2 | `bazinga/templates/pm_planning_steps.md` | PM workflow | Add component_path to task group creation |
+| 2 | `templates/pm_planning_steps.md` | PM workflow | Add component_path to task group creation |
 | 3 | `.claude/skills/bazinga-db/scripts/init_db.py` | DB schema | Add component_path column to task_groups |
 | 4 | `.claude/skills/bazinga-db/scripts/bazinga_db.py` | DB CLI | Support component_path in create/update |
 | 5 | `.claude/skills/prompt-builder/scripts/prompt_builder.py` | Prompt gen | Look up component version for guards |
@@ -208,7 +208,7 @@ Add new Step 0 before existing Step 1:
 
 ---
 
-### File 2: `bazinga/templates/pm_planning_steps.md`
+### File 2: `templates/pm_planning_steps.md`
 
 **Purpose:** PM binds each task group to a component path
 
@@ -742,7 +742,7 @@ The schema change adds a nullable column, so existing databases will:
 | Task | Effort | Files |
 |------|--------|-------|
 | Tech Stack Scout version detection | 2 hours | agents/tech_stack_scout.md |
-| PM component_path binding | 1 hour | bazinga/templates/pm_planning_steps.md |
+| PM component_path binding | 1 hour | templates/pm_planning_steps.md |
 | Database schema + migration | 1 hour | init_db.py |
 | bazinga-db CLI update | 1 hour | bazinga_db.py |
 | Prompt builder component lookup | 2 hours | prompt_builder.py |

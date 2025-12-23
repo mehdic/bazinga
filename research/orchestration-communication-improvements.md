@@ -195,7 +195,7 @@ Starting Phase 1 with Groups A, B, C...
    - Add explicit temp file fallback protocol
    - Add error reporting format
 
-3. **`bazinga/templates/message_templates.md`**
+3. **`templates/message_templates.md`**
    - Add "Execution Plan Ready" template
    - Add "Technical Review Summary" template
    - Add "Initialization Context" template
@@ -256,5 +256,5 @@ Starting Phase 1 with Groups A, B, C...
 
 - `agents/orchestrator.md` - Current orchestrator implementation
 - `agents/project_manager.md` - Current PM implementation
-- `bazinga/templates/message_templates.md` - Existing capsule templates
+- `templates/message_templates.md` - Existing capsule templates
 - User feedback from orchestration output (2025-11-25)

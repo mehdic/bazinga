@@ -305,7 +305,7 @@ FULL_PROMPT =
 | File | Purpose |
 |------|---------|
 | `agents/*.md` | Agent definitions (currently NOT sent to most agents) |
-| `bazinga/templates/orchestrator/phase_simple.md` | Simple mode spawn logic |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Parallel mode spawn logic |
-| `bazinga/templates/prompt_building.md` | Prompt building guide |
+| `templates/orchestrator/phase_simple.md` | Simple mode spawn logic |
+| `templates/orchestrator/phase_parallel.md` | Parallel mode spawn logic |
+| `templates/prompt_building.md` | Prompt building guide |
 | `agents/orchestrator.md` | Orchestrator definition |

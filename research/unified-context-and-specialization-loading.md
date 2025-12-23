@@ -192,7 +192,7 @@ Then invoke: Skill(command: "pre-spawn-assembler")
 
 **Approach:** Create a `prompt_building_sequence.md` template that orchestrator MUST follow for every spawn.
 
-**New Template:** `bazinga/templates/orchestrator/prompt_building_sequence.md`
+**New Template:** `templates/orchestrator/prompt_building_sequence.md`
 
 **Content:**
 ```markdown
@@ -238,7 +238,7 @@ Then invoke: Skill(command: "pre-spawn-assembler")
 ```markdown
 ### Step 2A.4: QA Expert Spawn
 
-**Follow prompt building sequence:** `bazinga/templates/orchestrator/prompt_building_sequence.md`
+**Follow prompt building sequence:** `templates/orchestrator/prompt_building_sequence.md`
 
 Agent: qa_expert
 Model: sonnet
@@ -605,7 +605,7 @@ You are the {role}. Your workflow:
 
 - `.claude/skills/context-assembler/SKILL.md` - Context assembly logic
 - `.claude/skills/specialization-loader/SKILL.md` - Specialization building logic
-- `bazinga/templates/orchestrator/phase_simple.md` - Simple mode workflow
-- `bazinga/templates/orchestrator/phase_parallel.md` - Parallel mode workflow
+- `templates/orchestrator/phase_simple.md` - Simple mode workflow
+- `templates/orchestrator/phase_parallel.md` - Parallel mode workflow
 - `research/reasoning-auto-enable-analysis.md` - Reasoning handoff implementation
 - `tmp/ultrathink-reviews/combined-review.md` - OpenAI review feedback

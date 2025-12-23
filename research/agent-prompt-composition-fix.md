@@ -386,9 +386,9 @@ Input context:
 | File | Changes |
 |------|---------|
 | `.claude/commands/bazinga.orchestrate.md` | Fix 1: Resume path, Fix 4: Composition formula |
-| `bazinga/templates/orchestrator/phase_simple.md` | Fix 3: Length validation |
-| `bazinga/templates/orchestrator/phase_parallel.md` | Fix 3: Length validation |
-| `bazinga/templates/prompt_building.md` | Fix 2: Clarify template |
+| `templates/orchestrator/phase_simple.md` | Fix 3: Length validation |
+| `templates/orchestrator/phase_parallel.md` | Fix 3: Length validation |
+| `templates/prompt_building.md` | Fix 2: Clarify template |
 | `agents/orchestrator.md` | Add composition formula reference |
 
 ---
@@ -404,7 +404,7 @@ Input context:
 
 ## References
 
-- `bazinga/templates/orchestrator/phase_simple.md` lines 126-165 (correct pattern)
-- `bazinga/templates/orchestrator/phase_parallel.md` lines 270-320 (correct pattern)
+- `templates/orchestrator/phase_simple.md` lines 126-165 (correct pattern)
+- `templates/orchestrator/phase_parallel.md` lines 270-320 (correct pattern)
 - `.claude/commands/bazinga.orchestrate.md` Step 5 (buggy resume path)
-- `bazinga/templates/prompt_building.md` (misleading example)
+- `templates/prompt_building.md` (misleading example)

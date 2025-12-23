@@ -98,7 +98,7 @@ IF specializations still empty:
 
 ### 2. Orphaned Template
 
-**File:** `bazinga/templates/orchestrator/spawn_with_specializations.md`
+**File:** `templates/orchestrator/spawn_with_specializations.md`
 
 This template had the CORRECT fallback derivation logic but was **never referenced** by:
 - orchestrator.md
@@ -110,8 +110,8 @@ The template existed in isolation, providing no value.
 ### 3. Phase Templates Missing Fallback
 
 **Files:**
-- `bazinga/templates/orchestrator/phase_simple.md`
-- `bazinga/templates/orchestrator/phase_parallel.md`
+- `templates/orchestrator/phase_simple.md`
+- `templates/orchestrator/phase_parallel.md`
 
 These templates assumed `task_group.specializations` would exist:
 ```
@@ -197,7 +197,7 @@ The template `spawn_with_specializations.md` was created but never integrated:
 $ grep -r "spawn_with_specializations" agents/
 (no results)
 
-$ grep -r "spawn_with_specializations" bazinga/templates/orchestrator/
+$ grep -r "spawn_with_specializations" templates/orchestrator/
 (no results)
 ```
 
@@ -221,7 +221,7 @@ If Scout doesn't create proper structure, fallback derivation won't help.
 ### 3. No Path Validation
 Orchestrator fallback derives paths like:
 ```
-bazinga/templates/specializations/01-languages/typescript.md
+templates/specializations/01-languages/typescript.md
 ```
 
 If these templates don't exist in client project, specialization loading fails.

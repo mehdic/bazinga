@@ -115,8 +115,8 @@ This is the correct architectural solution. It aligns with the principle that th
 - `.claude/skills/spawn-agent/scripts/spawn_agent.py`
 
 **Modify:**
-- `bazinga/templates/orchestrator/phase_simple.md` - Use skill instead of shell
-- `bazinga/templates/orchestrator/phase_parallel.md` - Use skill instead of shell
+- `templates/orchestrator/phase_simple.md` - Use skill instead of shell
+- `templates/orchestrator/phase_parallel.md` - Use skill instead of shell
 - `.claude/skills/prompt-builder/scripts/prompt_builder.py` - Add "did you mean?" for unknown args
 
 ## Decision Rationale
@@ -126,5 +126,5 @@ OpenAI's review correctly identified that my original proposal conflicts with th
 ## References
 
 - OpenAI Review: `tmp/ultrathink-reviews/openai-review.md`
-- Current templates: `bazinga/templates/orchestrator/phase_simple.md`
+- Current templates: `templates/orchestrator/phase_simple.md`
 - prompt-builder skill: `.claude/skills/prompt-builder/`
