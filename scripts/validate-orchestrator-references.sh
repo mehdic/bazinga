@@ -8,8 +8,15 @@ set -e
 set -o pipefail
 
 ORCHESTRATOR_FILE="agents/orchestrator.md"
-TEMPLATE_SIMPLE="bazinga/templates/orchestrator/phase_simple.md"
-TEMPLATE_PARALLEL="bazinga/templates/orchestrator/phase_parallel.md"
+
+# Template paths: try bazinga/templates first (symlink in dev), fall back to templates/ (CI/no symlink)
+if [ -f "bazinga/templates/orchestrator/phase_simple.md" ]; then
+    TEMPLATE_SIMPLE="bazinga/templates/orchestrator/phase_simple.md"
+    TEMPLATE_PARALLEL="bazinga/templates/orchestrator/phase_parallel.md"
+else
+    TEMPLATE_SIMPLE="templates/orchestrator/phase_simple.md"
+    TEMPLATE_PARALLEL="templates/orchestrator/phase_parallel.md"
+fi
 ERRORS=0
 WARNINGS=0
 FIX_MODE=false
