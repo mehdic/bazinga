@@ -280,7 +280,7 @@ PM assigns tasks to the right tier based on complexity:
 
 | Complexity | Tier | Model |
 |------------|------|-------|
-| 1-6 (standard) | Developer | Haiku |
+| 1-6 (standard) | Developer | Sonnet |
 | 7-10 (complex) | Senior Software Engineer | Sonnet |
 
 **Override rules:** Security-sensitive or architectural tasks always go to Senior Software Engineer, regardless of score.
