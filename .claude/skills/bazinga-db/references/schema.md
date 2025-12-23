@@ -722,7 +722,7 @@ These tables support the deterministic prompt building and workflow routing syst
 
 ### workflow_transitions
 
-Stores state machine transitions for deterministic workflow routing. Seeded from `bazinga/config/transitions.json` at session start.
+Stores state machine transitions for deterministic workflow routing. Seeded from `workflow/transitions.json` at session start.
 
 ```sql
 CREATE TABLE workflow_transitions (
@@ -769,7 +769,7 @@ transition = db.get_transition('developer', 'READY_FOR_QA')
 
 ### agent_markers
 
-Stores required markers that MUST be present in agent prompts. Seeded from `bazinga/config/agent-markers.json` at session start.
+Stores required markers that MUST be present in agent prompts. Seeded from `workflow/agent-markers.json` at session start.
 
 ```sql
 CREATE TABLE agent_markers (

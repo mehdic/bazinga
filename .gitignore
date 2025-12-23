@@ -86,7 +86,8 @@ bazinga/bazinga.db*
 !bazinga/testing_config.json
 !bazinga/scripts/
 !bazinga/scripts/**
-!bazinga/config/
-!bazinga/config/**
+
+# workflow/ folder is at root level (not inside bazinga/) - tracked by default
+# bazinga/config is a symlink -> ../workflow for dev mode compatibility
 
 test-results/

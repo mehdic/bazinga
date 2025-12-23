@@ -54,12 +54,13 @@ packages = ["src/bazinga_cli"]
 # Force-include bazinga config files as package data
 # These are gitignored (for runtime state) but needed for distribution
 # CLI checks package directory first, then falls back to shared-data
+# Note: workflow/ is source of truth for state machine configs (dev: bazinga/config symlink)
 [tool.hatch.build.targets.wheel.force-include]
 "bazinga/model_selection.json" = "bazinga_cli/bazinga/model_selection.json"
 "bazinga/challenge_levels.json" = "bazinga_cli/bazinga/challenge_levels.json"
 "bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
 "templates" = "bazinga_cli/templates"
-"bazinga/config" = "bazinga_cli/bazinga/config"
+"workflow" = "bazinga_cli/bazinga/config"  # workflow/ -> bazinga/config in clients
 
 [tool.hatch.build.targets.wheel.shared-data]
 "agents" = "share/bazinga_cli/agents"

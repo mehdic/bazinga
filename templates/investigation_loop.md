@@ -400,6 +400,6 @@ Tech Lead will decide next steps for "all hypotheses eliminated" scenario.
 
 - `agents/investigator.md` - Investigator agent definition
 - `agents/tech_lead.md` - Tech Lead triggers and validation
-- `bazinga/config/transitions.json` - Status code routing (v1.1.0)
+- `workflow/transitions.json` - Status code routing (v1.1.0)
 - `research/investigation-loop-template-ultrathink.md` - Design analysis
 - `docs/INVESTIGATION_WORKFLOW.md` - Workflow diagrams

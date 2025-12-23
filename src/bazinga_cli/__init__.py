@@ -493,6 +493,8 @@ class BazingaSetup:
                 continue
 
         # Copy config subdirectory (transitions.json, agent-markers.json)
+        # Source: workflow/ (packaged as bazinga_cli/bazinga/config/ in wheel)
+        # Dev: bazinga/config is symlink -> ../workflow
         source_config_dir = source_bazinga / "config"
         if source_config_dir.exists() and source_config_dir.is_dir():
             target_config_dir = bazinga_dir / "config"
