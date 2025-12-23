@@ -24,19 +24,23 @@
 
 ### 🔴 PHASE TRACKER INITIALIZATION (On PM PLANNING_COMPLETE)
 
-**When PM returns PLANNING_COMPLETE with execution_phases, initialize phase_tracker:**
+**When PM returns PLANNING_COMPLETE with execution_phases, initialize phase_tracker via skill:**
 
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
-  "{session_id}" "orchestrator" '{
-    "phase_tracker": {
-      "current_phase": 1,
-      "phase_totals": {"1": {count_of_phase_1_groups}, "2": {count_of_phase_2_groups}},
-      "phase_completed": {"1": 0, "2": 0}
-    },
-    "templates_loaded": [],
-    "total_spawns": 0
-  }'
+```
+Skill(command: "bazinga-db")
+
+bazinga-db, please save state:
+Session ID: {session_id}
+State Type: orchestrator
+State Data: {
+  "phase_tracker": {
+    "current_phase": 1,
+    "phase_totals": {"1": {count_of_phase_1_groups}, "2": {count_of_phase_2_groups}},
+    "phase_completed": {"1": 0, "2": 0}
+  },
+  "templates_loaded": [],
+  "total_spawns": 0
+}
 ```
 
 **This enables optimized phase continuation checks (Step 2B.7b) that reduce DB queries per group.**
@@ -312,17 +316,21 @@ Build aggregated data structure:
 ]
 ```
 
-**Step 2: Call workflow-router for EACH response to get routing decisions**
+**Step 2: Call workflow-router SKILL for EACH response to get routing decisions**
 
-```bash
-# For each response, get routing decision (outputs JSON)
-python3 .claude/skills/workflow-router/scripts/workflow_router.py \
-  --current-agent "developer" \
-  --status "{status}" \
-  --session-id "{session_id}" \
-  --group-id "{group_id}" \
-  --testing-mode "{testing_mode}"
+For each response, invoke the skill:
 ```
+Skill(command: "workflow-router")
+
+# Provide these parameters for the skill to use:
+Current Agent: developer
+Status: {status}
+Session ID: {session_id}
+Group ID: {group_id}
+Testing Mode: {testing_mode}
+```
+
+The skill returns JSON with `next_agent`, `action`, `model`.
 
 Build spawn queue from router outputs:
 ```json
@@ -348,11 +356,15 @@ Build spawn queue from router outputs:
 **Routing:** 2 → QA, 1 → Dev retry, 1 → Investigator
 ```
 
-**Step 4: Log to database** — Single aggregated log entry:
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet log-interaction \
-  "{session_id}" "developer_batch" "completion" \
-  '{"groups": ["A","B","C","D"], "routing": {"qa":2,"retry":1,"investigate":1}}'
+**Step 4: Log to database** — Single aggregated log entry via skill:
+```
+Skill(command: "bazinga-db")
+
+bazinga-db, please log interaction:
+Session ID: {session_id}
+Agent ID: developer_batch
+Event: completion
+Data: {"groups": ["A","B","C","D"], "routing": {"qa":2,"retry":1,"investigate":1}}
 ```
 
 **Step 5: Spawn ALL next agents in ONE Task block**
@@ -572,16 +584,24 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 **🔴 CONTEXT OPTIMIZATION: Use DB-persisted phase tracking to minimize queries**
 
-**Step 1: Update Group and Orchestrator State (SINGLE DB CALL)**
-```bash
-# Update group status AND increment orchestrator phase tracker in one operation
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
-  "{group_id}" "{session_id}" --status "completed" --merge_status "merged"
+**Step 1: Update Group Status via skill**
+```
+Skill(command: "bazinga-db")
+
+bazinga-db, please update task group:
+Group ID: {group_id}
+Session ID: {session_id}
+Status: completed
+Merge Status: merged
 ```
 
-**Step 2: Get Orchestrator State (check if phase complete)**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+**Step 2: Get Orchestrator State via skill (check if phase complete)**
+```
+Skill(command: "bazinga-db")
+
+bazinga-db, please get state:
+Session ID: {session_id}
+State Type: orchestrator
 ```
 
 Parse `phase_tracker` from state:
@@ -597,16 +617,20 @@ Parse `phase_tracker` from state:
 
 **Step 3: Minimal Capsule (NO full query if phase incomplete)**
 ```
-# Increment local counter from state
+# Increment counter from state
 phase_completed[current_phase] += 1
 
 IF phase_completed[current_phase] < phase_totals[current_phase]:
   # Phase still in progress - minimal capsule, NO full DB query
   Output: `✅ {group_id} merged | Phase {N}: {completed}/{total}`
 
-  # Save updated counter to DB
-  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
-    "{session_id}" "orchestrator" '{"phase_tracker": {updated_tracker}}'
+  # Save updated counter via skill
+  Skill(command: "bazinga-db")
+
+  bazinga-db, please save state:
+  Session ID: {session_id}
+  State Type: orchestrator
+  State Data: {"phase_tracker": {updated_tracker}}
 
   EXIT (wait for more completions)
 ```
@@ -614,15 +638,19 @@ IF phase_completed[current_phase] < phase_totals[current_phase]:
 **Step 4: Full Phase Check (ONLY when phase completes)**
 ```
 IF phase_completed[current_phase] == phase_totals[current_phase]:
-  # Phase complete - NOW do full query
-  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
-  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "pm"
+  # Phase complete - NOW do full queries via skill
+
+  Skill(command: "bazinga-db")
+  bazinga-db, please get task groups for session: {session_id}
+
+  Skill(command: "bazinga-db")
+  bazinga-db, please get state: {session_id} pm
 
   # Check for next phase
   IF next_phase exists in execution_phases:
     Output: `✅ Phase {N} complete | Starting Phase {N+1}`
     Reset phase_completed[next_phase] = 0
-    Save state, jump Step 2B.1
+    Save state via skill, jump Step 2B.1
   ELSE:
     Output: `✅ All phases complete | Final PM assessment`
     Proceed Step 2B.8
