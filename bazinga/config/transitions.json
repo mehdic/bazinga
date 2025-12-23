@@ -1,6 +1,9 @@
 {
-  "_version": "1.0.0",
+  "_version": "1.1.0",
   "_description": "Deterministic workflow state machine for BAZINGA orchestration",
+  "_changelog": {
+    "1.1.0": "Fixed status code mismatches between agents and transitions. Added SSE ROOT_CAUSE_FOUND, PARTIAL. Added TL UNBLOCKING_GUIDANCE alias. Added Investigator HYPOTHESIS_ELIMINATED, NEED_MORE_ANALYSIS. Renamed INCOMPLETE→INVESTIGATION_INCOMPLETE, WAITING_FOR_RESULTS→NEED_DEVELOPER_DIAGNOSTIC. Fixed Investigator ROOT_CAUSE_FOUND routing to tech_lead."
+  },
 
   "developer": {
     "READY_FOR_QA": {
@@ -61,6 +64,17 @@
       "next_agent": "tech_lead",
       "action": "spawn",
       "include_context": ["validation_request"]
+    },
+    "ROOT_CAUSE_FOUND": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "mandatory_review": true,
+      "include_context": ["root_cause_analysis", "recommendation", "evidence"]
+    },
+    "PARTIAL": {
+      "next_agent": "senior_software_engineer",
+      "action": "respawn",
+      "include_context": ["partial_work", "remaining_tasks"]
     }
   },
 
@@ -127,6 +141,12 @@
       "action": "spawn",
       "include_context": ["guidance", "unblocking_steps"]
     },
+    "UNBLOCKING_GUIDANCE": {
+      "next_agent": "_return_to_blocked",
+      "action": "spawn",
+      "include_context": ["guidance", "unblocking_steps"],
+      "_note": "Alias for UNBLOCKING_GUIDANCE_PROVIDED - agents may use either"
+    },
     "ARCHITECTURAL_DECISION_MADE": {
       "next_agent": "developer",
       "action": "spawn",
@@ -171,29 +191,41 @@
 
   "investigator": {
     "ROOT_CAUSE_FOUND": {
-      "next_agent": "developer",
-      "action": "spawn",
-      "include_context": ["root_cause", "fix_guidance"]
-    },
-    "INCOMPLETE": {
       "next_agent": "tech_lead",
       "action": "spawn",
-      "include_context": ["partial_findings", "next_steps"]
+      "include_context": ["root_cause", "fix_guidance", "investigation_summary", "evidence"]
+    },
+    "INVESTIGATION_INCOMPLETE": {
+      "next_agent": "tech_lead",
+      "action": "spawn",
+      "include_context": ["partial_findings", "iterations_completed", "hypotheses_tested", "next_steps"]
     },
     "BLOCKED": {
       "next_agent": "tech_lead",
       "action": "spawn",
-      "include_context": ["blocker_details"]
+      "include_context": ["blocker_details", "progress_summary"]
     },
     "EXHAUSTED": {
       "next_agent": "tech_lead",
       "action": "spawn",
-      "include_context": ["hypotheses_tested", "recommendations"]
+      "include_context": ["hypotheses_tested", "elimination_reasons", "recommendations"]
     },
-    "WAITING_FOR_RESULTS": {
+    "NEED_DEVELOPER_DIAGNOSTIC": {
       "next_agent": "developer",
       "action": "spawn",
-      "include_context": ["diagnostic_request"]
+      "include_context": ["diagnostic_request", "hypothesis", "expected_output"]
+    },
+    "HYPOTHESIS_ELIMINATED": {
+      "next_agent": "investigator",
+      "action": "respawn",
+      "include_context": ["eliminated_hypothesis", "next_hypothesis", "iteration", "evidence"],
+      "iteration_budget_check": true
+    },
+    "NEED_MORE_ANALYSIS": {
+      "next_agent": "investigator",
+      "action": "respawn",
+      "include_context": ["analysis_needed", "current_hypothesis", "iteration"],
+      "iteration_budget_check": true
     }
   },
 
@@ -242,5 +274,11 @@
       "agent": "requirements_engineer",
       "max_parallel": 2
     }
+  },
+
+  "_status_aliases": {
+    "_description": "Backward compatibility aliases - workflow-router should normalize these",
+    "INCOMPLETE": "INVESTIGATION_INCOMPLETE",
+    "WAITING_FOR_RESULTS": "NEED_DEVELOPER_DIAGNOSTIC"
   }
 }

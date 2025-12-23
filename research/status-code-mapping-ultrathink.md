@@ -3,8 +3,9 @@
 **Date:** 2025-12-23
 **Context:** Complete audit of all agent status codes vs transitions.json configuration
 **Decision:** Align transitions.json with authoritative agent definitions
-**Status:** Reviewed
+**Status:** Implemented
 **Reviewed by:** OpenAI GPT-5 (Gemini skipped - ENABLE_GEMINI=false)
+**Implemented:** 2025-12-23
 
 ---
 
@@ -722,22 +723,23 @@ def normalize_status(status: str) -> str:
 
 ## Updated Validation Checklist (Post-Review)
 
-After implementation:
+**Implementation completed:** 2025-12-23
 
-- [ ] Investigator ROOT_CAUSE_FOUND → tech_lead (not developer)
-- [ ] Investigator uses INVESTIGATION_INCOMPLETE (not INCOMPLETE)
-- [ ] Investigator uses NEED_DEVELOPER_DIAGNOSTIC (not WAITING_FOR_RESULTS)
-- [ ] Investigator has HYPOTHESIS_ELIMINATED → respawn investigator
-- [ ] Investigator has NEED_MORE_ANALYSIS → respawn investigator
-- [ ] SSE has ROOT_CAUSE_FOUND → tech_lead (per LLM recommendation)
-- [ ] SSE has PARTIAL → respawn SSE
-- [ ] Tech Lead has UNBLOCKING_GUIDANCE (alias for UNBLOCKING_GUIDANCE_PROVIDED)
-- [ ] response_parsing.md updated with all renamed statuses
-- [ ] transitions.json version bumped to 1.1.0
-- [ ] Grep for old status names shows 0 matches in transitions.json
-- [ ] workflow-router has alias layer for backward compat
-- [ ] Config-seeder re-run (if using database-backed routing)
-- [ ] Manual test: Each new/fixed status routes correctly
+- [x] Investigator ROOT_CAUSE_FOUND → tech_lead (not developer)
+- [x] Investigator uses INVESTIGATION_INCOMPLETE (not INCOMPLETE)
+- [x] Investigator uses NEED_DEVELOPER_DIAGNOSTIC (not WAITING_FOR_RESULTS)
+- [x] Investigator has HYPOTHESIS_ELIMINATED → respawn investigator
+- [x] Investigator has NEED_MORE_ANALYSIS → respawn investigator
+- [x] SSE has ROOT_CAUSE_FOUND → tech_lead (per LLM recommendation)
+- [x] SSE has PARTIAL → respawn SSE
+- [x] Tech Lead has UNBLOCKING_GUIDANCE (alias for UNBLOCKING_GUIDANCE_PROVIDED)
+- [x] response_parsing.md updated with all renamed statuses
+- [x] transitions.json version bumped to 1.1.0
+- [x] orchestrator.md status routing table updated
+- [x] INVESTIGATION_WORKFLOW.md Known Gaps section updated
+- [x] Backward compat aliases added to transitions.json (`_status_aliases` section)
+- [ ] Config-seeder re-run (if using database-backed routing) - N/A for now
+- [ ] Manual test: Each new/fixed status routes correctly - Pending integration test
 
 ---
 

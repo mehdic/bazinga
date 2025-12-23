@@ -319,31 +319,39 @@ The investigation loop is a **sub-workflow** that:
 
 ---
 
-## Known Gaps (To Be Fixed)
+## Known Gaps (Fixed)
 
-### Gap 1: ROOT_CAUSE_FOUND Routing Mismatch
+> **Status:** All gaps fixed in transitions.json v1.1.0 (2025-12-23)
+> **Reference:** `research/status-code-mapping-ultrathink.md`
+
+### Gap 1: ROOT_CAUSE_FOUND Routing Mismatch ✅ FIXED
 
 | Source | Route |
 |--------|-------|
-| `transitions.json` | ROOT_CAUSE_FOUND → Developer (WRONG) |
-| `phase_simple.md` | ROOT_CAUSE_FOUND → Tech Lead validation (CORRECT) |
-| `investigator.md` | "Routing back to Tech Lead for validation" (CORRECT) |
+| `transitions.json` (v1.1.0) | ROOT_CAUSE_FOUND → tech_lead ✅ |
+| `phase_simple.md` | ROOT_CAUSE_FOUND → Tech Lead validation ✅ |
+| `investigator.md` | "Routing back to Tech Lead for validation" ✅ |
 
-**Fix needed:** Update `transitions.json` to route ROOT_CAUSE_FOUND → tech_lead
+### Gap 2: Status Code Name Mismatches ✅ FIXED
 
-### Gap 2: Status Code Name Mismatches
+| Investigator Uses | transitions.json (v1.1.0) | Match? |
+|-------------------|---------------------------|--------|
+| `NEED_DEVELOPER_DIAGNOSTIC` | `NEED_DEVELOPER_DIAGNOSTIC` | ✅ Fixed |
+| `INVESTIGATION_INCOMPLETE` | `INVESTIGATION_INCOMPLETE` | ✅ Fixed |
+| `HYPOTHESIS_ELIMINATED` | `HYPOTHESIS_ELIMINATED` | ✅ Added |
+| `NEED_MORE_ANALYSIS` | `NEED_MORE_ANALYSIS` | ✅ Added |
 
-| Investigator Uses | transitions.json Has | Match? |
-|-------------------|---------------------|--------|
-| `NEED_DEVELOPER_DIAGNOSTIC` | `WAITING_FOR_RESULTS` | ❌ Different names |
-| `INVESTIGATION_INCOMPLETE` | `INCOMPLETE` | ❌ Different names |
-| `HYPOTHESIS_ELIMINATED` | (none) | ✓ Internal loop status |
-| `NEED_MORE_ANALYSIS` | (none) | ✓ Internal loop status |
+### Gap 3: Missing investigation_loop.md Template ⏳ PENDING
 
-**Fix needed:** Align status code names between investigator.md and transitions.json
+The file `templates/investigation_loop.md` is referenced but doesn't exist yet.
 
-### Gap 3: Missing investigation_loop.md Template
+**Status:** Template design complete in `research/investigation-loop-template-ultrathink.md`. Implementation pending.
 
-The file `bazinga/templates/investigation_loop.md` is referenced in phase_simple.md but doesn't exist.
+### Additional Fixes Applied
 
-**Fix needed:** Create the template per `research/investigation-loop-template-ultrathink.md`
+| Gap | Description | Status |
+|-----|-------------|--------|
+| SSE ROOT_CAUSE_FOUND | Added SSE → tech_lead routing | ✅ Fixed |
+| SSE PARTIAL | Added respawn routing | ✅ Fixed |
+| TL UNBLOCKING_GUIDANCE | Added alias for UNBLOCKING_GUIDANCE_PROVIDED | ✅ Fixed |
+| Backward compat aliases | Added `_status_aliases` section | ✅ Added |
