@@ -1120,15 +1120,21 @@ ls -la tmp/simple-calculator-app/
 
 #### Step 11: Specialization Loader Invocation Check (CRITICAL)
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output "<SESSION_ID>" "specialization-loader"
+# Use get-skill-output-all to see ALL invocations (not just latest)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output-all "<SESSION_ID>" "specialization-loader"
 ```
 
 **Expected output:**
 - At least 3 entries (one per agent: developer, qa_expert, tech_lead)
-- Each entry should have:
+- Each entry has `output_data` containing:
   - `templates_used` array (non-empty)
   - `token_count` within budget
   - `composed_identity` string
+
+**Quick check command:**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output-all "<SESSION_ID>" "specialization-loader" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f'{len(data)} entries'); [print(f\"  - {e.get('output_data',{}).get('agent_type','?')} ({len(e.get('output_data',{}).get('templates_used',[]))} templates)\") for e in data]"
+```
 
 **If empty:** Specialization-loader was NOT invoked - this is a critical failure!
 
@@ -1142,7 +1148,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 | Reasoning Entries | `get-reasoning` | 8 entries (2 per agent) |
 | Mandatory Phases | `check-mandatory-phases` | complete=true for all |
 | **🔴 Project Context** | `test -f bazinga/project_context.json` | **File exists with valid JSON** |
-| **Specialization** | `get-skill-output ... specialization-loader` | **3+ entries with composed_identity** |
+| **Specialization** | `get-skill-output-all ... specialization-loader` | **3+ entries with output_data.composed_identity** |
 | Files | `ls tmp/simple-calculator-app/` | 3 files |
 | Tests | `pytest test_calculator.py` | All pass |
 
@@ -1157,7 +1163,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
    - Step 0.5 was skipped (didn't spawn Tech Stack Scout)
    - **FIX:** Follow orchestrator workflow exactly - check/create project_context.json BEFORE PM spawn
 
-4. **🔴 Specialization Not Built** - If `get-skill-output ... specialization-loader` returns empty:
+4. **🔴 Specialization Not Built** - If `get-skill-output-all ... specialization-loader` returns empty:
    - Orchestrator skipped the skill invocation
    - Agents received raw template text instead of composed blocks
    - **FIX:** Follow Manual Orchestration Workflow above - invoke skill before EACH agent spawn
