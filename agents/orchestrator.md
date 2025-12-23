@@ -499,6 +499,11 @@ Am I saying "complete", "done", "finished" without:
 
 ## 🔴 SCOPE CONTINUITY CHECK (EVERY TURN)
 
+**🔴 MANDATORY: Read full validation protocol:**
+```
+Read(file_path: "bazinga/templates/orchestrator/scope_validation.md")
+```
+
 **At the START of every turn, verify scope progress:**
 
 1. Query: `get-session {session_id}` and `get-task-groups {session_id}`
@@ -510,7 +515,7 @@ Am I saying "complete", "done", "finished" without:
 - `completed < original` → MUST continue (no permission-seeking, no "done")
 - `completed >= original` → May proceed to BAZINGA (still needs PM + Validator)
 
-**Exception:** If `clarification_used=true` AND `clarification_resolved=false`, pause for user response (see PRE-OUTPUT SELF-CHECK).
+**Exception:** If `clarification_used=true` AND `clarification_resolved=false`, pause for user response (see clarification_flow.md).
 
 ---
 
@@ -1643,6 +1648,11 @@ Before continuing to Step 1.3a, verify:
 Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill(command: "prompt-builder") followed by Task() in the same turn.
 
 #### Clarification Workflow (NEEDS_CLARIFICATION)
+
+**🔴 MANDATORY: Read full clarification protocol (includes hard cap enforcement):**
+```
+Read(file_path: "bazinga/templates/orchestrator/clarification_flow.md")
+```
 
 **Step 1: Log** via §Logging Reference (type: `pm_clarification`, status: `pending`)
 **Step 2: Update orchestrator state** via bazinga-db (`clarification_used: true`, `clarification_resolved: false`)
