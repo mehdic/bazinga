@@ -15,16 +15,16 @@ def fix_parsing_references(content: str) -> str:
     # Replace with template reference
     patterns = [
         (r'Use §Developer Response Parsing \(lines \d+-\d+\)',
-         'Use the Developer Response Parsing section in `templates/response_parsing.md`'),
+         'Use the Developer Response Parsing section in `bazinga/templates/response_parsing.md`'),
 
         (r'Use §QA Expert Response Parsing \(lines \d+-\d+\)',
-         'Use the QA Expert Response Parsing section in `templates/response_parsing.md`'),
+         'Use the QA Expert Response Parsing section in `bazinga/templates/response_parsing.md`'),
 
         (r'Use §Tech Lead Response Parsing \(lines \d+-\d+\)',
-         'Use the Tech Lead Response Parsing section in `templates/response_parsing.md`'),
+         'Use the Tech Lead Response Parsing section in `bazinga/templates/response_parsing.md`'),
 
         (r'Use §PM Response Parsing \(lines \d+-\d+\)',
-         'Use the PM Response Parsing section in `templates/response_parsing.md`'),
+         'Use the PM Response Parsing section in `bazinga/templates/response_parsing.md`'),
     ]
 
     for pattern, replacement in patterns:
@@ -34,16 +34,16 @@ def fix_parsing_references(content: str) -> str:
     # Replace with template reference
     fallback_patterns = [
         (r'see §Developer Response Parsing line \d+-\d+',
-         'see Developer fallback strategies in `templates/response_parsing.md`'),
+         'see Developer fallback strategies in `bazinga/templates/response_parsing.md`'),
 
         (r'see §QA Expert Response Parsing line \d+-\d+',
-         'see QA fallback strategies in `templates/response_parsing.md`'),
+         'see QA fallback strategies in `bazinga/templates/response_parsing.md`'),
 
         (r'see §Tech Lead Response Parsing line \d+-\d+',
-         'see Tech Lead fallback strategies in `templates/response_parsing.md`'),
+         'see Tech Lead fallback strategies in `bazinga/templates/response_parsing.md`'),
 
         (r'see §PM Response Parsing line \d+-\d+',
-         'see PM fallback strategies in `templates/response_parsing.md`'),
+         'see PM fallback strategies in `bazinga/templates/response_parsing.md`'),
     ]
 
     for pattern, replacement in fallback_patterns:
@@ -73,7 +73,7 @@ def fix_logging_references(content: str) -> str:
     # Replace "Log response (§line XXXX)" with template reference
     content = re.sub(
         r'Log response \(§line \d+\)',
-        'Log to database (see `templates/logging_pattern.md`)',
+        'Log to database (see `bazinga/templates/logging_pattern.md`)',
         content
     )
 

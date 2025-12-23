@@ -176,7 +176,7 @@ If `project_context.json` exists, derive QA templates from detected testing fram
 2. **Verify each template path exists before adding:**
    ```
    FOR each candidate_template in role_defaults:
-     Use Glob to check if file exists at templates/specializations/{candidate_template}
+     Use Glob to check if file exists at bazinga/templates/specializations/{candidate_template}
      IF exists: add to augmented_templates
      IF NOT exists: add to skipped_missing list, log warning
    ```

@@ -23,7 +23,7 @@ def replace_parsing_section(content: str) -> str:
 
     replacement = '''## 📊 Agent Response Parsing for Capsule Construction
 
-**Complete parsing guide:** `templates/response_parsing.md`
+**Complete parsing guide:** `bazinga/templates/response_parsing.md`
 
 **Quick Reference:**
 
@@ -44,7 +44,7 @@ For each agent type, extract:
 📋 PM: Planning complete | {mode}: {groups} | Starting development
 ```
 
-**Detailed extraction patterns, fallback strategies, and complete examples:** See `templates/response_parsing.md`
+**Detailed extraction patterns, fallback strategies, and complete examples:** See `bazinga/templates/response_parsing.md`
 
 ---
 '''
@@ -74,7 +74,7 @@ def replace_simple_mode_prompt_building(content: str) -> str:
 
     replacement = '''### 🔴 MANDATORY DEVELOPER PROMPT BUILDING - NO SHORTCUTS ALLOWED
 
-**Follow the prompt building guide:** `templates/prompt_building.md`
+**Follow the prompt building guide:** `bazinga/templates/prompt_building.md`
 
 **Required sections for developer prompt:**
 1. ✓ Session ID (from Step 0)
@@ -92,7 +92,7 @@ def replace_simple_mode_prompt_building(content: str) -> str:
 - [ ] MANDATORY WORKFLOW section present
 - [ ] Report format specified
 
-See `templates/prompt_building.md` for complete instructions.
+See `bazinga/templates/prompt_building.md` for complete instructions.
 See `agents/developer.md` for full agent definition.
 
 '''
@@ -143,7 +143,7 @@ def replace_parallel_mode_prompt_building(content: str) -> str:
 
 **IMPORTANT:** Build prompts for ALL groups BEFORE spawning any.
 
-See `templates/prompt_building.md` for detailed instructions.
+See `bazinga/templates/prompt_building.md` for detailed instructions.
 
 '''
 

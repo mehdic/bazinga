@@ -11,7 +11,7 @@ It queries the database for:
 
 Then reads from filesystem:
 - Agent definition files (agents/*.md)
-- Specialization templates (templates/specializations/*.md)
+- Specialization templates (bazinga/templates/specializations/*.md)
 
 Usage (params-file mode - RECOMMENDED for orchestrator):
     python3 prompt_builder.py --params-file "bazinga/prompts/{session}/params.json"
@@ -110,7 +110,7 @@ MIN_AGENT_LINES = {
     "senior_software_engineer": 1200,
     "qa_expert": 800,
     "tech_lead": 600,
-    "project_manager": 300,  # Kernel file - details in templates/pm_*.md
+    "project_manager": 300,  # Kernel file - details in bazinga/templates/pm_*.md
     "investigator": 400,
     "requirements_engineer": 500,
 }

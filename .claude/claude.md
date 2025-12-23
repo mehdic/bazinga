@@ -1379,7 +1379,7 @@ The dashboard should reference this version in comments for traceability.
 ### ❌ WRONG (What was done in failed tests)
 ```python
 # Just reading the raw template file
-Read: templates/specializations/01-languages/python.md
+Read: bazinga/templates/specializations/01-languages/python.md
 # Then spawning Developer...
 ```
 

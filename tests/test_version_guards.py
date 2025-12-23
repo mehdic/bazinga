@@ -797,7 +797,7 @@ class TestInferComponentFromSpecializations:
                 {'path': 'frontend/', 'language': 'typescript'},
             ]
         }
-        spec_paths = ['templates/specializations/01-languages/python.md']
+        spec_paths = ['bazinga/templates/specializations/01-languages/python.md']
         result = infer_component_from_specializations(spec_paths, project_ctx)
         assert result == 'backend/'
 
@@ -809,7 +809,7 @@ class TestInferComponentFromSpecializations:
                 {'path': 'frontend/', 'language': 'typescript', 'framework': 'react'},
             ]
         }
-        spec_paths = ['templates/specializations/02-frameworks-frontend/react.md']
+        spec_paths = ['bazinga/templates/specializations/02-frameworks-frontend/react.md']
         result = infer_component_from_specializations(spec_paths, project_ctx)
         assert result == 'frontend/'
 
@@ -821,7 +821,7 @@ class TestInferComponentFromSpecializations:
                 {'path': 'frontend/', 'language': 'typescript', 'framework': 'nextjs'},
             ]
         }
-        spec_paths = ['templates/specializations/03-frameworks-backend/fastapi.md']
+        spec_paths = ['bazinga/templates/specializations/03-frameworks-backend/fastapi.md']
         result = infer_component_from_specializations(spec_paths, project_ctx)
         assert result == 'backend/'
 
@@ -847,7 +847,7 @@ class TestInferComponentFromSpecializations:
                 {'path': 'backend/', 'language': 'java'},
             ]
         }
-        spec_paths = ['templates/specializations/01-languages/python.md']
+        spec_paths = ['bazinga/templates/specializations/01-languages/python.md']
         result = infer_component_from_specializations(spec_paths, project_ctx)
         assert result is None
 
