@@ -89,8 +89,4 @@ bazinga/bazinga.db*
 !bazinga/config/
 !bazinga/config/**
 
-# Coordination folder (legacy - templates now at root templates/)
-coordination/
-!coordination/templates/
-!coordination/templates/**
 test-results/

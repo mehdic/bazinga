@@ -449,27 +449,13 @@ else
     fi
 fi
 
-# Copy templates to bazinga/templates if not present
-# On client projects, templates are installed to bazinga/templates/
+# Check templates exist at bazinga/templates (installed by bazinga CLI)
 if [ ! -d "bazinga/templates" ]; then
     echo ""
-    echo "📝 Copying templates to bazinga/templates..."
-
-    # Check legacy locations for migration
-    if [ -d "coordination/templates" ]; then
-        mkdir -p bazinga/templates
-        cp coordination/templates/*.md bazinga/templates/ 2>/dev/null
-        if [ $? -eq 0 ]; then
-            echo "✅ Templates copied from coordination/templates"
-        else
-            echo "⚠️  Warning: Could not copy templates"
-        fi
-    else
-        echo "⚠️  Warning: No templates found"
-        echo "   Run 'bazinga update' to install templates to bazinga/templates/"
-    fi
+    echo "⚠️  Warning: bazinga/templates not found"
+    echo "   Run 'bazinga update' to install templates"
 else
-    echo "✓ bazinga/templates already exists"
+    echo "✓ bazinga/templates exists"
 fi
 
 echo ""

@@ -357,13 +357,9 @@ class BazingaSetup:
         # Use helper for path resolution with legacy fallback
         source_templates = self._get_config_source("templates")
         if not source_templates:
-            # Legacy fallback: bazinga/templates or coordination/templates
-            legacy_path = self._get_config_source("bazinga/templates")
-            if not legacy_path:
-                legacy_path = self._get_config_source("coordination/templates")
-            if legacy_path:
-                source_templates = legacy_path
-            else:
+            # Legacy fallback: bazinga/templates
+            source_templates = self._get_config_source("bazinga/templates")
+            if not source_templates:
                 console.print("[yellow]⚠️  No templates found in source[/yellow]")
                 console.print("[dim]   Checked: package dir, shared-data, project root[/dim]")
                 console.print("[dim]   Hint: Update CLI with 'uv tool upgrade bazinga-cli' or reinstall[/dim]")
