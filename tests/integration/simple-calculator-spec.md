@@ -166,7 +166,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "$SE
 - [ ] QA Expert: `understanding`, `completion` phases logged
 - [ ] Tech Lead: `understanding`, `completion` phases logged
 
-**If reasoning logs are empty:** The orchestrator used simplified prompts instead of full agent definitions. Re-run using `/bazinga.orchestrate` which follows `bazinga/templates/orchestrator/phase_simple.md` to read full agent files.
+**If reasoning logs are empty:** The orchestrator used simplified prompts instead of full agent definitions. Re-run using `/bazinga.orchestrate` which follows `templates/orchestrator/phase_simple.md` to read full agent files.
 
 ### 4. Test Execution
 ```bash
@@ -188,10 +188,10 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs "$SE
 
 **🔴 If logs are empty, the test was executed incorrectly.**
 
-The `/bazinga.orchestrate` slash command follows `bazinga/templates/orchestrator/phase_simple.md` which mandates:
+The `/bazinga.orchestrate` slash command follows `templates/orchestrator/phase_simple.md` which mandates:
 - Reading full agent definitions from `agents/*.md`
 - Including specialization blocks
-- Building complete prompts per `bazinga/templates/prompt_building.md`
+- Building complete prompts per `templates/prompt_building.md`
 
 Simplified prompts (without full agent definitions) will skip mandatory workflows like reasoning documentation.
 
