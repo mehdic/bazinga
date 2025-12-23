@@ -1011,3 +1011,162 @@ After integrating feedback, the template must:
 1. **P0 (Blocking):** Fix status codes, prompt-builder usage, DB schema
 2. **P1 (Important):** Add capacity checks, turn boundaries, file path corrections
 3. **P2 (Enhancement):** Instrumentation hygiene, context package registration
+
+---
+
+## Gap Analysis: transitions.json vs investigator.md Alignment
+
+### Gap 1: ROOT_CAUSE_FOUND Routing Error
+
+**Current (WRONG):**
+```json
+// bazinga/config/transitions.json lines 173-177
+"ROOT_CAUSE_FOUND": {
+  "next_agent": "developer",  // ❌ WRONG
+  "action": "spawn",
+  "include_context": ["root_cause", "fix_guidance"]
+}
+```
+
+**Correct (Per investigator.md line 689):**
+```json
+"ROOT_CAUSE_FOUND": {
+  "next_agent": "tech_lead",  // ✅ CORRECT - Tech Lead validates first
+  "action": "spawn",
+  "include_context": ["root_cause", "fix_guidance", "investigation_summary"]
+}
+```
+
+**Evidence:**
+- `investigator.md:689`: "Routing back to Tech Lead for validation and decision"
+- `INVESTIGATION_WORKFLOW.md` Exit Routing diagram shows ROOT_CAUSE_FOUND → Tech Lead
+- Tech Lead validation is a safety net - catches weak root causes before Developer implements
+
+**Impact if not fixed:**
+- Developer receives root cause without Tech Lead validation
+- Potentially wrong root causes get implemented as fixes
+- Wastes development cycles on incorrect solutions
+
+### Gap 2: Status Code Name Mismatches
+
+**Current Status Code Comparison:**
+
+| Investigator Returns | transitions.json Has | Match? | Decision |
+|---------------------|---------------------|--------|----------|
+| `ROOT_CAUSE_FOUND` | `ROOT_CAUSE_FOUND` | ✅ | Keep |
+| `INVESTIGATION_INCOMPLETE` | `INCOMPLETE` | ❌ | Update transitions.json |
+| `NEED_DEVELOPER_DIAGNOSTIC` | `WAITING_FOR_RESULTS` | ❌ | Update transitions.json |
+| `BLOCKED` | `BLOCKED` | ✅ | Keep |
+| `EXHAUSTED` | `EXHAUSTED` | ✅ | Keep |
+
+**Rationale for Updating transitions.json (NOT investigator.md):**
+
+1. **Agent files are authoritative** - Agent definitions specify what status codes they return
+2. **Descriptive names are better** - `INVESTIGATION_INCOMPLETE` is more descriptive than `INCOMPLETE`
+3. **NEED_DEVELOPER_DIAGNOSTIC is action-oriented** - Better than passive `WAITING_FOR_RESULTS`
+4. **Config follows behavior** - transitions.json is configuration that matches agent behavior
+
+### Fix Plan
+
+#### Fix 1: Update ROOT_CAUSE_FOUND routing in transitions.json
+
+```json
+// Change line 174 from:
+"next_agent": "developer"
+// To:
+"next_agent": "tech_lead"
+```
+
+#### Fix 2: Rename INCOMPLETE to INVESTIGATION_INCOMPLETE in transitions.json
+
+```json
+// Change line 178 key from:
+"INCOMPLETE": {
+// To:
+"INVESTIGATION_INCOMPLETE": {
+```
+
+#### Fix 3: Rename WAITING_FOR_RESULTS to NEED_DEVELOPER_DIAGNOSTIC in transitions.json
+
+```json
+// Change line 193 key from:
+"WAITING_FOR_RESULTS": {
+// To:
+"NEED_DEVELOPER_DIAGNOSTIC": {
+```
+
+Additionally, `NEED_DEVELOPER_DIAGNOSTIC` is an **internal loop status** handled by the investigation_loop.md template (not workflow-router). The transitions.json entry exists as fallback only. The include_context should reflect diagnostic request:
+
+```json
+"NEED_DEVELOPER_DIAGNOSTIC": {
+  "next_agent": "developer",
+  "action": "spawn",
+  "include_context": ["diagnostic_request", "hypothesis", "expected_output"]
+}
+```
+
+### workflow_router.py Impact
+
+The `workflow_router.py` script reads from database (seeded from transitions.json). Changes:
+1. Update transitions.json
+2. Re-seed database using config-seeder skill (or re-init)
+
+No code changes needed to workflow_router.py itself.
+
+### Complete Updated investigator Section for transitions.json
+
+```json
+"investigator": {
+  "ROOT_CAUSE_FOUND": {
+    "next_agent": "tech_lead",
+    "action": "spawn",
+    "include_context": ["root_cause", "fix_guidance", "investigation_summary", "evidence"]
+  },
+  "INVESTIGATION_INCOMPLETE": {
+    "next_agent": "tech_lead",
+    "action": "spawn",
+    "include_context": ["partial_findings", "iterations_completed", "hypotheses_tested", "next_steps"]
+  },
+  "BLOCKED": {
+    "next_agent": "tech_lead",
+    "action": "spawn",
+    "include_context": ["blocker_details", "progress_summary"]
+  },
+  "EXHAUSTED": {
+    "next_agent": "tech_lead",
+    "action": "spawn",
+    "include_context": ["hypotheses_tested", "elimination_reasons", "recommendations"]
+  },
+  "NEED_DEVELOPER_DIAGNOSTIC": {
+    "next_agent": "developer",
+    "action": "spawn",
+    "include_context": ["diagnostic_request", "hypothesis", "expected_output"]
+  }
+}
+```
+
+### Validation Checklist
+
+After fix implementation:
+- [ ] transitions.json has correct `ROOT_CAUSE_FOUND` → `tech_lead` routing
+- [ ] transitions.json uses `INVESTIGATION_INCOMPLETE` (not `INCOMPLETE`)
+- [ ] transitions.json uses `NEED_DEVELOPER_DIAGNOSTIC` (not `WAITING_FOR_RESULTS`)
+- [ ] Database re-seeded with updated config
+- [ ] workflow_router.py tests pass (if any)
+- [ ] investigator.md status codes align with transitions.json
+
+### Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Breaking existing investigations | Low | High | Gap exists in code that was never working |
+| Config-seeder doesn't pick up changes | Low | Medium | Verify seeding script reads from correct path |
+| Other agents reference old status codes | Low | Low | Grep for WAITING_FOR_RESULTS and INCOMPLETE |
+
+### Implementation Order
+
+1. **Update transitions.json** (3 changes)
+2. **Create investigation_loop.md template** (Gap 3)
+3. **Re-seed database** (verify changes applied)
+4. **Update INVESTIGATION_WORKFLOW.md** Known Gaps section (mark as fixed)
+5. **Run tests** (if any exist for workflow routing)
