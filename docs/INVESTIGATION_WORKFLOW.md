@@ -341,11 +341,11 @@ The investigation loop is a **sub-workflow** that:
 | `HYPOTHESIS_ELIMINATED` | `HYPOTHESIS_ELIMINATED` | ✅ Added |
 | `NEED_MORE_ANALYSIS` | `NEED_MORE_ANALYSIS` | ✅ Added |
 
-### Gap 3: Missing investigation_loop.md Template ⏳ PENDING
+### Gap 3: Missing investigation_loop.md Template ✅ FIXED
 
-The file `templates/investigation_loop.md` is referenced but doesn't exist yet.
+The file `templates/investigation_loop.md` has been created from the ultrathink design.
 
-**Status:** Template design complete in `research/investigation-loop-template-ultrathink.md`. Implementation pending.
+**Status:** Template created at `templates/investigation_loop.md` (2025-12-23).
 
 ### Additional Fixes Applied
 
