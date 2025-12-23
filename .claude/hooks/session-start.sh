@@ -11,6 +11,14 @@ if [ -d "templates" ] && [ -d "bazinga" ] && [ ! -e "bazinga/templates" ]; then
   echo "🔗 Dev mode: Created bazinga/templates -> ../templates symlink"
 fi
 
+# Similarly, workflow configs are at root workflow/ in dev mode
+# but code references bazinga/config/ (for installed mode compatibility)
+if [ -d "workflow" ] && [ -d "bazinga" ] && [ ! -e "bazinga/config" ]; then
+  # We're in dev mode (bazinga repo) - create symlink
+  ln -s ../workflow bazinga/config 2>/dev/null || true
+  echo "🔗 Dev mode: Created bazinga/config -> ../workflow symlink"
+fi
+
 # Only run remaining setup in Claude Code Web environment
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0

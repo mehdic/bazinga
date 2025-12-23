@@ -1088,7 +1088,7 @@ def init_database(db_path: str) -> None:
             try:
                 cursor.execute("BEGIN IMMEDIATE")
 
-                # Create workflow_transitions table (seeded from transitions.json)
+                # Create workflow_transitions table (seeded from workflow/transitions.json)
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS workflow_transitions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1113,7 +1113,7 @@ def init_database(db_path: str) -> None:
                 """)
                 print("   ✓ Created workflow_transitions table with index")
 
-                # Create agent_markers table (seeded from agent-markers.json)
+                # Create agent_markers table (seeded from workflow/agent-markers.json)
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS agent_markers (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1124,7 +1124,7 @@ def init_database(db_path: str) -> None:
                 """)
                 print("   ✓ Created agent_markers table")
 
-                # Create workflow_special_rules table (seeded from transitions.json _special_rules)
+                # Create workflow_special_rules table (seeded from workflow/transitions.json _special_rules)
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS workflow_special_rules (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1665,7 +1665,7 @@ def init_database(db_path: str) -> None:
     """)
     print("✓ Created agent_markers table")
 
-    # Workflow special rules table (seeded from transitions.json _special_rules)
+    # Workflow special rules table (seeded from workflow/transitions.json _special_rules)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS workflow_special_rules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
