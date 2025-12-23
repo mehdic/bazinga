@@ -1111,9 +1111,9 @@ Display:
    These templates are NOT documentation - they contain critical operational logic that must be loaded before orchestration begins.
 
    ```
-   Read(file_path: "templates/message_templates.md")
-   Read(file_path: "templates/response_parsing.md")
-   Read(file_path: "templates/prompt_building.md")
+   Read(file_path: "bazinga/templates/message_templates.md")
+   Read(file_path: "bazinga/templates/response_parsing.md")
+   Read(file_path: "bazinga/templates/prompt_building.md")
    ```
 
    **Verify all 3 templates loaded.** If ANY Read fails → Output `❌ Template load failed | [filename]` and STOP.
@@ -1929,7 +1929,7 @@ If markers are missing, prompt-builder exits with error (prevents malformed agen
 **You MUST read the template. DO NOT spawn any agents without reading this template first.**
 
 ```
-Read(file_path: "templates/orchestrator/phase_simple.md")
+Read(file_path: "bazinga/templates/orchestrator/phase_simple.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | phase_simple.md` and STOP.
@@ -1963,7 +1963,7 @@ Read(file_path: "templates/orchestrator/phase_simple.md")
 **You MUST read the template. DO NOT spawn any agents without reading this template first.**
 
 ```
-Read(file_path: "templates/orchestrator/phase_parallel.md")
+Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | phase_parallel.md` and STOP.
@@ -2186,7 +2186,7 @@ Skill(command: "bazinga-validator")
 
 Use the Read tool to read the complete shutdown protocol:
 ```
-Read(file_path: "templates/shutdown_protocol.md")
+Read(file_path: "bazinga/templates/shutdown_protocol.md")
 ```
 
 **Step 2: Execute all steps in the template sequentially**

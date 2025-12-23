@@ -760,7 +760,7 @@ def infer_component_from_specializations(spec_paths, project_context):
     """Infer component_path from specialization paths when PM didn't set it.
 
     If a specialization path includes a component-specific prefix (e.g.,
-    'templates/specializations/01-languages/python.md'), we can try
+    'bazinga/templates/specializations/01-languages/python.md'), we can try
     to match it to a component in project_context.json based on language or framework.
 
     This is a fallback when component_path is not explicitly set.

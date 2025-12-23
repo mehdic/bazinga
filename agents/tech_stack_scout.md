@@ -274,9 +274,9 @@ Write(
       "playwright_version": "1.40.0",
       "tailwind_version": "3.4.0",
       "suggested_specializations": [
-        "templates/specializations/01-languages/typescript.md",
-        "templates/specializations/02-frameworks-frontend/nextjs.md",
-        "templates/specializations/08-testing/playwright-cypress.md"
+        "bazinga/templates/specializations/01-languages/typescript.md",
+        "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
+        "bazinga/templates/specializations/08-testing/playwright-cypress.md"
       ],
       "evidence": [
         {"file": "frontend/package.json", "key": "next", "version": "14.0.0"},
@@ -296,9 +296,9 @@ Write(
       "pytest_version": "7.4.0",
       "pydantic_version": "2.5.0",
       "suggested_specializations": [
-        "templates/specializations/01-languages/python.md",
-        "templates/specializations/03-frameworks-backend/fastapi.md",
-        "templates/specializations/05-databases/postgresql.md"
+        "bazinga/templates/specializations/01-languages/python.md",
+        "bazinga/templates/specializations/03-frameworks-backend/fastapi.md",
+        "bazinga/templates/specializations/05-databases/postgresql.md"
       ],
       "evidence": [
         {"file": "backend/pyproject.toml", "key": "fastapi", "version": "0.104.0"}
@@ -313,8 +313,8 @@ Write(
     "ci_cd": "github-actions",
     "terraform_version": "1.6.0",
     "suggested_specializations": [
-      "templates/specializations/06-infrastructure/docker.md",
-      "templates/specializations/06-infrastructure/github-actions.md"
+      "bazinga/templates/specializations/06-infrastructure/docker.md",
+      "bazinga/templates/specializations/06-infrastructure/github-actions.md"
     ]
   },
 
@@ -361,9 +361,9 @@ Write(
       "database": "prisma",
       "testing": ["jest"],
       "suggested_specializations": [
-        "templates/specializations/01-languages/typescript.md",
-        "templates/specializations/02-frameworks-frontend/nextjs.md",
-        "templates/specializations/05-databases/prisma-orm.md"
+        "bazinga/templates/specializations/01-languages/typescript.md",
+        "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md",
+        "bazinga/templates/specializations/05-databases/prisma-orm.md"
       ],
       "evidence": [
         {"file": "package.json", "key": "next", "version": "14.0.0"},
@@ -378,7 +378,7 @@ Write(
     "orchestration": null,
     "ci_cd": null,
     "suggested_specializations": [
-      "templates/specializations/06-infrastructure/docker.md"
+      "bazinga/templates/specializations/06-infrastructure/docker.md"
     ]
   },
 
@@ -409,7 +409,7 @@ Write(
 
 ```bash
 # Use Glob to verify each specialization path exists
-Glob("templates/specializations/01-languages/typescript.md")
+Glob("bazinga/templates/specializations/01-languages/typescript.md")
 ```
 
 **Rules:**

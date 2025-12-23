@@ -186,7 +186,7 @@ If `project_context.json` exists, derive QA templates from detected testing fram
 **Template Path Verification:**
 ```
 # Before adding any template, verify it exists
-Glob(pattern: "templates/specializations/08-testing/qa-strategies.md")
+Glob(pattern: "bazinga/templates/specializations/08-testing/qa-strategies.md")
 # If no match, skip and record in skipped_missing
 ```
 
@@ -442,9 +442,9 @@ Group ID: AUTH
 Agent Type: developer
 Model: haiku
 Specialization Paths: [
-  "templates/specializations/01-languages/java.md",
-  "templates/specializations/03-frameworks-backend/spring-boot.md",
-  "templates/specializations/11-domains/backend-api.md"
+  "bazinga/templates/specializations/01-languages/java.md",
+  "bazinga/templates/specializations/03-frameworks-backend/spring-boot.md",
+  "bazinga/templates/specializations/11-domains/backend-api.md"
 ]
 ```
 

@@ -6,6 +6,16 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+# === DEV MODE SETUP ===
+# In dev mode (bazinga repo), templates are at root templates/
+# but agent files reference bazinga/templates/ (for installed mode compatibility)
+# Create symlink so both paths work
+if [ -d "templates" ] && [ -d "bazinga" ] && [ ! -e "bazinga/templates" ]; then
+  # We're in dev mode (bazinga repo) - create symlink
+  ln -s ../templates bazinga/templates 2>/dev/null || true
+  echo "🔗 Dev mode: Created bazinga/templates -> ../templates symlink"
+fi
+
 # Load project context file at session start
 if [ -f ".claude/claude.md" ]; then
   echo "📋 Loading project context from .claude/claude.md..."

@@ -8,8 +8,8 @@ set -e
 set -o pipefail
 
 ORCHESTRATOR_FILE="agents/orchestrator.md"
-TEMPLATE_SIMPLE="templates/orchestrator/phase_simple.md"
-TEMPLATE_PARALLEL="templates/orchestrator/phase_parallel.md"
+TEMPLATE_SIMPLE="bazinga/templates/orchestrator/phase_simple.md"
+TEMPLATE_PARALLEL="bazinga/templates/orchestrator/phase_parallel.md"
 ERRORS=0
 WARNINGS=0
 FIX_MODE=false

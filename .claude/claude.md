@@ -175,10 +175,24 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 
 ### 📁 Templates Directory Structure
 
-Templates are source files that live at the **root `templates/` folder** (NOT in `bazinga/`):
+**🔴 CRITICAL: Dev Mode vs Installed Mode**
 
+Agent files reference templates at `bazinga/templates/...` for consistency across both modes:
+
+| Mode | Source Location | Agent Reference Path | How It Works |
+|------|-----------------|---------------------|--------------|
+| **Dev mode** (bazinga repo) | `templates/` | `bazinga/templates/...` | SessionStart hook creates symlink |
+| **Installed mode** (client project) | `bazinga/templates/` | `bazinga/templates/...` | Direct path match |
+
+**Dev mode symlink (created automatically by SessionStart hook):**
+```bash
+# In bazinga repo, the hook creates:
+bazinga/templates -> ../templates
 ```
-templates/                           # Source templates (tracked in git)
+
+**Template structure:**
+```
+templates/                           # SOURCE templates (tracked in git)
 ├── specializations/                 # Technology-specific agent guidance
 │   ├── 01-languages/               # Python, TypeScript, Go, etc.
 │   ├── 02-frameworks-frontend/     # React, Vue, Next.js, etc.
@@ -193,11 +207,15 @@ templates/                           # Source templates (tracked in git)
 └── orchestrator/                   # Phase execution templates
 ```
 
-**Why this location:**
-- `templates/` = **source files** (versioned, static, installed to clients)
-- `bazinga/` = **runtime state** (database, session data, gitignored)
+**Key principle:**
+- Agent files ALWAYS use `bazinga/templates/...` paths
+- In dev mode: symlink makes this work
+- In installed mode: templates are physically at `bazinga/templates/`
 
-Separating source from runtime prevents accidental gitignore conflicts and makes the codebase cleaner.
+**If symlink is missing in dev mode (should be auto-created by SessionStart hook):**
+```bash
+ln -s ../templates bazinga/templates
+```
 
 ### ⚠️ tmp/ Directory is Gitignored
 

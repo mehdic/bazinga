@@ -492,7 +492,7 @@ Use the Tech Lead Response Parsing section from `templates/response_parsing.md` 
 
 Use the Read tool to read the complete investigation loop:
 ```
-Read(file_path: "templates/investigation_loop.md")
+Read(file_path: "bazinga/templates/investigation_loop.md")
 ```
 
 2. **Execute all steps** in the template (up to 5 iterations)
@@ -676,7 +676,7 @@ For test issues (QA Expert):
 **⚠️ YOU MUST READ AND FOLLOW the merge workflow template. This is NOT optional.**
 
 ```
-Read(file_path: "templates/merge_workflow.md")
+Read(file_path: "bazinga/templates/merge_workflow.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | merge_workflow.md` and STOP.

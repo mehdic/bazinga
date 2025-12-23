@@ -239,7 +239,7 @@ CREATE TABLE task_groups (
     complexity INTEGER CHECK(complexity BETWEEN 1 AND 10),
     initial_tier TEXT CHECK(initial_tier IN ('Developer', 'Senior Software Engineer')) DEFAULT 'Developer',
     context_references TEXT,  -- JSON array of context package IDs relevant to this group
-    specializations TEXT,  -- JSON array of specialization file paths (e.g., ["templates/specializations/01-languages/typescript.md"])
+    specializations TEXT,  -- JSON array of specialization file paths (e.g., ["bazinga/templates/specializations/01-languages/typescript.md"])
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, session_id),
@@ -263,7 +263,7 @@ CREATE INDEX idx_taskgroups_session ON task_groups(session_id, status);
 - `complexity`: Task complexity score (1-10), set by PM
 - `initial_tier`: Initial implementation tier (`Developer` or `Senior Software Engineer`), set by PM
 - `context_references`: JSON array of context package IDs relevant to this group (e.g., `[1, 3, 5]`)
-- `specializations`: JSON array of specialization file paths assigned by PM (e.g., `["templates/specializations/01-languages/typescript.md", "templates/specializations/02-frameworks-frontend/nextjs.md"]`)
+- `specializations`: JSON array of specialization file paths assigned by PM (e.g., `["bazinga/templates/specializations/01-languages/typescript.md", "bazinga/templates/specializations/02-frameworks-frontend/nextjs.md"]`)
 - `created_at`: When task group was created
 - `updated_at`: Last modification timestamp
 
@@ -296,7 +296,7 @@ db.create_task_group(
     initial_tier='Senior Software Engineer',
     item_count=5,
     component_path='backend/auth/',
-    specializations=['templates/specializations/01-languages/typescript.md']
+    specializations=['bazinga/templates/specializations/01-languages/typescript.md']
 )
 
 # Update task group with complexity (requires session_id for composite key)
@@ -305,7 +305,7 @@ db.update_task_group(
     status='completed',
     complexity=5,
     last_review_status='APPROVED',
-    specializations=['templates/specializations/03-frameworks-backend/express.md']
+    specializations=['bazinga/templates/specializations/03-frameworks-backend/express.md']
 )
 
 # Get task groups (includes specializations, complexity, initial_tier)

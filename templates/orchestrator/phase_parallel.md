@@ -294,7 +294,7 @@ Use the Developer Response Parsing section from `templates/response_parsing.md` 
 **🔴 CRITICAL: YOU MUST READ AND FOLLOW the batch processing template. This is NOT optional.**
 
 ```
-Read(file_path: "templates/batch_processing.md")
+Read(file_path: "bazinga/templates/batch_processing.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | batch_processing.md` and STOP.
@@ -462,7 +462,7 @@ Task(subagent_type="general-purpose", model={model}, description="{agent_type} {
 **🔴 MANDATORY: Load and use merge workflow template:**
 
 ```
-Read(file_path: "templates/merge_workflow.md")
+Read(file_path: "bazinga/templates/merge_workflow.md")
 ```
 
 **If Read fails:** Output `❌ Template load failed | merge_workflow.md` and STOP.

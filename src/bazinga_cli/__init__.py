@@ -340,7 +340,10 @@ class BazingaSetup:
 
     def copy_templates(self, target_dir: Path) -> bool:
         """
-        Copy templates to target templates/ directory.
+        Copy templates to target bazinga/templates/ directory.
+
+        Templates are installed to bazinga/templates/ so that agent files
+        can reference them with consistent paths in both dev and installed modes.
 
         Args:
             target_dir: Target directory for installation
@@ -348,7 +351,7 @@ class BazingaSetup:
         Returns:
             True if templates were copied successfully, False otherwise
         """
-        templates_dir = target_dir / "templates"
+        templates_dir = target_dir / "bazinga" / "templates"
         templates_dir.mkdir(parents=True, exist_ok=True)
 
         # Use helper for path resolution with legacy fallback
