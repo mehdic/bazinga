@@ -262,13 +262,16 @@ class BazingaDB:
                 else:
                     project_root = Path(self.db_path).parent.parent
 
-            # Define the specializations base
+            # Define the specializations base (canonical path for installed mode)
             spec_base = "bazinga/templates/specializations/"
 
             # Normalize: auto-prefix if not already a full path
             if spec_path.startswith(spec_base):
-                # Already full path
+                # Already canonical full path
                 normalized_path = spec_path
+            elif spec_path.startswith("templates/specializations/"):
+                # Dev mode path: templates/specializations/... -> normalize to bazinga/templates/...
+                normalized_path = "bazinga/" + spec_path
             elif spec_path.startswith("specializations/"):
                 # Handle "specializations/01-languages/..." -> strip "specializations/" and prefix
                 normalized_path = spec_base + spec_path[len("specializations/"):]
@@ -3074,8 +3077,9 @@ TASK GROUP OPERATIONS:
   update-task-group <group_id> <session> [--status X] [--assigned_to Y] [--complexity N]
                     [--specializations JSON] [--component-path PATH] [--initial_tier TIER]
                     [--item_count N] [--revision_count N] [--security_sensitive 0|1]
+                    [--qa_attempts N] [--tl_review_attempts N]
                                               Update task group fields
-  get-task-groups <session> [status]          Get task groups (includes specializations and component_path)
+  get-task-groups <session> [status]          Get task groups (includes specializations, component_path, initial_tier, complexity)
 
 TOKEN OPERATIONS:
   log-tokens <session> <agent> <tokens> [agent_id]
