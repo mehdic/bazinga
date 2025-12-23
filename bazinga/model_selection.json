@@ -1,8 +1,8 @@
 {
   "agents": {
     "developer": {
-      "model": "haiku",
-      "rationale": "Cost-efficient for straightforward implementation tasks"
+      "model": "sonnet",
+      "rationale": "Balanced capability for implementation tasks"
     },
     "senior_software_engineer": {
       "model": "sonnet",
@@ -88,7 +88,7 @@
     "last_updated": "2025-12-04",
     "notes": [
       "Tech Lead and PM are ALWAYS on Opus - non-negotiable",
-      "Developer starts on Haiku for cost efficiency",
+      "Developer uses Sonnet for balanced capability",
       "Senior Software Engineer on Sonnet handles escalated complexity",
       "Escalation triggers after 1 failure (not 2)",
       "Security tasks always use SSE + mandatory TL review",
