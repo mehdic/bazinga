@@ -163,6 +163,72 @@ Operation → Check result → If error: Output capsule with error
 
 ---
 
+## 🔄 Template Caching Protocol (CONTEXT OPTIMIZATION)
+
+**Purpose:** Prevent repeated template reads from inflating context across turns.
+
+**Track loaded templates in orchestrator state:**
+```json
+{
+  "templates_loaded": ["phase_parallel", "message_templates", "batch_processing"]
+}
+```
+
+**BEFORE any Read(file_path: "bazinga/templates/X.md"):**
+1. Check orchestrator state for `templates_loaded` array
+2. IF template name in `templates_loaded` → **SKIP Read**, reference cached content conceptually
+3. ELSE → Read template, add template name to `templates_loaded`, save state:
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
+  "{session_id}" "orchestrator" '{"templates_loaded": [... updated array ...]}'
+```
+
+**Exception:** Always re-read if explicitly instructed or if template may have changed mid-session.
+
+**Token Savings:** ~5k tokens/session by avoiding repeated template reads.
+
+---
+
+## 📊 Context Threshold Protocol (PREVENTS OVERFLOW)
+
+**Purpose:** Proactive intervention before context exhaustion in long parallel sessions.
+
+**Check context usage at each turn (estimate from spawn count):**
+```
+estimated_usage = (total_spawns * 600) + 25000  # 600 tokens/agent notification + base prompt
+usage_percent = estimated_usage / 200000
+```
+
+**Threshold Actions:**
+
+| Threshold | Action |
+|-----------|--------|
+| **70%** | Switch to ultra-compact capsules (counts only, no tables) |
+| **80%** | Force phase summary offload: Save routing history to DB via `save-state`, clear in-context tracking |
+| **90%** | Emergency mode: Skip non-essential logs, DB reconciliation only, minimal output |
+
+**70% Compact Capsule Format:**
+```
+✅ 4 devs → 3 QA + 1 retry | Phase 2: 6/8
+```
+(Instead of full table with files, tests, coverage)
+
+**80% Phase Offload:**
+```bash
+# Save all routing decisions to DB, clear from context
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
+  "{session_id}" "orchestrator" '{"phase_N_routing": [...], "context_offloaded": true}'
+```
+
+**90% Emergency Output:**
+```
+⚠️ Context 90% | Minimal mode | {N} complete, {M} pending
+```
+
+**This protocol prevents the 4-round context exhaustion observed in long parallel sessions.**
+
+---
+
 ## 📁 File Paths
 
 **Structure:** `bazinga/bazinga.db`, `bazinga/skills_config.json`, `bazinga/testing_config.json`, `bazinga/artifacts/{session_id}/` (outputs), `bazinga/templates/` (prompts). **Rules:** Artifacts → `bazinga/artifacts/${SESSION_ID}/`, Skills → `bazinga/artifacts/${SESSION_ID}/skills/`, Never write to bazinga root.

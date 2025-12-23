@@ -22,6 +22,27 @@
 
 ---
 
+### 🔴 PHASE TRACKER INITIALIZATION (On PM PLANNING_COMPLETE)
+
+**When PM returns PLANNING_COMPLETE with execution_phases, initialize phase_tracker:**
+
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
+  "{session_id}" "orchestrator" '{
+    "phase_tracker": {
+      "current_phase": 1,
+      "phase_totals": {"1": {count_of_phase_1_groups}, "2": {count_of_phase_2_groups}},
+      "phase_completed": {"1": 0, "2": 0}
+    },
+    "templates_loaded": [],
+    "total_spawns": 0
+  }'
+```
+
+**This enables optimized phase continuation checks (Step 2B.7b) that reduce DB queries per group.**
+
+---
+
 **🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
 
 **Note:** Phase 2B is already announced in Step 1.5 mode routing. No additional message needed here.
@@ -274,20 +295,71 @@ FULL_PROMPT[group_id] =
 
 ### Step 2B.2: Receive All Developer Responses
 
-**For EACH developer response:**
+**🔴 CONTEXT OPTIMIZATION: Aggregate all responses, use workflow-router for routing decisions**
 
-**Step 1: Parse response and output capsule to user**
+**Step 1: Parse ALL responses into aggregated table (NO individual capsules yet)**
 
-Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
+For each response, extract using `bazinga/templates/response_parsing.md`:
+- `group_id`, `status`, `files_count`, `tests_pass/total`, `summary[0]`
 
-**Step 2: Construct and output capsule** (same templates as Step 2A.2):
-- READY_FOR_QA/REVIEW: `🔨 Group {id} [{tier}/{model}] complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
-- PARTIAL: `🔨 Group {id} [{tier}/{model}] implementing | {what's done} | {current_status}`
-- BLOCKED: `⚠️ Group {id} [{tier}/{model}] blocked | {blocker} | Investigating`
+Build aggregated data structure:
+```json
+[
+  {"group": "A", "status": "READY_FOR_QA", "files": 5, "tests": "12/12", "summary": "Auth endpoints"},
+  {"group": "B", "status": "PARTIAL", "files": 3, "tests": "8/15", "summary": "7 test failures"},
+  {"group": "C", "status": "READY_FOR_QA", "files": 4, "tests": "20/20", "summary": "Cart service"},
+  {"group": "D", "status": "BLOCKED", "files": 0, "tests": "0/0", "summary": "Missing dependency"}
+]
+```
 
-**Step 3: Output capsule to user**
+**Step 2: Call workflow-router for EACH response to get routing decisions**
 
-**Step 4: Log to database** — Use §Logging Reference pattern. Agent ID: `dev_group_{X}`.
+```bash
+# For each response, get routing decision (outputs JSON)
+python3 .claude/skills/workflow-router/scripts/workflow_router.py \
+  --current-agent "developer" \
+  --status "{status}" \
+  --session-id "{session_id}" \
+  --group-id "{group_id}" \
+  --testing-mode "{testing_mode}"
+```
+
+Build spawn queue from router outputs:
+```json
+{
+  "qa_spawns": ["A", "C"],
+  "dev_retry": ["B"],
+  "investigator": ["D"]
+}
+```
+
+**Step 3: Output SINGLE aggregated capsule**
+
+```
+🔨 **{N} Developers Complete**
+
+| Group | Status | Files | Tests | Summary |
+|-------|--------|-------|-------|---------|
+| A | READY_FOR_QA | 5 | 12/12 | Auth endpoints |
+| B | PARTIAL | 3 | 8/15 | 7 test failures |
+| C | READY_FOR_QA | 4 | 20/20 | Cart service |
+| D | BLOCKED | 0 | — | Missing dependency |
+
+**Routing:** 2 → QA, 1 → Dev retry, 1 → Investigator
+```
+
+**Step 4: Log to database** — Single aggregated log entry:
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet log-interaction \
+  "{session_id}" "developer_batch" "completion" \
+  '{"groups": ["A","B","C","D"], "routing": {"qa":2,"retry":1,"investigate":1}}'
+```
+
+**Step 5: Spawn ALL next agents in ONE Task block**
+
+Use spawn queue from Step 2 to spawn all agents in parallel.
+
+**Token Savings:** ~2k tokens/round by eliminating per-group routing logic
 
 ### Step 2B.2a: Mandatory Batch Processing (LAYER 1 - ROOT CAUSE FIX)
 
@@ -498,9 +570,65 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 **🔴 MANDATORY: After MERGE_SUCCESS, check for next phase BEFORE spawning PM**
 
-**Actions:** 1) Update group status=completed, merge_status=merged (bazinga-db update task group), 2) Query ALL groups (bazinga-db get all task groups), 3) Load PM state for execution_phases (bazinga-db get PM state), 4) Count: completed_count, in_progress_count, pending_count (include "deferred" status as pending), total_count.
+**🔴 CONTEXT OPTIMIZATION: Use DB-persisted phase tracking to minimize queries**
 
-**Decision Logic (Phase-Aware):** IF execution_phases null/empty → simple: pending_count>0 → output `✅ Group {id} merged | {done}/{total} groups | Starting {pending_ids}` → jump Step 2B.1, ELSE → proceed Step 2B.8. IF execution_phases exists → find current_phase (lowest incomplete) → IF current_phase complete AND next_phase exists → output `✅ Phase {N} complete | Starting Phase {N+1}` → jump Step 2B.1, ELSE IF current_phase complete AND no next_phase → proceed Step 2B.8, ELSE IF current_phase in_progress → output `✅ Group {id} merged | Phase {N}: {done}/{total} | Waiting {in_progress}` → exit (re-run on next completion). **All complete → Step 2B.8**
+**Step 1: Update Group and Orchestrator State (SINGLE DB CALL)**
+```bash
+# Update group status AND increment orchestrator phase tracker in one operation
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
+  "{group_id}" "{session_id}" --status "completed" --merge_status "merged"
+```
+
+**Step 2: Get Orchestrator State (check if phase complete)**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "orchestrator"
+```
+
+Parse `phase_tracker` from state:
+```json
+{
+  "phase_tracker": {
+    "current_phase": 1,
+    "phase_totals": {"1": 4, "2": 3},
+    "phase_completed": {"1": 3, "2": 0}
+  }
+}
+```
+
+**Step 3: Minimal Capsule (NO full query if phase incomplete)**
+```
+# Increment local counter from state
+phase_completed[current_phase] += 1
+
+IF phase_completed[current_phase] < phase_totals[current_phase]:
+  # Phase still in progress - minimal capsule, NO full DB query
+  Output: `✅ {group_id} merged | Phase {N}: {completed}/{total}`
+
+  # Save updated counter to DB
+  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
+    "{session_id}" "orchestrator" '{"phase_tracker": {updated_tracker}}'
+
+  EXIT (wait for more completions)
+```
+
+**Step 4: Full Phase Check (ONLY when phase completes)**
+```
+IF phase_completed[current_phase] == phase_totals[current_phase]:
+  # Phase complete - NOW do full query
+  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+  python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "{session_id}" "pm"
+
+  # Check for next phase
+  IF next_phase exists in execution_phases:
+    Output: `✅ Phase {N} complete | Starting Phase {N+1}`
+    Reset phase_completed[next_phase] = 0
+    Save state, jump Step 2B.1
+  ELSE:
+    Output: `✅ All phases complete | Final PM assessment`
+    Proceed Step 2B.8
+```
+
+**Token Savings:** ~2.4k tokens/phase by deferring full queries until phase boundary
 
 ### Step 2B.7c: Pre-Stop Verification Gate (LAYER 3 - FINAL SAFETY NET)
 
