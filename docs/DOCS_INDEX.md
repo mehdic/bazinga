@@ -196,6 +196,26 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ---
 
+### 12. **[INVESTIGATION_WORKFLOW.md](INVESTIGATION_WORKFLOW.md)** - Investigation Loop Workflow
+**Length**: ~350 lines | **Time to read**: 15 minutes
+**Sections**:
+- Where Investigation Fits (in main workflow)
+- Investigation Loop Detail (multi-turn diagrams)
+- Exit Routing (how investigations conclude)
+- State Persistence (session resume handling)
+- Workflow Router Integration (entry/exit vs internal loop)
+- Agent Knowledge Requirements (what each agent needs to know)
+- Known Gaps (implementation TODOs)
+
+**Read this for**: Understanding how the Investigator agent integrates with the orchestrator, including workflow diagrams and state management.
+
+**Cross-reference**:
+- Link to [ARCHITECTURE.md](ARCHITECTURE.md) for overall system design
+- Link to `agents/investigator.md` for agent definition
+- Link to `research/investigation-loop-template-ultrathink.md` for detailed design analysis
+
+---
+
 ## 📚 Original Documentation - Historical Reference
 
 Located in **`historical-dev-docs/`** - These are historical records of BAZINGA's development. They're preserved for reference but not actively maintained.
@@ -276,6 +296,7 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 | "What tools can each agent use?" | [ARCHITECTURE.md](ARCHITECTURE.md) → Tool Restrictions section |
 | "How do we catch stuck tasks?" | [PM_METRICS.md](PM_METRICS.md) → 99% Rule Detection section |
 | "Why are security scans progressive?" | [MODEL_ESCALATION.md](MODEL_ESCALATION.md) → Progressive Analysis section |
+| "How does the investigation loop work?" | [INVESTIGATION_WORKFLOW.md](INVESTIGATION_WORKFLOW.md) → Investigation Loop Detail |
 
 ---
 

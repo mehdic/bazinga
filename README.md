@@ -476,6 +476,7 @@ bazinga init my-project
 ### Architecture & Design
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical deep-dive
 - **[docs/ROLE_DRIFT_PREVENTION.md](docs/ROLE_DRIFT_PREVENTION.md)** - How role enforcement works
+- **[docs/INVESTIGATION_WORKFLOW.md](docs/INVESTIGATION_WORKFLOW.md)** - Investigation loop workflow diagrams
 - **[docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)** - Complete documentation index
 
 ---
