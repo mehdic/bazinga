@@ -1633,7 +1633,7 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_consumption_unique ON consumption_scope(session_id, group_id, agent_type, iteration, package_id)")
     print("✓ Created consumption_scope table with indexes")
 
-    # Workflow transitions table (seeded from bazinga/config/transitions.json)
+    # Workflow transitions table (seeded from workflow/transitions.json via bazinga/config symlink)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS workflow_transitions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1654,7 +1654,7 @@ def init_database(db_path: str) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_wt_agent ON workflow_transitions(current_agent)")
     print("✓ Created workflow_transitions table with indexes")
 
-    # Agent markers table (seeded from bazinga/config/agent-markers.json)
+    # Agent markers table (seeded from workflow/agent-markers.json via bazinga/config symlink)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS agent_markers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

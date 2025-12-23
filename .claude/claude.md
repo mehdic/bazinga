@@ -200,8 +200,44 @@ Complete orchestration workflow: `.claude/agents/orchestrator.md`
 - `.claude/commands/` - Slash commands (orchestrate)
 - `docs/` - Architecture documentation
 - `templates/` - **SOURCE TEMPLATES** (agent prompts, specializations, workflow guides)
+- `workflow/` - **SOURCE WORKFLOW CONFIGS** (transitions.json, agent-markers.json)
 - `bazinga/` - **RUNTIME STATE** (database, session artifacts, config JSONs)
 - `tmp/` - **GITIGNORED** - Temporary test artifacts (never commit)
+
+### 📁 Workflow Config Directory Structure
+
+**🔴 CRITICAL: Dev Mode vs Installed Mode**
+
+Workflow configuration files follow the same symlink pattern as templates:
+
+| Mode | Source Location | Runtime Path | How It Works |
+|------|-----------------|--------------|--------------|
+| **Dev mode** (bazinga repo) | `workflow/` | `bazinga/config/...` | Symlink: `bazinga/config -> ../workflow` |
+| **Installed mode** (client project) | `bazinga/config/` | `bazinga/config/...` | Direct path match |
+
+**Files in workflow/ folder:**
+```
+workflow/                        # SOURCE configs (tracked in git)
+├── transitions.json             # State machine routing (v1.1.0)
+└── agent-markers.json           # Required agent output markers
+```
+
+**Dev mode symlink:**
+```bash
+# In bazinga repo:
+bazinga/config -> ../workflow
+```
+
+**Key principle:**
+- Code/scripts reference `bazinga/config/...` paths (works in both modes)
+- Source files live at `workflow/` (tracked in git at root level)
+- Packaged as `bazinga_cli/bazinga/config/` in wheel
+- Clients get files at `bazinga/config/` after install
+
+**pyproject.toml mapping:**
+```toml
+"workflow" = "bazinga_cli/bazinga/config"  # Source -> Package location
+```
 
 ### 📁 Templates Directory Structure
 
