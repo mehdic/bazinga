@@ -477,7 +477,7 @@ Create comprehensive report file:
 bazinga/artifacts/{SESSION_ID}/completion_report.md
 ```
 
-See `templates/completion_report.md` for full report structure.
+See `bazinga/templates/completion_report.md` for full report structure.
 
 Report includes:
 - Session summary (mode, duration, groups)
@@ -549,7 +549,7 @@ Skill(command: "bazinga-db")
 
 Output to user (keep under 30 lines):
 
-See `templates/completion_report.md` for Tier 1 report format.
+See `bazinga/templates/completion_report.md` for Tier 1 report format.
 
 Display includes:
 - Mode, duration, groups completed

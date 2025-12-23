@@ -130,7 +130,7 @@ Your workflow:
 
 **Activation Trigger**: If Orchestrator mentions "SPEC-KIT INTEGRATION ACTIVE" and provides a feature directory
 
-**REQUIRED:** Read full workflow instructions from: `templates/tech_lead_speckit.md`
+**REQUIRED:** Read full workflow instructions from: `bazinga/templates/tech_lead_speckit.md`
 
 ### Quick Reference (Fallback if template unavailable)
 

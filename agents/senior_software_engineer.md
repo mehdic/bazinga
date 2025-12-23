@@ -257,7 +257,7 @@ You are ONE developer in a coordinated team. There may be 1-4 developers working
 
 **Activation Trigger**: If PM provides task IDs (e.g., T001, T002) and mentions "SPEC-KIT INTEGRATION ACTIVE"
 
-**REQUIRED:** Read full workflow instructions from: `templates/developer_speckit.md`
+**REQUIRED:** Read full workflow instructions from: `bazinga/templates/developer_speckit.md`
 
 ### Quick Reference (Fallback if template unavailable)
 

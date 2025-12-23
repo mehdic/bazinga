@@ -415,7 +415,7 @@ Glob("bazinga/templates/specializations/01-languages/typescript.md")
 **Rules:**
 - ✅ Path exists → Include in `suggested_specializations`
 - ❌ Path missing → **DO NOT include** (prevents DB validation errors downstream)
-- ⚠️ If unsure about exact filename, use Glob pattern: `templates/specializations/**/*typescript*.md`
+- ⚠️ If unsure about exact filename, use Glob pattern: `bazinga/templates/specializations/**/*typescript*.md`
 
 This prevents invalid paths from being saved to project_context.json and later rejected by the database path validator.
 

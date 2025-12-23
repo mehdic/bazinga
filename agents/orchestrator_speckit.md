@@ -467,7 +467,7 @@ Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 
 When spawning any agent (Developer, SSE, QA, Tech Lead), follow the centralized spawn procedure:
 
-**🔴 Required:** Read and follow `templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
+**🔴 Required:** Read and follow `bazinga/templates/orchestrator/spawn_with_specializations.md` before every agent spawn.
 
 This ensures:
 - Specialization templates are loaded for the project's tech stack
