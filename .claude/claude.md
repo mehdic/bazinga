@@ -6,6 +6,36 @@ This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration syste
 
 ---
 
+## 🔴 CRITICAL: Template Path Rules (Dev vs Installed Mode)
+
+**When referencing template files, use the correct path based on whether the file is installed to clients:**
+
+### Installed Files → Use `bazinga/templates/`
+
+These files are copied to client projects by `bazinga install`. Templates will be at `bazinga/templates/` on clients:
+
+| Source | Installed To | Path in Code |
+|--------|--------------|--------------|
+| `agents/*.md` | `.claude/agents/` | `bazinga/templates/...` |
+| `.claude/skills/` | `.claude/skills/` | `bazinga/templates/...` |
+| `.claude/commands/` | `.claude/commands/` | `bazinga/templates/...` |
+| `templates/` | `bazinga/templates/` | `bazinga/templates/...` |
+
+### Dev-Only Files → Use `templates/`
+
+These files stay in the bazinga repo only. The symlink `bazinga/templates -> ../templates` makes both paths work, but use the source path for clarity:
+
+| File/Folder | Purpose | Path in Code |
+|-------------|---------|--------------|
+| `.claude/claude.md` | Repo documentation | `templates/...` |
+| `tests/*.py` | Test files | `templates/...` |
+| `scripts/*.py` | Build/dev scripts | `templates/...` |
+| `research/` | Historical docs | `templates/...` |
+
+**Why:** In dev mode, `templates/` is the actual source location. The symlink exists only to make installed-file paths work during development.
+
+---
+
 ## 🔴 CRITICAL: Git Branch Requirements (Claude Code Web)
 
 **When working in Claude Code Web environment:**
