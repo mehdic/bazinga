@@ -2,6 +2,14 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 FOREGROUND EXECUTION ONLY (CRITICAL)
+
+**All Task() calls in parallel mode still run in FOREGROUND.** "Parallel mode" means the PM split work into multiple groups - it does NOT mean background execution.
+
+**Why:** Background subagents have critical bugs (context leaks, missing MCP access, session hangs). See orchestrator.md §FOREGROUND EXECUTION ONLY for details.
+
+**When spawning multiple groups:** Call multiple Task() in ONE message, but each waits for completion before the next starts. This is expected behavior.
+
 ### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
 
 **After EVERY Task() call, you MUST:**

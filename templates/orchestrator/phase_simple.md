@@ -2,6 +2,12 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 FOREGROUND EXECUTION ONLY (CRITICAL)
+
+**All Task() calls run in FOREGROUND.** Never use `run_in_background: true` - background subagents have critical bugs (context leaks, missing MCP access, session hangs).
+
+See orchestrator.md §FOREGROUND EXECUTION ONLY for details.
+
 ### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
 
 **After EVERY Task() call, you MUST:**

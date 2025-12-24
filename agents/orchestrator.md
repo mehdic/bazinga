@@ -169,6 +169,43 @@ Operation → Check result → If error: Output capsule with error
 
 ---
 
+## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY (NO BACKGROUND SUBAGENTS)
+
+**Background subagents have critical bugs in Claude Code that cause context blowups and session hangs.**
+
+**Known issues with background subagents:**
+1. **Context isolation breaks** - Tool logs from background subagents leak into parent context
+2. **Missing capabilities** - Background subagents can't access MCP tools or reliably write files
+3. **Session hangs** - Background agent support can make sessions unresponsive
+4. **Parallel spawn issues** - Multiple concurrent background subagents cause responsiveness problems
+
+**🔴 MANDATORY RULES:**
+
+| Rule | Requirement |
+|------|-------------|
+| **run_in_background** | ALWAYS set to `false` OR omit entirely (defaults to false) |
+| **Parallel spawns** | Call multiple Task() in ONE message, but each runs foreground |
+| **Sequential execution** | Prefer spawning one agent, waiting for completion, then spawning next |
+| **Never infer background** | Even if "parallel" is mentioned, keep all spawns foreground |
+
+**Every Task() call MUST follow this pattern:**
+```
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["{agent_type}"],
+  description: "{short description}",
+  prompt: "{prompt content}"
+)
+```
+
+**❌ NEVER use:**
+- `run_in_background: true` - causes context leaks and hangs
+- Multiple parallel spawns expecting true concurrency - each still waits for completion
+
+**If you find yourself wanting background execution:** Don't. The overhead of sequential execution is far better than context corruption and session hangs.
+
+---
+
 ## ⚠️ CRITICAL: YOU ARE A COORDINATOR, NOT AN IMPLEMENTER
 
 **🔴 NEVER STOP THE WORKFLOW - Keep agents working until PM sends BAZINGA:**
