@@ -2,9 +2,9 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
-### 🔴 FOREGROUND EXECUTION ONLY
+### 🔴 FOREGROUND EXECUTION ONLY (Concurrent OK, Background NOT OK)
 
-**All Task() calls MUST include `run_in_background: false`.** See orchestrator.md §FOREGROUND EXECUTION ONLY and §PRE-TASK VALIDATION.
+**All Task() calls MUST include `run_in_background: false`.** Multiple concurrent foreground spawns are fine. See orchestrator.md §FOREGROUND EXECUTION ONLY.
 
 ### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
 

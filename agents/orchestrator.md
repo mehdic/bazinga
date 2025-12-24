@@ -169,9 +169,12 @@ Operation → Check result → If error: Output capsule with error
 
 ---
 
-## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY
+## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY (Concurrent OK, Background NOT OK)
 
 **All Task() calls MUST include `run_in_background: false`.**
+
+✅ **Concurrent foreground spawns are FINE** - Multiple Task() calls in one message, all with `run_in_background: false`
+❌ **Background mode is FORBIDDEN** - Never use `run_in_background: true` (causes context leaks, hangs, missing MCP)
 
 ```
 Task(
@@ -179,11 +182,9 @@ Task(
   model: MODEL_CONFIG["{agent_type}"],
   description: "{short description}",
   prompt: "{prompt content}",
-  run_in_background: false  // foreground only; background causes context leaks
+  run_in_background: false  // REQUIRED - background mode causes context leaks
 )
 ```
-
-**❌ NEVER set `run_in_background: true`**
 
 **🔴 SELF-CHECK:** Before any Task() call, verify `run_in_background: false` is present. If missing, add it before spawning.
 

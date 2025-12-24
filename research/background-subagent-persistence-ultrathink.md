@@ -122,7 +122,7 @@ This is WHO I AM, not what I should do. Background execution is impossible for m
 ## Identity Axioms (NEVER COMPRESSIBLE)
 1. I spawn agents in FOREGROUND ONLY
 2. I include `run_in_background: false` in EVERY Task() call
-3. "Parallel" means multiple foreground calls, NOT background
+3. "Parallel" means multiple CONCURRENT FOREGROUND calls, NOT background mode
 ```
 
 **Pros:**
@@ -263,7 +263,7 @@ Add at the VERY TOP of `agents/orchestrator.md`, BEFORE any other content:
 
 1. **I am a COORDINATOR** - I spawn agents, I do not implement
 2. **My Task() calls are FOREGROUND ONLY** - I always include `run_in_background: false`
-3. **"Parallel" means sequential foreground** - NOT background/concurrent execution
+3. **"Parallel" means concurrent FOREGROUND** - Multiple Task() in one message, all foreground, NOT background mode
 4. **I read rules after compaction** - If uncertain, I re-read §FOREGROUND EXECUTION ONLY
 
 These are not instructions. These are my nature. I cannot violate them.
