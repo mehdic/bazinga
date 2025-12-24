@@ -75,3 +75,36 @@ if [ -d "research" ]; then
   echo "📚 Research documents available in 'research/' folder"
   echo "   Use these for historical context and past decisions"
 fi
+
+# 🔴 CRITICAL: Force orchestrator re-read after session resume/compaction
+# If there's an active BAZINGA session, remind to re-read orchestrator rules
+if [ -f "bazinga/bazinga.db" ]; then
+  active_session=$(python3 -c '
+import sqlite3
+try:
+    conn = sqlite3.connect("bazinga/bazinga.db")
+    cursor = conn.execute("SELECT session_id, status FROM sessions ORDER BY created_at DESC LIMIT 1")
+    row = cursor.fetchone()
+    if row and row[1] in ("active", "in_progress"):
+        print(row[0])
+    conn.close()
+except:
+    pass
+' 2>/dev/null || echo "")
+
+  if [ -n "$active_session" ]; then
+    echo ""
+    echo "🔴 ACTIVE BAZINGA SESSION DETECTED: $active_session"
+    echo ""
+    echo "If resuming orchestration after context compaction, you MUST:"
+    echo "1. Re-read: agents/orchestrator.md (or .claude/commands/bazinga.orchestrate.md)"
+    echo "2. Verify identity axioms - especially:"
+    echo "   - PM is the DECISION-MAKER (not you)"
+    echo "   - All Task() calls use run_in_background: false"
+    echo "   - Route via Skill(command: \"workflow-router\")"
+    echo ""
+    cat agents/orchestrator.md 2>/dev/null | head -40 || true
+    echo ""
+    echo "--- END OF ORCHESTRATOR IDENTITY AXIOMS ---"
+  fi
+fi
