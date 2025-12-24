@@ -28,7 +28,9 @@
 
 ### Step 2A.1: Spawn Single Developer
 
-**User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
+**User output:** `🔨 Implementing | {tier_name} ({model}) [C:{complexity}] - {brief_task_description}`
+
+Example: `🔨 Implementing | Senior Software Engineer (Sonnet) [C:7] - JWT authentication implementation`
 
 ### 🔴 MANDATORY DEVELOPER/SSE PROMPT BUILDING (PM Tier Decision)
 
@@ -150,12 +152,13 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 - **Summary** of work
 
 **Step 2: Construct capsule** per `response_parsing.md` §Developer Response templates:
-- **READY_FOR_QA/REVIEW:** `🔨 Group {id} [{tier}] complete | {summary}, {files}, {tests} ({coverage}%) | → {next}`
-- **PARTIAL:** `🔨 Group {id} [{tier}] implementing | {done} | {status}`
-- **BLOCKED:** `⚠️ Group {id} [{tier}] blocked | {blocker} | Investigating`
-- **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] escalating | {reason} | → SSE`
+- **READY_FOR_QA/REVIEW:** `🔨 Group {id} [{tier}] [C:{complexity}] complete | {summary}, {files}, {tests} ({coverage}%) | → {next}`
+- **PARTIAL:** `🔨 Group {id} [{tier}] [C:{complexity}] implementing | {done} | {status}`
+- **BLOCKED:** `⚠️ Group {id} [{tier}] [C:{complexity}] blocked | {blocker} | Investigating`
+- **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] [C:{complexity}] escalating | {reason} | → SSE`
 
 **Tier notation:** `[SSE/Sonnet]`, `[Dev/Haiku]`
+**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev), 4-6=Medium (SSE), 7-10=High (SSE)
 
 **Step 3: Output capsule to user**
 

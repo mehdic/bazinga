@@ -120,22 +120,24 @@ Orchestrator output:
 🔨 **Phase {N} starting** | Spawning {parallel_count} developers in parallel
 
 📋 **Developer Assignments:**
-• {group_id}: {tier_name} ({model}) - {task[:90]}
+• {group_id}: {tier_name} ({model}) [C:{complexity}] - {task[:90]}
 [repeat for each group]
 
 💡 For ≥3 developers, consider `/compact` first.
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
 ```
 
+**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev), 4-6=Medium (SSE), 7-10=High (SSE)
+
 **Example output (4 developers):**
 ```
 🔨 **Phase 1 starting** | Spawning 4 developers in parallel
 
 📋 **Developer Assignments:**
-• P0-NURSE-FE: Senior Software Engineer (Sonnet) - Nurse App Frontend with auth integration
-• P0-NURSE-BE: Senior Software Engineer (Sonnet) - Nurse Backend Services with API endpoints
-• P0-MSG-BE: Senior Software Engineer (Sonnet) - Messaging Backend with WhatsApp channel
-• P1-DOCTOR-FE: Developer (Haiku) - Doctor Frontend basic components
+• P0-NURSE-FE: Senior Software Engineer (Sonnet) [C:7] - Nurse App Frontend with auth integration
+• P0-NURSE-BE: Senior Software Engineer (Sonnet) [C:6] - Nurse Backend Services with API endpoints
+• P0-MSG-BE: Senior Software Engineer (Sonnet) [C:8] - Messaging Backend with WhatsApp channel
+• P1-DOCTOR-FE: Developer (Haiku) [C:3] - Doctor Frontend basic components
 
 💡 For ≥3 developers, consider `/compact` first.
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
@@ -321,9 +323,9 @@ FULL_PROMPT[group_id] =
 Use the Developer Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract status, files, tests, coverage, summary.
 
 **Step 2: Construct and output capsule** (same templates as Step 2A.2):
-- READY_FOR_QA/REVIEW: `🔨 Group {id} [{tier}/{model}] complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
-- PARTIAL: `🔨 Group {id} [{tier}/{model}] implementing | {what's done} | {current_status}`
-- BLOCKED: `⚠️ Group {id} [{tier}/{model}] blocked | {blocker} | Investigating`
+- READY_FOR_QA/REVIEW: `🔨 Group {id} [{tier}/{model}] [C:{complexity}] complete | {summary}, {files}, {tests}, {coverage} | {status} → {next}`
+- PARTIAL: `🔨 Group {id} [{tier}/{model}] [C:{complexity}] implementing | {what's done} | {current_status}`
+- BLOCKED: `⚠️ Group {id} [{tier}/{model}] [C:{complexity}] blocked | {blocker} | Investigating`
 
 **Step 3: Output capsule to user**
 
