@@ -61,6 +61,7 @@ packages = ["src/bazinga_cli"]
 "bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
 "templates" = "bazinga_cli/templates"
 "workflow" = "bazinga_cli/bazinga/config"  # workflow/ -> bazinga/config in clients
+"src/bazinga_cli/hooks" = "bazinga_cli/hooks"  # Post-compaction recovery hook for clients
 
 [tool.hatch.build.targets.wheel.shared-data]
 "agents" = "share/bazinga_cli/agents"

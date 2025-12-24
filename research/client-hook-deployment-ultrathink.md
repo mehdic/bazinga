@@ -2,9 +2,9 @@
 
 **Date:** 2024-12-24
 **Context:** BAZINGA orchestrator loses critical rules after context compaction. Need to deploy recovery hook to CLIENT projects (not just bazinga repo).
-**Decision:** TBD after analysis
-**Status:** Proposed
-**Reviewed by:** Pending OpenAI GPT-5, Google Gemini 3 Pro Preview
+**Decision:** Implemented Solution A (Dedicated Script) with conditional execution via transcript check
+**Status:** Implemented
+**Reviewed by:** Internal analysis (external LLM reviews failed due to network)
 
 ---
 
@@ -55,6 +55,37 @@ From [Claude Code Hooks Reference](https://code.claude.com/docs/en/hooks):
 - `compact` - **From auto or manual compact** ← This is what we need!
 
 **Hook output:** Stdout from the script becomes context automatically.
+
+---
+
+## Key Discovery 2: Conditional Execution via Transcript
+
+The hook receives `transcript_path` in its input JSON, pointing to the JSONL conversation history:
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "~/.claude/projects/.../session.jsonl",
+  "hook_event_name": "SessionStart",
+  "source": "compact"
+}
+```
+
+**We can check if orchestration was active by grepping the transcript:**
+
+```bash
+# Read hook input from stdin
+HOOK_INPUT=$(cat)
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path')
+
+# Check if orchestration was happening
+if grep -q "bazinga.orchestrate\|ORCHESTRATOR\|orchestrator.md" "$TRANSCRIPT_PATH" 2>/dev/null; then
+  # Output recovery axioms
+  echo "🔴 BAZINGA POST-COMPACTION RECOVERY..."
+fi
+```
+
+**This ensures the hook only outputs when orchestration was actually in progress.**
 
 ---
 
