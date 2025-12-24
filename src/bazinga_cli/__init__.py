@@ -531,6 +531,100 @@ class BazingaSetup:
         console.print(f"  [dim]Skipping config setup (users manage their own .claude/claude.md)[/dim]")
         return True
 
+    def install_compact_recovery_hook(self, target_dir: Path) -> bool:
+        """
+        Install the post-compaction recovery hook for BAZINGA orchestrator.
+
+        This hook fires after context compaction and re-injects the orchestrator
+        identity axioms to prevent role drift and background execution issues.
+
+        The hook only outputs if it detects orchestration was in progress
+        (checks transcript for /bazinga.orchestrate evidence).
+
+        Args:
+            target_dir: Target project directory
+
+        Returns:
+            True if hook was installed/updated, False on failure
+        """
+        import json
+
+        # 1. Create hooks directory
+        hooks_dir = target_dir / ".claude" / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+
+        # 2. Copy hook script from package
+        hook_filename = "bazinga-compact-recovery.sh"
+        source_hook = self._get_config_source("hooks")
+        if source_hook:
+            source_hook = source_hook / hook_filename
+        else:
+            # Try alternative locations
+            for try_path in [
+                self.source_dir / "hooks" / hook_filename,
+                Path(__file__).parent / "hooks" / hook_filename,
+            ]:
+                if try_path.exists():
+                    source_hook = try_path
+                    break
+
+        if not source_hook or not source_hook.exists():
+            console.print(f"  [yellow]⚠️  Hook script not found: {hook_filename}[/yellow]")
+            return False
+
+        hook_dst = hooks_dir / hook_filename
+        try:
+            shutil.copy2(source_hook, hook_dst)
+            hook_dst.chmod(0o755)  # Make executable
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Failed to copy hook script: {e}[/yellow]")
+            return False
+
+        # 3. Update settings.json to include the hook
+        settings_path = target_dir / ".claude" / "settings.json"
+        settings = {}
+        if settings_path.exists():
+            try:
+                settings = json.loads(settings_path.read_text())
+            except json.JSONDecodeError:
+                console.print("  [yellow]⚠️  Existing settings.json is malformed, creating new[/yellow]")
+                settings = {}
+
+        # Ensure structure exists
+        if "hooks" not in settings:
+            settings["hooks"] = {}
+        if "SessionStart" not in settings["hooks"]:
+            settings["hooks"]["SessionStart"] = []
+
+        # Define our hook config - fires on compact and resume events
+        bazinga_hook = {
+            "matcher": "compact|resume",
+            "hooks": [{
+                "type": "command",
+                "command": ".claude/hooks/bazinga-compact-recovery.sh"
+            }]
+        }
+
+        # Check if already installed (avoid duplicates)
+        already_installed = any(
+            "bazinga-compact-recovery" in str(hook)
+            for hook in settings["hooks"]["SessionStart"]
+        )
+
+        if not already_installed:
+            settings["hooks"]["SessionStart"].append(bazinga_hook)
+            try:
+                settings_path.write_text(json.dumps(settings, indent=2))
+                console.print("  ✓ Installed post-compaction recovery hook")
+            except Exception as e:
+                console.print(f"  [yellow]⚠️  Failed to update settings.json: {e}[/yellow]")
+                return False
+        else:
+            # Update the hook script even if config already exists
+            console.print("  ✓ Updated post-compaction recovery hook")
+
+        return True
+
     def _replace_bazinga_section(self, content: str, new_bazinga_section: str) -> Optional[str]:
         """
         Replace the BAZINGA section in the content with a new version.
@@ -1533,6 +1627,9 @@ def init(
         if not setup.copy_claude_templates(target_dir):
             console.print("[yellow]⚠️  No .claude templates found[/yellow]")
 
+        console.print("\n[bold cyan]7.3. Installing compaction recovery hook[/bold cyan]")
+        setup.install_compact_recovery_hook(target_dir)
+
         console.print("\n[bold cyan]8. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
@@ -2269,6 +2366,10 @@ def update(
         console.print("  [green]✓ .claude templates updated[/green]")
     else:
         console.print("  [yellow]⚠️  No .claude templates found[/yellow]")
+
+    # Install/update compaction recovery hook
+    console.print("\n[bold cyan]7.3. Updating compaction recovery hook[/bold cyan]")
+    setup.install_compact_recovery_hook(target_dir)
 
     # Update dashboard dependencies
     console.print("\n[bold cyan]8. Dashboard dependencies[/bold cyan]")

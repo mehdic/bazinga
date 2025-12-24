@@ -431,13 +431,12 @@ This ensures:
 
 ---
 
-## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY
+## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY (Concurrent OK, Background NOT OK)
 
 **All Task() calls MUST include `run_in_background: false`.**
 
-❌ NEVER set `run_in_background: true` — causes context leaks, missing MCP access, file write failures, and session hangs.
-
-**Syntax:** Use colon notation (`run_in_background: false`) in all examples.
+✅ Concurrent foreground spawns are FINE — Multiple Task() calls in one message, all foreground
+❌ Background mode is FORBIDDEN — `run_in_background: true` causes context leaks, hangs, missing MCP
 
 ---
 
