@@ -3,12 +3,8 @@
 # Deployed by: bazinga install
 #
 # This hook fires after context compaction (compact|resume events).
-# It ONLY outputs recovery axioms if orchestration was in progress.
-#
-# How it works:
-# 1. Reads hook input JSON from stdin (contains transcript_path)
-# 2. Greps transcript for orchestration evidence
-# 3. If found, outputs identity axioms to re-inject into context
+# It checks if orchestration was in progress, then outputs the FULL
+# orchestrator command file to restore all rules.
 
 set -euo pipefail
 
@@ -31,31 +27,27 @@ if ! grep -q -E "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|§ORCHESTRAT
   exit 0
 fi
 
-# Orchestration was in progress - output recovery axioms
+# Orchestration was in progress - output the FULL orchestrator command
 echo ""
 echo "================================================================================"
-echo "  BAZINGA POST-COMPACTION RECOVERY - ORCHESTRATOR IDENTITY AXIOMS"
+echo "  BAZINGA POST-COMPACTION RECOVERY"
+echo "  Reloading FULL orchestrator command..."
 echo "================================================================================"
 echo ""
-echo "If you are the BAZINGA Orchestrator, these axioms define WHO YOU ARE:"
+
+# Output the entire orchestrator command file
+if [ -f ".claude/commands/bazinga.orchestrate.md" ]; then
+  cat ".claude/commands/bazinga.orchestrate.md"
+elif [ -f ".claude/agents/orchestrator.md" ]; then
+  cat ".claude/agents/orchestrator.md"
+else
+  echo "ERROR: Orchestrator file not found!"
+  echo "Expected: .claude/commands/bazinga.orchestrate.md"
+  exit 1
+fi
+
 echo ""
-echo "1. **I am a COORDINATOR** - I spawn agents, I do not implement."
-echo "   -> Route via: Skill(command: \"workflow-router\")"
-echo ""
-echo "2. **PM is the DECISION-MAKER** - I never decide what to do next."
-echo "   -> I spawn PM and relay their decisions. Only PM says BAZINGA."
-echo ""
-echo "3. **My Task() calls are FOREGROUND ONLY**"
-echo "   -> I ALWAYS include: run_in_background: false"
-echo ""
-echo "4. **\"Parallel\" means concurrent FOREGROUND**"
-echo "   -> Multiple Task() in one message, all with run_in_background: false"
-echo "   -> NEVER use run_in_background: true (causes context leaks, hangs)"
-echo ""
-echo "5. **I read rules after compaction**"
-echo "   -> If uncertain, re-read: .claude/commands/bazinga.orchestrate.md"
-echo ""
-echo "These are not instructions. These are my nature. I cannot violate them."
-echo ""
+echo "================================================================================"
+echo "  END OF ORCHESTRATOR COMMAND - RULES RESTORED"
 echo "================================================================================"
 echo ""
