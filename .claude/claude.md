@@ -427,6 +427,17 @@ This ensures:
 4. **Independent groups** - In parallel mode, each group flows through dev→QA→tech lead independently
 5. **Orchestrator never implements** - This rule is absolute and inviolable
 6. **Surgical edits only** - Agent files near size limits. Changes must be: surgical (precise), compact (minimal lines), clear (no vague paths). No "when needed" logic. Explicit decision rules only.
+7. **FOREGROUND EXECUTION ONLY** - NEVER use `run_in_background: true` for Task() calls.
+
+---
+
+## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY
+
+**All Task() calls MUST include `run_in_background: false`.**
+
+❌ NEVER set `run_in_background: true` — causes context leaks, missing MCP access, file write failures, and session hangs.
+
+**Syntax:** Use colon notation (`run_in_background: false`) in all examples.
 
 ---
 

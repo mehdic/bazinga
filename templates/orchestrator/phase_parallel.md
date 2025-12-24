@@ -2,6 +2,10 @@
 
 **Before any Bash command:** See §Policy-Gate and §Bash Command Allowlist in orchestrator.md
 
+### 🔴 FOREGROUND EXECUTION ONLY
+
+**All Task() calls MUST include `run_in_background: false`.** See orchestrator.md §FOREGROUND EXECUTION ONLY and §PRE-TASK VALIDATION.
+
 ### 🔴 POST-SPAWN TOKEN TRACKING (MANDATORY)
 
 **After EVERY Task() call, you MUST:**
@@ -228,9 +232,9 @@ For EACH group, check skill response:
 • Group B: {agent_type} | {task_title} | Prompt: bazinga/prompts/{session_id}/{agent_type}_B.md
 ...
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type_A], description="{agent_type}: {task_A[:90]}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_A.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type_A], description="{agent_type}: {task_A[:90]}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_A.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.", run_in_background: false)
 
-Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type_B], description="{agent_type}: {task_B[:90]}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_B.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type_B], description="{agent_type}: {task_B[:90]}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_B.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.", run_in_background: false)
 ...
 ```
 
@@ -354,7 +358,7 @@ Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}_retry.json
 
 **Step 4: Spawn Agent with file-based instructions**
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type], description="{agent_type} {group_id}: continuation", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}_retry.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.", run_in_background: false)`
 
 **🔴 SELF-CHECK:**
 - ✅ Did prompt-builder create the file successfully?
@@ -424,7 +428,7 @@ Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
 **Step 4: Spawn Agent with file-based instructions**
 
 ```
-Task(subagent_type="general-purpose", model={model}, description="{agent_type} {group_id}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+Task(subagent_type="general-purpose", model={model}, description="{agent_type} {group_id}", prompt="FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.", run_in_background: false)
 ```
 
 **🔴 SELF-CHECK:**
@@ -571,7 +575,7 @@ Write to `bazinga/prompts/{session_id}/params_project_manager_parallel_final.jso
 
 **Step 4: Spawn PM with file-based instructions**
 
-→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt="FIRST: Read bazinga/prompts/{session_id}/project_manager_parallel_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")`
+→ `Task(subagent_type="general-purpose", model=MODEL_CONFIG["project_manager"], description="PM overall assessment", prompt="FIRST: Read bazinga/prompts/{session_id}/project_manager_parallel_final.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.", run_in_background: false)`
 
 
 **AFTER PM response:** Follow §Step 2A.8 process (parse, construct capsule, apply auto-route rules).
@@ -641,7 +645,8 @@ Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["project_manager"],
   description: "PM: All phases complete - final assessment",
-  prompt: "FIRST: Read bazinga/prompts/{session_id}/project_manager_all_phases.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
+  prompt: "FIRST: Read bazinga/prompts/{session_id}/project_manager_all_phases.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.",
+  run_in_background: false
 )
 ```
 

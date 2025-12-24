@@ -169,6 +169,26 @@ Operation → Check result → If error: Output capsule with error
 
 ---
 
+## 🔴 CRITICAL: FOREGROUND EXECUTION ONLY
+
+**All Task() calls MUST include `run_in_background: false`.**
+
+```
+Task(
+  subagent_type: "general-purpose",
+  model: MODEL_CONFIG["{agent_type}"],
+  description: "{short description}",
+  prompt: "{prompt content}",
+  run_in_background: false  // foreground only; background causes context leaks
+)
+```
+
+**❌ NEVER set `run_in_background: true`**
+
+**🔴 SELF-CHECK:** Before any Task() call, verify `run_in_background: false` is present. If missing, add it before spawning.
+
+---
+
 ## ⚠️ CRITICAL: YOU ARE A COORDINATOR, NOT AN IMPLEMENTER
 
 **🔴 NEVER STOP THE WORKFLOW - Keep agents working until PM sends BAZINGA:**
@@ -1201,9 +1221,10 @@ test -f bazinga/project_context.json && echo "exists" || echo "missing"
 ```
 Task(
   subagent_type: "general-purpose",
-  model: MODEL_CONFIG["tech_stack_scout"],  // From bazinga/model_selection.json
+  model: MODEL_CONFIG["tech_stack_scout"],
   description: "Tech Stack Scout: detect project stack",
-  prompt: [Full Scout prompt from agents/tech_stack_scout.md with session_id]
+  prompt: [Full Scout prompt from agents/tech_stack_scout.md with session_id],
+  run_in_background: false
 )
 ```
 
@@ -1468,7 +1489,8 @@ Before ANY analysis, save your understanding of this request:
 Task(
   subagent_type: "general-purpose",
   description: "PM analyzing requirements and deciding execution mode",
-  prompt: [Full PM prompt from agents/project_manager.md with session_id context AND mandatory understanding capture above]
+  prompt: [Full PM prompt from agents/project_manager.md with session_id context AND mandatory understanding capture above],
+  run_in_background: false
 )
 ```
 
@@ -1753,7 +1775,8 @@ You are the Project Manager. You previously requested clarification and received
 **Session Info:**
 - Session ID: {session_id}
 - Previous PM state: [if any]
-"""
+""",
+  run_in_background: false
 )
 ```
 
@@ -1919,7 +1942,8 @@ Task(
   subagent_type: "general-purpose",
   model: MODEL_CONFIG["{agent_type}"],
   description: "{agent_type} working on {group_id}",
-  prompt: "FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first."
+  prompt: "FIRST: Read bazinga/prompts/{session_id}/{agent_type}_{group_id}.md which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.",
+  run_in_background: false
 )
 ```
 
@@ -2020,7 +2044,8 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
    - Spawn with file-based instruction:
    ```
    Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
-        prompt="FIRST: Read {prompt_file} which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.")
+        prompt="FIRST: Read {prompt_file} which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.",
+        run_in_background: false)  // foreground only
    ```
 
 **For parallel spawns:** Write params files for each group, invoke prompt-builder for each, then spawn all agents. You can call multiple Task() tools in the same message.
