@@ -26,35 +26,25 @@ DB_PATH = "bazinga/bazinga.db"
 # Config file path - relative to project root
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"
 
-# Fallback model assignments (used if config file missing)
-# Keep in sync with bazinga/model_selection.json
-DEFAULT_MODEL_CONFIG = {
-    "developer": "sonnet",
-    "senior_software_engineer": "opus",
-    "qa_expert": "sonnet",
-    "tech_lead": "opus",
-    "project_manager": "opus",
-    "investigator": "opus",
-    "requirements_engineer": "opus",
-}
-
 
 def load_model_config():
-    """Load model config from JSON file, fallback to defaults."""
-    try:
-        if Path(MODEL_CONFIG_PATH).exists():
-            with open(MODEL_CONFIG_PATH, encoding="utf-8") as f:
-                data = json.load(f)
-            # Extract agent -> model mapping
-            config = {}
-            for agent_name, agent_data in data.get("agents", {}).items():
-                if isinstance(agent_data, dict) and "model" in agent_data:
-                    config[agent_name] = agent_data["model"]
-            if config:
-                return config
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"WARNING: Failed to load model config: {e}", file=sys.stderr)
-    return DEFAULT_MODEL_CONFIG
+    """Load model config from JSON file. Raises error if file missing."""
+    if not Path(MODEL_CONFIG_PATH).exists():
+        raise FileNotFoundError(f"Model config not found: {MODEL_CONFIG_PATH}")
+
+    with open(MODEL_CONFIG_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Extract agent -> model mapping
+    config = {}
+    for agent_name, agent_data in data.get("agents", {}).items():
+        if isinstance(agent_data, dict) and "model" in agent_data:
+            config[agent_name] = agent_data["model"]
+
+    if not config:
+        raise ValueError(f"No agent configs found in {MODEL_CONFIG_PATH}")
+
+    return config
 
 
 # Load model config at module init
@@ -296,8 +286,12 @@ def route(args):
             action = "spawn"
             transition["phase_check"] = "complete"
 
-    # Determine model
-    model = transition.get("model_override") or MODEL_CONFIG.get(next_agent, "sonnet")
+    # Determine model - require agent to be in config
+    model = transition.get("model_override")
+    if not model:
+        if next_agent not in MODEL_CONFIG:
+            raise ValueError(f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}")
+        model = MODEL_CONFIG[next_agent]
 
     # Build result
     result = {
