@@ -5,8 +5,8 @@
       "rationale": "Balanced capability for implementation tasks"
     },
     "senior_software_engineer": {
-      "model": "sonnet",
-      "rationale": "Escalation from developer - handles complex failures"
+      "model": "opus",
+      "rationale": "Escalation from developer - handles complex failures requiring deep reasoning"
     },
     "qa_expert": {
       "model": "sonnet",
@@ -74,7 +74,7 @@
     },
     "security": {
       "agent": "senior_software_engineer",
-      "model": "sonnet",
+      "model": "opus",
       "markers": ["auth", "authentication", "authorization", "security", "crypto", "encryption", "password", "jwt", "oauth", "saml", "sso", "bearer", "credential"],
       "note": "Removed generic 'token' - too broad (matches CSRF token, string token). Added 'bearer', 'credential' instead.",
       "matching": "case-insensitive",
@@ -89,7 +89,7 @@
     "notes": [
       "Tech Lead and PM are ALWAYS on Opus - non-negotiable",
       "Developer uses Sonnet for balanced capability",
-      "Senior Software Engineer on Sonnet handles escalated complexity",
+      "Senior Software Engineer on Opus handles escalated complexity",
       "Escalation triggers after 1 failure (not 2)",
       "Security tasks always use SSE + mandatory TL review",
       "Research/architecture tasks route to Requirements Engineer",
