@@ -127,17 +127,19 @@ Orchestrator output:
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
 ```
 
-**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev/Sonnet), 4-6=Medium (SSE/Sonnet), 7-10=High (SSE/Sonnet)
+**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev), 4-6=Medium (SSE), 7-10=High (SSE)
+
+**Model source:** Read from `MODEL_CONFIG[agent_type]` (loaded from `bazinga/model_selection.json`)
 
 **Example output (4 developers):**
 ```
 🔨 **Phase 1 starting** | Spawning 4 developers in parallel
 
 📋 **Developer Assignments:**
-• P0-NURSE-FE: Senior Software Engineer (Sonnet) [C:7] - Nurse App Frontend with auth integration
-• P0-NURSE-BE: Senior Software Engineer (Sonnet) [C:6] - Nurse Backend Services with API endpoints
-• P0-MSG-BE: Senior Software Engineer (Sonnet) [C:8] - Messaging Backend with WhatsApp channel
-• P1-DOCTOR-FE: Developer (Sonnet) [C:3] - Doctor Frontend basic components
+• P0-NURSE-FE: Senior Software Engineer ({MODEL_CONFIG["senior_software_engineer"]}) [C:7] - Nurse App Frontend with auth integration
+• P0-NURSE-BE: Senior Software Engineer ({MODEL_CONFIG["senior_software_engineer"]}) [C:6] - Nurse Backend Services with API endpoints
+• P0-MSG-BE: Senior Software Engineer ({MODEL_CONFIG["senior_software_engineer"]}) [C:8] - Messaging Backend with WhatsApp channel
+• P1-DOCTOR-FE: Developer ({MODEL_CONFIG["developer"]}) [C:3] - Doctor Frontend basic components
 
 💡 For ≥3 developers, consider `/compact` first.
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)

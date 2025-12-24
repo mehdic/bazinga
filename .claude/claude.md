@@ -523,14 +523,22 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 - ❌ `"spawn with opus"` or `"use sonnet for this"`
 - ❌ `MODEL_CONFIG["developer"] = "haiku"` (hardcoded assignment)
 - ❌ Any mention of specific model names in text content that implies runtime behavior
+- ❌ `[SSE/Sonnet]`, `[Dev/Haiku]` - hardcoded tier/model notation in templates
+- ❌ `Levels: 1-3=Low (Dev/Haiku), 4-6=Medium (SSE/Sonnet)` - hardcoded in docs
 
 **ALWAYS USE:**
 - ✅ `MODEL_CONFIG["developer"]` - variable reference
 - ✅ `MODEL_CONFIG["tech_lead"]` - variable reference
 - ✅ "Developer tier model" - tier-based language in documentation
 - ✅ Frontmatter `model: haiku` is OK (documentation only, not read at runtime)
+- ✅ `[SSE/{model}]`, `[Dev/{model}]` - model from `MODEL_CONFIG[agent_type]`
+- ✅ `Levels: 1-3=Low (Developer), 4-6=Medium (SSE), 7-10=High (SSE)` - tier names only, no models
 
 **Why:** Model assignments are configured in `bazinga/model_selection.json`. Hardcoding in agent files creates inconsistency when config changes.
+
+**Template files affected:**
+- `templates/orchestrator/phase_simple.md` - Tier/complexity notation in output capsules
+- `templates/orchestrator/phase_parallel.md` - Developer assignment examples
 
 ### 1. `model_selection.json` - Agent Model Assignment
 
@@ -539,7 +547,7 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 **Current assignments:**
 | Agent | Model | Rationale |
 |-------|-------|-----------|
-| developer | haiku | Cost-efficient for straightforward implementation |
+| developer | sonnet | Balanced capability for implementation tasks |
 | senior_software_engineer | sonnet | Escalation - handles complex failures |
 | qa_expert | sonnet | Balanced for test generation/validation |
 | tech_lead | opus | **Always Opus** - critical architectural decisions |
