@@ -11,12 +11,20 @@ set -euo pipefail
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
 
-# Extract transcript path from JSON input
-# Use python as jq may not be installed on all systems
-TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | python3 -c "import sys, json; print(json.load(sys.stdin).get('transcript_path', ''))" 2>/dev/null || echo "")
+# Extract fields from JSON input using python (jq may not be installed)
+read -r TRANSCRIPT_PATH PROJECT_CWD < <(echo "$HOOK_INPUT" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+print(data.get('transcript_path', ''), data.get('cwd', ''))
+" 2>/dev/null || echo "")
 
 # Exit silently if no transcript path
 if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
+  exit 0
+fi
+
+# Exit silently if no cwd (can't find orchestrator file)
+if [ -z "$PROJECT_CWD" ]; then
   exit 0
 fi
 
@@ -27,22 +35,28 @@ if ! grep -q -E "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|§ORCHESTRAT
   exit 0
 fi
 
+# Build absolute paths to orchestrator files
+ORCHESTRATOR_CMD="$PROJECT_CWD/.claude/commands/bazinga.orchestrate.md"
+ORCHESTRATOR_AGENT="$PROJECT_CWD/.claude/agents/orchestrator.md"
+
 # Orchestration was in progress - output the FULL orchestrator command
 echo ""
 echo "================================================================================"
 echo "  BAZINGA POST-COMPACTION RECOVERY"
 echo "  Reloading FULL orchestrator command..."
+echo "  Project: $PROJECT_CWD"
 echo "================================================================================"
 echo ""
 
 # Output the entire orchestrator command file
-if [ -f ".claude/commands/bazinga.orchestrate.md" ]; then
-  cat ".claude/commands/bazinga.orchestrate.md"
-elif [ -f ".claude/agents/orchestrator.md" ]; then
-  cat ".claude/agents/orchestrator.md"
+if [ -f "$ORCHESTRATOR_CMD" ]; then
+  cat "$ORCHESTRATOR_CMD"
+elif [ -f "$ORCHESTRATOR_AGENT" ]; then
+  cat "$ORCHESTRATOR_AGENT"
 else
   echo "ERROR: Orchestrator file not found!"
-  echo "Expected: .claude/commands/bazinga.orchestrate.md"
+  echo "Checked: $ORCHESTRATOR_CMD"
+  echo "Checked: $ORCHESTRATOR_AGENT"
   exit 1
 fi
 
