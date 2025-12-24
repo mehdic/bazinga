@@ -431,46 +431,11 @@ This ensures:
 
 ---
 
-## 🔴 CRITICAL: Foreground Execution Only (No Background Subagents)
+## 🔴 CRITICAL: Foreground Execution Only
 
-**Background subagents are FORBIDDEN due to critical bugs in Claude Code v2.0.60+.**
+**All Task() calls MUST include `run_in_background: false`.**
 
-### Known Issues with Background Subagents
-
-| Issue | Impact |
-|-------|--------|
-| **Context isolation breaks** | Tool logs from background subagents leak into parent context, causing token spikes |
-| **Missing MCP access** | Background subagents can't access MCP tools (silent failures) |
-| **File write failures** | Background agents can report success but not actually write files |
-| **Session hangs** | Background agent support can make sessions completely unresponsive |
-
-### Mandatory Rules
-
-**When using the Task tool:**
-- ✅ ALWAYS omit `run_in_background` (defaults to false) OR set explicitly to `false`
-- ✅ Spawn agents sequentially - wait for each to complete before spawning the next
-- ✅ If multiple spawns needed, call multiple Task() in ONE message (each runs foreground sequentially)
-- ❌ NEVER set `run_in_background: true`
-- ❌ NEVER expect true parallel/concurrent execution from multiple Task() calls
-
-### Policy for System Prompts
-
-Add to any orchestration or multi-agent system prompts:
-```
-Policy: When using the Task tool, never set run_in_background. Always run subagents in the
-foreground (synchronous). Do not launch multiple subagents concurrently. Wait for each to
-finish before starting the next.
-```
-
-### Why This Matters
-
-Without this policy:
-- Context can suddenly balloon from tool log leakage
-- Sessions become unresponsive with no clear cause
-- Workflows hang waiting for files that were never written
-- MCP tools silently fail, causing retry loops
-
-**Reference:** Claude Code v2.0.60 release notes and subsequent bug reports
+❌ NEVER set `run_in_background: true` - causes context leaks, missing MCP access, file write failures, and session hangs.
 
 ---
 
