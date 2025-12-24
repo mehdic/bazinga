@@ -51,12 +51,47 @@
 
 This section handles spawning Developer, SSE, or RE based on PM's `initial_tier` decision.
 
+**🔴🔴🔴 MANDATORY Step 0: Query Task Group and Map Tier to Agent Type 🔴🔴🔴**
+
+**BEFORE creating the params file, you MUST:**
+
+1. **Query task group from database:**
+   ```
+   Skill(command: "bazinga-db") → get-task-groups {session_id}
+   ```
+
+2. **Extract initial_tier for this group and map to agent_type:**
+
+   | DB `initial_tier` Value | Maps To `agent_type` | Model Key |
+   |-------------------------|---------------------|-----------|
+   | `"Developer"` | `"developer"` | `MODEL_CONFIG["developer"]` |
+   | `"Senior Software Engineer"` | `"senior_software_engineer"` | `MODEL_CONFIG["senior_software_engineer"]` |
+   | `null` or missing | `"developer"` (default) | `MODEL_CONFIG["developer"]` |
+
+3. **Store the mapped agent_type for use in params file:**
+   ```python
+   # Pseudocode
+   TIER_TO_AGENT = {
+       "Developer": "developer",
+       "Senior Software Engineer": "senior_software_engineer"
+   }
+   agent_type = TIER_TO_AGENT.get(task_group.initial_tier, "developer")
+   ```
+
+**🔴 CRITICAL: If you skip this step, SSE tasks will wrongly spawn as Developer!**
+
+**🔴 SELF-CHECK before proceeding:**
+- ✅ Did I query task_groups from database?
+- ✅ Did I read initial_tier for this group?
+- ✅ Did I map the tier value to agent_type using the table above?
+- ✅ For security tasks (security_sensitive=true), is agent_type = "senior_software_engineer"?
+
 **Step 1: Write params file**
 
-Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json` using the **mapped agent_type from Step 0**:
 ```json
 {
-  "agent_type": "{agent_type}",
+  "agent_type": "{mapped_agent_type_from_step_0}",
   "session_id": "{session_id}",
   "group_id": "{group_id}",
   "task_title": "{task_title}",

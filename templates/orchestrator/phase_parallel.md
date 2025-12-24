@@ -190,14 +190,50 @@ IF len(impl_groups) > 4: defer_excess_impl()  # spawn in batches
 
 This section handles spawning Developer, SSE, or RE for each group based on PM's `initial_tier` decision.
 
+**🔴🔴🔴 MANDATORY Step 0: Query Task Groups and Map Tiers to Agent Types 🔴🔴🔴**
+
+**BEFORE creating ANY params files, you MUST:**
+
+1. **Query task groups from database:**
+   ```
+   Skill(command: "bazinga-db") → get-task-groups {session_id}
+   ```
+
+2. **For EACH group, extract and map initial_tier to agent_type:**
+
+   | DB `initial_tier` Value | Maps To `agent_type` | Model Key |
+   |-------------------------|---------------------|-----------|
+   | `"Developer"` | `"developer"` | `MODEL_CONFIG["developer"]` |
+   | `"Senior Software Engineer"` | `"senior_software_engineer"` | `MODEL_CONFIG["senior_software_engineer"]` |
+   | `null` or missing | `"developer"` (default) | `MODEL_CONFIG["developer"]` |
+
+3. **Store the mapping in memory for subsequent steps:**
+   ```python
+   # Pseudocode - do this mentally for each group
+   TIER_TO_AGENT = {
+       "Developer": "developer",
+       "Senior Software Engineer": "senior_software_engineer"
+   }
+   for group in task_groups:
+       group.agent_type = TIER_TO_AGENT.get(group.initial_tier, "developer")
+   ```
+
+**🔴 CRITICAL: If you skip this step, ALL groups will spawn as Developer regardless of PM's tier decision!**
+
+**🔴 SELF-CHECK before proceeding:**
+- ✅ Did I query task_groups from database?
+- ✅ Did I read initial_tier for EACH group?
+- ✅ Did I map tier values to agent_types using the table above?
+- ✅ For security tasks, is initial_tier = "Senior Software Engineer"?
+
 **Step 1: Write params files for EACH group**
 
-For EACH group, write a params JSON file:
+For EACH group, write a params JSON file using the **mapped agent_type from Step 0**:
 
 Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
 ```json
 {
-  "agent_type": "{task_groups[group_id][\"initial_tier\"]}",
+  "agent_type": "{mapped_agent_type_from_step_0}",
   "session_id": "{session_id}",
   "group_id": "{group_id}",
   "task_title": "{task_groups[group_id][\"title\"]}",
