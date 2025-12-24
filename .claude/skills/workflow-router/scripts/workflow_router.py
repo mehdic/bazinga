@@ -26,14 +26,20 @@ DB_PATH = "bazinga/bazinga.db"
 # Config file path - relative to project root
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"
 
+# Global config - loaded lazily in main()
+MODEL_CONFIG = None
+
 
 def load_model_config():
-    """Load model config from JSON file. Raises error if file missing."""
+    """Load model config from JSON file. Returns (config, error) tuple."""
     if not Path(MODEL_CONFIG_PATH).exists():
-        raise FileNotFoundError(f"Model config not found: {MODEL_CONFIG_PATH}")
+        return None, f"Model config not found: {MODEL_CONFIG_PATH}"
 
-    with open(MODEL_CONFIG_PATH, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(MODEL_CONFIG_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        return None, f"Invalid JSON in {MODEL_CONFIG_PATH}: {e}"
 
     # Extract agent -> model mapping
     config = {}
@@ -42,13 +48,21 @@ def load_model_config():
             config[agent_name] = agent_data["model"]
 
     if not config:
-        raise ValueError(f"No agent configs found in {MODEL_CONFIG_PATH}")
+        return None, f"No agent configs found in {MODEL_CONFIG_PATH}"
 
-    return config
+    return config, None
 
 
-# Load model config at module init
-MODEL_CONFIG = load_model_config()
+def emit_error(error_msg, suggestion=None):
+    """Print JSON error and exit."""
+    result = {
+        "success": False,
+        "error": error_msg,
+    }
+    if suggestion:
+        result["suggestion"] = suggestion
+    print(json.dumps(result, indent=2))
+    sys.exit(1)
 
 
 def get_transition(conn, current_agent, status):
@@ -286,11 +300,15 @@ def route(args):
             action = "spawn"
             transition["phase_check"] = "complete"
 
-    # Determine model - require agent to be in config
+    # Determine model - use config with graceful fallback
     model = transition.get("model_override")
     if not model:
         if next_agent not in MODEL_CONFIG:
-            raise ValueError(f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}")
+            # Unknown agent - emit error JSON instead of raising
+            emit_error(
+                f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}",
+                f"Add '{next_agent}' to agents section in {MODEL_CONFIG_PATH}"
+            )
         model = MODEL_CONFIG[next_agent]
 
     # Build result
@@ -328,6 +346,8 @@ def route(args):
 
 
 def main():
+    global MODEL_CONFIG
+
     parser = argparse.ArgumentParser(description="Deterministic workflow routing")
 
     parser.add_argument("--current-agent", required=True,
@@ -345,6 +365,12 @@ def main():
                         help="Database path")
 
     args = parser.parse_args()
+
+    # Load model config with error handling
+    MODEL_CONFIG, config_error = load_model_config()
+    if config_error:
+        emit_error(config_error, "Ensure bazinga/model_selection.json exists and is valid JSON")
+
     route(args)
 
 

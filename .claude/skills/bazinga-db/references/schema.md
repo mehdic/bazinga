@@ -483,12 +483,16 @@ INSERT INTO model_config (agent_role, model, rationale) VALUES
 models = db.get_model_config()
 # Returns: {'developer': 'sonnet', 'senior_software_engineer': 'opus', ...}
 
+# Get model for specific agent (before update)
+model = db.get_agent_model('developer')
+# Returns: 'sonnet'
+
 # Update model for an agent
 db.set_model_config('developer', 'opus', 'Upgrading for complex project')
 
-# Get model for specific agent
+# Get model after update
 model = db.get_agent_model('developer')
-# Returns: 'sonnet'
+# Returns: 'opus'
 ```
 
 **Why This Table:**
