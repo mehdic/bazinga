@@ -189,8 +189,8 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 - **BLOCKED:** `⚠️ Group {id} [{tier}] [C:{complexity}] blocked | {blocker} | Investigating`
 - **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] [C:{complexity}] escalating | {reason} | → SSE`
 
-**Tier notation:** `[SSE/Sonnet]`, `[Dev/Haiku]`
-**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev), 4-6=Medium (SSE), 7-10=High (SSE)
+**Tier notation:** `[SSE/Sonnet]`, `[Dev/Sonnet]`
+**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev/Sonnet), 4-6=Medium (SSE/Sonnet), 7-10=High (SSE/Sonnet)
 
 **Step 3: Output capsule to user**
 

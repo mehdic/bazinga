@@ -127,7 +127,7 @@ Orchestrator output:
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
 ```
 
-**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev), 4-6=Medium (SSE), 7-10=High (SSE)
+**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Dev/Sonnet), 4-6=Medium (SSE/Sonnet), 7-10=High (SSE/Sonnet)
 
 **Example output (4 developers):**
 ```
@@ -137,7 +137,7 @@ Orchestrator output:
 • P0-NURSE-FE: Senior Software Engineer (Sonnet) [C:7] - Nurse App Frontend with auth integration
 • P0-NURSE-BE: Senior Software Engineer (Sonnet) [C:6] - Nurse Backend Services with API endpoints
 • P0-MSG-BE: Senior Software Engineer (Sonnet) [C:8] - Messaging Backend with WhatsApp channel
-• P1-DOCTOR-FE: Developer (Haiku) [C:3] - Doctor Frontend basic components
+• P1-DOCTOR-FE: Developer (Sonnet) [C:3] - Doctor Frontend basic components
 
 💡 For ≥3 developers, consider `/compact` first.
 ⏳ Continuing immediately... (Ctrl+C to pause. Resume via `/bazinga.orchestrate` after `/compact`)
