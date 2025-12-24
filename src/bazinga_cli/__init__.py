@@ -556,9 +556,13 @@ class BazingaSetup:
             script_type = "ps" if platform.system() == "Windows" else "sh"
 
         # Determine file extension and command format
+        # Use safety flags for PowerShell: -NoProfile -NonInteractive
+        # Quote the path to handle spaces
         if script_type == "ps":
             hook_filename = "bazinga-compact-recovery.ps1"
-            hook_command = "powershell -ExecutionPolicy Bypass -File .claude/hooks/bazinga-compact-recovery.ps1"
+            # Prefer pwsh (PowerShell 7) if available, fall back to powershell (5.1)
+            ps_exe = "pwsh" if shutil.which("pwsh") else "powershell"
+            hook_command = f'{ps_exe} -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".claude/hooks/bazinga-compact-recovery.ps1"'
         else:
             hook_filename = "bazinga-compact-recovery.sh"
             hook_command = ".claude/hooks/bazinga-compact-recovery.sh"
@@ -589,7 +593,7 @@ class BazingaSetup:
         try:
             shutil.copy2(source_hook, hook_dst)
             # Make executable on Unix-like systems
-            if script_type == "sh" and os.name != 'nt':
+            if script_type == "sh" and platform.system() != "Windows":
                 hook_dst.chmod(0o755)
         except Exception as e:
             console.print(f"  [yellow]⚠️  Failed to copy hook script: {e}[/yellow]")
@@ -620,23 +624,36 @@ class BazingaSetup:
             }]
         }
 
-        # Check if already installed (avoid duplicates) - check for either .sh or .ps1
-        already_installed = any(
-            "bazinga-compact-recovery" in str(hook)
-            for hook in settings["hooks"]["SessionStart"]
-        )
+        # Check if already installed and update command if script type changed
+        existing_index = None
+        for i, hook in enumerate(settings["hooks"]["SessionStart"]):
+            if "bazinga-compact-recovery" in str(hook):
+                existing_index = i
+                break
 
-        if not already_installed:
+        settings_changed = False
+        if existing_index is not None:
+            # Update existing entry (handles sh -> ps1 switch)
+            old_hook = settings["hooks"]["SessionStart"][existing_index]
+            if old_hook != bazinga_hook:
+                settings["hooks"]["SessionStart"][existing_index] = bazinga_hook
+                settings_changed = True
+                console.print(f"  ✓ Updated post-compaction recovery hook ({hook_filename})")
+            else:
+                console.print(f"  ✓ Post-compaction recovery hook already current ({hook_filename})")
+        else:
+            # Add new entry
             settings["hooks"]["SessionStart"].append(bazinga_hook)
+            settings_changed = True
+            console.print(f"  ✓ Installed post-compaction recovery hook ({hook_filename})")
+
+        # Write settings if changed
+        if settings_changed:
             try:
-                settings_path.write_text(json.dumps(settings, indent=2))
-                console.print(f"  ✓ Installed post-compaction recovery hook ({hook_filename})")
+                settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
             except Exception as e:
                 console.print(f"  [yellow]⚠️  Failed to update settings.json: {e}[/yellow]")
                 return False
-        else:
-            # Update the hook script even if config already exists
-            console.print(f"  ✓ Updated post-compaction recovery hook ({hook_filename})")
 
         return True
 
