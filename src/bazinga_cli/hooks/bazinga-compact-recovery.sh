@@ -3,10 +3,11 @@
 # Deployed by: bazinga install
 #
 # This hook fires after context compaction (compact|resume events).
-# It checks if orchestration was in progress, then outputs the FULL
-# orchestrator command file to restore all rules.
+# It checks if orchestration was in progress, then outputs the
+# IDENTITY AXIOMS section (not full file to avoid token blow-up).
 
-set -euo pipefail
+set -uo pipefail
+# Note: No -e flag - we want soft failures (exit 0) to not break sessions
 
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
@@ -18,12 +19,12 @@ data = json.load(sys.stdin)
 print(data.get('transcript_path', ''), data.get('cwd', ''))
 " 2>/dev/null || echo "")
 
-# Exit silently if no transcript path
+# Exit silently if no transcript path (soft fail)
 if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
   exit 0
 fi
 
-# Exit silently if no cwd (can't find orchestrator file)
+# Exit silently if no cwd (soft fail)
 if [ -z "$PROJECT_CWD" ]; then
   exit 0
 fi
@@ -39,29 +40,39 @@ fi
 ORCHESTRATOR_CMD="$PROJECT_CWD/.claude/commands/bazinga.orchestrate.md"
 ORCHESTRATOR_AGENT="$PROJECT_CWD/.claude/agents/orchestrator.md"
 
-# Orchestration was in progress - output the FULL orchestrator command
+# Find the orchestrator file
+ORCHESTRATOR_FILE=""
+if [ -f "$ORCHESTRATOR_CMD" ]; then
+  ORCHESTRATOR_FILE="$ORCHESTRATOR_CMD"
+elif [ -f "$ORCHESTRATOR_AGENT" ]; then
+  ORCHESTRATOR_FILE="$ORCHESTRATOR_AGENT"
+fi
+
+# Soft fail if file not found (don't break session)
+if [ -z "$ORCHESTRATOR_FILE" ]; then
+  echo ""
+  echo "⚠️  BAZINGA: Orchestrator file not found for recovery."
+  echo "   If you are the orchestrator, manually read: .claude/agents/orchestrator.md"
+  exit 0  # Soft fail - don't break session
+fi
+
+# Output ONLY the identity axioms section (not full file to avoid token blow-up)
+# Extract first ~50 lines which contain the axioms, or up to the first major section
 echo ""
 echo "================================================================================"
 echo "  BAZINGA POST-COMPACTION RECOVERY"
-echo "  Reloading FULL orchestrator command..."
-echo "  Project: $PROJECT_CWD"
+echo "  Re-injecting identity axioms (not full file to save tokens)..."
 echo "================================================================================"
 echo ""
 
-# Output the entire orchestrator command file
-if [ -f "$ORCHESTRATOR_CMD" ]; then
-  cat "$ORCHESTRATOR_CMD"
-elif [ -f "$ORCHESTRATOR_AGENT" ]; then
-  cat "$ORCHESTRATOR_AGENT"
-else
-  echo "ERROR: Orchestrator file not found!"
-  echo "Checked: $ORCHESTRATOR_CMD"
-  echo "Checked: $ORCHESTRATOR_AGENT"
-  exit 1
-fi
+# Output the identity axioms section (first ~50 lines containing the critical rules)
+head -60 "$ORCHESTRATOR_FILE"
 
 echo ""
 echo "================================================================================"
-echo "  END OF ORCHESTRATOR COMMAND - RULES RESTORED"
+echo "  IDENTITY AXIOMS RESTORED"
+echo "  For full rules, read: .claude/agents/orchestrator.md"
 echo "================================================================================"
 echo ""
+
+exit 0

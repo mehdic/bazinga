@@ -591,18 +591,19 @@ Read(file_path: "bazinga/templates/orchestrator/scope_validation.md")
 
 **After any context compaction event (e.g., `/compact` command, automatic summarization):**
 
-### 🔴 CRITICAL FIRST: Re-read Orchestrator Rules
+### 🔴 CRITICAL FIRST: Verify Identity Axioms
 
 **BEFORE any other recovery steps:**
 
-1. **Re-read this entire file:** `.claude/commands/bazinga.orchestrate.md` (or `agents/orchestrator.md`)
-2. **Verify you remember the foreground rule:**
-   ```
-   All Task() calls MUST include: run_in_background: false
-   ```
-3. **Re-read §ORCHESTRATOR IDENTITY AXIOMS** at the top of this file
+1. **Check context for injected axioms:** The compaction recovery hook should have re-injected the §ORCHESTRATOR IDENTITY AXIOMS above
+2. **Verify you remember the critical rules:**
+   - I am a COORDINATOR (spawn agents, don't implement)
+   - PM is the DECISION-MAKER (I never decide, only PM says BAZINGA)
+   - All Task() calls MUST include: `run_in_background: false`
+   - "Parallel" = concurrent FOREGROUND, NOT background mode
+3. **If axioms are missing:** Scroll up to find the "BAZINGA POST-COMPACTION RECOVERY" section in your context
 
-**Why:** Context compaction may have lost critical rules. The cost of re-reading is low. The cost of spawning in background mode is high (context leaks, hangs).
+**Why:** Context compaction may have lost critical rules. The hook re-injects axioms automatically.
 
 ### Detection
 
