@@ -160,11 +160,13 @@ Task(
   model: MODEL_CONFIG["{agent_type}"],
   description: "{short description}",
   prompt: "{prompt content}",
-  run_in_background: false
+  run_in_background: false  // foreground only; background causes context leaks
 )
 ```
 
 **❌ NEVER set `run_in_background: true`**
+
+**🔴 SELF-CHECK:** Before any Task() call, verify `run_in_background: false` is present. If missing, add it before spawning.
 
 ---
 
@@ -2024,7 +2026,7 @@ Read(file_path: "bazinga/templates/orchestrator/phase_parallel.md")
    ```
    Task(subagent_type="general-purpose", model=MODEL_CONFIG[agent_type],
         prompt="FIRST: Read {prompt_file} which contains your complete instructions.\nTHEN: Execute ALL instructions in that file.\n\nDo NOT proceed without reading the file first.",
-        run_in_background=false)
+        run_in_background: false)  // foreground only
    ```
 
 **For parallel spawns:** Write params files for each group, invoke prompt-builder for each, then spawn all agents. You can call multiple Task() tools in the same message.
