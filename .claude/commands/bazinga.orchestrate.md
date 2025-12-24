@@ -1045,9 +1045,9 @@ Display:
    **Store model mappings in context for this session:**
    ```
    MODEL_CONFIG = {
-     "developer": "[model from DB, default: haiku]",
-     "senior_software_engineer": "[model from DB, default: sonnet]",
-     "requirements_engineer": "[model from DB, default: sonnet]",
+     "developer": "[model from DB, default: sonnet]",
+     "senior_software_engineer": "[model from DB, default: opus]",
+     "requirements_engineer": "[model from DB, default: opus]",
      "qa_expert": "[model from DB, default: sonnet]",
      "tech_lead": "[model from DB, default: opus]",
      "project_manager": "[model from DB, default: opus]",

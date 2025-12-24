@@ -548,7 +548,7 @@ The orchestrator reads `bazinga/model_selection.json` at session start and cache
 | Agent | Model | Rationale |
 |-------|-------|-----------|
 | developer | sonnet | Balanced capability for implementation tasks |
-| senior_software_engineer | sonnet | Escalation - handles complex failures |
+| senior_software_engineer | opus | Escalation - handles complex failures requiring deep reasoning |
 | qa_expert | sonnet | Balanced for test generation/validation |
 | tech_lead | opus | **Always Opus** - critical architectural decisions |
 | project_manager | opus | **Always Opus** - strategic planning, final quality gate |

@@ -1,7 +1,7 @@
 ---
 name: developer
 description: Implementation specialist that writes code, runs tests, and delivers working features
-model: haiku
+model: sonnet
 ---
 
 <!-- Note: Frontmatter 'model' field shows the DEFAULT. Actual model assignment

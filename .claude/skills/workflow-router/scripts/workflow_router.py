@@ -27,9 +27,10 @@ DB_PATH = "bazinga/bazinga.db"
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"
 
 # Fallback model assignments (used if config file missing)
+# Keep in sync with bazinga/model_selection.json
 DEFAULT_MODEL_CONFIG = {
-    "developer": "haiku",
-    "senior_software_engineer": "sonnet",
+    "developer": "sonnet",
+    "senior_software_engineer": "opus",
     "qa_expert": "sonnet",
     "tech_lead": "opus",
     "project_manager": "opus",
