@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 import tempfile
 import shutil
+import subprocess
 
 # Add _shared directory to path for bazinga_paths import
 _script_dir = Path(__file__).parent.resolve()
@@ -1719,6 +1720,26 @@ def main():
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
     init_database(db_path)
+
+    # Auto-seed workflow configs from JSON files
+    # This ensures workflow_transitions table is populated after DB creation
+    seed_script = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
+    if seed_script.exists():
+        print("\n📦 Seeding workflow configurations...")
+        result = subprocess.run(
+            [sys.executable, str(seed_script), "--db", db_path, "--all"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            # Print seed_configs output (already has ✅ prefix)
+            if result.stdout.strip():
+                print(result.stdout.strip())
+        else:
+            print(f"⚠️  Config seeding failed: {result.stderr.strip()}", file=sys.stderr)
+            # Don't exit - database is still usable, just without seeded configs
+    else:
+        print(f"⚠️  Config seeder not found at {seed_script}", file=sys.stderr)
 
 
 if __name__ == "__main__":
