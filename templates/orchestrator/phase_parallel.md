@@ -197,9 +197,13 @@ This section handles spawning Developer, SSE, or RE for each group based on PM's
 **BEFORE creating ANY params files, you MUST:**
 
 1. **Query task groups from database:**
+   ```bash
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
    ```
-   Skill(command: "bazinga-db") → get-task-groups {session_id}
-   ```
+
+   **Response format:** JSON array of task groups, each with `id`, `name`, `initial_tier`, `complexity`, etc.
+
+   **If query fails:** Output `❌ Failed to query task groups | {error}` → STOP
 
 2. **For EACH group, extract and map initial_tier to agent_type:**
 
@@ -207,35 +211,57 @@ This section handles spawning Developer, SSE, or RE for each group based on PM's
    |-------------------------|---------------------|-----------|
    | `"Developer"` | `"developer"` | `MODEL_CONFIG["developer"]` |
    | `"Senior Software Engineer"` | `"senior_software_engineer"` | `MODEL_CONFIG["senior_software_engineer"]` |
+   | `"Requirements Engineer"` | `"requirements_engineer"` | `MODEL_CONFIG["requirements_engineer"]` |
    | `null` or missing | `"developer"` (default) | `MODEL_CONFIG["developer"]` |
 
-3. **Store the mapping in memory for subsequent steps:**
+   **Also check task type:** If PM's description contains `**Type:** research`, use `requirements_engineer` regardless of initial_tier.
+
+3. **Build agent_type map keyed by group_id:**
    ```python
-   # Pseudocode - do this mentally for each group
+   # Pseudocode - build explicit map for Step 1
    TIER_TO_AGENT = {
        "Developer": "developer",
-       "Senior Software Engineer": "senior_software_engineer"
+       "Senior Software Engineer": "senior_software_engineer",
+       "Requirements Engineer": "requirements_engineer"
    }
+
+   agent_type_map = {}  # group_id → agent_type
    for group in task_groups:
-       group.agent_type = TIER_TO_AGENT.get(group.initial_tier, "developer")
+       # Normalize: strip whitespace, handle case variations
+       tier = (group.get("initial_tier") or "").strip()
+
+       # Research type override
+       if "**type:** research" in group.get("description", "").lower():
+           agent_type_map[group["id"]] = "requirements_engineer"
+       elif tier in TIER_TO_AGENT:
+           agent_type_map[group["id"]] = TIER_TO_AGENT[tier]
+       else:
+           # Unknown tier - warn and default
+           print(f"⚠️ Unknown tier '{tier}' for {group['id']}, defaulting to developer")
+           agent_type_map[group["id"]] = "developer"
    ```
 
 **🔴 CRITICAL: If you skip this step, ALL groups will spawn as Developer regardless of PM's tier decision!**
 
 **🔴 SELF-CHECK before proceeding:**
-- ✅ Did I query task_groups from database?
+- ✅ Did I query task_groups from database successfully?
 - ✅ Did I read initial_tier for EACH group?
-- ✅ Did I map tier values to agent_types using the table above?
-- ✅ For security tasks, is initial_tier = "Senior Software Engineer"?
+- ✅ Did I check for research type override?
+- ✅ Did I build agent_type_map with correct mappings?
+- ✅ For security tasks, is agent_type = "senior_software_engineer"?
+- ✅ For research tasks, is agent_type = "requirements_engineer"?
 
 **Step 1: Write params files for EACH group**
 
-For EACH group, write a params JSON file using the **mapped agent_type from Step 0**:
+For EACH group, write a params JSON file using `agent_type_map[group_id]` from Step 0:
 
 Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+
+**⚠️ Path safety:** Ensure session_id and group_id contain only alphanumeric chars and underscores. Reject if they contain `../` or special characters.
+
 ```json
 {
-  "agent_type": "{mapped_agent_type_from_step_0}",
+  "agent_type": "{agent_type_map[group_id]}",
   "session_id": "{session_id}",
   "group_id": "{group_id}",
   "task_title": "{task_groups[group_id][\"title\"]}",
