@@ -1062,30 +1062,24 @@ Display:
    Skill(command: "bazinga-db")
    ```
 
-   **Store model mappings in context for this session:**
+   **Load model config from source of truth:**
    ```
-   MODEL_CONFIG = {
-     "developer": "[model from DB, default: haiku]",
-     "senior_software_engineer": "[model from DB, default: sonnet]",
-     "requirements_engineer": "[model from DB, default: sonnet]",
-     "qa_expert": "[model from DB, default: sonnet]",
-     "tech_lead": "[model from DB, default: opus]",
-     "project_manager": "[model from DB, default: opus]",
-     "investigator": "[model from DB, default: opus]",
-     "validator": "[model from DB, default: sonnet]",
-     "tech_stack_scout": "[model from DB, default: sonnet]"
-   }
+   Read(file_path: "bazinga/model_selection.json")
    ```
 
-   **IF model_config table doesn't exist or is empty:**
-   - Use defaults from `bazinga/model_selection.json`
-   - Read file: `Read(file_path: "bazinga/model_selection.json")`
-   - Extract model assignments from `agents` section
-
-   **🔄 CONTEXT RECOVERY:** If you lose model config (e.g., after context compaction), re-query:
+   **Parse and store model mappings:**
    ```
-   bazinga-db, please retrieve model configuration:
-   Query: Get all agent model assignments
+   MODEL_CONFIG = {}
+   for agent_name, agent_data in config["agents"].items():
+       MODEL_CONFIG[agent_name] = agent_data["model"]
+   # e.g., MODEL_CONFIG["developer"] = "sonnet", MODEL_CONFIG["tech_lead"] = "opus"
+   ```
+
+   **Source of truth:** `bazinga/model_selection.json` - NEVER hardcode model names elsewhere.
+
+   **🔄 CONTEXT RECOVERY:** If you lose model config (e.g., after context compaction), re-read:
+   ```
+   Read(file_path: "bazinga/model_selection.json")
    ```
 
    **Use MODEL_CONFIG values in ALL Task invocations instead of hardcoded models.**

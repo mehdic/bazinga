@@ -28,7 +28,9 @@
 
 ### Step 2A.1: Spawn Single Developer
 
-**User output:** `🔨 Implementing | Spawning developer for {brief_task_description}`
+**User output:** `🔨 Implementing | {tier_name} ({model}) [C:{complexity}] - {brief_task_description}`
+
+Example: `🔨 Implementing | Senior Software Engineer (Sonnet) [C:7] - JWT authentication implementation`
 
 ### 🔴 MANDATORY DEVELOPER/SSE PROMPT BUILDING (PM Tier Decision)
 
@@ -51,9 +53,76 @@
 
 This section handles spawning Developer, SSE, or RE based on PM's `initial_tier` decision.
 
+**🔴🔴🔴 MANDATORY Step 0: Query Task Group and Map Tier to Agent Type 🔴🔴🔴**
+
+**BEFORE creating the params file, you MUST:**
+
+1. **Query task groups from database:**
+   ```bash
+   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
+   ```
+
+   **Response format:** JSON array of task groups, each with `id`, `name`, `initial_tier`, `complexity`, etc.
+
+   **If query fails:** Output `❌ Failed to query task groups | {error}` → STOP
+
+2. **Find the target group and extract initial_tier:**
+   ```python
+   # Find group by group_id
+   target_group = next((g for g in task_groups if g["id"] == group_id), None)
+   if not target_group:
+       print(f"❌ Group {group_id} not found in task_groups")
+       # STOP
+   ```
+
+3. **Map initial_tier to agent_type:**
+
+   | DB `initial_tier` Value | Maps To `agent_type` | Model Key |
+   |-------------------------|---------------------|-----------|
+   | `"Developer"` | `"developer"` | `MODEL_CONFIG["developer"]` |
+   | `"Senior Software Engineer"` | `"senior_software_engineer"` | `MODEL_CONFIG["senior_software_engineer"]` |
+   | `"Requirements Engineer"` | `"requirements_engineer"` | `MODEL_CONFIG["requirements_engineer"]` |
+   | `null` or missing | `"developer"` (default) | `MODEL_CONFIG["developer"]` |
+
+   **Also check task type:** If PM's description contains `**Type:** research`, use `requirements_engineer` regardless of initial_tier.
+
+4. **Determine final agent_type:**
+   ```python
+   TIER_TO_AGENT = {
+       "Developer": "developer",
+       "Senior Software Engineer": "senior_software_engineer",
+       "Requirements Engineer": "requirements_engineer"
+   }
+
+   # Normalize tier value
+   tier = (target_group.get("initial_tier") or "").strip()
+
+   # Research type override
+   if "**type:** research" in target_group.get("description", "").lower():
+       agent_type = "requirements_engineer"
+   elif tier in TIER_TO_AGENT:
+       agent_type = TIER_TO_AGENT[tier]
+   else:
+       print(f"⚠️ Unknown tier '{tier}', defaulting to developer")
+       agent_type = "developer"
+   ```
+
+**🔴 CRITICAL: If you skip this step, SSE/RE tasks will wrongly spawn as Developer!**
+
+**🔴 SELF-CHECK before proceeding:**
+- ✅ Did I query task_groups from database successfully?
+- ✅ Did I find the target group by group_id?
+- ✅ Did I check for research type override?
+- ✅ Did I map the tier value to agent_type correctly?
+- ✅ For security tasks, is agent_type = "senior_software_engineer"?
+- ✅ For research tasks, is agent_type = "requirements_engineer"?
+
 **Step 1: Write params file**
 
-Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json`:
+Write to `bazinga/prompts/{session_id}/params_{agent_type}_{group_id}.json` using the agent_type from Step 0:
+
+**⚠️ Path safety:** Ensure session_id and group_id contain only alphanumeric chars and underscores. Reject if they contain `../` or special characters.
+
 ```json
 {
   "agent_type": "{agent_type}",
@@ -115,12 +184,13 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 - **Summary** of work
 
 **Step 2: Construct capsule** per `response_parsing.md` §Developer Response templates:
-- **READY_FOR_QA/REVIEW:** `🔨 Group {id} [{tier}] complete | {summary}, {files}, {tests} ({coverage}%) | → {next}`
-- **PARTIAL:** `🔨 Group {id} [{tier}] implementing | {done} | {status}`
-- **BLOCKED:** `⚠️ Group {id} [{tier}] blocked | {blocker} | Investigating`
-- **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] escalating | {reason} | → SSE`
+- **READY_FOR_QA/REVIEW:** `🔨 Group {id} [{tier}] [C:{complexity}] complete | {summary}, {files}, {tests} ({coverage}%) | → {next}`
+- **PARTIAL:** `🔨 Group {id} [{tier}] [C:{complexity}] implementing | {done} | {status}`
+- **BLOCKED:** `⚠️ Group {id} [{tier}] [C:{complexity}] blocked | {blocker} | Investigating`
+- **ESCALATE_SENIOR:** `🔺 Group {id} [{tier}] [C:{complexity}] escalating | {reason} | → SSE`
 
-**Tier notation:** `[SSE/Sonnet]`, `[Dev/Haiku]`
+**Tier notation:** `[SSE/{model}]`, `[Dev/{model}]` - Model from `MODEL_CONFIG[agent_type]`
+**Complexity notation:** `[C:N]` where N is 1-10. Levels: 1-3=Low (Developer), 4-6=Medium (SSE), 7-10=High (SSE)
 
 **Step 3: Output capsule to user**
 

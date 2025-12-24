@@ -1,7 +1,7 @@
 ---
 name: senior_software_engineer
 description: Senior implementation specialist handling escalated complexity from developer failures
-model: sonnet
+model: opus
 ---
 
 <!-- ⚠️  AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY ⚠️

@@ -460,10 +460,10 @@ CREATE TABLE model_config (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 
--- Default data
+-- Default data (keep in sync with bazinga/model_selection.json)
 INSERT INTO model_config (agent_role, model, rationale) VALUES
-    ('developer', 'haiku', 'Cost-efficient for L1-2 tasks'),
-    ('senior_software_engineer', 'sonnet', 'Complex failures and L3+ tasks'),
+    ('developer', 'sonnet', 'Balanced capability for implementation tasks'),
+    ('senior_software_engineer', 'opus', 'Complex failures requiring deep reasoning'),
     ('qa_expert', 'sonnet', 'Test generation and validation'),
     ('tech_lead', 'opus', 'Architectural decisions - non-negotiable'),
     ('project_manager', 'opus', 'Strategic planning - non-negotiable'),
@@ -481,14 +481,18 @@ INSERT INTO model_config (agent_role, model, rationale) VALUES
 ```python
 # Get all model assignments
 models = db.get_model_config()
-# Returns: {'developer': 'haiku', 'senior_software_engineer': 'sonnet', ...}
+# Returns: {'developer': 'sonnet', 'senior_software_engineer': 'opus', ...}
+
+# Get model for specific agent (before update)
+model = db.get_agent_model('developer')
+# Returns: 'sonnet'
 
 # Update model for an agent
-db.set_model_config('developer', 'sonnet', 'Upgrading for complex project')
+db.set_model_config('developer', 'opus', 'Upgrading for complex project')
 
-# Get model for specific agent
+# Get model after update
 model = db.get_agent_model('developer')
-# Returns: 'haiku'
+# Returns: 'opus'
 ```
 
 **Why This Table:**
