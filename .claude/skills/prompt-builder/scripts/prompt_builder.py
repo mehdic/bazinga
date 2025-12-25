@@ -72,14 +72,26 @@ def get_project_root():
 # Detect project root once at module load
 PROJECT_ROOT = get_project_root()
 
-# Change to project root so all relative paths work correctly
-# This is critical when the script is invoked from a different CWD
-# See: research/absolute-path-resolution-ultrathink.md
-os.chdir(PROJECT_ROOT)
-print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
-
 # Database path - relative to project root
 DB_PATH = str(PROJECT_ROOT / "bazinga" / "bazinga.db")
+
+
+def _ensure_cwd_at_project_root():
+    """Change to project root so all relative paths work correctly.
+
+    This is critical when the script is invoked from a different CWD.
+    See: research/absolute-path-resolution-ultrathink.md
+
+    Must be called at entry point (main), NOT at module import time,
+    to avoid side effects when this module is imported by tests.
+    """
+    global PROJECT_ROOT
+    try:
+        os.chdir(PROJECT_ROOT)
+        print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
+    except OSError as e:
+        print(f"[ERROR] Failed to chdir to project root {PROJECT_ROOT}: {e}", file=sys.stderr)
+        print("[INFO] Continuing with current directory, paths may fail", file=sys.stderr)
 
 # Agent file names (without directory prefix - resolved dynamically)
 AGENT_FILE_NAMES = {
@@ -1936,6 +1948,9 @@ def build_prompt(args):
 
 
 def main():
+    # Ensure we're in project root for relative path resolution
+    _ensure_cwd_at_project_root()
+
     parser = argparse.ArgumentParser(
         description="Build deterministic agent prompts",
         formatter_class=argparse.RawDescriptionHelpFormatter,

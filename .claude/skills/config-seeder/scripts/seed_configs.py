@@ -45,18 +45,29 @@ def get_project_root():
 # Detect project root once at module load
 PROJECT_ROOT = get_project_root()
 
-# Change to project root so all relative paths work correctly
-# This is critical when the script is invoked from a different CWD
-# See: research/absolute-path-resolution-ultrathink.md
-import os
-os.chdir(PROJECT_ROOT)
-print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
-
 # Database path - relative to project root
 DB_PATH = str(PROJECT_ROOT / "bazinga" / "bazinga.db")
 
 # Config directory - relative to project root
 CONFIG_DIR = PROJECT_ROOT / "bazinga" / "config"
+
+
+def _ensure_cwd_at_project_root():
+    """Change to project root so all relative paths work correctly.
+
+    This is critical when the script is invoked from a different CWD.
+    See: research/absolute-path-resolution-ultrathink.md
+
+    Must be called at entry point (main), NOT at module import time,
+    to avoid side effects when this module is imported by tests.
+    """
+    import os
+    try:
+        os.chdir(PROJECT_ROOT)
+        print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
+    except OSError as e:
+        print(f"[ERROR] Failed to chdir to project root {PROJECT_ROOT}: {e}", file=sys.stderr)
+        print("[INFO] Continuing with current directory, paths may fail", file=sys.stderr)
 
 
 def seed_transitions(conn):
@@ -177,6 +188,9 @@ def seed_special_rules(conn):
 
 def main():
     global PROJECT_ROOT, CONFIG_DIR
+
+    # Ensure we're in project root for relative path resolution
+    _ensure_cwd_at_project_root()
 
     parser = argparse.ArgumentParser(description="Seed config files to database")
     parser.add_argument("--transitions", action="store_true", help="Seed transitions only")

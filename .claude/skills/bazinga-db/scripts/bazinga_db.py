@@ -125,20 +125,31 @@ if _shared_dir.exists() and str(_shared_dir) not in sys.path:
 try:
     from bazinga_paths import get_project_root, get_db_path, get_detection_info
     _HAS_BAZINGA_PATHS = True
-
-    # Change to project root so all relative paths work correctly
-    # This is critical when the script is invoked from a different CWD
-    # See: research/absolute-path-resolution-ultrathink.md
-    try:
-        _project_root = get_project_root()
-        import os as _os
-        _os.chdir(_project_root)
-        print(f"[INFO] project_root={_project_root}", file=sys.stderr)
-    except RuntimeError:
-        # Project root detection failed - will be handled later in main()
-        pass
 except ImportError:
     _HAS_BAZINGA_PATHS = False
+
+
+def _ensure_cwd_at_project_root():
+    """Change to project root so all relative paths work correctly.
+
+    This is critical when the script is invoked from a different CWD.
+    See: research/absolute-path-resolution-ultrathink.md
+
+    Must be called at entry point (main), NOT at module import time,
+    to avoid side effects when this module is imported by tests.
+    """
+    if not _HAS_BAZINGA_PATHS:
+        return  # Cannot detect project root without bazinga_paths
+
+    try:
+        project_root = get_project_root()
+        import os
+        os.chdir(project_root)
+        print(f"[INFO] project_root={project_root}", file=sys.stderr)
+    except (RuntimeError, OSError) as e:
+        # RuntimeError: project root detection failed
+        # OSError: chdir failed (e.g., directory deleted)
+        print(f"[WARNING] Could not chdir to project root: {e}", file=sys.stderr)
 
 # Import SCHEMA_VERSION from init_db.py to avoid duplication
 try:
@@ -3236,6 +3247,9 @@ def _resolve_db_path(args) -> str:
 
 
 def main():
+    # Ensure we're in project root for relative path resolution
+    _ensure_cwd_at_project_root()
+
     parser = argparse.ArgumentParser(
         description='BAZINGA Database Client',
         epilog='Run with "help" command to see all available commands'
