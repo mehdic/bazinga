@@ -6,7 +6,10 @@ on:
       - 'agents/**'
       - '.claude/commands/**'
       - '.claude/agents/**'
+      - '.claude/skills/**'
       - 'templates/**'
+      - 'scripts/**'
+      - 'src/**'
       - 'scripts/check-no-hardcoded-models.sh'
   push:
     branches:
@@ -16,7 +19,10 @@ on:
       - 'agents/**'
       - '.claude/commands/**'
       - '.claude/agents/**'
+      - '.claude/skills/**'
       - 'templates/**'
+      - 'scripts/**'
+      - 'src/**'
       - 'scripts/check-no-hardcoded-models.sh'
 
 # Limit permissions to least privilege
@@ -46,12 +52,15 @@ jobs:
           echo ""
           echo "Rule: Model assignments MUST come from bazinga/model_selection.json"
           echo ""
+          echo "Scanning: *.md, *.mdx, *.py, *.ts, *.js, *.sh, *.yml, *.yaml"
+          echo ""
           echo "Allowed exceptions:"
           echo "  - YAML frontmatter (model: sonnet) - documentation only"
           echo "  - Variable references (MODEL_CONFIG[\"developer\"])"
           echo "  - Template placeholders ({haiku|sonnet|opus})"
           echo "  - Token budget tables"
           echo "  - Status markers (ESCALATE_TO_OPUS)"
+          echo "  - Fenced code blocks (examples)"
           echo ""
           ./scripts/check-no-hardcoded-models.sh
 

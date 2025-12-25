@@ -12,11 +12,12 @@
 # - Token budget tables (| haiku | 900 |)
 # - Status markers (ESCALATE_TO_OPUS)
 # - Documentation showing what NOT to do (NEVER, ❌, example, etc.)
+# - Fenced code blocks (examples in documentation)
 
 # Use strict mode but allow grep to return non-zero (no matches)
 set -Euo pipefail
 
-echo "🔍 Checking for hardcoded model names in agent files..."
+echo "🔍 Checking for hardcoded model names in agent and source files..."
 echo ""
 
 VIOLATION_COUNT=0
@@ -27,6 +28,7 @@ echo "Forbidden patterns:"
 echo "  ❌ [SSE/Sonnet], [Dev/Haiku] - use [SSE/{model}] or [Dev/{model}] instead"
 echo "  ❌ (Sonnet), (Haiku), (Opus) in operational context"
 echo "  ❌ 'spawn with opus', 'use sonnet for' - imperative model instructions"
+echo "  ❌ model = \"haiku\" - direct assignments"
 echo ""
 echo "Allowed patterns:"
 echo "  ✅ YAML frontmatter 'model: sonnet' (documentation only)"
@@ -34,34 +36,50 @@ echo "  ✅ MODEL_CONFIG[\"developer\"] (variable reference)"
 echo "  ✅ {haiku|sonnet|opus} (template placeholder)"
 echo "  ✅ | haiku | 900 | (token budget table)"
 echo "  ✅ ESCALATE_TO_OPUS (status marker)"
+echo "  ✅ Fenced code blocks (examples)"
 echo ""
 
-# Build list of directories to search
-SEARCH_DIRS=""
-[ -d "agents" ] && SEARCH_DIRS="$SEARCH_DIRS agents"
-[ -d "templates" ] && SEARCH_DIRS="$SEARCH_DIRS templates"
-[ -d ".claude/commands" ] && SEARCH_DIRS="$SEARCH_DIRS .claude/commands"
-[ -d ".claude/agents" ] && SEARCH_DIRS="$SEARCH_DIRS .claude/agents"
+# Build array of directories to search
+declare -a SEARCH_DIRS=()
+[ -d "agents" ] && SEARCH_DIRS+=("agents")
+[ -d "templates" ] && SEARCH_DIRS+=("templates")
+[ -d ".claude/commands" ] && SEARCH_DIRS+=(".claude/commands")
+[ -d ".claude/agents" ] && SEARCH_DIRS+=(".claude/agents")
+[ -d ".claude/skills" ] && SEARCH_DIRS+=(".claude/skills")
+[ -d "scripts" ] && SEARCH_DIRS+=("scripts")
+[ -d "src" ] && SEARCH_DIRS+=("src")
 
-if [ -z "$SEARCH_DIRS" ]; then
+if [ ${#SEARCH_DIRS[@]} -eq 0 ]; then
     echo "⚠️  No directories to scan found"
     exit 0
 fi
 
+# File extensions to scan
+FILE_PATTERNS=(-name '*.md' -o -name '*.mdx' -o -name '*.py' -o -name '*.ts' -o -name '*.js' -o -name '*.sh' -o -name '*.yml' -o -name '*.yaml')
+
 # Process files using find -print0 for robust filename handling
 while IFS= read -r -d '' file; do
-    # Skip research folder
+    # Skip research folder, node_modules, and this script itself
     [[ "$file" == *"/research/"* ]] && continue
+    [[ "$file" == *"/node_modules/"* ]] && continue
+    [[ "$file" == *"/.git/"* ]] && continue
+    [[ "$file" == *"check-no-hardcoded-models.sh" ]] && continue
     [ -f "$file" ] || continue
 
     file_violations=""
 
-    # Read file content, skipping YAML frontmatter only if file starts with ---
-    # Gate on NR==1 to avoid triggering on --- appearing mid-file
-    content_without_frontmatter=$(awk '
-        NR == 1 && /^---$/ { in_frontmatter = 1; next }
-        in_frontmatter && /^---$/ { in_frontmatter = 0; next }
-        !in_frontmatter { print }
+    # Process file content with awk:
+    # 1. Skip YAML frontmatter (only if file starts with ---)
+    # 2. Skip fenced code blocks (```)
+    # 3. Preserve original line numbers (prefixed as "LINENUM:")
+    processed_content=$(awk '
+        BEGIN { in_frontmatter = 0; in_fenced = 0 }
+        NR == 1 && /^---[[:space:]]*$/ { in_frontmatter = 1; next }
+        in_frontmatter && /^---[[:space:]]*$/ { in_frontmatter = 0; next }
+        in_frontmatter { next }
+        /^```/ { in_fenced = !in_fenced; next }
+        in_fenced { next }
+        { print NR ":" $0 }
     ' "$file")
 
     # Collect all pattern matches into an array for proper handling
@@ -71,27 +89,26 @@ while IFS= read -r -d '' file; do
     # Case-insensitive to catch [Dev/haiku], [SSE/SONNET], etc.
     while IFS= read -r match; do
         [ -n "$match" ] && all_matches+=("$match")
-    done < <(echo "$content_without_frontmatter" | grep -niE '\[.*/[[:space:]]*(haiku|sonnet|opus)[[:space:]]*\]' 2>/dev/null || true)
+    done < <(echo "$processed_content" | grep -iE '^[0-9]+:.*\[.*/[[:space:]]*(haiku|sonnet|opus)[[:space:]]*\]' 2>/dev/null || true)
 
     # Pattern 2: Model name in parentheses in operational context
     # e.g., "Senior Software Engineer (Sonnet)" but not "(haiku=900)"
-    # Case-insensitive
     while IFS= read -r match; do
         [ -n "$match" ] && all_matches+=("$match")
-    done < <(echo "$content_without_frontmatter" | grep -niE '\([a-z ]*[[:space:]]*(haiku|sonnet|opus)[[:space:]]*\)' 2>/dev/null | grep -viE '\((haiku|sonnet|opus)=' || true)
+    done < <(echo "$processed_content" | grep -iE '^[0-9]+:.*\([a-z ]*[[:space:]]*(haiku|sonnet|opus)[[:space:]]*\)' 2>/dev/null | grep -viE '\((haiku|sonnet|opus)=' || true)
 
     # Pattern 3: Imperative instructions with model names
     # e.g., "spawn with opus", "use sonnet for", "assign haiku to"
     while IFS= read -r match; do
         [ -n "$match" ] && all_matches+=("$match")
-    done < <(echo "$content_without_frontmatter" | grep -niE '(spawn|use|assign|run|execute)[[:space:]]+(with[[:space:]]+|using[[:space:]]+|on[[:space:]]+)?(haiku|sonnet|opus)' 2>/dev/null || true)
+    done < <(echo "$processed_content" | grep -iE '^[0-9]+:.*(spawn|use|assign|run|execute)[[:space:]]+(with[[:space:]]+|using[[:space:]]+|on[[:space:]]+)?(haiku|sonnet|opus)' 2>/dev/null || true)
 
     # Pattern 4: Direct hardcoded model string assignments
-    # e.g., = "haiku" or = 'sonnet' but not MODEL_CONFIG["x"] = "haiku"
-    # Handles start-of-line and case-insensitive
+    # e.g., model = "haiku", model="sonnet", x = 'opus'
+    # Match: identifier followed by = and quoted model name
     while IFS= read -r match; do
         [ -n "$match" ] && all_matches+=("$match")
-    done < <(echo "$content_without_frontmatter" | grep -niE '(^|[^A-Z_])[[:space:]]*=[[:space:]]*["'"'"'](haiku|sonnet|opus)["'"'"']' 2>/dev/null || true)
+    done < <(echo "$processed_content" | grep -iE '^[0-9]+:.*[[:alnum:]_]+[[:space:]]*=[[:space:]]*["'"'"'](haiku|sonnet|opus)["'"'"']' 2>/dev/null || true)
 
     # Filter out documentation/educational context and allowed patterns
     for match in "${all_matches[@]+"${all_matches[@]}"}"; do
@@ -127,6 +144,21 @@ while IFS= read -r -d '' file; do
             continue
         fi
 
+        # Skip test assertions and mock data
+        if echo "$match" | grep -qiE '(assert|expect|mock|test_|_test|spec\.)'; then
+            continue
+        fi
+
+        # Skip Python function parameter defaults: def func(..., model="sonnet"):
+        if echo "$match" | grep -qE 'def [[:alnum:]_]+\(.*=[[:space:]]*["'"'"'](haiku|sonnet|opus)["'"'"']'; then
+            continue
+        fi
+
+        # Skip argparse/CLI defaults: default="sonnet", default='haiku'
+        if echo "$match" | grep -qiE 'default[[:space:]]*=[[:space:]]*["'"'"'](haiku|sonnet|opus)["'"'"']'; then
+            continue
+        fi
+
         # This is a real violation
         file_violations="$file_violations$match"$'\n'
     done
@@ -145,7 +177,7 @@ while IFS= read -r -d '' file; do
     # Clear the array for next file
     unset all_matches
 
-done < <(find $SEARCH_DIRS -name '*.md' -print0 2>/dev/null)
+done < <(find "${SEARCH_DIRS[@]}" \( "${FILE_PATTERNS[@]}" \) -print0 2>/dev/null)
 
 # Summary
 echo "═══════════════════════════════════════════════════════════"
@@ -169,7 +201,7 @@ if [ "$VIOLATION_COUNT" -gt 0 ]; then
 else
     echo "✅ PASSED: No hardcoded model name violations found"
     echo ""
-    echo "Verified that agent files use:"
+    echo "Verified that agent and source files use:"
     echo "  ✅ MODEL_CONFIG[\"agent\"] for model references"
     echo "  ✅ {model} placeholders in templates"
     echo "  ✅ Tier-based language (Developer tier, SSE tier)"
