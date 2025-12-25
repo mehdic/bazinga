@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAZINGA Mini Dashboard</title>
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-tertiary: #0f3460;
+      --text-primary: #eee;
+      --text-secondary: #888;
+      --accent: #e94560;
+      --success: #4ade80;
+      --info: #60a5fa;
+      --warning: #fbbf24;
+      --error: #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--bg-secondary);
+      padding: 1rem;
+      overflow-y: auto;
+      border-right: 1px solid #333;
+    }
+
+    .sidebar-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar h2 {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid #333;
+    }
+
+    .clickable-item {
+      padding: 0.75rem;
+      margin: 0.25rem 0;
+      background: var(--bg-primary);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .clickable-item:hover {
+      background: var(--bg-tertiary);
+      border-color: #444;
+    }
+
+    .clickable-item.active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .clickable-item.selected {
+      border-color: var(--accent);
+      background: var(--bg-tertiary);
+    }
+
+    .item-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .item-meta {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* Status badges */
+    .status-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-active { background: var(--success); color: #000; }
+    .status-completed { background: var(--info); color: #000; }
+    .status-failed { background: var(--error); color: #000; }
+    .status-pending { background: var(--warning); color: #000; }
+    .status-in_progress { background: var(--success); color: #000; }
+
+    /* Main content */
+    .main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      background: var(--bg-tertiary);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .refresh-indicator {
+      font-size: 0.8rem;
+      color: var(--success);
+    }
+
+    .refresh-indicator.refreshing {
+      color: var(--warning);
+    }
+
+    /* Panels */
+    .panels {
+      flex: 1;
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      overflow: hidden;
+    }
+
+    .panel {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #333;
+    }
+
+    .panel-header {
+      padding: 0.75rem 1rem;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-header h3 {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    /* Logs */
+    .log-entry {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid #2a2a4a;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    .log-entry:hover {
+      background: var(--bg-secondary);
+    }
+
+    .log-time {
+      color: var(--text-secondary);
+      margin-right: 0.5rem;
+    }
+
+    .log-agent {
+      color: var(--success);
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+
+    .log-content {
+      color: var(--text-primary);
+      word-break: break-word;
+    }
+
+    /* Reasoning entries */
+    .reasoning-entry {
+      background: var(--bg-secondary);
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .reasoning-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .reasoning-phase {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    .reasoning-meta {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .reasoning-content {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text-primary);
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 0.75rem;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      margin-top: 0.5rem;
+    }
+
+    /* Empty states */
+    .empty-state {
+      color: var(--text-secondary);
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.9rem;
+    }
+
+    /* Loading state */
+    .loading {
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    /* Error state */
+    .error-message {
+      color: var(--error);
+      padding: 1rem;
+      background: rgba(248, 113, 113, 0.1);
+      border-radius: 4px;
+      margin: 1rem;
+    }
+
+    /* Agent row details */
+    .agent-status {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+
+    .agent-stats {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.25rem;
+    }
+
+    .agent-stat {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .agent-stat strong {
+      color: var(--text-primary);
+    }
+
+    /* Session requirements preview */
+    .session-requirements {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <h2>Sessions</h2>
+        <div id="sessions">
+          <div class="loading">Loading sessions...</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2>Task Groups</h2>
+        <div id="groups">
+          <div class="empty-state">Select a session</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2>Agents (click to view)</h2>
+        <div id="agents">
+          <div class="empty-state">Select a session</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+      <div class="header">
+        <h1>BAZINGA Mini Dashboard</h1>
+        <div class="header-controls">
+          <span class="refresh-indicator" id="refresh-status">Auto-refresh: 5s</span>
+        </div>
+      </div>
+
+      <div class="panels">
+        <!-- Logs Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Orchestration Logs (recent first)</h3>
+            <span id="log-count" class="item-meta"></span>
+          </div>
+          <div class="panel-content" id="logs-panel">
+            <div class="empty-state">Select a session to view logs</div>
+          </div>
+        </div>
+
+        <!-- Reasoning Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Agent Reasoning</h3>
+            <span id="reasoning-agent" class="item-meta"></span>
+          </div>
+          <div class="panel-content" id="reasoning-panel">
+            <div class="empty-state">Click on an agent to view their reasoning</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentSession = null;
+    let selectedAgent = null;
+    let refreshInterval = null;
+
+    // Utility functions
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatTime(timestamp) {
+      if (!timestamp) return '?';
+      // Handle both ISO format and SQLite format
+      const time = timestamp.includes('T') ? timestamp.split('T')[1] : timestamp.split(' ')[1];
+      return time ? time.slice(0, 8) : '?';
+    }
+
+    function getStatusClass(status) {
+      if (!status) return '';
+      const s = status.toLowerCase();
+      if (s === 'active' || s === 'in_progress') return 'status-active';
+      if (s === 'completed' || s === 'pass' || s === 'approved') return 'status-completed';
+      if (s === 'failed' || s === 'fail') return 'status-failed';
+      if (s === 'pending') return 'status-pending';
+      return 'status-active';
+    }
+
+    function truncate(text, maxLen = 100) {
+      if (!text || text.length <= maxLen) return text || '';
+      return text.slice(0, maxLen) + '...';
+    }
+
+    // API calls
+    async function fetchJSON(url) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error('HTTP error:', res.status, text.slice(0, 100));
+          return { error: `HTTP ${res.status}: ${text.slice(0, 100)}` };
+        }
+        const data = await res.json();
+        if (data.error) {
+          console.error('API error:', data.error);
+        }
+        return data;
+      } catch (e) {
+        console.error('Fetch error:', e);
+        return { error: e.message };
+      }
+    }
+
+    // Load sessions
+    async function loadSessions() {
+      const data = await fetchJSON('/api/sessions');
+      const el = document.getElementById('sessions');
+
+      if (data.error || !data.length) {
+        el.innerHTML = `<div class="empty-state">${data.error || 'No sessions found'}</div>`;
+        return;
+      }
+
+      el.innerHTML = data.map(s => `
+        <div class="clickable-item ${s.session_id === currentSession ? 'active' : ''}"
+             data-session-id="${escapeHtml(s.session_id)}">
+          <div class="item-title">
+            ${escapeHtml(s.session_id.slice(-20))}
+            <span class="status-badge ${getStatusClass(s.status)}">${escapeHtml(s.status)}</span>
+          </div>
+          <div class="item-meta">
+            Mode: ${escapeHtml(s.mode || 'unknown')}
+          </div>
+          ${s.original_requirements ? `<div class="session-requirements">${escapeHtml(truncate(s.original_requirements, 60))}</div>` : ''}
+        </div>
+      `).join('');
+
+      // Auto-select first session if none selected
+      if (!currentSession && data.length > 0) {
+        selectSession(data[0].session_id);
+      }
+    }
+
+    // Select session
+    async function selectSession(sessionId) {
+      currentSession = sessionId;
+      selectedAgent = null;
+
+      // Update UI - use data attribute for comparison
+      document.querySelectorAll('#sessions .clickable-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.sessionId === sessionId);
+      });
+
+      document.getElementById('reasoning-panel').innerHTML = '<div class="empty-state">Click on an agent to view their reasoning</div>';
+      document.getElementById('reasoning-agent').textContent = '';
+
+      // Load session data
+      await Promise.all([loadGroups(), loadAgents(), loadLogs()]);
+    }
+
+    // Load task groups
+    async function loadGroups() {
+      if (!currentSession) return;
+
+      const data = await fetchJSON(`/api/session/${currentSession}/groups`);
+      const el = document.getElementById('groups');
+
+      if (data.error) {
+        el.innerHTML = `<div class="error-message">${escapeHtml(data.error)}</div>`;
+        return;
+      }
+
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state">No task groups</div>';
+        return;
+      }
+
+      el.innerHTML = data.map(g => `
+        <div class="clickable-item">
+          <div class="item-title">
+            ${escapeHtml(g.id)}
+            <span class="status-badge ${getStatusClass(g.status)}">${escapeHtml(g.status)}</span>
+          </div>
+          <div class="item-meta">
+            ${g.name ? escapeHtml(g.name) : 'Unnamed'}
+            ${g.assigned_to ? ` | ${escapeHtml(g.assigned_to)}` : ''}
+            ${g.complexity ? ` | Complexity: ${g.complexity}` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Load agents
+    async function loadAgents() {
+      if (!currentSession) return;
+
+      const data = await fetchJSON(`/api/session/${currentSession}/agents`);
+      const el = document.getElementById('agents');
+
+      if (data.error) {
+        el.innerHTML = `<div class="error-message">${escapeHtml(data.error)}</div>`;
+        return;
+      }
+
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state">No agents spawned yet</div>';
+        return;
+      }
+
+      el.innerHTML = data.map(a => `
+        <div class="clickable-item ${selectedAgent === a.agent_type ? 'selected' : ''}"
+             data-agent-type="${escapeHtml(a.agent_type)}">
+          <div class="item-title">
+            ${escapeHtml(a.agent_type)}
+            ${a.agent_id ? `<span class="item-meta">(${escapeHtml(a.agent_id)})</span>` : ''}
+            <span class="agent-status ${getStatusClass(a.status)}">${escapeHtml(a.status)}</span>
+          </div>
+          <div class="agent-stats">
+            <span class="agent-stat">Reasoning: <strong>${a.reasoning_count || 0}</strong></span>
+            <span class="agent-stat">Logs: <strong>${a.total_logs || 0}</strong></span>
+            <span class="agent-stat">Tokens: <strong>${(a.tokens || 0).toLocaleString()}</strong></span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Load logs
+    async function loadLogs() {
+      if (!currentSession) return;
+
+      const data = await fetchJSON(`/api/session/${currentSession}/logs`);
+      const el = document.getElementById('logs-panel');
+      const countEl = document.getElementById('log-count');
+
+      if (data.error) {
+        el.innerHTML = `<div class="error-message">${escapeHtml(data.error)}</div>`;
+        return;
+      }
+
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state">No logs yet</div>';
+        countEl.textContent = '';
+        return;
+      }
+
+      countEl.textContent = `${data.length} entries`;
+
+      el.innerHTML = data.map(l => `
+        <div class="log-entry">
+          <span class="log-time">[${formatTime(l.timestamp)}]</span>
+          <span class="log-agent">${escapeHtml(l.agent_type)}${l.agent_id ? `/${escapeHtml(l.agent_id)}` : ''}</span>
+          <span class="log-content">${escapeHtml(truncate(l.content_preview, 200))}</span>
+        </div>
+      `).join('');
+    }
+
+    // Select agent
+    async function selectAgent(agentType) {
+      selectedAgent = agentType;
+
+      // Update UI - use data attribute for comparison
+      document.querySelectorAll('#agents .clickable-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.agentType === agentType);
+      });
+
+      document.getElementById('reasoning-agent').textContent = agentType;
+
+      await loadReasoning();
+    }
+
+    // Load reasoning
+    async function loadReasoning() {
+      if (!currentSession || !selectedAgent) return;
+
+      const data = await fetchJSON(`/api/session/${currentSession}/agent/${selectedAgent}/reasoning`);
+      const el = document.getElementById('reasoning-panel');
+
+      if (data.error) {
+        el.innerHTML = `<div class="error-message">${escapeHtml(data.error)}</div>`;
+        return;
+      }
+
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state">No reasoning entries for this agent</div>';
+        return;
+      }
+
+      el.innerHTML = data.map(r => `
+        <div class="reasoning-entry">
+          <div class="reasoning-header">
+            <span class="reasoning-phase">[${escapeHtml(r.reasoning_phase || 'unknown')}]</span>
+            <span class="reasoning-meta">
+              ${r.confidence_level ? `Confidence: ${escapeHtml(r.confidence_level)}` : ''}
+              ${r.group_id ? ` | Group: ${escapeHtml(r.group_id)}` : ''}
+              | ${formatTime(r.timestamp)}
+            </span>
+          </div>
+          <div class="reasoning-content">${escapeHtml(r.content || 'No content')}</div>
+        </div>
+      `).join('');
+    }
+
+    // Refresh all data
+    async function refresh() {
+      const status = document.getElementById('refresh-status');
+      status.textContent = 'Refreshing...';
+      status.classList.add('refreshing');
+
+      try {
+        await loadSessions();
+        if (currentSession) {
+          await Promise.all([loadGroups(), loadAgents(), loadLogs()]);
+          if (selectedAgent) {
+            await loadReasoning();
+          }
+        }
+      } catch (e) {
+        console.error('Refresh error:', e);
+      }
+
+      status.textContent = 'Auto-refresh: 5s';
+      status.classList.remove('refreshing');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSessions();
+      refreshInterval = setInterval(refresh, 5000);
+
+      // Event delegation for session clicks
+      document.getElementById('sessions').addEventListener('click', (e) => {
+        const item = e.target.closest('.clickable-item[data-session-id]');
+        if (item) {
+          selectSession(item.dataset.sessionId);
+        }
+      });
+
+      // Event delegation for agent clicks
+      document.getElementById('agents').addEventListener('click', (e) => {
+        const item = e.target.closest('.clickable-item[data-agent-type]');
+        if (item) {
+          selectAgent(item.dataset.agentType);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -449,6 +449,46 @@ class BazingaSetup:
 
         return copied_count > 0
 
+    def copy_mini_dashboard(self, target_dir: Path) -> bool:
+        """
+        Copy mini-dashboard to target bazinga/mini-dashboard/ directory.
+
+        The mini-dashboard is a lightweight Flask + HTML dashboard for
+        monitoring BAZINGA orchestration sessions without npm dependencies.
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if mini-dashboard was copied successfully, False otherwise
+        """
+        mini_dashboard_dir = target_dir / "bazinga" / "mini-dashboard"
+
+        # Find source mini-dashboard
+        source_mini_dashboard = self._get_shared_data_path("mini-dashboard")
+        if not source_mini_dashboard or not source_mini_dashboard.exists():
+            # Fallback: check project root (dev mode)
+            source_mini_dashboard = self.source_dir / "mini-dashboard"
+            if not source_mini_dashboard.exists():
+                console.print("  [dim]Mini-dashboard not found in source[/dim]")
+                return False
+
+        try:
+            # Copy mini-dashboard (exclude tests and __pycache__)
+            if mini_dashboard_dir.exists():
+                shutil.rmtree(mini_dashboard_dir)
+
+            shutil.copytree(
+                source_mini_dashboard,
+                mini_dashboard_dir,
+                ignore=shutil.ignore_patterns('tests', '__pycache__', '*.pyc', '.pytest_cache')
+            )
+            console.print("  [green]✓[/green] Mini-dashboard copied (run with: python bazinga/mini-dashboard/server.py)")
+            return True
+        except Exception as e:
+            console.print(f"  [yellow]⚠️  Failed to copy mini-dashboard: {e}[/yellow]")
+            return False
+
     def copy_bazinga_configs(self, target_dir: Path) -> bool:
         """
         Copy bazinga config files (JSON) to target bazinga/ directory.
@@ -1662,6 +1702,9 @@ def init(
         console.print("\n[bold cyan]7.3. Installing compaction recovery hook[/bold cyan]")
         setup.install_compact_recovery_hook(target_dir, script_type)
 
+        console.print("\n[bold cyan]7.4. Mini-dashboard[/bold cyan]")
+        setup.copy_mini_dashboard(target_dir)
+
         console.print("\n[bold cyan]8. Initializing coordination files[/bold cyan]")
         setup.run_init_script(target_dir, script_type)
 
@@ -2402,6 +2445,10 @@ def update(
     # Install/update compaction recovery hook
     console.print("\n[bold cyan]7.3. Updating compaction recovery hook[/bold cyan]")
     setup.install_compact_recovery_hook(target_dir, script_type)
+
+    # Update mini-dashboard
+    console.print("\n[bold cyan]7.4. Updating mini-dashboard[/bold cyan]")
+    setup.copy_mini_dashboard(target_dir)
 
     # Update dashboard dependencies
     console.print("\n[bold cyan]8. Dashboard dependencies[/bold cyan]")
