@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bazinga-cli"
-version = "1.2.0"
+version = "1.2.1"
 description = "BAZINGA CLI - A sophisticated multi-agent orchestration system for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -66,7 +66,7 @@ exclude = [
 "bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
 "templates" = "bazinga_cli/templates"
 "workflow" = "bazinga_cli/bazinga/config"  # workflow/ -> bazinga/config in clients
-"src/bazinga_cli/hooks" = "bazinga_cli/hooks"  # Post-compaction recovery hook for clients
+# Note: hooks are included via packages = ["src/bazinga_cli"], no need to force-include
 
 [tool.hatch.build.targets.wheel.shared-data]
 "agents" = "share/bazinga_cli/agents"
