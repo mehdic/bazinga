@@ -36,7 +36,7 @@ jobs:
       - name: Run API tests
         working-directory: mini-dashboard
         run: |
-          python -m pytest tests/test_api.py -v --tb=short -c /dev/null
+          python -m pytest tests/test_api.py -v --tb=short -c /dev/null -p no:cacheprovider
 
   frontend-tests:
     name: Frontend Tests (Playwright)
@@ -75,4 +75,4 @@ jobs:
       - name: Run Frontend tests
         working-directory: mini-dashboard
         run: |
-          python -m pytest tests/test_frontend.py -v --tb=short -c /dev/null
+          python -m pytest tests/test_frontend.py -v --tb=short -c /dev/null -p no:cacheprovider
