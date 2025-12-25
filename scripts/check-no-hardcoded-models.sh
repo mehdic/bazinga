@@ -13,22 +13,13 @@
 # - Status markers (ESCALATE_TO_OPUS)
 # - Documentation showing what NOT to do (NEVER, ❌, example, etc.)
 
-set +e
+# Use strict mode but allow grep to return non-zero (no matches)
+set -Euo pipefail
 
 echo "🔍 Checking for hardcoded model names in agent files..."
 echo ""
 
-ERRORS_FOUND=0
-
-# Files to check
-# Note: We check agents/, templates/, and .claude/commands/
-# Exclude research/ (analysis docs) and bazinga/model_selection.json (config source)
-FILES_TO_CHECK=$(find agents templates .claude/commands -name '*.md' 2>/dev/null | grep -v 'research/' || true)
-
-# Also add any .claude/agents if they exist
-if [ -d ".claude/agents" ]; then
-    FILES_TO_CHECK="$FILES_TO_CHECK $(find .claude/agents -name '*.md' 2>/dev/null || true)"
-fi
+VIOLATION_COUNT=0
 
 echo "━━━ Check: Hardcoded tier/model notation ━━━"
 echo ""
@@ -45,49 +36,65 @@ echo "  ✅ | haiku | 900 | (token budget table)"
 echo "  ✅ ESCALATE_TO_OPUS (status marker)"
 echo ""
 
-VIOLATION_COUNT=0
+# Build list of directories to search
+SEARCH_DIRS=""
+[ -d "agents" ] && SEARCH_DIRS="$SEARCH_DIRS agents"
+[ -d "templates" ] && SEARCH_DIRS="$SEARCH_DIRS templates"
+[ -d ".claude/commands" ] && SEARCH_DIRS="$SEARCH_DIRS .claude/commands"
+[ -d ".claude/agents" ] && SEARCH_DIRS="$SEARCH_DIRS .claude/agents"
 
-for file in $FILES_TO_CHECK; do
+if [ -z "$SEARCH_DIRS" ]; then
+    echo "⚠️  No directories to scan found"
+    exit 0
+fi
+
+# Process files using find -print0 for robust filename handling
+while IFS= read -r -d '' file; do
+    # Skip research folder
+    [[ "$file" == *"/research/"* ]] && continue
     [ -f "$file" ] || continue
 
     file_violations=""
 
-    # Read file content, skipping YAML frontmatter (first --- to second ---)
-    # We use awk to skip the frontmatter section
+    # Read file content, skipping YAML frontmatter only if file starts with ---
+    # Gate on NR==1 to avoid triggering on --- appearing mid-file
     content_without_frontmatter=$(awk '
-        BEGIN { in_frontmatter = 0; found_first = 0 }
-        /^---$/ {
-            if (!found_first) { found_first = 1; in_frontmatter = 1; next }
-            else if (in_frontmatter) { in_frontmatter = 0; next }
-        }
+        NR == 1 && /^---$/ { in_frontmatter = 1; next }
+        in_frontmatter && /^---$/ { in_frontmatter = 0; next }
         !in_frontmatter { print }
     ' "$file")
 
+    # Collect all pattern matches into an array for proper handling
+    declare -a all_matches=()
+
     # Pattern 1: Hardcoded tier/model notation like [SSE/Sonnet], [Dev/Haiku]
-    # This catches brackets with model names that should use {model} placeholder
-    pattern1_matches=$(echo "$content_without_frontmatter" | grep -n '\[.*\/\(Haiku\|Sonnet\|Opus\)\]' 2>/dev/null || true)
+    # Case-insensitive to catch [Dev/haiku], [SSE/SONNET], etc.
+    while IFS= read -r match; do
+        [ -n "$match" ] && all_matches+=("$match")
+    done < <(echo "$content_without_frontmatter" | grep -niE '\[.*/[[:space:]]*(haiku|sonnet|opus)[[:space:]]*\]' 2>/dev/null || true)
 
     # Pattern 2: Model name in parentheses in operational context
     # e.g., "Senior Software Engineer (Sonnet)" but not "(haiku=900)"
-    pattern2_matches=$(echo "$content_without_frontmatter" | grep -n '([A-Za-z ]*\(Haiku\|Sonnet\|Opus\))' 2>/dev/null | grep -v '(haiku=' | grep -v '(sonnet=' | grep -v '(opus=' || true)
+    # Case-insensitive
+    while IFS= read -r match; do
+        [ -n "$match" ] && all_matches+=("$match")
+    done < <(echo "$content_without_frontmatter" | grep -niE '\([a-z ]*[[:space:]]*(haiku|sonnet|opus)[[:space:]]*\)' 2>/dev/null | grep -viE '\((haiku|sonnet|opus)=' || true)
 
     # Pattern 3: Imperative instructions with model names
     # e.g., "spawn with opus", "use sonnet for", "assign haiku to"
-    pattern3_matches=$(echo "$content_without_frontmatter" | grep -niE '(spawn|use|assign|run|execute) (with |using |on )?(haiku|sonnet|opus)' 2>/dev/null || true)
+    while IFS= read -r match; do
+        [ -n "$match" ] && all_matches+=("$match")
+    done < <(echo "$content_without_frontmatter" | grep -niE '(spawn|use|assign|run|execute)[[:space:]]+(with[[:space:]]+|using[[:space:]]+|on[[:space:]]+)?(haiku|sonnet|opus)' 2>/dev/null || true)
 
-    # Pattern 4: Direct hardcoded model string assignments (not MODEL_CONFIG references)
+    # Pattern 4: Direct hardcoded model string assignments
     # e.g., = "haiku" or = 'sonnet' but not MODEL_CONFIG["x"] = "haiku"
-    pattern4_matches=$(echo "$content_without_frontmatter" | grep -nE '[^A-Z_]= ?"(haiku|sonnet|opus)"' 2>/dev/null || true)
-    pattern4_matches="$pattern4_matches$(echo "$content_without_frontmatter" | grep -nE "[^A-Z_]= ?'(haiku|sonnet|opus)'" 2>/dev/null || true)"
-
-    # Combine all matches
-    all_matches="$pattern1_matches
-$pattern2_matches
-$pattern3_matches
-$pattern4_matches"
+    # Handles start-of-line and case-insensitive
+    while IFS= read -r match; do
+        [ -n "$match" ] && all_matches+=("$match")
+    done < <(echo "$content_without_frontmatter" | grep -niE '(^|[^A-Z_])[[:space:]]*=[[:space:]]*["'"'"'](haiku|sonnet|opus)["'"'"']' 2>/dev/null || true)
 
     # Filter out documentation/educational context and allowed patterns
-    while IFS= read -r match; do
+    for match in "${all_matches[@]+"${all_matches[@]}"}"; do
         [ -z "$match" ] && continue
 
         # Skip lines with documentation markers
@@ -101,18 +108,12 @@ $pattern4_matches"
         fi
 
         # Skip template placeholders like {haiku|sonnet|opus}
-        if echo "$match" | grep -qE '\{haiku\|sonnet\|opus\}|\{model\}'; then
+        if echo "$match" | grep -qiE '\{haiku\|sonnet\|opus\}|\{model\}'; then
             continue
         fi
 
-        # Skip token budget table rows
-        if echo "$match" | grep -qE '^\|.*haiku.*\|.*[0-9]+.*\|'; then
-            continue
-        fi
-        if echo "$match" | grep -qE '^\|.*sonnet.*\|.*[0-9]+.*\|'; then
-            continue
-        fi
-        if echo "$match" | grep -qE '^\|.*opus.*\|.*[0-9]+.*\|'; then
+        # Skip token budget table rows (case-insensitive)
+        if echo "$match" | grep -qiE '^[0-9]+:\|.*(haiku|sonnet|opus).*\|.*[0-9]+.*\|'; then
             continue
         fi
 
@@ -127,9 +128,8 @@ $pattern4_matches"
         fi
 
         # This is a real violation
-        file_violations="$file_violations$match
-"
-    done <<< "$all_matches"
+        file_violations="$file_violations$match"$'\n'
+    done
 
     # Report violations for this file
     if [ -n "$(echo "$file_violations" | tr -d '[:space:]')" ]; then
@@ -141,15 +141,17 @@ $pattern4_matches"
         echo ""
         VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
     fi
-done
 
-ERRORS_FOUND=$VIOLATION_COUNT
+    # Clear the array for next file
+    unset all_matches
+
+done < <(find $SEARCH_DIRS -name '*.md' -print0 2>/dev/null)
 
 # Summary
 echo "═══════════════════════════════════════════════════════════"
 
-if [ $ERRORS_FOUND -gt 0 ]; then
-    echo "❌ FAILED: Found $ERRORS_FOUND file(s) with hardcoded model names"
+if [ "$VIOLATION_COUNT" -gt 0 ]; then
+    echo "❌ FAILED: Found $VIOLATION_COUNT file(s) with hardcoded model names"
     echo ""
     echo "How to fix:"
     echo "  1. Replace [SSE/Sonnet] with [SSE/{model}] or remove model specification"

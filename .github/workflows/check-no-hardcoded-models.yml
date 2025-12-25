@@ -19,6 +19,15 @@ on:
       - 'templates/**'
       - 'scripts/check-no-hardcoded-models.sh'
 
+# Limit permissions to least privilege
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref
+concurrency:
+  group: hardcoded-models-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-no-hardcoded-models:
     name: Verify No Hardcoded Model Names
@@ -75,5 +84,3 @@ jobs:
           echo "  ✅ bazinga/model_selection.json"
           echo ""
           echo "See .claude/claude.md section on NEVER Hardcode Model Names"
-          echo ""
-          exit 1
