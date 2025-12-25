@@ -205,7 +205,7 @@ test.describe("Sessions List Page", () => {
                           pageContent?.includes("Next") ||
                           pageContent?.includes("Showing");
     // Pagination only shows when > 12 sessions
-    expect(page.locator("body")).toBeVisible();
+    await expect(page.locator("body")).toBeVisible();
   });
 
   test("displays empty state when no sessions match filter", async ({ page }) => {

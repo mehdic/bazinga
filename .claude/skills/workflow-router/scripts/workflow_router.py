@@ -18,16 +18,53 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
+# Add _shared directory to path for bazinga_paths import
+_script_dir = Path(__file__).resolve().parent
+_shared_dir = _script_dir.parent.parent / '_shared'
+if _shared_dir.exists() and str(_shared_dir) not in sys.path:
+    sys.path.insert(0, str(_shared_dir))
+
+try:
+    from bazinga_paths import get_project_root
+    _HAS_BAZINGA_PATHS = True
+except ImportError:
+    _HAS_BAZINGA_PATHS = False
+
+
+def _ensure_cwd_at_project_root():
+    """Change to project root so all relative paths work correctly.
+
+    This is critical when the script is invoked from a different CWD.
+    See: research/absolute-path-resolution-ultrathink.md
+
+    Must be called at entry point (main), NOT at module import time,
+    to avoid side effects when this module is imported by tests.
+    """
+    if not _HAS_BAZINGA_PATHS:
+        return  # Cannot detect project root without bazinga_paths
+
+    try:
+        project_root = get_project_root()
+        os.chdir(project_root)
+        # Only log if BAZINGA_VERBOSE is set to reduce noise
+        if os.environ.get("BAZINGA_VERBOSE"):
+            print(f"[INFO] project_root={project_root}", file=sys.stderr)
+    except RuntimeError:
+        # Project root detection failed - no valid markers found
+        # Don't chdir to avoid changing to wrong directory
+        pass
+    except OSError as e:
+        print(f"[WARNING] Failed to chdir to project root: {e}", file=sys.stderr)
+
+
 # Database path - relative to project root
 DB_PATH = "bazinga/bazinga.db"
-
-# Script directory for locating sibling skills
-_script_dir = Path(__file__).resolve().parent
 
 # Config file path - relative to project root
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"
@@ -484,6 +521,9 @@ def route(args):
 
 def main():
     global MODEL_CONFIG
+
+    # Ensure we're in project root for relative path resolution
+    _ensure_cwd_at_project_root()
 
     parser = argparse.ArgumentParser(description="Deterministic workflow routing")
 
