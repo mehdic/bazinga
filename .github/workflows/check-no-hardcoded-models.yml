@@ -1,0 +1,93 @@
+name: Check No Hardcoded Models
+
+on:
+  pull_request:
+    paths:
+      - 'agents/**'
+      - '.claude/commands/**'
+      - '.claude/agents/**'
+      - '.claude/skills/**'
+      - 'templates/**'
+      - 'scripts/**'
+      - 'src/**'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'agents/**'
+      - '.claude/commands/**'
+      - '.claude/agents/**'
+      - '.claude/skills/**'
+      - 'templates/**'
+      - 'scripts/**'
+      - 'src/**'
+
+# Limit permissions to least privilege
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref
+concurrency:
+  group: hardcoded-models-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-no-hardcoded-models:
+    name: Verify No Hardcoded Model Names
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x scripts/check-no-hardcoded-models.sh
+
+      - name: Check for hardcoded model names
+        run: |
+          echo "🔍 Checking for prohibited hardcoded model names..."
+          echo ""
+          echo "Rule: Model assignments MUST come from bazinga/model_selection.json"
+          echo ""
+          echo "Scanning: *.md, *.mdx, *.py, *.ts, *.js, *.sh, *.yml, *.yaml"
+          echo ""
+          echo "Allowed exceptions:"
+          echo "  - YAML frontmatter (model: sonnet) - documentation only"
+          echo "  - Variable references (MODEL_CONFIG[\"developer\"])"
+          echo "  - Template placeholders ({haiku|sonnet|opus})"
+          echo "  - Token budget tables"
+          echo "  - Status markers (ESCALATE_TO_OPUS)"
+          echo "  - Fenced code blocks (examples)"
+          echo ""
+          ./scripts/check-no-hardcoded-models.sh
+
+      - name: Check passed
+        if: success()
+        run: |
+          echo ""
+          echo "✅ All files comply with the no-hardcoded-models rule!"
+          echo ""
+          echo "Verified that:"
+          echo "  - No [SSE/Sonnet] or [Dev/Haiku] notation"
+          echo "  - No imperative model instructions (spawn with opus)"
+          echo "  - No hardcoded model string assignments"
+          echo "  - Model references use MODEL_CONFIG or {model} placeholders"
+
+      - name: Check failed
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ Hardcoded model check failed!"
+          echo ""
+          echo "One or more files contain hardcoded model names."
+          echo ""
+          echo "To fix:"
+          echo "  1. Replace [SSE/Sonnet] with [SSE/{model}] or tier-based language"
+          echo "  2. Replace hardcoded model names with MODEL_CONFIG references"
+          echo "  3. Use tier-based language: 'Developer tier' instead of 'Haiku'"
+          echo ""
+          echo "Model configuration belongs in:"
+          echo "  ✅ bazinga/model_selection.json"
+          echo ""
+          echo "See .claude/claude.md section on NEVER Hardcode Model Names"

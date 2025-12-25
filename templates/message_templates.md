@@ -173,15 +173,15 @@ Spawning Project Manager for analysis...
 🔨 Group {id} [{tier}/{model}] implementing | {files_created/modified}, {tests_added} ({coverage}% coverage) | {current_status}
 ```
 
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer. For backward compatibility, brackets are optional and may be omitted if tier/model information is unavailable.
+**Tier notation:** `[SSE]` for Senior Software Engineer, `[Dev]` for Developer. For backward compatibility, brackets are optional and may be omitted if tier information is unavailable.
 
 **Examples:**
 ```
-🔨 Group A [SSE/Sonnet] implementing | auth_middleware.py + jwt_utils.py created, 12 tests added (92% coverage) | Tests passing → QA review
+🔨 Group A [SSE] implementing | auth_middleware.py + jwt_utils.py created, 12 tests added (92% coverage) | Tests passing → QA review
 
-🔨 Group B [Dev/Haiku] implementing | user_service.py in progress (8/12 tests passing) | Fixing validation edge cases
+🔨 Group B [Dev] implementing | user_service.py in progress (8/12 tests passing) | Fixing validation edge cases
 
-🔨 Group C [SSE/Sonnet] implementing | password_reset.py complete, coverage at 78% | Adding missing tests
+🔨 Group C [SSE] implementing | password_reset.py complete, coverage at 78% | Adding missing tests
 ```
 
 ### Developer Work Complete
@@ -191,9 +191,9 @@ Spawning Project Manager for analysis...
 
 **Examples:**
 ```
-🔨 Group A [SSE/Sonnet] complete | JWT auth implemented in 3 files, 12 tests added (92% coverage) | No blockers → QA review
+🔨 Group A [SSE] complete | JWT auth implemented in 3 files, 12 tests added (92% coverage) | No blockers → QA review
 
-🔨 Group B [Dev/Haiku] complete | User registration with validation, 15 tests (88% coverage) | Ready → QA testing
+🔨 Group B [Dev] complete | User registration with validation, 15 tests (88% coverage) | Ready → QA testing
 ```
 
 ---

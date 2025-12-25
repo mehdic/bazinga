@@ -141,7 +141,7 @@ If response is NOT valid JSON (for backwards compatibility), fall back to text p
 🔨 Group {id} [{tier}/{model}] complete | {summary}, {file_count} files modified, {test_count} tests added ({coverage}% coverage) | {status} → {next_phase}
 ```
 
-**Tier/Model notation:** `[SSE/Sonnet]` for Senior Software Engineer, `[Dev/Haiku]` for Developer. Bracket is optional for backward compatibility - omit if tier/model unavailable.
+**Tier notation:** `[SSE]` for Senior Software Engineer, `[Dev]` for Developer. Bracket is optional for backward compatibility - omit if tier unavailable.
 
 **Fallback logic:**
 
@@ -156,7 +156,7 @@ If missing:
 
 Full data available:
 ```
-🔨 Group A [SSE/Sonnet] complete | JWT auth implemented, 3 files created, 12 tests added (92% coverage) | No blockers → QA review
+🔨 Group A [SSE] complete | JWT auth implemented, 3 files created, 12 tests added (92% coverage) | No blockers → QA review
 ```
 
 Minimal data (only status available):
@@ -166,7 +166,7 @@ Minimal data (only status available):
 
 Files but no test count:
 ```
-🔨 Group C [Dev/Haiku] complete | Password reset in password_reset.py, with tests | Ready → QA testing
+🔨 Group C [Dev] complete | Password reset in password_reset.py, with tests | Ready → QA testing
 ```
 
 ---
