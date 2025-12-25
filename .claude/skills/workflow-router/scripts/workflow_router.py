@@ -18,10 +18,58 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+
+
+def _get_project_root() -> Path:
+    """Detect project root by looking for .claude directory or bazinga directory.
+
+    Returns:
+        Path to project root, or current working directory if not found.
+    """
+    # Start from script location and traverse up
+    script_dir = Path(__file__).resolve().parent
+
+    # Look for project markers going up from script location
+    current = script_dir
+    for _ in range(10):  # Max 10 levels up
+        if (current / ".claude").is_dir() and (current / "bazinga").is_dir():
+            return current
+        parent = current.parent
+        if parent == current:  # Reached filesystem root
+            break
+        current = parent
+
+    # Fallback: check CWD
+    cwd = Path.cwd()
+    if (cwd / ".claude").is_dir() and (cwd / "bazinga").is_dir():
+        return cwd
+
+    # Last resort: use CWD and hope for the best
+    return cwd
+
+
+def _ensure_cwd_at_project_root():
+    """Change to project root so all relative paths work correctly.
+
+    This is critical when the script is invoked from a different CWD.
+    See: research/absolute-path-resolution-ultrathink.md
+
+    Must be called at entry point (main), NOT at module import time,
+    to avoid side effects when this module is imported by tests.
+    """
+    try:
+        project_root = _get_project_root()
+        os.chdir(project_root)
+        print(f"[INFO] project_root={project_root}", file=sys.stderr)
+    except OSError as e:
+        print(f"[ERROR] Failed to chdir to project root: {e}", file=sys.stderr)
+        print("[INFO] Continuing with current directory, paths may fail", file=sys.stderr)
+
 
 # Database path - relative to project root
 DB_PATH = "bazinga/bazinga.db"
@@ -484,6 +532,9 @@ def route(args):
 
 def main():
     global MODEL_CONFIG
+
+    # Ensure we're in project root for relative path resolution
+    _ensure_cwd_at_project_root()
 
     parser = argparse.ArgumentParser(description="Deterministic workflow routing")
 
