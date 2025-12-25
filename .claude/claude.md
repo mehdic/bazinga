@@ -1499,6 +1499,57 @@ Without it:
 
 ---
 
+## 🧪 Mini Dashboard Testing
+
+The Mini Dashboard has a comprehensive test suite located in `mini-dashboard/tests/`.
+
+### Running Tests
+
+```bash
+# Navigate to mini-dashboard directory
+cd mini-dashboard
+
+# Run all tests (API + Frontend if Playwright available)
+./run_tests.sh
+
+# Run API tests only (no browser needed)
+./run_tests.sh api
+# Or directly:
+python -m pytest tests/test_api.py -v --tb=short -c /dev/null
+
+# Run Frontend tests only (requires Playwright)
+./run_tests.sh frontend
+# Or directly:
+python -m pytest tests/test_frontend.py -v --tb=short -c /dev/null
+```
+
+### Test Dependencies
+
+```bash
+# Install test dependencies
+pip install flask pytest pytest-playwright
+
+# Install Playwright browser (for frontend tests)
+playwright install chromium
+```
+
+### Test Structure
+
+| File | Description | Count |
+|------|-------------|-------|
+| `tests/test_api.py` | API endpoint tests | 42 tests |
+| `tests/test_frontend.py` | Playwright UI tests | 25 tests |
+| `tests/seed_test_db.py` | Test database seeder | - |
+| `tests/conftest.py` | Pytest configuration | - |
+
+### GitHub Actions
+
+Tests run automatically on push/PR via `.github/workflows/mini-dashboard-tests.yml`:
+- API tests always run
+- Frontend tests run with Playwright in headless mode
+
+---
+
 ✅ Project context loaded successfully!
 
 📚 Research documents available in 'research/' folder
