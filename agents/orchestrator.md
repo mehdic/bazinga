@@ -2245,38 +2245,45 @@ Skill(command: "bazinga-validator")
 ```
 
 **Step 2b: Log REJECT event via bazinga-db skill**
-```
-bazinga-db, log event:
-Event type: validator_reject
-Session ID: {session_id}
-Details: Validator rejected - {brief_summary}
+
+Write params file `bazinga/prompts/{session_id}/params_log_reject.json`:
+```json
+{
+  "action": "log-event",
+  "session_id": "{session_id}",
+  "event_type": "validator_reject",
+  "details": "Validator rejected: {brief_summary}"
+}
 ```
 Then invoke: `Skill(command: "bazinga-db")`
 
 **Step 2c: Route via workflow-router**
+
+Invoke workflow-router with validator status:
 ```
 workflow-router, determine next action:
 Current agent: validator
 Status: REJECT
 Session ID: {session_id}
-Group ID: VALIDATION
 ```
 Then invoke: `Skill(command: "workflow-router")`
 
 **Expected result:** `{"next_agent": "project_manager", "action": "spawn"}`
 
 **Step 2d: Create PM remediation params file**
+
+**Note:** PM is session-scoped - do NOT include `group_id`. Model comes from `MODEL_CONFIG["project_manager"]`.
+
+Write `bazinga/prompts/{session_id}/params_pm_remediation.json`:
 ```json
 {
   "agent_type": "project_manager",
   "session_id": "{session_id}",
-  "group_id": "REMEDIATION",
   "task_title": "BAZINGA Rejected - Fix Required Issues",
   "task_requirements": "VALIDATOR REJECTED YOUR BAZINGA.\n\n## Rejection Reason\n{validator_verdict}\n\n## Failed Checks\n{list_of_failed_checks}\n\n## Your Task\nAnalyze the failures and determine next steps:\n1. If issues are fixable → Create remediation task group(s) and return Status: CONTINUE\n2. If issues are external blockers → Document with evidence and resubmit BAZINGA with justification\n3. If scope should be reduced → Return Status: NEEDS_CLARIFICATION to get user approval\n\nDO NOT resubmit BAZINGA without fixing the issues or getting user approval for scope reduction.",
   "branch": "{branch}",
   "mode": "{mode}",
-  "testing_mode": "{testing_mode}",
-  "model": "opus"
+  "testing_mode": "{testing_mode}"
 }
 ```
 
@@ -2284,7 +2291,7 @@ Then invoke: `Skill(command: "workflow-router")`
 ```
 Skill(command: "prompt-builder")  // with params file from Step 2d
 ```
-Then spawn PM:
+Then spawn PM (model from config, NOT hardcoded):
 ```
 Task(subagent_type: "project_manager", prompt: "{built_prompt}", run_in_background: false, model: MODEL_CONFIG["project_manager"])
 ```

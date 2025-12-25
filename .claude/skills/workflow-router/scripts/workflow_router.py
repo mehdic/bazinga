@@ -30,10 +30,54 @@ _script_dir = Path(__file__).resolve().parent
 # Config file path - relative to project root
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"
 
+# Expected transitions version (from workflow/transitions.json)
+EXPECTED_TRANSITIONS_VERSION = "1.2.0"
 
-def auto_seed_configs(db_path: str) -> tuple[bool, str]:
+# Version file path (relative to DB directory)
+VERSION_FILE_NAME = ".transitions_version"
+
+
+def get_transitions_info(db_path: str) -> tuple[int, str | None]:
     """
-    Auto-seed workflow configs if missing.
+    Get transitions count from DB and version from version file.
+    Returns (count, version) tuple. Version is None if file doesn't exist.
+    """
+    count = 0
+    version = None
+
+    # Get count from DB
+    try:
+        conn = sqlite3.connect(db_path, timeout=2.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
+        count = cursor.fetchone()[0]
+        conn.close()
+    except sqlite3.OperationalError:
+        pass
+
+    # Get version from file (next to DB)
+    version_file = Path(db_path).parent / VERSION_FILE_NAME
+    if version_file.exists():
+        try:
+            version = version_file.read_text().strip()
+        except Exception:
+            pass
+
+    return count, version
+
+
+def write_version_file(db_path: str, version: str):
+    """Write version to version file next to DB."""
+    version_file = Path(db_path).parent / VERSION_FILE_NAME
+    try:
+        version_file.write_text(version)
+    except Exception:
+        pass  # Best effort
+
+
+def auto_seed_configs(db_path: str, verbose: bool = False) -> tuple[bool, str]:
+    """
+    Auto-seed workflow configs if missing or outdated.
     Returns (success, message) tuple.
     """
     seed_script = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
@@ -41,7 +85,8 @@ def auto_seed_configs(db_path: str) -> tuple[bool, str]:
     if not seed_script.exists():
         return False, f"Config seeder not found at {seed_script}"
 
-    print(f"[workflow-router] Auto-seeding configs from {seed_script}...", file=sys.stderr)
+    if verbose:
+        print(f"[workflow-router] Seeding configs...", file=sys.stderr)
 
     result = subprocess.run(
         [sys.executable, str(seed_script), "--db", db_path, "--all"],
@@ -51,11 +96,6 @@ def auto_seed_configs(db_path: str) -> tuple[bool, str]:
 
     if result.returncode != 0:
         return False, f"Config seeding failed: {result.stderr.strip()}"
-
-    # Print seed output to stderr for visibility
-    if result.stdout.strip():
-        for line in result.stdout.strip().split("\n"):
-            print(f"  {line}", file=sys.stderr)
 
     return True, "Configs seeded successfully"
 
@@ -256,17 +296,40 @@ def route(args):
         print(json.dumps(result, indent=2))
         sys.exit(1)
 
-    # Always re-seed configs to ensure latest transitions are loaded
-    # This handles cases where new transitions were added (e.g., validator ACCEPT/REJECT)
-    success, message = auto_seed_configs(args.db)
-    if not success:
-        result = {
-            "success": False,
-            "error": f"Config seeding failed: {message}",
-            "suggestion": "Check workflow/transitions.json exists and is valid"
-        }
-        print(json.dumps(result, indent=2))
-        sys.exit(1)
+    # Smart seeding: only seed if missing, empty, or version mismatch
+    count, stored_version = get_transitions_info(args.db)
+    needs_seeding = (count == 0) or (stored_version != EXPECTED_TRANSITIONS_VERSION)
+
+    if needs_seeding:
+        seed_script = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
+
+        if seed_script.exists():
+            success, message = auto_seed_configs(args.db, verbose=True)
+            if success:
+                # Write version file after successful seeding
+                write_version_file(args.db, EXPECTED_TRANSITIONS_VERSION)
+            elif count > 0:
+                # Seeding failed, but we have existing transitions - proceed with warning
+                print(f"[workflow-router] Warning: {message} (proceeding with existing {count} transitions)", file=sys.stderr)
+            else:
+                # Seeding failed and no transitions - fatal
+                result = {
+                    "success": False,
+                    "error": f"Config seeding failed and no transitions exist: {message}",
+                    "suggestion": "Check workflow/transitions.json exists and is valid"
+                }
+                print(json.dumps(result, indent=2))
+                sys.exit(1)
+        elif count == 0:
+            # Seeder not found and no transitions - fatal
+            result = {
+                "success": False,
+                "error": "No transitions in database and config-seeder not found",
+                "suggestion": "Run config-seeder skill or ensure workflow/transitions.json exists"
+            }
+            print(json.dumps(result, indent=2))
+            sys.exit(1)
+        # else: seeder not found but we have transitions - proceed
 
     conn = sqlite3.connect(args.db)
 
