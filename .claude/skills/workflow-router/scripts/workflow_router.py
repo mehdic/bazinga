@@ -17,14 +17,47 @@ Output:
 import argparse
 import json
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
 # Database path - relative to project root
 DB_PATH = "bazinga/bazinga.db"
 
+# Script directory for locating sibling skills
+_script_dir = Path(__file__).resolve().parent
+
 # Config file path - relative to project root
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"
+
+
+def auto_seed_configs(db_path: str) -> tuple[bool, str]:
+    """
+    Auto-seed workflow configs if missing.
+    Returns (success, message) tuple.
+    """
+    seed_script = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
+
+    if not seed_script.exists():
+        return False, f"Config seeder not found at {seed_script}"
+
+    print(f"[workflow-router] Auto-seeding configs from {seed_script}...", file=sys.stderr)
+
+    result = subprocess.run(
+        [sys.executable, str(seed_script), "--db", db_path, "--all"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        return False, f"Config seeding failed: {result.stderr.strip()}"
+
+    # Print seed output to stderr for visibility
+    if result.stdout.strip():
+        for line in result.stdout.strip().split("\n"):
+            print(f"  {line}", file=sys.stderr)
+
+    return True, "Configs seeded successfully"
 
 # Global config - loaded lazily in main()
 MODEL_CONFIG = None
@@ -225,33 +258,53 @@ def route(args):
 
     conn = sqlite3.connect(args.db)
 
-    # Check if configs are seeded (defensive check)
+    # Check if configs are seeded (defensive check with auto-recovery)
     cursor = conn.cursor()
+    needs_seeding = False
     try:
+        cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
+        transitions_count = cursor.fetchone()[0]
+        if transitions_count == 0:
+            needs_seeding = True
+            print("[workflow-router] workflow_transitions is empty, auto-seeding...", file=sys.stderr)
+    except sqlite3.OperationalError:
+        result = {
+            "success": False,
+            "error": "workflow_transitions table does not exist",
+            "suggestion": "Run init_db.py to create database schema first"
+        }
+        print(json.dumps(result, indent=2))
+        conn.close()
+        sys.exit(1)
+
+    # Auto-seed if needed and retry
+    if needs_seeding:
+        conn.close()  # Close before seeding to avoid locks
+        success, message = auto_seed_configs(args.db)
+        if not success:
+            result = {
+                "success": False,
+                "error": f"Auto-seeding failed: {message}",
+                "suggestion": "Run Skill(command: 'config-seeder') manually"
+            }
+            print(json.dumps(result, indent=2))
+            sys.exit(1)
+
+        # Reconnect and verify
+        conn = sqlite3.connect(args.db)
+        cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
         transitions_count = cursor.fetchone()[0]
         if transitions_count == 0:
             result = {
                 "success": False,
-                "error": "Workflow transitions not seeded - database is empty",
-                "suggestion": "Run Skill(command: 'config-seeder') to seed workflow configs",
-                "fallback_action": {
-                    "action": "seed_configs",
-                    "reason": "Missing workflow_transitions - config-seeder must run first"
-                }
+                "error": "Auto-seeding completed but table still empty",
+                "suggestion": "Check workflow/transitions.json exists and is valid"
             }
             print(json.dumps(result, indent=2))
             conn.close()
             sys.exit(1)
-    except sqlite3.OperationalError:
-        result = {
-            "success": False,
-            "error": "workflow_transitions table does not exist",
-            "suggestion": "Run init_db.py to create database schema, then config-seeder to seed configs"
-        }
-        print(json.dumps(result, indent=2))
-        conn.close()
-        sys.exit(1)
+        print(f"[workflow-router] Auto-seeded {transitions_count} transitions, continuing...", file=sys.stderr)
 
     # Get base transition
     transition = get_transition(conn, args.current_agent, args.status)
