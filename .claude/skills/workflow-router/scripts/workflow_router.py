@@ -256,55 +256,19 @@ def route(args):
         print(json.dumps(result, indent=2))
         sys.exit(1)
 
-    conn = sqlite3.connect(args.db)
-
-    # Check if configs are seeded (defensive check with auto-recovery)
-    cursor = conn.cursor()
-    needs_seeding = False
-    try:
-        cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
-        transitions_count = cursor.fetchone()[0]
-        if transitions_count == 0:
-            needs_seeding = True
-            print("[workflow-router] workflow_transitions is empty, auto-seeding...", file=sys.stderr)
-    except sqlite3.OperationalError:
+    # Always re-seed configs to ensure latest transitions are loaded
+    # This handles cases where new transitions were added (e.g., validator ACCEPT/REJECT)
+    success, message = auto_seed_configs(args.db)
+    if not success:
         result = {
             "success": False,
-            "error": "workflow_transitions table does not exist",
-            "suggestion": "Run init_db.py to create database schema first"
+            "error": f"Config seeding failed: {message}",
+            "suggestion": "Check workflow/transitions.json exists and is valid"
         }
         print(json.dumps(result, indent=2))
-        conn.close()
         sys.exit(1)
 
-    # Auto-seed if needed and retry
-    if needs_seeding:
-        conn.close()  # Close before seeding to avoid locks
-        success, message = auto_seed_configs(args.db)
-        if not success:
-            result = {
-                "success": False,
-                "error": f"Auto-seeding failed: {message}",
-                "suggestion": "Run Skill(command: 'config-seeder') manually"
-            }
-            print(json.dumps(result, indent=2))
-            sys.exit(1)
-
-        # Reconnect and verify
-        conn = sqlite3.connect(args.db)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
-        transitions_count = cursor.fetchone()[0]
-        if transitions_count == 0:
-            result = {
-                "success": False,
-                "error": "Auto-seeding completed but table still empty",
-                "suggestion": "Check workflow/transitions.json exists and is valid"
-            }
-            print(json.dumps(result, indent=2))
-            conn.close()
-            sys.exit(1)
-        print(f"[workflow-router] Auto-seeded {transitions_count} transitions, continuing...", file=sys.stderr)
+    conn = sqlite3.connect(args.db)
 
     # Get base transition
     transition = get_transition(conn, args.current_agent, args.status)
