@@ -24,33 +24,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Add _shared directory to path for bazinga_paths import
+_script_dir = Path(__file__).resolve().parent
+_shared_dir = _script_dir.parent.parent / '_shared'
+if _shared_dir.exists() and str(_shared_dir) not in sys.path:
+    sys.path.insert(0, str(_shared_dir))
 
-def _get_project_root() -> Path:
-    """Detect project root by looking for .claude directory or bazinga directory.
-
-    Returns:
-        Path to project root, or current working directory if not found.
-    """
-    # Start from script location and traverse up
-    script_dir = Path(__file__).resolve().parent
-
-    # Look for project markers going up from script location
-    current = script_dir
-    for _ in range(10):  # Max 10 levels up
-        if (current / ".claude").is_dir() and (current / "bazinga").is_dir():
-            return current
-        parent = current.parent
-        if parent == current:  # Reached filesystem root
-            break
-        current = parent
-
-    # Fallback: check CWD
-    cwd = Path.cwd()
-    if (cwd / ".claude").is_dir() and (cwd / "bazinga").is_dir():
-        return cwd
-
-    # Last resort: use CWD and hope for the best
-    return cwd
+try:
+    from bazinga_paths import get_project_root
+    _HAS_BAZINGA_PATHS = True
+except ImportError:
+    _HAS_BAZINGA_PATHS = False
 
 
 def _ensure_cwd_at_project_root():
@@ -62,20 +46,25 @@ def _ensure_cwd_at_project_root():
     Must be called at entry point (main), NOT at module import time,
     to avoid side effects when this module is imported by tests.
     """
+    if not _HAS_BAZINGA_PATHS:
+        return  # Cannot detect project root without bazinga_paths
+
     try:
-        project_root = _get_project_root()
+        project_root = get_project_root()
         os.chdir(project_root)
-        print(f"[INFO] project_root={project_root}", file=sys.stderr)
+        # Only log if BAZINGA_VERBOSE is set to reduce noise
+        if os.environ.get("BAZINGA_VERBOSE"):
+            print(f"[INFO] project_root={project_root}", file=sys.stderr)
+    except RuntimeError:
+        # Project root detection failed - no valid markers found
+        # Don't chdir to avoid changing to wrong directory
+        pass
     except OSError as e:
-        print(f"[ERROR] Failed to chdir to project root: {e}", file=sys.stderr)
-        print("[INFO] Continuing with current directory, paths may fail", file=sys.stderr)
+        print(f"[WARNING] Failed to chdir to project root: {e}", file=sys.stderr)
 
 
 # Database path - relative to project root
 DB_PATH = "bazinga/bazinga.db"
-
-# Script directory for locating sibling skills
-_script_dir = Path(__file__).resolve().parent
 
 # Config file path - relative to project root
 MODEL_CONFIG_PATH = "bazinga/model_selection.json"

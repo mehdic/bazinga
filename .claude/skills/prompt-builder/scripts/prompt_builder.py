@@ -85,13 +85,13 @@ def _ensure_cwd_at_project_root():
     Must be called at entry point (main), NOT at module import time,
     to avoid side effects when this module is imported by tests.
     """
-    global PROJECT_ROOT
     try:
         os.chdir(PROJECT_ROOT)
-        print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
+        # Only log if BAZINGA_VERBOSE is set to reduce noise
+        if os.environ.get("BAZINGA_VERBOSE"):
+            print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
     except OSError as e:
-        print(f"[ERROR] Failed to chdir to project root {PROJECT_ROOT}: {e}", file=sys.stderr)
-        print("[INFO] Continuing with current directory, paths may fail", file=sys.stderr)
+        print(f"[WARNING] Failed to chdir to project root {PROJECT_ROOT}: {e}", file=sys.stderr)
 
 # Agent file names (without directory prefix - resolved dynamically)
 AGENT_FILE_NAMES = {

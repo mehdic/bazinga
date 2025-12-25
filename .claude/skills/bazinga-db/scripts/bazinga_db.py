@@ -145,11 +145,15 @@ def _ensure_cwd_at_project_root():
         project_root = get_project_root()
         import os
         os.chdir(project_root)
-        print(f"[INFO] project_root={project_root}", file=sys.stderr)
-    except (RuntimeError, OSError) as e:
-        # RuntimeError: project root detection failed
-        # OSError: chdir failed (e.g., directory deleted)
-        print(f"[WARNING] Could not chdir to project root: {e}", file=sys.stderr)
+        # Only log if BAZINGA_VERBOSE is set to reduce noise
+        if os.environ.get("BAZINGA_VERBOSE"):
+            print(f"[INFO] project_root={project_root}", file=sys.stderr)
+    except RuntimeError:
+        # Project root detection failed - no valid markers found
+        # Don't chdir to avoid changing to wrong directory
+        pass
+    except OSError as e:
+        print(f"[WARNING] Failed to chdir to project root: {e}", file=sys.stderr)
 
 # Import SCHEMA_VERSION from init_db.py to avoid duplication
 try:
