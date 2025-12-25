@@ -10,7 +10,6 @@ on:
       - 'templates/**'
       - 'scripts/**'
       - 'src/**'
-      - 'scripts/check-no-hardcoded-models.sh'
   push:
     branches:
       - main
@@ -23,7 +22,6 @@ on:
       - 'templates/**'
       - 'scripts/**'
       - 'src/**'
-      - 'scripts/check-no-hardcoded-models.sh'
 
 # Limit permissions to least privilege
 permissions:
