@@ -28,7 +28,8 @@ else:
 
 DB_PATH = os.environ.get('BAZINGA_DB_PATH', str(DEFAULT_DB))
 
-app = Flask(__name__, static_folder='.')
+# Disable static file serving from current directory (security)
+app = Flask(__name__, static_folder=None)
 
 
 def get_db():
@@ -98,24 +99,28 @@ def parse_status(content: str) -> str:
 @app.route('/')
 def index():
     """Serve the main HTML page."""
-    return send_from_directory('.', 'index.html')
+    return send_from_directory(str(SCRIPT_DIR), 'index.html')
 
 
 @app.route('/api/health')
 def health():
     """Health check endpoint."""
+    conn = None
     try:
         conn = get_db()
         conn.execute("SELECT 1").fetchone()
-        conn.close()
         return jsonify({"status": "ok", "db_path": DB_PATH})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/sessions')
 def get_sessions():
     """Get recent sessions (active first)."""
+    conn = None
     try:
         conn = get_db()
         rows = conn.execute("""
@@ -127,17 +132,20 @@ def get_sessions():
                 COALESCE(created_at, start_time) DESC
             LIMIT 10
         """).fetchall()
-        conn.close()
         return jsonify([dict(r) for r in rows])
     except FileNotFoundError as e:
         return jsonify({"error": str(e), "sessions": []}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/session/<session_id>/agents')
 def get_agents(session_id):
     """Get spawned agents with parsed status, ordered by first appearance."""
+    conn = None
     try:
         conn = get_db()
 
@@ -173,7 +181,6 @@ def get_agents(session_id):
                     AND COALESCE(l2.agent_id, '') = COALESCE(l.agent_id, ''))
             ORDER BY first_seen ASC
         """, (session_id,)).fetchall()
-        conn.close()
 
         agents = []
         for r in rows:
@@ -186,11 +193,15 @@ def get_agents(session_id):
         return jsonify(agents)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/session/<session_id>/groups')
 def get_groups(session_id):
     """Get task groups for a session."""
+    conn = None
     try:
         conn = get_db()
         rows = conn.execute("""
@@ -200,10 +211,12 @@ def get_groups(session_id):
             WHERE session_id = ?
             ORDER BY created_at
         """, (session_id,)).fetchall()
-        conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/session/<session_id>/logs')
@@ -211,6 +224,7 @@ def get_logs(session_id):
     """Get recent orchestration logs (interactions only)."""
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
+    conn = None
 
     try:
         conn = get_db()
@@ -219,19 +233,22 @@ def get_logs(session_id):
                    SUBSTR(content, 1, 500) as content_preview
             FROM orchestration_logs
             WHERE session_id = ? AND log_type = 'interaction'
-            ORDER BY timestamp DESC
+            ORDER BY datetime(timestamp) DESC
             LIMIT ? OFFSET ?
         """, (session_id, limit, offset)).fetchall()
-        conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
-@app.route('/api/session/<session_id>/agent/<agent_type>/reasoning')
+@app.route('/api/session/<session_id>/agent/<path:agent_type>/reasoning')
 def get_reasoning(session_id, agent_type):
     """Get reasoning entries for a specific agent."""
     group_id = request.args.get('group_id')
+    conn = None
 
     try:
         conn = get_db()
@@ -248,19 +265,22 @@ def get_reasoning(session_id, agent_type):
             query += " AND group_id = ?"
             params.append(group_id)
 
-        query += " ORDER BY timestamp ASC LIMIT 50"
+        query += " ORDER BY datetime(timestamp) ASC LIMIT 50"
 
         rows = conn.execute(query, params).fetchall()
-        conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
-@app.route('/api/session/<session_id>/agent/<agent_type>/logs')
+@app.route('/api/session/<session_id>/agent/<path:agent_type>/logs')
 def get_agent_logs(session_id, agent_type):
     """Get all logs for a specific agent (both interactions and reasoning)."""
     limit = request.args.get('limit', 50, type=int)
+    conn = None
 
     try:
         conn = get_db()
@@ -269,18 +289,21 @@ def get_agent_logs(session_id, agent_type):
                    content, group_id, agent_id
             FROM orchestration_logs
             WHERE session_id = ? AND agent_type = ?
-            ORDER BY timestamp ASC
+            ORDER BY datetime(timestamp) ASC
             LIMIT ?
         """, (session_id, agent_type, limit)).fetchall()
-        conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/session/<session_id>/stats')
 def get_session_stats(session_id):
     """Get summary statistics for a session."""
+    conn = None
     try:
         conn = get_db()
 
@@ -311,8 +334,6 @@ def get_session_stats(session_id):
             GROUP BY status
         """, (session_id,)).fetchall()
 
-        conn.close()
-
         return jsonify({
             "session": dict(session) if session else None,
             "agent_stats": {r['agent_type']: r['log_count'] for r in agent_stats},
@@ -321,6 +342,9 @@ def get_session_stats(session_id):
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 if __name__ == '__main__':

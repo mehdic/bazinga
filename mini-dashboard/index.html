@@ -430,6 +430,11 @@
     async function fetchJSON(url) {
       try {
         const res = await fetch(url);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error('HTTP error:', res.status, text.slice(0, 100));
+          return { error: `HTTP ${res.status}: ${text.slice(0, 100)}` };
+        }
         const data = await res.json();
         if (data.error) {
           console.error('API error:', data.error);
@@ -453,7 +458,7 @@
 
       el.innerHTML = data.map(s => `
         <div class="clickable-item ${s.session_id === currentSession ? 'active' : ''}"
-             onclick="selectSession('${escapeHtml(s.session_id)}')">
+             data-session-id="${escapeHtml(s.session_id)}">
           <div class="item-title">
             ${escapeHtml(s.session_id.slice(-20))}
             <span class="status-badge ${getStatusClass(s.status)}">${escapeHtml(s.status)}</span>
@@ -476,9 +481,9 @@
       currentSession = sessionId;
       selectedAgent = null;
 
-      // Update UI
+      // Update UI - use data attribute for comparison
       document.querySelectorAll('#sessions .clickable-item').forEach(el => {
-        el.classList.toggle('active', el.onclick.toString().includes(sessionId));
+        el.classList.toggle('active', el.dataset.sessionId === sessionId);
       });
 
       document.getElementById('reasoning-panel').innerHTML = '<div class="empty-state">Click on an agent to view their reasoning</div>';
@@ -539,7 +544,7 @@
 
       el.innerHTML = data.map(a => `
         <div class="clickable-item ${selectedAgent === a.agent_type ? 'selected' : ''}"
-             onclick="selectAgent('${escapeHtml(a.agent_type)}')">
+             data-agent-type="${escapeHtml(a.agent_type)}">
           <div class="item-title">
             ${escapeHtml(a.agent_type)}
             ${a.agent_id ? `<span class="item-meta">(${escapeHtml(a.agent_id)})</span>` : ''}
@@ -588,9 +593,9 @@
     async function selectAgent(agentType) {
       selectedAgent = agentType;
 
-      // Update UI
+      // Update UI - use data attribute for comparison
       document.querySelectorAll('#agents .clickable-item').forEach(el => {
-        el.classList.toggle('selected', el.onclick.toString().includes(agentType));
+        el.classList.toggle('selected', el.dataset.agentType === agentType);
       });
 
       document.getElementById('reasoning-agent').textContent = agentType;
@@ -656,6 +661,22 @@
     document.addEventListener('DOMContentLoaded', () => {
       loadSessions();
       refreshInterval = setInterval(refresh, 5000);
+
+      // Event delegation for session clicks
+      document.getElementById('sessions').addEventListener('click', (e) => {
+        const item = e.target.closest('.clickable-item[data-session-id]');
+        if (item) {
+          selectSession(item.dataset.sessionId);
+        }
+      });
+
+      // Event delegation for agent clicks
+      document.getElementById('agents').addEventListener('click', (e) => {
+        const item = e.target.closest('.clickable-item[data-agent-type]');
+        if (item) {
+          selectAgent(item.dataset.agentType);
+        }
+      });
     });
   </script>
 </body>

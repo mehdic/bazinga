@@ -16,7 +16,6 @@ import sys
 import time
 import tempfile
 import subprocess
-import signal
 from contextlib import contextmanager
 
 import re
@@ -48,12 +47,23 @@ def run_server(db_path: str, port: int = 5051):
     process = subprocess.Popen(
         [sys.executable, server_path],
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
 
-    # Wait for server to start
-    time.sleep(2)
+    # Wait for server to start with health check polling
+    server_url = f'http://localhost:{port}'
+    max_retries = 10
+    for i in range(max_retries):
+        try:
+            import urllib.request
+            urllib.request.urlopen(f'{server_url}/api/health', timeout=1)
+            break
+        except Exception:
+            if i == max_retries - 1:
+                process.terminate()
+                raise RuntimeError("Server failed to start")
+            time.sleep(0.5)
 
     try:
         yield f'http://localhost:{port}'
@@ -116,9 +126,9 @@ class TestDashboardLoad:
 
     def test_sidebar_sections_visible(self, page: Page):
         """All sidebar sections should be visible."""
-        expect(page.locator('h2:text("Sessions")')).to_be_visible()
-        expect(page.locator('h2:text("Task Groups")')).to_be_visible()
-        expect(page.locator('h2:text("Agents")')).to_be_visible()
+        expect(page.locator('h2:has-text("Sessions")')).to_be_visible()
+        expect(page.locator('h2:has-text("Task Groups")')).to_be_visible()
+        expect(page.locator('h2:has-text("Agents")')).to_be_visible()
 
     def test_panels_visible(self, page: Page):
         """Main panels should be visible."""
