@@ -50,6 +50,11 @@ bazinga = "bazinga_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bazinga_cli"]
+# Exclude symlinks that exist for dev mode (they would cause duplicates)
+exclude = [
+    "bazinga/templates",
+    "bazinga/config",
+]
 
 # Force-include bazinga config files as package data
 # These are gitignored (for runtime state) but needed for distribution
