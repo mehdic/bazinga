@@ -125,6 +125,18 @@ if _shared_dir.exists() and str(_shared_dir) not in sys.path:
 try:
     from bazinga_paths import get_project_root, get_db_path, get_detection_info
     _HAS_BAZINGA_PATHS = True
+
+    # Change to project root so all relative paths work correctly
+    # This is critical when the script is invoked from a different CWD
+    # See: research/absolute-path-resolution-ultrathink.md
+    try:
+        _project_root = get_project_root()
+        import os as _os
+        _os.chdir(_project_root)
+        print(f"[INFO] project_root={_project_root}", file=sys.stderr)
+    except RuntimeError:
+        # Project root detection failed - will be handled later in main()
+        pass
 except ImportError:
     _HAS_BAZINGA_PATHS = False
 

@@ -45,6 +45,13 @@ def get_project_root():
 # Detect project root once at module load
 PROJECT_ROOT = get_project_root()
 
+# Change to project root so all relative paths work correctly
+# This is critical when the script is invoked from a different CWD
+# See: research/absolute-path-resolution-ultrathink.md
+import os
+os.chdir(PROJECT_ROOT)
+print(f"[INFO] project_root={PROJECT_ROOT}", file=sys.stderr)
+
 # Database path - relative to project root
 DB_PATH = str(PROJECT_ROOT / "bazinga" / "bazinga.db")
 
