@@ -104,7 +104,11 @@ def auto_seed_configs(db_path: str, verbose: bool = False) -> tuple[bool, str]:
         return False, f"Config seeding timed out after {SEED_TIMEOUT_SECONDS}s"
 
     if result.returncode != 0:
-        return False, f"Config seeding failed: {result.stderr.strip()}"
+        # Include stdout if stderr is empty for better diagnostics
+        error_output = result.stderr.strip()
+        if not error_output and result.stdout.strip():
+            error_output = result.stdout.strip()[:200]  # Truncate long output
+        return False, f"Config seeding failed: {error_output}"
 
     return True, "Configs seeded successfully"
 
@@ -162,7 +166,11 @@ def get_transition(conn, current_agent, status):
         # Parse include_context safely - handle malformed JSON
         try:
             include_context = json.loads(row[2]) if row[2] else []
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(
+                f"[workflow-router] malformed include_context for {current_agent}/{status}: {e}",
+                file=sys.stderr
+            )
             include_context = []
 
         return {
@@ -336,7 +344,15 @@ def route(args):
             }
             print(json.dumps(result, indent=2))
             sys.exit(1)
-        # else: seeder not found but we have transitions - proceed
+        else:
+            # Seeder not found but we have transitions - proceed with warning if version mismatch
+            if stored_version != EXPECTED_TRANSITIONS_VERSION:
+                print(
+                    f"[workflow-router] transitions version mismatch "
+                    f"(stored={stored_version}, expected={EXPECTED_TRANSITIONS_VERSION}); "
+                    f"proceeding with existing {count} transitions",
+                    file=sys.stderr
+                )
 
     # Use try/finally to ensure connection closure on all paths
     conn = sqlite3.connect(args.db, timeout=2.0)
@@ -415,16 +431,18 @@ def route(args):
                 action = "spawn"
                 transition["phase_check"] = "complete"
 
-        # Determine model - use config with graceful fallback
-        model = transition.get("model_override")
-        if not model:
-            if next_agent not in MODEL_CONFIG:
-                # Unknown agent - emit error JSON instead of raising
-                emit_error(
-                    f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}",
-                    f"Add '{next_agent}' to agents section in {MODEL_CONFIG_PATH}"
-                )
-            model = MODEL_CONFIG[next_agent]
+        # Determine model - only needed for spawn/respawn actions with a next_agent
+        model = None
+        if action in ("spawn", "respawn", "spawn_batch") and next_agent:
+            model = transition.get("model_override")
+            if not model:
+                if next_agent not in MODEL_CONFIG:
+                    # Unknown agent - emit error JSON instead of raising
+                    emit_error(
+                        f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}",
+                        f"Add '{next_agent}' to agents section in {MODEL_CONFIG_PATH}"
+                    )
+                model = MODEL_CONFIG[next_agent]
 
         # Build result
         result = {
@@ -433,11 +451,14 @@ def route(args):
             "response_status": args.status,
             "next_agent": next_agent,
             "action": action,
-            "model": model,
             "group_id": args.group_id,
             "session_id": args.session_id,
             "include_context": transition.get("include_context", []),
         }
+
+        # Only include model when spawning an agent
+        if model:
+            result["model"] = model
 
         # Add batch spawn info if applicable
         if groups_to_spawn:

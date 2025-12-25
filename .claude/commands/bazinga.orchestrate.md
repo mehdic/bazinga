@@ -64,7 +64,7 @@ The user's message to you contains their requirements for this orchestration tas
 **BAZINGA Verification Process:**
 When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 - IF ACCEPT → Proceed to completion
-- IF REJECT → **Execute §Validator REJECT Handling Procedure** (do NOT stop!)
+- IF REJECT → **Execute [Validator REJECT Handling Procedure](#-mandatory-validator-reject-handling-procedure)** (do NOT stop!)
 
 **The PM's job is coordination. Your job is QUALITY CONTROL via the validator.**
 
@@ -1657,7 +1657,7 @@ Before continuing to Step 1.3a, verify:
 - All work complete (if PM returns this early, likely a resume of already-complete session)
 - **MANDATORY: Invoke `Skill(command: "bazinga-validator")` to verify completion**
   - IF validator returns ACCEPT → Proceed to completion
-  - IF validator returns REJECT → **Execute §Validator REJECT Handling Procedure** (do NOT stop!)
+  - IF validator returns REJECT → **Execute [Validator REJECT Handling Procedure](#-mandatory-validator-reject-handling-procedure)** (do NOT stop!)
 - **IMMEDIATELY proceed to Completion phase ONLY after validator ACCEPTS**
 
 **IF status is missing or unclear:**
