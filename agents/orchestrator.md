@@ -83,7 +83,7 @@ The user's message to you contains their requirements for this orchestration tas
 **BAZINGA Verification Process:**
 When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 - IF ACCEPT → Proceed to completion
-- IF REJECT → Spawn PM with validator's failure details
+- IF REJECT → **Execute §Validator REJECT Handling Procedure** (do NOT stop!)
 
 **The PM's job is coordination. Your job is QUALITY CONTROL via the validator.**
 
@@ -1676,7 +1676,7 @@ Before continuing to Step 1.3a, verify:
 - All work complete (if PM returns this early, likely a resume of already-complete session)
 - **MANDATORY: Invoke `Skill(command: "bazinga-validator")` to verify completion**
   - IF validator returns ACCEPT → Proceed to completion
-  - IF validator returns REJECT → Spawn PM with validator's failure details
+  - IF validator returns REJECT → **Execute §Validator REJECT Handling Procedure** (do NOT stop!)
 - **IMMEDIATELY proceed to Completion phase ONLY after validator ACCEPTS**
 
 **IF status is missing or unclear:**
@@ -2233,7 +2233,62 @@ Skill(command: "bazinga-validator")
 
 **Step 2: Wait for validator verdict**
 - IF ACCEPT → Proceed to shutdown protocol below
-- IF REJECT → Spawn PM with validator's failure details (do NOT proceed to shutdown)
+- IF REJECT → **IMMEDIATELY execute REJECT handling below** (do NOT proceed to shutdown)
+
+### 🔴 MANDATORY: Validator REJECT Handling Procedure
+
+**When validator returns REJECT, you MUST execute these steps IN ORDER:**
+
+**Step 2a: Output REJECT status to user**
+```
+❌ BAZINGA REJECTED | Validator found {issue_count} issues | Routing back to PM for remediation
+```
+
+**Step 2b: Log REJECT event**
+```
+bazinga-db log-event {session_id} "validator_reject" "Validator rejected: {brief_summary}"
+```
+
+**Step 2c: Create PM remediation params file**
+```json
+{
+  "agent_type": "project_manager",
+  "session_id": "{session_id}",
+  "group_id": "REMEDIATION",
+  "task_title": "BAZINGA Rejected - Fix Required Issues",
+  "task_requirements": "VALIDATOR REJECTED YOUR BAZINGA.\n\n## Rejection Reason\n{validator_verdict}\n\n## Failed Checks\n{list_of_failed_checks}\n\n## Your Task\nAnalyze the failures and determine next steps:\n1. If issues are fixable → Create remediation task group(s) and return Status: CONTINUE\n2. If issues are external blockers → Document with evidence and resubmit BAZINGA with justification\n3. If scope should be reduced → Return Status: NEEDS_CLARIFICATION to get user approval\n\nDO NOT resubmit BAZINGA without fixing the issues or getting user approval for scope reduction.",
+  "branch": "{branch}",
+  "mode": "{mode}",
+  "testing_mode": "{testing_mode}",
+  "model": "opus"
+}
+```
+
+**Step 2d: Build PM prompt and spawn**
+```
+Skill(command: "prompt-builder")  // with params file from Step 2c
+Task(subagent_type: "project_manager", prompt: "{built_prompt}")
+```
+
+**Step 2e: Process PM response and continue workflow**
+- PM returns CONTINUE → Jump to Phase 3 (Development) with new remediation tasks
+- PM returns BAZINGA again → Re-invoke validator (repeat this section)
+- PM returns NEEDS_CLARIFICATION → Execute clarification workflow
+
+**⚠️ CRITICAL: You MUST NOT stop after validator REJECT. This is a ROUTING action, not an endpoint.**
+
+**Example Validator REJECT → PM Spawn:**
+```
+Validator verdict: "REJECT - 44 unit tests failing in DeliveryCard, NurseDashboard"
+↓
+Orchestrator: "❌ BAZINGA REJECTED | 44 test failures | Routing to PM"
+↓
+PM receives: "VALIDATOR REJECTED YOUR BAZINGA. 44 unit tests failing..."
+↓
+PM returns: "Status: CONTINUE" with remediation task group CALC-FIX
+↓
+Orchestrator: Routes to Developer for CALC-FIX group
+```
 
 **⚠️ CRITICAL: You MUST NOT:**
 - ❌ Accept BAZINGA without invoking validator
