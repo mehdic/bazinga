@@ -92,6 +92,7 @@
 
   "validator": {
     "_note": "bazinga-validator skill - not an agent but has status codes",
+    "_spawnable": false,
     "required": [
       "ACCEPT",
       "REJECT"

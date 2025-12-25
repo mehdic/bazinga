@@ -93,16 +93,17 @@ Return this JSON to the orchestrator.
 
 When PM sends BAZINGA, the orchestrator invokes `bazinga-validator`. After validator returns:
 
-1. **Call workflow-router with validator status:**
-```bash
-python3 .claude/skills/workflow-router/scripts/workflow_router.py \
-  --current-agent "validator" \
-  --status "ACCEPT"  # or "REJECT" \
-  --session-id "{session_id}" \
-  --group-id "VALIDATION"
+**Orchestrator calls workflow-router skill:**
 ```
+workflow-router, determine next action:
+Current agent: validator
+Status: ACCEPT  # or REJECT
+Session ID: {session_id}
+Group ID: VALIDATION
+```
+Then invoke: `Skill(command: "workflow-router")`
 
-2. **Handle the result:**
+**Transitions defined in `workflow/transitions.json` → `validator` section:**
 - `ACCEPT` → `end_session` action → Complete shutdown protocol
 - `REJECT` → `spawn` action with `next_agent: project_manager` → PM fixes issues
 

@@ -225,6 +225,34 @@ def route(args):
 
     conn = sqlite3.connect(args.db)
 
+    # Check if configs are seeded (defensive check)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
+        transitions_count = cursor.fetchone()[0]
+        if transitions_count == 0:
+            result = {
+                "success": False,
+                "error": "Workflow transitions not seeded - database is empty",
+                "suggestion": "Run Skill(command: 'config-seeder') to seed workflow configs",
+                "fallback_action": {
+                    "action": "seed_configs",
+                    "reason": "Missing workflow_transitions - config-seeder must run first"
+                }
+            }
+            print(json.dumps(result, indent=2))
+            conn.close()
+            sys.exit(1)
+    except sqlite3.OperationalError:
+        result = {
+            "success": False,
+            "error": "workflow_transitions table does not exist",
+            "suggestion": "Run init_db.py to create database schema, then config-seeder to seed configs"
+        }
+        print(json.dumps(result, indent=2))
+        conn.close()
+        sys.exit(1)
+
     # Get base transition
     transition = get_transition(conn, args.current_agent, args.status)
 

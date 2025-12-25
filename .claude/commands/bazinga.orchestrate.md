@@ -2220,17 +2220,33 @@ Skill(command: "bazinga-validator")
 
 **When validator returns REJECT, you MUST execute these steps IN ORDER:**
 
-**Step 2a: Output REJECT status to user**
+**Step 2a: Output REJECT status to user (capsule format)**
 ```
-❌ BAZINGA REJECTED | Validator found {issue_count} issues | Routing back to PM for remediation
-```
-
-**Step 2b: Log REJECT event**
-```
-bazinga-db log-event {session_id} "validator_reject" "Validator rejected: {brief_summary}"
+❌ BAZINGA rejected | {issue_count} issues found | Routing to PM → Remediation
 ```
 
-**Step 2c: Create PM remediation params file**
+**Step 2b: Log REJECT event via bazinga-db skill**
+```
+bazinga-db, log event:
+Event type: validator_reject
+Session ID: {session_id}
+Details: Validator rejected - {brief_summary}
+```
+Then invoke: `Skill(command: "bazinga-db")`
+
+**Step 2c: Route via workflow-router**
+```
+workflow-router, determine next action:
+Current agent: validator
+Status: REJECT
+Session ID: {session_id}
+Group ID: VALIDATION
+```
+Then invoke: `Skill(command: "workflow-router")`
+
+**Expected result:** `{"next_agent": "project_manager", "action": "spawn"}`
+
+**Step 2d: Create PM remediation params file**
 ```json
 {
   "agent_type": "project_manager",
@@ -2245,13 +2261,16 @@ bazinga-db log-event {session_id} "validator_reject" "Validator rejected: {brief
 }
 ```
 
-**Step 2d: Build PM prompt and spawn**
+**Step 2e: Build PM prompt and spawn**
 ```
-Skill(command: "prompt-builder")  // with params file from Step 2c
-Task(subagent_type: "project_manager", prompt: "{built_prompt}")
+Skill(command: "prompt-builder")  // with params file from Step 2d
+```
+Then spawn PM:
+```
+Task(subagent_type: "project_manager", prompt: "{built_prompt}", run_in_background: false, model: MODEL_CONFIG["project_manager"])
 ```
 
-**Step 2e: Process PM response and continue workflow**
+**Step 2f: Process PM response and continue workflow**
 - PM returns CONTINUE → Jump to Phase 3 (Development) with new remediation tasks
 - PM returns BAZINGA again → Re-invoke validator (repeat this section)
 - PM returns NEEDS_CLARIFICATION → Execute clarification workflow
@@ -2262,7 +2281,7 @@ Task(subagent_type: "project_manager", prompt: "{built_prompt}")
 ```
 Validator verdict: "REJECT - 44 unit tests failing in DeliveryCard, NurseDashboard"
 ↓
-Orchestrator: "❌ BAZINGA REJECTED | 44 test failures | Routing to PM"
+Orchestrator: "❌ BAZINGA rejected | 44 test failures | Routing to PM → Remediation"
 ↓
 PM receives: "VALIDATOR REJECTED YOUR BAZINGA. 44 unit tests failing..."
 ↓
