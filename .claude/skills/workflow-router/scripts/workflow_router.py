@@ -38,6 +38,12 @@ EXPECTED_TRANSITIONS_VERSION = "1.2.0"
 # Version file path (relative to DB directory)
 VERSION_FILE_NAME = ".transitions_version"
 
+# Seed script path (centralized to avoid duplication)
+SEED_SCRIPT_PATH = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
+
+# Subprocess timeout for seeding (seconds)
+SEED_TIMEOUT_SECONDS = 30
+
 
 def get_transitions_info(db_path: str) -> tuple[int, str | None]:
     """
@@ -53,8 +59,8 @@ def get_transitions_info(db_path: str) -> tuple[int, str | None]:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
             count = cursor.fetchone()[0]
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError as e:
+        print(f"[workflow-router] Could not read transitions count: {e}", file=sys.stderr)
 
     # Get version from file (next to DB)
     version_file = Path(db_path).parent / VERSION_FILE_NAME
@@ -81,19 +87,21 @@ def auto_seed_configs(db_path: str, verbose: bool = False) -> tuple[bool, str]:
     Auto-seed workflow configs if missing or outdated.
     Returns (success, message) tuple.
     """
-    seed_script = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
-
-    if not seed_script.exists():
-        return False, f"Config seeder not found at {seed_script}"
+    if not SEED_SCRIPT_PATH.exists():
+        return False, f"Config seeder not found at {SEED_SCRIPT_PATH}"
 
     if verbose:
         print(f"[workflow-router] Seeding configs...", file=sys.stderr)
 
-    result = subprocess.run(
-        [sys.executable, str(seed_script), "--db", db_path, "--all"],
-        capture_output=True,
-        text=True
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, str(SEED_SCRIPT_PATH), "--db", db_path, "--all"],
+            capture_output=True,
+            text=True,
+            timeout=SEED_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"Config seeding timed out after {SEED_TIMEOUT_SECONDS}s"
 
     if result.returncode != 0:
         return False, f"Config seeding failed: {result.stderr.strip()}"
@@ -302,9 +310,7 @@ def route(args):
     needs_seeding = (count == 0) or (stored_version != EXPECTED_TRANSITIONS_VERSION)
 
     if needs_seeding:
-        seed_script = _script_dir.parent.parent / "config-seeder" / "scripts" / "seed_configs.py"
-
-        if seed_script.exists():
+        if SEED_SCRIPT_PATH.exists():
             success, message = auto_seed_configs(args.db, verbose=True)
             if success:
                 # Write version file after successful seeding
@@ -332,127 +338,127 @@ def route(args):
             sys.exit(1)
         # else: seeder not found but we have transitions - proceed
 
-    # Use context manager to ensure connection closure
+    # Use try/finally to ensure connection closure on all paths
     conn = sqlite3.connect(args.db, timeout=2.0)
+    try:
+        # Get base transition
+        transition = get_transition(conn, args.current_agent, args.status)
 
-    # Get base transition
-    transition = get_transition(conn, args.current_agent, args.status)
-
-    if not transition:
-        result = {
-            "success": False,
-            "error": f"Unknown transition: {args.current_agent} + {args.status}",
-            "suggestion": "Route to tech_lead for manual handling",
-            "fallback_action": {
-                "next_agent": "tech_lead",
-                "action": "spawn",
-                "reason": "Unknown status - escalating for guidance"
+        if not transition:
+            result = {
+                "success": False,
+                "error": f"Unknown transition: {args.current_agent} + {args.status}",
+                "suggestion": "Route to tech_lead for manual handling",
+                "fallback_action": {
+                    "next_agent": "tech_lead",
+                    "action": "spawn",
+                    "reason": "Unknown status - escalating for guidance"
+                }
             }
-        }
-        print(json.dumps(result, indent=2))
-        conn.close()
-        sys.exit(1)
+            print(json.dumps(result, indent=2))
+            sys.exit(1)
 
-    next_agent = transition["next_agent"]
-    action = transition["action"]
+        next_agent = transition["next_agent"]
+        action = transition["action"]
 
-    # Apply testing mode rules
-    if args.testing_mode in ["disabled", "minimal"]:
-        if next_agent == "qa_expert":
-            next_agent = "tech_lead"
-            action = "spawn"
-            transition["skip_reason"] = f"QA skipped (testing_mode={args.testing_mode})"
+        # Apply testing mode rules
+        if args.testing_mode in ["disabled", "minimal"]:
+            if next_agent == "qa_expert":
+                next_agent = "tech_lead"
+                action = "spawn"
+                transition["skip_reason"] = f"QA skipped (testing_mode={args.testing_mode})"
 
-    # Apply escalation rules
-    # v14: Use appropriate counter based on agent type (qa_attempts, tl_review_attempts, or revision_count)
-    if transition.get("escalation_check"):
-        escalation_count = get_escalation_count(conn, args.session_id, args.group_id, args.current_agent)
-        escalation_rule = get_special_rule(conn, "escalation_after_failures")
-        threshold = escalation_rule.get("threshold", 2) if escalation_rule else 2
+        # Apply escalation rules
+        # v14: Use appropriate counter based on agent type (qa_attempts, tl_review_attempts, or revision_count)
+        if transition.get("escalation_check"):
+            escalation_count = get_escalation_count(conn, args.session_id, args.group_id, args.current_agent)
+            escalation_rule = get_special_rule(conn, "escalation_after_failures")
+            threshold = escalation_rule.get("threshold", 2) if escalation_rule else 2
 
-        if escalation_count >= threshold:
-            next_agent = "senior_software_engineer"
-            action = "spawn"
-            transition["escalation_applied"] = True
-            transition["escalation_counter"] = f"{args.current_agent}_attempts={escalation_count}"
-            transition["escalation_reason"] = f"Escalated after {escalation_count} failures"
-
-    # Apply security sensitive rules
-    if check_security_sensitive(conn, args.session_id, args.group_id):
-        security_rule = get_special_rule(conn, "security_sensitive")
-        if security_rule and args.current_agent == "developer":
-            # Force SSE for security tasks
-            if next_agent == "developer":
+            if escalation_count >= threshold:
                 next_agent = "senior_software_engineer"
-            transition["security_override"] = True
+                action = "spawn"
+                transition["escalation_applied"] = True
+                transition["escalation_counter"] = f"{args.current_agent}_attempts={escalation_count}"
+                transition["escalation_reason"] = f"Escalated after {escalation_count} failures"
 
-    # Handle batch spawns
-    groups_to_spawn = []
-    if action == "spawn_batch":
-        pending = get_pending_groups(conn, args.session_id)
-        # Use 'or 4' instead of default to handle NULL from DB (which returns None, not default)
-        max_parallel = transition.get("max_parallel") or 4
-        groups_to_spawn = pending[:max_parallel]
+        # Apply security sensitive rules
+        if check_security_sensitive(conn, args.session_id, args.group_id):
+            security_rule = get_special_rule(conn, "security_sensitive")
+            if security_rule and args.current_agent == "developer":
+                # Force SSE for security tasks
+                if next_agent == "developer":
+                    next_agent = "senior_software_engineer"
+                transition["security_override"] = True
 
-    # Handle phase check (after merge)
-    if transition.get("then_action") == "check_phase":
-        pending = get_pending_groups(conn, args.session_id)
-        in_progress = get_in_progress_groups(conn, args.session_id)
+        # Handle batch spawns
+        groups_to_spawn = []
+        if action == "spawn_batch":
+            pending = get_pending_groups(conn, args.session_id)
+            # Use 'or 4' instead of default to handle NULL from DB (which returns None, not default)
+            max_parallel = transition.get("max_parallel") or 4
+            groups_to_spawn = pending[:max_parallel]
 
-        if pending or in_progress:
-            # More work to do
-            transition["phase_check"] = "continue"
-            if pending:
-                groups_to_spawn = pending[:4]
-        else:
-            # All complete - route to PM
-            next_agent = "project_manager"
-            action = "spawn"
-            transition["phase_check"] = "complete"
+        # Handle phase check (after merge)
+        if transition.get("then_action") == "check_phase":
+            pending = get_pending_groups(conn, args.session_id)
+            in_progress = get_in_progress_groups(conn, args.session_id)
 
-    # Determine model - use config with graceful fallback
-    model = transition.get("model_override")
-    if not model:
-        if next_agent not in MODEL_CONFIG:
-            # Unknown agent - emit error JSON instead of raising
-            emit_error(
-                f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}",
-                f"Add '{next_agent}' to agents section in {MODEL_CONFIG_PATH}"
-            )
-        model = MODEL_CONFIG[next_agent]
+            if pending or in_progress:
+                # More work to do
+                transition["phase_check"] = "continue"
+                if pending:
+                    groups_to_spawn = pending[:4]
+            else:
+                # All complete - route to PM
+                next_agent = "project_manager"
+                action = "spawn"
+                transition["phase_check"] = "complete"
 
-    # Build result
-    result = {
-        "success": True,
-        "current_agent": args.current_agent,
-        "response_status": args.status,
-        "next_agent": next_agent,
-        "action": action,
-        "model": model,
-        "group_id": args.group_id,
-        "session_id": args.session_id,
-        "include_context": transition.get("include_context", []),
-    }
+        # Determine model - use config with graceful fallback
+        model = transition.get("model_override")
+        if not model:
+            if next_agent not in MODEL_CONFIG:
+                # Unknown agent - emit error JSON instead of raising
+                emit_error(
+                    f"Agent '{next_agent}' not found in {MODEL_CONFIG_PATH}",
+                    f"Add '{next_agent}' to agents section in {MODEL_CONFIG_PATH}"
+                )
+            model = MODEL_CONFIG[next_agent]
 
-    # Add batch spawn info if applicable
-    if groups_to_spawn:
-        result["groups_to_spawn"] = groups_to_spawn
+        # Build result
+        result = {
+            "success": True,
+            "current_agent": args.current_agent,
+            "response_status": args.status,
+            "next_agent": next_agent,
+            "action": action,
+            "model": model,
+            "group_id": args.group_id,
+            "session_id": args.session_id,
+            "include_context": transition.get("include_context", []),
+        }
 
-    # Add any special flags
-    if transition.get("bypass_qa"):
-        result["bypass_qa"] = True
-    if transition.get("escalation_applied"):
-        result["escalation_applied"] = True
-        result["escalation_reason"] = transition.get("escalation_reason")
-    if transition.get("skip_reason"):
-        result["skip_reason"] = transition.get("skip_reason")
-    if transition.get("phase_check"):
-        result["phase_check"] = transition.get("phase_check")
-    if transition.get("security_override"):
-        result["security_override"] = True
+        # Add batch spawn info if applicable
+        if groups_to_spawn:
+            result["groups_to_spawn"] = groups_to_spawn
 
-    print(json.dumps(result, indent=2))
-    conn.close()
+        # Add any special flags
+        if transition.get("bypass_qa"):
+            result["bypass_qa"] = True
+        if transition.get("escalation_applied"):
+            result["escalation_applied"] = True
+            result["escalation_reason"] = transition.get("escalation_reason")
+        if transition.get("skip_reason"):
+            result["skip_reason"] = transition.get("skip_reason")
+        if transition.get("phase_check"):
+            result["phase_check"] = transition.get("phase_check")
+        if transition.get("security_override"):
+            result["security_override"] = True
+
+        print(json.dumps(result, indent=2))
+    finally:
+        conn.close()
 
 
 def main():
