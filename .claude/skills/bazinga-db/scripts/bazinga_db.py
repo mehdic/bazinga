@@ -128,6 +128,33 @@ try:
 except ImportError:
     _HAS_BAZINGA_PATHS = False
 
+
+def _ensure_cwd_at_project_root():
+    """Change to project root so all relative paths work correctly.
+
+    This is critical when the script is invoked from a different CWD.
+    See: research/absolute-path-resolution-ultrathink.md
+
+    Must be called at entry point (main), NOT at module import time,
+    to avoid side effects when this module is imported by tests.
+    """
+    if not _HAS_BAZINGA_PATHS:
+        return  # Cannot detect project root without bazinga_paths
+
+    try:
+        project_root = get_project_root()
+        import os
+        os.chdir(project_root)
+        # Only log if BAZINGA_VERBOSE is set to reduce noise
+        if os.environ.get("BAZINGA_VERBOSE"):
+            print(f"[INFO] project_root={project_root}", file=sys.stderr)
+    except RuntimeError:
+        # Project root detection failed - no valid markers found
+        # Don't chdir to avoid changing to wrong directory
+        pass
+    except OSError as e:
+        print(f"[WARNING] Failed to chdir to project root: {e}", file=sys.stderr)
+
 # Import SCHEMA_VERSION from init_db.py to avoid duplication
 try:
     from init_db import SCHEMA_VERSION as EXPECTED_SCHEMA_VERSION
@@ -3224,6 +3251,9 @@ def _resolve_db_path(args) -> str:
 
 
 def main():
+    # Ensure we're in project root for relative path resolution
+    _ensure_cwd_at_project_root()
+
     parser = argparse.ArgumentParser(
         description='BAZINGA Database Client',
         epilog='Run with "help" command to see all available commands'
