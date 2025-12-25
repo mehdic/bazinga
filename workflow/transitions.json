@@ -1,7 +1,8 @@
 {
-  "_version": "1.1.0",
+  "_version": "1.2.0",
   "_description": "Deterministic workflow state machine for BAZINGA orchestration",
   "_changelog": {
+    "1.2.0": "Added validator agent transitions for ACCEPT/REJECT. Enables explicit routing after bazinga-validator returns verdict. REJECT routes back to PM for remediation.",
     "1.1.0": "Fixed status code mismatches between agents and transitions. Added SSE ROOT_CAUSE_FOUND, PARTIAL. Added TL UNBLOCKING_GUIDANCE alias. Added Investigator HYPOTHESIS_ELIMINATED, NEED_MORE_ANALYSIS. Renamed INCOMPLETE→INVESTIGATION_INCOMPLETE, WAITING_FOR_RESULTS→NEED_DEVELOPER_DIAGNOSTIC. Fixed Investigator ROOT_CAUSE_FOUND routing to tech_lead."
   },
 
@@ -245,6 +246,21 @@
       "next_agent": "requirements_engineer",
       "action": "respawn",
       "include_context": ["partial_research"]
+    }
+  },
+
+  "validator": {
+    "_description": "bazinga-validator skill verdicts after PM sends BAZINGA",
+    "ACCEPT": {
+      "next_agent": null,
+      "action": "end_session",
+      "include_context": ["validator_verdict", "completion_summary"]
+    },
+    "REJECT": {
+      "next_agent": "project_manager",
+      "action": "spawn",
+      "include_context": ["validator_verdict", "failed_checks", "remediation_guidance"],
+      "_note": "PM must analyze failures and either fix issues or get user approval for scope reduction"
     }
   },
 
