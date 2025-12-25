@@ -99,9 +99,10 @@ workflow-router, determine next action:
 Current agent: validator
 Status: ACCEPT  # or REJECT
 Session ID: {session_id}
-Group ID: VALIDATION
 ```
 Then invoke: `Skill(command: "workflow-router")`
+
+**Note:** Validator is session-scoped - omit `group_id` (not needed for routing).
 
 **Transitions defined in `workflow/transitions.json` → `validator` section:**
 - `ACCEPT` → `end_session` action → Complete shutdown protocol

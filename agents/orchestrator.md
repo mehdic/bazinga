@@ -2259,7 +2259,7 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Step 2c: Route via workflow-router**
 
-Invoke workflow-router with validator status:
+Invoke workflow-router with validator status (validator is session-scoped - omit `group_id`):
 ```
 workflow-router, determine next action:
 Current agent: validator

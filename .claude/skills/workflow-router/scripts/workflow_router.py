@@ -14,6 +14,8 @@ Output:
     JSON with next action to stdout
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sqlite3
@@ -45,13 +47,12 @@ def get_transitions_info(db_path: str) -> tuple[int, str | None]:
     count = 0
     version = None
 
-    # Get count from DB
+    # Get count from DB (use context manager to ensure closure)
     try:
-        conn = sqlite3.connect(db_path, timeout=2.0)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
-        count = cursor.fetchone()[0]
-        conn.close()
+        with sqlite3.connect(db_path, timeout=2.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM workflow_transitions")
+            count = cursor.fetchone()[0]
     except sqlite3.OperationalError:
         pass
 
@@ -291,7 +292,7 @@ def route(args):
         result = {
             "success": False,
             "error": f"Database not found at {args.db}",
-            "suggestion": "Run init_db.py and seed_configs.py first"
+            "suggestion": "Use Skill(command: 'bazinga-db') to initialize database"
         }
         print(json.dumps(result, indent=2))
         sys.exit(1)
@@ -316,7 +317,7 @@ def route(args):
                 result = {
                     "success": False,
                     "error": f"Config seeding failed and no transitions exist: {message}",
-                    "suggestion": "Check workflow/transitions.json exists and is valid"
+                    "suggestion": "Use Skill(command: 'config-seeder') to seed configs"
                 }
                 print(json.dumps(result, indent=2))
                 sys.exit(1)
@@ -325,13 +326,14 @@ def route(args):
             result = {
                 "success": False,
                 "error": "No transitions in database and config-seeder not found",
-                "suggestion": "Run config-seeder skill or ensure workflow/transitions.json exists"
+                "suggestion": "Use Skill(command: 'config-seeder') to seed workflow configs"
             }
             print(json.dumps(result, indent=2))
             sys.exit(1)
         # else: seeder not found but we have transitions - proceed
 
-    conn = sqlite3.connect(args.db)
+    # Use context manager to ensure connection closure
+    conn = sqlite3.connect(args.db, timeout=2.0)
 
     # Get base transition
     transition = get_transition(conn, args.current_agent, args.status)
