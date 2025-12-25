@@ -88,5 +88,17 @@
       "RE → Tech Lead",
       "bypasses QA"
     ]
+  },
+
+  "validator": {
+    "_note": "bazinga-validator skill - not an agent but has status codes",
+    "required": [
+      "ACCEPT",
+      "REJECT"
+    ],
+    "workflow_markers": [
+      "Validator → End Session (ACCEPT)",
+      "Validator → PM (REJECT)"
+    ]
   }
 }

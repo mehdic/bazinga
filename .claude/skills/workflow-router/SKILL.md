@@ -85,9 +85,28 @@ Return this JSON to the orchestrator.
 | `spawn` | Use prompt-builder, then spawn single agent |
 | `respawn` | Re-spawn same agent type with feedback |
 | `spawn_batch` | Spawn multiple developers for `groups_to_spawn` |
-| `validate_then_end` | Invoke bazinga-validator skill, then end session |
+| `validate_then_end` | Invoke bazinga-validator skill, then route based on verdict |
 | `pause_for_user` | Surface clarification question to user |
 | `end_session` | Mark session complete, no more spawns |
+
+## Validator Workflow
+
+When PM sends BAZINGA, the orchestrator invokes `bazinga-validator`. After validator returns:
+
+1. **Call workflow-router with validator status:**
+```bash
+python3 .claude/skills/workflow-router/scripts/workflow_router.py \
+  --current-agent "validator" \
+  --status "ACCEPT"  # or "REJECT" \
+  --session-id "{session_id}" \
+  --group-id "VALIDATION"
+```
+
+2. **Handle the result:**
+- `ACCEPT` → `end_session` action → Complete shutdown protocol
+- `REJECT` → `spawn` action with `next_agent: project_manager` → PM fixes issues
+
+**🔴 CRITICAL:** After validator REJECT, orchestrator MUST spawn PM with the rejection details. Do NOT stop!
 
 ## Special Flags in Result
 
