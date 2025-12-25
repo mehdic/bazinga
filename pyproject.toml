@@ -72,3 +72,4 @@ packages = ["src/bazinga_cli"]
 "config" = "share/bazinga_cli/config"
 ".claude/skills" = "share/bazinga_cli/.claude/skills"
 "dashboard-v2" = "share/bazinga_cli/dashboard-v2"
+"mini-dashboard" = "share/bazinga_cli/mini-dashboard"
