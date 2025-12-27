@@ -31,7 +31,8 @@ fi
 
 # Check if orchestration was in progress
 # Look for evidence of /bazinga.orchestrate command or orchestrator activity
-if ! grep -q -E "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|§ORCHESTRATOR IDENTITY AXIOMS" "$TRANSCRIPT_PATH" 2>/dev/null; then
+# Check both with and without § symbol for consistency across platforms
+if ! grep -q -E "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|ORCHESTRATOR IDENTITY AXIOMS" "$TRANSCRIPT_PATH" 2>/dev/null; then
   # No orchestration evidence - exit silently
   exit 0
 fi
@@ -56,22 +57,23 @@ if [ -z "$ORCHESTRATOR_FILE" ]; then
   exit 0  # Soft fail - don't break session
 fi
 
-# Output ONLY the identity axioms section (not full file to avoid token blow-up)
-# Extract first ~50 lines which contain the axioms, or up to the first major section
+# Output the FULL orchestrator file to restore complete context
+# After compaction, partial context leads to role drift and workflow failures
 echo ""
 echo "================================================================================"
 echo "  BAZINGA POST-COMPACTION RECOVERY"
-echo "  Re-injecting identity axioms (not full file to save tokens)..."
+echo "  Re-injecting FULL orchestrator context..."
 echo "================================================================================"
 echo ""
 
-# Output the identity axioms section (first ~50 lines containing the critical rules)
-head -60 "$ORCHESTRATOR_FILE"
+# Output the complete orchestrator file
+cat "$ORCHESTRATOR_FILE"
 
 echo ""
 echo "================================================================================"
-echo "  IDENTITY AXIOMS RESTORED"
-echo "  For full rules, read: .claude/agents/orchestrator.md"
+echo "  ORCHESTRATOR CONTEXT FULLY RESTORED"
+echo "  Continue orchestration from where you left off."
+echo "  Check bazinga/bazinga.db for current session state."
 echo "================================================================================"
 echo ""
 
