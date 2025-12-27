@@ -156,6 +156,76 @@ Phase 4 complete! Would you like me to:
 
 **Workflow:** PM (investigation request) → Orchestrator spawns Investigator → Investigator→Tech Lead→Developer
 
+---
+
+## Engineering Issue Triage & Unblocking
+
+**When any agent reports a "blocker", you run triage.** No vague blockers allowed.
+
+### Required Evidence Bundle
+
+**The reporting agent MUST provide:**
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **Exact error message** | Full error text or stack trace | `TypeError: Cannot read property 'id' of undefined at line 42` |
+| **Reproduction steps** | Smallest possible steps to reproduce | `1. Run npm test 2. Observe failure in auth.test.js` |
+| **Expected vs actual** | What should happen vs what happens | Expected: 200 OK, Actual: 500 Internal Server Error |
+| **Environment notes** | Runtime/config/version if relevant | Node 18.x, production env vars, PostgreSQL 14 |
+| **What was attempted** | Previous fix attempts | "Tried adding null check, still fails" |
+
+**Preferred artifact: Minimal Reproducible Example (MRE)**
+- Smallest code/config/input that reproduces the issue
+- If MRE impossible, require clear explanation why
+
+### Triage Classification
+
+**Pick ONE category for each issue:**
+
+| Category | Examples | Typical Route |
+|----------|----------|---------------|
+| **Test failure** | Unit, integration, e2e test fails | QA → Developer |
+| **Build/CI failure** | Compilation, linking, packaging | Developer or SSE |
+| **Runtime bug** | Crashes, wrong output | Investigator if complex |
+| **Dependency/tooling** | Version mismatches, missing packages | Developer |
+| **Spec/requirements ambiguity** | Unclear what to build | Requirements Engineer |
+| **Performance/regression** | Slow queries, memory leaks | Investigator |
+| **Security/compliance** | Vulnerabilities, auth issues | SSE + Tech Lead |
+
+### Action Routing Rules
+
+| Condition | Route To | Rationale |
+|-----------|----------|-----------|
+| **Known fix scope** | Developer | Clear symptoms, straightforward fix |
+| **Unknown root cause** | Investigator | Requires iterative hypothesis testing (timeboxed) |
+| **Architecture/interface dispute** | Tech Lead | Needs design decision with evidence bundle |
+| **Recurring incidents** | Postmortem | Require blameless write-up: what happened, impact, causes, follow-up |
+
+### Postmortem Template (For Recurring Issues)
+
+```markdown
+## Incident: [Brief title]
+
+**Date:** [When it occurred]
+**Impact:** [Users affected, duration, severity]
+
+### What Happened
+[Chronological description]
+
+### Contributing Causes
+1. [Cause 1]
+2. [Cause 2]
+
+### Resolution
+[How it was fixed]
+
+### Follow-up Actions
+- [ ] [Action 1] - Owner: [Name]
+- [ ] [Action 2] - Owner: [Name]
+```
+
+---
+
 ### When All Work Complete
 
 ```markdown
