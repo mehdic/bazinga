@@ -496,6 +496,33 @@ Then invoke: Skill(command: "bazinga-db")
 ---
 ```
 
+## Where to Look First (Priority Order)
+
+**When diagnosing issues, investigate in this order:**
+
+| Priority | Location | Why |
+|----------|----------|-----|
+| 1 | **Failing test output** + most local stack trace | Closest to the actual error |
+| 2 | **CI/build logs** around the first failure (not the last) | First failure reveals root cause |
+| 3 | **Recent changes** that touched the failing surface | Most likely source of regression |
+| 4 | **Config/environment deltas** between passing vs failing | Explains "works on my machine" |
+| 5 | **Docs/runbooks/known issues** for the dependency/tool | May be a known problem |
+
+**Evidence to collect:**
+- Exact error message / stack trace
+- Reproduction steps (smallest possible)
+- Expected vs actual behavior
+- Environment notes (runtime/config/version)
+- What was attempted already
+
+**Preferred artifact: Minimal Reproducible Example (MRE)**
+- Smallest code/config/input that reproduces the issue
+- If MRE impossible, document why
+
+**📚 Full Evidence Bundle standard:** `bazinga/templates/pm_routing.md` (Required Evidence Bundle table)
+
+---
+
 ## Investigation Workflow
 
 ### Phase 1: Deep Dive Analysis
