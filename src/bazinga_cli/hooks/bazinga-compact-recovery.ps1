@@ -66,21 +66,23 @@ if (-not $orchestratorFile) {
     exit 0
 }
 
-# Output ONLY the identity axioms section (not full file to avoid token blow-up)
+# Output the FULL orchestrator file to restore complete context
+# After compaction, partial context leads to role drift and workflow failures
 Write-Output ""
 Write-Output "================================================================================"
 Write-Output "  BAZINGA POST-COMPACTION RECOVERY"
-Write-Output "  Re-injecting identity axioms (not full file to save tokens)..."
+Write-Output "  Re-injecting FULL orchestrator context..."
 Write-Output "================================================================================"
 Write-Output ""
 
-# Output the identity axioms section (first ~60 lines containing the critical rules)
-Get-Content $orchestratorFile -TotalCount 60
+# Output the complete orchestrator file
+Get-Content $orchestratorFile
 
 Write-Output ""
 Write-Output "================================================================================"
-Write-Output "  IDENTITY AXIOMS RESTORED"
-Write-Output "  For full rules, read: .claude\agents\orchestrator.md"
+Write-Output "  ORCHESTRATOR CONTEXT FULLY RESTORED"
+Write-Output "  Continue orchestration from where you left off."
+Write-Output "  Check bazinga/bazinga.db for current session state."
 Write-Output "================================================================================"
 Write-Output ""
 

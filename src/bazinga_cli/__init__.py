@@ -655,37 +655,44 @@ class BazingaSetup:
         if "SessionStart" not in settings["hooks"]:
             settings["hooks"]["SessionStart"] = []
 
-        # Define our hook config - fires on compact and resume events
-        bazinga_hook = {
-            "matcher": "compact|resume",
-            "hooks": [{
-                "type": "command",
-                "command": hook_command
-            }]
+        # Define our hook configs - separate entries for compact and resume
+        # Claude Code matchers are exact strings, not regex patterns
+        hook_entry = {
+            "type": "command",
+            "command": hook_command
         }
+        bazinga_hooks = [
+            {"matcher": "compact", "hooks": [hook_entry]},
+            {"matcher": "resume", "hooks": [hook_entry]}
+        ]
 
-        # Check if already installed and update command if script type changed
-        existing_index = None
-        for i, hook in enumerate(settings["hooks"]["SessionStart"]):
-            if "bazinga-compact-recovery" in str(hook):
-                existing_index = i
-                break
+        # Remove any existing bazinga-compact-recovery entries (handles old format too)
+        existing_hooks = settings["hooks"]["SessionStart"]
+        new_hooks = [h for h in existing_hooks if "bazinga-compact-recovery" not in str(h)]
+
+        # Check if we removed anything or if the hooks are different
+        removed_count = len(existing_hooks) - len(new_hooks)
+
+        # Add our hooks
+        new_hooks.extend(bazinga_hooks)
 
         settings_changed = False
-        if existing_index is not None:
-            # Update existing entry (handles sh -> ps1 switch)
-            old_hook = settings["hooks"]["SessionStart"][existing_index]
-            if old_hook != bazinga_hook:
-                settings["hooks"]["SessionStart"][existing_index] = bazinga_hook
+        if removed_count > 0 or len(existing_hooks) == 0:
+            settings["hooks"]["SessionStart"] = new_hooks
+            settings_changed = True
+            if removed_count > 0:
+                console.print(f"  ✓ Updated post-compaction recovery hook ({hook_filename})")
+            else:
+                console.print(f"  ✓ Installed post-compaction recovery hook ({hook_filename})")
+        else:
+            # Check if current hooks match what we want
+            current_bazinga = [h for h in existing_hooks if "bazinga-compact-recovery" in str(h)]
+            if current_bazinga != bazinga_hooks:
+                settings["hooks"]["SessionStart"] = new_hooks
                 settings_changed = True
                 console.print(f"  ✓ Updated post-compaction recovery hook ({hook_filename})")
             else:
                 console.print(f"  ✓ Post-compaction recovery hook already current ({hook_filename})")
-        else:
-            # Add new entry
-            settings["hooks"]["SessionStart"].append(bazinga_hook)
-            settings_changed = True
-            console.print(f"  ✓ Installed post-compaction recovery hook ({hook_filename})")
 
         # Write settings if changed
         if settings_changed:
