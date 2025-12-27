@@ -35,11 +35,13 @@ if ([string]::IsNullOrWhiteSpace($projectCwd)) {
 
 # Check if orchestration was in progress
 # Look for evidence of /bazinga.orchestrate command or orchestrator activity
+# Using -Raw for better performance with large files
 $transcriptContent = Get-Content $transcriptPath -Raw -ErrorAction SilentlyContinue
 if (-not $transcriptContent) {
     exit 0
 }
 
+# Check both with and without § symbol for consistency across platforms
 $orchestrationPattern = "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|ORCHESTRATOR IDENTITY AXIOMS"
 if ($transcriptContent -notmatch $orchestrationPattern) {
     # No orchestration evidence - exit silently
@@ -75,8 +77,8 @@ Write-Output "  Re-injecting FULL orchestrator context..."
 Write-Output "================================================================================"
 Write-Output ""
 
-# Output the complete orchestrator file
-Get-Content $orchestratorFile
+# Output the complete orchestrator file (using -Raw for performance and exact fidelity)
+Get-Content $orchestratorFile -Raw
 
 Write-Output ""
 Write-Output "================================================================================"

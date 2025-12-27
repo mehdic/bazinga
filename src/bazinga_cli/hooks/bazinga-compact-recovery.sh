@@ -31,7 +31,8 @@ fi
 
 # Check if orchestration was in progress
 # Look for evidence of /bazinga.orchestrate command or orchestrator activity
-if ! grep -q -E "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|§ORCHESTRATOR IDENTITY AXIOMS" "$TRANSCRIPT_PATH" 2>/dev/null; then
+# Check both with and without § symbol for consistency across platforms
+if ! grep -q -E "bazinga\.orchestrate|ORCHESTRATOR|orchestrator\.md|ORCHESTRATOR IDENTITY AXIOMS" "$TRANSCRIPT_PATH" 2>/dev/null; then
   # No orchestration evidence - exit silently
   exit 0
 fi

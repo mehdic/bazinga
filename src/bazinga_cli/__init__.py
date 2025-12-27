@@ -657,42 +657,47 @@ class BazingaSetup:
 
         # Define our hook configs - separate entries for compact and resume
         # Claude Code matchers are exact strings, not regex patterns
-        hook_entry = {
-            "type": "command",
-            "command": hook_command
-        }
+        # Use separate dict objects to avoid shared mutation issues
         bazinga_hooks = [
-            {"matcher": "compact", "hooks": [hook_entry]},
-            {"matcher": "resume", "hooks": [hook_entry]}
+            {"matcher": "compact", "hooks": [{"type": "command", "command": hook_command}]},
+            {"matcher": "resume", "hooks": [{"type": "command", "command": hook_command}]}
         ]
 
-        # Remove any existing bazinga-compact-recovery entries (handles old format too)
+        def is_bazinga_hook(hook: dict) -> bool:
+            """Check if a hook entry is a bazinga-compact-recovery hook (structural check)."""
+            if not isinstance(hook, dict):
+                return False
+            hooks_list = hook.get("hooks", [])
+            for h in hooks_list:
+                if isinstance(h, dict):
+                    cmd = h.get("command", "")
+                    if "bazinga-compact-recovery" in cmd:
+                        return True
+            return False
+
+        def hooks_match(existing: list, desired: list) -> bool:
+            """Compare hooks by matcher and command, ignoring order."""
+            def normalize(h):
+                matcher = h.get("matcher", "")
+                cmds = tuple(sorted(sub.get("command", "") for sub in h.get("hooks", []) if isinstance(sub, dict)))
+                return (matcher, cmds)
+            existing_set = set(normalize(h) for h in existing if is_bazinga_hook(h))
+            desired_set = set(normalize(h) for h in desired)
+            return existing_set == desired_set
+
+        # Filter out existing bazinga hooks (structural check, not string-based)
         existing_hooks = settings["hooks"]["SessionStart"]
-        new_hooks = [h for h in existing_hooks if "bazinga-compact-recovery" not in str(h)]
+        other_hooks = [h for h in existing_hooks if not is_bazinga_hook(h)]
 
-        # Check if we removed anything or if the hooks are different
-        removed_count = len(existing_hooks) - len(new_hooks)
-
-        # Add our hooks
-        new_hooks.extend(bazinga_hooks)
-
+        # Check if hooks are already current (order-insensitive comparison)
         settings_changed = False
-        if removed_count > 0 or len(existing_hooks) == 0:
-            settings["hooks"]["SessionStart"] = new_hooks
-            settings_changed = True
-            if removed_count > 0:
-                console.print(f"  ✓ Updated post-compaction recovery hook ({hook_filename})")
-            else:
-                console.print(f"  ✓ Installed post-compaction recovery hook ({hook_filename})")
+        if hooks_match(existing_hooks, bazinga_hooks):
+            console.print(f"  ✓ Post-compaction recovery hook already current ({hook_filename})")
         else:
-            # Check if current hooks match what we want
-            current_bazinga = [h for h in existing_hooks if "bazinga-compact-recovery" in str(h)]
-            if current_bazinga != bazinga_hooks:
-                settings["hooks"]["SessionStart"] = new_hooks
-                settings_changed = True
-                console.print(f"  ✓ Updated post-compaction recovery hook ({hook_filename})")
-            else:
-                console.print(f"  ✓ Post-compaction recovery hook already current ({hook_filename})")
+            # Update: keep other hooks, add our hooks
+            settings["hooks"]["SessionStart"] = other_hooks + bazinga_hooks
+            settings_changed = True
+            console.print(f"  ✓ {'Updated' if any(is_bazinga_hook(h) for h in existing_hooks) else 'Installed'} post-compaction recovery hook ({hook_filename})")
 
         # Write settings if changed
         if settings_changed:
