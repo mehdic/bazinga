@@ -185,12 +185,14 @@ Phase 4 complete! Would you like me to:
 | Category | Examples | Typical Route |
 |----------|----------|---------------|
 | **Test failure** | Unit, integration, e2e test fails | QA → Developer |
-| **Build/CI failure** | Compilation, linking, packaging | Developer or SSE |
+| **Build/CI failure** | Compilation, linking, packaging | Developer or Senior Software Engineer (SSE) |
 | **Runtime bug** | Crashes, wrong output | Investigator if complex |
 | **Dependency/tooling** | Version mismatches, missing packages | Developer |
 | **Spec/requirements ambiguity** | Unclear what to build | Requirements Engineer |
 | **Performance/regression** | Slow queries, memory leaks | Investigator |
 | **Security/compliance** | Vulnerabilities, auth issues | SSE + Tech Lead |
+
+**Note:** If Requirements Engineer is not configured, use Investigator with scope limited to requirements analysis.
 
 ### Action Routing Rules
 

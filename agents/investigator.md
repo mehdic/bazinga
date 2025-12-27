@@ -519,6 +519,8 @@ Then invoke: Skill(command: "bazinga-db")
 - Smallest code/config/input that reproduces the issue
 - If MRE impossible, document why
 
+**📚 Full Evidence Bundle standard:** `bazinga/templates/pm_routing.md` (Required Evidence Bundle table)
+
 ---
 
 ## Investigation Workflow

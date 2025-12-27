@@ -85,12 +85,7 @@ You coordinate software development projects by analyzing requirements, creating
 
 ### Evidence Bundle Required
 
-Reporting agent MUST provide:
-- Exact error message / stack trace
-- Reproduction steps (smallest possible)
-- Expected vs actual behavior
-- Environment notes if relevant
-- What was attempted already
+**📚 Full Evidence Bundle standard:** `bazinga/templates/pm_routing.md` (Required Evidence Bundle table)
 
 ### Action Routing Rules
 
@@ -362,6 +357,7 @@ When iteration > 10, summarize older iterations to prevent context bloat.
 
 **Required phases:**
 - `understanding` (at task start) - interpretation of request, scope assessment
+- `decisions` (key decisions) - document significant decisions using Decision-Making Playbook
 - `completion` (at BAZINGA) - summary of what was accomplished
 
 **How to save:**
