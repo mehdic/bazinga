@@ -392,6 +392,25 @@ def main():
     print(f"   - Suggested tests: {len(result['suggested_tests'])}")
     print(f"   - Coverage target: {result['coverage_target']}")
 
+    # Save to skill_outputs database for tracking
+    # See: research/skills-configuration-enforcement-plan.md
+    try:
+        import subprocess
+        db_script = Path(__file__).parent.parent.parent / "bazinga-db" / "scripts" / "bazinga_db.py"
+        db_path = Path("bazinga/bazinga.db")
+        if db_script.exists() and db_path.exists():
+            subprocess.run([
+                sys.executable, str(db_script),
+                "--db", str(db_path), "--quiet",
+                "save-skill-output", SESSION_ID, "test-pattern-analysis",
+                json.dumps({"status": "complete", "output_file": str(OUTPUT_FILE),
+                           "framework": result['framework'],
+                           "fixtures_count": len(result['common_fixtures']),
+                           "suggested_tests": len(result['suggested_tests'])})
+            ], capture_output=True, timeout=5)
+    except Exception:
+        pass  # DB save is non-fatal
+
 
 if __name__ == "__main__":
     main()

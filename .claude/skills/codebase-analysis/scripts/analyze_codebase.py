@@ -384,6 +384,24 @@ def main():
         results = analyzer.analyze()
         analyzer.save_results(results, args.output)
 
+        # Save to skill_outputs database for tracking
+        # See: research/skills-configuration-enforcement-plan.md
+        try:
+            import subprocess
+            db_script = Path(__file__).parent.parent.parent / "bazinga-db" / "scripts" / "bazinga_db.py"
+            db_path = Path("bazinga/bazinga.db")
+            if db_script.exists() and db_path.exists():
+                subprocess.run([
+                    sys.executable, str(db_script),
+                    "--db", str(db_path), "--quiet",
+                    "save-skill-output", args.session, "codebase-analysis",
+                    json.dumps({"status": "complete", "output_file": args.output,
+                               "similar_features": len(results.get('similar_features', [])),
+                               "utilities": len(results.get('utilities', []))})
+                ], capture_output=True, timeout=5)
+        except Exception:
+            pass  # DB save is non-fatal
+
         if results.get('timed_out'):
             print(f"⚠️  {results.get('timeout_message', 'Analysis timed out')}")
             print(f"Partial results saved to {args.output}")

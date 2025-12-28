@@ -93,3 +93,16 @@ echo "📄 Results: $PATTERN_FILE"
 echo
 echo "Note: This is a simplified implementation."
 echo "Full pattern mining requires ≥10 historical runs for statistical significance."
+
+# Save to skill_outputs database for tracking
+# See: research/skills-configuration-enforcement-plan.md
+echo "💾 Saving to database..."
+DB_PATH="bazinga/bazinga.db"
+DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+
+if [ -f "$DB_PATH" ] && [ -f "$DB_SCRIPT" ]; then
+    python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
+        "$SESSION_ID" \
+        "pattern-miner" \
+        "{\"status\": \"complete\", \"output_file\": \"$PATTERN_FILE\"}" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
+fi
