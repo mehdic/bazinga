@@ -3518,7 +3518,18 @@ def main():
                     agent_type = cmd_args[i + 1]
                     i += 2
                 elif cmd_args[i] == '--since' and i + 1 < len(cmd_args):
-                    since_minutes = int(cmd_args[i + 1])
+                    # Validate --since input is a positive integer
+                    try:
+                        since_val = int(cmd_args[i + 1])
+                        if since_val < 1:
+                            raise ValueError("must be >= 1")
+                        since_minutes = since_val
+                    except ValueError as e:
+                        print(json.dumps({
+                            "success": False,
+                            "error": f"--since must be a positive integer (got: '{cmd_args[i + 1]}')"
+                        }, indent=2), file=sys.stderr)
+                        sys.exit(1)
                     i += 2
                 else:
                     positional_args.append(cmd_args[i])

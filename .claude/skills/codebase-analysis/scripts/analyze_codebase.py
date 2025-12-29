@@ -363,6 +363,7 @@ def main():
     parser = argparse.ArgumentParser(description='Analyze codebase for implementation context')
     parser.add_argument('--task', required=True, help='Task description')
     parser.add_argument('--session', required=True, help='Session ID')
+    parser.add_argument('--agent', help='Agent type invoking this skill (for DB tracking)')
     parser.add_argument('--cache-enabled', action='store_true', help='Enable caching')
     parser.add_argument('--output', help='Output file path (default: session-isolated artifacts directory)')
     parser.add_argument('--timeout', type=int, default=30, help='Timeout in seconds (default: 30, 0=no timeout)')
@@ -389,16 +390,22 @@ def main():
         try:
             import subprocess
             db_script = Path(__file__).parent.parent.parent / "bazinga-db" / "scripts" / "bazinga_db.py"
-            db_path = Path("bazinga/bazinga.db")
+            # Use absolute path relative to script location to avoid CWD issues
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+            db_path = project_root / "bazinga" / "bazinga.db"
             if db_script.exists() and db_path.exists():
-                subprocess.run([
+                cmd = [
                     sys.executable, str(db_script),
                     "--db", str(db_path), "--quiet",
                     "save-skill-output", args.session, "codebase-analysis",
                     json.dumps({"status": "complete", "output_file": args.output,
                                "similar_features": len(results.get('similar_features', [])),
                                "utilities": len(results.get('utilities', []))})
-                ], capture_output=True, timeout=5)
+                ]
+                # Add --agent flag if provided (enables agent-scoped evidence checks)
+                if args.agent:
+                    cmd.extend(["--agent", args.agent])
+                subprocess.run(cmd, capture_output=True, timeout=5)
         except Exception:
             pass  # DB save is non-fatal
 

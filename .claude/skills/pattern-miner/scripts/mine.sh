@@ -5,6 +5,24 @@ set +e  # Don't exit on error for graceful degradation
 # Full implementation would include ML-based clustering, but this version
 # provides basic statistical analysis and pattern detection
 
+# Parse --agent flag if present (for DB tracking)
+AGENT_TYPE=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --agent)
+            AGENT_TYPE="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# Get script directory for absolute path resolution
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+
 # Get current session ID from database
 get_current_session_id() {
     local db_path="bazinga/bazinga.db"
@@ -97,12 +115,22 @@ echo "Full pattern mining requires ≥10 historical runs for statistical signifi
 # Save to skill_outputs database for tracking
 # See: research/skills-configuration-enforcement-plan.md
 echo "💾 Saving to database..."
-DB_PATH="bazinga/bazinga.db"
-DB_SCRIPT=".claude/skills/bazinga-db/scripts/bazinga_db.py"
+# Use absolute paths to avoid CWD issues
+DB_PATH="$PROJECT_ROOT/bazinga/bazinga.db"
+DB_SCRIPT="$PROJECT_ROOT/.claude/skills/bazinga-db/scripts/bazinga_db.py"
 
 if [ -f "$DB_PATH" ] && [ -f "$DB_SCRIPT" ]; then
-    python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
-        "$SESSION_ID" \
-        "pattern-miner" \
-        "{\"status\": \"complete\", \"output_file\": \"$PATTERN_FILE\"}" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
+    # Build command with optional --agent flag
+    if [ -n "$AGENT_TYPE" ]; then
+        python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
+            "$SESSION_ID" \
+            "pattern-miner" \
+            "{\"status\": \"complete\", \"output_file\": \"$PATTERN_FILE\"}" \
+            --agent "$AGENT_TYPE" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
+    else
+        python3 "$DB_SCRIPT" --db "$DB_PATH" --quiet save-skill-output \
+            "$SESSION_ID" \
+            "pattern-miner" \
+            "{\"status\": \"complete\", \"output_file\": \"$PATTERN_FILE\"}" 2>/dev/null || echo "⚠️  Database save failed (non-fatal)"
+    fi
 fi
