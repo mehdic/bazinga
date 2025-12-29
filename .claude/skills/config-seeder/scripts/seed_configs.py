@@ -91,6 +91,8 @@ def seed_transitions(conn):
         if agent.startswith("_"):  # Skip metadata keys like _version, _description, _special_rules
             continue
         for status, config in statuses.items():
+            if status.startswith("_"):  # Skip metadata like _description, _note inside agent blocks
+                continue
             cursor.execute("""
                 INSERT INTO workflow_transitions
                 (current_agent, response_status, next_agent, action, include_context,
