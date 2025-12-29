@@ -393,7 +393,9 @@
   <script>
     // State
     let currentSession = null;
-    let selectedAgent = null;
+    let selectedGroup = null;
+    let selectedAgentId = null;
+    let selectedAgentType = null;
     let refreshInterval = null;
 
     // Utility functions
@@ -479,7 +481,10 @@
     // Select session
     async function selectSession(sessionId) {
       currentSession = sessionId;
-      selectedAgent = null;
+      // Clear all selection state when switching sessions
+      selectedGroup = null;
+      selectedAgentId = null;
+      selectedAgentType = null;
 
       // Update UI - use data attribute for comparison
       document.querySelectorAll('#sessions .clickable-item').forEach(el => {
@@ -511,7 +516,8 @@
       }
 
       el.innerHTML = data.map(g => `
-        <div class="clickable-item">
+        <div class="clickable-item ${selectedGroup === g.id ? 'selected' : ''}"
+             data-group-id="${escapeHtml(g.id)}">
           <div class="item-title">
             ${escapeHtml(g.id)}
             <span class="status-badge ${getStatusClass(g.status)}">${escapeHtml(g.status)}</span>
@@ -542,12 +548,15 @@
         return;
       }
 
-      el.innerHTML = data.map(a => `
-        <div class="clickable-item ${selectedAgent === a.agent_type ? 'selected' : ''}"
-             data-agent-type="${escapeHtml(a.agent_type)}">
+      el.innerHTML = data.map(a => {
+        const agentId = a.agent_id || a.agent_type;
+        return `
+        <div class="clickable-item ${selectedAgentId === agentId ? 'selected' : ''}"
+             data-agent-type="${escapeHtml(a.agent_type)}"
+             data-agent-id="${escapeHtml(agentId)}">
           <div class="item-title">
             ${escapeHtml(a.agent_type)}
-            ${a.agent_id ? `<span class="item-meta">(${escapeHtml(a.agent_id)})</span>` : ''}
+            ${a.agent_id && a.agent_id !== a.agent_type ? `<span class="item-meta">(${escapeHtml(a.agent_id)})</span>` : ''}
             <span class="agent-status ${getStatusClass(a.status)}">${escapeHtml(a.status)}</span>
           </div>
           <div class="agent-stats">
@@ -556,14 +565,22 @@
             <span class="agent-stat">Tokens: <strong>${(a.tokens || 0).toLocaleString()}</strong></span>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     // Load logs
     async function loadLogs() {
       if (!currentSession) return;
 
-      const data = await fetchJSON(`/api/session/${currentSession}/logs`);
+      // Build URL with optional group_id filter
+      const params = new URLSearchParams();
+      if (selectedGroup) {
+        params.append('group_id', selectedGroup);
+      }
+      const queryString = params.toString();
+      const url = `/api/session/${currentSession}/logs${queryString ? '?' + queryString : ''}`;
+
+      const data = await fetchJSON(url);
       const el = document.getElementById('logs-panel');
       const countEl = document.getElementById('log-count');
 
@@ -573,12 +590,14 @@
       }
 
       if (!data.length) {
-        el.innerHTML = '<div class="empty-state">No logs yet</div>';
+        // Contextual empty state message
+        const filterMsg = selectedGroup ? ` for group "${selectedGroup}"` : '';
+        el.innerHTML = `<div class="empty-state">No logs${filterMsg}</div>`;
         countEl.textContent = '';
         return;
       }
 
-      countEl.textContent = `${data.length} entries`;
+      countEl.textContent = `${data.length} entries${selectedGroup ? ` (group: ${selectedGroup})` : ''}`;
 
       el.innerHTML = data.map(l => `
         <div class="log-entry">
@@ -589,25 +608,88 @@
       `).join('');
     }
 
-    // Select agent
-    async function selectAgent(agentType) {
-      selectedAgent = agentType;
+    // Select agent (with toggle-to-deselect)
+    async function selectAgent(agentId, agentType) {
+      // Toggle: if clicking already-selected agent, deselect
+      if (selectedAgentId === agentId) {
+        selectedAgentId = null;
+        selectedAgentType = null;
+        document.querySelectorAll('#agents .clickable-item').forEach(el => {
+          el.classList.remove('selected');
+        });
+        document.getElementById('reasoning-agent').textContent = '';
+        document.getElementById('reasoning-panel').innerHTML = '<div class="empty-state">Click on an agent to view their reasoning</div>';
+        return;
+      }
 
-      // Update UI - use data attribute for comparison
+      selectedAgentId = agentId;
+      selectedAgentType = agentType;
+
+      // Update UI - only highlight the specific agent instance
       document.querySelectorAll('#agents .clickable-item').forEach(el => {
-        el.classList.toggle('selected', el.dataset.agentType === agentType);
+        el.classList.toggle('selected', el.dataset.agentId === agentId);
       });
 
-      document.getElementById('reasoning-agent').textContent = agentType;
+      // Display which specific agent is selected
+      const displayName = agentId !== agentType ? `${agentType} (${agentId})` : agentType;
+      document.getElementById('reasoning-agent').textContent = displayName + (selectedGroup ? ` — Group: ${selectedGroup}` : '');
 
       await loadReasoning();
     }
 
+    // Select group (with toggle-to-deselect)
+    async function selectGroup(groupId) {
+      // Toggle: if clicking already-selected group, deselect
+      if (selectedGroup === groupId) {
+        selectedGroup = null;
+        document.querySelectorAll('#groups .clickable-item').forEach(el => {
+          el.classList.remove('selected');
+        });
+        // Reload logs without filter
+        await loadLogs();
+        // Update reasoning header if agent selected
+        if (selectedAgentId) {
+          const displayName = selectedAgentId !== selectedAgentType ? `${selectedAgentType} (${selectedAgentId})` : selectedAgentType;
+          document.getElementById('reasoning-agent').textContent = displayName;
+          await loadReasoning();
+        }
+        return;
+      }
+
+      selectedGroup = groupId;
+
+      // Update UI - highlight selected group
+      document.querySelectorAll('#groups .clickable-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.groupId === groupId);
+      });
+
+      // Reload logs filtered by group
+      await loadLogs();
+
+      // Update reasoning header and reload if agent selected
+      if (selectedAgentId) {
+        const displayName = selectedAgentId !== selectedAgentType ? `${selectedAgentType} (${selectedAgentId})` : selectedAgentType;
+        document.getElementById('reasoning-agent').textContent = displayName + ` — Group: ${groupId}`;
+        await loadReasoning();
+      }
+    }
+
     // Load reasoning
     async function loadReasoning() {
-      if (!currentSession || !selectedAgent) return;
+      if (!currentSession || !selectedAgentId) return;
 
-      const data = await fetchJSON(`/api/session/${currentSession}/agent/${selectedAgent}/reasoning`);
+      // Build URL with optional filters
+      const params = new URLSearchParams();
+      if (selectedAgentId !== selectedAgentType) {
+        params.append('agent_id', selectedAgentId);
+      }
+      if (selectedGroup) {
+        params.append('group_id', selectedGroup);
+      }
+      const queryString = params.toString();
+      const url = `/api/session/${currentSession}/agent/${selectedAgentType}/reasoning${queryString ? '?' + queryString : ''}`;
+
+      const data = await fetchJSON(url);
       const el = document.getElementById('reasoning-panel');
 
       if (data.error) {
@@ -616,7 +698,10 @@
       }
 
       if (!data.length) {
-        el.innerHTML = '<div class="empty-state">No reasoning entries for this agent</div>';
+        // Contextual empty state message
+        const agentLabel = selectedAgentId !== selectedAgentType ? `${selectedAgentType} (${selectedAgentId})` : selectedAgentType;
+        const groupLabel = selectedGroup ? ` in group "${selectedGroup}"` : '';
+        el.innerHTML = `<div class="empty-state">No reasoning entries for ${agentLabel}${groupLabel}</div>`;
         return;
       }
 
@@ -645,7 +730,7 @@
         await loadSessions();
         if (currentSession) {
           await Promise.all([loadGroups(), loadAgents(), loadLogs()]);
-          if (selectedAgent) {
+          if (selectedAgentId) {
             await loadReasoning();
           }
         }
@@ -670,11 +755,19 @@
         }
       });
 
+      // Event delegation for group clicks
+      document.getElementById('groups').addEventListener('click', (e) => {
+        const item = e.target.closest('.clickable-item[data-group-id]');
+        if (item) {
+          selectGroup(item.dataset.groupId);
+        }
+      });
+
       // Event delegation for agent clicks
       document.getElementById('agents').addEventListener('click', (e) => {
-        const item = e.target.closest('.clickable-item[data-agent-type]');
+        const item = e.target.closest('.clickable-item[data-agent-id]');
         if (item) {
-          selectAgent(item.dataset.agentType);
+          selectAgent(item.dataset.agentId, item.dataset.agentType);
         }
       });
     });

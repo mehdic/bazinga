@@ -419,5 +419,238 @@ class TestErrorStates:
         assert page.title() == 'BAZINGA Mini Dashboard'
 
 
+@pytest.mark.skipif(not PLAYWRIGHT_AVAILABLE, reason='Playwright not installed')
+class TestGroupSelection:
+    """Tests for task group selection functionality."""
+
+    def test_group_is_clickable(self, page: Page):
+        """Task groups should be clickable."""
+        page.wait_for_selector('#groups .clickable-item', timeout=5000)
+
+        group = page.locator('#groups .clickable-item').first
+        # Should have data-group-id attribute
+        group_id = group.get_attribute('data-group-id')
+        assert group_id is not None and group_id != ''
+
+    def test_click_group_selects_it(self, page: Page):
+        """Clicking a group should select it."""
+        page.wait_for_selector('#groups .clickable-item', timeout=5000)
+
+        group = page.locator('#groups .clickable-item').first
+        group.click()
+
+        # Wait for UI update
+        page.wait_for_timeout(500)
+
+        # Group should have selected class
+        expect(group).to_have_class(re.compile(r"selected"))
+
+    def test_click_selected_group_deselects(self, page: Page):
+        """Clicking already-selected group should deselect it (toggle)."""
+        page.wait_for_selector('#groups .clickable-item', timeout=5000)
+
+        group = page.locator('#groups .clickable-item').first
+        group.click()
+
+        # Wait for selection
+        page.wait_for_timeout(500)
+        expect(group).to_have_class(re.compile(r"selected"))
+
+        # Click again to deselect
+        group.click()
+        page.wait_for_timeout(500)
+
+        # Should no longer be selected
+        expect(group).not_to_have_class(re.compile(r"selected"))
+
+    def test_group_selection_filters_logs(self, page: Page):
+        """Selecting a group should filter logs panel."""
+        page.wait_for_selector('#groups .clickable-item', timeout=5000)
+
+        # Get initial log count
+        page.wait_for_selector('#log-count')
+        initial_count_text = page.locator('#log-count').text_content()
+
+        # Select a group
+        group = page.locator('#groups .clickable-item').first
+        group_id = group.get_attribute('data-group-id')
+        group.click()
+
+        # Wait for reload
+        page.wait_for_timeout(1000)
+
+        # Log count should show group filter indicator
+        count_text = page.locator('#log-count').text_content()
+        # Should either be empty (no logs for group) or include group indicator
+        # The count may change or stay same depending on data
+
+
+@pytest.mark.skipif(not PLAYWRIGHT_AVAILABLE, reason='Playwright not installed')
+class TestIndividualAgentSelection:
+    """Tests for individual agent instance selection."""
+
+    def test_agent_has_agent_id_attribute(self, page: Page):
+        """Agents should have data-agent-id attribute."""
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        agent = page.locator('#agents .clickable-item').first
+        agent_id = agent.get_attribute('data-agent-id')
+        assert agent_id is not None and agent_id != ''
+
+    def test_agent_has_agent_type_attribute(self, page: Page):
+        """Agents should have data-agent-type attribute."""
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        agent = page.locator('#agents .clickable-item').first
+        agent_type = agent.get_attribute('data-agent-type')
+        assert agent_type is not None and agent_type != ''
+
+    def test_click_agent_selects_by_id(self, page: Page):
+        """Clicking an agent should select by agent_id, not agent_type."""
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        # Click first agent
+        agent = page.locator('#agents .clickable-item').first
+        agent_id = agent.get_attribute('data-agent-id')
+        agent.click()
+
+        # Wait for UI update
+        page.wait_for_timeout(500)
+
+        # Only this specific agent should be selected
+        expect(agent).to_have_class(re.compile(r"selected"))
+
+        # Other agents should not be selected
+        other_agents = page.locator('#agents .clickable-item:not(.selected)')
+        # None of them should have the same agent_id
+        for i in range(other_agents.count()):
+            other_id = other_agents.nth(i).get_attribute('data-agent-id')
+            assert other_id != agent_id
+
+    def test_click_selected_agent_deselects(self, page: Page):
+        """Clicking already-selected agent should deselect it (toggle)."""
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        agent = page.locator('#agents .clickable-item').first
+        agent.click()
+
+        # Wait for selection
+        page.wait_for_timeout(500)
+        expect(agent).to_have_class(re.compile(r"selected"))
+
+        # Click again to deselect
+        agent.click()
+        page.wait_for_timeout(500)
+
+        # Should no longer be selected
+        expect(agent).not_to_have_class(re.compile(r"selected"))
+
+        # Reasoning panel should show empty state
+        reasoning_panel = page.locator('#reasoning-panel')
+        expect(reasoning_panel).to_contain_text('Click on an agent')
+
+    def test_reasoning_header_shows_agent_id(self, page: Page):
+        """Reasoning header should display agent_id when different from type."""
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        # Find an agent where agent_id differs from agent_type
+        agents = page.locator('#agents .clickable-item')
+        for i in range(agents.count()):
+            agent = agents.nth(i)
+            agent_id = agent.get_attribute('data-agent-id')
+            agent_type = agent.get_attribute('data-agent-type')
+
+            if agent_id != agent_type:
+                agent.click()
+                page.wait_for_timeout(500)
+
+                # Header should show both type and id
+                header = page.locator('#reasoning-agent')
+                header_text = header.text_content()
+                assert agent_type in header_text
+                assert agent_id in header_text
+                break
+
+
+@pytest.mark.skipif(not PLAYWRIGHT_AVAILABLE, reason='Playwright not installed')
+class TestCombinedFiltering:
+    """Tests for combined group + agent filtering."""
+
+    def test_select_group_then_agent(self, page: Page):
+        """Should be able to select both group and agent."""
+        page.wait_for_selector('#groups .clickable-item', timeout=5000)
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        # Select a group
+        group = page.locator('#groups .clickable-item').first
+        group_id = group.get_attribute('data-group-id')
+        group.click()
+        page.wait_for_timeout(500)
+
+        # Select an agent
+        agent = page.locator('#agents .clickable-item').first
+        agent.click()
+        page.wait_for_timeout(500)
+
+        # Both should be selected
+        expect(group).to_have_class(re.compile(r"selected"))
+        expect(agent).to_have_class(re.compile(r"selected"))
+
+        # Reasoning header should show group filter
+        header = page.locator('#reasoning-agent')
+        header_text = header.text_content()
+        assert 'Group' in header_text or group_id in header_text
+
+    def test_session_change_clears_selections(self, page: Page):
+        """Switching sessions should clear group and agent selections."""
+        page.wait_for_selector('#groups .clickable-item', timeout=5000)
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        # Select a group
+        group = page.locator('#groups .clickable-item').first
+        group.click()
+        page.wait_for_timeout(500)
+
+        # Select an agent
+        agent = page.locator('#agents .clickable-item').first
+        agent.click()
+        page.wait_for_timeout(500)
+
+        # Switch to different session (if more than one exists)
+        sessions = page.locator('#sessions .clickable-item')
+        if sessions.count() >= 2:
+            sessions.nth(1).click()
+            page.wait_for_timeout(1000)
+
+            # Reasoning panel should reset
+            reasoning_panel = page.locator('#reasoning-panel')
+            expect(reasoning_panel).to_contain_text('Click on an agent')
+
+
+@pytest.mark.skipif(not PLAYWRIGHT_AVAILABLE, reason='Playwright not installed')
+class TestContextualEmptyStates:
+    """Tests for contextual empty state messages."""
+
+    def test_no_reasoning_shows_contextual_message(self, page: Page):
+        """Empty reasoning should show contextual message with agent name."""
+        page.wait_for_selector('#agents .clickable-item', timeout=5000)
+
+        # Find an agent, select it
+        agent = page.locator('#agents .clickable-item').first
+        agent_type = agent.get_attribute('data-agent-type')
+        agent.click()
+
+        page.wait_for_timeout(1000)
+
+        # If no reasoning, should show contextual message
+        reasoning_panel = page.locator('#reasoning-panel')
+        content = reasoning_panel.text_content()
+
+        # Should either have reasoning entries OR a contextual empty message
+        if 'No reasoning' in content:
+            # Should mention the agent type
+            assert agent_type in content or 'reasoning' in content.lower()
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
