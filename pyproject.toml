@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "bazinga-cli"
-version = "1.2.3"
+dynamic = ["version"]
 description = "BAZINGA CLI - A sophisticated multi-agent orchestration system for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -78,3 +78,9 @@ exclude = [
 ".claude/skills" = "share/bazinga_cli/.claude/skills"
 "dashboard-v2" = "share/bazinga_cli/dashboard-v2"
 "mini-dashboard" = "share/bazinga_cli/mini-dashboard"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/bazinga_cli/_version.py"
