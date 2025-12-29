@@ -25,7 +25,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 
 # Get current session ID from database
 get_current_session_id() {
-    local db_path="bazinga/bazinga.db"
+    # Use absolute path from PROJECT_ROOT to avoid CWD issues
+    local db_path="$PROJECT_ROOT/bazinga/bazinga.db"
     if [ ! -f "$db_path" ]; then
         echo "bazinga_default"
         return
@@ -51,7 +52,8 @@ except:
 
 SESSION_ID=$(get_current_session_id)
 
-COORD_DIR="bazinga"
+# Use absolute paths for all artifact directories
+COORD_DIR="$PROJECT_ROOT/bazinga"
 SKILLS_DIR="${COORD_DIR}/artifacts/${SESSION_ID}/skills"
 mkdir -p "$SKILLS_DIR"
 
