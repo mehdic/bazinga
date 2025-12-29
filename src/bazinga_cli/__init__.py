@@ -465,7 +465,7 @@ class BazingaSetup:
         mini_dashboard_dir = target_dir / "bazinga" / "mini-dashboard"
 
         # Find source mini-dashboard
-        source_mini_dashboard = self._get_shared_data_path("mini-dashboard")
+        source_mini_dashboard = self._get_config_source("mini-dashboard")
         if not source_mini_dashboard or not source_mini_dashboard.exists():
             # Fallback: check project root (dev mode)
             source_mini_dashboard = self.source_dir / "mini-dashboard"
