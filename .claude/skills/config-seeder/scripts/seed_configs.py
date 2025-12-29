@@ -93,6 +93,14 @@ def seed_transitions(conn):
         for status, config in statuses.items():
             if status.startswith("_"):  # Skip metadata like _description, _note inside agent blocks
                 continue
+            # Guard: config must be a dict to call .get()
+            if not isinstance(config, dict):
+                print(f"ERROR: Malformed config for {agent}/{status}: expected dict, got {type(config).__name__}", file=sys.stderr)
+                return False
+            # Validate required field: action is mandatory for all transitions
+            if not config.get("action"):
+                print(f"ERROR: Missing required 'action' field for {agent}/{status}", file=sys.stderr)
+                return False
             cursor.execute("""
                 INSERT INTO workflow_transitions
                 (current_agent, response_status, next_agent, action, include_context,
@@ -207,11 +215,14 @@ def main():
                         help="Auto-initialize database if missing")
     args = parser.parse_args()
 
+    # Detect if --db was explicitly provided by comparing to parser default
+    db_explicitly_set = args.db != parser.get_default("db")
+
     # Allow project root override
     if args.project_root:
         PROJECT_ROOT = Path(args.project_root)
         CONFIG_DIR = PROJECT_ROOT / "bazinga" / "config"
-        if args.db == DB_PATH:  # Only override if not explicitly set
+        if not db_explicitly_set:  # Only override if not explicitly set
             args.db = str(PROJECT_ROOT / "bazinga" / "bazinga.db")
         print(f"[INFO] Using override project root: {PROJECT_ROOT}", file=sys.stderr)
 
@@ -247,6 +258,9 @@ def main():
     # multiple processes try to seed simultaneously, they will wait rather than
     # fail immediately with "database is locked" errors.
     conn = sqlite3.connect(args.db, timeout=5.0)
+
+    # Enable foreign key enforcement (SQLite defaults to OFF)
+    conn.execute("PRAGMA foreign_keys=ON")
 
     # Wrap all seeding in a single transaction for atomicity
     # If any seeding fails, rollback all changes
