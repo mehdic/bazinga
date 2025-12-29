@@ -30,7 +30,5 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-        # Alternative: Use trusted publishing after first release
-        # https://pypi.org/manage/project/bazinga-cli/settings/publishing/
+        # Uses Trusted Publishing - no password/token needed
+        # See CONTRIBUTING.md for setup instructions

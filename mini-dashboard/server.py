@@ -171,7 +171,8 @@ def get_agents(session_id):
                    AND COALESCE(l2.agent_id, '') = COALESCE(l.agent_id, '')) as total_logs,
                 (SELECT SUM(tokens_estimated) FROM token_usage t
                  WHERE t.session_id = l.session_id
-                   AND t.agent_type = l.agent_type) as tokens
+                   AND t.agent_type = l.agent_type
+                   AND COALESCE(t.agent_id, '') = COALESCE(l.agent_id, '')) as tokens
             FROM orchestration_logs l
             WHERE l.session_id = ?
               AND l.id = (
@@ -224,18 +225,28 @@ def get_logs(session_id):
     """Get recent orchestration logs (interactions only)."""
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
+    group_id = request.args.get('group_id')
     conn = None
 
     try:
         conn = get_db()
-        rows = conn.execute("""
+
+        query = """
             SELECT id, timestamp, agent_type, agent_id, iteration,
                    SUBSTR(content, 1, 500) as content_preview
             FROM orchestration_logs
             WHERE session_id = ? AND log_type = 'interaction'
-            ORDER BY datetime(timestamp) DESC
-            LIMIT ? OFFSET ?
-        """, (session_id, limit, offset)).fetchall()
+        """
+        params = [session_id]
+
+        if group_id:
+            query += " AND group_id = ?"
+            params.append(group_id)
+
+        query += " ORDER BY datetime(timestamp) DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = conn.execute(query, params).fetchall()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -248,6 +259,7 @@ def get_logs(session_id):
 def get_reasoning(session_id, agent_type):
     """Get reasoning entries for a specific agent."""
     group_id = request.args.get('group_id')
+    agent_id = request.args.get('agent_id')
     conn = None
 
     try:
@@ -260,6 +272,10 @@ def get_reasoning(session_id, agent_type):
             WHERE session_id = ? AND agent_type = ? AND log_type = 'reasoning'
         """
         params = [session_id, agent_type]
+
+        if agent_id:
+            query += " AND agent_id = ?"
+            params.append(agent_id)
 
         if group_id:
             query += " AND group_id = ?"

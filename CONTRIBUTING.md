@@ -127,6 +127,42 @@ Open an issue or discussion on GitHub: https://github.com/mehdic/bazinga
 
 ---
 
+## Publishing to PyPI
+
+### Trusted Publishing Setup (One-Time)
+
+The project uses [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) for secure, tokenless releases. A repository owner must configure this once:
+
+1. **Log in to PyPI** as a project owner
+2. **Navigate to**: https://pypi.org/manage/project/bazinga-cli/settings/publishing/
+3. **Add a new publisher** with these settings:
+   - **Owner**: `mehdic`
+   - **Repository**: `bazinga`
+   - **Workflow name**: `publish.yml`
+   - **Environment**: (leave blank)
+4. **Save** the publisher configuration
+
+### Release Process
+
+1. **Update version** in `pyproject.toml`
+2. **Commit and push** the version change
+3. **Create and push a tag**:
+   ```bash
+   git tag v1.3.0
+   git push origin v1.3.0
+   ```
+4. GitHub Actions automatically builds and publishes to PyPI
+
+### Troubleshooting
+
+| Error | Solution |
+|-------|----------|
+| "File already exists" | Version already on PyPI - bump version in `pyproject.toml` |
+| "Invalid API token" | Trusted Publisher not configured - follow setup above |
+| "attestations input ignored" | Remove any `password:` lines from workflow |
+
+---
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the same license as the project.
