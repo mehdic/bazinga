@@ -3,8 +3,8 @@
 **Date:** 2025-12-29
 **Context:** User reported two issues: (1) task groups not clickable, (2) agent selection groups all same-type agents together
 **Decision:** Define correct behavior for task group clicks and individual agent selection
-**Status:** Proposed
-**Reviewed by:** (pending external review)
+**Status:** Implemented
+**Reviewed by:** OpenAI GPT-5
 
 ---
 
