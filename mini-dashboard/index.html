@@ -428,6 +428,11 @@
       return text.slice(0, maxLen) + '...';
     }
 
+    // Helper to format agent display name consistently
+    function formatAgentDisplayName(agentId, agentType) {
+      return agentId !== agentType ? `${agentType} (${agentId})` : agentType;
+    }
+
     // API calls
     async function fetchJSON(url) {
       try {
@@ -491,6 +496,15 @@
         el.classList.toggle('active', el.dataset.sessionId === sessionId);
       });
 
+      // Explicitly clear any prior selection styling to avoid transient inconsistencies
+      document.querySelectorAll('#groups .clickable-item').forEach(el => {
+        el.classList.remove('selected');
+      });
+      document.querySelectorAll('#agents .clickable-item').forEach(el => {
+        el.classList.remove('selected');
+      });
+
+      // Reset reasoning panel
       document.getElementById('reasoning-panel').innerHTML = '<div class="empty-state">Click on an agent to view their reasoning</div>';
       document.getElementById('reasoning-agent').textContent = '';
 
@@ -590,13 +604,14 @@
       }
 
       if (!data.length) {
-        // Contextual empty state message
-        const filterMsg = selectedGroup ? ` for group "${selectedGroup}"` : '';
+        // Contextual empty state message (escape user-controlled values for XSS prevention)
+        const filterMsg = selectedGroup ? ` for group "${escapeHtml(selectedGroup)}"` : '';
         el.innerHTML = `<div class="empty-state">No logs${filterMsg}</div>`;
         countEl.textContent = '';
         return;
       }
 
+      // Use textContent for the count (no HTML, safe from XSS)
       countEl.textContent = `${data.length} entries${selectedGroup ? ` (group: ${selectedGroup})` : ''}`;
 
       el.innerHTML = data.map(l => `
@@ -631,7 +646,7 @@
       });
 
       // Display which specific agent is selected
-      const displayName = agentId !== agentType ? `${agentType} (${agentId})` : agentType;
+      const displayName = formatAgentDisplayName(agentId, agentType);
       document.getElementById('reasoning-agent').textContent = displayName + (selectedGroup ? ` — Group: ${selectedGroup}` : '');
 
       await loadReasoning();
@@ -649,8 +664,7 @@
         await loadLogs();
         // Update reasoning header if agent selected
         if (selectedAgentId) {
-          const displayName = selectedAgentId !== selectedAgentType ? `${selectedAgentType} (${selectedAgentId})` : selectedAgentType;
-          document.getElementById('reasoning-agent').textContent = displayName;
+          document.getElementById('reasoning-agent').textContent = formatAgentDisplayName(selectedAgentId, selectedAgentType);
           await loadReasoning();
         }
         return;
@@ -668,8 +682,7 @@
 
       // Update reasoning header and reload if agent selected
       if (selectedAgentId) {
-        const displayName = selectedAgentId !== selectedAgentType ? `${selectedAgentType} (${selectedAgentId})` : selectedAgentType;
-        document.getElementById('reasoning-agent').textContent = displayName + ` — Group: ${groupId}`;
+        document.getElementById('reasoning-agent').textContent = formatAgentDisplayName(selectedAgentId, selectedAgentType) + ` — Group: ${groupId}`;
         await loadReasoning();
       }
     }
@@ -698,9 +711,9 @@
       }
 
       if (!data.length) {
-        // Contextual empty state message
-        const agentLabel = selectedAgentId !== selectedAgentType ? `${selectedAgentType} (${selectedAgentId})` : selectedAgentType;
-        const groupLabel = selectedGroup ? ` in group "${selectedGroup}"` : '';
+        // Contextual empty state message (escape user-controlled values for XSS prevention)
+        const agentLabel = escapeHtml(formatAgentDisplayName(selectedAgentId, selectedAgentType));
+        const groupLabel = selectedGroup ? ` in group "${escapeHtml(selectedGroup)}"` : '';
         el.innerHTML = `<div class="empty-state">No reasoning entries for ${agentLabel}${groupLabel}</div>`;
         return;
       }
