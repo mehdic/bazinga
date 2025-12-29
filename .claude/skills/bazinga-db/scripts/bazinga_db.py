@@ -1657,6 +1657,76 @@ class BazingaDB:
             'output_data': json.loads(row['output_data'])
         } for row in rows]
 
+    def check_skill_evidence(self, session_id: str, mandatory_skills: List[str],
+                            agent_type: Optional[str] = None,
+                            since_minutes: int = 30) -> Dict:
+        """Check if mandatory skills have recent evidence in skill_outputs.
+
+        Uses the existing skill_outputs table as evidence of skill invocation.
+        This avoids needing a new table or modifying individual skills.
+
+        Args:
+            session_id: Session to check
+            mandatory_skills: List of skill names that must have evidence
+            agent_type: Optional filter by agent type
+            since_minutes: Look for evidence within this time window (default: 30)
+
+        Returns:
+            Dict with: complete (bool), missing (list), found (list),
+                      mandatory (list), recency_window_minutes (int)
+
+        Note: Uses SQL datetime() for proper timestamp comparison.
+        See: research/skills-configuration-enforcement-plan.md
+        """
+        if not mandatory_skills:
+            return {
+                "complete": True,
+                "missing": [],
+                "found": [],
+                "mandatory": [],
+                "recency_window_minutes": since_minutes
+            }
+
+        conn = self._get_connection()
+
+        try:
+            # Build query with proper SQL datetime filtering
+            # Using datetime('now', '-N minutes') for correct timestamp comparison
+            time_modifier = f'-{since_minutes} minutes'
+
+            if agent_type:
+                # Filter by session_id AND agent_type
+                rows = conn.execute("""
+                    SELECT DISTINCT skill_name FROM skill_outputs
+                    WHERE session_id = ?
+                    AND agent_type = ?
+                    AND timestamp >= datetime('now', ?)
+                """, (session_id, agent_type, time_modifier)).fetchall()
+            else:
+                # Filter by session_id only
+                rows = conn.execute("""
+                    SELECT DISTINCT skill_name FROM skill_outputs
+                    WHERE session_id = ?
+                    AND timestamp >= datetime('now', ?)
+                """, (session_id, time_modifier)).fetchall()
+
+            recent_outputs = {row['skill_name'] for row in rows}
+
+            # Calculate found and missing
+            found = [s for s in mandatory_skills if s in recent_outputs]
+            missing = [s for s in mandatory_skills if s not in recent_outputs]
+
+            return {
+                "complete": len(missing) == 0,
+                "missing": missing,
+                "found": found,
+                "mandatory": mandatory_skills,
+                "recency_window_minutes": since_minutes
+            }
+
+        finally:
+            conn.close()
+
     # ==================== CONFIGURATION OPERATIONS ====================
     # REMOVED: Configuration table no longer exists (2025-11-21)
     # See research/empty-tables-analysis.md for details
@@ -3120,6 +3190,9 @@ SKILL OUTPUT OPERATIONS:
                                               Get latest skill output
   get-skill-output-all <session> <skill> [--agent X]
                                               Get all skill outputs (multi-invocation)
+  check-skill-evidence <session> <skill1,skill2,...> [--agent X] [--since N]
+                                              Check if skills have recent evidence in skill_outputs
+                                              --since: Minutes to look back (default: 30)
 
 DEVELOPMENT PLAN OPERATIONS:
   save-development-plan <session> <prompt> <plan> <phases_json> <current> <total> [metadata]
@@ -3431,6 +3504,46 @@ def main():
             session_id = positional_args[0]
             skill_name = positional_args[1]
             result = db.get_skill_output_all(session_id, skill_name, agent_type)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'check-skill-evidence':
+            # Check if mandatory skills have recent evidence in skill_outputs
+            # Usage: check-skill-evidence <session_id> <skill1,skill2,...> [--agent TYPE] [--since N]
+            # See: research/skills-configuration-enforcement-plan.md
+            agent_type = None
+            since_minutes = 30
+            positional_args = []
+            i = 0
+            while i < len(cmd_args):
+                if cmd_args[i] == '--agent' and i + 1 < len(cmd_args):
+                    agent_type = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--since' and i + 1 < len(cmd_args):
+                    # Validate --since input is a positive integer
+                    try:
+                        since_val = int(cmd_args[i + 1])
+                        if since_val < 1:
+                            raise ValueError("must be >= 1")
+                        since_minutes = since_val
+                    except ValueError as e:
+                        print(json.dumps({
+                            "success": False,
+                            "error": f"--since must be a positive integer (got: '{cmd_args[i + 1]}')"
+                        }, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                else:
+                    positional_args.append(cmd_args[i])
+                    i += 1
+            if len(positional_args) < 2:
+                print(json.dumps({
+                    "success": False,
+                    "error": "check-skill-evidence requires <session_id> <skill1,skill2,...> [--agent TYPE] [--since N]"
+                }, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = positional_args[0]
+            # Parse comma-separated skill names
+            mandatory_skills = [s.strip() for s in positional_args[1].split(',') if s.strip()]
+            result = db.check_skill_evidence(session_id, mandatory_skills, agent_type, since_minutes)
             print(json.dumps(result, indent=2))
         elif cmd == 'get-task-groups':
             session_id = cmd_args[0]

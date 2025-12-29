@@ -93,6 +93,19 @@ def _ensure_cwd_at_project_root():
     except OSError as e:
         print(f"[WARNING] Failed to chdir to project root {PROJECT_ROOT}: {e}", file=sys.stderr)
 
+# Agent type to skills config key mapping
+# Skills config uses short keys (pm) but agent_type uses full names (project_manager)
+AGENT_KEY_ALIASES = {
+    "project_manager": "pm",
+}
+
+# Test-related skills to filter when testing is disabled/minimal
+# Note: SSE keeps test-pattern-analysis regardless (per OpenAI review)
+TEST_RELATED_SKILLS = {"test-coverage", "test-pattern-analysis"}
+
+# Agents that should keep test skills even when testing is disabled/minimal
+AGENTS_KEEP_TEST_SKILLS = {"senior_software_engineer"}
+
 # Agent file names (without directory prefix - resolved dynamically)
 AGENT_FILE_NAMES = {
     "developer": "developer.md",
@@ -1451,6 +1464,95 @@ def build_context_block(conn, session_id, group_id, agent_type, model="sonnet"):
 
 
 # =============================================================================
+# SKILLS CONFIGURATION (File-first approach - reads JSON directly)
+# See: research/skills-configuration-enforcement-plan.md
+# =============================================================================
+
+def get_skills_config_from_file():
+    """Read skills configuration from JSON file.
+
+    Returns the raw config dict or None if file not found/invalid.
+    File-first approach avoids DB dependency (configuration table doesn't exist).
+    """
+    config_path = PROJECT_ROOT / "bazinga" / "skills_config.json"
+    if not config_path.exists():
+        return None
+
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"WARNING: Failed to read skills_config.json: {e}", file=sys.stderr)
+        return None
+
+
+def get_skills_for_agent(agent_type, testing_mode="full"):
+    """Get skills configuration for an agent.
+
+    Args:
+        agent_type: Agent type (e.g., "developer", "project_manager")
+        testing_mode: Testing mode ("full", "minimal", "disabled")
+
+    Returns:
+        Dict with keys: mandatory (list), optional (list)
+    """
+    empty_result = {"mandatory": [], "optional": []}
+
+    config = get_skills_config_from_file()
+    if not config:
+        return empty_result
+
+    # Apply key aliasing (project_manager -> pm)
+    agent_key = AGENT_KEY_ALIASES.get(agent_type, agent_type)
+    agent_config = config.get(agent_key, {})
+
+    # Categorize skills by level
+    mandatory = []
+    optional = []
+    for skill, level in agent_config.items():
+        if level == "mandatory":
+            mandatory.append(skill)
+        elif level == "optional":
+            optional.append(skill)
+
+    # Filter test-related skills when testing is disabled/minimal
+    # BUT: Keep them for SSE (per OpenAI review - SSE mandates test-pattern-analysis)
+    if testing_mode in ("disabled", "minimal") and agent_type not in AGENTS_KEEP_TEST_SKILLS:
+        mandatory = [s for s in mandatory if s not in TEST_RELATED_SKILLS]
+
+    return {"mandatory": mandatory, "optional": optional}
+
+
+def build_skills_block(agent_type, testing_mode="full"):
+    """Build compact skills checklist for prompt injection.
+
+    Returns a compact checklist (≤10 lines) to minimize token impact.
+    Inserted after specialization block, before agent definition.
+    """
+    skills = get_skills_for_agent(agent_type, testing_mode)
+
+    # Skip if no skills configured for this agent
+    if not skills["mandatory"] and not skills["optional"]:
+        return ""
+
+    # Compact checklist format (≤10 lines)
+    lines = ["## Skills Checklist", ""]
+
+    if skills["mandatory"]:
+        lines.append("**MUST invoke before completion:**")
+        for skill in skills["mandatory"]:
+            lines.append(f'- [ ] `Skill(command: "{skill}")`')
+        lines.append("")
+
+    if skills["optional"]:
+        lines.append("**Consider if relevant:** " + ", ".join(
+            f'`{s}`' for s in skills["optional"]
+        ))
+
+    return "\n".join(lines)
+
+
+# =============================================================================
 # TASK CONTEXT BUILDING
 # =============================================================================
 
@@ -1738,6 +1840,14 @@ def build_prompt(args):
             )
             if spec_block:
                 components.append(spec_block)
+
+        # 2.5. Build SKILLS CHECKLIST block (compact, file-first)
+        # See: research/skills-configuration-enforcement-plan.md
+        if args.agent_type not in ["project_manager", "orchestrator"]:
+            testing_mode = getattr(args, 'testing_mode', 'full') or 'full'
+            skills_block = build_skills_block(args.agent_type, testing_mode)
+            if skills_block:
+                components.append(skills_block)
 
         # 3. Read AGENT DEFINITION (MANDATORY - this is the core)
         agent_definition = read_agent_file(args.agent_type)
