@@ -1326,6 +1326,25 @@ def init_database(db_path: str) -> None:
                         else:
                             raise
 
+                    # Backfill NULL values in existing rows (ALTER TABLE DEFAULT doesn't populate existing rows)
+                    backfill_ri = cursor.execute(
+                        "UPDATE task_groups SET review_iteration = 1 WHERE review_iteration IS NULL"
+                    ).rowcount
+                    if backfill_ri > 0:
+                        print(f"   ✓ Backfilled review_iteration=1 for {backfill_ri} rows")
+
+                    backfill_npc = cursor.execute(
+                        "UPDATE task_groups SET no_progress_count = 0 WHERE no_progress_count IS NULL"
+                    ).rowcount
+                    if backfill_npc > 0:
+                        print(f"   ✓ Backfilled no_progress_count=0 for {backfill_npc} rows")
+
+                    backfill_bic = cursor.execute(
+                        "UPDATE task_groups SET blocking_issues_count = 0 WHERE blocking_issues_count IS NULL"
+                    ).rowcount
+                    if backfill_bic > 0:
+                        print(f"   ✓ Backfilled blocking_issues_count=0 for {backfill_bic} rows")
+
                     # Verify integrity before commit
                     integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
                     if integrity != "ok":
