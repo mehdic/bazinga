@@ -3682,6 +3682,17 @@ def main():
                         if key == 'complexity' and not 1 <= value <= 10:
                             print(json.dumps({"success": False, "error": "--complexity must be between 1 and 10"}, indent=2), file=sys.stderr)
                             sys.exit(1)
+                        # Validate non-negative for counter fields
+                        non_negative_fields = ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts', 'no_progress_count', 'blocking_issues_count')
+                        if key in non_negative_fields and value < 0:
+                            print(json.dumps({"success": False, "error": f"--{key} must be non-negative, got: {value}"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        # Validate review_iteration >= 1 (iterations start at 1, not 0)
+                        if key == 'review_iteration' and value < 1:
+                            print(json.dumps({"success": False, "error": "--review_iteration must be >= 1 (iterations start at 1)"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        # TODO: Future enhancement - add monotonicity check to prevent decreasing
+                        # review_iteration (would require reading current value first)
                     except ValueError:
                         print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
                         sys.exit(1)

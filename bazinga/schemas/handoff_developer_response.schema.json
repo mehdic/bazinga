@@ -67,10 +67,10 @@
       "type": "object",
       "required": ["total_blocking", "fixed", "rejected_with_reason", "unaddressed"],
       "properties": {
-        "total_blocking": { "type": "integer", "minimum": 0 },
-        "fixed": { "type": "integer", "minimum": 0 },
-        "rejected_with_reason": { "type": "integer", "minimum": 0 },
-        "unaddressed": { "type": "integer", "minimum": 0 }
+        "total_blocking": { "type": "integer", "minimum": 0, "description": "Total blocking issues from TL review" },
+        "fixed": { "type": "integer", "minimum": 0, "description": "Blocking issues addressed with code fixes" },
+        "rejected_with_reason": { "type": "integer", "minimum": 0, "description": "Blocking issues rejected with justification. NOTE: This is NOT final - tl_verdicts events are the authoritative source for TL acceptance/overruling." },
+        "unaddressed": { "type": "integer", "minimum": 0, "description": "Blocking issues not addressed (should be 0)" }
       }
     },
 

@@ -2190,18 +2190,21 @@ verdicts += [{"issue_id": id, "verdict": "OVERRULED", **{k: issues.get(id, {}).g
 
 **Data source: Query prior TL verdicts from DB (authoritative source)**
 ```bash
-# Get all prior TL verdicts for this group
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "{session_id}" "tl_verdicts" | jq '[.[] | select(.group_id == "{group_id}")]'
+# Get all prior TL verdicts for this group (assign to variable)
+all_prior_verdicts=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "{session_id}" "tl_verdicts" | jq '[.[] | select(.group_id == "{group_id}")]')
 ```
 
 ```python
 # Build set of previously ACCEPTED issues (closed, cannot be re-flagged)
+# NOTE: all_prior_verdicts is the result from the bash command above
 previous_accepted = set()
 for verdict_event in all_prior_verdicts:
     for verdict in verdict_event.get("verdicts", []):
         if verdict.get("verdict") == "ACCEPTED":
-            # Use location|title for cross-iteration matching
+            # Use location|title for CROSS-ITERATION matching (issue_ids change per iteration)
+            # Within same iteration: prefer issue_id matching
+            # Cross-iteration: fall back to location|title as stable identifiers
             issue_key = f"{verdict.get('location', '')}|{verdict.get('title', '')}"
             previous_accepted.add(issue_key)
 

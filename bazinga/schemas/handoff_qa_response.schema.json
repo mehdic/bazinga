@@ -13,7 +13,7 @@
     "test_progression": {
       "type": "object",
       "description": "Test progress tracking as documented in qa_expert.md",
-      "required": ["iteration", "original_failures", "still_failing"],
+      "required": ["iteration", "original_failures", "still_failing", "progress_made"],
       "properties": {
         "iteration": {
           "type": "integer",
@@ -40,11 +40,15 @@
           "items": { "type": "string" },
           "description": "Test names that failed this iteration but not before"
         },
+        "progress_made": {
+          "type": "boolean",
+          "description": "True if fixed_since_start increased since last iteration. Used by Orchestrator for escalation decisions."
+        },
         "progress_percentage": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Percentage of original failures now fixed"
+          "description": "Percentage of original failures now fixed (optional)"
         }
       }
     },

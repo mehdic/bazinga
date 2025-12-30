@@ -1267,7 +1267,7 @@ def init_database(db_path: str) -> None:
 
                     # Refresh query planner statistics
                     cursor.execute("ANALYZE task_groups;")
-                    print("   ✓ WAL checkpoint completed")
+                    print("   ✓ ANALYZE completed")
 
                 except Exception as e:
                     try:
@@ -1355,7 +1355,7 @@ def init_database(db_path: str) -> None:
 
                     # Refresh query planner statistics
                     cursor.execute("ANALYZE task_groups;")
-                    print("   ✓ WAL checkpoint completed")
+                    print("   ✓ ANALYZE completed")
 
                 except Exception as e:
                     try:

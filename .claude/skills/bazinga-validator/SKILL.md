@@ -298,17 +298,20 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 **Step 1: Query TL issues and Developer responses from events**
 ```bash
-# Get latest TL issues for each group
+# Get ALL TL issues (no limit - filter by group after)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" "tl_issues" --limit 10
+  "[session_id]" "tl_issues"
 
-# Get latest Developer responses for each group
+# Get ALL Developer responses (no limit - filter by group after)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" "tl_issue_responses" --limit 10
+  "[session_id]" "tl_issue_responses"
 
-# Get TL verdicts (single source of truth for rejection acceptance)
+# Get ALL TL verdicts (single source of truth for rejection acceptance)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" "tl_verdicts" --limit 20
+  "[session_id]" "tl_verdicts"
+
+# NOTE: Filter events by group_id after retrieval, then get latest iteration per group:
+# jq '[.[] | select(.group_id == "GROUP_ID")] | sort_by(.timestamp) | last'
 ```
 
 **Step 2: Compute unresolved blocking issues**
@@ -339,9 +342,14 @@ for issue in tl_issues.issues where issue.blocking == true:
 
 **Alternative: If events not found, check handoff files directly:**
 ```bash
-# Fallback: Read handoff files
+# Fallback: Read handoff files (check both simple and parallel mode paths)
+# Simple mode:
 cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead.json | jq '.issues[] | select(.blocking == true)'
 cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json | jq '.issue_responses'
+
+# Parallel mode (agent-specific files):
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead_{agent_id}.json | jq '.issues[] | select(.blocking == true)'
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation_{agent_id}.json | jq '.issue_responses'
 ```
 
 **⚠️ Field-level fallbacks for old handoff formats:**
@@ -431,7 +439,7 @@ completion_percentage = (met_count / total_count) * 100
 IF missing_review_data_for_reviewed_groups:
   → Return: REJECT
   → Reason: "Cannot verify blocking issues - missing review data"
-  → Note: No tl_issues events AND no handoff files for groups with review_iteration > 0
+  → Note: No tl_issues events AND no handoff files for groups where TL review occurred (detected via tl_issues events existence)
 
 ELSE IF unresolved_blocking_issues > 0:
   → Return: REJECT
