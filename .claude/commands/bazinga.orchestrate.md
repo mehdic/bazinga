@@ -2186,7 +2186,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 ```bash
 # Extract issue_responses from Dev handoff and save as event
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
-  "{session_id}" "tl_issue_responses" '{"group_id": "{group_id}", "issue_responses": [...], "blocking_summary": {...}}'
+  "{session_id}" "tl_issue_responses" '{"group_id": "{group_id}", "iteration": {N}, "issue_responses": [...], "blocking_summary": {...}}'
 ```
 
 **Why this matters:** The validator uses these events to compute unresolved blocking issues. Without them, BAZINGA could be accepted with unresolved CRITICAL/HIGH issues.

@@ -317,9 +317,9 @@ for issue in tl_issues.issues where issue.blocking == true:
   if response is None:
     unresolved_blocking.append(issue)  # Not addressed
   elif response.action == "REJECTED":
-    # Check if TL accepted the rejection (from iteration_tracking)
-    if issue.id not in tl_issues.iteration_tracking.rejections_accepted:
-      unresolved_blocking.append(issue)  # Rejection not accepted
+    # Check if TL accepted the rejection (rejection_accepted field on response)
+    if not response.get("rejection_accepted", False):
+      unresolved_blocking.append(issue)  # Rejection not yet accepted by TL
   elif response.action == "FIXED":
     # Assume fixed (TL will re-flag if not actually fixed)
     pass

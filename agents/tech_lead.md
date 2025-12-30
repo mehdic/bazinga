@@ -1296,7 +1296,7 @@ Write(
     "prior_issues_still_blocking": ["{list of issue IDs still unresolved}"],
     "new_blocking_issues": ["{list of new CRITICAL/HIGH issues found this iteration}"],
     "rejections_accepted": ["{issue IDs where Developer rejection was valid}"],
-    "rejections_overruled": ["{issue IDs where Developer rejection was invalid}"
+    "rejections_overruled": ["{issue IDs where Developer rejection was invalid}"]
   },
 
   "security_issues": {N},
