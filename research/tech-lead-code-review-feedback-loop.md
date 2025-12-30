@@ -177,20 +177,95 @@ On re-review, Tech Lead:
    - All blocking resolved (or validly rejected) → `APPROVED`
    - Any blocking unresolved → `CHANGES_REQUIRED` (max 2 iterations)
 
-### Iteration Limit
+### Progress-Based Iteration Control
+
+**Key insight:** Escalate based on *lack of progress*, not iteration count.
+
+**Applies to:** Developer, SSE, AND QA when in feedback loops.
+
+#### Agent-Specific Feedback Loops
+
+| Loop | Agents Involved | Progress Metric | Escalation Path |
+|------|-----------------|-----------------|-----------------|
+| **TL→Developer** | Tech Lead ↔ Developer | Blocking issues fixed | Developer → SSE |
+| **TL→SSE** | Tech Lead ↔ SSE | Blocking issues fixed | SSE → PM |
+| **QA→Developer** | QA Expert ↔ Developer | Test failures fixed | Developer → SSE |
+| **QA→SSE** | QA Expert ↔ SSE | Test failures fixed | SSE → PM |
 
 ```
-Iteration 1: Initial review → Issues found
-Iteration 2: Developer fixes → Re-review
-Iteration 3: If still blocked → ESCALATE to PM
+Progress Tracking (for ANY implementing agent):
+- IF issues_fixed_this_iteration > 0:
+    no_progress_count = 0  # Reset - agent is making progress
+- ELSE:
+    no_progress_count += 1  # No fixes this round
 
-PM Decision:
-- Force approve with tech debt
-- Reject the implementation entirely
-- Request different approach
+Escalation Rules:
+- IF no_progress_count >= 2 AND current_agent == "developer":
+    → ESCALATE to SSE (Developer stuck, try senior)
+- ELIF no_progress_count >= 2 AND current_agent == "sse":
+    → ESCALATE to PM (SSE stuck, need PM decision)
+- ELIF total_iterations >= 5:
+    → ESCALATE to next tier (hard cap)
+- ELSE:
+    → Continue feedback loop with current agent
 ```
 
-**Why limit?** Prevents endless loop of nitpicks. After 2 iterations, either issues are resolved or there's a fundamental disagreement that PM must arbitrate.
+#### QA Feedback Loop (Test Failures)
+
+Same progress logic applies when QA sends FAIL back to implementing agent:
+
+```
+QA FAIL with test_failures:
+- Developer/SSE attempts fixes
+- QA re-tests
+- IF same tests still failing (0 progress):
+    no_progress_count += 1
+- IF different tests failing (some fixed, new ones found):
+    no_progress_count = 0  # Progress made
+```
+
+| QA Iteration | Tests Fixed | New Failures | Progress? |
+|--------------|-------------|--------------|-----------|
+| 1 | - | 5 found | Initial |
+| 2 | 3 | 0 | ✅ Yes (3 fixed) |
+| 3 | 0 | 2 | ❌ No (0 from original fixed) |
+| 4 | 2 | 0 | ✅ Yes (remaining 2 fixed) |
+
+**Example scenarios:**
+
+| Iteration | Issues Fixed | No-Progress Count | Action |
+|-----------|--------------|-------------------|--------|
+| 1 | - | 0 | Initial review, find 6 issues |
+| 2 | 4 | 0 | Progress! Continue |
+| 3 | 1 | 0 | Progress! Continue |
+| 4 | 0 | 1 | No progress, warn |
+| 5 | 0 | 2 | **Escalate** (2 consecutive no-progress) |
+
+| Iteration | Issues Fixed | No-Progress Count | Action |
+|-----------|--------------|-------------------|--------|
+| 1 | - | 0 | Initial review, find 6 issues |
+| 2 | 0 | 1 | No progress |
+| 3 | 2 | 0 | Progress! Reset counter |
+| 4 | 1 | 0 | Progress! Continue |
+| 5 | 1 | 0 | Progress! Hard cap reached → **Escalate** |
+
+**What counts as progress:**
+- ✅ At least 1 blocking issue marked FIXED (and validated by TL)
+- ✅ TL accepts a REJECTED justification (issue removed from blocking list)
+- ❌ Re-submitting unchanged code = no progress
+- ❌ DEFERRED doesn't count (not allowed for blocking issues anyway)
+
+PM Escalation Options (when stuck):
+- Re-plan tasks (split work, different approach)
+- Escalate to SSE for complex fixes
+- Reject implementation and restart
+- Request user decision (if scope reduction needed)
+
+**Why this approach?**
+- Rewards incremental progress (don't punish slow but steady fixes)
+- Catches true deadlocks (developer cannot fix remaining issues)
+- Hard cap prevents infinite loops even with tiny progress
+- PM only gets involved when genuinely stuck
 
 ---
 
@@ -905,17 +980,128 @@ None rejected - all OpenAI feedback was valid and has been incorporated.
    }
    ```
 
+#### SSE (Senior Software Engineer) Changes
+
+1. **Add "Responding to Tech Lead Feedback" section** (same as Developer):
+   - SSE follows identical protocol for responding to TL issues
+   - Same handoff structure with `issue_responses` and `blocking_summary`
+
+2. **Add "Responding to QA Feedback" section:**
+   ```markdown
+   ## Responding to QA Feedback
+
+   When QA returns FAIL:
+   - Read test_failures from QA handoff
+   - Track which tests you fix vs which remain
+   - Report in handoff:
+     - tests_fixed: [list of test names]
+     - tests_remaining: [list of test names]
+     - progress_made: true/false
+   ```
+
+3. **Handoff file enhancement for QA feedback:**
+   ```json
+   {
+     "qa_response": {
+       "tests_fixed": ["test_auth_valid", "test_token_expiry"],
+       "tests_remaining": ["test_rate_limit"],
+       "progress_made": true
+     }
+   }
+   ```
+
+#### QA Expert Changes
+
+1. **Track test progression across iterations:**
+   ```json
+   {
+     "test_tracking": {
+       "iteration": 2,
+       "original_failures": ["test_a", "test_b", "test_c"],
+       "fixed_since_start": ["test_a"],
+       "still_failing": ["test_b", "test_c"],
+       "new_failures": []
+     }
+   }
+   ```
+
+2. **Progress detection for escalation:**
+   - Compare current failures vs previous iteration
+   - Report `progress_made: true` if any original tests now pass
+   - Report `progress_made: false` if exact same tests still fail
+
 #### Orchestrator Changes
 
 1. **Use existing CHANGES_REQUESTED transitions** (no new status codes)
 
-2. **Iteration tracking via stuck detection:**
-   - Track review_attempts per group (existing mechanism)
-   - After 2 TL→Dev→TL loops, route to PM with iteration_history
+2. **Progress-based iteration tracking (STATE PERSISTENCE):**
 
-3. **Prompt-builder updates:**
-   - Include prior TL issues and dev responses in TL re-review spawns
+   **Problem:** Each agent spawn is stateless. How to track `no_progress_count`?
+
+   **Solution:** Orchestrator maintains state via database + handoff files.
+
+   ```
+   STATE PERSISTENCE FLOW:
+
+   1. Orchestrator spawns TL (iteration 1)
+   2. TL writes handoff with issues[]
+   3. Orchestrator reads TL handoff, updates DB:
+      - task_groups.review_iteration = 1
+      - task_groups.blocking_issues = N
+
+   4. Orchestrator spawns Developer with TL feedback
+   5. Developer writes handoff with issue_responses[]
+   6. Orchestrator reads Dev handoff:
+      - Extract blocking_summary.fixed count
+      - IF fixed > 0:
+          task_groups.no_progress_count = 0  (reset)
+        ELSE:
+          task_groups.no_progress_count += 1 (increment)
+      - task_groups.review_iteration += 1
+
+   7. Orchestrator checks escalation rules BEFORE next spawn
+   8. IF escalate: spawn SSE or route to PM
+      ELSE: spawn TL for re-review (pass iteration context)
+   ```
+
+   **Database fields to add to task_groups:**
+   ```sql
+   review_iteration INTEGER DEFAULT 0,
+   no_progress_count INTEGER DEFAULT 0,
+   blocking_issues_count INTEGER DEFAULT 0
+   ```
+
+   **Orchestrator is the state keeper** - it persists across the entire session and:
+   - Reads handoff files from each agent
+   - Calculates progress (issues fixed this round)
+   - Updates database with iteration state
+   - Passes state to next agent via prompt-builder
+
+3. **Escalation logic (all feedback loops):**
+   ```
+   # Orchestrator checks AFTER reading Dev/SSE handoff:
+
+   TL→Developer loop stuck (no_progress >= 2):
+     → Escalate to SSE (not PM)
+
+   TL→SSE loop stuck (no_progress >= 2):
+     → Escalate to PM
+
+   QA→Developer loop stuck (no_progress >= 2):
+     → Escalate to SSE
+
+   QA→SSE loop stuck (no_progress >= 2):
+     → Escalate to PM
+
+   Any loop at iteration >= 5:
+     → Escalate to next tier (hard cap)
+   ```
+
+4. **Prompt-builder updates:**
+   - Include prior TL/QA issues and dev/SSE responses in re-review spawns
    - Add instruction: "validate prior issues; only raise new CRITICAL/HIGH"
+   - Include `no_progress_count` and `review_iteration` so agent knows escalation is near
+   - Example: "This is iteration 3 of review. No-progress count: 1. One more round without fixes will escalate."
 
 #### Validator Changes
 
