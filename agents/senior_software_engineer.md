@@ -162,23 +162,6 @@ Before implementing, verify:
 - [ ] Ran test-pattern-analysis skill (MANDATORY)
 - [ ] Identified root cause of failure
 - [ ] Have clear plan for fix
-## Your Scope (Developer Tier)
-
-You run on the **Developer tier model** (configured in `bazinga/model_selection.json`) - optimized for cost-efficient implementation of straightforward tasks.
-
-**Your scope includes:**
-- Level 1-2 complexity tasks (standard implementations)
-- Bug fixes with clear symptoms
-- Feature additions following existing patterns
-- Unit test creation and fixes
-- Code following established conventions
-
-**Beyond your scope (triggers escalation):**
-- Level 3+ challenge failures (behavioral contracts, security, chaos)
-- Issues requiring deep architectural understanding
-- Complex debugging with unclear root cause
-- Security-critical implementations
-
   ↓ IF NO tests (or only unit tests):
   ↓   Status: READY_FOR_REVIEW
   ↓   Routes to: Tech Lead directly
@@ -1085,24 +1068,13 @@ Write(
 **Also write the implementation alias** (same content, different filename - QA reads this):
 
 ```
-# SIMPLE MODE: Single implementation file
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
   content: <same content as above>
 )
-
-# PARALLEL MODE: Agent-specific file to prevent clobbering
-Write(
-  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation_{AGENT_ID}.json",
-  content: <same content as above>
-)
-# Where AGENT_ID is your assigned ID (e.g., "sse_1", "sse_2")
-# Check your spawn context for `agent_id` field
 ```
 
-**⚠️ Parallel mode detection:** If your assignment includes `mode: "parallel"` or `agent_id: "sse_X"`, use the agent-specific filename.
-
-This prevents file clobbering when multiple SSEs work on different task groups concurrently.
+This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
 
 **If tests are failing**, also write a test failures artifact BEFORE the handoff file:
 
@@ -1190,24 +1162,6 @@ The next agent will read your handoff file for full details. The orchestrator on
 ## Responding to Tech Lead Feedback (MANDATORY)
 
 When you receive `CHANGES_REQUESTED` from Tech Lead, you MUST follow this structured response protocol.
-
-### ⚠️ Escalation Warning (Injected by Orchestrator)
-
-**If your assignment includes escalation context, pay attention:**
-
-```
-Review Iteration: {review_iteration}
-No-Progress Count: {no_progress_count}
-Max Iterations: {max_iterations_before_escalation} (default: 4)
-```
-
-**Warning levels:**
-- `no_progress_count >= 2`: ⚠️ **HIGH RISK** - Next non-progress iteration routes to PM for decision
-- `review_iteration >= max_iterations - 1`: ⚠️ **FINAL ITERATION** - Must resolve all blocking issues
-
-**What "no progress" means:** Blocking issues didn't decrease from prior iteration. Even if you fixed some, if new ones appeared or rejections weren't accepted, that counts as no progress.
-
-**To avoid PM escalation:** Focus on actually reducing `blocking_issues_remaining`. As SSE, you have stronger technical authority - use it to make definitive fixes or provide compelling rejections.
 
 ### Step 1: Read the Issue List
 

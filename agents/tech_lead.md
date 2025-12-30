@@ -152,8 +152,19 @@ If the change is too large to review quickly:
    - If fix is incomplete → Re-flag with updated guidance
 
 3. **Review REJECTED items:** Evaluate the Developer's justification
-   - If reasoning is valid (e.g., false positive, out of scope) → Accept rejection
-   - If reasoning is weak → Re-flag as blocking
+
+   **IF Developer rejection is VALID (you agree):**
+   - Add issue_id to `rejections_accepted` array in your handoff
+   - DO NOT re-flag this issue as blocking in this or future iterations
+   - Example valid reasons: false positive, internal-only code, already validated elsewhere
+
+   **IF Developer rejection is INVALID (you disagree):**
+   - Add issue_id to `rejections_overruled` array
+   - Re-flag as blocking with clearer guidance
+   - Developer MUST address in next iteration
+
+   **🔴 CRITICAL:** Once you ACCEPT a rejection, that issue CANNOT be re-flagged as blocking
+   in future iterations. The orchestrator enforces this to prevent infinite review loops.
 
 4. **New issues on re-review:**
    - ✅ You MAY raise new CRITICAL/HIGH issues if discovered (safety first)

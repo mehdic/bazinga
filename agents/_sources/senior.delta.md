@@ -181,9 +181,9 @@ Before implementing, verify:
 ## END_REPLACE
 
 # =============================================================================
-# REMOVE: Haiku Tier Scope (Senior has no tier limits)
+# REMOVE: Developer Tier Scope (Senior has no tier limits)
 # =============================================================================
-## REMOVE: Your Scope (Haiku Tier)
+## REMOVE: Your Scope (Developer Tier)
 
 # =============================================================================
 # REMOVE: Escalation Awareness (Senior IS the escalation)

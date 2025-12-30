@@ -1082,10 +1082,14 @@ Display:
 
    ```python
    # skills_config.json structure: {"developer": {"lint-check": "mandatory", ...}, "tech_lead": {...}}
+   # May also have metadata fields like "_version", "_updated" - skip those
    AVAILABLE_SKILLS = {}
    CRITICAL_DISABLED = []
 
    for agent_name, agent_skills in skills_config.items():
+       # Skip metadata fields (start with underscore) and non-dict values
+       if agent_name.startswith("_") or not isinstance(agent_skills, dict):
+           continue
        for skill_name, mode in agent_skills.items():
            if mode != "disabled":
                AVAILABLE_SKILLS[skill_name] = mode  # Track all enabled skills
@@ -2222,16 +2226,22 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 prior_responses = db_result.get("issue_responses", [])
 
 # Find rejections that TL accepted in prior iteration
-previous_overruled = []
+# Note: Issue IDs include iteration (TL-AUTH-1-001 vs TL-AUTH-2-001)
+# So we track by location+title for cross-iteration matching
+previous_overruled = set()
 for response in prior_responses:
-    if response.get("rejection_overruled", False):
-        previous_overruled.append(response["issue_id"])
+    if response.get("rejection_overruled", False) or response.get("rejection_accepted", False):
+        # Store a normalized key for matching
+        issue_key = f"{response.get('location', '')}|{response.get('title', '')}"
+        previous_overruled.add(issue_key)
 
 # Check if TL is re-flagging any previously overruled issues
 re_flagged = []
 for issue in current_tl_handoff.get("issues", []):
-    if issue.get("blocking") and issue.get("id") in previous_overruled:
-        re_flagged.append(issue["id"])
+    if issue.get("blocking"):
+        issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
+        if issue_key in previous_overruled:
+            re_flagged.append(issue.get("id"))
 ```
 
 **IF re_flagged issues detected:**

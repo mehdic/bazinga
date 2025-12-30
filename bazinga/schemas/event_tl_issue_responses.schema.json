@@ -55,9 +55,17 @@
             "type": "string",
             "description": "Commit hash for FIXED actions"
           },
-          "rejection_overruled": {
+          "rejection_accepted": {
             "type": "boolean",
-            "description": "Whether this rejection was accepted by TL (set in subsequent iteration)"
+            "description": "TL agreed with developer's rejection - issue is closed, cannot be re-flagged"
+          },
+          "location": {
+            "type": "string",
+            "description": "File:line location (for cross-iteration matching)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Issue title (for cross-iteration matching)"
           }
         }
       }

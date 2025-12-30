@@ -94,7 +94,8 @@ When PM sends BAZINGA → `Skill(command: "bazinga-validator")`
 **Handoff file locations:**
 - **Group-scoped (Dev/QA/TL):** `bazinga/artifacts/{session_id}/{group_id}/handoff_{agent}.json`
 - **Session-scoped (PM):** `bazinga/artifacts/{session_id}/handoff_project_manager.json` (no group directory)
-- **Implementation alias:** `bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json` (written by Developer OR SSE)
+- **Implementation alias (simple mode):** `bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json`
+- **Implementation alias (parallel mode):** `bazinga/artifacts/{session_id}/{group_id}/handoff_implementation_{agent_id}.json` (prevents file clobbering)
 
 **When routing to next agent:** Set `prior_handoff_file` in params to previous agent's handoff file.
 **Note:** PM handoff is session-scoped (no group_id in path). When spawning PM, omit `prior_handoff_file` or use session-scoped path.
@@ -1052,9 +1053,48 @@ Display:
 
    **Note:** Read configurations using Read tool, but don't show Read tool output to user - it's internal setup.
 
-   **AFTER reading configs: IMMEDIATELY continue to step 5 (Store config in database). Do NOT stop.**
+   **AFTER reading configs: IMMEDIATELY continue to step 4.5 (Capability discovery). Do NOT stop.**
 
    See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
+
+4.5. **Capability discovery (MANDATORY):**
+
+   After loading skills_config.json, determine which skills are available:
+
+   ```python
+   # skills_config.json structure: {"developer": {"lint-check": "mandatory", ...}, "tech_lead": {...}}
+   # May also have metadata fields like "_version", "_updated" - skip those
+   AVAILABLE_SKILLS = {}
+   CRITICAL_DISABLED = []
+
+   for agent_name, agent_skills in skills_config.items():
+       # Skip metadata fields (start with underscore) and non-dict values
+       if agent_name.startswith("_") or not isinstance(agent_skills, dict):
+           continue
+       for skill_name, mode in agent_skills.items():
+           if mode != "disabled":
+               AVAILABLE_SKILLS[skill_name] = mode  # Track all enabled skills
+           elif skill_name in ["lint-check", "security-scan", "test-coverage"]:
+               if skill_name not in CRITICAL_DISABLED:  # Avoid duplicates
+                   CRITICAL_DISABLED.append(skill_name)
+   ```
+
+   **Critical skill fallbacks:**
+   | Disabled Skill | Fallback Behavior |
+   |----------------|-------------------|
+   | `lint-check` | Skip lint validation (log warning) |
+   | `security-scan` | Skip security checks (⚠️ WARN USER) |
+   | `test-coverage` | Skip coverage checks (log warning) |
+
+   **IF any CRITICAL_DISABLED skills:**
+   ```
+   ⚠️ WARNING: Critical skills disabled: {CRITICAL_DISABLED}
+   - security-scan: Security vulnerabilities may not be detected
+   - lint-check: Code style issues may be missed
+   - test-coverage: Coverage gaps may not be identified
+   ```
+
+   Store in session state: `disabled_skills: [list]`, `capability_warnings: [list]`
 
 5. **Load model configuration from database:**
 
@@ -2151,12 +2191,70 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 **Why this matters:** The validator uses these events to compute unresolved blocking issues. Without them, BAZINGA could be accepted with unresolved CRITICAL/HIGH issues.
 
+#### Step 0.5: Re-Rejection Prevention (MANDATORY for Iteration > 1)
+
+**After TL sends CHANGES_REQUESTED (iteration > 1), validate no re-flagged overruled issues:**
+
+**Data source: Query prior iteration's tl_issue_responses event from DB**
+```bash
+# Get prior iteration responses from DB (authoritative source)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "{session_id}" "tl_issue_responses" | jq '.[] | select(.group_id == "{group_id}")'
+```
+
+```python
+# Parse prior responses from DB event
+prior_responses = db_result.get("issue_responses", [])
+
+# Find rejections that TL accepted in prior iteration
+# Note: Issue IDs include iteration (TL-AUTH-1-001 vs TL-AUTH-2-001)
+# So we track by location+title for cross-iteration matching
+previous_overruled = set()
+for response in prior_responses:
+    if response.get("rejection_overruled", False) or response.get("rejection_accepted", False):
+        # Store a normalized key for matching
+        issue_key = f"{response.get('location', '')}|{response.get('title', '')}"
+        previous_overruled.add(issue_key)
+
+# Check if TL is re-flagging any previously overruled issues
+re_flagged = []
+for issue in current_tl_handoff.get("issues", []):
+    if issue.get("blocking"):
+        issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
+        if issue_key in previous_overruled:
+            re_flagged.append(issue.get("id"))
+```
+
+**IF re_flagged issues detected:**
+```
+⚠️ RE-REJECTION VIOLATION: TL re-flagged {len(re_flagged)} previously overruled issues
+  Issues: {re_flagged}
+  Action: Auto-accepting these issues (overrule cannot be reversed)
+  → Mark issues as non-blocking in tl_issues event
+  → Log warning for PM in next status capsule
+```
+
+**Rationale:** Once a rejection is overruled (e.g., by PM or TL in prior iteration), it cannot be re-flagged as blocking. This prevents infinite loops where TL keeps flagging the same issue.
+
 #### Step 1: Read Handoff Files to Determine Progress
 
 After receiving Developer/SSE response to CHANGES_REQUESTED:
 ```bash
-# Read the implementing agent's handoff
+# Simple mode: Read unified implementation handoff
 cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json | jq '.blocking_summary'
+
+# Parallel mode: Read agent-specific handoff
+cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation_{AGENT_ID}.json | jq '.blocking_summary'
+# Where AGENT_ID = task_group.assigned_to (e.g., "developer_1", "sse_1")
+```
+
+**⚠️ Backward Compatibility:** If handoff fields are missing, use these defaults:
+```python
+notes_for_future = handoff.get("notes_for_future", [])
+blocking_summary = handoff.get("blocking_summary", {
+    "total_blocking": 0, "fixed": 0, "rejected_with_reason": 0, "unaddressed": 0
+})
+iteration_tracking = handoff.get("iteration_tracking", {"iteration": 1})
 ```
 
 **Progress is measured by "blocking_issues_remaining decreased", NOT "any fixes":**
@@ -2187,27 +2285,63 @@ ELSE:
   → No progress
 ```
 
-#### Step 2: Update Database State
+#### Step 2: Query Previous State from Database
 
-Update task_groups with progress tracking:
+**BEFORE comparing, query current state:**
 ```bash
-# Calculate blocking_remaining
-blocking_remaining = blocking_summary.total_blocking - blocking_summary.fixed
+# Get previous iteration state from DB
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}" | \
+  jq '.[] | select(.id == "{group_id}") | {review_iteration, no_progress_count, blocking_issues_count}'
+```
 
-# Update via bazinga-db
+**Extract values:**
+```python
+previous_iteration = db_result.get("review_iteration", 0)
+previous_no_progress = db_result.get("no_progress_count", 0)
+previous_blocking = db_result.get("blocking_issues_count", 0)
+```
+
+#### Step 3: Calculate Progress and Update Database
+
+**Calculate new values:**
+```python
+# Current blocking from Dev/SSE handoff
+current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - blocking_summary.rejected_with_reason
+
+# Determine progress with first-iteration exception
+if previous_iteration == 0:
+    # First iteration - no "no progress" penalty
+    progress = True
+    new_no_progress = 0
+elif current_blocking == 0:
+    # Zero blocking issues = always progress
+    progress = True
+    new_no_progress = 0
+elif current_blocking < previous_blocking:
+    progress = True
+    new_no_progress = 0  # Reset on progress
+else:
+    progress = False
+    new_no_progress = previous_no_progress + 1  # Increment on no progress
+
+new_iteration = previous_iteration + 1
+```
+
+**Update via bazinga-db:**
+```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
   "{group_id}" "{session_id}" \
   --review_iteration {new_iteration} \
-  --no_progress_count {0 if progress else current+1} \
-  --blocking_issues_count {blocking_remaining}
+  --no_progress_count {new_no_progress} \
+  --blocking_issues_count {current_blocking}
 ```
 
-**Progress determination:**
-- If `blocking_remaining < previous_blocking_count`: Reset `no_progress_count` to 0
-- If `blocking_remaining >= previous_blocking_count`: Increment `no_progress_count` by 1
+**Progress summary:**
+- If `current_blocking < previous_blocking`: Reset `no_progress_count` to 0
+- If `current_blocking >= previous_blocking`: Increment `no_progress_count` by 1
 - Always increment `review_iteration` by 1
 
-#### Step 3: Check Escalation Rules
+#### Step 4: Check Escalation Rules
 
 **Before spawning next agent, check if escalation is needed:**
 
@@ -2225,19 +2359,32 @@ ELSE:
   → Continue normal feedback loop
 ```
 
-#### Step 4: Include Context in Re-spawn
+#### Step 5: Include Context in Re-spawn
 
-When spawning for re-review (TL or QA), include iteration context:
+**Config constant:** `MAX_ITERATIONS_BEFORE_ESCALATION = 4`
+
+When spawning Developer/SSE for re-review (after CHANGES_REQUESTED), include escalation context:
 ```
 Review Iteration: {review_iteration}
 No-Progress Count: {no_progress_count}
+Max Iterations Before Escalation: 4
 Prior Issues: {list from prior handoff}
 Developer Responses: {from implementation handoff}
 ```
 
-This allows reviewers to:
-- Know this is a re-review
+**Dynamic warning injection:**
+```
+IF no_progress_count >= 2:
+  Add to context: "⚠️ HIGH RISK: Next non-progress iteration escalates to SSE"
+
+IF review_iteration >= 3:
+  Add to context: "⚠️ FINAL ITERATION: Must resolve all blocking issues"
+```
+
+This allows:
+- Developer to know urgency level
 - See what was fixed vs what's pending
+- Understand escalation risk
 - Avoid raising new MEDIUM/LOW issues (prevents nitpick loops)
 
 #### Example Flow
