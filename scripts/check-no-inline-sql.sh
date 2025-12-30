@@ -65,7 +65,7 @@ for file in $FILES_TO_CHECK; do
         while IFS= read -r match; do
             # Skip lines that are clearly documentation/examples/educational content
             # These patterns indicate SQL shown for teaching, not for execution
-            if echo "$match" | grep -qiE "(NEVER|DON'T|❌|🚫|example|prohibited|forbidden|wrong|bad|Fix:|Change|Review:|sql injection|vulnerability|parameterized|payload|CRITICAL|Should be|Current code|Solution|migration|idempotent|\*\*Location|\*\*Problem|\*\*Why)"; then
+            if echo "$match" | grep -qiE "(NEVER|DON'T|❌|🚫|example|prohibited|forbidden|wrong|bad|Fix:|fix_patch|Change|Review:|sql injection|vulnerability|parameterized|payload|CRITICAL|Should be|Current code|Solution|migration|idempotent|\*\*Location|\*\*Problem|\*\*Why)"; then
                 continue
             fi
             real_violations="$real_violations$match

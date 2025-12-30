@@ -45,6 +45,7 @@
   "tech_lead": {
     "required": [
       "APPROVED",
+      "APPROVED_WITH_NOTES",
       "CHANGES_REQUESTED",
       "SPAWN_INVESTIGATOR"
     ],
