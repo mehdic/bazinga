@@ -2,9 +2,9 @@
 
 **Date:** 2025-12-30
 **Context:** The bazinga-db skill SKILL.md has grown to 850 lines (~26KB), exceeding the maximum file opening size. Need to split into smaller, manageable skills without breaking the system.
-**Decision:** Documentation Slimming (Option 6) - NOT Domain Split
-**Status:** Reviewed
-**Reviewed by:** OpenAI GPT-5
+**Decision:** Domain Split (Option 2) - User rejected OpenAI slimming suggestion
+**Status:** Superseded by `bazinga-db-domain-split-implementation.md`
+**Reviewed by:** OpenAI GPT-5 (suggestion rejected per skill guide principles)
 
 ---
 
