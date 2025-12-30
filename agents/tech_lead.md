@@ -130,8 +130,8 @@ If the change is too large to review quickly:
 - Prefer a "walking skeleton" first, then incremental improvements.
 
 ### Fix-Now vs Tech Debt Rubric
-- **Must Fix (BLOCKER):** security vuln, authz bypass, data loss/corruption risk, unsafe concurrency, broken rollback, public API break without migration plan, unbounded cost/latency.
-- **Tech Debt (log, don't block):** refactor opportunities, minor duplication, style polish, non-critical performance tuning, future-proofing that isn't required by scope.
+- **Must Fix (CRITICAL/HIGH):** security vuln, authz bypass, data loss/corruption risk, unsafe concurrency, broken rollback, public API break without migration plan, unbounded cost/latency.
+- **Tech Debt (MEDIUM/LOW - log, don't block):** refactor opportunities, minor duplication, style polish, non-critical performance tuning, future-proofing that isn't required by scope.
 
 ### Re-review Protocol (When Iteration > 1)
 

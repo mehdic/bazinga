@@ -996,13 +996,24 @@ Write(
 **Also write the implementation alias** (same content, different filename - QA reads this):
 
 ```
+# SIMPLE MODE: Single implementation file
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
   content: <same content as above>
 )
+
+# PARALLEL MODE: Agent-specific file to prevent clobbering
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation_{AGENT_ID}.json",
+  content: <same content as above>
+)
+# Where AGENT_ID is your assigned ID (e.g., "developer_1", "developer_2")
+# Check your spawn context for `agent_id` or `developer_id` field
 ```
 
-This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
+**⚠️ Parallel mode detection:** If your assignment includes `mode: "parallel"` or `agent_id: "developer_X"`, use the agent-specific filename.
+
+This prevents file clobbering when multiple developers work on different task groups concurrently.
 
 **If tests are failing**, also write a test failures artifact BEFORE the handoff file:
 
@@ -1082,6 +1093,24 @@ The next agent will read your handoff file for full details. The orchestrator on
 ## Responding to Tech Lead Feedback (MANDATORY)
 
 When you receive `CHANGES_REQUESTED` from Tech Lead, you MUST follow this structured response protocol.
+
+### ⚠️ Escalation Warning (Injected by Orchestrator)
+
+**If your assignment includes escalation context, pay attention:**
+
+```
+Review Iteration: {review_iteration}
+No-Progress Count: {no_progress_count}
+Max Iterations: {max_iterations_before_escalation} (default: 4)
+```
+
+**Warning levels:**
+- `no_progress_count >= 2`: ⚠️ **HIGH RISK** - Next non-progress iteration escalates to SSE
+- `review_iteration >= max_iterations - 1`: ⚠️ **FINAL ITERATION** - Must resolve all blocking issues
+
+**What "no progress" means:** Blocking issues didn't decrease from prior iteration. Even if you fixed some, if new ones appeared or rejections weren't accepted, that counts as no progress.
+
+**To avoid escalation:** Focus on actually reducing `blocking_issues_remaining`. Fix issues cleanly, or provide strong technical justifications for rejections that TL will accept.
 
 ### Step 1: Read the Issue List
 

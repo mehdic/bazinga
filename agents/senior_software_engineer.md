@@ -1085,13 +1085,24 @@ Write(
 **Also write the implementation alias** (same content, different filename - QA reads this):
 
 ```
+# SIMPLE MODE: Single implementation file
 Write(
   file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json",
   content: <same content as above>
 )
+
+# PARALLEL MODE: Agent-specific file to prevent clobbering
+Write(
+  file_path: "bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation_{AGENT_ID}.json",
+  content: <same content as above>
+)
+# Where AGENT_ID is your assigned ID (e.g., "sse_1", "sse_2")
+# Check your spawn context for `agent_id` field
 ```
 
-This alias allows QA to always read `handoff_implementation.json` regardless of whether Developer or SSE completed the work.
+**⚠️ Parallel mode detection:** If your assignment includes `mode: "parallel"` or `agent_id: "sse_X"`, use the agent-specific filename.
+
+This prevents file clobbering when multiple SSEs work on different task groups concurrently.
 
 **If tests are failing**, also write a test failures artifact BEFORE the handoff file:
 

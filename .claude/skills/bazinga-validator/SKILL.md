@@ -332,6 +332,14 @@ cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead.json | jq '.issu
 cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json | jq '.issue_responses'
 ```
 
+**⚠️ Field-level fallbacks for old handoff formats:**
+```python
+# When reading handoff files, handle missing fields gracefully:
+issues = handoff.get("issues", [])
+blocking_summary = handoff.get("blocking_summary", {"total_blocking": 0, "fixed": 0})
+issue_responses = handoff.get("issue_responses", [])
+```
+
 **🔴 CRITICAL: If NEITHER events NOR handoff files exist for reviewed groups:**
 ```
 # For each task group that had review_iteration > 0:

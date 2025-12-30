@@ -292,6 +292,23 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "sess_123" "role_violation" '{"agent": "orchestrator", "violation": "attempted implementation"}'
 ```
 
+**Tech Lead Review Events (Code Review Feedback Loop):**
+```bash
+# Save TL issues event (after TL CHANGES_REQUESTED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "tl_issues" '{"group_id": "AUTH", "iteration": 1, "issues": [...], "blocking_count": 3}'
+
+# Save Dev/SSE responses to TL issues
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "tl_issue_responses" '{"group_id": "AUTH", "issue_responses": [...], "blocking_summary": {...}}'
+```
+
+**Schema validation:** Event payloads should conform to schemas in `bazinga/schemas/`:
+- `event_tl_issues.schema.json` - TL issues with blocking counts
+- `event_tl_issue_responses.schema.json` - Dev/SSE responses with blocking_summary
+
+**Deduplication:** Events are deduplicated by key: `(session_id, group_id, iteration, event_type)`. Duplicate save attempts return existing event (idempotent).
+
 **Get events (filter by session and optionally by subtype):**
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
