@@ -12,6 +12,30 @@
 
 When running `/bazinga.orchestrate` on the ARTK project, the orchestration stops immediately after session creation:
 
+### Likely Regression Cause
+
+**Commit `8a42ab9` (Dec 29 11:22)** - "Fix orchestrator stopping after developer spawn"
+
+This commit removed text from Axiom 1:
+
+**Before (working):**
+```markdown
+1. **I am a COORDINATOR** - I spawn agents, I do not implement. I route messages via `Skill(command: "workflow-router")`.
+```
+
+**After (broken):**
+```markdown
+1. **I am a COORDINATOR** - I spawn agents, I do not implement.
+```
+
+**Why this caused the regression:**
+- The phrase "I route messages via `Skill(command: "workflow-router")`" gave the model general guidance to keep making Skill calls
+- Without this, the model lost "momentum" and is more likely to stop after ANY tool call
+- The intent was to fix a conflict with inline routing in phase_simple.md
+- **Unintended side effect:** Reduced the model's inclination to continue making Skill calls during initialization
+
+**Fix:** Re-add a general "continue making tool calls" instruction to Axiom 1, but phrase it to avoid conflict with inline routing.
+
 ```
 ⏺ Bash(python3 ... create-session ...)
   ⎿  {
