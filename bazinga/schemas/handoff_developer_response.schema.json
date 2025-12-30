@@ -12,7 +12,7 @@
     "session_id": { "type": "string", "pattern": "^bazinga_" },
     "group_id": { "type": "string" },
     "status": {
-      "enum": ["READY_FOR_QA", "READY_FOR_REVIEW", "BLOCKED", "ESCALATE_SENIOR", "SPAWN_INVESTIGATOR"]
+      "enum": ["READY_FOR_QA", "READY_FOR_REVIEW", "BLOCKED", "ESCALATE_SENIOR", "SPAWN_INVESTIGATOR", "ROOT_CAUSE_FOUND", "NEEDS_TECH_LEAD_VALIDATION"]
     },
     "summary": { "type": "string" },
 

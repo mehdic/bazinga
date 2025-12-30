@@ -1447,22 +1447,35 @@ class BazingaDB:
                 updates.append("blocking_issues_count = ?")
                 params.append(blocking_issues_count)
 
-            # Server-side validation for non-negative counters (defense in depth)
+            # Server-side validation and clamping for counters (defense in depth)
+            # Clamp negative values to 0 rather than rejecting - handles race conditions gracefully
             if no_progress_count is not None and no_progress_count < 0:
-                return {"success": False, "error": f"no_progress_count cannot be negative: {no_progress_count}"}
+                no_progress_count = 0
+                # Find and update the param value
+                for i, (u, p) in enumerate(zip(updates, params)):
+                    if "no_progress_count" in u:
+                        params[i] = 0
+                        break
             if blocking_issues_count is not None and blocking_issues_count < 0:
-                return {"success": False, "error": f"blocking_issues_count cannot be negative: {blocking_issues_count}"}
+                blocking_issues_count = 0
+                # Find and update the param value
+                for i, (u, p) in enumerate(zip(updates, params)):
+                    if "blocking_issues_count" in u:
+                        params[i] = 0
+                        break
             if review_iteration is not None and review_iteration < 1:
                 return {"success": False, "error": f"review_iteration must be >= 1: {review_iteration}"}
 
             # Monotonicity enforcement for review_iteration only (use SQL MAX for idempotency)
             # Note: no_progress_count is NOT monotonic - it resets to 0 on progress
+            # Use field-name search instead of string equality for robustness
             if review_iteration is not None:
                 # Use SQL-level MAX() to enforce monotonicity atomically
                 # This avoids race conditions from read-check-update pattern
-                idx = updates.index("review_iteration = ?")
-                updates[idx] = "review_iteration = MAX(COALESCE(review_iteration, 0), ?)"
-                # params already has review_iteration value at correct position
+                for i, clause in enumerate(updates):
+                    if "review_iteration" in clause and "MAX(" not in clause:
+                        updates[i] = "review_iteration = MAX(COALESCE(review_iteration, 0), ?)"
+                        break
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")

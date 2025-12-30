@@ -4,6 +4,7 @@
   "title": "Tech Lead Issue Responses Event Schema",
   "description": "Schema for tl_issue_responses event stored in bazinga-db. Records developer/SSE responses to TL issues.",
   "type": "object",
+  "additionalProperties": false,
   "required": ["group_id", "iteration", "from_agent", "issue_responses", "blocking_summary"],
   "$comment": "session_id and event_type are NOT required in payload - injected by save-event CLI",
   "properties": {

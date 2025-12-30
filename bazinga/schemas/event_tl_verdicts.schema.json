@@ -4,6 +4,7 @@
   "title": "Tech Lead Rejection Verdicts Event Schema",
   "description": "Schema for tl_verdicts event - records TL's acceptance or overruling of Developer rejections. Single source of truth for rejection resolution.",
   "type": "object",
+  "additionalProperties": false,
   "required": ["group_id", "iteration", "verdicts"],
   "$comment": "session_id and event_type are NOT required in payload - injected by save-event CLI",
   "properties": {

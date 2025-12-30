@@ -4,6 +4,7 @@
   "title": "Tech Lead Issues Event Schema",
   "description": "Schema for tl_issues event stored in bazinga-db. Used by validator to verify blocking issue resolution.",
   "type": "object",
+  "additionalProperties": false,
   "required": ["group_id", "iteration", "issues", "blocking_count"],
   "$comment": "session_id and event_type are NOT required in payload - injected by save-event CLI",
   "properties": {
