@@ -4,7 +4,7 @@
   "title": "Tech Lead Issue Responses Event Schema",
   "description": "Schema for tl_issue_responses event stored in bazinga-db. Records developer/SSE responses to TL issues.",
   "type": "object",
-  "required": ["session_id", "group_id", "iteration", "event_type", "issue_responses", "blocking_summary"],
+  "required": ["session_id", "group_id", "iteration", "event_type", "from_agent", "issue_responses", "blocking_summary"],
   "properties": {
     "session_id": {
       "type": "string",
@@ -23,6 +23,10 @@
     "event_type": {
       "const": "tl_issue_responses",
       "description": "Event type identifier"
+    },
+    "from_agent": {
+      "enum": ["developer", "senior_software_engineer"],
+      "description": "Which agent responded to TL issues (Developer or SSE after escalation)"
     },
     "timestamp": {
       "type": "string",

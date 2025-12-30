@@ -2167,9 +2167,9 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 **After receiving Developer/SSE response to CHANGES_REQUESTED:**
 ```bash
-# Extract issue_responses from Dev handoff and save as event
+# from_agent = "developer" or "senior_software_engineer"
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
-  "{session_id}" "tl_issue_responses" '{"group_id": "{group_id}", "iteration": {N}, "issue_responses": [...], "blocking_summary": {...}}'
+  "{session_id}" "tl_issue_responses" '{"group_id": "{group_id}", "iteration": {N}, "from_agent": "{developer|senior_software_engineer}", "issue_responses": [...], "blocking_summary": {...}}'
 ```
 
 **After TL re-review (iteration > 1), save TL verdicts:**
@@ -2302,15 +2302,15 @@ if previous_iteration == 1:
     progress = True
     new_no_progress = 0
 elif current_blocking == 0:
-    # Zero blocking issues = always progress
+    # Zero blocking = progress
     progress = True
     new_no_progress = 0
 elif current_blocking < previous_blocking:
     progress = True
-    new_no_progress = 0  # Reset on progress
+    new_no_progress = 0  # Reset
 else:
     progress = False
-    new_no_progress = previous_no_progress + 1  # Increment on no progress
+    new_no_progress = previous_no_progress + 1  # Increment
 
 new_iteration = previous_iteration + 1
 ```
