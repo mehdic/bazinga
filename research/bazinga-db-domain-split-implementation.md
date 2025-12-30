@@ -252,6 +252,39 @@ allowed-tools: [Bash, Read]
 |------|--------|------|
 | `.claude/skills/bazinga-db/SKILL.md` | Replace with deprecated router (~50 lines) | Low |
 | `.claude/claude.md` | Update skill references in "NEVER Use Inline SQL" section | Low |
+| `agents/orchestrator.md` | Update ~40 `Skill(command: "bazinga-db")` → domain skills | Medium |
+| `agents/investigator.md` | Update ~10 `Skill(command: "bazinga-db")` → domain skills | Medium |
+| `agents/orchestrator_speckit.md` | Update ~5 `Skill(command: "bazinga-db")` → domain skills | Low |
+| `agents/qa_expert.md` | Update ~1 `Skill(command: "bazinga-db")` → domain skills | Low |
+| `agents/tech_lead.md` | Update ~1 `Skill(command: "bazinga-db")` → domain skills | Low |
+| `agents/requirements_engineer.md` | Update ~1 `Skill(command: "bazinga-db")` → domain skills | Low |
+| `agents/developer.md` | Update CLI script references (reasoning) | Low |
+| `agents/senior_software_engineer.md` | Update CLI script references (reasoning) | Low |
+| `agents/project_manager.md` | Update CLI script references (reasoning) | Low |
+
+**Total: ~58+ skill invocation changes across 11 agent files**
+
+### Command-to-Skill Mapping for Agent Updates
+
+When updating agent files, use this mapping:
+
+| Command Pattern | Target Skill |
+|-----------------|--------------|
+| `create-session`, `get-session`, `list-sessions`, `update-session-status` | `bazinga-db-core` |
+| `save-state`, `get-state`, `dashboard-snapshot` | `bazinga-db-core` |
+| `query`, `integrity-check`, `recover-db`, `detect-paths` | `bazinga-db-core` |
+| `create-task-group`, `update-task-group`, `get-task-groups` | `bazinga-db-workflow` |
+| `save-development-plan`, `get-development-plan`, `update-plan-progress` | `bazinga-db-workflow` |
+| `save-success-criteria`, `get-success-criteria`, `update-success-criterion` | `bazinga-db-workflow` |
+| `log-interaction`, `stream-logs` | `bazinga-db-agents` |
+| `save-reasoning`, `get-reasoning`, `reasoning-timeline`, `check-mandatory-phases` | `bazinga-db-agents` |
+| `log-tokens`, `token-summary` | `bazinga-db-agents` |
+| `save-skill-output`, `get-skill-output`, `get-skill-output-all`, `check-skill-evidence` | `bazinga-db-agents` |
+| `save-event`, `get-events` | `bazinga-db-agents` |
+| `save-context-package`, `get-context-packages`, `mark-context-consumed`, `update-context-references` | `bazinga-db-context` |
+| `save-consumption`, `get-consumption` | `bazinga-db-context` |
+| `save-error-pattern`, `get-error-patterns`, `update-error-confidence`, `cleanup-error-patterns` | `bazinga-db-context` |
+| `save-strategy`, `get-strategies`, `update-strategy-helpfulness`, `extract-strategies` | `bazinga-db-context` |
 
 ### Files with NO CHANGE
 
@@ -403,13 +436,160 @@ The installer iterates over `source_skills.iterdir()` and copies each skill dire
 
 ---
 
+## Comprehensive Testing Plan
+
+### Phase 1: Unit Tests (After Creating Skills)
+
+**Test each domain skill in isolation:**
+
+```bash
+# Test bazinga-db-core
+Skill(command: "bazinga-db-core") → create-session "test_123" "simple" "Test"
+Skill(command: "bazinga-db-core") → get-session "test_123"
+Skill(command: "bazinga-db-core") → save-state "test_123" "orchestrator" '{"test": true}'
+Skill(command: "bazinga-db-core") → get-state "test_123" "orchestrator"
+Skill(command: "bazinga-db-core") → dashboard-snapshot "test_123"
+
+# Test bazinga-db-workflow
+Skill(command: "bazinga-db-workflow") → create-task-group "GRP1" "test_123" "Test Group"
+Skill(command: "bazinga-db-workflow") → get-task-groups "test_123"
+Skill(command: "bazinga-db-workflow") → save-success-criteria "test_123" '[{"criterion":"Test","status":"pending"}]'
+Skill(command: "bazinga-db-workflow") → get-success-criteria "test_123"
+
+# Test bazinga-db-agents
+Skill(command: "bazinga-db-agents") → log-interaction "test_123" "developer" "Test log" 1
+Skill(command: "bazinga-db-agents") → save-reasoning "test_123" "GRP1" "developer" "understanding" "Test reasoning"
+Skill(command: "bazinga-db-agents") → get-reasoning "test_123"
+Skill(command: "bazinga-db-agents") → log-tokens "test_123" "developer" 1000
+
+# Test bazinga-db-context
+Skill(command: "bazinga-db-context") → save-context-package "test_123" "GRP1" "research" "/tmp/test.md" "developer" '["qa_expert"]' "high" "Test package"
+Skill(command: "bazinga-db-context") → get-context-packages "test_123" "GRP1" "qa_expert"
+```
+
+**Success criteria:** All commands execute without errors, return expected JSON.
+
+### Phase 2: Agent Invocation Tests (After Updating Agents)
+
+**Verify each agent file has correct skill references:**
+
+```bash
+# Check no remaining old references
+grep -l 'Skill(command: "bazinga-db")' agents/*.md
+# Expected: No output (all references updated)
+
+# Verify new references are valid
+grep -oh 'Skill(command: "bazinga-db-[^"]*")' agents/*.md | sort | uniq -c
+# Expected: bazinga-db-core, bazinga-db-workflow, bazinga-db-agents, bazinga-db-context
+```
+
+### Phase 3: Integration Test (Full Orchestration)
+
+**Run the full BAZINGA integration test:**
+
+```bash
+# 1. Clear previous test data
+rm -rf tmp/simple-calculator-app bazinga/bazinga.db bazinga/project_context.json
+
+# 2. Run orchestration
+/bazinga.orchestrate Implement the Simple Calculator App as specified in tests/integration/simple-calculator-spec.md
+```
+
+**Verification points during test:**
+- [ ] Session created via `bazinga-db-core`
+- [ ] Task groups created via `bazinga-db-workflow`
+- [ ] Interactions logged via `bazinga-db-agents`
+- [ ] Reasoning saved via `bazinga-db-agents`
+- [ ] Success criteria saved via `bazinga-db-workflow`
+- [ ] Context packages work via `bazinga-db-context`
+
+### Phase 4: Post-Integration Verification
+
+**Run ALL verification commands from project context:**
+
+```bash
+SESSION_ID=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1 | jq -r '.[0].session_id')
+
+# Core operations
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-session "$SESSION_ID"
+
+# Workflow operations
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "$SESSION_ID"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-criteria "$SESSION_ID"
+
+# Agent operations
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-reasoning "$SESSION_ID"
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline "$SESSION_ID" --format markdown
+
+# Full dashboard
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet dashboard-snapshot "$SESSION_ID"
+```
+
+**Success criteria:**
+| Check | Expected |
+|-------|----------|
+| Session status | `completed` |
+| Task groups | 1+ groups, all `completed` |
+| Success criteria | 7 entries, all met |
+| Reasoning entries | 8+ entries (2 per agent × 4 agents) |
+| Files created | calculator.py, test_calculator.py, README.md |
+| Tests passing | All pass |
+
+### Phase 5: Cross-Domain Operation Tests
+
+**Test operations that span multiple domains (common orchestrator patterns):**
+
+```bash
+# Simulate orchestrator session init flow
+Skill(command: "bazinga-db-core") → create-session "flow_test" "parallel" "Test flow"
+Skill(command: "bazinga-db-core") → save-state "flow_test" "orchestrator" '{"phase": "init"}'
+Skill(command: "bazinga-db-workflow") → create-task-group "AUTH" "flow_test" "Authentication"
+Skill(command: "bazinga-db-workflow") → save-success-criteria "flow_test" '[{"criterion":"Tests pass","status":"pending"}]'
+Skill(command: "bazinga-db-agents") → log-interaction "flow_test" "pm" "Created task breakdown" 1
+
+# Verify all operations succeeded
+Skill(command: "bazinga-db-core") → dashboard-snapshot "flow_test"
+```
+
+### Phase 6: Error Handling Tests
+
+**Test graceful failures:**
+
+```bash
+# Invalid session
+Skill(command: "bazinga-db-core") → get-session "nonexistent"
+# Expected: Error message, not crash
+
+# Wrong domain skill for command (deprecated router should guide)
+Skill(command: "bazinga-db") → save-reasoning ...
+# Expected: Router message pointing to bazinga-db-agents
+
+# Missing required args
+Skill(command: "bazinga-db-workflow") → create-task-group
+# Expected: Usage error, not crash
+```
+
+### Testing Checklist
+
+- [ ] All 4 domain skills can be invoked
+- [ ] Each skill's commands execute correctly
+- [ ] No `Skill(command: "bazinga-db")` remains in agent files
+- [ ] Full integration test passes
+- [ ] All 10 verification commands pass
+- [ ] Cross-domain flows work
+- [ ] Error handling is graceful
+- [ ] Dashboard snapshot shows all data
+
+---
+
 ## Rollback Plan
 
 If issues occur after implementation:
 
-1. **Quick rollback:** Restore original `bazinga-db/SKILL.md` from git
-2. **Keep domain skills:** They coexist safely
-3. **No path changes:** Nothing to revert in 57+ files
+1. **Quick rollback:** `git checkout HEAD~1 -- agents/ .claude/skills/bazinga-db/`
+2. **Restore all agent files** to previous state
+3. **Keep domain skills:** They don't break anything on their own
+4. **Domain skills can coexist** with original bazinga-db during debugging
 
 ---
 
