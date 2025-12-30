@@ -19,11 +19,12 @@ BAZINGA (Claude Code Multi-Agent Dev Team) is a hierarchical, stateless agent co
 
 ### Core Principles
 
-1. **Stateless Agents**: Each agent spawn is independent; state persists via JSON files
+1. **Stateless Agents**: Each agent spawn is independent; state persists in SQLite database
 2. **Explicit Routing**: Agents tell orchestrator where to route (no implicit decisions)
 3. **Conditional Workflows**: Routing adapts based on context (tests vs no tests)
 4. **Role Enforcement**: Multiple layers prevent agents from drifting from their roles
 5. **Single Source of Truth**: Only PM decides project completion (BAZINGA)
+6. **Database-First State**: All orchestration state stored via `bazinga-db` skill
 
 ### System Architecture Diagram
 
@@ -154,11 +155,11 @@ Tech Lead status: CHANGES_REQUESTED
 - Never ask user questions (full autonomy)
 
 **Tool Usage**:
-- Read: ONLY bazinga/*.json state files
-- Write: ONLY bazinga/*.json state files
+- Read: Codebase files for analysis, `bazinga/project_context.json`
+- Skill: `bazinga-db` for all state operations (sessions, task groups, reasoning)
 - Glob/Grep: Understanding codebase structure only
 - Bash: Analysis only, never run tests
-- FORBIDDEN: Edit, NotebookEdit
+- FORBIDDEN: Edit, NotebookEdit, direct database access
 
 **Decision Logic**:
 
@@ -616,113 +617,96 @@ PM decides → Next assignment OR BAZINGA
 
 ## State Management
 
-### State Files
+### SQLite Database
 
-#### pm_state.json
+All orchestration state is stored in a SQLite database via the `bazinga-db` skill.
 
-**Purpose**: PM's planning and progress tracking
+**Location**: `bazinga/bazinga.db`
 
-**Location**: `bazinga/pm_state.json`
+**Why SQLite over JSON files**:
+- Concurrent access without file corruption
+- Structured queries for complex state lookups
+- Transaction support for atomic updates
+- Better performance with large session histories
 
-**Schema**:
-```json
-{
-  "session_id": "session_20250107_120000",
-  "mode": "parallel",
-  "mode_reasoning": "3 independent features",
-  "original_requirements": "User request text",
-  "task_groups": [...],
-  "completed_groups": ["A", "B"],
-  "in_progress_groups": ["C"],
-  "pending_groups": [],
-  "iteration": 5,
-  "last_update": "2025-01-07T12:30:00Z",
-  "completion_percentage": 66
-}
+### Database Schema
+
+#### sessions
+
+Tracks orchestration sessions:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT | Primary key (e.g., `bazinga_20250107_120000`) |
+| status | TEXT | `planning`, `in_progress`, `completed`, `failed` |
+| mode | TEXT | `simple` or `parallel` |
+| original_request | TEXT | User's original request |
+| created_at | TIMESTAMP | Session start time |
+| updated_at | TIMESTAMP | Last update time |
+
+#### task_groups
+
+Individual task group tracking:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| session_id | TEXT | FK to sessions |
+| group_id | TEXT | Group identifier (e.g., `A`, `B`) |
+| description | TEXT | Task description |
+| status | TEXT | `pending`, `dev_in_progress`, `qa_in_progress`, `review_in_progress`, `completed` |
+| assigned_to | TEXT | Current agent (e.g., `developer_1`) |
+| revision_count | INTEGER | Number of review cycles |
+
+#### orchestration_logs
+
+Agent interaction history:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Auto-increment |
+| session_id | TEXT | FK to sessions |
+| agent_type | TEXT | `pm`, `developer`, `qa_expert`, `tech_lead` |
+| action | TEXT | What the agent did |
+| status | TEXT | Agent's output status |
+| timestamp | TIMESTAMP | When it happened |
+
+#### reasoning_log
+
+Captures agent decision-making:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| session_id | TEXT | FK to sessions |
+| group_id | TEXT | Task group |
+| agent_type | TEXT | Which agent |
+| phase | TEXT | `understanding`, `strategy`, `completion` |
+| content | TEXT | Reasoning explanation |
+| confidence | INTEGER | 1-10 confidence level |
+
+### Accessing State
+
+**Always use the `bazinga-db` skill**:
+
+```python
+# ✅ CORRECT - Use skill
+Skill(command: "bazinga-db") → get-session {session_id}
+Skill(command: "bazinga-db") → get-task-groups {session_id}
+Skill(command: "bazinga-db") → save-reasoning {session_id} {group_id} {agent} {phase} {content}
+
+# ❌ WRONG - Never use inline SQL
+cursor.execute("SELECT * FROM sessions...")  # FORBIDDEN
 ```
 
-#### group_status.json
+### Configuration Files
 
-**Purpose**: Individual task group detailed status
+These JSON files contain **configuration** (not runtime state):
 
-**Location**: `bazinga/group_status.json`
-
-**Schema**:
-```json
-{
-  "A": {
-    "status": "completed",
-    "developer_iterations": 2,
-    "qa_iterations": 1,
-    "tech_lead_iterations": 1,
-    "current_agent": "pm",
-    "last_message": "Tech Lead approved",
-    "completion_time": "2025-01-07T12:15:00Z"
-  },
-  "B": {
-    "status": "in_progress",
-    "developer_iterations": 1,
-    "current_agent": "qa_expert",
-    "last_message": "Running tests"
-  }
-}
-```
-
-#### orchestrator_state.json
-
-**Purpose**: Orchestrator's routing and spawn history
-
-**Location**: `bazinga/orchestrator_state.json`
-
-**Schema**:
-```json
-{
-  "session_id": "session_20250107_120000",
-  "current_phase": "2B",
-  "active_agents": ["developer_A", "developer_B"],
-  "iteration": 10,
-  "total_spawns": 15,
-  "decisions_log": [
-    {
-      "iteration": 1,
-      "decision": "spawn_pm",
-      "reason": "Initial planning"
-    }
-  ],
-  "status": "running",
-  "start_time": "2025-01-07T12:00:00Z",
-  "last_update": "2025-01-07T12:30:00Z"
-}
-```
-
-### Initialization Script
-
-**File**: `scripts/init-orchestration.sh`
-
-**Purpose**: Idempotent setup of coordination environment
-
-**Features**:
-- Creates `bazinga/` folder structure
-- Initializes all state JSON files
-- Generates unique session IDs with timestamps
-- Creates `.gitignore` to exclude state files
-- Safe to run multiple times
-
-**Usage**:
-```bash
-./.claude/scripts/init-orchestration.sh
-```
-
-**Output**:
-```
-🔄 Initializing Claude Code Multi-Agent Dev Team orchestration system...
-📅 Session ID: session_20250107_120000
-📁 Creating bazinga/ folder structure...
-📝 Creating pm_state.json...
-📝 Creating group_status.json...
-📝 Creating orchestrator_state.json...
-✅ Initialization complete!
-```
+| File | Purpose |
+|------|---------|
+| `bazinga/model_selection.json` | Which model each agent uses |
+| `bazinga/skills_config.json` | Which skills are enabled/disabled |
+| `bazinga/challenge_levels.json` | QA test progression levels |
+| `bazinga/project_context.json` | Tech stack detection output |
 
 ## Routing Mechanism
 
@@ -807,8 +791,8 @@ Tool restrictions prevent agents from doing work outside their role.
 ### PM Tool Restrictions
 
 **ALLOWED**:
-- Read `bazinga/*.json` (state files)
-- Write `bazinga/*.json` (state files)
+- Read (codebase files, `bazinga/project_context.json`)
+- Skill (`bazinga-db` for all state operations)
 - Glob/Grep (understanding codebase structure)
 - Bash (analysis only, e.g., `ls` to check structure)
 
@@ -817,6 +801,7 @@ Tool restrictions prevent agents from doing work outside their role.
 - Write code/test files
 - Bash for running tests or implementation
 - NotebookEdit
+- Direct database access (must use `bazinga-db` skill)
 
 **Why**: PM coordinates, doesn't implement.
 
@@ -972,6 +957,6 @@ The system is production-ready and can be adapted for various software developme
 
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-01-07
+**Version**: 1.1.0
+**Last Updated**: 2025-12-30
 **Authors**: Developed iteratively through collaborative refinement

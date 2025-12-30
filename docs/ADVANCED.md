@@ -663,5 +663,5 @@ A: Install jq: `brew install jq` (macOS) or `apt install jq` (Linux).
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2025-01-10
+**Version:** 1.1.0
+**Last Updated:** 2025-12-30
