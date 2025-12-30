@@ -1,9 +1,9 @@
 # Bazinga-DB Domain Split: Implementation Strategy
 
-**Date:** 2025-12-30
+**Date:** 2025-12-30 (Updated after main merge)
 **Context:** Splitting bazinga-db into domain-focused skills while maintaining shared Python infrastructure
 **Decision:** Keep scripts in original location, create domain SKILL.md files only
-**Status:** Awaiting User Approval
+**Status:** Ready for Final Approval
 
 ---
 
@@ -248,38 +248,44 @@ allowed-tools: [Bash, Read]
 
 ### Files to MODIFY
 
-| File | Change | Risk |
-|------|--------|------|
-| `.claude/skills/bazinga-db/SKILL.md` | Replace with deprecated router (~50 lines) | Low |
-| `.claude/claude.md` | Update skill references in "NEVER Use Inline SQL" section | Low |
-| `agents/orchestrator.md` | Update ~40 `Skill(command: "bazinga-db")` → domain skills | Medium |
-| `agents/investigator.md` | Update ~10 `Skill(command: "bazinga-db")` → domain skills | Medium |
-| `agents/orchestrator_speckit.md` | Update ~5 `Skill(command: "bazinga-db")` → domain skills | Low |
-| `agents/qa_expert.md` | Update ~1 `Skill(command: "bazinga-db")` → domain skills | Low |
-| `agents/tech_lead.md` | Update ~1 `Skill(command: "bazinga-db")` → domain skills | Low |
-| `agents/requirements_engineer.md` | Update ~1 `Skill(command: "bazinga-db")` → domain skills | Low |
-| `agents/developer.md` | Update CLI script references (reasoning) | Low |
-| `agents/senior_software_engineer.md` | Update CLI script references (reasoning) | Low |
-| `agents/project_manager.md` | Update CLI script references (reasoning) | Low |
+| File | Skill Invocations | CLI Calls | Change | Risk |
+|------|-------------------|-----------|--------|------|
+| `.claude/skills/bazinga-db/SKILL.md` | - | - | Replace 887-line monolith with ~50-line router | Low |
+| `.claude/claude.md` | - | - | Update skill references in "NEVER Use Inline SQL" section | Low |
+| `agents/orchestrator.md` | 34 | 5 | Update skill invocations + convert CLI calls | Medium |
+| `agents/investigator.md` | 10 | 2 | Update skill invocations + convert CLI calls | Medium |
+| `agents/orchestrator_speckit.md` | 5 | 0 | Update skill invocations | Low |
+| `agents/tech_lead.md` | 1 | 4 | Update skill invocations + convert CLI calls | Low |
+| `agents/qa_expert.md` | 1 | 2 | Update skill invocations + convert CLI calls | Low |
+| `agents/requirements_engineer.md` | 1 | 2 | Update skill invocations + convert CLI calls | Low |
+| `agents/developer.md` | 0 | 3 | Convert CLI calls to skill invocations | Low |
+| `agents/senior_software_engineer.md` | 0 | 3 | Convert CLI calls to skill invocations | Low |
+| `agents/project_manager.md` | 0 | 1 | Convert CLI calls to skill invocations | Low |
+| `agents/_sources/developer.base.md` | 0 | 3 | Convert CLI calls to skill invocations | Low |
+| `agents/_sources/senior.delta.md` | 0 | 3 | Convert CLI calls to skill invocations | Low |
 
-**Total: ~58+ skill invocation changes + ~23 CLI-to-skill conversions across 11 agent files**
+**Post-Merge Totals:**
+- **52 skill invocations** to update (across 6 agent files)
+- **28 CLI calls** to convert to skill invocations (across 10 agent files)
 
 ### CLI Script Calls to Convert to Skill Invocations
 
 These direct CLI calls must be replaced with skill invocations:
 
-| Agent File | CLI Calls | Command | Target Skill |
-|------------|-----------|---------|--------------|
+| Agent File | CLI Calls | Commands | Target Skill |
+|------------|-----------|----------|--------------|
+| `orchestrator.md` | 5 | `get-session`, `list-sessions` | `bazinga-db-core` |
+| `tech_lead.md` | 4 | `save-reasoning`, `get-skill-output` | `bazinga-db-agents` |
 | `developer.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
 | `senior_software_engineer.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+| `_sources/developer.base.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+| `_sources/senior.delta.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
 | `qa_expert.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
-| `tech_lead.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
-| `tech_lead.md` | 2 | `get-skill-output` | `bazinga-db-agents` |
 | `investigator.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
 | `requirements_engineer.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
 | `project_manager.md` | 1 | `save-reasoning` | `bazinga-db-agents` |
-| `_sources/developer.base.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
-| `_sources/senior.delta.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+
+**Total: 28 CLI calls to convert**
 
 **Conversion pattern:**
 
@@ -696,7 +702,7 @@ If issues occur after implementation:
 
 ### MODIFY: `.claude/skills/bazinga-db/SKILL.md`
 
-**Change:** Replace 850-line monolith with ~50-line deprecated router
+**Change:** Replace 887-line monolith with ~50-line deprecated router
 **Content:** Deprecation notice + routing table + quick reference
 
 ### NO CHANGE: `bazinga/skills_config.json`
@@ -821,9 +827,30 @@ Ensuring no commands are missed or duplicated:
 
 ---
 
-## Questions for User Approval
+## User Decisions (Confirmed)
 
-1. **Domain count:** 4 domains (core, workflow, agents, context) - acceptable?
-2. **Deprecation approach:** Keep original as router vs. remove entirely?
-3. **Learning commands:** Merged into context domain - acceptable?
-4. **skills_config.json:** Proposed mandatory/optional assignments look correct?
+1. ✅ **Domain count:** 4 domains (core, workflow, agents, context) - approved
+2. ✅ **Deprecation approach:** Keep original as router (not remove entirely)
+3. ✅ **Learning commands:** Merged into context domain - approved
+4. ✅ **skills_config.json:** No changes needed - these are infrastructure skills
+5. ✅ **Agent file updates:** Update all 52 skill invocations + 28 CLI calls
+
+---
+
+## Post-Merge Analysis Notes
+
+**Changes from main merge (2025-12-30):**
+
+1. **SKILL.md grew from 850 → 887 lines** (+37 lines)
+   - New TL review iteration tracking features
+   - New event schemas for `tl_issues`, `tl_issue_responses`, `tl_verdicts`
+
+2. **Skill invocations:** 52 (slightly lower than initial estimate of 58)
+   - Most are in `orchestrator.md` (34) and `investigator.md` (10)
+
+3. **CLI calls:** 28 (higher than initial estimate of 23)
+   - `orchestrator.md` gained 5 CLI calls (session verification)
+   - All need conversion to skill invocations per project standards
+
+4. **New commands to distribute:**
+   - TL review events → `bazinga-db-agents` (save-event, get-events already covered)
