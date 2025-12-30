@@ -12,7 +12,7 @@
     "session_id": { "type": "string", "pattern": "^bazinga_" },
     "group_id": { "type": "string" },
     "status": {
-      "enum": ["APPROVED", "APPROVED_WITH_NOTES", "CHANGES_REQUESTED", "SPAWN_INVESTIGATOR", "UNBLOCKING_GUIDANCE"]
+      "enum": ["APPROVED", "APPROVED_WITH_NOTES", "CHANGES_REQUESTED", "SPAWN_INVESTIGATOR", "UNBLOCKING_GUIDANCE", "ESCALATE_TO_OPUS", "ARCHITECTURAL_DECISION_MADE"]
     },
     "summary": { "type": "string" },
     "review_decision": { "enum": ["APPROVED", "APPROVED_WITH_NOTES", "CHANGES_REQUESTED"] },
@@ -31,7 +31,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^TL-[A-Z0-9]+-[0-9]+-[0-9]+$",
+            "pattern": "^TL-[A-Za-z0-9_-]+-[0-9]+-[0-9]+$",
             "description": "Format: TL-{GROUP_ID}-{ITERATION}-{SEQ}"
           },
           "severity": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },

@@ -7,7 +7,7 @@
   "required": ["from_agent", "to_agent", "session_id", "group_id", "status", "issue_responses", "blocking_summary"],
   "properties": {
     "from_agent": { "enum": ["developer", "senior_software_engineer"] },
-    "to_agent": { "enum": ["qa_expert", "tech_lead"] },
+    "to_agent": { "enum": ["qa_expert", "tech_lead", "investigator"] },
     "timestamp": { "type": "string", "format": "date-time" },
     "session_id": { "type": "string", "pattern": "^bazinga_" },
     "group_id": { "type": "string" },
@@ -24,7 +24,7 @@
         "properties": {
           "issue_id": {
             "type": "string",
-            "pattern": "^TL-[A-Z0-9]+-[0-9]+-[0-9]+$"
+            "pattern": "^TL-[A-Za-z0-9_-]+-[0-9]+-[0-9]+$"
           },
           "action": {
             "enum": ["FIXED", "REJECTED", "DEFERRED"]

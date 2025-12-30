@@ -1048,19 +1048,24 @@ Display:
    ```python
    # skills_config.json structure: {"developer": {"lint-check": "mandatory", ...}, "tech_lead": {...}}
    # May also have metadata fields like "_version", "_updated" - skip those
-   AVAILABLE_SKILLS = {}
+   AVAILABLE_SKILLS = {}  # {agent_name: {skill_name: mode}}
    CRITICAL_DISABLED = []
 
    for agent_name, agent_skills in skills_config.items():
        # Skip metadata fields (start with underscore) and non-dict values
        if agent_name.startswith("_") or not isinstance(agent_skills, dict):
            continue
+       AVAILABLE_SKILLS[agent_name] = {}
        for skill_name, mode in agent_skills.items():
            if mode != "disabled":
-               AVAILABLE_SKILLS[skill_name] = mode  # Track all enabled skills
+               AVAILABLE_SKILLS[agent_name][skill_name] = mode  # Track per-agent
            elif skill_name in ["lint-check", "security-scan", "test-coverage"]:
                if skill_name not in CRITICAL_DISABLED:  # Avoid duplicates
                    CRITICAL_DISABLED.append(skill_name)
+
+   # Helper: Check if skill is available for a specific agent
+   def skill_available(agent: str, skill: str) -> bool:
+       return skill in AVAILABLE_SKILLS.get(agent, {})
    ```
 
    **Critical skill fallbacks:**
@@ -2190,15 +2195,22 @@ verdicts += [{"issue_id": id, "verdict": "OVERRULED", **{k: issues.get(id, {}).g
 **After TL sends CHANGES_REQUESTED (iteration > 1), validate no re-flagged accepted issues:**
 
 **Data source: Query prior TL verdicts from DB (authoritative source)**
-```bash
-# Get all prior TL verdicts for this group (assign to variable)
-all_prior_verdicts=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "{session_id}" "tl_verdicts" | jq '[.[] | select(.group_id == "{group_id}")]')
-```
-
 ```python
-# Build set of previously ACCEPTED issues (closed, cannot be re-flagged)
-# NOTE: all_prior_verdicts is the result from the bash command above
+import json
+import subprocess
+
+# Step 1: Get all TL verdicts for this session
+result = subprocess.run(
+    ["python3", ".claude/skills/bazinga-db/scripts/bazinga_db.py", "--quiet",
+     "get-events", session_id, "tl_verdicts"],
+    capture_output=True, text=True
+)
+all_verdicts = json.loads(result.stdout) if result.stdout else []
+
+# Step 2: Filter to this group's verdicts
+all_prior_verdicts = [v for v in all_verdicts if v.get("group_id") == group_id]
+
+# Step 3: Build set of previously ACCEPTED issues (closed, cannot be re-flagged)
 previous_accepted = set()
 for verdict_event in all_prior_verdicts:
     for verdict in verdict_event.get("verdicts", []):
@@ -2209,7 +2221,7 @@ for verdict_event in all_prior_verdicts:
             issue_key = f"{verdict.get('location', '')}|{verdict.get('title', '')}"
             previous_accepted.add(issue_key)
 
-# Check if TL is re-flagging any previously ACCEPTED issues
+# Step 4: Check if TL is re-flagging any previously ACCEPTED issues
 re_flagged = []
 for issue in current_tl_handoff.get("issues", []):
     if issue.get("blocking"):

@@ -312,6 +312,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 - `event_tl_issue_responses.schema.json` - Dev/SSE responses with blocking_summary
 - `event_tl_verdicts.schema.json` - TL verdicts on Developer rejections (accepted/overruled)
 
+**Note on session_id:** The `session_id` is passed as a CLI argument (first positional arg) and does NOT need to be included in the JSON payload. The bazinga_db script stores `session_id` in the database record separately from the payload. The schemas include `session_id` for completeness when querying events (the full event structure), but the save-event command handles session_id routing automatically.
+
 **Deduplication:** Events are deduplicated by key: `(session_id, group_id, iteration, event_type)`. Duplicate save attempts return existing event (idempotent).
 
 **Get events (filter by session and optionally by subtype):**

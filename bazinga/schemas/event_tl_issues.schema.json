@@ -36,7 +36,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^TL-[A-Z0-9]+-[0-9]+-[0-9]+$",
+            "pattern": "^TL-[A-Za-z0-9_-]+-[0-9]+-[0-9]+$",
             "description": "Issue ID format: TL-{GROUP_ID}-{ITERATION}-{SEQ}"
           },
           "severity": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },

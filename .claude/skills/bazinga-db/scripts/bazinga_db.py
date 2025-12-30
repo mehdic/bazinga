@@ -1447,6 +1447,26 @@ class BazingaDB:
                 updates.append("blocking_issues_count = ?")
                 params.append(blocking_issues_count)
 
+            # Monotonicity enforcement for iteration counters (prevent accidental decreases)
+            if review_iteration is not None or no_progress_count is not None:
+                current = conn.execute(
+                    "SELECT review_iteration, no_progress_count FROM task_groups WHERE id = ? AND session_id = ?",
+                    (group_id, session_id)
+                ).fetchone()
+                if current:
+                    current_ri = current['review_iteration'] or 0
+                    current_npc = current['no_progress_count'] or 0
+                    if review_iteration is not None and review_iteration < current_ri:
+                        return {
+                            "success": False,
+                            "error": f"review_iteration cannot decrease: current={current_ri}, requested={review_iteration}"
+                        }
+                    if no_progress_count is not None and no_progress_count < current_npc:
+                        return {
+                            "success": False,
+                            "error": f"no_progress_count cannot decrease: current={current_npc}, requested={no_progress_count}"
+                        }
+
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
                 query = f"UPDATE task_groups SET {', '.join(updates)} WHERE id = ? AND session_id = ?"
@@ -3691,8 +3711,8 @@ def main():
                         if key == 'review_iteration' and value < 1:
                             print(json.dumps({"success": False, "error": "--review_iteration must be >= 1 (iterations start at 1)"}, indent=2), file=sys.stderr)
                             sys.exit(1)
-                        # TODO: Future enhancement - add monotonicity check to prevent decreasing
-                        # review_iteration (would require reading current value first)
+                        # Monotonicity enforcement for review_iteration/no_progress_count
+                        # is handled server-side in update_task_group() method
                     except ValueError:
                         print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
                         sys.exit(1)

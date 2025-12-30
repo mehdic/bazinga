@@ -439,7 +439,8 @@ completion_percentage = (met_count / total_count) * 100
 IF missing_review_data_for_reviewed_groups:
   → Return: REJECT
   → Reason: "Cannot verify blocking issues - missing review data"
-  → Note: No tl_issues events AND no handoff files for groups where TL review occurred (detected via tl_issues events existence)
+  → Detection: If tl_issues events exist for a group (TL flagged issues) but no corresponding
+    tl_issue_responses events or implementation handoff exists → review data is incomplete
 
 ELSE IF unresolved_blocking_issues > 0:
   → Return: REJECT
