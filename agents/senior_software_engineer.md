@@ -1191,6 +1191,24 @@ The next agent will read your handoff file for full details. The orchestrator on
 
 When you receive `CHANGES_REQUESTED` from Tech Lead, you MUST follow this structured response protocol.
 
+### ⚠️ Escalation Warning (Injected by Orchestrator)
+
+**If your assignment includes escalation context, pay attention:**
+
+```
+Review Iteration: {review_iteration}
+No-Progress Count: {no_progress_count}
+Max Iterations: {max_iterations_before_escalation} (default: 4)
+```
+
+**Warning levels:**
+- `no_progress_count >= 2`: ⚠️ **HIGH RISK** - Next non-progress iteration routes to PM for decision
+- `review_iteration >= max_iterations - 1`: ⚠️ **FINAL ITERATION** - Must resolve all blocking issues
+
+**What "no progress" means:** Blocking issues didn't decrease from prior iteration. Even if you fixed some, if new ones appeared or rejections weren't accepted, that counts as no progress.
+
+**To avoid PM escalation:** Focus on actually reducing `blocking_issues_remaining`. As SSE, you have stronger technical authority - use it to make definitive fixes or provide compelling rejections.
+
 ### Step 1: Read the Issue List
 
 ```bash

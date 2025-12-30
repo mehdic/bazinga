@@ -1081,15 +1081,17 @@ Display:
    After loading skills_config.json, determine which skills are available:
 
    ```python
+   # skills_config.json structure: {"developer": {"lint-check": "mandatory", ...}, "tech_lead": {...}}
    AVAILABLE_SKILLS = {}
    CRITICAL_DISABLED = []
 
-   for agent, skill_config in skills_config.items():
-       for skill_name, mode in skill_config.items():
+   for agent_name, agent_skills in skills_config.items():
+       for skill_name, mode in agent_skills.items():
            if mode != "disabled":
-               AVAILABLE_SKILLS[skill_name] = mode
+               AVAILABLE_SKILLS[skill_name] = mode  # Track all enabled skills
            elif skill_name in ["lint-check", "security-scan", "test-coverage"]:
-               CRITICAL_DISABLED.append(skill_name)
+               if skill_name not in CRITICAL_DISABLED:  # Avoid duplicates
+                   CRITICAL_DISABLED.append(skill_name)
    ```
 
    **Critical skill fallbacks:**
@@ -2208,18 +2210,28 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 **After TL sends CHANGES_REQUESTED (iteration > 1), validate no re-flagged overruled issues:**
 
+**Data source: Query prior iteration's tl_issue_responses event from DB**
+```bash
+# Get prior iteration responses from DB (authoritative source)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "{session_id}" "tl_issue_responses" | jq '.[] | select(.group_id == "{group_id}")'
+```
+
 ```python
-# Read previous iteration's rejections that were overruled by PM/TL
+# Parse prior responses from DB event
+prior_responses = db_result.get("issue_responses", [])
+
+# Find rejections that TL accepted in prior iteration
 previous_overruled = []
-for prev_response in prior_handoff.get("issue_responses", []):
-    if prev_response.get("rejection_overruled", False):
-        previous_overruled.append(prev_response["issue_id"])
+for response in prior_responses:
+    if response.get("rejection_overruled", False):
+        previous_overruled.append(response["issue_id"])
 
 # Check if TL is re-flagging any previously overruled issues
 re_flagged = []
 for issue in current_tl_handoff.get("issues", []):
-    if issue.get("blocking") and issue.get("issue_id") in previous_overruled:
-        re_flagged.append(issue["issue_id"])
+    if issue.get("blocking") and issue.get("id") in previous_overruled:
+        re_flagged.append(issue["id"])
 ```
 
 **IF re_flagged issues detected:**
@@ -2305,8 +2317,16 @@ previous_blocking = db_result.get("blocking_issues_count", 0)
 # Current blocking from Dev/SSE handoff
 current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - blocking_summary.rejected_with_reason
 
-# Determine progress
-if current_blocking < previous_blocking:
+# Determine progress with first-iteration exception
+if previous_iteration == 0:
+    # First iteration - no "no progress" penalty
+    progress = True
+    new_no_progress = 0
+elif current_blocking == 0:
+    # Zero blocking issues = always progress
+    progress = True
+    new_no_progress = 0
+elif current_blocking < previous_blocking:
     progress = True
     new_no_progress = 0  # Reset on progress
 else:
