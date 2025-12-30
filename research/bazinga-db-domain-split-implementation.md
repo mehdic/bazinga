@@ -262,7 +262,37 @@ allowed-tools: [Bash, Read]
 | `agents/senior_software_engineer.md` | Update CLI script references (reasoning) | Low |
 | `agents/project_manager.md` | Update CLI script references (reasoning) | Low |
 
-**Total: ~58+ skill invocation changes across 11 agent files**
+**Total: ~58+ skill invocation changes + ~23 CLI-to-skill conversions across 11 agent files**
+
+### CLI Script Calls to Convert to Skill Invocations
+
+These direct CLI calls must be replaced with skill invocations:
+
+| Agent File | CLI Calls | Command | Target Skill |
+|------------|-----------|---------|--------------|
+| `developer.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+| `senior_software_engineer.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+| `qa_expert.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
+| `tech_lead.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
+| `tech_lead.md` | 2 | `get-skill-output` | `bazinga-db-agents` |
+| `investigator.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
+| `requirements_engineer.md` | 2 | `save-reasoning` | `bazinga-db-agents` |
+| `project_manager.md` | 1 | `save-reasoning` | `bazinga-db-agents` |
+| `_sources/developer.base.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+| `_sources/senior.delta.md` | 3 | `save-reasoning` | `bazinga-db-agents` |
+
+**Conversion pattern:**
+
+```markdown
+# ❌ BEFORE (direct CLI call)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{session_id}" "{group_id}" "developer" "understanding" "content..."
+
+# ✅ AFTER (skill invocation)
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{session_id}" "{group_id}" "developer" "understanding" "content..."
+```
 
 ### Command-to-Skill Mapping for Agent Updates
 
@@ -474,9 +504,13 @@ Skill(command: "bazinga-db-context") → get-context-packages "test_123" "GRP1" 
 **Verify each agent file has correct skill references:**
 
 ```bash
-# Check no remaining old references
+# Check no remaining old skill references
 grep -l 'Skill(command: "bazinga-db")' agents/*.md
 # Expected: No output (all references updated)
+
+# Check no remaining direct CLI calls
+grep -l 'python3.*bazinga_db\.py' agents/*.md
+# Expected: No output (all CLI calls converted to skill invocations)
 
 # Verify new references are valid
 grep -oh 'Skill(command: "bazinga-db-[^"]*")' agents/*.md | sort | uniq -c
@@ -574,6 +608,7 @@ Skill(command: "bazinga-db-workflow") → create-task-group
 - [ ] All 4 domain skills can be invoked
 - [ ] Each skill's commands execute correctly
 - [ ] No `Skill(command: "bazinga-db")` remains in agent files
+- [ ] No `python3 .../bazinga_db.py` CLI calls remain in agent files
 - [ ] Full integration test passes
 - [ ] All 10 verification commands pass
 - [ ] Cross-domain flows work
