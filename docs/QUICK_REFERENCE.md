@@ -62,10 +62,10 @@ PM: Analyzes request → Spawns N developers (1-4) → Parallel implementation
 
 ### 3. Check Status
 
-Project state is tracked in `bazinga/*.json` files:
-- `pm_state.json` - Task groups, progress, iteration count
-- `group_status.json` - Per-task status, revision counts
-- `orchestrator_state.json` - Active agents, routing state
+Project state is tracked in SQLite database via the `bazinga-db` skill:
+- **Sessions** - Mode, status, original request
+- **Task Groups** - Per-task status, revision counts, assigned agents
+- **Orchestration Logs** - Agent interactions, routing history
 
 ---
 
@@ -241,13 +241,17 @@ bazinga init --profile advanced
 
 ## Agent Interactions
 
-### The Team
+### The Team (9 Agents)
 
 1. **Orchestrator** - Routes messages, maintains workflow
-2. **Project Manager** - Analyzes requirements, spawns developers, confirms completion
-3. **Developer (1-4)** - Implements code, writes tests, fixes issues (parallel execution)
-4. **QA Expert** - Runs integration/E2E tests (full mode only)
-5. **Tech Lead** - Reviews code quality, security, architecture
+2. **Tech Stack Scout** - Detects project tech stack before development begins
+3. **Project Manager** - Analyzes requirements, spawns developers, confirms completion
+4. **Requirements Engineer** - Clarifies ambiguous requests (used with `/orchestrate-advanced`)
+5. **Developer (1-4)** - Implements code, writes tests, fixes issues (parallel execution)
+6. **Senior Software Engineer** - Handles complex tasks, escalation target
+7. **QA Expert** - Runs integration/E2E tests (full mode only)
+8. **Tech Lead** - Reviews code quality, security, architecture
+9. **Investigator** - Deep-dive investigation for complex problems
 
 ### Routing
 
@@ -293,24 +297,21 @@ BAZINGA automatically escalates to more powerful models when stuck:
 ```
 your-project/
 ├── .claude/
-│   ├── agents/                # 5 agent definitions
+│   ├── agents/                # 9 agent definitions
 │   ├── commands/              # Slash commands
-│   ├── scripts/               # Utility scripts
-│   └── skills/                # 10 Skills (analysis tools)
-├── bazinga/              # State files (auto-generated)
-│   ├── pm_state.json         # PM planning
-│   ├── group_status.json     # Task status
-│   ├── orchestrator_state.json # Routing state
+│   └── skills/                # 18 Skills (10 user-facing + 8 internal)
+├── bazinga/                   # State and config (auto-generated)
+│   ├── bazinga.db            # SQLite database (sessions, tasks, logs)
+│   ├── project_context.json  # Tech stack detection output
+│   ├── model_selection.json  # Agent model configuration
 │   ├── skills_config.json    # Skills configuration
-│   ├── testing_config.json   # Testing mode
-│   ├── security_scan.json    # Security findings
-│   ├── coverage_report.json  # Coverage data
-│   └── lint_results.json     # Lint issues
+│   ├── challenge_levels.json # QA test progression
+│   └── templates/            # Specialization templates
 ├── .claude.md                 # Global configuration
 └── .git/                      # Git repository
 ```
 
-**Note:** All `bazinga/*.json` files are gitignored except `skills_config.json` and `testing_config.json`.
+**Note:** Configuration JSON files are git-tracked. The database (`bazinga.db`) is gitignored.
 
 ---
 
@@ -419,7 +420,7 @@ PM may have detected:
 - High file overlap
 - Complexity makes parallel risky
 
-Check PM's reasoning in `bazinga/pm_state.json`.
+Check PM's reasoning via the `bazinga-db` skill or dashboard.
 
 ---
 
@@ -470,5 +471,5 @@ bazinga update
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2025-01-10
+**Version:** 1.1.0
+**Last Updated:** 2025-12-30

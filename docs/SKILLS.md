@@ -27,7 +27,9 @@ Skills are automated analysis tools that agents invoke to validate code quality,
 
 **💡 Profiles:** BAZINGA has two main modes:
 - **Lite** (default) - 3 core skills, fast iteration (~1-2 min overhead)
-- **Advanced** - All 10 skills, comprehensive analysis (~3-5 min overhead)
+- **Advanced** - All 10 user-facing skills, comprehensive analysis (~3-5 min overhead)
+
+**Note:** In addition to these configurable skills, BAZINGA includes 8 internal orchestration skills that run automatically (bazinga-db, prompt-builder, workflow-router, etc.).
 
 ### Why Configure Skills?
 
@@ -58,7 +60,7 @@ Open the interactive configuration menu:
 /bazinga.configure-skills
 ```
 
-This displays all 11 Skills grouped by agent with current status:
+This displays all 10 user-configurable Skills grouped by agent with current status:
 
 ```
 🎯 BAZINGA Skills Configuration

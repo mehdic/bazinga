@@ -119,16 +119,17 @@ This adds 2-4 minutes upfront but provides better decisions, fewer revisions, an
 
 ### The Team
 
-BAZINGA coordinates 8 specialized AI agents:
+BAZINGA coordinates 9 specialized AI agents:
 
-1. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
-2. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (Opus model, used with `/orchestrate-advanced`)
-3. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
-4. **Senior Software Engineer (SSE)** - Handles medium-to-complex tasks (complexity 4-10), security-sensitive code, and architectural work; escalation target when Developers get stuck
-5. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
-6. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
-7. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
-8. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
+1. **Tech Stack Scout** - Auto-detects project technology stack, frameworks, and versions before development begins
+2. **Project Manager (PM)** - Analyzes requirements, breaks down work, decides parallelism
+3. **Requirements Engineer** - Clarifies ambiguous requests, discovers codebase patterns, assesses complexity (used with `/orchestrate-advanced`)
+4. **Developers (1-4)** - Implement code in parallel, create tests, fix issues
+5. **Senior Software Engineer (SSE)** - Handles medium-to-complex tasks (complexity 4-10), security-sensitive code, and architectural work; escalation target when Developers get stuck
+6. **QA Expert** - Runs integration/contract/E2E tests (optional, advanced mode)
+7. **Tech Lead** - Reviews code quality, security, architecture; classifies problem complexity
+8. **Investigator** - Deep-dive systematic investigation for complex multi-hypothesis problems (spawned by Tech Lead)
+9. **Orchestrator** - Routes messages between agents, maintains workflow, manages investigation loops
 
 All agents are enhanced with **72 technology specializations** covering languages, frameworks, databases, and infrastructure—ensuring each agent receives context-appropriate expertise for your project's tech stack.
 
@@ -517,19 +518,16 @@ A: Check `bazinga/build_baseline.log`. BAZINGA tracks baseline vs. final build s
 ```
 your-project/
 ├── .claude/
-│   ├── agents/                # Agent definitions (7 agents)
+│   ├── agents/                # Agent definitions (9 agents)
 │   ├── commands/              # Slash commands
-│   ├── scripts/               # Utility scripts
-│   └── skills/                # Analysis tools (Skills)
+│   └── skills/                # Analysis tools (10+ Skills)
 ├── bazinga/
-│   ├── skills_config.json    # Agent skills configuration (git-tracked)
-│   ├── pm_state.json         # PM planning and progress (auto-generated)
-│   ├── group_status.json     # Individual task status (auto-generated)
-│   ├── orchestrator_state.json # Routing state (auto-generated)
-│   ├── security_scan.json    # Security findings (auto-generated)
-│   ├── coverage_report.json  # Test coverage (auto-generated)
-│   ├── lint_results.json     # Code quality issues (auto-generated)
-│   └── testing_config.json   # Testing mode configuration (auto-generated)
+│   ├── bazinga.db            # SQLite database (sessions, tasks, logs)
+│   ├── project_context.json  # Tech stack detection output
+│   ├── model_selection.json  # Agent model configuration
+│   ├── skills_config.json    # Agent skills configuration
+│   ├── challenge_levels.json # QA test progression config
+│   └── templates/            # Specialization templates
 ├── .claude.md                 # Global configuration
 └── .git/                      # Git repository
 ```
@@ -628,8 +626,8 @@ Special thanks to:
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2025-01-10
+**Version:** 1.1.0
+**Last Updated:** 2025-12-30
 **Created by:** [@mehdic](https://github.com/mehdic)
 
 ---

@@ -29,7 +29,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1267,7 +1267,7 @@ def init_database(db_path: str) -> None:
 
                     # Refresh query planner statistics
                     cursor.execute("ANALYZE task_groups;")
-                    print("   ✓ WAL checkpoint completed")
+                    print("   ✓ ANALYZE completed")
 
                 except Exception as e:
                     try:
@@ -1279,6 +1279,113 @@ def init_database(db_path: str) -> None:
 
             current_version = 15
             print("✓ Migration to v15 complete (component_path for version context)")
+
+        # v15 → v16: Add review iteration tracking columns to task_groups
+        if current_version == 15:
+            print("\n--- Migrating v15 → v16 (review iteration tracking) ---")
+
+            # Check if task_groups table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new columns - skip migration
+                print("   ⊘ task_groups table will be created with review iteration columns")
+            else:
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Add review_iteration column (current iteration in feedback loop, starts at 1)
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN review_iteration INTEGER DEFAULT 1")
+                        print("   ✓ Added task_groups.review_iteration")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.review_iteration already exists")
+                        else:
+                            raise
+
+                    # Add no_progress_count column (consecutive iterations with 0 fixes)
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN no_progress_count INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.no_progress_count")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.no_progress_count already exists")
+                        else:
+                            raise
+
+                    # Add blocking_issues_count column (count of unresolved CRITICAL/HIGH issues)
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN blocking_issues_count INTEGER DEFAULT 0")
+                        print("   ✓ Added task_groups.blocking_issues_count")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.blocking_issues_count already exists")
+                        else:
+                            raise
+
+                    # Backfill NULL values in existing rows (ALTER TABLE DEFAULT doesn't populate existing rows)
+                    backfill_ri = cursor.execute(
+                        "UPDATE task_groups SET review_iteration = 1 WHERE review_iteration IS NULL"
+                    ).rowcount
+                    if backfill_ri > 0:
+                        print(f"   ✓ Backfilled review_iteration=1 for {backfill_ri} rows")
+
+                    backfill_npc = cursor.execute(
+                        "UPDATE task_groups SET no_progress_count = 0 WHERE no_progress_count IS NULL"
+                    ).rowcount
+                    if backfill_npc > 0:
+                        print(f"   ✓ Backfilled no_progress_count=0 for {backfill_npc} rows")
+
+                    backfill_bic = cursor.execute(
+                        "UPDATE task_groups SET blocking_issues_count = 0 WHERE blocking_issues_count IS NULL"
+                    ).rowcount
+                    if backfill_bic > 0:
+                        print(f"   ✓ Backfilled blocking_issues_count=0 for {backfill_bic} rows")
+
+                    # Verify integrity before commit
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v15→v16: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                    # WAL checkpoint for clean state
+                    checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                    if checkpoint_result:
+                        busy, log_frames, checkpointed = checkpoint_result
+                        if busy:
+                            for retry in range(3):
+                                time.sleep(0.5 * (retry + 1))
+                                checkpoint_result = cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                                if checkpoint_result and not checkpoint_result[0]:
+                                    print(f"   ✓ WAL checkpoint succeeded after retry {retry + 1}")
+                                    break
+                            else:
+                                print(f"   ⚠️ WAL checkpoint incomplete: busy={busy}")
+
+                    # Post-commit integrity verification
+                    post_integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if post_integrity != "ok":
+                        print(f"   ⚠️ Post-commit integrity check failed: {post_integrity}")
+
+                    # Refresh query planner statistics
+                    cursor.execute("ANALYZE task_groups;")
+                    print("   ✓ ANALYZE completed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v15→v16 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 16
+            print("✓ Migration to v16 complete (review iteration tracking)")
 
         # Record version upgrade
         cursor.execute("""
@@ -1386,6 +1493,7 @@ def init_database(db_path: str) -> None:
     # Extended in v9 to support item_count for progress tracking
     # Extended in v14 to support security_sensitive, qa_attempts, tl_review_attempts
     # Extended in v15 to support component_path for version-specific prompt building
+    # Extended in v16 to support review_iteration, no_progress_count, blocking_issues_count
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT NOT NULL,
@@ -1409,6 +1517,9 @@ def init_database(db_path: str) -> None:
             qa_attempts INTEGER DEFAULT 0,
             tl_review_attempts INTEGER DEFAULT 0,
             component_path TEXT,
+            review_iteration INTEGER DEFAULT 1 CHECK(review_iteration >= 1),
+            no_progress_count INTEGER DEFAULT 0 CHECK(no_progress_count >= 0),
+            blocking_issues_count INTEGER DEFAULT 0 CHECK(blocking_issues_count >= 0),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),

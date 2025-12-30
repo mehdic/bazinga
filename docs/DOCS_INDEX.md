@@ -81,7 +81,7 @@ Once familiar with basics, these documents explain how BAZINGA works:
 **Length**: ~1,100 lines | **Time to read**: 30-40 minutes
 **Sections**:
 - System Overview (workflow types, agent roles)
-- Agent Definitions (5 agents: Developer, Tech Lead, QA Expert, PM, Orchestrator)
+- Agent Definitions (9 agents: Orchestrator, Tech Stack Scout, PM, Requirements Engineer, Developer, SSE, QA Expert, Tech Lead, Investigator)
 - Workflow Patterns (5 routing strategies)
 - Role Drift Prevention (6-layer defense system)
 - State Management (coordination files)
@@ -216,6 +216,53 @@ Once familiar with basics, these documents explain how BAZINGA works:
 
 ---
 
+### 13. **[DASHBOARD.md](DASHBOARD.md)** - Visual Monitoring Interface (Experimental)
+**Length**: ~200 lines | **Time to read**: 10 minutes
+**Status**: Experimental - Under active development
+
+**Sections**:
+- Installation and setup
+- Starting the dashboard
+- Feature overview (sessions, tasks, timeline, reasoning)
+- Architecture (Next.js, tRPC, Drizzle)
+- Known limitations
+- Troubleshooting
+
+**Read this for**: Setting up visual monitoring of orchestration sessions.
+
+---
+
+### 14. **[SPECIALIZATIONS.md](SPECIALIZATIONS.md)** - Technology-Specific Agent Expertise
+**Length**: ~300 lines | **Time to read**: 15 minutes
+
+**Sections**:
+- What are specializations (72 templates)
+- Tech stack detection
+- Available categories (languages, frameworks, databases, etc.)
+- Template structure and version guards
+- Token budgets
+- Customization
+
+**Read this for**: Understanding how agents receive technology-specific expertise.
+
+---
+
+### 15. **[MIGRATION.md](MIGRATION.md)** - Upgrading from Earlier Versions
+**Length**: ~250 lines | **Time to read**: 10 minutes
+
+**Sections**:
+- State management changes (JSON → SQLite)
+- Agent count changes (9 agents)
+- Skills count changes (18 skills)
+- Project structure changes
+- Upgrade steps
+- Breaking changes
+- FAQ
+
+**Read this for**: Migrating existing projects to v1.1.0.
+
+---
+
 ## 📚 Original Documentation - Historical Reference
 
 Located in **`historical-dev-docs/`** - These are historical records of BAZINGA's development. They're preserved for reference but not actively maintained.
@@ -247,7 +294,7 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 - [../examples/EXAMPLES.md](../examples/EXAMPLES.md) → Practical examples
 
 **Quality & Skills Configuration**
-- [SKILLS.md](SKILLS.md) → All 11 Skills explained
+- [SKILLS.md](SKILLS.md) → All user-configurable Skills explained
 - [ARCHITECTURE.md](ARCHITECTURE.md) → Tool Restrictions section
 - [../agents/](../agents/) → Agent capability files
 
@@ -267,9 +314,8 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 - [ARCHITECTURE.md](ARCHITECTURE.md) → Role Drift Prevention section
 
 **State Management & Configuration**
-- [historical-dev-docs/V4_STATE_SCHEMAS.md](historical-dev-docs/V4_STATE_SCHEMAS.md) → Schema definitions
-- [ARCHITECTURE.md](ARCHITECTURE.md) → State Management section
-- [../scripts/README.md](../scripts/README.md) → Initialization
+- [ARCHITECTURE.md](ARCHITECTURE.md) → State Management section (SQLite database)
+- Configuration files in `bazinga/` folder
 
 **Technical Debt**
 - [TECH_DEBT_GUIDE.md](TECH_DEBT_GUIDE.md) → When to log, how to log, guidelines
@@ -302,20 +348,21 @@ Located in **`historical-dev-docs/`** - These are historical records of BAZINGA'
 
 ## 📊 Documentation Statistics
 
-**Active Documentation**: ~5,200 lines across 11 main files
+**Active Documentation**: ~6,000 lines across 15 main files
 - **For New Users**: 4 files (~1,500 lines)
 - **Core Concepts**: 5 files (~3,300 lines)
-- **Specific Features**: 2 files (~400 lines)
+- **Specific Features**: 3 files (~550 lines)
+- **New in v1.1**: 3 files (~750 lines) - Dashboard, Specializations, Migration
 
 **Historical Documentation**: ~3,900 lines across 4 files (preserved for reference)
 
-**Total**: ~7,800+ lines of comprehensive documentation
+**Total**: ~9,900+ lines of comprehensive documentation
 
 **Agent Definitions**: ~4,200 lines (in ../agents/)
 **Examples**: ~350 lines (in ../examples/)
-**Scripts**: ~500 lines (in ../scripts/)
+**Specialization Templates**: ~7,000 lines (72 templates)
 
-**Grand Total**: ~12,800+ lines of documentation and reference material
+**Grand Total**: ~21,000+ lines of documentation and reference material
 
 ---
 
@@ -360,6 +407,6 @@ Can't find what you need? Try:
 
 ---
 
-**Last Updated**: 2025-01-10
-**Version**: 2.1 (Added QUICK_REFERENCE, ADVANCED; restructured for lite/advanced profiles)
+**Last Updated**: 2025-12-30
+**Version**: 1.1.0 (Updated agent count, state management, skills overview)
 **Maintained By**: Project contributors
