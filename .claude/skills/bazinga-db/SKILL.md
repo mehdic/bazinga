@@ -301,11 +301,16 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 # Save Dev/SSE responses to TL issues (iteration required for dedup)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "sess_123" "tl_issue_responses" '{"group_id": "AUTH", "iteration": 1, "issue_responses": [...], "blocking_summary": {...}}'
+
+# Save TL verdicts on Developer rejections (SINGLE SOURCE OF TRUTH for rejection acceptance)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "tl_verdicts" '{"group_id": "AUTH", "iteration": 2, "verdicts": [{"issue_id": "TL-AUTH-1-001", "verdict": "ACCEPTED", "location": "auth.py:45", "title": "..."}], "summary": {"accepted_count": 1, "overruled_count": 0}}'
 ```
 
 **Schema validation:** Event payloads should conform to schemas in `bazinga/schemas/`:
 - `event_tl_issues.schema.json` - TL issues with blocking counts
 - `event_tl_issue_responses.schema.json` - Dev/SSE responses with blocking_summary
+- `event_tl_verdicts.schema.json` - TL verdicts on Developer rejections (accepted/overruled)
 
 **Deduplication:** Events are deduplicated by key: `(session_id, group_id, iteration, event_type)`. Duplicate save attempts return existing event (idempotent).
 

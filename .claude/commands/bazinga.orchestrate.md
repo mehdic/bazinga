@@ -2172,56 +2172,53 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "{session_id}" "tl_issue_responses" '{"group_id": "{group_id}", "iteration": {N}, "issue_responses": [...], "blocking_summary": {...}}'
 ```
 
+**After TL re-review (iteration > 1), save TL verdicts:**
+```bash
+# Extract verdicts from TL handoff iteration_tracking and save as event
+# This is the SINGLE SOURCE OF TRUTH for rejection acceptance
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "{session_id}" "tl_verdicts" '{"group_id": "{group_id}", "iteration": {N}, "verdicts": [{"issue_id": "TL-...", "verdict": "ACCEPTED|OVERRULED", "location": "...", "title": "..."}], "summary": {"accepted_count": N, "overruled_count": N}}'
+```
+
 **Why this matters:** The validator uses these events to compute unresolved blocking issues. Without them, BAZINGA could be accepted with unresolved CRITICAL/HIGH issues.
 
 #### Step 0.5: Re-Rejection Prevention (MANDATORY for Iteration > 1)
 
-**After TL sends CHANGES_REQUESTED (iteration > 1), validate no re-flagged overruled issues:**
+**After TL sends CHANGES_REQUESTED (iteration > 1), validate no re-flagged accepted issues:**
 
-**Data source: Query prior iteration's tl_issue_responses event from DB**
+**Data source: Query prior TL verdicts from DB (authoritative source)**
 ```bash
-# Get prior iteration responses from DB (authoritative source)
+# Get all prior TL verdicts for this group
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "{session_id}" "tl_issue_responses" | jq '.[] | select(.group_id == "{group_id}")'
+  "{session_id}" "tl_verdicts" | jq '[.[] | select(.group_id == "{group_id}")]'
 ```
 
 ```python
-# Parse prior TL handoff from DB event
-iteration_tracking = db_result.get("iteration_tracking", {})
-prior_issues = db_result.get("issues", [])
+# Build set of previously ACCEPTED issues (closed, cannot be re-flagged)
+previous_accepted = set()
+for verdict_event in all_prior_verdicts:
+    for verdict in verdict_event.get("verdicts", []):
+        if verdict.get("verdict") == "ACCEPTED":
+            # Use location|title for cross-iteration matching
+            issue_key = f"{verdict.get('location', '')}|{verdict.get('title', '')}"
+            previous_accepted.add(issue_key)
 
-# TL tracks accepted/overruled in iteration_tracking arrays (issue IDs)
-rejections_accepted_ids = set(iteration_tracking.get("rejections_accepted", []))
-rejections_overruled_ids = set(iteration_tracking.get("rejections_overruled", []))
-
-# Build location+title keys for cross-iteration matching
-# (Issue IDs include iteration number, so direct ID matching fails across iterations)
-previous_closed = set()
-for issue in prior_issues:
-    issue_id = issue.get("id", "")
-    if issue_id in rejections_accepted_ids or issue_id in rejections_overruled_ids:
-        issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
-        previous_closed.add(issue_key)
-
-# Check if TL is re-flagging any previously closed issues
+# Check if TL is re-flagging any previously ACCEPTED issues
 re_flagged = []
 for issue in current_tl_handoff.get("issues", []):
     if issue.get("blocking"):
         issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
-        if issue_key in previous_closed:
+        if issue_key in previous_accepted:
             re_flagged.append(issue.get("id"))
 ```
 
 **IF re_flagged issues detected:**
 ```
-⚠️ RE-REJECTION VIOLATION: TL re-flagged {len(re_flagged)} previously overruled issues
-  Issues: {re_flagged}
-  Action: Auto-accepting these issues (overrule cannot be reversed)
-  → Mark issues as non-blocking in tl_issues event
-  → Log warning for PM in next status capsule
+⚠️ RE-REJECTION VIOLATION: {len(re_flagged)} issues re-flagged after ACCEPTED
+→ Auto-accept these (cannot be re-flagged). Log warning for PM.
 ```
 
-**Rationale:** Once a rejection is overruled (e.g., by PM or TL in prior iteration), it cannot be re-flagged as blocking. This prevents infinite loops where TL keeps flagging the same issue.
+**Rationale:** Once TL accepts a rejection, it cannot be re-flagged. Prevents infinite review loops.
 
 #### Step 1: Read Handoff Files to Determine Progress
 
@@ -2246,11 +2243,11 @@ iteration_tracking = handoff.get("iteration_tracking", {"iteration": 1})
 
 **Progress is measured by "blocking_issues_remaining decreased", NOT "any fixes":**
 ```python
-previous_blocking = {from prior TL handoff blocking_issues_count}
+previous_blocking = {from DB: task_groups.blocking_issues_count}
 
-# Only count TL-accepted rejections (not all rejected_with_reason)
-# Get accepted count from prior tl_issue_responses event
-tl_accepted = len([r for r in prior_tl_responses if r.get("rejection_accepted")])
+# Count TL-accepted rejections from tl_verdicts events (single source of truth)
+tl_verdicts = get_events(session_id, "tl_verdicts", group_id)
+tl_accepted = sum(1 for v in all_verdicts if v.get("verdict") == "ACCEPTED")
 current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
 
 IF current_blocking < previous_blocking:
@@ -2297,13 +2294,14 @@ previous_blocking = db_result.get("blocking_issues_count", 0)
 **Calculate new values:**
 ```python
 # Current blocking = total - fixed - TL-accepted rejections
-# Note: Only count rejections that TL accepted (from prior tl_issue_responses)
-tl_accepted = len([r for r in prior_tl_responses if r.get("rejection_accepted")])
+# Query tl_verdicts events for ACCEPTED count (single source of truth)
+tl_verdicts = get_events(session_id, "tl_verdicts", group_id)
+tl_accepted = sum(1 for v in all_verdicts if v.get("verdict") == "ACCEPTED")
 current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
 
 # Determine progress with first-iteration exception
-# Note: DB default is review_iteration=1, so first iteration is when previous <= 1
-if previous_iteration <= 1:
+# Note: DB default is review_iteration=1, so first iteration check uses == 1
+if previous_iteration == 1:
     # First iteration - no "no progress" penalty
     progress = True
     new_no_progress = 0

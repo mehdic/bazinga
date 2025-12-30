@@ -300,27 +300,36 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 ```bash
 # Get latest TL issues for each group
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" --event_type "tl_issues" --limit 10
+  "[session_id]" "tl_issues" --limit 10
 
 # Get latest Developer responses for each group
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
-  "[session_id]" --event_type "tl_issue_responses" --limit 10
+  "[session_id]" "tl_issue_responses" --limit 10
+
+# Get TL verdicts (single source of truth for rejection acceptance)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "tl_verdicts" --limit 20
 ```
 
 **Step 2: Compute unresolved blocking issues**
 
-For each task group, diff `tl_issues` against Dev responses AND TL's acceptance verdict:
+For each task group, diff `tl_issues` against Dev responses AND TL verdicts:
 ```python
 unresolved_blocking = []
-# Get TL's acceptance verdicts from their handoff iteration_tracking
-tl_accepted_ids = set(tl_handoff.get("iteration_tracking", {}).get("rejections_accepted", []))
+
+# Get TL's acceptance verdicts from tl_verdicts events (single source of truth)
+tl_accepted_ids = set()
+for verdict_event in tl_verdicts_events:
+    for verdict in verdict_event.get("verdicts", []):
+        if verdict.get("verdict") == "ACCEPTED":
+            tl_accepted_ids.add(verdict.get("issue_id"))
 
 for issue in tl_issues.issues where issue.blocking == true:
   response = find(tl_issue_responses.issue_responses, issue.id)
   if response is None:
     unresolved_blocking.append(issue)  # Not addressed
   elif response.action == "REJECTED":
-    # Check if TL accepted the rejection (from TL's iteration_tracking.rejections_accepted)
+    # Check if TL accepted the rejection (from tl_verdicts events)
     if issue.id not in tl_accepted_ids:
       unresolved_blocking.append(issue)  # Rejection not yet accepted by TL
   elif response.action == "FIXED":
