@@ -259,9 +259,6 @@ def main():
     # fail immediately with "database is locked" errors.
     conn = sqlite3.connect(args.db, timeout=5.0)
 
-    # Enable foreign key enforcement (SQLite defaults to OFF)
-    conn.execute("PRAGMA foreign_keys=ON")
-
     # Wrap all seeding in a single transaction for atomicity
     # If any seeding fails, rollback all changes
     #
