@@ -2146,6 +2146,81 @@ The skill returns JSON with:
 - `action: merge` → Developer performs merge to initial_branch
 - `action: check_phase` → Check if more groups need work
 
+### Progress-Based Iteration Tracking (MANDATORY for Feedback Loops)
+
+**When routing CHANGES_REQUESTED or FAIL back to Developer/SSE, you MUST track progress.**
+
+#### Step 1: Read Handoff Files to Determine Progress
+
+After receiving Developer/SSE response to CHANGES_REQUESTED:
+```bash
+# Read the implementing agent's handoff
+cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json | jq '.blocking_summary.fixed'
+```
+
+After receiving QA FAIL response:
+```bash
+# Read QA's handoff
+cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_qa_expert.json | jq '.test_progression.progress_made'
+```
+
+#### Step 2: Update Database State
+
+Update task_groups with progress tracking (via bazinga-db skill):
+```
+Skill(command: "bazinga-db") → update-review-progress {session_id} {group_id} {issues_fixed_count}
+```
+
+This command:
+- If `issues_fixed_count > 0`: Resets `no_progress_count` to 0
+- If `issues_fixed_count == 0`: Increments `no_progress_count` by 1
+- Increments `review_iteration` by 1
+
+#### Step 3: Check Escalation Rules
+
+**Before spawning next agent, check if escalation is needed:**
+
+```
+IF no_progress_count >= 2 AND current_agent == "developer":
+  → Spawn SSE instead (Developer stuck, escalate)
+
+IF no_progress_count >= 2 AND current_agent == "senior_software_engineer":
+  → Route to PM (SSE stuck, need PM decision)
+
+IF review_iteration >= 5:
+  → Escalate to next tier regardless (hard cap)
+
+ELSE:
+  → Continue normal feedback loop
+```
+
+#### Step 4: Include Context in Re-spawn
+
+When spawning for re-review (TL or QA), include iteration context:
+```
+Review Iteration: {review_iteration}
+No-Progress Count: {no_progress_count}
+Prior Issues: {list from prior handoff}
+Developer Responses: {from implementation handoff}
+```
+
+This allows reviewers to:
+- Know this is a re-review
+- See what was fixed vs what's pending
+- Avoid raising new MEDIUM/LOW issues (prevents nitpick loops)
+
+#### Example Flow
+
+```
+1. TL sends CHANGES_REQUESTED with 3 blocking issues
+2. Orchestrator updates DB: review_iteration=1, blocking_issues=3
+3. Developer fixes 2, rejects 1
+4. Orchestrator reads handoff: blocking_summary.fixed=2
+5. Orchestrator updates DB: no_progress_count=0 (reset - progress made!), review_iteration=2
+6. Orchestrator spawns TL for re-review with iteration context
+7. TL validates: 2 fixed, 1 rejection accepted → APPROVED
+```
+
 ### Fallback
 
 If workflow-router returns an error or unknown transition:

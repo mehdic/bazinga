@@ -292,6 +292,64 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 ---
 
+## Step 5.7: Blocking Issue Verification (MANDATORY)
+
+**Problem:** PM may send BAZINGA while unresolved CRITICAL/HIGH issues exist from Tech Lead reviews.
+
+**Step 1: Query unresolved blocking issues**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-unresolved-blocking \
+  "[session_id]"
+```
+
+This returns all review issues where:
+- `blocking = true` (CRITICAL or HIGH severity)
+- `resolution_status != "FIXED"` AND `resolution_status != "REJECTED_ACCEPTED"`
+
+**Step 2: Check for any unresolved blocking issues**
+
+**IF unresolved blocking issues exist:**
+```
+→ Return: REJECT
+→ Reason: "Unresolved blocking issues from code review"
+→ List all unresolved issues with their IDs, severity, and title
+```
+
+**Example rejection:**
+```markdown
+❌ Blocking Issue Verification: FAIL
+   - Unresolved blocking issues: 2
+   - TL-AUTH-1-001 (CRITICAL): SQL injection in login query
+   - TL-AUTH-2-003 (HIGH): Missing rate limiting on auth endpoint
+
+   These issues must be FIXED or have accepted rejections before BAZINGA.
+```
+
+**IF no unresolved blocking issues:**
+```
+→ Proceed to Step 6
+→ Log: "Blocking issue check: PASS (0 unresolved)"
+```
+
+**Step 3: Validate rejected issues (if any)**
+
+For issues with `resolution_status = "REJECTED"`:
+- Check if Tech Lead accepted the rejection (`REJECTED_ACCEPTED`)
+- If rejection NOT accepted, issue still counts as unresolved
+- Only `REJECTED_ACCEPTED` status means Tech Lead agreed the fix is unnecessary
+
+**Rejection states:**
+| Status | Meaning | Blocks BAZINGA? |
+|--------|---------|-----------------|
+| `FIXED` | Developer fixed the issue | ❌ No |
+| `REJECTED` | Developer rejected, TL not yet reviewed | ✅ YES |
+| `REJECTED_ACCEPTED` | Developer rejected, TL agreed | ❌ No |
+| `REJECTED_OVERRULED` | Developer rejected, TL disagreed | ✅ YES |
+| `DEFERRED` | Non-blocking only, deferred | ❌ No (blocking can't defer) |
+| `OPEN` | Not addressed | ✅ YES |
+
+---
+
 ## Step 6: Calculate Completion & Return Verdict
 
 ```
@@ -307,7 +365,12 @@ completion_percentage = (met_count / total_count) * 100
 ## Verdict Decision Tree
 
 ```
-IF all verifications passed AND met_count == total_count:
+IF unresolved_blocking_issues > 0:
+  → Return: REJECT
+  → Reason: "Unresolved blocking issues from code review"
+  → Note: CRITICAL/HIGH issues must be FIXED or have accepted rejection
+
+ELSE IF all verifications passed AND met_count == total_count:
   → Return: ACCEPT
   → Path: A (Full achievement)
 
@@ -361,6 +424,10 @@ ELSE:
 ✅ Evidence Verification: {passed}/{total}
    - Criterion 1: ✅ PASS ({actual} vs {target})
    - Criterion 2: ❌ FAIL (evidence mismatch)
+
+✅ Blocking Issue Verification: PASS | FAIL
+   - Unresolved blocking issues: {count}
+   - {issue_id} ({severity}): {title}
 
 ### Reason
 
@@ -503,10 +570,11 @@ Accept BAZINGA and proceed to shutdown protocol.
 1. **Be skeptical** - Assume PM wrong until proven right
 2. **Run tests yourself** - Don't trust PM's status updates
 3. **Zero tolerance for test failures** - Even 1 failure = REJECT
-4. **Verify evidence** - Don't accept claims without proof
-5. **Structured response** - Orchestrator parses your verdict
-6. **Timeout protection** - Use configurable timeout (default 60s, see .claude/skills/bazinga-validator/resources/validator_config.json)
-7. **Clear reasoning** - Explain WHY you accepted or rejected
+4. **Zero tolerance for blocking issues** - CRITICAL/HIGH issues must be resolved
+5. **Verify evidence** - Don't accept claims without proof
+6. **Structured response** - Orchestrator parses your verdict
+7. **Timeout protection** - Use configurable timeout (default 60s, see .claude/skills/bazinga-validator/resources/validator_config.json)
+8. **Clear reasoning** - Explain WHY you accepted or rejected
 
 ---
 

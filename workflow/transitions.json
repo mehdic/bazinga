@@ -1,7 +1,8 @@
 {
-  "_version": "1.2.0",
+  "_version": "1.3.0",
   "_description": "Deterministic workflow state machine for BAZINGA orchestration",
   "_changelog": {
+    "1.3.0": "Added APPROVED_WITH_NOTES status for Tech Lead. Enables approval with non-blocking MEDIUM/LOW suggestions that developer can optionally address. Part of code review feedback loop enhancement.",
     "1.2.0": "Added validator agent transitions for ACCEPT/REJECT. Enables explicit routing after bazinga-validator returns verdict. REJECT routes back to PM for remediation.",
     "1.1.0": "Fixed status code mismatches between agents and transitions. Added SSE ROOT_CAUSE_FOUND, PARTIAL. Added TL UNBLOCKING_GUIDANCE alias. Added Investigator HYPOTHESIS_ELIMINATED, NEED_MORE_ANALYSIS. Renamed INCOMPLETE→INVESTIGATION_INCOMPLETE, WAITING_FOR_RESULTS→NEED_DEVELOPER_DIAGNOSTIC. Fixed Investigator ROOT_CAUSE_FOUND routing to tech_lead."
   },
@@ -119,6 +120,13 @@
       "action": "spawn_merge",
       "then": "check_phase",
       "include_context": ["approval_notes"]
+    },
+    "APPROVED_WITH_NOTES": {
+      "next_agent": "developer",
+      "action": "spawn_merge",
+      "then": "check_phase",
+      "include_context": ["approval_notes", "non_blocking_suggestions"],
+      "_note": "Code approved but with MEDIUM/LOW suggestions for future improvement. Developer sees suggestions but is not required to address them."
     },
     "CHANGES_REQUESTED": {
       "next_agent": "developer",

@@ -1174,12 +1174,119 @@ The next agent will read your handoff file for full details. The orchestrator on
 | `BLOCKED` | Cannot proceed without external help |
 | `ROOT_CAUSE_FOUND` | Identified root cause, need PM decision |
 | `PARTIAL` | Partial work done, can continue with more context |
-## If Implementing Feedback
+## Responding to Tech Lead Feedback (MANDATORY)
+
+When you receive `CHANGES_REQUESTED` from Tech Lead, you MUST follow this structured response protocol.
+
+### Step 1: Read the Issue List
+
+```bash
+# Read Tech Lead's handoff file
+cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_tech_lead.json | jq '.issues'
+```
+
+### Step 2: Address Each Issue
+
+For EACH issue in the `issues` array, determine your action:
+
+| Issue Type | Blocking? | Allowed Actions |
+|------------|-----------|-----------------|
+| CRITICAL/HIGH | **YES** | `FIXED` or `REJECTED` (with strong justification) |
+| MEDIUM/LOW | NO | `FIXED`, `DEFERRED`, or skip |
+
+**Action Definitions:**
+- **FIXED**: You implemented the fix
+- **REJECTED**: You disagree with the issue (requires technical reasoning)
+- **DEFERRED**: Valid but out of scope (only for non-blocking issues)
+
+**❌ DEFERRED is NOT allowed for blocking issues (CRITICAL/HIGH)**
+
+### Step 3: Document Your Responses
+
+In your handoff file, include `issue_responses`:
+
+```json
+{
+  "issue_responses": [
+    {
+      "issue_id": "TL-AUTH-1-001",
+      "action": "FIXED",
+      "details": "Changed to parameterized query on line 45",
+      "commit": "abc123"
+    },
+    {
+      "issue_id": "TL-AUTH-1-002",
+      "action": "REJECTED",
+      "reason": "This is a false positive. The input comes from internal service, not user input. Validation happens in auth_service.py:12."
+    },
+    {
+      "issue_id": "TL-AUTH-1-003",
+      "action": "DEFERRED",
+      "reason": "Rate limiting requires Redis infrastructure, out of scope for MVP",
+      "tech_debt_id": "TD-042"
+    }
+  ],
+  "blocking_summary": {
+    "total_blocking": 2,
+    "fixed": 1,
+    "rejected_with_reason": 1,
+    "unaddressed": 0
+  }
+}
+```
+
+### Rejection Rules
+
+You may REJECT a blocking issue ONLY if:
+- ✅ The issue is based on incorrect understanding of requirements
+- ✅ The suggested fix would break other functionality
+- ✅ The issue is a false positive from automated scan
+- ✅ There's a better alternative fix (document it)
+
+**Weak reasons (NOT acceptable):**
+- ❌ "Too hard" → Then escalate to SSE, don't reject
+- ❌ "Takes too long" → Log as tech debt if truly out of scope
+- ❌ "I disagree" → Provide technical reasoning
+
+### Step 4: Ensure All Blocking Issues Addressed
+
+Before reporting status, verify:
+```
+blocking_summary.unaddressed == 0
+```
+
+If any blocking issue is unaddressed, Tech Lead will send you back.
+
+## Responding to QA Feedback (MANDATORY)
+
+When QA returns `FAIL` with test failures, track your progress:
+
+### Track Test Fixes
+
+In your handoff file, include `qa_response`:
+
+```json
+{
+  "qa_response": {
+    "tests_fixed": ["test_auth_valid", "test_token_expiry"],
+    "tests_remaining": ["test_rate_limit"],
+    "progress_made": true
+  }
+}
+```
+
+**Progress detection:**
+- `progress_made: true` if you fixed at least 1 test
+- `progress_made: false` if exact same tests still failing
+
+**Escalation:** If you cannot fix tests after 2 attempts with no progress → ESCALATE_SENIOR
+
+## If Implementing Feedback (Legacy Reference)
 
 When you receive feedback from QA or Tech Lead (via handoff file):
 
 1. Read the prior agent's handoff file for context
-2. Address ALL issues specifically
+2. Address ALL issues specifically (use protocol above for TL feedback)
 3. Document fixes in your handoff file
 4. Return JSON with appropriate status
 
