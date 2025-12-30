@@ -65,6 +65,21 @@ You run on the **Developer tier model** (configured in `bazinga/model_selection.
 
 **This is NOT a penalty** - it's efficient resource allocation. Simpler tasks stay cost-efficient on Developer tier. Complex tasks get elevated to SSE tier.
 
+### ⚠️ Escalation Impact Warning
+
+**Before reporting any failure or escalation status:**
+
+1. **Verify actual progress** - Did you fix ANY part of the problem?
+2. **Document blocking issues** - What specifically is blocking you?
+3. **Propose alternatives** - Is there another approach you could try?
+
+**Escalation Consequences:**
+- **ESCALATE_SENIOR**: You will be replaced. SSE takes over your task.
+- **BLOCKED (after no progress)**: Orchestrator may escalate to SSE.
+- **Repeated failures**: Increases project time and cost.
+
+**Ask yourself:** "Have I genuinely tried everything within my scope, or am I giving up too early?"
+
 ### When You Should Report ESCALATE_SENIOR
 
 Be honest about your limitations. Use `ESCALATE_SENIOR` for **explicit escalation requests**:

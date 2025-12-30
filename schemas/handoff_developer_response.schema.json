@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "handoff_developer_response.schema.json",
+  "title": "Developer/SSE Issue Response Schema",
+  "description": "Schema for Developer/SSE responses to Tech Lead feedback",
+  "type": "object",
+  "required": ["from_agent", "to_agent", "session_id", "group_id", "status", "issue_responses", "blocking_summary"],
+  "properties": {
+    "from_agent": { "enum": ["developer", "senior_software_engineer"] },
+    "to_agent": { "enum": ["qa_expert", "tech_lead"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "session_id": { "type": "string", "pattern": "^bazinga_" },
+    "group_id": { "type": "string" },
+    "status": {
+      "enum": ["READY_FOR_QA", "READY_FOR_REVIEW", "BLOCKED", "ESCALATE_SENIOR", "SPAWN_INVESTIGATOR"]
+    },
+    "summary": { "type": "string" },
+
+    "issue_responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "action"],
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "pattern": "^TL-[A-Z0-9]+-[0-9]+-[0-9]+$"
+          },
+          "action": {
+            "enum": ["FIXED", "REJECTED", "DEFERRED"]
+          },
+          "details": {
+            "type": "string",
+            "description": "For FIXED: what was changed"
+          },
+          "commit": {
+            "type": "string",
+            "description": "For FIXED: commit hash"
+          },
+          "reason": {
+            "type": "string",
+            "description": "For REJECTED/DEFERRED: technical justification"
+          },
+          "tech_debt_id": {
+            "type": "string",
+            "description": "For DEFERRED: tech debt tracking ID"
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "action": { "const": "FIXED" } } },
+            "then": { "required": ["details"] }
+          },
+          {
+            "if": { "properties": { "action": { "const": "REJECTED" } } },
+            "then": { "required": ["reason"] }
+          },
+          {
+            "if": { "properties": { "action": { "const": "DEFERRED" } } },
+            "then": { "required": ["reason"] }
+          }
+        ]
+      }
+    },
+
+    "blocking_summary": {
+      "type": "object",
+      "required": ["total_blocking", "fixed", "rejected_with_reason", "unaddressed"],
+      "properties": {
+        "total_blocking": { "type": "integer", "minimum": 0 },
+        "fixed": { "type": "integer", "minimum": 0 },
+        "rejected_with_reason": { "type": "integer", "minimum": 0 },
+        "unaddressed": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "implementation": {
+      "type": "object",
+      "properties": {
+        "files_created": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "files_modified": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "key_changes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "tests": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passing": { "type": "integer", "minimum": 0 },
+        "failing": { "type": "integer", "minimum": 0 },
+        "coverage": { "type": "string" },
+        "types": {
+          "type": "array",
+          "items": { "enum": ["unit", "integration", "contract", "e2e"] }
+        }
+      }
+    },
+
+    "validation": {
+      "type": "object",
+      "properties": {
+        "build": { "enum": ["PASS", "FAIL"] },
+        "lint": { "enum": ["PASS", "FAIL", "SKIPPED"] },
+        "tests": { "type": "string" }
+      }
+    },
+
+    "branch": { "type": "string" },
+    "tech_debt_logged": { "type": "boolean" },
+    "testing_mode": { "enum": ["full", "minimal", "disabled"] }
+  }
+}

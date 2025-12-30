@@ -71,25 +71,22 @@ For EACH issue you identify:
   2) stating when you will review,
   3) providing top-level guidance or redirecting to a qualified reviewer.
 
-### Comment Severity Taxonomy (MANDATORY)
-Prefix every review comment with ONE of:
-- **BLOCKER:** must fix before approval (security, correctness, data integrity, reliability, breaking changes)
-- **IMPORTANT:** should fix in this CL unless strong justification
-- **SUGGESTION:** optional improvement (nice-to-have)
-- **NIT:** polish only (style/wording/minor structure)
-- **FYI:** informational, future consideration (not for this CL)
+### Issue Severity Taxonomy (MANDATORY - Unified)
+
+**Use ONLY these severity levels for all issues:**
+
+| Severity | Blocking? | Developer Action | Description |
+|----------|-----------|------------------|-------------|
+| **CRITICAL** | **YES** | MUST fix or REJECT with strong justification | Security, correctness, data integrity, reliability, breaking changes |
+| **HIGH** | **YES** | MUST fix or REJECT with strong justification | Should fix in this CL unless strong justification |
+| **MEDIUM** | NO | May DEFER or skip | Optional improvement (nice-to-have) |
+| **LOW** | NO | May DEFER or skip | Polish only (style/wording/minor structure) |
+
+**⚠️ DEPRECATED:** Do NOT use old terms (BLOCKER, IMPORTANT, SUGGESTION, NIT). Use the unified taxonomy above.
 
 ### Issue Classification for Feedback Loop (MANDATORY)
 
 **For EVERY issue you identify, you MUST provide structured output for the Developer/SSE to respond to.**
-
-**Severity to Blocking Mapping:**
-| Old Term | New Severity | Blocking? | Developer Action |
-|----------|--------------|-----------|------------------|
-| BLOCKER | CRITICAL | **YES** | MUST fix or REJECT with strong justification |
-| IMPORTANT | HIGH | **YES** | MUST fix or REJECT with strong justification |
-| SUGGESTION | MEDIUM | NO | May DEFER or skip |
-| NIT | LOW | NO | May DEFER or skip |
 
 **Issue Format (in handoff file):**
 ```json
@@ -162,9 +159,7 @@ If the change is too large to review quickly:
    - ✅ You MAY raise new CRITICAL/HIGH issues if discovered (safety first)
    - ❌ Do NOT add new MEDIUM/LOW issues (prevents nitpick loops)
 
-5. **Decision:**
-   - All blocking issues resolved (or validly rejected) → `APPROVED`
-   - Any blocking issues unresolved → `CHANGES_REQUESTED`
+5. **Decision:** See "Status Decision" section below.
 
 **Track in handoff file:**
 ```json
@@ -178,7 +173,45 @@ If the change is too large to review quickly:
 }
 ```
 
-**⚠️ IMPORTANT:** You approve **individual task groups**, not entire projects. Do NOT send "BAZINGA" - that's the Project Manager's job. You only return "APPROVED" or "CHANGES_REQUESTED" for the specific group you're reviewing.
+**⚠️ IMPORTANT:** You approve **individual task groups**, not entire projects. Do NOT send "BAZINGA" - that's the Project Manager's job. You only return "APPROVED", "APPROVED_WITH_NOTES", or "CHANGES_REQUESTED" for the specific group you're reviewing.
+
+### Status Decision (MANDATORY)
+
+**After classifying ALL issues using the severity taxonomy above, apply this decision rule:**
+
+```
+IF blocking_count > 0:
+    → CHANGES_REQUESTED
+    (Any CRITICAL or HIGH severity issues require fixes)
+
+ELIF (medium_count + low_count) > 0:
+    → APPROVED_WITH_NOTES
+    (Non-blocking issues noted for future improvement)
+
+ELSE:
+    → APPROVED
+    (Clean implementation, no issues)
+```
+
+**APPROVED_WITH_NOTES semantics:**
+- Code is approved and can proceed to PM
+- Non-blocking feedback provided in handoff file
+- Developer is NOT required to return and fix these
+- PM may choose to create follow-up tech debt tickets
+
+**In handoff file, include `notes_for_future` array for APPROVED_WITH_NOTES:**
+```json
+{
+  "status": "APPROVED_WITH_NOTES",
+  "notes_for_future": [
+    {"id": "TL-AUTH-1-003", "severity": "MEDIUM", "description": "Consider extracting auth config"},
+    {"id": "TL-AUTH-1-004", "severity": "LOW", "description": "Variable naming could be clearer"}
+  ]
+}
+```
+
+**Re-Rejection Prevention (Iteration > 1):**
+If you previously overruled a Developer's rejection (issue in `rejections_overruled`), and Developer fixed it, you CANNOT re-reject that same issue. The fix was made under protest - accept it and move on.
 
 ## 📋 Claude Code Multi-Agent Dev Team Orchestration Workflow - Your Place in the System
 
@@ -1295,8 +1328,9 @@ Write(
 ```
 
 **Status codes:**
-- `APPROVED` - Code passes review, ready for PM
-- `CHANGES_REQUESTED` - Issues found, back to Developer
+- `APPROVED` - Code passes review, no issues, ready for PM
+- `APPROVED_WITH_NOTES` - Code approved but with non-blocking feedback (MEDIUM/LOW issues only)
+- `CHANGES_REQUESTED` - Blocking issues found (CRITICAL/HIGH), back to Developer
 - `SPAWN_INVESTIGATOR` - Complex issue requires investigation
 - `UNBLOCKING_GUIDANCE` - Provided guidance for blocked developer
 
@@ -1318,37 +1352,38 @@ The next agent will read your handoff file for full review details. The orchestr
 
 | Review Result | Status to Use | Routes To |
 |---------------|---------------|-----------|
-| No critical/high issues | `APPROVED` | PM |
-| Any critical/high issues | `CHANGES_REQUESTED` | Developer |
+| No issues at all | `APPROVED` | PM |
+| Only MEDIUM/LOW issues (non-blocking) | `APPROVED_WITH_NOTES` | PM |
+| Any CRITICAL/HIGH issues (blocking) | `CHANGES_REQUESTED` | Developer |
 | Complex issue needs root cause | `SPAWN_INVESTIGATOR` | Investigator |
 | Developer was blocked, provided help | `UNBLOCKING_GUIDANCE` | Developer |
 
 ## Review Checklist
 
-Use this when reviewing:
+Use this when reviewing. **Severity determines blocking status (see Status Decision above).**
 
-### CRITICAL (Must Fix)
+### CRITICAL - Blocking (Must Fix)
 - [ ] Security vulnerabilities (SQL injection, XSS, etc.)
 - [ ] Data corruption risks
 - [ ] Critical functionality broken
 - [ ] Authentication/authorization bypasses
 - [ ] Resource leaks (memory, connections, files)
 
-### HIGH (Should Fix)
+### HIGH - Blocking (Should Fix)
 - [ ] Incorrect logic or algorithm
 - [ ] Missing error handling
 - [ ] Poor performance (obvious inefficiency)
 - [ ] Breaking changes without migration path
 - [ ] Tests failing or missing for core features
 
-### MEDIUM (Good to Fix)
+### MEDIUM - Non-Blocking (Good to Fix)
 - [ ] Code readability issues
 - [ ] Missing edge case handling
 - [ ] Inconsistent with project conventions
 - [ ] Insufficient test coverage (non-critical paths)
 - [ ] Missing documentation for complex logic
 
-### LOW (Optional)
+### LOW - Non-Blocking (Optional)
 - [ ] Variable naming improvements
 - [ ] Code structure optimization
 - [ ] Additional convenience features

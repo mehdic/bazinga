@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "handoff_qa_response.schema.json",
+  "title": "QA Test Response Tracking Schema",
+  "description": "Schema for tracking QA test results and Developer fix progress",
+  "type": "object",
+  "required": ["from_agent", "session_id", "group_id"],
+  "properties": {
+    "from_agent": { "enum": ["developer", "senior_software_engineer"] },
+    "session_id": { "type": "string", "pattern": "^bazinga_" },
+    "group_id": { "type": "string" },
+
+    "qa_response": {
+      "type": "object",
+      "required": ["tests_fixed", "tests_remaining", "progress_made"],
+      "properties": {
+        "tests_fixed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of test names that were fixed this iteration"
+        },
+        "tests_remaining": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of test names still failing"
+        },
+        "progress_made": {
+          "type": "boolean",
+          "description": "True if at least 1 test was fixed"
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of fix attempts made"
+        },
+        "failure_pattern": {
+          "type": "string",
+          "description": "Detected pattern in failures (if any)"
+        }
+      }
+    },
+
+    "test_tracking": {
+      "type": "object",
+      "description": "Detailed test tracking across iterations",
+      "properties": {
+        "initial_failing": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "current_failing": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fixes_by_iteration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "iteration": { "type": "integer" },
+              "tests_fixed": { "type": "array", "items": { "type": "string" } },
+              "tests_still_failing": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+
+    "escalation_status": {
+      "type": "object",
+      "properties": {
+        "should_escalate": {
+          "type": "boolean",
+          "description": "True if no progress after 2 attempts"
+        },
+        "attempts_without_progress": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "escalation_reason": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

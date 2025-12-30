@@ -296,15 +296,41 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 **Problem:** PM may send BAZINGA while unresolved CRITICAL/HIGH issues exist from Tech Lead reviews.
 
-**Step 1: Query unresolved blocking issues**
+**Step 1: Query TL issues and Developer responses from events**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-unresolved-blocking \
-  "[session_id]"
+# Get latest TL issues for each group
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" --event_type "tl_issues" --limit 10
+
+# Get latest Developer responses for each group
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" --event_type "tl_issue_responses" --limit 10
 ```
 
-This returns all review issues where:
-- `blocking = true` (CRITICAL or HIGH severity)
-- `resolution_status != "FIXED"` AND `resolution_status != "REJECTED_ACCEPTED"`
+**Step 2: Compute unresolved blocking issues**
+
+For each task group, diff the latest `tl_issues` against `tl_issue_responses`:
+```
+unresolved_blocking = []
+for issue in tl_issues.issues where issue.blocking == true:
+  response = find(tl_issue_responses.issue_responses, issue.id)
+  if response is None:
+    unresolved_blocking.append(issue)  # Not addressed
+  elif response.action == "REJECTED":
+    # Check if TL accepted the rejection (from iteration_tracking)
+    if issue.id not in tl_issues.iteration_tracking.rejections_accepted:
+      unresolved_blocking.append(issue)  # Rejection not accepted
+  elif response.action == "FIXED":
+    # Assume fixed (TL will re-flag if not actually fixed)
+    pass
+```
+
+**Alternative: If events not found, check handoff files directly:**
+```bash
+# Fallback: Read handoff files
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead.json | jq '.issues[] | select(.blocking == true)'
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json | jq '.issue_responses'
+```
 
 **Step 2: Check for any unresolved blocking issues**
 

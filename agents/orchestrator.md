@@ -2150,31 +2150,79 @@ The skill returns JSON with:
 
 **When routing CHANGES_REQUESTED or FAIL back to Developer/SSE, you MUST track progress.**
 
+#### Step 0: Save Issue Events (CRITICAL for Validator)
+
+**After receiving Tech Lead response:**
+```bash
+# Extract issues from TL handoff and save as event
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "{session_id}" "tl_issues" '{"group_id": "{group_id}", "iteration": {N}, "issues": [...], "blocking_count": {N}}'
+```
+
+**After receiving Developer/SSE response to CHANGES_REQUESTED:**
+```bash
+# Extract issue_responses from Dev handoff and save as event
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "{session_id}" "tl_issue_responses" '{"group_id": "{group_id}", "issue_responses": [...], "blocking_summary": {...}}'
+```
+
+**Why this matters:** The validator uses these events to compute unresolved blocking issues. Without them, BAZINGA could be accepted with unresolved CRITICAL/HIGH issues.
+
 #### Step 1: Read Handoff Files to Determine Progress
 
 After receiving Developer/SSE response to CHANGES_REQUESTED:
 ```bash
 # Read the implementing agent's handoff
-cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json | jq '.blocking_summary.fixed'
+cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json | jq '.blocking_summary'
+```
+
+**Progress is measured by "blocking_issues_remaining decreased", NOT "any fixes":**
+```
+previous_blocking = {from prior TL handoff}
+current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - blocking_summary.rejected_with_reason
+
+IF current_blocking < previous_blocking:
+  → Progress made (blocking issues decreased)
+ELSE:
+  → No progress (same or more blocking issues)
 ```
 
 After receiving QA FAIL response:
 ```bash
 # Read QA's handoff
-cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_qa_expert.json | jq '.test_progression.progress_made'
+cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_qa_expert.json | jq '.test_progression'
+```
+
+**QA progress is measured by "still_failing count decreased":**
+```
+previous_failing = {from prior QA handoff}
+current_failing = len(test_progression.still_failing)
+
+IF current_failing < previous_failing:
+  → Progress made
+ELSE:
+  → No progress
 ```
 
 #### Step 2: Update Database State
 
-Update task_groups with progress tracking (via bazinga-db skill):
-```
-Skill(command: "bazinga-db") → update-review-progress {session_id} {group_id} {issues_fixed_count}
+Update task_groups with progress tracking:
+```bash
+# Calculate blocking_remaining
+blocking_remaining = blocking_summary.total_blocking - blocking_summary.fixed
+
+# Update via bazinga-db
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-group \
+  "{group_id}" "{session_id}" \
+  --review_iteration {new_iteration} \
+  --no_progress_count {0 if progress else current+1} \
+  --blocking_issues_count {blocking_remaining}
 ```
 
-This command:
-- If `issues_fixed_count > 0`: Resets `no_progress_count` to 0
-- If `issues_fixed_count == 0`: Increments `no_progress_count` by 1
-- Increments `review_iteration` by 1
+**Progress determination:**
+- If `blocking_remaining < previous_blocking_count`: Reset `no_progress_count` to 0
+- If `blocking_remaining >= previous_blocking_count`: Increment `no_progress_count` by 1
+- Always increment `review_iteration` by 1
 
 #### Step 3: Check Escalation Rules
 

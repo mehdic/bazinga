@@ -1116,12 +1116,13 @@ Write(
 
 ### SSE Status Codes
 
-| Status | When to Use |
-|--------|-------------|
-| `READY_FOR_QA` | Fix complete with tests |
-| `READY_FOR_REVIEW` | Fix complete, minimal/no tests |
-| `BLOCKED` | Cannot proceed without help |
-| `ROOT_CAUSE_FOUND` | Identified cause, need PM decision |
+| Status | When to Use | Routes To |
+|--------|-------------|-----------|
+| `READY_FOR_QA` | Fix complete with tests | QA Expert |
+| `READY_FOR_REVIEW` | Fix complete, minimal/no tests | Tech Lead |
+| `BLOCKED` | Need architectural guidance | Tech Lead |
+| `SPAWN_INVESTIGATOR` | Root cause unclear, need investigation | Investigator |
+| `ROOT_CAUSE_FOUND` | Identified cause, need PM decision | PM |
 ### 6. Final Response (MANDATORY FORMAT)
 
 **Your final response to the orchestrator MUST be ONLY this JSON:**
@@ -1138,10 +1139,11 @@ Write(
 ```
 
 **Status codes:**
-- `READY_FOR_QA` - Implementation complete with integration/contract/E2E tests
-- `READY_FOR_REVIEW` - Implementation complete (unit tests only or no tests)
-- `BLOCKED` - Cannot proceed without external help
-- `ROOT_CAUSE_FOUND` - Identified root cause, need PM decision
+- `READY_FOR_QA` - Implementation complete with integration/contract/E2E tests → QA Expert
+- `READY_FOR_REVIEW` - Implementation complete (unit tests only or no tests) → Tech Lead
+- `BLOCKED` - Need architectural guidance → Tech Lead
+- `SPAWN_INVESTIGATOR` - Root cause unclear, need systematic investigation → Investigator
+- `ROOT_CAUSE_FOUND` - Identified root cause, need PM decision → PM
 
 **Summary guidelines:**
 - Line 1: "Fixed race condition in async auth flow"
@@ -1515,9 +1517,51 @@ async def fetch_with_resilience(url: str) -> Response:
                 await asyncio.sleep(2 ** attempt)
 ```
 
-## Senior Escalation to Tech Lead
+## Senior Escalation Paths (When You Also Struggle)
 
-If you ALSO struggle (shouldn't happen often):
+If you ALSO struggle (shouldn't happen often), choose the appropriate escalation path:
+
+### Path A: Investigator (Complex Debugging)
+
+**Use when:**
+- Root cause unclear after your analysis
+- Need systematic hypothesis testing
+- Multi-variable problem (A works, B works, A+B fails)
+- Environmental differences (prod vs staging)
+- Intermittent/non-deterministic behavior
+
+```markdown
+## Senior Engineer Needs Investigation
+
+### Original Task
+{task description}
+
+### Developer Attempt
+{what developer tried}
+
+### My Attempt
+{what I tried}
+
+### Root Cause Analysis Status
+- Root cause unclear despite analysis
+- Need systematic investigation
+
+### Hypothesis Matrix
+| Hypothesis | Likelihood | Evidence |
+|-----------|------------|----------|
+| [H1] | High (70%) | [Supporting facts] |
+| [H2] | Medium (50%) | [Supporting facts] |
+
+### Status: SPAWN_INVESTIGATOR
+### Next Step: Orchestrator, please spawn Investigator for root cause analysis
+```
+
+### Path B: Tech Lead (Architectural Guidance)
+
+**Use when:**
+- Need architectural decision
+- Design alternatives unclear
+- Trade-off analysis required
 
 ```markdown
 ## Senior Engineer Blocked
@@ -1541,6 +1585,15 @@ If you ALSO struggle (shouldn't happen often):
 
 ### Status: BLOCKED
 ### Next Step: Orchestrator, please forward to Tech Lead for guidance
+```
+
+### ⚠️ Escalation Decision Rule
+
+```
+IF root_cause_unclear AND needs_systematic_investigation:
+    → SPAWN_INVESTIGATOR
+ELIF needs_architectural_decision OR design_guidance_needed:
+    → BLOCKED (to Tech Lead)
 ```
 
 
