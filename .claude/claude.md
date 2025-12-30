@@ -1293,6 +1293,76 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-skill-output
 
 ---
 
+### 🧪 Full Integration Test Suite
+
+**When the user says "run full integration test" or "run all integration tests", execute BOTH tests:**
+
+#### Test 1: Simple Calculator (Happy Path)
+
+The test described above (`tests/integration/simple-calculator-spec.md`). This validates the complete workflow when everything passes on first try.
+
+#### Test 2: Code Review Feedback Loop
+
+**Purpose:** Validates the CHANGES_REQUESTED → Developer fix → re-review cycle.
+
+```bash
+# Clear previous test data (separate from calculator test)
+rm -rf tmp/auth-service
+
+# Run orchestration with feedback loop spec
+/bazinga.orchestrate Implement the User Authentication Service as specified in tests/integration/code-review-loop-spec.md
+```
+
+**What This Tests:**
+
+| Component | Validation |
+|-----------|------------|
+| TL Issues Event Storage | `tl_issues` event saved with blocking issues |
+| Developer Response Tracking | `tl_issue_responses` event with fix actions |
+| TL Verdicts (if rejections) | `tl_verdicts` event for ACCEPTED/OVERRULED |
+| Progress Tracking | `review_iteration` increments correctly |
+| Blocking Issue Count | `blocking_issues_count` updates correctly |
+| Re-rejection Prevention | Accepted rejections cannot be re-flagged |
+| Monotonicity Enforcement | Counters never decrease (race-safe) |
+
+**Expected Flow:**
+
+1. Developer implements (with deliberate security issues)
+2. QA passes (functional tests)
+3. Tech Lead returns `CHANGES_REQUESTED` with 5+ blocking issues
+4. Developer fixes issues, returns `READY_FOR_REVIEW`
+5. Tech Lead re-reviews → `APPROVED` or another `CHANGES_REQUESTED`
+6. Loop continues until `APPROVED`
+7. PM sends `BAZINGA`
+
+**Verification Commands:**
+
+```bash
+# Check TL issues were stored
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events "<SESSION_ID>" "tl_issues"
+
+# Check Developer responses were stored
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events "<SESSION_ID>" "tl_issue_responses"
+
+# Check review iteration incremented
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "<SESSION_ID>"
+# Look for: review_iteration >= 2
+```
+
+**Pass Criteria:**
+
+| Check | Expected |
+|-------|----------|
+| TL Issues Events | 1+ events with blocking_count > 0 |
+| Developer Response Events | 1+ events with issue_responses |
+| Review Iterations | review_iteration >= 2 |
+| Final Status | Session completed, all groups approved |
+| Security Issues Fixed | No hardcoded secrets, parameterized SQL |
+
+**Test Spec Location:** `tests/integration/code-review-loop-spec.md`
+
+---
+
 ## 🧪 Prompt Builder Testing
 
 **When the user says "test the prompt builder", "test prompt building", or "run prompt builder tests":**
