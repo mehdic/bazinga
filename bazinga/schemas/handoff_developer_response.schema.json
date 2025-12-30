@@ -7,7 +7,7 @@
   "required": ["from_agent", "to_agent", "session_id", "group_id", "status", "issue_responses", "blocking_summary"],
   "properties": {
     "from_agent": { "enum": ["developer", "senior_software_engineer"] },
-    "to_agent": { "enum": ["qa_expert", "tech_lead", "investigator"] },
+    "to_agent": { "enum": ["qa_expert", "tech_lead", "investigator", "project_manager"] },
     "timestamp": { "type": "string", "format": "date-time" },
     "session_id": { "type": "string", "pattern": "^bazinga_" },
     "group_id": { "type": "string" },

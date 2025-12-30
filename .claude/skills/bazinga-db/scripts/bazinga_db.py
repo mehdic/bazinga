@@ -1447,25 +1447,41 @@ class BazingaDB:
                 updates.append("blocking_issues_count = ?")
                 params.append(blocking_issues_count)
 
+            # Server-side validation for non-negative counters (defense in depth)
+            if no_progress_count is not None and no_progress_count < 0:
+                return {"success": False, "error": f"no_progress_count cannot be negative: {no_progress_count}"}
+            if blocking_issues_count is not None and blocking_issues_count < 0:
+                return {"success": False, "error": f"blocking_issues_count cannot be negative: {blocking_issues_count}"}
+            if review_iteration is not None and review_iteration < 1:
+                return {"success": False, "error": f"review_iteration must be >= 1: {review_iteration}"}
+
             # Monotonicity enforcement for iteration counters (prevent accidental decreases)
+            # Use BEGIN IMMEDIATE for atomic read-check-update to prevent race conditions
             if review_iteration is not None or no_progress_count is not None:
-                current = conn.execute(
-                    "SELECT review_iteration, no_progress_count FROM task_groups WHERE id = ? AND session_id = ?",
-                    (group_id, session_id)
-                ).fetchone()
-                if current:
-                    current_ri = current['review_iteration'] or 0
-                    current_npc = current['no_progress_count'] or 0
-                    if review_iteration is not None and review_iteration < current_ri:
-                        return {
-                            "success": False,
-                            "error": f"review_iteration cannot decrease: current={current_ri}, requested={review_iteration}"
-                        }
-                    if no_progress_count is not None and no_progress_count < current_npc:
-                        return {
-                            "success": False,
-                            "error": f"no_progress_count cannot decrease: current={current_npc}, requested={no_progress_count}"
-                        }
+                conn.execute("BEGIN IMMEDIATE")  # Acquire write lock immediately
+                try:
+                    current = conn.execute(
+                        "SELECT review_iteration, no_progress_count FROM task_groups WHERE id = ? AND session_id = ?",
+                        (group_id, session_id)
+                    ).fetchone()
+                    if current:
+                        current_ri = current['review_iteration'] or 0
+                        current_npc = current['no_progress_count'] or 0
+                        if review_iteration is not None and review_iteration < current_ri:
+                            conn.rollback()
+                            return {
+                                "success": False,
+                                "error": f"review_iteration cannot decrease: current={current_ri}, requested={review_iteration}"
+                            }
+                        if no_progress_count is not None and no_progress_count < current_npc:
+                            conn.rollback()
+                            return {
+                                "success": False,
+                                "error": f"no_progress_count cannot decrease: current={current_npc}, requested={no_progress_count}"
+                            }
+                except Exception as e:
+                    conn.rollback()
+                    raise e
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")

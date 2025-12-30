@@ -268,5 +268,16 @@ def skill_available(agent: str, skill: str) -> bool:
 2. `ca21ed4` - First self-review fixes (missed schemas, error handling)
 3. `adbd8d0` - Second self-review fixes (routing gap, markers)
 
+**Third Review Fixes (commit pending):**
+
+| Issue | Severity | Fix |
+|-------|----------|-----|
+| Monotonicity race condition | 🔴 Critical | Added `BEGIN IMMEDIATE` transaction |
+| to_agent missing project_manager | 🔴 Critical | Added to handoff_developer_response schema |
+| session_id required in event schemas | 🟡 Medium | Made optional, added `$comment` |
+| Server-side counter validation | 🟡 Medium | Added validation in update_task_group |
+| CHECK constraints missing | 🟡 Medium | Added to init_db.py CREATE TABLE |
+| Code review loop not tested | 🟡 Medium | Created code-review-loop-spec.md |
+
 **Remaining work (short-term):**
 - Unit tests for monotonicity enforcement
