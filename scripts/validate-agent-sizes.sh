@@ -13,9 +13,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Size limits
-# Claude Code has a practical limit of ~25,000 tokens
+# Claude Code has a practical limit of ~25,000 tokens for most agents
 # Using rough estimate of 4 characters per token = 100,000 characters
-HARD_LIMIT_CHARS=100000  # ~25,000 tokens - will fail CI
+# Orchestrator gets a higher limit (120k chars / ~30k tokens) due to its complexity
+HARD_LIMIT_CHARS=100000  # ~25,000 tokens - will fail CI (default)
+ORCHESTRATOR_HARD_LIMIT=120000  # ~30,000 tokens - orchestrator exception
 WARN_LIMIT_CHARS=80000   # ~20,000 tokens - will show warning
 
 # Counters
@@ -36,6 +38,12 @@ echo ""
 check_file() {
     local file="$1"
     local char_count
+    local limit=$HARD_LIMIT_CHARS
+
+    # Orchestrator files get a higher limit (includes orchestrate command)
+    if [[ "$file" == *"orchestrat"* ]]; then
+        limit=$ORCHESTRATOR_HARD_LIMIT
+    fi
 
     # Get character count (bytes, approximation for ASCII/UTF-8 text)
     char_count=$(wc -c < "$file")
@@ -48,17 +56,21 @@ check_file() {
     local estimated_tokens=$((char_count / 4))
 
     # Check against limits
-    if [ "$char_count" -gt "$HARD_LIMIT_CHARS" ]; then
+    if [ "$char_count" -gt "$limit" ]; then
         echo -e "${RED}❌ FAIL${NC}: $file"
         echo "   Size: $char_count chars (~$estimated_tokens tokens, $line_count lines)"
-        echo "   Exceeds hard limit by $((char_count - HARD_LIMIT_CHARS)) characters"
+        echo "   Exceeds hard limit ($limit chars) by $((char_count - limit)) characters"
         echo ""
         oversized_files=$((oversized_files + 1))
         return 1
     elif [ "$char_count" -gt "$WARN_LIMIT_CHARS" ]; then
+        local limit_label="$limit chars"
+        if [[ "$file" == *"orchestrat"* ]]; then
+            limit_label="$limit chars (orchestrator exception)"
+        fi
         echo -e "${YELLOW}⚠️  WARN${NC}: $file"
         echo "   Size: $char_count chars (~$estimated_tokens tokens, $line_count lines)"
-        echo "   Approaching limit (${WARN_LIMIT_CHARS} chars)"
+        echo "   Approaching limit ($limit_label)"
         echo ""
         warning_files=$((warning_files + 1))
         return 0
