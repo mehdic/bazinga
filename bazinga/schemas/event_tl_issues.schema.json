@@ -9,7 +9,7 @@
     "session_id": {
       "type": "string",
       "pattern": "^bazinga_",
-      "description": "Session identifier"
+      "description": "Session identifier. Note: When using save-event CLI, session_id is passed as first arg and stored in DB record - NOT required in JSON payload."
     },
     "group_id": {
       "type": "string",

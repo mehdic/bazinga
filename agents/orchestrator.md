@@ -2217,6 +2217,7 @@ verdicts += [{"issue_id": id, "verdict": "OVERRULED", **{k: issues.get(id, {}).g
 ```python
 import json
 import subprocess
+import sys
 
 # Step 1: Get all TL verdicts for this session
 result = subprocess.run(
@@ -2224,7 +2225,17 @@ result = subprocess.run(
      "get-events", session_id, "tl_verdicts"],
     capture_output=True, text=True
 )
-all_verdicts = json.loads(result.stdout) if result.stdout else []
+
+# Step 1.5: Handle subprocess errors gracefully
+if result.returncode != 0:
+    print(f"Warning: Failed to get verdicts (exit {result.returncode}): {result.stderr}", file=sys.stderr)
+    all_verdicts = []
+else:
+    try:
+        all_verdicts = json.loads(result.stdout) if result.stdout.strip() else []
+    except json.JSONDecodeError as e:
+        print(f"Warning: Invalid JSON from get-events: {e}", file=sys.stderr)
+        all_verdicts = []
 
 # Step 2: Filter to this group's verdicts
 all_prior_verdicts = [v for v in all_verdicts if v.get("group_id") == group_id]

@@ -9,7 +9,7 @@
     "session_id": {
       "type": "string",
       "pattern": "^bazinga_",
-      "description": "Session identifier"
+      "description": "Session identifier. Note: When using save-event CLI, session_id is passed as first arg and stored in DB record - NOT required in JSON payload."
     },
     "group_id": {
       "type": "string",
@@ -37,7 +37,7 @@
         "properties": {
           "issue_id": {
             "type": "string",
-            "pattern": "^TL-[A-Z0-9]+-[0-9]+-[0-9]+$",
+            "pattern": "^TL-[A-Za-z0-9_-]+-[0-9]+-[0-9]+$",
             "description": "Original TL issue ID that Developer rejected"
           },
           "verdict": {
