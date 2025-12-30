@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "handoff_qa_response.schema.json",
   "title": "QA Test Response Tracking Schema",
-  "description": "Schema for tracking QA test results and Developer fix progress",
+  "description": "Schema for tracking QA test results and Developer fix progress. Uses test_progression as documented in qa_expert.md.",
   "type": "object",
   "required": ["from_agent", "session_id", "group_id"],
   "properties": {
@@ -10,58 +10,41 @@
     "session_id": { "type": "string", "pattern": "^bazinga_" },
     "group_id": { "type": "string" },
 
-    "qa_response": {
+    "test_progression": {
       "type": "object",
-      "required": ["tests_fixed", "tests_remaining", "progress_made"],
+      "description": "Test progress tracking as documented in qa_expert.md",
+      "required": ["iteration", "original_failures", "still_failing"],
       "properties": {
-        "tests_fixed": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "List of test names that were fixed this iteration"
-        },
-        "tests_remaining": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "List of test names still failing"
-        },
-        "progress_made": {
-          "type": "boolean",
-          "description": "True if at least 1 test was fixed"
-        },
-        "attempt_count": {
+        "iteration": {
           "type": "integer",
           "minimum": 1,
-          "description": "Number of fix attempts made"
+          "description": "Current QA iteration number"
         },
-        "failure_pattern": {
-          "type": "string",
-          "description": "Detected pattern in failures (if any)"
-        }
-      }
-    },
-
-    "test_tracking": {
-      "type": "object",
-      "description": "Detailed test tracking across iterations",
-      "properties": {
-        "initial_failing": {
+        "original_failures": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "description": "Test names that failed in first iteration"
         },
-        "current_failing": {
+        "fixed_since_start": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "description": "Test names now passing that originally failed"
         },
-        "fixes_by_iteration": {
+        "still_failing": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "iteration": { "type": "integer" },
-              "tests_fixed": { "type": "array", "items": { "type": "string" } },
-              "tests_still_failing": { "type": "array", "items": { "type": "string" } }
-            }
-          }
+          "items": { "type": "string" },
+          "description": "Test names still failing from original set"
+        },
+        "new_failures": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Test names that failed this iteration but not before"
+        },
+        "progress_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of original failures now fixed"
         }
       }
     },

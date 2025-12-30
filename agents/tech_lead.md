@@ -1282,11 +1282,11 @@ Write(
   ],
 
   "issue_summary": {
-    "critical": "{N}",
-    "high": "{N}",
-    "medium": "{N}",
-    "low": "{N}",
-    "blocking_count": "{N - total CRITICAL + HIGH}"
+    "critical": 1,
+    "high": 2,
+    "medium": 3,
+    "low": 1,
+    "blocking_count": 3
   },
 
   "iteration": "{current review iteration number, starts at 1}",

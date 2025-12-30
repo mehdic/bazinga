@@ -352,13 +352,17 @@ blocking_summary = handoff.get("blocking_summary", {"total_blocking": 0, "fixed"
 issue_responses = handoff.get("issue_responses", [])
 ```
 
-**🔴 CRITICAL: If NEITHER events NOR handoff files exist for reviewed groups:**
+**🔴 CRITICAL: If review occurred but evidence is missing:**
 ```
-# For each task group that had review_iteration > 0:
-IF no tl_issues events found AND no handoff_tech_lead.json exists:
-  → Return: REJECT
-  → Reason: "Cannot verify blocking issues - missing review data for group {group_id}"
-  → Note: This indicates orchestrator failed to save review events
+# Check if TL review actually occurred by looking for tl_issues events
+# Note: review_iteration defaults to 1, so checking > 0 is unreliable
+tl_issues_events = get_events(session_id, "tl_issues", group_id)
+
+IF tl_issues_events exist (TL review happened):
+  IF no tl_issue_responses events AND no handoff_implementation.json exists:
+    → Return: REJECT
+    → Reason: "TL raised issues but no Developer responses found for group {group_id}"
+    → Note: This indicates Developer did not address TL feedback
 ```
 
 This hard failure prevents BAZINGA acceptance when review evidence is missing.
@@ -390,20 +394,22 @@ This hard failure prevents BAZINGA acceptance when review evidence is missing.
 
 **Step 3: Validate rejected issues (if any)**
 
-For issues with `resolution_status = "REJECTED"`:
-- Check if Tech Lead accepted the rejection (`REJECTED_ACCEPTED`)
-- If rejection NOT accepted, issue still counts as unresolved
-- Only `REJECTED_ACCEPTED` status means Tech Lead agreed the fix is unnecessary
+For issues with Developer `action = "REJECTED"`:
+- Check tl_verdicts events for TL's verdict on this issue_id
+- Only `ACCEPTED` verdict means TL agreed the fix is unnecessary
+- `OVERRULED` or no verdict means issue still counts as blocking
 
-**Rejection states:**
-| Status | Meaning | Blocks BAZINGA? |
-|--------|---------|-----------------|
-| `FIXED` | Developer fixed the issue | ❌ No |
-| `REJECTED` | Developer rejected, TL not yet reviewed | ✅ YES |
-| `REJECTED_ACCEPTED` | Developer rejected, TL agreed | ❌ No |
-| `REJECTED_OVERRULED` | Developer rejected, TL disagreed | ✅ YES |
-| `DEFERRED` | Non-blocking only, deferred | ❌ No (blocking can't defer) |
-| `OPEN` | Not addressed | ✅ YES |
+**Resolution states (based on tl_verdicts events):**
+| Developer Action | TL Verdict | Final State | Blocks BAZINGA? |
+|------------------|------------|-------------|-----------------|
+| `FIXED` | N/A | Resolved | ❌ No |
+| `REJECTED` | `ACCEPTED` | TL agreed | ❌ No |
+| `REJECTED` | `OVERRULED` | TL disagreed | ✅ YES |
+| `REJECTED` | (none yet) | Pending TL review | ✅ YES |
+| `DEFERRED` | N/A | Deferred (non-blocking only) | ❌ No |
+| (none) | N/A | Unaddressed | ✅ YES |
+
+**Note:** The `rejection_accepted` field in event_tl_issue_responses.schema.json is deprecated. Use tl_verdicts events as the single source of truth for TL decisions.
 
 ---
 

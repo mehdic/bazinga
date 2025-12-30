@@ -57,7 +57,8 @@
           },
           "rejection_accepted": {
             "type": "boolean",
-            "description": "TL agreed with developer's rejection - issue is closed, cannot be re-flagged"
+            "description": "DEPRECATED: Use tl_verdicts events instead. This field is ignored in progress calculations. The tl_verdicts event is the single source of truth for TL decisions.",
+            "deprecated": true
           },
           "location": {
             "type": "string",

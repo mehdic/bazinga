@@ -2192,14 +2192,16 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 ```
 
 **After TL re-review (iteration > 1), save TL verdicts:**
-```bash
-# Extract verdicts from TL handoff iteration_tracking and save as event
-# This is the SINGLE SOURCE OF TRUTH for rejection acceptance
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
-  "{session_id}" "tl_verdicts" '{"group_id": "{group_id}", "iteration": {N}, "verdicts": [{"issue_id": "TL-...", "verdict": "ACCEPTED|OVERRULED", "location": "...", "title": "..."}], "summary": {"accepted_count": N, "overruled_count": N}}'
-```
 
-**Why this matters:** The validator uses these events to compute unresolved blocking issues. Without them, BAZINGA could be accepted with unresolved CRITICAL/HIGH issues.
+Transform TL's `iteration_tracking` into tl_verdicts event:
+```python
+# Get IDs from TL handoff, lookup details from tl_issues, save via Skill(command: "bazinga-db")
+it = tl_handoff.get("iteration_tracking", {})
+issues = {i["id"]: i for e in tl_issues_events for i in e.get("issues", [])}
+verdicts = [{"issue_id": id, "verdict": "ACCEPTED", **{k: issues.get(id, {}).get(k, "") for k in ["location", "title"]}} for id in it.get("rejections_accepted", [])]
+verdicts += [{"issue_id": id, "verdict": "OVERRULED", **{k: issues.get(id, {}).get(k, "") for k in ["location", "title"]}} for id in it.get("rejections_overruled", [])]
+# Save: Skill(command: "bazinga-db") → save-event {session_id} tl_verdicts {payload}
+```
 
 #### Step 0.5: Re-Rejection Prevention (MANDATORY for Iteration > 1)
 
@@ -2262,17 +2264,11 @@ iteration_tracking = handoff.get("iteration_tracking", {"iteration": 1})
 
 **Progress is measured by "blocking_issues_remaining decreased", NOT "any fixes":**
 ```python
-previous_blocking = {from DB: task_groups.blocking_issues_count}
-
-# Count TL-accepted rejections from tl_verdicts events (single source of truth)
-tl_verdicts = get_events(session_id, "tl_verdicts", group_id)
-tl_accepted = sum(1 for v in all_verdicts if v.get("verdict") == "ACCEPTED")
+previous_blocking = db.blocking_issues_count  # From task_groups table
+# Query via Skill(command: "bazinga-db") → get-events, then flatten and count ACCEPTED
+tl_accepted = sum(1 for e in tl_verdicts_events for v in e.get("verdicts", []) if v.get("verdict") == "ACCEPTED")
 current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
-
-IF current_blocking < previous_blocking:
-  → Progress made (blocking issues decreased)
-ELSE:
-  → No progress (same or more blocking issues)
+# Progress: current_blocking < previous_blocking
 ```
 
 After receiving QA FAIL response:
@@ -2303,7 +2299,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups 
 
 **Extract values:**
 ```python
-previous_iteration = db_result.get("review_iteration", 0)
+# Default to 1 (not 0) to match DB DEFAULT and avoid false first-iteration penalty
+previous_iteration = db_result.get("review_iteration", 1)
 previous_no_progress = db_result.get("no_progress_count", 0)
 previous_blocking = db_result.get("blocking_issues_count", 0)
 ```
@@ -2313,15 +2310,14 @@ previous_blocking = db_result.get("blocking_issues_count", 0)
 **Calculate new values:**
 ```python
 # Current blocking = total - fixed - TL-accepted rejections
-# Query tl_verdicts events for ACCEPTED count (single source of truth)
-tl_verdicts = get_events(session_id, "tl_verdicts", group_id)
-tl_accepted = sum(1 for v in all_verdicts if v.get("verdict") == "ACCEPTED")
+# Query tl_verdicts events via Skill(command: "bazinga-db") → get-events
+# Then flatten verdicts from all events and count ACCEPTED
+tl_verdicts_events = get_events(session_id, "tl_verdicts", group_id)
+tl_accepted = sum(1 for e in tl_verdicts_events for v in e.get("verdicts", []) if v.get("verdict") == "ACCEPTED")
 current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
 
-# Determine progress with first-iteration exception
-# Note: DB default is review_iteration=1, so first iteration check uses == 1
+# First-iteration exception (DB default=1)
 if previous_iteration == 1:
-    # First iteration - no "no progress" penalty
     progress = True
     new_no_progress = 0
 elif current_blocking == 0:
