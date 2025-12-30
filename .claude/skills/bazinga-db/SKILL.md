@@ -298,9 +298,9 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "sess_123" "tl_issues" '{"group_id": "AUTH", "iteration": 1, "issues": [...], "blocking_count": 3}'
 
-# Save Dev/SSE responses to TL issues
+# Save Dev/SSE responses to TL issues (iteration required for dedup)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
-  "sess_123" "tl_issue_responses" '{"group_id": "AUTH", "issue_responses": [...], "blocking_summary": {...}}'
+  "sess_123" "tl_issue_responses" '{"group_id": "AUTH", "iteration": 1, "issue_responses": [...], "blocking_summary": {...}}'
 ```
 
 **Schema validation:** Event payloads should conform to schemas in `bazinga/schemas/`:

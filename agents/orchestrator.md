@@ -2205,25 +2205,29 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 ```
 
 ```python
-# Parse prior responses from DB event
-prior_responses = db_result.get("issue_responses", [])
+# Parse prior TL handoff from DB event
+iteration_tracking = db_result.get("iteration_tracking", {})
+prior_issues = db_result.get("issues", [])
 
-# Find rejections that TL accepted in prior iteration
-# Note: Issue IDs include iteration (TL-AUTH-1-001 vs TL-AUTH-2-001)
-# So we track by location+title for cross-iteration matching
-previous_overruled = set()
-for response in prior_responses:
-    if response.get("rejection_overruled", False) or response.get("rejection_accepted", False):
-        # Store a normalized key for matching
-        issue_key = f"{response.get('location', '')}|{response.get('title', '')}"
-        previous_overruled.add(issue_key)
+# TL tracks accepted/overruled in iteration_tracking arrays (issue IDs)
+rejections_accepted_ids = set(iteration_tracking.get("rejections_accepted", []))
+rejections_overruled_ids = set(iteration_tracking.get("rejections_overruled", []))
 
-# Check if TL is re-flagging any previously overruled issues
+# Build location+title keys for cross-iteration matching
+# (Issue IDs include iteration number, so direct ID matching fails across iterations)
+previous_closed = set()
+for issue in prior_issues:
+    issue_id = issue.get("id", "")
+    if issue_id in rejections_accepted_ids or issue_id in rejections_overruled_ids:
+        issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
+        previous_closed.add(issue_key)
+
+# Check if TL is re-flagging any previously closed issues
 re_flagged = []
 for issue in current_tl_handoff.get("issues", []):
     if issue.get("blocking"):
         issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
-        if issue_key in previous_overruled:
+        if issue_key in previous_closed:
             re_flagged.append(issue.get("id"))
 ```
 
@@ -2260,9 +2264,13 @@ iteration_tracking = handoff.get("iteration_tracking", {"iteration": 1})
 ```
 
 **Progress is measured by "blocking_issues_remaining decreased", NOT "any fixes":**
-```
-previous_blocking = {from prior TL handoff}
-current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - blocking_summary.rejected_with_reason
+```python
+previous_blocking = {from prior TL handoff blocking_issues_count}
+
+# Only count TL-accepted rejections (not all rejected_with_reason)
+# Get accepted count from prior tl_issue_responses event
+tl_accepted = len([r for r in prior_tl_responses if r.get("rejection_accepted")])
+current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
 
 IF current_blocking < previous_blocking:
   → Progress made (blocking issues decreased)
@@ -2307,11 +2315,14 @@ previous_blocking = db_result.get("blocking_issues_count", 0)
 
 **Calculate new values:**
 ```python
-# Current blocking from Dev/SSE handoff
-current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - blocking_summary.rejected_with_reason
+# Current blocking = total - fixed - TL-accepted rejections
+# Note: Only count rejections that TL accepted (from prior tl_issue_responses)
+tl_accepted = len([r for r in prior_tl_responses if r.get("rejection_accepted")])
+current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
 
 # Determine progress with first-iteration exception
-if previous_iteration == 0:
+# Note: DB default is review_iteration=1, so first iteration is when previous <= 1
+if previous_iteration <= 1:
     # First iteration - no "no progress" penalty
     progress = True
     new_no_progress = 0

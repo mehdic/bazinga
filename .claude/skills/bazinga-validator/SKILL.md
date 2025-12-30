@@ -309,16 +309,19 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 
 **Step 2: Compute unresolved blocking issues**
 
-For each task group, diff the latest `tl_issues` against `tl_issue_responses`:
-```
+For each task group, diff `tl_issues` against Dev responses AND TL's acceptance verdict:
+```python
 unresolved_blocking = []
+# Get TL's acceptance verdicts from their handoff iteration_tracking
+tl_accepted_ids = set(tl_handoff.get("iteration_tracking", {}).get("rejections_accepted", []))
+
 for issue in tl_issues.issues where issue.blocking == true:
   response = find(tl_issue_responses.issue_responses, issue.id)
   if response is None:
     unresolved_blocking.append(issue)  # Not addressed
   elif response.action == "REJECTED":
-    # Check if TL accepted the rejection (rejection_accepted field on response)
-    if not response.get("rejection_accepted", False):
+    # Check if TL accepted the rejection (from TL's iteration_tracking.rejections_accepted)
+    if issue.id not in tl_accepted_ids:
       unresolved_blocking.append(issue)  # Rejection not yet accepted by TL
   elif response.action == "FIXED":
     # Assume fixed (TL will re-flag if not actually fixed)
