@@ -552,6 +552,25 @@ class BazingaSetup:
                     console.print(f"[red]✗ Skipping unsafe file config/{config_file.name}: {e}[/red]")
                     continue
 
+        # Copy schemas subdirectory (handoff validation schemas)
+        # Source: bazinga/schemas/ (packaged as bazinga_cli/bazinga/schemas/ in wheel)
+        source_schemas_dir = source_bazinga / "schemas"
+        if source_schemas_dir.exists() and source_schemas_dir.is_dir():
+            target_schemas_dir = bazinga_dir / "schemas"
+            target_schemas_dir.mkdir(parents=True, exist_ok=True)
+
+            for schema_file in source_schemas_dir.glob("*.json"):
+                try:
+                    safe_filename = PathValidator.validate_filename(schema_file.name)
+                    dest = target_schemas_dir / safe_filename
+                    PathValidator.ensure_within_directory(dest, target_schemas_dir)
+                    shutil.copy2(schema_file, dest)
+                    console.print(f"  ✓ Copied schemas/{safe_filename}")
+                    copied_count += 1
+                except SecurityError as e:
+                    console.print(f"[red]✗ Skipping unsafe file schemas/{schema_file.name}: {e}[/red]")
+                    continue
+
         return copied_count > 0
 
     def setup_config(self, target_dir: Path, is_update: bool = False) -> bool:

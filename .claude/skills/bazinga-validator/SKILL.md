@@ -332,6 +332,17 @@ cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead.json | jq '.issu
 cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json | jq '.issue_responses'
 ```
 
+**🔴 CRITICAL: If NEITHER events NOR handoff files exist for reviewed groups:**
+```
+# For each task group that had review_iteration > 0:
+IF no tl_issues events found AND no handoff_tech_lead.json exists:
+  → Return: REJECT
+  → Reason: "Cannot verify blocking issues - missing review data for group {group_id}"
+  → Note: This indicates orchestrator failed to save review events
+```
+
+This hard failure prevents BAZINGA acceptance when review evidence is missing.
+
 **Step 2: Check for any unresolved blocking issues**
 
 **IF unresolved blocking issues exist:**
@@ -391,7 +402,12 @@ completion_percentage = (met_count / total_count) * 100
 ## Verdict Decision Tree
 
 ```
-IF unresolved_blocking_issues > 0:
+IF missing_review_data_for_reviewed_groups:
+  → Return: REJECT
+  → Reason: "Cannot verify blocking issues - missing review data"
+  → Note: No tl_issues events AND no handoff files for groups with review_iteration > 0
+
+ELSE IF unresolved_blocking_issues > 0:
   → Return: REJECT
   → Reason: "Unresolved blocking issues from code review"
   → Note: CRITICAL/HIGH issues must be FIXED or have accepted rejection

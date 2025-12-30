@@ -73,6 +73,12 @@
       "mandatory_review": true,
       "include_context": ["root_cause_analysis", "recommendation", "evidence"]
     },
+    "SPAWN_INVESTIGATOR": {
+      "next_agent": "investigator",
+      "action": "spawn",
+      "include_context": ["investigation_scope", "sse_attempt_summary", "hypothesis_matrix"],
+      "_note": "SSE escalates to Investigator when root cause unclear despite senior analysis"
+    },
     "PARTIAL": {
       "next_agent": "senior_software_engineer",
       "action": "respawn",
