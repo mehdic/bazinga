@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_tl_verdicts.schema.json",
+  "title": "Tech Lead Rejection Verdicts Event Schema",
+  "description": "Schema for tl_verdicts event - records TL's acceptance or overruling of Developer rejections. Single source of truth for rejection resolution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["group_id", "iteration", "verdicts"],
+  "$comment": "session_id and event_type are NOT required in payload - injected by save-event CLI",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier. Note: When using save-event CLI, session_id is passed as first arg and stored in DB record - NOT required in JSON payload."
+    },
+    "group_id": {
+      "type": "string",
+      "description": "Task group identifier"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Review iteration when verdicts were issued"
+    },
+    "event_type": {
+      "const": "tl_verdicts",
+      "description": "Event type identifier"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verdicts": {
+      "type": "array",
+      "description": "List of TL verdicts on Developer rejections",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "verdict"],
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "pattern": "^TL-[A-Za-z0-9_-]+-[0-9]+-[0-9]+$",
+            "description": "Original TL issue ID that Developer rejected"
+          },
+          "verdict": {
+            "enum": ["ACCEPTED", "OVERRULED"],
+            "description": "ACCEPTED = TL agrees with rejection (issue closed). OVERRULED = TL disagrees (issue remains blocking)"
+          },
+          "location": {
+            "type": "string",
+            "description": "File:line location (for cross-iteration matching)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Issue title (for cross-iteration matching)"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total_rejected": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total rejections reviewed this iteration"
+        },
+        "accepted_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Rejections TL agreed with (issues closed)"
+        },
+        "overruled_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Rejections TL disagreed with (issues remain blocking)"
+        }
+      }
+    }
+  },
+  "x-dedup-key": {
+    "description": "Deduplication key to prevent duplicate events",
+    "fields": ["session_id", "group_id", "iteration", "event_type"]
+  }
+}

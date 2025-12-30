@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "handoff_tech_lead.schema.json",
+  "title": "Tech Lead Handoff Schema",
+  "description": "Schema for Tech Lead code review handoff with feedback loop support",
+  "type": "object",
+  "required": ["from_agent", "to_agent", "session_id", "group_id", "status", "summary", "issues", "issue_summary", "iteration"],
+  "properties": {
+    "from_agent": { "const": "tech_lead" },
+    "to_agent": { "enum": ["project_manager", "developer", "senior_software_engineer", "investigator"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "session_id": { "type": "string", "pattern": "^bazinga_" },
+    "group_id": { "type": "string" },
+    "status": {
+      "enum": ["APPROVED", "APPROVED_WITH_NOTES", "CHANGES_REQUESTED", "SPAWN_INVESTIGATOR", "UNBLOCKING_GUIDANCE", "ESCALATE_TO_OPUS", "ARCHITECTURAL_DECISION_MADE"]
+    },
+    "summary": { "type": "string" },
+    "review_decision": { "enum": ["APPROVED", "APPROVED_WITH_NOTES", "CHANGES_REQUESTED"] },
+    "code_quality_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+
+    "what_was_done_well": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "blocking", "title", "location", "problem", "fix", "why"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TL-[A-Za-z0-9_-]+-[0-9]+-[0-9]+$",
+            "description": "Format: TL-{GROUP_ID}-{ITERATION}-{SEQ}"
+          },
+          "severity": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "blocking": { "type": "boolean" },
+          "title": { "type": "string" },
+          "location": { "type": "string" },
+          "problem": { "type": "string" },
+          "fix": { "type": "string" },
+          "fix_patch": { "type": "string", "description": "Optional unified diff for simple fixes" },
+          "why": { "type": "string" }
+        }
+      }
+    },
+
+    "issue_summary": {
+      "type": "object",
+      "required": ["critical", "high", "medium", "low", "blocking_count"],
+      "properties": {
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 },
+        "blocking_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sum of critical + high (blocking issues)"
+        }
+      }
+    },
+
+    "iteration": { "type": "integer", "minimum": 1 },
+
+    "iteration_tracking": {
+      "type": "object",
+      "properties": {
+        "prior_issues_resolved": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "prior_issues_still_blocking": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "new_blocking_issues": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rejections_accepted": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rejections_overruled": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "notes_for_future": {
+      "type": "array",
+      "description": "For APPROVED_WITH_NOTES status - non-blocking feedback",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "enum": ["MEDIUM", "LOW"] },
+          "description": { "type": "string" }
+        }
+      }
+    },
+
+    "security_issues": { "type": "integer", "minimum": 0 },
+    "lint_issues": { "type": "integer", "minimum": 0 },
+    "test_coverage_acceptable": { "type": "boolean" },
+
+    "suggestions_for_future": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+
+    "self_adversarial_review": {
+      "type": "object",
+      "properties": {
+        "devils_advocate": { "type": "string" },
+        "future_self": { "type": "string" },
+        "red_team": { "type": "string" }
+      }
+    },
+
+    "ready_for_production": { "type": "boolean" },
+
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "review_details": { "type": "string" }
+      }
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "APPROVED_WITH_NOTES" } } },
+      "then": { "required": ["notes_for_future"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "CHANGES_REQUESTED" } } },
+      "then": {
+        "properties": {
+          "issue_summary": {
+            "properties": {
+              "blocking_count": { "minimum": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
