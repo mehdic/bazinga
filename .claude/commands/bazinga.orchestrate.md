@@ -1064,6 +1064,8 @@ Display:
                    CRITICAL_DISABLED.append(skill_name)
 
    # Helper: Check if skill is available for a specific agent
+   # Usage: skill_available("developer", "lint-check") → True if enabled
+   # Note: Use before spawning to validate mandatory skills, or when conditionally invoking optional skills
    def skill_available(agent: str, skill: str) -> bool:
        return skill in AVAILABLE_SKILLS.get(agent, {})
    ```

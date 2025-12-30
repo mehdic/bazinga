@@ -43,6 +43,12 @@
       "next_agent": "tech_lead",
       "action": "spawn",
       "include_context": ["validation_request", "uncertainty_details"]
+    },
+    "SPAWN_INVESTIGATOR": {
+      "next_agent": "investigator",
+      "action": "spawn",
+      "include_context": ["investigation_scope", "dev_attempt_summary", "blocker_details"],
+      "_note": "Developer escalates to Investigator when blocked on complex issue beyond simple debugging"
     }
   },
 
