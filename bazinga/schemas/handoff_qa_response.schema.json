@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "handoff_qa_response.schema.json",
+  "title": "QA Test Response Tracking Schema",
+  "description": "Schema for tracking QA test results and Developer fix progress. Uses test_progression as documented in qa_expert.md.",
+  "type": "object",
+  "required": ["from_agent", "session_id", "group_id"],
+  "properties": {
+    "from_agent": { "enum": ["qa_expert"] },
+    "session_id": { "type": "string", "pattern": "^bazinga_" },
+    "group_id": { "type": "string" },
+
+    "test_progression": {
+      "type": "object",
+      "description": "Test progress tracking as documented in qa_expert.md",
+      "required": ["iteration", "original_failures", "still_failing", "progress_made"],
+      "properties": {
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current QA iteration number"
+        },
+        "original_failures": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Test names that failed in first iteration"
+        },
+        "fixed_since_start": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Test names now passing that originally failed"
+        },
+        "still_failing": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Test names still failing from original set"
+        },
+        "new_failures": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Test names that failed this iteration but not before"
+        },
+        "progress_made": {
+          "type": "boolean",
+          "description": "True if fixed_since_start increased since last iteration. Used by Orchestrator for escalation decisions."
+        },
+        "progress_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of original failures now fixed (optional)"
+        }
+      }
+    },
+
+    "escalation_status": {
+      "type": "object",
+      "properties": {
+        "should_escalate": {
+          "type": "boolean",
+          "description": "True if no progress after 2 attempts"
+        },
+        "attempts_without_progress": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "escalation_reason": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

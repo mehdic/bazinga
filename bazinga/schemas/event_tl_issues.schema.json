@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_tl_issues.schema.json",
+  "title": "Tech Lead Issues Event Schema",
+  "description": "Schema for tl_issues event stored in bazinga-db. Used by validator to verify blocking issue resolution.",
+  "type": "object",
+  "required": ["session_id", "group_id", "iteration", "event_type", "issues", "blocking_count"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier"
+    },
+    "group_id": {
+      "type": "string",
+      "description": "Task group identifier"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Review iteration number"
+    },
+    "event_type": {
+      "const": "tl_issues",
+      "description": "Event type identifier"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "blocking", "title"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TL-[A-Z0-9]+-[0-9]+-[0-9]+$",
+            "description": "Issue ID format: TL-{GROUP_ID}-{ITERATION}-{SEQ}"
+          },
+          "severity": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "blocking": { "type": "boolean" },
+          "title": { "type": "string" },
+          "location": { "type": "string" },
+          "problem": { "type": "string" },
+          "fix": { "type": "string" }
+        }
+      }
+    },
+    "blocking_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of blocking issues (CRITICAL + HIGH with blocking=true)"
+    }
+  },
+  "_dedup_key": {
+    "description": "Deduplication key to prevent duplicate events",
+    "fields": ["session_id", "group_id", "iteration", "event_type"]
+  }
+}

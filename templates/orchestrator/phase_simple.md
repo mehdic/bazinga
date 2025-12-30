@@ -254,7 +254,7 @@ Write to `bazinga/prompts/{session_id}/params_investigator_{group_id}.json`:
   "session_id": "{session_id}",
   "group_id": "{group_id}",
   "task_title": "Investigate: {blocker_description[:60]}",
-  "task_requirements": "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}",
+  "task_requirements": "BLOCKING_ISSUE: {blocker_description}\nEvidence from Developer: {developer_evidence}",
   "branch": "{branch}",
   "mode": "simple",
   "testing_mode": "{testing_mode}",
