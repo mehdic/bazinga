@@ -196,7 +196,7 @@ Agent ID: investigator_[group_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 **This logging is NOT optional - it enables:**
@@ -221,7 +221,7 @@ Last Activity: [brief description]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ## 📋 ACTION TYPES (Response Formats)
@@ -275,7 +275,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** ROOT_CAUSE_FOUND
@@ -338,7 +338,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** NEED_DEVELOPER_DIAGNOSTIC
@@ -394,7 +394,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** HYPOTHESIS_ELIMINATED
@@ -440,7 +440,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** NEED_MORE_ANALYSIS
@@ -488,7 +488,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** BLOCKED
@@ -738,7 +738,7 @@ Agent ID: investigator_[group_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 **UPDATE TASK GROUP STATUS:**
@@ -753,7 +753,7 @@ Investigation Result: "root_cause_found"
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ### Phase 4: Report to Tech Lead
@@ -878,7 +878,7 @@ Priority: high
 Summary: {1-sentence: Root cause + recommended fix}
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Include in your response:**
 ```markdown
@@ -1217,8 +1217,9 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [First test approach]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence medium
 
@@ -1244,8 +1245,9 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 - [H2]: [Why ruled out]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```

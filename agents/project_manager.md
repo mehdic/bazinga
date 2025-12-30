@@ -361,14 +361,15 @@ When iteration > 10, summarize older iterations to prevent context bloat.
 - `completion` (at BAZINGA) - summary of what was accomplished
 
 **How to save:**
-```bash
+```
 cat > /tmp/reasoning_{phase}.md << 'REASONING_EOF'
 ## {Phase Title}
 [Content]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "{phase}" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "project_manager" "{phase}" \
   --content-file /tmp/reasoning_{phase}.md \
   --confidence high
 ```

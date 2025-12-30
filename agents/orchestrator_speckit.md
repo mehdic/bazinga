@@ -92,19 +92,19 @@ Show what will be executed:
 
 Check if session exists in database:
 ```
-bazinga-db, please check if session exists:
+bazinga-db-core, please check if session exists:
 
 Session ID: [current session_id]
 ```
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 If session doesn't exist, create it:
 ```
-bazinga-db, please create session:
+bazinga-db-core, please create session:
 
 Session ID: [current session_id]
 Mode: [simple|parallel - will be determined by PM]
@@ -113,7 +113,7 @@ Requirements: [user requirements text]
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 ### Step 5: Spawn PM with Spec-Kit Context
@@ -415,8 +415,8 @@ Note: Developers won't have full requirements context."
 
 **At the START of every turn:**
 ```
-Skill(command: "bazinga-db") → get-session {session_id}
-Skill(command: "bazinga-db") → get-task-groups {session_id}
+Skill(command: "bazinga-db-core") → get-session {session_id}
+Skill(command: "bazinga-db-workflow") → get-task-groups {session_id}
 ```
 
 **Compare:** `completed_items` vs `Original_Scope.estimated_items`
@@ -437,7 +437,7 @@ Skill(command: "bazinga-db") → get-task-groups {session_id}
 
 **After context compaction, automatically resume:**
 ```
-Skill(command: "bazinga-db") → get-state {session_id} orchestrator
+Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator
 ```
 - Resume from where workflow paused
 - Never ask permission after recovery

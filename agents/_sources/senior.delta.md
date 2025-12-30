@@ -611,9 +611,10 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [file2.py]
 REASONING_EOF
 
-# Step 2: Save via --content-file (avoids process table exposure)
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
+# Step 2: Invoke skill to save reasoning
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence high \
   --references '["file1.py", "file2.py"]'
@@ -634,8 +635,9 @@ cat > /tmp/reasoning_decisions.md << 'REASONING_EOF'
 - [Alternative 2] → [Why rejected]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "decisions" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "decisions" \
   --content-file /tmp/reasoning_decisions.md \
   --confidence medium
 
@@ -655,8 +657,9 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 - [Any remaining questions for Tech Lead]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "completion" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "senior_software_engineer" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high \
   --references '["modified_file1.py", "modified_file2.py"]'
