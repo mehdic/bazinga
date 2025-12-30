@@ -251,8 +251,15 @@ allowed-tools: [Bash, Read]
 | File | Change | Risk |
 |------|--------|------|
 | `.claude/skills/bazinga-db/SKILL.md` | Replace with deprecated router (~50 lines) | Low |
-| `bazinga/skills_config.json` | Add 4 new skills, update bazinga-db | Low |
 | `.claude/claude.md` | Update skill references in "NEVER Use Inline SQL" section | Low |
+
+### Files with NO CHANGE
+
+| File | Reason |
+|------|--------|
+| `bazinga/skills_config.json` | Infrastructure skills, not configurable tools |
+| Agent files (`agents/*.md`) | Skills auto-discovered, no explicit references needed |
+| Installer (`src/bazinga_cli/__init__.py`) | Auto-copies all skill directories |
 
 ### Files to VERIFY (No Changes, Just Confirm)
 
@@ -477,71 +484,23 @@ If issues occur after implementation:
 **Change:** Replace 850-line monolith with ~50-line deprecated router
 **Content:** Deprecation notice + routing table + quick reference
 
-### MODIFY: `bazinga/skills_config.json`
+### NO CHANGE: `bazinga/skills_config.json`
 
-**Note:** skills_config.json is organized BY AGENT, not by skill. Add new skills to each agent's section:
+**These are INFRASTRUCTURE skills, NOT configurable tools.**
 
-```json
-{
-  "developer": {
-    "lint-check": "mandatory",
-    "bazinga-db-agents": "mandatory",     // NEW
-    "bazinga-db-workflow": "optional",    // NEW
-    ...
-  },
-  "senior_software_engineer": {
-    "lint-check": "mandatory",
-    "bazinga-db-agents": "mandatory",     // NEW
-    "bazinga-db-workflow": "optional",    // NEW
-    ...
-  },
-  "tech_lead": {
-    "security-scan": "mandatory",
-    "bazinga-db-agents": "mandatory",     // NEW
-    "bazinga-db-workflow": "optional",    // NEW
-    ...
-  },
-  "qa_expert": {
-    "bazinga-db-agents": "mandatory",     // NEW
-    "bazinga-db-workflow": "optional",    // NEW
-    ...
-  },
-  "pm": {
-    "bazinga-db-workflow": "mandatory",   // NEW
-    "bazinga-db-agents": "mandatory",     // NEW
-    "bazinga-db-core": "optional",        // NEW
-    ...
-  },
-  "orchestrator": {
-    "bazinga-db-core": "mandatory",       // NEW
-    "bazinga-db-workflow": "mandatory",   // NEW
-    "bazinga-db-agents": "optional",      // NEW
-    ...
-  },
-  "requirements_engineer": {
-    "bazinga-db-context": "mandatory",    // NEW
-    "bazinga-db-agents": "optional",      // NEW
-    ...
-  },
-  "investigator": {
-    "bazinga-db-agents": "optional",      // NEW
-    "bazinga-db-context": "optional",     // NEW
-    ...
-  }
-}
-```
+The bazinga-db domain skills work like the current `bazinga-db`:
+- **NOT in skills_config.json** - That file is for optional/configurable skills
+- **Always available** - Any agent can invoke them anytime
+- **Never disabled** - Core system functionality
+- **No permissions needed** - Skill exists = available to all
 
-**Skill assignment rationale:**
-| Agent | Core | Workflow | Agents | Context |
-|-------|------|----------|--------|---------|
-| orchestrator | mandatory | mandatory | optional | - |
-| pm | optional | mandatory | mandatory | - |
-| developer | - | optional | mandatory | optional |
-| senior_software_engineer | - | optional | mandatory | optional |
-| qa_expert | - | optional | mandatory | - |
-| tech_lead | - | optional | mandatory | - |
-| requirements_engineer | - | - | optional | mandatory |
-| investigator | - | - | optional | optional |
+**Why this is correct:**
+- `skills_config.json` controls optional tools like `lint-check`, `security-scan`
+- Current `bazinga-db` is NOT in skills_config.json - it's just always there
+- Domain skills are the same: infrastructure, not optional features
+- Agents invoke whichever domain skill they need based on the task
+
+**Result:** No changes to skills_config.json required!
 
 ### MODIFY: `.claude/claude.md`
 
