@@ -110,7 +110,7 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 ---
 
-## Step 3.5: Assign Specializations (MANDATORY - BLOCKER)
+## Step 3.5: Assign Specializations (CRITICAL - BLOCKS WORKFLOW)
 
 **Purpose:** Provide technology-specific patterns to agents.
 

@@ -238,7 +238,7 @@ Contains:
 Contains:
 - Step 0: Development plan management
 - Step 0.9: Backfill missing fields (on resume)
-- Step 3.5: Assign specializations (MANDATORY BLOCKER)
+- Step 3.5: Assign specializations (CRITICAL - BLOCKS WORKFLOW)
 - Step 5: Save PM state to database (canonical template)
 - Step 6: Return decision format
 

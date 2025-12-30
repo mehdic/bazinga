@@ -232,7 +232,8 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-grou
   "<group_id>" "<session_id>" [--status "<status>"] [--assigned_to "<agent_id>"] \
   [--specializations '<json_array>'] [--item_count N] [--initial_tier "<tier>"] \
   [--component-path "<path>"] [--qa_attempts N] [--tl_review_attempts N] \
-  [--security_sensitive 0|1] [--complexity N]
+  [--security_sensitive 0|1] [--complexity N] \
+  [--review_iteration N] [--no_progress_count N] [--blocking_issues_count N]
 ```
 
 **Example (correct):**
@@ -240,9 +241,21 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-task-grou
 python3 .../bazinga_db.py --quiet update-task-group "CALC" "bazinga_xxx" --status "in_progress"
 ```
 
+**Review iteration tracking (v16):**
+```bash
+# Update iteration count after Tech Lead feedback loop
+python3 .../bazinga_db.py --quiet update-task-group "AUTH" "bazinga_xxx" \
+  --review_iteration 2 --no_progress_count 0 --blocking_issues_count 3
+```
+
 **Valid status values:** `pending`, `in_progress`, `completed`, `failed`, `approved_pending_merge`, `merging`
 
 **Valid initial_tier values:** `"Developer"`, `"Senior Software Engineer"`
+
+**Review iteration fields (v16):**
+- `review_iteration`: Current iteration in feedback loop (starts at 1, increments on each TL→Dev cycle)
+- `no_progress_count`: Consecutive iterations with 0 blocking issues fixed (triggers escalation at 2)
+- `blocking_issues_count`: Current count of unresolved CRITICAL/HIGH issues
 
 **Get task groups:**
 ```bash
@@ -278,6 +291,30 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "sess_123" "role_violation" '{"agent": "orchestrator", "violation": "attempted implementation"}'
 ```
+
+**Tech Lead Review Events (Code Review Feedback Loop):**
+```bash
+# Save TL issues event (after TL CHANGES_REQUESTED)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "tl_issues" '{"group_id": "AUTH", "iteration": 1, "issues": [...], "blocking_count": 3}'
+
+# Save Dev/SSE responses to TL issues (iteration required for dedup)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "tl_issue_responses" '{"group_id": "AUTH", "iteration": 1, "issue_responses": [...], "blocking_summary": {...}}'
+
+# Save TL verdicts on Developer rejections (SINGLE SOURCE OF TRUTH for rejection acceptance)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "sess_123" "tl_verdicts" '{"group_id": "AUTH", "iteration": 2, "verdicts": [{"issue_id": "TL-AUTH-1-001", "verdict": "ACCEPTED", "location": "auth.py:45", "title": "..."}], "summary": {"accepted_count": 1, "overruled_count": 0}}'
+```
+
+**Schema validation:** Event payloads should conform to schemas in `bazinga/schemas/`:
+- `event_tl_issues.schema.json` - TL issues with blocking counts
+- `event_tl_issue_responses.schema.json` - Dev/SSE responses with blocking_summary
+- `event_tl_verdicts.schema.json` - TL verdicts on Developer rejections (accepted/overruled)
+
+**Note on session_id:** The `session_id` is passed as a CLI argument (first positional arg) and does NOT need to be included in the JSON payload. The bazinga_db script stores `session_id` in the database record separately from the payload. The schemas include `session_id` for completeness when querying events (the full event structure), but the save-event command handles session_id routing automatically.
+
+**Deduplication:** Events are deduplicated by key: `(session_id, group_id, iteration, event_type)`. Duplicate save attempts return existing event (idempotent).
 
 **Get events (filter by session and optionally by subtype):**
 ```bash

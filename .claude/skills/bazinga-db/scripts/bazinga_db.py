@@ -1329,7 +1329,10 @@ class BazingaDB:
                          tl_review_attempts: Optional[int] = None,
                          component_path: Optional[str] = None,
                          initial_tier: Optional[str] = None,
-                         complexity: Optional[int] = None) -> Dict[str, Any]:
+                         complexity: Optional[int] = None,
+                         review_iteration: Optional[int] = None,
+                         no_progress_count: Optional[int] = None,
+                         blocking_issues_count: Optional[int] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -1349,6 +1352,9 @@ class BazingaDB:
             component_path: Monorepo component path (e.g., 'frontend/', 'backend/') for version lookup
             initial_tier: Starting agent tier ('Developer' or 'Senior Software Engineer')
             complexity: Task complexity score (1-10). 1-3=Low, 4-6=Medium, 7-10=High
+            review_iteration: Current iteration in feedback loop (starts at 1)
+            no_progress_count: Consecutive iterations with 0 fixes (escalate at 2)
+            blocking_issues_count: Current count of unresolved CRITICAL/HIGH issues
 
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
@@ -1431,6 +1437,51 @@ class BazingaDB:
                     return {"success": False, "error": complexity_error}
                 updates.append("complexity = ?")
                 params.append(complexity)
+            if review_iteration is not None:
+                updates.append("review_iteration = ?")
+                params.append(review_iteration)
+            if no_progress_count is not None:
+                updates.append("no_progress_count = ?")
+                params.append(no_progress_count)
+            if blocking_issues_count is not None:
+                updates.append("blocking_issues_count = ?")
+                params.append(blocking_issues_count)
+
+            # Server-side validation for non-negative counters (defense in depth)
+            if no_progress_count is not None and no_progress_count < 0:
+                return {"success": False, "error": f"no_progress_count cannot be negative: {no_progress_count}"}
+            if blocking_issues_count is not None and blocking_issues_count < 0:
+                return {"success": False, "error": f"blocking_issues_count cannot be negative: {blocking_issues_count}"}
+            if review_iteration is not None and review_iteration < 1:
+                return {"success": False, "error": f"review_iteration must be >= 1: {review_iteration}"}
+
+            # Monotonicity enforcement for iteration counters (prevent accidental decreases)
+            # Use BEGIN IMMEDIATE for atomic read-check-update to prevent race conditions
+            if review_iteration is not None or no_progress_count is not None:
+                conn.execute("BEGIN IMMEDIATE")  # Acquire write lock immediately
+                try:
+                    current = conn.execute(
+                        "SELECT review_iteration, no_progress_count FROM task_groups WHERE id = ? AND session_id = ?",
+                        (group_id, session_id)
+                    ).fetchone()
+                    if current:
+                        current_ri = current['review_iteration'] or 0
+                        current_npc = current['no_progress_count'] or 0
+                        if review_iteration is not None and review_iteration < current_ri:
+                            conn.rollback()
+                            return {
+                                "success": False,
+                                "error": f"review_iteration cannot decrease: current={current_ri}, requested={review_iteration}"
+                            }
+                        if no_progress_count is not None and no_progress_count < current_npc:
+                            conn.rollback()
+                            return {
+                                "success": False,
+                                "error": f"no_progress_count cannot decrease: current={current_npc}, requested={no_progress_count}"
+                            }
+                except Exception as e:
+                    conn.rollback()
+                    raise e
 
             if updates:
                 updates.append("updated_at = CURRENT_TIMESTAMP")
@@ -3646,7 +3697,8 @@ def main():
             # v15: Added component_path for version-specific prompt building
             # v16: Added initial_tier for PM-assigned starting tier
             # v17: Added complexity for PM-assigned task complexity scoring (1-10)
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier", "complexity"}
+            # v16 (schema): Added review_iteration, no_progress_count, blocking_issues_count for feedback loop tracking
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier", "complexity", "review_iteration", "no_progress_count", "blocking_issues_count"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 key = key.replace('-', '_')  # Normalize dashes to underscores (--assigned-to → assigned_to)
@@ -3659,13 +3711,24 @@ def main():
                     sys.exit(1)
                 value = cmd_args[i + 1]
                 # Convert integer flags
-                if key in ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts', 'complexity'):
+                if key in ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts', 'complexity', 'review_iteration', 'no_progress_count', 'blocking_issues_count'):
                     try:
                         value = int(value)
                         # Validate complexity range
                         if key == 'complexity' and not 1 <= value <= 10:
                             print(json.dumps({"success": False, "error": "--complexity must be between 1 and 10"}, indent=2), file=sys.stderr)
                             sys.exit(1)
+                        # Validate non-negative for counter fields
+                        non_negative_fields = ('revision_count', 'item_count', 'qa_attempts', 'tl_review_attempts', 'no_progress_count', 'blocking_issues_count')
+                        if key in non_negative_fields and value < 0:
+                            print(json.dumps({"success": False, "error": f"--{key} must be non-negative, got: {value}"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        # Validate review_iteration >= 1 (iterations start at 1, not 0)
+                        if key == 'review_iteration' and value < 1:
+                            print(json.dumps({"success": False, "error": "--review_iteration must be >= 1 (iterations start at 1)"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        # Monotonicity enforcement for review_iteration/no_progress_count
+                        # is handled server-side in update_task_group() method
                     except ValueError:
                         print(json.dumps({"success": False, "error": f"--{key} must be an integer, got: {value}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
