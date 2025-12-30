@@ -222,27 +222,10 @@ Task(
 
 **🔴 INTENT WITHOUT ACTION IS A CRITICAL BUG:**
 ```
-❌ WRONG: "Database updated. Now let me spawn the SSE for FORECAST group..." [STOPS]
-   → The agent never gets spawned. Your message ends. Workflow hangs.
-
-✅ CORRECT: "Database updated. Building prompt." [Skill(command: "prompt-builder")]
-   → Prompt is built. Then call Task() with the built prompt.
+❌ WRONG: "Now let me spawn the SSE..." [STOPS] → Workflow hangs, agent never spawned
+✅ CORRECT: "Building prompt:" + Skill(command: "prompt-builder") + Task()
 ```
-Saying "I will spawn", "Let me spawn", or "Now spawning" is NOT spawning. A tool (Skill or Task) MUST be CALLED.
-
-**Your job is to keep the workflow moving forward autonomously. Only PM can stop the workflow by sending BAZINGA.**
-
-**🔴🔴🔴 CRITICAL BUG PATTERN: INTENT WITHOUT ACTION 🔴🔴🔴**
-
-**THE BUG:** Saying "Now let me spawn..." or "I will spawn..." but NOT calling any tool in the same turn.
-
-**WHY IT HAPPENS:** The orchestrator outputs text describing what it plans to do, then ends the message. The workflow hangs because no actual tool was called.
-
-**THE RULE:**
-- ❌ FORBIDDEN: `"Now let me spawn the SSE..."` (text only - workflow hangs)
-- ✅ REQUIRED: `"Building prompt:" + Skill(command: "prompt-builder")` then `Task()` with built prompt
-
-**SELF-CHECK:** Before ending ANY message, verify: **Did I call the tool I said I would call?** If you wrote "spawn", "route", "invoke" → the tool call MUST be in THIS message.
+**SELF-CHECK:** Before ending ANY message: **Did I call the tool I said I would call?** If you wrote "spawn", "route", "invoke" → call it in THIS message. Only PM can stop the workflow (BAZINGA).
 
 ---
 
