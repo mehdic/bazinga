@@ -59,6 +59,12 @@ Stream orchestration logs, optionally in markdown format.
 ### save-reasoning
 
 ```bash
+# Recommended: Use --content-file to avoid exposing content in process table
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "<session_id>" "<group_id>" "<agent_type>" "<phase>" \
+  --content-file /tmp/reasoning.txt [--confidence N] [--tokens N]
+
+# Alternative: Inline content (avoid for sensitive data)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
   "<session_id>" "<group_id>" "<agent_type>" "<phase>" "<content>" \
   [--confidence N] [--tokens N]
@@ -66,14 +72,20 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
 
 Saves agent reasoning with automatic secret redaction.
 
+**⚠️ Security:** Prefer `--content-file` over inline content to avoid exposing reasoning in process listings.
+
 **Phases:** `understanding`, `approach`, `decisions`, `risks`, `blockers`, `pivot`, `completion`
 
-**Example:**
+**Example (recommended):**
 ```bash
+# Write content to temp file first
+cat > /tmp/reasoning.txt << 'EOF'
+Analyzed requirements: need add/subtract/multiply/divide operations
+EOF
+
 python3 .../bazinga_db.py --quiet save-reasoning \
   "bazinga_xxx" "CALC" "developer" "understanding" \
-  "Analyzed requirements: need add/subtract/multiply/divide operations" \
-  --confidence 85
+  --content-file /tmp/reasoning.txt --confidence 85
 ```
 
 ### get-reasoning

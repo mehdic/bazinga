@@ -44,10 +44,18 @@ allowed-tools: [Bash, Read]
 
 ## Quick Reference
 
-**Script location:** `.claude/skills/bazinga-db/scripts/bazinga_db.py`
-**Full CLI help:** `python3 .../bazinga_db.py help`
-**Schema docs:** `.claude/skills/bazinga-db/references/schema.md`
-**Command examples:** `.claude/skills/bazinga-db/references/command_examples.md`
+⚠️ **DO NOT use CLI directly.** Instead, invoke the domain-specific skill:
+
+| Need | Invoke |
+|------|--------|
+| Session/state ops | `Skill(command: "bazinga-db-core")` |
+| Task groups/plans | `Skill(command: "bazinga-db-workflow")` |
+| Logging/reasoning | `Skill(command: "bazinga-db-agents")` |
+| Context packages | `Skill(command: "bazinga-db-context")` |
+
+**Reference docs (for skill authors only):**
+- Schema: `.claude/skills/bazinga-db/references/schema.md`
+- Examples: `.claude/skills/bazinga-db/references/command_examples.md`
 
 ## If You're Here By Mistake
 

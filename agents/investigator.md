@@ -173,7 +173,7 @@ You have full access to:
 After each hypothesis test:
 
 ```bash
-# Use bazinga-db skill to log iteration progress
+# Use bazinga-db-agents skill to log iteration progress
 ```
 
 **Request to bazinga-db-agents skill:**
@@ -207,22 +207,33 @@ Skill(command: "bazinga-db-agents")
 
 ### Update Investigation Status
 
-After each major decision:
+After each major decision, update status via TWO operations:
 
-**Request to bazinga-db-workflow skill:**
+**1. Update task group status (workflow skill):**
 ```
-bazinga-db-workflow, please update task group investigation status:
+bazinga-db-workflow, please update task group:
 
 Group ID: [group_id]
-Investigation Iteration: [current iteration number]
-Status: [under_investigation|root_cause_found|investigation_incomplete]
-Last Activity: [brief description]
+Session ID: [session_id]
+Status: in_progress
+Review Iteration: [current iteration number]
 ```
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
-Then invoke:
+**2. Log investigation activity (agents skill):**
 ```
-Skill(command: "bazinga-db-workflow")
+bazinga-db-agents, please save event:
+
+Session ID: [session_id]
+Event Type: investigation_status
+Payload: {
+  "group_id": "[group_id]",
+  "iteration": [current iteration],
+  "status": "[under_investigation|root_cause_found|investigation_incomplete]",
+  "activity": "[brief description of last activity]"
+}
 ```
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 ## 📋 ACTION TYPES (Response Formats)
 
@@ -1116,7 +1127,7 @@ Confidence: 95% - ROOT CAUSE FOUND
 - Quantify confidence levels
 - Admit uncertainty when appropriate
 
-**With Database (via bazinga-db skill):**
+**With Database (via bazinga-db-agents skill):**
 - Log EVERY iteration (start and result)
 - Log final outcome (root cause found/incomplete/blocked)
 - Update task group status at major milestones
@@ -1169,7 +1180,7 @@ Let's solve this systematically! 🔍
 
 ## 🧠 Reasoning Documentation (MANDATORY)
 
-**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the bazinga-db skill.
+**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the bazinga-db-agents skill.
 
 ### Why This Matters
 
