@@ -1014,7 +1014,7 @@ Project ID: {project_id}
 Lang: {detected_lang}
 Framework: {detected_framework}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **What the command does:**
 1. Queries `agent_reasoning` table for completion/decisions/approach phases

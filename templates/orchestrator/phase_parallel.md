@@ -18,7 +18,7 @@
    State Type: orchestrator
    State Data: {"total_spawns": {current_total_spawns + 1}}
    ```
-   Then invoke: `Skill(command: "bazinga-db")`
+   Then invoke: `Skill(command: "bazinga-db-core")`
 
 2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
 
@@ -514,7 +514,7 @@ Task(subagent_type="general-purpose", model={model}, description="{agent_type} {
   Lang: {detected_lang}
   Framework: {detected_framework}
   ```
-  Then invoke: `Skill(command: "bazinga-db")`
+  Then invoke: `Skill(command: "bazinga-db-context")`
   *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2B.7a** (Spawn Developer for merge)
 
@@ -558,7 +558,7 @@ Use the template for merge prompt and response handling. Apply to this group's c
    Session ID: [session_id]
    Status: completed
    ```
-   Then invoke: `Skill(command: "bazinga-db")`
+   Then invoke: `Skill(command: "bazinga-db-workflow")`
    Sum item_count from the returned JSON to get completed items.
 3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 

@@ -23,17 +23,24 @@ allowed-tools: [Bash, Read]
 | `create-session`, `get-session`, `list-sessions` | `bazinga-db-core` |
 | `update-session-status`, `save-state`, `get-state` | `bazinga-db-core` |
 | `dashboard-snapshot`, `query`, `integrity-check` | `bazinga-db-core` |
+| `recover-db`, `detect-paths` | `bazinga-db-core` |
 | `create-task-group`, `update-task-group`, `get-task-groups` | `bazinga-db-workflow` |
 | `save-development-plan`, `get-development-plan`, `update-plan-progress` | `bazinga-db-workflow` |
 | `save-success-criteria`, `get-success-criteria`, `update-success-criterion` | `bazinga-db-workflow` |
 | `log-interaction`, `stream-logs` | `bazinga-db-agents` |
 | `save-reasoning`, `get-reasoning`, `reasoning-timeline` | `bazinga-db-agents` |
+| `check-mandatory-phases` | `bazinga-db-agents` |
 | `log-tokens`, `token-summary` | `bazinga-db-agents` |
-| `save-skill-output`, `get-skill-output`, `check-skill-evidence` | `bazinga-db-agents` |
+| `save-skill-output`, `get-skill-output`, `get-skill-output-all` | `bazinga-db-agents` |
+| `check-skill-evidence` | `bazinga-db-agents` |
 | `save-event`, `get-events` | `bazinga-db-agents` |
 | `save-context-package`, `get-context-packages`, `mark-context-consumed` | `bazinga-db-context` |
+| `update-context-references` | `bazinga-db-context` |
+| `save-consumption`, `get-consumption` | `bazinga-db-context` |
 | `save-error-pattern`, `get-error-patterns` | `bazinga-db-context` |
+| `update-error-confidence`, `cleanup-error-patterns` | `bazinga-db-context` |
 | `save-strategy`, `get-strategies` | `bazinga-db-context` |
+| `update-strategy-helpfulness`, `extract-strategies` | `bazinga-db-context` |
 
 ## Quick Reference
 

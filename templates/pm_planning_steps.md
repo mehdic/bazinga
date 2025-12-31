@@ -8,7 +8,7 @@
 
 **Query current session's plan:**
 
-Invoke skill: `Skill(command: "bazinga-db")`
+Invoke skill: `Skill(command: "bazinga-db-workflow")`
 
 Provide request:
 ```
@@ -31,7 +31,7 @@ User request contains phase references ("Phase", "phase", "Step")? If yes:
 
 *New sessions may lose plan context. Search recent sessions:*
 
-Invoke: `Skill(command: "bazinga-db")`
+Invoke: `Skill(command: "bazinga-db-core")`
 ```
 bazinga-db, please list the most recent sessions (limit 5).
 ```
@@ -49,7 +49,7 @@ Detect plan type:
 
 **Save plan:**
 
-Invoke: `Skill(command: "bazinga-db")`
+Invoke: `Skill(command: "bazinga-db-workflow")`
 ```
 bazinga-db, please save this development plan:
 
@@ -254,7 +254,7 @@ State Data: {
 }
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ### Sub-step 5.3: Verify Task Groups Were Persisted
 

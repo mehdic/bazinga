@@ -1,7 +1,7 @@
 ---
 name: bazinga-db-core
 description: Session lifecycle and system operations. Use when creating sessions, saving state, getting dashboard data, or running system queries.
-version: 1.0.0
+version: 2.0.0
 allowed-tools: [Bash, Read]
 ---
 

@@ -418,7 +418,7 @@ State Data: {
 
 **Then invoke the skill:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
@@ -438,7 +438,7 @@ Status: pending
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-workflow")
 ```
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.

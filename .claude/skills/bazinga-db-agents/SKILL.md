@@ -1,7 +1,7 @@
 ---
 name: bazinga-db-agents
 description: Agent logs, reasoning, and token tracking. Use when logging interactions, saving reasoning, tracking tokens, or managing events.
-version: 1.0.0
+version: 2.0.0
 allowed-tools: [Bash, Read]
 ---
 

@@ -19,7 +19,7 @@ bazinga-db, get events for session [session_id] with type "validator_verdict" li
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 **Parse the response:**
@@ -61,7 +61,7 @@ bazinga-db, save event for session [session_id]:
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ### 🚨 WHY THIS GATE EXISTS
@@ -157,7 +157,7 @@ if pm_message contains "BAZINGA":
         try:
             Request: "bazinga-db, get success criteria for session [session_id]"
             Command: get-success-criteria [session_id]
-            Invoke: Skill(command: "bazinga-db")
+            Invoke: Skill(command: "bazinga-db-workflow")
             criteria = parse_database_response()
             break  # Success, exit retry loop
         except Exception as e:
@@ -214,7 +214,7 @@ if pm_message contains "BAZINGA":
 
     Request: "bazinga-db, get success criteria for session [session_id]"
     Command: get-success-criteria [session_id]
-    Invoke: Skill(command: "bazinga-db")
+    Invoke: Skill(command: "bazinga-db-workflow")
 
     criteria = parse_criteria_from_database_response()
     met_count = count(criteria where status="met")
@@ -297,7 +297,7 @@ Session ID: [current session_id]
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
@@ -446,7 +446,7 @@ State Data: {
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 **Verification:**
@@ -516,7 +516,7 @@ State Data: {
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 
@@ -533,7 +533,7 @@ End Time: [timestamp]
 
 **Then invoke:**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 

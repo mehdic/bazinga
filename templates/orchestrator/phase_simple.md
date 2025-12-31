@@ -18,7 +18,7 @@
    State Type: orchestrator
    State Data: {"total_spawns": {current_total_spawns + 1}}
    ```
-   Then invoke: `Skill(command: "bazinga-db")`
+   Then invoke: `Skill(command: "bazinga-db-core")`
 
 2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
 
@@ -323,7 +323,7 @@ Write to `bazinga/prompts/{session_id}/params_senior_software_engineer_{group_id
   Group ID: {group_id}
   Revision Count: {revision_count + 1}
   ```
-  Invoke: `Skill(command: "bazinga-db")`
+  Invoke: `Skill(command: "bazinga-db-workflow")`
 
 #### SPAWN DEVELOPER RETRY (SKILL-BASED PROMPT)
 
@@ -695,7 +695,7 @@ Task(
   Lang: {detected_lang}
   Framework: {detected_framework}
   ```
-  Then invoke: `Skill(command: "bazinga-db")`
+  Then invoke: `Skill(command: "bazinga-db-context")`
   *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2A.7a** (Spawn Developer for immediate merge)
 - Do NOT stop for user input
@@ -781,7 +781,7 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
    Session ID: [session_id]
    Status: completed
    ```
-   Then invoke: `Skill(command: "bazinga-db")`
+   Then invoke: `Skill(command: "bazinga-db-workflow")`
    Sum item_count from the returned JSON to get completed items.
 3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 

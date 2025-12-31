@@ -16,7 +16,7 @@ Session ID: [current session_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 The snapshot contains:

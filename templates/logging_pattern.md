@@ -17,7 +17,7 @@ Agent ID: [agent_identifier]
 
 **Step 2: Invoke the skill**
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ## Examples
@@ -35,7 +35,7 @@ Agent ID: pm_main
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ### Logging Developer Interaction
@@ -51,7 +51,7 @@ Agent ID: dev_group_1
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ### Logging QA Interaction
@@ -67,7 +67,7 @@ Agent ID: qa_group_1
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ### Logging Tech Lead Interaction
@@ -83,7 +83,7 @@ Agent ID: techlead_group_1
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 ## Important Notes

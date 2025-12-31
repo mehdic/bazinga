@@ -22,7 +22,7 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, invest
 
 **Note:** System is extensible - any agent type is accepted (no validation against hardcoded list).
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Examples:**
 
@@ -59,7 +59,7 @@ Iteration: [iteration]
 Agent ID: developer_main
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Process internally** (logging is system operation - no user output needed for database sync).
 
@@ -78,7 +78,7 @@ Request to bazinga-db skill:
 bazinga-db, please get the latest PM state for session [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
@@ -94,7 +94,7 @@ Request to bazinga-db skill:
 bazinga-db, please get the latest orchestrator state for session [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
@@ -110,7 +110,7 @@ Request to bazinga-db skill:
 bazinga-db, please get all task groups for session [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 Returns array of groups with their statuses.
 
@@ -129,7 +129,7 @@ State Type: pm
 State Data: {JSON data from PM}
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
@@ -151,7 +151,7 @@ State Data: {
 }
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
@@ -169,7 +169,7 @@ Name: [extracted group name]
 Status: pending
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 Repeat for each group.
 
@@ -186,7 +186,7 @@ Status: completed | failed | in_progress
 Last Review Status: APPROVED | CHANGES_REQUESTED
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 ---
 
@@ -201,7 +201,7 @@ bazinga-db, please provide dashboard snapshot:
 Session ID: [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 Returns comprehensive session summary.
 
@@ -220,7 +220,7 @@ Mode: simple
 Requirements: [User's requirements from input]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
@@ -235,7 +235,7 @@ Status: completed
 End Time: [timestamp]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
@@ -246,7 +246,7 @@ Request to bazinga-db skill:
 bazinga-db, please check for active orchestration sessions
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 Returns most recent session_id or null.
 

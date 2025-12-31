@@ -1,7 +1,7 @@
 ---
 name: bazinga-db-workflow
 description: Task groups and development planning. Use when managing task groups, development plans, or success criteria.
-version: 1.0.0
+version: 2.0.0
 allowed-tools: [Bash, Read]
 ---
 
