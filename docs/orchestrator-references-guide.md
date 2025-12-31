@@ -247,7 +247,7 @@ For even more stability, you can use anchor comments:
 
 ```markdown
 <!-- ANCHOR: task-groups-query -->
-bazinga-db, please get all task groups
+bazinga-db-workflow, please get all task groups
 <!-- /ANCHOR -->
 ```
 

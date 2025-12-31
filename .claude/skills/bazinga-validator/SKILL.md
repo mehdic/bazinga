@@ -42,7 +42,7 @@ Skill(command: "bazinga-db-workflow")
 
 In the same message, provide the request:
 ```
-bazinga-db, please get success criteria for session: [session_id]
+bazinga-db-workflow, please get success criteria for session: [session_id]
 ```
 
 **Parse the response to extract:**

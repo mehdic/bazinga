@@ -9,7 +9,7 @@ bazinga/reports/session_{YYYYMMDD_HHMMSS}.md
 
 Query dashboard snapshot from database (contains all metrics):
 ```
-bazinga-db, please provide dashboard snapshot:
+bazinga-db-core, please provide dashboard snapshot:
 
 Session ID: [current session_id]
 ```

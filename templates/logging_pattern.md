@@ -6,7 +6,7 @@ Use this pattern whenever you need to log an agent interaction to the database.
 
 **Step 1: Prepare natural language request**
 ```
-bazinga-db, please log this [AGENT_TYPE] interaction:
+bazinga-db-agents, please log this [AGENT_TYPE] interaction:
 
 Session ID: [current session_id from initialization]
 Agent Type: [pm|developer|qa_expert|tech_lead]
@@ -24,7 +24,7 @@ Skill(command: "bazinga-db-agents")
 
 ### Logging PM Interaction
 ```
-bazinga-db, please log this PM interaction:
+bazinga-db-agents, please log this PM interaction:
 
 Session ID: bazinga_20250113_143022
 Agent Type: pm
@@ -40,7 +40,7 @@ Skill(command: "bazinga-db-agents")
 
 ### Logging Developer Interaction
 ```
-bazinga-db, please log this developer interaction:
+bazinga-db-agents, please log this developer interaction:
 
 Session ID: bazinga_20250113_143022
 Agent Type: developer
@@ -56,7 +56,7 @@ Skill(command: "bazinga-db-agents")
 
 ### Logging QA Interaction
 ```
-bazinga-db, please log this QA interaction:
+bazinga-db-agents, please log this QA interaction:
 
 Session ID: bazinga_20250113_143022
 Agent Type: qa_expert
@@ -72,7 +72,7 @@ Skill(command: "bazinga-db-agents")
 
 ### Logging Tech Lead Interaction
 ```
-bazinga-db, please log this tech_lead interaction:
+bazinga-db-agents, please log this tech_lead interaction:
 
 Session ID: bazinga_20250113_143022
 Agent Type: tech_lead

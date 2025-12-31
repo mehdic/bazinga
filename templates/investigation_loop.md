@@ -23,7 +23,7 @@ Before starting investigation loop, verify:
 
 **Query database for existing investigation:**
 ```
-bazinga-db, please get state:
+bazinga-db-core, please get state:
 Session ID: {session_id}
 State Type: investigation
 ```
@@ -68,7 +68,7 @@ investigation_state:
 
 **1c. Save to database (using bazinga-db state APIs):**
 ```
-bazinga-db, please save state:
+bazinga-db-core, please save state:
 Session ID: {session_id}
 State Type: investigation
 Data: {investigation_state as JSON}
@@ -83,7 +83,7 @@ investigation_state.current_iteration += 1
 
 IF current_iteration > max_iterations:
     investigation_state.status = "incomplete"
-    bazinga-db, please save state:
+    bazinga-db-core, please save state:
     Session ID: {session_id}
     State Type: investigation
     Data: {investigation_state}
@@ -153,7 +153,7 @@ Task(
 
 **Step 4a-log: Log iteration result:**
 ```
-bazinga-db, please log investigation iteration:
+bazinga-db-core, please log investigation iteration:
 Session ID: {session_id}
 Group ID: {group_id}
 Iteration: {current_iteration}
@@ -168,7 +168,7 @@ iterations_log.append({
   "status": status,
   "summary": extracted_summary
 })
-bazinga-db, please save state: ...
+bazinga-db-core, please save state: ...
 ```
 
 ---
@@ -177,7 +177,7 @@ bazinga-db, please save state: ...
 
 **Check active developer count:**
 ```
-bazinga-db, please get active agent count:
+bazinga-db-core, please get active agent count:
 Session ID: {session_id}
 Agent Type: developer
 ```
@@ -222,7 +222,7 @@ Skill(command: "prompt-builder")
 
 **Step 4c-3: Check escalation (respect revision count):**
 ```
-bazinga-db, please get revision count:
+bazinga-db-core, please get revision count:
 Session ID: {session_id}
 Group ID: {group_id}
 
@@ -244,7 +244,7 @@ Task(
 
 **Increment revision count:**
 ```
-bazinga-db, please increment revision:
+bazinga-db-core, please increment revision:
 Session ID: {session_id}
 Group ID: {group_id}
 ```
@@ -292,12 +292,12 @@ investigation_state.status = "root_cause_found"
 investigation_state.root_cause = {from investigator}
 investigation_state.confidence = {from investigator}
 investigation_state.solution = {from investigator}
-bazinga-db, please save state: ...
+bazinga-db-core, please save state: ...
 ```
 
 **Register context package:**
 ```
-bazinga-db, please save context package:
+bazinga-db-core, please save context package:
 Session ID: {session_id}
 Group ID: {group_id}
 Package Type: investigation
@@ -323,7 +323,7 @@ investigation_state.partial_findings = {
   "hypotheses_tested": [list from iterations_log],
   "progress": {summary of what was learned}
 }
-bazinga-db, please save state: ...
+bazinga-db-core, please save state: ...
 ```
 
 **Route to Tech Lead partial review** (per transitions.json: INVESTIGATION_INCOMPLETE → tech_lead)
@@ -336,7 +336,7 @@ bazinga-db, please save state: ...
 ```
 investigation_state.status = "blocked"
 investigation_state.blocker = {from investigator}
-bazinga-db, please save state: ...
+bazinga-db-core, please save state: ...
 ```
 
 **Route to Tech Lead** (per transitions.json: BLOCKED → tech_lead)
@@ -353,7 +353,7 @@ Tech Lead will decide whether to:
 **Update state:**
 ```
 investigation_state.status = "exhausted"
-bazinga-db, please save state: ...
+bazinga-db-core, please save state: ...
 ```
 
 **Route to Tech Lead** (per transitions.json: EXHAUSTED → tech_lead)

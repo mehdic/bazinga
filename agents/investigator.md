@@ -176,9 +176,9 @@ After each hypothesis test:
 # Use bazinga-db skill to log iteration progress
 ```
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-agents skill:**
 ```
-bazinga-db, please log this investigator iteration:
+bazinga-db-agents, please log this investigator iteration:
 
 Session ID: [current_session_id]
 Agent Type: investigator
@@ -209,9 +209,9 @@ Skill(command: "bazinga-db-agents")
 
 After each major decision:
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-workflow skill:**
 ```
-bazinga-db, please update task group investigation status:
+bazinga-db-workflow, please update task group investigation status:
 
 Group ID: [group_id]
 Investigation Iteration: [current iteration number]
@@ -221,7 +221,7 @@ Last Activity: [brief description]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db-agents")
+Skill(command: "bazinga-db-workflow")
 ```
 
 ## 📋 ACTION TYPES (Response Formats)
@@ -260,7 +260,7 @@ Skill(command: "bazinga-db-agents")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log investigation completion:
+bazinga-db-agents, please log investigation completion:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -325,7 +325,7 @@ Then invoke: Skill(command: "bazinga-db-agents")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log diagnostic request:
+bazinga-db-agents, please log diagnostic request:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -380,7 +380,7 @@ Then invoke: Skill(command: "bazinga-db-agents")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log hypothesis elimination:
+bazinga-db-agents, please log hypothesis elimination:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -427,7 +427,7 @@ Then invoke: Skill(command: "bazinga-db-agents")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log analysis need:
+bazinga-db-agents, please log analysis need:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -474,7 +474,7 @@ Then invoke: Skill(command: "bazinga-db-agents")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log investigation blocked:
+bazinga-db-agents, please log investigation blocked:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -548,7 +548,7 @@ Then invoke: Skill(command: "bazinga-db-agents")
 
 **LOG TO DATABASE:**
 ```
-bazinga-db, please log initial analysis:
+bazinga-db-agents, please log initial analysis:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -610,7 +610,7 @@ Then:
 
 **LOG ITERATION START:**
 ```
-bazinga-db, please log iteration start:
+bazinga-db-agents, please log iteration start:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -651,7 +651,7 @@ Agent ID: investigator_[group_id]
 
 **LOG ITERATION RESULT:**
 ```
-bazinga-db, please log iteration result:
+bazinga-db-agents, please log iteration result:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -718,7 +718,7 @@ Agent ID: investigator_[group_id]
 
 **LOG ROOT CAUSE FINDING:**
 ```
-bazinga-db, please log root cause found:
+bazinga-db-agents, please log root cause found:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -743,7 +743,7 @@ Skill(command: "bazinga-db-agents")
 
 **UPDATE TASK GROUP STATUS:**
 ```
-bazinga-db, please update task group:
+bazinga-db-workflow, please update task group:
 
 Group ID: [group_id]
 Status: root_cause_identified
@@ -753,7 +753,7 @@ Investigation Result: "root_cause_found"
 
 Then invoke:
 ```
-Skill(command: "bazinga-db-agents")
+Skill(command: "bazinga-db-workflow")
 ```
 
 ### Phase 4: Report to Tech Lead
@@ -866,7 +866,7 @@ Write(
 **After writing your investigation artifact, register it so developers receive your findings:**
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
@@ -878,7 +878,7 @@ Priority: high
 Summary: {1-sentence: Root cause + recommended fix}
 ```
 
-Then invoke: `Skill(command: "bazinga-db-agents")`
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **Include in your response:**
 ```markdown
@@ -993,7 +993,7 @@ The next agent will read your handoff file and full investigation report for det
 **For each limit scenario, MUST log to database:**
 
 ```
-bazinga-db, please log investigation conclusion:
+bazinga-db-agents, please log investigation conclusion:
 
 Session ID: [session_id]
 Agent Type: investigator

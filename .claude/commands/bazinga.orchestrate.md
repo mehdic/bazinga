@@ -961,9 +961,9 @@ Display:
    **YOU MUST invoke the bazinga-db skill to create a new session.**
    **Database will auto-initialize if it doesn't exist (< 2 seconds).**
 
-   Request to bazinga-db skill:
+   Request to bazinga-db-core skill:
    ```
-   bazinga-db, please create a new orchestration session:
+   bazinga-db-core, please create a new orchestration session:
 
    Session ID: $SESSION_ID
    Mode: simple
@@ -1831,7 +1831,7 @@ You are the Project Manager. You previously requested clarification and received
 - Update orchestrator state to mark clarification resolved:
 
 ```
-bazinga-db, please update orchestrator state:
+bazinga-db-core, please update orchestrator state:
 
 Session ID: [current session_id]
 State Data: {

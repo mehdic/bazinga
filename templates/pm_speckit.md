@@ -363,9 +363,9 @@ Key patterns to follow:
 
 **Phase 5: Save Your PM State with Spec-Kit Context to Database**
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-core skill:**
 ```
-bazinga-db, please save the PM state:
+bazinga-db-core, please save the PM state:
 
 Session ID: [session_id from orchestrator]
 State Type: pm
@@ -421,14 +421,14 @@ State Data: {
 Skill(command: "bazinga-db-core")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db-core skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 Additionally, create task groups in the database:
 
 **For each task group, request:**
 ```
-bazinga-db, please create task group:
+bazinga-db-workflow, please create task group:
 
 Group ID: SETUP
 Session ID: [session_id]

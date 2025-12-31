@@ -131,7 +131,7 @@ fi
 
 When the orchestrator invokes the bazinga-db skill:
 ```
-Orchestrator: "bazinga-db, please log this developer interaction: ..."
+Orchestrator: "bazinga-db-agents, please log this developer interaction: ..."
 ↓
 Bazinga-DB skill:
   1. Parses request

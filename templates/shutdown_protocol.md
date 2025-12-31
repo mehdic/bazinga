@@ -12,9 +12,9 @@
 
 Before ANY shutdown step, query the database for a validator verdict:
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-agents skill:**
 ```
-bazinga-db, get events for session [session_id] with type "validator_verdict" limit 1
+bazinga-db-agents, get events for session [session_id] with type "validator_verdict" limit 1
 ```
 
 **Then invoke:**
@@ -52,9 +52,9 @@ Skill(command: "bazinga-db-agents")
 
 After validator gate passes, log the check:
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-agents skill:**
 ```
-bazinga-db, save event for session [session_id]:
+bazinga-db-agents, save event for session [session_id]:
   Event type: validator_gate_check
   Payload: {"passed": true, "verdict": "ACCEPT", "timestamp": "[ISO timestamp]"}
 ```
@@ -155,7 +155,7 @@ if pm_message contains "BAZINGA":
     criteria = None
     for attempt in range(3):
         try:
-            Request: "bazinga-db, get success criteria for session [session_id]"
+            Request: "bazinga-db-workflow, get success criteria for session [session_id]"
             Command: get-success-criteria [session_id]
             Invoke: Skill(command: "bazinga-db-workflow")
             criteria = parse_database_response()
@@ -212,7 +212,7 @@ if pm_message contains "BAZINGA":
 
     # Check B: Query database (ground truth), then validate
 
-    Request: "bazinga-db, get success criteria for session [session_id]"
+    Request: "bazinga-db-workflow, get success criteria for session [session_id]"
     Command: get-success-criteria [session_id]
     Invoke: Skill(command: "bazinga-db-workflow")
 
@@ -288,9 +288,9 @@ if pm_message contains "BAZINGA":
 
 Query complete metrics from database:
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-core skill:**
 ```
-bazinga-db, please provide dashboard snapshot:
+bazinga-db-core, please provide dashboard snapshot:
 
 Session ID: [current session_id]
 ```
@@ -300,7 +300,7 @@ Session ID: [current session_id]
 Skill(command: "bazinga-db-core")
 ```
 
-**IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
+**IMPORTANT:** You MUST invoke bazinga-db-core skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
 
 
 The dashboard snapshot returns:
@@ -428,9 +428,9 @@ git push -u origin $CURRENT_BRANCH
 
 **After successful commit/push, record final state:**
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-core skill:**
 ```
-bazinga-db, please save git state:
+bazinga-db-core, please save git state:
 
 Session ID: [current session_id]
 State Type: git_final
@@ -497,9 +497,9 @@ This step has TWO required sub-steps that MUST both be completed:
 
 #### Sub-step 4.1: Save Final Orchestrator State
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-core skill:**
 ```
-bazinga-db, please save the orchestrator state:
+bazinga-db-core, please save the orchestrator state:
 
 Session ID: [current session_id]
 State Type: orchestrator
@@ -522,9 +522,9 @@ Skill(command: "bazinga-db-core")
 
 #### Sub-step 4.2: Update Session Status to Completed
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-core skill:**
 ```
-bazinga-db, please update session status:
+bazinga-db-core, please update session status:
 
 Session ID: [current session_id]
 Status: completed

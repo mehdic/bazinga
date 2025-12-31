@@ -12,7 +12,7 @@
 
 1. **Increment spawn counter:**
    ```
-   bazinga-db, please update orchestrator state:
+   bazinga-db-core, please update orchestrator state:
 
    Session ID: {session_id}
    State Type: orchestrator
@@ -506,7 +506,7 @@ Task(subagent_type="general-purpose", model={model}, description="{agent_type} {
 **IF Tech Lead approves this group:**
 - **Trigger strategy extraction** (capture successful patterns for future context):
   ```
-  bazinga-db, please extract strategies:
+  bazinga-db-context, please extract strategies:
 
   Session ID: {session_id}
   Group ID: {group_id}
@@ -551,9 +551,9 @@ Use the template for merge prompt and response handling. Apply to this group's c
 
 **MERGE_SUCCESS Progress Tracking:**
 1. Update task_group: status="completed", merge_status="merged"
-2. Query completed progress from task_groups using bazinga-db skill:
+2. Query completed progress from task_groups using bazinga-db-workflow skill:
    ```
-   bazinga-db, please get task groups:
+   bazinga-db-workflow, please get task groups:
 
    Session ID: [session_id]
    Status: completed

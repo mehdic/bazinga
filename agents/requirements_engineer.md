@@ -761,7 +761,7 @@ The next agent will read your handoff file and full deliverable for details.
 ### Step 1: Invoke bazinga-db to Register Package
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}

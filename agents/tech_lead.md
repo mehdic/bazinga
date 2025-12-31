@@ -635,7 +635,7 @@ For each option, document:
 **After making architectural decision, register it for future agents:**
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}

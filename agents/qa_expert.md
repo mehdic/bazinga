@@ -1496,7 +1496,7 @@ Write(
 **When tests FAIL, register a context package so the next developer iteration has failure details:**
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
