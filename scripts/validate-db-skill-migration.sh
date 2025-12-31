@@ -77,7 +77,33 @@ check_consistency() {
     fi
 }
 
-# Check all markdown files for consistency (excluding documentation directories)
+# Define operational templates that MUST be validated (not documentation)
+OPERATIONAL_TEMPLATES=(
+    "templates/orchestrator/phase_simple.md"
+    "templates/orchestrator/phase_parallel.md"
+    "templates/orchestrator/clarification_flow.md"
+    "templates/orchestrator/scope_validation.md"
+    "templates/shutdown_protocol.md"
+    "templates/investigation_loop.md"
+    "templates/logging_pattern.md"
+    "templates/pm_planning_steps.md"
+    "templates/pm_speckit.md"
+    "templates/pm_bazinga_validation.md"
+    "templates/completion_report.md"
+)
+
+# Check operational templates explicitly
+echo ""
+echo "📋 Checking operational templates..."
+for template in "${OPERATIONAL_TEMPLATES[@]}"; do
+    if [ -f "$REPO_ROOT/$template" ]; then
+        for domain in "${DOMAINS[@]}"; do
+            check_consistency "$REPO_ROOT/$template" "$domain"
+        done
+    fi
+done
+
+# Check all other markdown files (excluding documentation directories and templates)
 while IFS= read -r -d '' file; do
     for domain in "${DOMAINS[@]}"; do
         check_consistency "$file" "$domain"

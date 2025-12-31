@@ -24,9 +24,11 @@ Before starting investigation loop, verify:
 **Query database for existing investigation:**
 ```
 bazinga-db-core, please get state:
+
 Session ID: {session_id}
 State Type: investigation
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 **IF existing investigation found:**
 ```
@@ -69,10 +71,12 @@ investigation_state:
 **1c. Save to database (using bazinga-db state APIs):**
 ```
 bazinga-db-core, please save state:
+
 Session ID: {session_id}
 State Type: investigation
 Data: {investigation_state as JSON}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
@@ -151,15 +155,20 @@ Task(
 | `EXHAUSTED` | → Step 5d |
 | Unknown/Parse Error | → Treat as NEED_MORE_ANALYSIS (max 2 times) → then BLOCKED |
 
-**Step 4a-log: Log iteration result:**
+**Step 4a-log: Log iteration result via event:**
 ```
-bazinga-db-core, please log investigation iteration:
+bazinga-db-agents, please save event:
+
 Session ID: {session_id}
-Group ID: {group_id}
-Iteration: {current_iteration}
-Status: {status}
-Summary: {extracted summary}
+Event Type: investigation_iteration
+Payload: {
+  "group_id": "{group_id}",
+  "iteration": {current_iteration},
+  "status": "{status}",
+  "summary": "{extracted summary}"
+}
 ```
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Update investigation_state.iterations_log and save:**
 ```
@@ -175,12 +184,16 @@ bazinga-db-core, please save state: ...
 
 ## Step 4b: Capacity Check (Before Diagnostic Developer Spawn)
 
-**Check active developer count:**
+**Check active developer count (from orchestrator state):**
 ```
-bazinga-db-core, please get active agent count:
+bazinga-db-core, please get state:
+
 Session ID: {session_id}
-Agent Type: developer
+State Type: orchestrator
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
+
+Parse response: `active_developers = count(state.active_agents where type == "developer")`
 
 **IF active_developers >= 4:**
 ```
@@ -222,10 +235,15 @@ Skill(command: "prompt-builder")
 
 **Step 4c-3: Check escalation (respect revision count):**
 ```
-bazinga-db-core, please get revision count:
-Session ID: {session_id}
-Group ID: {group_id}
+bazinga-db-workflow, please get task groups:
 
+Session ID: {session_id}
+```
+Then invoke: `Skill(command: "bazinga-db-workflow")`
+
+Parse response: `revision_count = task_group[group_id].revision_count`
+
+```
 IF revision_count >= 1:
     model = MODEL_CONFIG["senior_software_engineer"]
 ELSE:
@@ -244,10 +262,13 @@ Task(
 
 **Increment revision count:**
 ```
-bazinga-db-core, please increment revision:
-Session ID: {session_id}
+bazinga-db-workflow, please update task group:
+
 Group ID: {group_id}
+Session ID: {session_id}
+Revision Count: +1
 ```
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 **TERMINATE orchestrator turn** (await Developer response)
 
@@ -297,7 +318,8 @@ bazinga-db-core, please save state: ...
 
 **Register context package:**
 ```
-bazinga-db-core, please save context package:
+bazinga-db-context, please save context package:
+
 Session ID: {session_id}
 Group ID: {group_id}
 Package Type: investigation
@@ -307,6 +329,7 @@ Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {1-sentence root cause + fix}
 ```
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **Route to Tech Lead validation** (per transitions.json: ROOT_CAUSE_FOUND → tech_lead)
 
