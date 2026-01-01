@@ -459,14 +459,14 @@ cursor.execute("INSERT INTO reasoning_log ...")
 sqlite3 bazinga/bazinga.db "SELECT ..."
 ```
 
-### ✅ ALWAYS Use bazinga-db Skill
+### ✅ ALWAYS Use bazinga-db Domain Skills
 
 ```python
-# ✅ CORRECT: Use the bazinga-db skill for ALL database operations
-Skill(command: "bazinga-db") → list-sessions
-Skill(command: "bazinga-db") → get-task-groups {session_id}
-Skill(command: "bazinga-db") → save-reasoning {session_id} {agent_type} {phase} {content}
-Skill(command: "bazinga-db") → update-task-group {session_id} {group_id} {status}
+# ✅ CORRECT: Use domain-specific bazinga-db skills for ALL database operations
+Skill(command: "bazinga-db-core") → list-sessions, get-session, save-state, dashboard-snapshot
+Skill(command: "bazinga-db-workflow") → get-task-groups, update-task-group, save-success-criteria
+Skill(command: "bazinga-db-agents") → save-reasoning, log-interaction, save-skill-output
+Skill(command: "bazinga-db-context") → save-context-package, get-error-patterns, extract-strategies
 
 # ✅ CORRECT: Or use the CLI script (for verification commands in docs)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet list-sessions 1
@@ -487,7 +487,7 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-success-crit
 - No `sqlite3` imports or commands
 - No raw SQL strings (SELECT, INSERT, UPDATE, DELETE)
 - No direct `bazinga/bazinga.db` file access
-- All DB operations use `Skill(command: "bazinga-db")` or the CLI script
+- All DB operations use domain-specific skills (`bazinga-db-core`, `bazinga-db-workflow`, `bazinga-db-agents`, `bazinga-db-context`) or the CLI script
 
 **If you see inline SQL:** STOP and refactor to use the bazinga-db skill immediately.
 

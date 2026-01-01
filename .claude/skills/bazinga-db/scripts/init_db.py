@@ -29,7 +29,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 18
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1387,11 +1387,215 @@ def init_database(db_path: str) -> None:
             current_version = 16
             print("✓ Migration to v16 complete (review iteration tracking)")
 
+        # v16 → v17: Add idempotency_key column to orchestration_logs for event deduplication
+        if current_version == 16:
+            print("\n--- Migrating v16 → v17 (event idempotency support) ---")
+
+            # Check if orchestration_logs table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='orchestration_logs'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new column - skip migration
+                print("   ⊘ orchestration_logs table will be created with idempotency_key column")
+            else:
+                # Check if column already exists
+                cols = cursor.execute("PRAGMA table_info(orchestration_logs)").fetchall()
+                col_names = {col[1] for col in cols}
+
+                try:
+                    # Begin transaction for migration
+                    conn.execute("BEGIN IMMEDIATE")
+
+                    # Add idempotency_key column if missing
+                    if 'idempotency_key' not in col_names:
+                        cursor.execute("""
+                            ALTER TABLE orchestration_logs
+                            ADD COLUMN idempotency_key TEXT
+                        """)
+                        print("   ✓ Added orchestration_logs.idempotency_key")
+                    else:
+                        print("   ⊘ orchestration_logs.idempotency_key already exists")
+
+                    # Create partial unique index for idempotency enforcement
+                    try:
+                        cursor.execute("""
+                            CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_idempotency
+                            ON orchestration_logs(session_id, event_subtype, idempotency_key)
+                            WHERE idempotency_key IS NOT NULL AND log_type = 'event'
+                        """)
+                        print("   ✓ Created idx_logs_idempotency unique index")
+                    except sqlite3.OperationalError as e:
+                        if "already exists" in str(e):
+                            print("   ⊘ idx_logs_idempotency index already exists")
+                        else:
+                            raise
+
+                    # Verify integrity before commit
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v16→v17: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                    # WAL checkpoint for clean state
+                    try:
+                        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                    except Exception:
+                        pass  # WAL checkpoint is optional
+
+                    # Refresh query planner statistics
+                    cursor.execute("ANALYZE orchestration_logs;")
+                    print("   ✓ ANALYZE completed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v16→v17 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 17
+            print("✓ Migration to v17 complete (event idempotency support)")
+
+        # v17 → v18: Investigation state isolation + group-aware dedup
+        if current_version == 17:
+            print("\n--- Migrating v17 → v18 (investigation state isolation) ---")
+
+            # Check if state_snapshots table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='state_snapshots'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new schema - skip migration
+                print("   ⊘ state_snapshots table will be created with new schema")
+            else:
+                try:
+                    # Begin transaction for table rebuild
+                    conn.execute("BEGIN IMMEDIATE")
+
+                    # Backup existing data with SQL window deduplication
+                    # Keep only the latest row per (session_id, state_type) to avoid UNIQUE violations
+                    cursor.execute("""
+                        SELECT id, session_id, timestamp, state_type, state_data
+                        FROM (
+                            SELECT *, ROW_NUMBER() OVER (
+                                PARTITION BY session_id, state_type
+                                ORDER BY timestamp DESC
+                            ) as rn
+                            FROM state_snapshots
+                        ) WHERE rn = 1
+                    """)
+                    state_data = cursor.fetchall()
+                    # Also get total count to show dedup info
+                    cursor.execute("SELECT COUNT(*) FROM state_snapshots")
+                    total_count = cursor.fetchone()[0]
+                    if total_count != len(state_data):
+                        print(f"   - Backed up {len(state_data)} unique state entries (deduplicated from {total_count})")
+                    else:
+                        print(f"   - Backed up {len(state_data)} state snapshot entries")
+
+                    # Drop old table and indexes
+                    cursor.execute("DROP INDEX IF EXISTS idx_state_session_type")
+                    cursor.execute("DROP TABLE state_snapshots")
+
+                    # Create new table with group_id and expanded CHECK constraint
+                    cursor.execute("""
+                        CREATE TABLE state_snapshots (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT NOT NULL,
+                            group_id TEXT NOT NULL DEFAULT 'global',
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status', 'investigation')),
+                            state_data TEXT NOT NULL,
+                            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                        )
+                    """)
+                    print("   ✓ Created state_snapshots with group_id and 'investigation' state_type")
+
+                    # Create UNIQUE index for upsert support
+                    cursor.execute("""
+                        CREATE UNIQUE INDEX idx_state_unique
+                        ON state_snapshots(session_id, state_type, group_id)
+                    """)
+                    print("   ✓ Created idx_state_unique for upsert support")
+
+                    # Create performance index
+                    cursor.execute("""
+                        CREATE INDEX idx_state_session_type_group
+                        ON state_snapshots(session_id, state_type, group_id, timestamp DESC)
+                    """)
+                    print("   ✓ Created idx_state_session_type_group performance index")
+
+                    # Restore data with group_id='global' backfill
+                    if state_data:
+                        for row in state_data:
+                            cursor.execute("""
+                                INSERT INTO state_snapshots (id, session_id, group_id, timestamp, state_type, state_data)
+                                VALUES (?, ?, 'global', ?, ?, ?)
+                            """, (row[0], row[1], row[2], row[3], row[4]))
+                        print(f"   ✓ Restored {len(state_data)} entries with group_id='global'")
+
+                    # Update event idempotency index to include group_id
+                    cursor.execute("DROP INDEX IF EXISTS idx_logs_idempotency")
+                    cursor.execute("""
+                        CREATE UNIQUE INDEX idx_logs_idempotency
+                        ON orchestration_logs(session_id, event_subtype, group_id, idempotency_key)
+                        WHERE idempotency_key IS NOT NULL AND log_type = 'event'
+                    """)
+                    print("   ✓ Recreated idx_logs_idempotency with group_id")
+
+                    # Fix F: Backfill NULL group_id to 'global' for legacy events
+                    # See: research/domain-skill-migration-phase4-ultrathink.md
+                    # This ensures queries with group_id='global' predicate find old events
+                    result = cursor.execute("""
+                        UPDATE orchestration_logs
+                        SET group_id = 'global'
+                        WHERE log_type = 'event' AND (group_id IS NULL OR group_id = '')
+                    """)
+                    backfill_count = result.rowcount
+                    if backfill_count > 0:
+                        print(f"   ✓ Backfilled {backfill_count} events with group_id='global'")
+
+                    # Verify integrity before commit
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v17→v18: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                    # WAL checkpoint for clean state
+                    try:
+                        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                    except Exception:
+                        pass  # WAL checkpoint is optional
+
+                    # Refresh query planner statistics
+                    cursor.execute("ANALYZE state_snapshots;")
+                    cursor.execute("ANALYZE orchestration_logs;")
+                    print("   ✓ ANALYZE completed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v17→v18 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 18
+            print("✓ Migration to v18 complete (investigation state isolation)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Context engineering system tables"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Investigation state isolation + group-aware dedup"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -1419,6 +1623,7 @@ def init_database(db_path: str) -> None:
     # Orchestration logs table (replaces orchestration-log.md)
     # Extended in v8 to support agent reasoning capture
     # Extended in v9 to support event logging (pm_bazinga, scope_change, validator_verdict)
+    # Extended in v17 to support idempotency_key for event deduplication
     # CHECK constraints enforce valid enumeration values at database layer
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orchestration_logs (
@@ -1443,6 +1648,7 @@ def init_database(db_path: str) -> None:
             group_id TEXT,
             event_subtype TEXT,
             event_payload TEXT,
+            idempotency_key TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
@@ -1469,22 +1675,37 @@ def init_database(db_path: str) -> None:
         ON orchestration_logs(session_id, log_type, event_subtype)
         WHERE log_type = 'event'
     """)
+    # v18: Updated to include group_id for cross-group isolation
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_idempotency
+        ON orchestration_logs(session_id, event_subtype, group_id, idempotency_key)
+        WHERE idempotency_key IS NOT NULL AND log_type = 'event'
+    """)
     print("✓ Created orchestration_logs table with indexes")
 
     # State snapshots table (replaces JSON state files)
+    # Extended in v18 to support group_id for investigation state isolation
+    # Extended in v18 to support 'investigation' state_type
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS state_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
+            group_id TEXT NOT NULL DEFAULT 'global',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status')),
+            state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status', 'investigation')),
             state_data TEXT NOT NULL,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
+    # UNIQUE index for upsert support (allows ON CONFLICT)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_state_session_type
-        ON state_snapshots(session_id, state_type, timestamp DESC)
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_state_unique
+        ON state_snapshots(session_id, state_type, group_id)
+    """)
+    # Performance index for queries
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_state_session_type_group
+        ON state_snapshots(session_id, state_type, group_id, timestamp DESC)
     """)
     print("✓ Created state_snapshots table with indexes")
 

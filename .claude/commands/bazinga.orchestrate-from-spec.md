@@ -495,28 +495,28 @@ While orchestration runs, you can monitor progress by invoking the bazinga-db sk
 
 **To check orchestration logs:**
 
-Request to bazinga-db skill:
+Request to bazinga-db-agents skill:
 ```
-bazinga-db, please stream recent logs for session {session_id}.
+bazinga-db-agents, please stream recent logs for session {session_id}.
 Show me the last 20 log entries.
 ```
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 **To check PM state:**
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please get the PM state for session {session_id}.
+bazinga-db-core, please get the PM state for session {session_id}.
 I need to see the current status and task groups.
 ```
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-core")
 ```
 
 **Note:** All orchestration data is stored in bazinga/bazinga.db. Use the bazinga-db skill to query it instead of direct bash commands.

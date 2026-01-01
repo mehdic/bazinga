@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_investigation_iteration.schema.json",
+  "title": "Investigation Iteration Event Schema",
+  "description": "Schema for investigation_iteration event stored in bazinga-db. Tracks Investigator agent progress.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["group_id", "iteration", "status"],
+  "$comment": "session_id and event_type are NOT required in payload - injected by save-event CLI",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier. Note: When using save-event CLI, session_id is passed as first arg."
+    },
+    "group_id": {
+      "type": "string",
+      "description": "Task group identifier"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Investigation iteration number (max 5 typically)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "under_investigation",
+        "root_cause_found",
+        "hypothesis_eliminated",
+        "need_more_analysis",
+        "need_developer_diagnostic",
+        "blocked",
+        "exhausted",
+        "investigation_incomplete"
+      ],
+      "description": "Current investigation status"
+    },
+    "activity": {
+      "type": "string",
+      "description": "Brief description of last activity"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Summary of investigation findings this iteration"
+    },
+    "hypothesis": {
+      "type": "string",
+      "description": "Current hypothesis being tested"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Confidence level in findings"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "x-dedup-key": {
+    "description": "Deduplication key to prevent duplicate events",
+    "fields": ["session_id", "group_id", "iteration"]
+  }
+}

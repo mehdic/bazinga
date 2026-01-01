@@ -84,12 +84,16 @@ CREATE TABLE orchestration_logs (
     agent_id TEXT,
     content TEXT NOT NULL,
     -- Reasoning capture columns (v8)
-    log_type TEXT DEFAULT 'interaction',  -- 'interaction' or 'reasoning'
+    log_type TEXT DEFAULT 'interaction',  -- 'interaction', 'reasoning', or 'event'
     reasoning_phase TEXT,  -- understanding, approach, decisions, risks, blockers, pivot, completion
     confidence_level TEXT,  -- high, medium, low
     references_json TEXT,  -- JSON array of files consulted
     redacted INTEGER DEFAULT 0,  -- 1 if secrets were redacted
     group_id TEXT,  -- Task group for reasoning context
+    -- Event columns (v17)
+    event_subtype TEXT,  -- pm_bazinga, scope_change, validator_verdict, tl_issues, etc.
+    event_payload TEXT,  -- JSON string event payload
+    idempotency_key TEXT,  -- Prevents duplicate events: {session}|{group}|{type}|{iteration}
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 )
 
@@ -101,6 +105,10 @@ CREATE INDEX idx_logs_reasoning ON orchestration_logs(session_id, log_type, reas
     WHERE log_type = 'reasoning';
 CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id, log_type)
     WHERE log_type = 'reasoning';
+-- Event idempotency index (v17) - prevents duplicate events with same key
+CREATE UNIQUE INDEX idx_logs_idempotency
+    ON orchestration_logs(session_id, event_subtype, group_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL AND log_type = 'event';
 ```
 
 **Columns:**
@@ -124,12 +132,16 @@ CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id
 - `references_json`: JSON array of file paths consulted during reasoning
 - `redacted`: 1 if secrets were detected and redacted from content
 - `group_id`: Task group ID for associating reasoning with specific work
+- `event_subtype`: (v17) Event type for log_type='event': `pm_bazinga`, `scope_change`, `validator_verdict`, `tl_issues`, `tl_issue_responses`, `investigation_iteration`, etc.
+- `event_payload`: (v17) JSON string event payload (secrets are scanned and redacted)
+- `idempotency_key`: (v17) Prevents duplicate events. Recommended format: `{session_id}|{group_id}|{event_type}|{iteration}`
 
 **Indexes:**
 - `idx_logs_session`: Fast session-based queries sorted by time
 - `idx_logs_agent_type`: Filter by agent type efficiently
 - `idx_logs_reasoning`: Efficient reasoning queries by phase (partial index)
 - `idx_logs_group_reasoning`: Efficient reasoning queries by group (partial index)
+- `idx_logs_idempotency`: (v17) Unique constraint for event idempotency - prevents duplicate events with same key. Uses INSERT-first pattern with IntegrityError catch for race-safe concurrent writes.
 
 **Usage Example - Interactions:**
 ```python
@@ -186,25 +198,32 @@ CREATE TABLE state_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status')),
+    state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status', 'investigation')),
+    group_id TEXT DEFAULT 'global',  -- Isolation key for parallel mode (v18)
     state_data TEXT NOT NULL,  -- JSON format
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+    UNIQUE(session_id, state_type, group_id)  -- UPSERT support (v18)
 )
 
 -- Indexes
 CREATE INDEX idx_state_session_type ON state_snapshots(session_id, state_type, timestamp DESC);
+CREATE INDEX idx_state_group ON state_snapshots(session_id, state_type, group_id);
 ```
 
 **Columns:**
 - `id`: Auto-increment primary key
 - `session_id`: Foreign key to sessions table
 - `timestamp`: When the state was saved
-- `state_type`: Type of state (`pm`, `orchestrator`, `group_status`)
+- `state_type`: Type of state (`pm`, `orchestrator`, `group_status`, `investigation`)
+- `group_id`: Group isolation key for parallel mode (default: `'global'`). Session-level states (pm, orchestrator) use 'global'. Investigation states use the task group ID.
 - `state_data`: Complete state as JSON string
+
+**UPSERT Behavior (v18):**
+The `UNIQUE(session_id, state_type, group_id)` constraint enables UPSERT. Saving state with the same session/type/group replaces the previous state rather than creating duplicates.
 
 **Usage Example:**
 ```python
-# Save PM state
+# Save PM state (session-level, uses default group_id='global')
 pm_state = {
     'mode': 'parallel',
     'iteration': 5,
@@ -212,8 +231,29 @@ pm_state = {
 }
 db.save_state('bazinga_123', 'pm', pm_state)
 
-# Retrieve latest state
+# Retrieve latest PM state
 current_state = db.get_latest_state('bazinga_123', 'pm')
+
+# Save investigation state (group-specific)
+inv_state = {
+    'iteration': 3,
+    'status': 'root_cause_found',
+    'hypotheses': [...]
+}
+db.save_state('bazinga_123', 'investigation', inv_state, group_id='AUTH')
+
+# Retrieve investigation state for specific group
+inv_state = db.get_latest_state('bazinga_123', 'investigation', group_id='AUTH')
+```
+
+**CLI Usage:**
+```bash
+# Save state with group_id
+python3 .../bazinga_db.py --quiet save-state "sess_123" "investigation" \
+  --state-file /tmp/state.json --group-id "AUTH"
+
+# Get state with group_id
+python3 .../bazinga_db.py --quiet get-state "sess_123" "investigation" --group-id "AUTH"
 ```
 
 ---

@@ -1486,6 +1486,121 @@ def get_skills_config_from_file():
         return None
 
 
+# =============================================================================
+# REASONING BLOCK INJECTION (Phase 0 fix for reasoning save failure)
+# See: research/reasoning-save-failure-ultrathink.md
+# =============================================================================
+
+# Agents that MUST save reasoning (understanding + completion phases)
+AGENTS_REQUIRING_REASONING = frozenset({
+    "developer", "senior_software_engineer", "qa_expert", "tech_lead", "project_manager"
+})
+
+
+def build_mandatory_reasoning_block(session_id, group_id, agent_type):
+    """Build pre-filled mandatory reasoning block with concrete values.
+
+    This block is injected BEFORE the agent definition to ensure agents
+    see ready-to-execute reasoning save commands at the top of their prompt.
+
+    See: research/reasoning-save-failure-ultrathink.md (Phase 0)
+    """
+    if agent_type not in AGENTS_REQUIRING_REASONING:
+        return ""
+
+    # Use "global" for session-level agents (PM)
+    effective_group_id = group_id or "global"
+
+    return f"""---
+
+## 🔴 MANDATORY REASONING SAVES (Pre-filled for this session)
+
+**Save understanding at START of your task:**
+```bash
+cat > /tmp/reasoning_understanding.md << 'EOF'
+## Understanding
+[Document your interpretation of the task, key requirements, and approach]
+EOF
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{session_id}" "{effective_group_id}" "{agent_type}" "understanding" \\
+  --content-file /tmp/reasoning_understanding.md --confidence high
+```
+
+**Save completion at END before returning status:**
+```bash
+cat > /tmp/reasoning_completion.md << 'EOF'
+## Completion
+[Document what you accomplished, key decisions made, and any issues encountered]
+EOF
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{session_id}" "{effective_group_id}" "{agent_type}" "completion" \\
+  --content-file /tmp/reasoning_completion.md --confidence high
+```
+
+⚠️ **These values are pre-filled. Invoke the skill directly - do NOT modify session_id or group_id.**
+
+---"""
+
+
+def substitute_reasoning_placeholders(content, session_id, group_id):
+    """Substitute placeholders ONLY in save-reasoning command lines.
+
+    Uses scoped substitution to avoid accidentally modifying unrelated
+    JSON examples or code snippets in the agent definition.
+
+    See: research/reasoning-save-failure-ultrathink.md (Phase 1)
+    """
+    import re
+
+    effective_group_id = group_id or "global"
+
+    def replacer(match):
+        line = match.group(0)
+        line = line.replace("{SESSION_ID}", session_id)
+        line = line.replace("{GROUP_ID}", effective_group_id)
+        return line
+
+    # Match lines containing save-reasoning commands with placeholders
+    # This pattern matches the entire line containing save-reasoning and placeholders
+    pattern = r'.*save-reasoning.*\{SESSION_ID\}.*'
+    content = re.sub(pattern, replacer, content)
+
+    # Also handle lines where GROUP_ID appears separately
+    pattern2 = r'.*save-reasoning.*\{GROUP_ID\}.*'
+    content = re.sub(pattern2, replacer, content)
+
+    return content
+
+
+def validate_reasoning_placeholders(content):
+    """Check for unsubstituted placeholders in save-reasoning lines.
+
+    Returns True if valid (no unsubstituted placeholders), False otherwise.
+
+    See: research/reasoning-save-failure-ultrathink.md (Phase 2)
+    """
+    import re
+
+    # Only check in lines that contain save-reasoning
+    lines = content.split('\n')
+    for line in lines:
+        if 'save-reasoning' in line:
+            if '{SESSION_ID}' in line or '{GROUP_ID}' in line:
+                print(f"ERROR: Unsubstituted placeholder in save-reasoning line: {line.strip()}", file=sys.stderr)
+                return False
+    return True
+
+
 def get_skills_for_agent(agent_type, testing_mode="full"):
     """Get skills configuration for an agent.
 
@@ -1519,6 +1634,12 @@ def get_skills_for_agent(agent_type, testing_mode="full"):
     # BUT: Keep them for SSE (per OpenAI review - SSE mandates test-pattern-analysis)
     if testing_mode in ("disabled", "minimal") and agent_type not in AGENTS_KEEP_TEST_SKILLS:
         mandatory = [s for s in mandatory if s not in TEST_RELATED_SKILLS]
+
+    # Phase 3: Always include bazinga-db-agents as mandatory for agents requiring reasoning
+    # See: research/reasoning-save-failure-ultrathink.md
+    if agent_type in AGENTS_REQUIRING_REASONING:
+        if "bazinga-db-agents" not in mandatory:
+            mandatory.append("bazinga-db-agents")
 
     return {"mandatory": mandatory, "optional": optional}
 
@@ -1849,8 +1970,23 @@ def build_prompt(args):
             if skills_block:
                 components.append(skills_block)
 
+        # 2.6. Build MANDATORY REASONING BLOCK (pre-filled with concrete values)
+        # See: research/reasoning-save-failure-ultrathink.md (Phase 0)
+        reasoning_block = build_mandatory_reasoning_block(
+            args.session_id, args.group_id or "", args.agent_type
+        )
+        if reasoning_block:
+            components.append(reasoning_block)
+
         # 3. Read AGENT DEFINITION (MANDATORY - this is the core)
         agent_definition = read_agent_file(args.agent_type)
+
+        # 3.1. Apply scoped placeholder substitution for reasoning commands
+        # See: research/reasoning-save-failure-ultrathink.md (Phase 1)
+        agent_definition = substitute_reasoning_placeholders(
+            agent_definition, args.session_id, args.group_id or ""
+        )
+
         components.append(agent_definition)
 
         # 4. Build TASK CONTEXT
@@ -1884,6 +2020,13 @@ def build_prompt(args):
 
         # Compose final prompt
         full_prompt = "\n\n".join(components)
+
+        # 8.5. Validate no unsubstituted placeholders in reasoning commands
+        # See: research/reasoning-save-failure-ultrathink.md (Phase 2)
+        if args.agent_type in AGENTS_REQUIRING_REASONING:
+            if not validate_reasoning_placeholders(full_prompt):
+                print("WARNING: Prompt contains unsubstituted reasoning placeholders", file=sys.stderr)
+                # Continue anyway - this is a warning, not a hard failure
 
         # 9. ENFORCE FILE READ LIMIT (25000 tokens outer guard)
         # This is the final safety check before the prompt is delivered

@@ -173,12 +173,12 @@ You have full access to:
 After each hypothesis test:
 
 ```bash
-# Use bazinga-db skill to log iteration progress
+# Use bazinga-db-agents skill to log iteration progress
 ```
 
-**Request to bazinga-db skill:**
+**Request to bazinga-db-agents skill:**
 ```
-bazinga-db, please log this investigator iteration:
+bazinga-db-agents, please log this investigator iteration:
 
 Session ID: [current_session_id]
 Agent Type: investigator
@@ -196,7 +196,7 @@ Agent ID: investigator_[group_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
 **This logging is NOT optional - it enables:**
@@ -207,22 +207,24 @@ Skill(command: "bazinga-db")
 
 ### Update Investigation Status
 
-After each major decision:
+After each major decision, log via events (do NOT use review_iteration - that's for Tech Lead):
 
-**Request to bazinga-db skill:**
+**Log investigation progress (agents skill):**
 ```
-bazinga-db, please update task group investigation status:
+bazinga-db-agents, please save event:
 
-Group ID: [group_id]
-Investigation Iteration: [current iteration number]
-Status: [under_investigation|root_cause_found|investigation_incomplete]
-Last Activity: [brief description]
+Session ID: [session_id]
+Event Type: investigation_iteration
+Payload: {
+  "group_id": "[group_id]",
+  "iteration": [current iteration number],
+  "status": "[under_investigation|root_cause_found|investigation_incomplete]",
+  "activity": "[brief description of last activity]"
+}
 ```
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
-Then invoke:
-```
-Skill(command: "bazinga-db")
-```
+**Note:** Investigation iterations are tracked via events, not task_group fields. Query with `get-events [session_id] investigation_iteration` to see history.
 
 ## 📋 ACTION TYPES (Response Formats)
 
@@ -260,7 +262,7 @@ Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log investigation completion:
+bazinga-db-agents, please log investigation completion:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -275,7 +277,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** ROOT_CAUSE_FOUND
@@ -325,7 +327,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log diagnostic request:
+bazinga-db-agents, please log diagnostic request:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -338,7 +340,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** NEED_DEVELOPER_DIAGNOSTIC
@@ -380,7 +382,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log hypothesis elimination:
+bazinga-db-agents, please log hypothesis elimination:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -394,7 +396,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** HYPOTHESIS_ELIMINATED
@@ -427,7 +429,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log analysis need:
+bazinga-db-agents, please log analysis need:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -440,7 +442,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** NEED_MORE_ANALYSIS
@@ -474,7 +476,7 @@ Then invoke: Skill(command: "bazinga-db")
 🔴 **MANDATORY DATABASE LOGGING CHECKPOINT**
 ---
 
-bazinga-db, please log investigation blocked:
+bazinga-db-agents, please log investigation blocked:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -488,7 +490,7 @@ Content: {
 Iteration: [N]
 Agent ID: investigator_[group_id]_iter[N]
 
-Then invoke: Skill(command: "bazinga-db")
+Then invoke: Skill(command: "bazinga-db-agents")
 
 ---
 **STATUS:** BLOCKED
@@ -548,7 +550,7 @@ Then invoke: Skill(command: "bazinga-db")
 
 **LOG TO DATABASE:**
 ```
-bazinga-db, please log initial analysis:
+bazinga-db-agents, please log initial analysis:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -610,7 +612,7 @@ Then:
 
 **LOG ITERATION START:**
 ```
-bazinga-db, please log iteration start:
+bazinga-db-agents, please log iteration start:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -651,7 +653,7 @@ Agent ID: investigator_[group_id]
 
 **LOG ITERATION RESULT:**
 ```
-bazinga-db, please log iteration result:
+bazinga-db-agents, please log iteration result:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -718,7 +720,7 @@ Agent ID: investigator_[group_id]
 
 **LOG ROOT CAUSE FINDING:**
 ```
-bazinga-db, please log root cause found:
+bazinga-db-agents, please log root cause found:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -738,22 +740,57 @@ Agent ID: investigator_[group_id]
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
 ```
 
-**UPDATE TASK GROUP STATUS:**
-```
-bazinga-db, please update task group:
+**SAVE INVESTIGATION STATE ATOMICALLY:**
 
-Group ID: [group_id]
-Status: root_cause_identified
-Investigation Iterations: [N]
-Investigation Result: "root_cause_found"
+Write state and event payloads to temp files:
+```bash
+# State file for session resumption
+cat > /tmp/inv_state.json << 'EOF'
+{
+  "session_id": "[session_id]",
+  "group_id": "[group_id]",
+  "current_iteration": [N],
+  "status": "root_cause_found",
+  "root_cause": "[description]",
+  "confidence": "[%]",
+  "solution": "[recommended fix]"
+}
+EOF
+
+# Event file for audit trail
+cat > /tmp/inv_event.json << 'EOF'
+{
+  "group_id": "[group_id]",
+  "iteration": [N],
+  "status": "root_cause_found",
+  "summary": "Root cause identified with [confidence]% confidence"
+}
+EOF
+```
+
+Then invoke the atomic save:
+```
+bazinga-db-agents, please save investigation iteration atomically:
+
+Session: [session_id]
+Group: [group_id]
+Iteration: [N]
+Status: root_cause_found
+State file: /tmp/inv_state.json
+Event file: /tmp/inv_event.json
 ```
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-agents")
+```
+
+Clean up temp files after successful save:
+```bash
+rm -f /tmp/inv_state.json /tmp/inv_event.json
 ```
 
 ### Phase 4: Report to Tech Lead
@@ -866,7 +903,7 @@ Write(
 **After writing your investigation artifact, register it so developers receive your findings:**
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
@@ -878,7 +915,7 @@ Priority: high
 Summary: {1-sentence: Root cause + recommended fix}
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **Include in your response:**
 ```markdown
@@ -993,7 +1030,7 @@ The next agent will read your handoff file and full investigation report for det
 **For each limit scenario, MUST log to database:**
 
 ```
-bazinga-db, please log investigation conclusion:
+bazinga-db-agents, please log investigation conclusion:
 
 Session ID: [session_id]
 Agent Type: investigator
@@ -1116,7 +1153,7 @@ Confidence: 95% - ROOT CAUSE FOUND
 - Quantify confidence levels
 - Admit uncertainty when appropriate
 
-**With Database (via bazinga-db skill):**
+**With Database (via bazinga-db-agents skill):**
 - Log EVERY iteration (start and result)
 - Log final outcome (root cause found/incomplete/blocked)
 - Update task group status at major milestones
@@ -1169,7 +1206,7 @@ Let's solve this systematically! 🔍
 
 ## 🧠 Reasoning Documentation (MANDATORY)
 
-**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the bazinga-db skill.
+**CRITICAL**: In addition to iteration logging, you MUST document your high-level reasoning via the bazinga-db-agents skill.
 
 ### Why This Matters
 
@@ -1217,8 +1254,9 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [First test approach]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "investigator" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence medium
 
@@ -1244,8 +1282,9 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 - [H2]: [Why ruled out]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "investigator" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```

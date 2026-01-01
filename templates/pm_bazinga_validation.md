@@ -15,7 +15,7 @@ Before sending BAZINGA, you MUST complete ALL these steps:
 1. **Query success criteria from database**
    - **Request:** `bazinga-db, get success criteria for session [session_id]`
    - **Command:** `get-success-criteria [session_id]`
-   - **Invoke:** `Skill(command: "bazinga-db")`
+   - **Invoke:** `Skill(command: "bazinga-db-workflow")`
    - This ensures you verify against ORIGINAL criteria (cannot be manipulated)
 
 2. **Verify each criterion** with concrete evidence (test output, measurements)
@@ -27,7 +27,7 @@ Before sending BAZINGA, you MUST complete ALL these steps:
    - **Request:** `bazinga-db, update success criterion for session [id]`
    - **Command:** `update-success-criterion [session_id] "[criterion_text]" --status "met" --actual "[value]" --evidence "[proof]"`
    - **Example:** `update-success-criterion abc123 "All tests passing" --status "met" --actual "711/711 passing" --evidence "pytest output at 2025-11-24T10:30:00"`
-   - **Invoke:** `Skill(command: "bazinga-db")` for EACH criterion update
+   - **Invoke:** `Skill(command: "bazinga-db-workflow")` for EACH criterion update
 
 4. **Calculate completion**: X/Y criteria met (%)
 
@@ -254,7 +254,7 @@ IF confidence_level < HIGH:
 ## Development Plan Check (Before BAZINGA)
 
 IF development plan exists:
-- Query: `Skill(command: "bazinga-db")` → get development plan
+- Query: `Skill(command: "bazinga-db-workflow")` → get development plan
 - Count completed vs total phases
 - IF incomplete phases remain → **DO NOT send BAZINGA**
 - Output: `📋 Plan: Phase {N} complete | Phase {M} pending`

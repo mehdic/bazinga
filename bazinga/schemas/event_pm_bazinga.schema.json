@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_pm_bazinga.schema.json",
+  "title": "PM BAZINGA Event Schema",
+  "description": "Schema for pm_bazinga event stored in bazinga-db. Records PM sending BAZINGA completion signal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["all_criteria_met", "completed_groups"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier"
+    },
+    "all_criteria_met": {
+      "type": "boolean",
+      "description": "Whether all success criteria were met"
+    },
+    "completed_groups": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of completed task group IDs"
+    },
+    "final_summary": {
+      "type": "string",
+      "description": "PM's final summary of completion"
+    },
+    "tests_passing": {
+      "type": "boolean",
+      "description": "Whether all tests are passing"
+    },
+    "quality_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Overall quality score (0-10)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "x-dedup-key": {
+    "description": "Deduplication key - only one BAZINGA per session",
+    "fields": ["session_id"]
+  }
+}

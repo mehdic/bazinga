@@ -34,15 +34,15 @@ When invoked, you must independently verify all success criteria and return a st
 
 ## Step 1: Query Success Criteria from Database
 
-Use the bazinga-db skill to get success criteria for this session:
+Use the bazinga-db-workflow skill to get success criteria for this session:
 
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-workflow")
 ```
 
 In the same message, provide the request:
 ```
-bazinga-db, please get success criteria for session: [session_id]
+bazinga-db-workflow, please get success criteria for session: [session_id]
 ```
 
 **Parse the response to extract:**

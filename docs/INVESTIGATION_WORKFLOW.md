@@ -204,7 +204,7 @@ The investigation loop spans **multiple orchestrator turns**. Each agent spawn t
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │ Orchestrator Step 0: Check for active investigations               │    │
 │  │                                                                     │    │
-│  │  bazinga-db, please get state:                                      │    │
+│  │  bazinga-db-core, please get state:                                      │    │
 │  │  Session ID: {session_id}                                           │    │
 │  │  State Type: investigation                                          │    │
 │  │                                                                     │    │

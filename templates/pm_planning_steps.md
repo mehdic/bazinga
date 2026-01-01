@@ -8,11 +8,11 @@
 
 **Query current session's plan:**
 
-Invoke skill: `Skill(command: "bazinga-db")`
+Invoke skill: `Skill(command: "bazinga-db-workflow")`
 
 Provide request:
 ```
-bazinga-db, please get the development plan:
+bazinga-db-workflow, please get the development plan:
 
 Session ID: {session_id}
 ```
@@ -31,9 +31,9 @@ User request contains phase references ("Phase", "phase", "Step")? If yes:
 
 *New sessions may lose plan context. Search recent sessions:*
 
-Invoke: `Skill(command: "bazinga-db")`
+Invoke: `Skill(command: "bazinga-db-core")`
 ```
-bazinga-db, please list the most recent sessions (limit 5).
+bazinga-db-core, please list the most recent sessions (limit 5).
 ```
 
 For each recent session (last 24h), query its plan. If plan found with matching phase names:
@@ -49,9 +49,9 @@ Detect plan type:
 
 **Save plan:**
 
-Invoke: `Skill(command: "bazinga-db")`
+Invoke: `Skill(command: "bazinga-db-workflow")`
 ```
-bazinga-db, please save this development plan:
+bazinga-db-workflow, please save this development plan:
 
 Session ID: {session_id}
 Original Prompt: {user's exact message, escape quotes}
@@ -165,7 +165,7 @@ FOR each task_group:
 ### Step 3.5.4: Store via bazinga-db (CANONICAL TEMPLATE)
 
 ```
-bazinga-db, please create task group:
+bazinga-db-workflow, please create task group:
 
 Group ID: A
 Session ID: [session_id]
@@ -228,7 +228,7 @@ bazinga-db, get session [session_id] with initial_branch
 ### Sub-step 5.2: Save PM State
 
 ```
-bazinga-db, please save the PM state:
+bazinga-db-core, please save the PM state:
 
 Session ID: [session_id]
 State Type: pm
@@ -254,7 +254,7 @@ State Data: {
 }
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ### Sub-step 5.3: Verify Task Groups Were Persisted
 

@@ -11,7 +11,7 @@ This file contains reference examples for database operations. The orchestrator 
 After **EVERY agent response** (PM, Developer, QA, Tech Lead):
 
 ```
-bazinga-db, please log this [agent_type] interaction:
+bazinga-db-agents, please log this [agent_type] interaction:
 
 Session ID: [current session_id from init]
 Agent Type: [any agent type - common: pm, developer, qa_expert, tech_lead, orchestrator, investigator]
@@ -22,13 +22,13 @@ Agent ID: [agent identifier - pm_main, developer_1, qa_expert, tech_lead, invest
 
 **Note:** System is extensible - any agent type is accepted (no validation against hardcoded list).
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Examples:**
 
 **After PM response:**
 ```
-bazinga-db, please log this pm interaction:
+bazinga-db-agents, please log this pm interaction:
 
 Session ID: [session_id]
 Agent Type: pm
@@ -39,7 +39,7 @@ Agent ID: pm_main
 
 **After Developer response:**
 ```
-bazinga-db, please log this developer interaction:
+bazinga-db-agents, please log this developer interaction:
 
 Session ID: [session_id]
 Agent Type: developer
@@ -50,7 +50,7 @@ Agent ID: developer_main
 
 **Fully Expanded Example (use this pattern when needed):**
 ```
-bazinga-db, please log this developer interaction:
+bazinga-db-agents, please log this developer interaction:
 
 Session ID: [session_id]
 Agent Type: developer
@@ -59,7 +59,7 @@ Iteration: [iteration]
 Agent ID: developer_main
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Process internally** (logging is system operation - no user output needed for database sync).
 
@@ -73,12 +73,12 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **When you need PM state** (before spawning PM):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please get the latest PM state for session [current session_id]
+bazinga-db-core, please get the latest PM state for session [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
@@ -89,12 +89,12 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **When you need orchestrator state** (to check current phase):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please get the latest orchestrator state for session [current session_id]
+bazinga-db-core, please get the latest orchestrator state for session [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 
 **IMPORTANT:** You MUST invoke bazinga-db skill here. Use the returned data. Simply do not echo the skill response text in your message to user.
@@ -105,12 +105,12 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **When you need task groups** (to check statuses):
 
-Request to bazinga-db skill:
+Request to bazinga-db-workflow skill:
 ```
-bazinga-db, please get all task groups for session [current session_id]
+bazinga-db-workflow, please get all task groups for session [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 Returns array of groups with their statuses.
 
@@ -120,24 +120,24 @@ Returns array of groups with their statuses.
 
 **Saving PM state** (after PM responds):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please save the PM state:
+bazinga-db-core, please save the PM state:
 
 Session ID: [session_id]
 State Type: pm
 State Data: {JSON data from PM}
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
 **Saving orchestrator state** (after phase transitions):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please save the orchestrator state:
+bazinga-db-core, please save the orchestrator state:
 
 Session ID: [current session_id]
 State Type: orchestrator
@@ -151,7 +151,7 @@ State Data: {
 }
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
@@ -159,9 +159,9 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 For EACH group in PM's task_groups:
 
-Request to bazinga-db skill:
+Request to bazinga-db-workflow skill:
 ```
-bazinga-db, please create task group:
+bazinga-db-workflow, please create task group:
 
 Group ID: [extracted group_id]
 Session ID: [current session_id]
@@ -169,7 +169,7 @@ Name: [extracted group name]
 Status: pending
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 Repeat for each group.
 
@@ -177,16 +177,16 @@ Repeat for each group.
 
 **Updating task group status** (after Tech Lead approval):
 
-Request to bazinga-db skill:
+Request to bazinga-db-workflow skill:
 ```
-bazinga-db, please update task group:
+bazinga-db-workflow, please update task group:
 
 Group ID: [group_id]
 Status: completed | failed | in_progress
 Last Review Status: APPROVED | CHANGES_REQUESTED
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 ---
 
@@ -194,14 +194,14 @@ Then invoke: `Skill(command: "bazinga-db")`
 
 **Getting dashboard snapshot** (for completion):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please provide dashboard snapshot:
+bazinga-db-core, please provide dashboard snapshot:
 
 Session ID: [current session_id]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 Returns comprehensive session summary.
 
@@ -211,42 +211,42 @@ Returns comprehensive session summary.
 
 **Creating new session** (Path B):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please create a new orchestration session:
+bazinga-db-core, please create a new orchestration session:
 
 Session ID: $SESSION_ID
 Mode: simple
 Requirements: [User's requirements from input]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
 **Updating session status** (at completion):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please update session status:
+bazinga-db-core, please update session status:
 
 Session ID: [current session_id]
 Status: completed
 End Time: [timestamp]
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ---
 
 **Checking for active sessions** (Path A):
 
-Request to bazinga-db skill:
+Request to bazinga-db-core skill:
 ```
-bazinga-db, please check for active orchestration sessions
+bazinga-db-core, please check for active orchestration sessions
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 Returns most recent session_id or null.
 

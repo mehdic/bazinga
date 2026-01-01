@@ -685,13 +685,13 @@ Captures agent decision-making:
 
 ### Accessing State
 
-**Always use the `bazinga-db` skill**:
+**Always use the domain-specific `bazinga-db-*` skills**:
 
 ```python
-# ✅ CORRECT - Use skill
-Skill(command: "bazinga-db") → get-session {session_id}
-Skill(command: "bazinga-db") → get-task-groups {session_id}
-Skill(command: "bazinga-db") → save-reasoning {session_id} {group_id} {agent} {phase} {content}
+# ✅ CORRECT - Use domain-specific skills
+Skill(command: "bazinga-db-core") → get-session {session_id}
+Skill(command: "bazinga-db-workflow") → get-task-groups {session_id}
+Skill(command: "bazinga-db-agents") → save-reasoning {session_id} {group_id} {agent} {phase} {content}
 
 # ❌ WRONG - Never use inline SQL
 cursor.execute("SELECT * FROM sessions...")  # FORBIDDEN

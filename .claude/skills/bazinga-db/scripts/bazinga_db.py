@@ -93,6 +93,140 @@ def validate_complexity(complexity: Any) -> Optional[str]:
     return None
 
 
+# See: research/domain-skill-migration-phase6-ultrathink.md
+# Pattern: alphanumeric with underscores and hyphens, max 64 chars
+GROUP_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+# Reserved names - checked CASE-INSENSITIVELY per OpenAI review
+RESERVED_GROUP_IDS = frozenset({'global', 'session', 'all', 'default'})
+
+# Investigation status whitelist (per CI review suggestion)
+VALID_INVESTIGATION_STATUSES = frozenset({
+    'under_investigation',
+    'root_cause_found',
+    'hypothesis_eliminated',
+    'fix_proposed',
+    'fix_verified',
+    'escalated',
+    'blocked',
+    'completed'
+})
+MAX_INVESTIGATION_ITERATION = 20  # Reasonable upper bound
+
+
+def _validate_group_id_base(group_id: Any) -> Optional[str]:
+    """Base validation: type, format, length. Used by all three validators.
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    if group_id is None:
+        return "group_id cannot be None"
+    if not isinstance(group_id, str):
+        return f"group_id must be a string, got {type(group_id).__name__}"
+    if not group_id or not group_id.strip():
+        return "group_id cannot be empty"
+    if len(group_id) > 64:
+        return f"group_id too long (max 64 chars, got {len(group_id)})"
+    if not GROUP_ID_PATTERN.match(group_id):
+        return "group_id must be alphanumeric with underscores/hyphens only"
+    return None
+
+
+def validate_scope_global_or_group(group_id: Any) -> Optional[str]:
+    """Validate scope allowing 'global' (session-level) or any valid group ID.
+
+    Use for: save_state (non-investigation), get_latest_state, save_event,
+             save_context_package, get_context_packages, save_reasoning,
+             get_reasoning, reasoning_timeline, check_mandatory_phases,
+             get_consumption
+
+    Note: Callers accepting None should coerce to 'global' BEFORE calling.
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    return _validate_group_id_base(group_id)
+
+
+def validate_scope_group_only(group_id: Any) -> Optional[str]:
+    """Validate scope that MUST be group-specific (rejects 'global').
+
+    Use for: save_investigation_iteration, save_state (investigation type),
+             save_consumption, extract_strategies
+
+    CASE-INSENSITIVE: 'GLOBAL', 'Global', 'global' all rejected.
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    error = _validate_group_id_base(group_id)
+    if error:
+        return error
+    if group_id.lower() == 'global':
+        return "group_id cannot be 'global' for this operation (must be group-specific)"
+    return None
+
+
+def validate_task_group_id(task_group_id: Any) -> Optional[str]:
+    """Validate task group identifier (rejects reserved names).
+
+    Use for: create_task_group, update_task_group, update_context_references
+
+    Reserved names (case-insensitive): global, session, all, default
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    error = _validate_group_id_base(task_group_id)
+    if error:
+        return error
+    if task_group_id.lower() in RESERVED_GROUP_IDS:
+        return f"'{task_group_id}' is a reserved identifier and cannot be used as a task group ID"
+    return None
+
+
+def validate_investigation_inputs(iteration: Any, status: Any) -> Optional[str]:
+    """Validate investigation iteration number and status.
+
+    Per CI review: Enforce iteration as positive int (1-20) and whitelist status values.
+    """
+    # Validate iteration
+    if not isinstance(iteration, int):
+        return f"iteration must be an integer, got {type(iteration).__name__}"
+    if iteration < 1:
+        return f"iteration must be >= 1, got {iteration}"
+    if iteration > MAX_INVESTIGATION_ITERATION:
+        return f"iteration too high (max {MAX_INVESTIGATION_ITERATION}, got {iteration})"
+
+    # Validate status
+    if not isinstance(status, str):
+        return f"status must be a string, got {type(status).__name__}"
+    if status not in VALID_INVESTIGATION_STATUSES:
+        valid_list = ', '.join(sorted(VALID_INVESTIGATION_STATUSES))
+        return f"invalid status '{status}'. Valid: {valid_list}"
+
+    return None
+
+
+# DEPRECATED: Use validate_scope_global_or_group, validate_scope_group_only,
+# or validate_task_group_id instead. This function will be removed in Phase 7.
+# See: research/domain-skill-migration-phase6-ultrathink.md
+_DEPRECATION_WARNED = False  # One-time warning flag
+
+def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]:
+    """DEPRECATED: Use the new explicit validators instead.
+
+    - validate_scope_global_or_group() for session/group scope
+    - validate_scope_group_only() for group-only operations
+    - validate_task_group_id() for task group identifiers
+    """
+    global _DEPRECATION_WARNED
+    if not _DEPRECATION_WARNED:
+        # Use stderr instead of warnings.warn to avoid noisy output (per CI review)
+        import sys
+        print("DEPRECATION: validate_group_id is deprecated. Use validate_scope_global_or_group, "
+              "validate_scope_group_only, or validate_task_group_id instead.",
+              file=sys.stderr)
+        _DEPRECATION_WARNED = True
+    return _validate_group_id_base(group_id)
+
+
 # Cross-platform file locking
 # fcntl is Unix/Linux/macOS only; msvcrt is Windows only
 try:
@@ -228,8 +362,17 @@ class BazingaDB:
         if not self.quiet:
             print(message)
 
+    def _print_warning(self, message: str):
+        """Print warning message to stderr unless in quiet mode.
+
+        Per CI review: Suppress non-critical warnings (like secret redaction)
+        in quiet mode to keep stdout/stderr clean for JSON-only flows.
+        """
+        if not self.quiet:
+            print(f"⚠ {message}", file=sys.stderr)
+
     def _print_error(self, message: str):
-        """Print error message to stderr."""
+        """Print error message to stderr (always, even in quiet mode)."""
         print(f"! {message}", file=sys.stderr)
 
     def _is_query_error(self, error: Exception) -> bool:
@@ -1084,15 +1227,23 @@ class BazingaDB:
     # ==================== EVENT OPERATIONS (v9) ====================
 
     def save_event(self, session_id: str, event_subtype: str, payload: str,
+                   idempotency_key: Optional[str] = None,
+                   group_id: str = 'global',
                    _retry_count: int = 0) -> Dict[str, Any]:
         """Save an event to orchestration_logs with log_type='event'.
 
-        Used for: pm_bazinga, scope_change, validator_verdict events.
+        SECURITY: Payload is scanned for secrets and redacted before storage.
+
+        Used for: pm_bazinga, scope_change, validator_verdict, tl_issues, etc.
 
         Args:
             session_id: The session ID
-            event_subtype: Type of event (pm_bazinga, scope_change, validator_verdict)
+            event_subtype: Type of event (pm_bazinga, scope_change, validator_verdict, etc.)
             payload: JSON string payload
+            idempotency_key: If provided, prevents duplicate events with same key.
+                            Recommended format: {session_id}|{group_id}|{event_type}|{iteration}
+            group_id: Group isolation key (default 'global'). Used in idempotency check
+                      to ensure events are unique per group.
             _retry_count: Internal retry counter
 
         Returns:
@@ -1107,27 +1258,76 @@ class BazingaDB:
             raise ValueError("session_id cannot be empty")
         if not event_subtype or not event_subtype.strip():
             raise ValueError("event_subtype cannot be empty")
+        # Phase 6: Use explicit validator for scope (events can be session-level)
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
+        # Scan and redact secrets from payload (security parity with save_reasoning)
+        redacted_payload, was_redacted = scan_and_redact(payload)
+        if was_redacted:
+            self._print_warning("Secrets detected and redacted from event payload")
 
         conn = None
         try:
             conn = self._get_connection()
-            cursor = conn.execute("""
-                INSERT INTO orchestration_logs
-                (session_id, agent_type, content, log_type, event_subtype, event_payload)
-                VALUES (?, 'system', ?, 'event', ?, ?)
-            """, (session_id, f"Event: {event_subtype}", event_subtype, payload))
-            event_id = cursor.lastrowid
-            conn.commit()
 
-            result = {
-                'success': True,
-                'event_id': event_id,
-                'session_id': session_id,
-                'event_subtype': event_subtype
-            }
+            # Race-safe INSERT-first pattern (See: research/domain-skill-migration-phase6-ultrathink.md)
+            # Instead of SELECT-then-INSERT (race condition), we INSERT first and catch IntegrityError
+            # The unique index idx_logs_idempotency enforces uniqueness on (session_id, event_subtype, group_id, idempotency_key)
+            try:
+                cursor = conn.execute("""
+                    INSERT INTO orchestration_logs
+                    (session_id, group_id, agent_type, content, log_type, event_subtype, event_payload, redacted, idempotency_key)
+                    VALUES (?, ?, 'system', ?, 'event', ?, ?, ?, ?)
+                """, (session_id, group_id, f"Event: {event_subtype}", event_subtype, redacted_payload,
+                      1 if was_redacted else 0, idempotency_key))
+                event_id = cursor.lastrowid
+                conn.commit()
 
-            self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
-            return result
+                result = {
+                    'success': True,
+                    'event_id': event_id,
+                    'session_id': session_id,
+                    'event_subtype': event_subtype,
+                    'redacted': was_redacted
+                }
+
+                self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
+                return result
+
+            except sqlite3.IntegrityError as e:
+                # Unique constraint violation - event already exists (idempotent case)
+                # This is the expected path when concurrent saves happen
+                conn.rollback()
+                if idempotency_key:
+                    existing = conn.execute("""
+                        SELECT id FROM orchestration_logs
+                        WHERE session_id = ? AND log_type = 'event'
+                        AND event_subtype = ? AND group_id = ? AND idempotency_key = ?
+                    """, (session_id, event_subtype, group_id, idempotency_key)).fetchone()
+
+                    if existing:
+                        self._print_success(f"✓ Event already exists (idempotent, id={existing[0]})")
+                        return {
+                            'success': True,
+                            'event_id': existing[0],
+                            'session_id': session_id,
+                            'event_subtype': event_subtype,
+                            'idempotent': True,
+                            'message': 'Event already exists with same idempotency key'
+                        }
+                    # Idempotency key provided but existing record not found - unusual
+                    raise
+                else:
+                    # Per CI review: Provide helpful error when concurrent insert fails
+                    # without idempotency key
+                    return {
+                        'success': False,
+                        'error': 'Concurrent insert conflict. Use --idempotency-key for safe retries.',
+                        'hint': 'Recommended format: {session_id}|{group_id}|{event_type}|{iteration}',
+                        'original_error': str(e)
+                    }
 
         except sqlite3.DatabaseError as e:
             if conn:
@@ -1138,6 +1338,8 @@ class BazingaDB:
             if self._is_corruption_error(e):
                 if self._recover_from_corruption():
                     return self.save_event(session_id, event_subtype, payload,
+                                          idempotency_key=idempotency_key,
+                                          group_id=group_id,
                                           _retry_count=_retry_count + 1)
             self._print_error(f"Failed to save {event_subtype} event: {str(e)}")
             return {"success": False, "error": f"Database error: {str(e)}"}
@@ -1186,27 +1388,202 @@ class BazingaDB:
 
         return [dict(row) for row in rows]
 
+    def save_investigation_iteration(self, session_id: str, group_id: str,
+                                       iteration: int, status: str,
+                                       state_data: str, event_payload: str) -> Dict[str, Any]:
+        """Atomically save investigation state AND event together.
+
+        This ensures consistency between state (for resumption) and events (for audit).
+        Uses single transaction - both succeed or both fail.
+
+        Args:
+            session_id: The session ID
+            group_id: Task group identifier
+            iteration: Investigation iteration number
+            status: Investigation status (under_investigation, root_cause_found, etc.)
+            state_data: JSON string for state snapshot
+            event_payload: JSON string for event payload
+
+        Returns:
+            Dict with success status and operation details
+
+        Raises:
+            ValueError: If group_id, iteration, or status is invalid
+        """
+        # Phase 6: Investigation MUST be group-specific (rejects 'global')
+        error = validate_scope_group_only(group_id)
+        if error:
+            raise ValueError(f"Invalid group_id: {error}")
+
+        # Validate iteration and status (per CI review suggestion)
+        error = validate_investigation_inputs(iteration, status)
+        if error:
+            raise ValueError(f"Invalid investigation input: {error}")
+
+        # Generate idempotency key
+        idempotency_key = f"{session_id}|{group_id}|investigation_iteration|{iteration}"
+
+        # Scan and redact secrets from payloads
+        redacted_state, state_redacted = scan_and_redact(state_data)
+        redacted_event, event_redacted = scan_and_redact(event_payload)
+
+        if state_redacted or event_redacted:
+            self._print_warning("Secrets detected and redacted from investigation data")
+
+        conn = None
+        try:
+            conn = self._get_connection()
+
+            # Start transaction with IMMEDIATE mode to prevent deadlocks
+            conn.execute("BEGIN IMMEDIATE")
+
+            # 1. Save/update state snapshot using UPSERT (not INSERT OR REPLACE)
+            # Uses ON CONFLICT for proper update semantics without delete-insert cascade
+            conn.execute("""
+                INSERT INTO state_snapshots
+                (session_id, group_id, state_type, state_data, timestamp)
+                VALUES (?, ?, 'investigation', ?, datetime('now'))
+                ON CONFLICT(session_id, state_type, group_id)
+                DO UPDATE SET
+                    state_data = excluded.state_data,
+                    timestamp = excluded.timestamp
+            """, (session_id, group_id, redacted_state))
+
+            # 2. Save event with race-safe idempotency handling
+            # Use INSERT with IntegrityError handling to avoid SELECT-then-INSERT race
+            event_saved = False
+            event_id = None
+
+            try:
+                cursor = conn.execute("""
+                    INSERT INTO orchestration_logs
+                    (session_id, agent_type, content, log_type, event_subtype,
+                     event_payload, redacted, group_id, idempotency_key)
+                    VALUES (?, 'investigator', ?, 'event', 'investigation_iteration',
+                            ?, ?, ?, ?)
+                """, (session_id, f"Investigation iteration {iteration}: {status}",
+                      redacted_event, 1 if event_redacted else 0, group_id, idempotency_key))
+                event_id = cursor.lastrowid
+                event_saved = True
+            except sqlite3.IntegrityError:
+                # Race condition: another process inserted first - this is idempotent success
+                # Query with full index columns for optimal lookup
+                existing = conn.execute("""
+                    SELECT id FROM orchestration_logs
+                    WHERE session_id = ? AND log_type = 'event'
+                    AND event_subtype = 'investigation_iteration'
+                    AND group_id = ? AND idempotency_key = ?
+                """, (session_id, group_id, idempotency_key)).fetchone()
+                if existing:
+                    event_id = existing[0]
+                else:
+                    # Integrity error for other reason - re-raise
+                    raise
+
+            conn.commit()
+
+            result = {
+                'success': True,
+                'atomic': True,
+                'state_saved': True,
+                'event_saved': event_saved,
+                'event_id': event_id,
+                'iteration': iteration,
+                'idempotent': not event_saved,
+                'redacted': state_redacted or event_redacted
+            }
+
+            self._print_success(f"✓ Saved investigation iteration {iteration} atomically")
+            return result
+
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            self._print_error(f"Failed to save investigation iteration atomically: {str(e)}")
+            return {'success': False, 'error': str(e), 'atomic': False}
+        finally:
+            if conn:
+                conn.close()
+
     # ==================== STATE OPERATIONS ====================
 
-    def save_state(self, session_id: str, state_type: str, state_data: Dict) -> None:
-        """Save state snapshot."""
+    def save_state(self, session_id: str, state_type: str, state_data: Dict,
+                   group_id: str = 'global') -> Dict[str, Any]:
+        """Save state snapshot with group isolation (UPSERT).
+
+        Args:
+            session_id: The session ID
+            state_type: Type of state ('pm', 'orchestrator', 'group_status', 'investigation')
+            state_data: Dict to be JSON-encoded and stored
+            group_id: Group isolation key (default 'global' for session-level state,
+                      use task group ID for group-specific state like 'investigation')
+
+        Returns:
+            Dict with success status and details (Fix G: consistent API)
+
+        Raises:
+            ValueError: If group_id is invalid
+
+        Note: Uses UPSERT (INSERT ... ON CONFLICT ... DO UPDATE) to handle
+        repeated saves for the same (session_id, state_type, group_id).
+        """
+        # Phase 6: Conditional validation based on state_type
+        # Investigation state MUST be group-specific; other states can be session-level
+        if state_type == 'investigation':
+            error = validate_scope_group_only(group_id)
+        else:
+            error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
         conn.execute("""
-            INSERT INTO state_snapshots (session_id, state_type, state_data)
-            VALUES (?, ?, ?)
-        """, (session_id, state_type, json.dumps(state_data)))
+            INSERT INTO state_snapshots (session_id, group_id, state_type, state_data, timestamp)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(session_id, state_type, group_id)
+            DO UPDATE SET
+                state_data = excluded.state_data,
+                timestamp = excluded.timestamp
+        """, (session_id, group_id, state_type, json.dumps(state_data)))
         conn.commit()
         conn.close()
-        self._print_success(f"✓ Saved {state_type} state")
+        self._print_success(f"✓ Saved {state_type} state (group={group_id})")
+        return {
+            'success': True,
+            'session_id': session_id,
+            'state_type': state_type,
+            'group_id': group_id
+        }
 
-    def get_latest_state(self, session_id: str, state_type: str) -> Optional[Dict]:
-        """Get latest state snapshot."""
+    def get_latest_state(self, session_id: str, state_type: str,
+                         group_id: str = 'global') -> Optional[Dict]:
+        """Get latest state snapshot for specific group.
+
+        Args:
+            session_id: The session ID
+            state_type: Type of state ('pm', 'orchestrator', 'group_status', 'investigation')
+            group_id: Group isolation key (default 'global' for session-level state)
+
+        Returns:
+            Dict of state data, or None if not found
+
+        Raises:
+            ValueError: If group_id is invalid
+        """
+        # Phase 6: Reads can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
+        # Fix E: No ORDER BY needed - UNIQUE(session_id, state_type, group_id) ensures at most one row
         row = conn.execute("""
             SELECT state_data FROM state_snapshots
-            WHERE session_id = ? AND state_type = ?
-            ORDER BY timestamp DESC LIMIT 1
-        """, (session_id, state_type)).fetchone()
+            WHERE session_id = ? AND state_type = ? AND group_id = ?
+        """, (session_id, state_type, group_id)).fetchone()
         conn.close()
         return json.loads(row['state_data']) if row else None
 
@@ -1235,6 +1612,11 @@ class BazingaDB:
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
+        # Phase 6: Validate task group ID (rejects reserved names)
+        error = validate_task_group_id(group_id)
+        if error:
+            return {"success": False, "error": error}
+
         conn = None
         try:
             # Defensive type validation for specializations
@@ -1359,6 +1741,11 @@ class BazingaDB:
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
+        # Phase 6: Validate task group ID (rejects reserved names)
+        error = validate_task_group_id(group_id)
+        if error:
+            return {"success": False, "error": error}
+
         conn = None
         try:
             # Defensive type validation for specializations
@@ -1979,6 +2366,11 @@ class BazingaDB:
         NOTE: Versioning is not yet implemented. All packages have supersedes_id=NULL.
         Future enhancement: add superseded_by_id column and link previous versions.
         """
+        # Phase 6: Context packages can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         valid_types = ('research', 'failures', 'decisions', 'handoff', 'investigation')
         if package_type not in valid_types:
             raise ValueError(f"Invalid package_type: {package_type}. Must be one of {valid_types}")
@@ -2091,6 +2483,11 @@ class BazingaDB:
             limit: Maximum number of packages to return (default 3)
             include_consumed: If False (default), only return unconsumed packages
         """
+        # Phase 6: Reads can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         # Normalize agent_type for consistent matching
         agent_type = agent_type.strip().lower()
 
@@ -2179,6 +2576,11 @@ class BazingaDB:
 
     def update_context_references(self, group_id: str, session_id: str, package_ids: List[int]) -> None:
         """Update the context_references for a task group."""
+        # Phase 6: Validate task group ID (rejects reserved names)
+        error = validate_task_group_id(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -2240,8 +2642,10 @@ class BazingaDB:
         # Validate inputs
         if not session_id or not session_id.strip():
             raise ValueError("session_id cannot be empty")
-        if not group_id or not group_id.strip():
-            raise ValueError("group_id cannot be empty")
+        # Phase 6: Session-level reasoning allowed (PM uses 'global')
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
         if not agent_type or not agent_type.strip():
             raise ValueError("agent_type cannot be empty")
         if not reasoning_phase or not reasoning_phase.strip():
@@ -2264,7 +2668,7 @@ class BazingaDB:
         # Scan and redact secrets
         redacted_content, was_redacted = scan_and_redact(content)
         if was_redacted:
-            self._print_error("Warning: Secrets detected and redacted from reasoning content")
+            self._print_warning("Secrets detected and redacted from reasoning content")
 
         # Serialize references
         references_json = json.dumps(references) if references else None
@@ -2358,6 +2762,12 @@ class BazingaDB:
         Returns:
             List of reasoning entries (json) or formatted markdown string (prompt-summary)
         """
+        # Phase 6: Validate group_id if provided
+        if group_id is not None:
+            error = validate_scope_global_or_group(group_id)
+            if error:
+                raise ValueError(error)
+
         conn = self._get_connection()
 
         query = """
@@ -2463,6 +2873,12 @@ class BazingaDB:
         Returns:
             Formatted timeline string
         """
+        # Phase 6: Validate group_id if provided
+        if group_id is not None:
+            error = validate_scope_global_or_group(group_id)
+            if error:
+                raise ValueError(error)
+
         conn = self._get_connection()
 
         query = """
@@ -2549,6 +2965,11 @@ class BazingaDB:
                 - missing: List[str] - Phases not yet documented
                 - documented: List[str] - Phases that have been documented
         """
+        # Phase 6: Reads can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
 
         # Get all reasoning phases for this agent/group
@@ -2885,6 +3306,11 @@ class BazingaDB:
         Returns:
             Dict with scope_id and success status
         """
+        # Phase 6: Consumption is per-group (not session-level)
+        error = validate_scope_group_only(group_id)
+        if error:
+            raise ValueError(error)
+
         import hashlib
         # Deterministic scope_id for idempotency (same inputs = same ID)
         composite = f"{session_id}:{group_id}:{agent_type}:{iteration}:{package_id}"
@@ -2936,6 +3362,12 @@ class BazingaDB:
         Returns:
             List of consumption records
         """
+        # Phase 6: Validate group_id if provided
+        if group_id is not None:
+            error = validate_scope_global_or_group(group_id)
+            if error:
+                raise ValueError(error)
+
         # Clamp limit to safe range (1-1000)
         limit = max(1, min(limit, 1000))
 
@@ -3127,6 +3559,11 @@ class BazingaDB:
         Returns:
             Dict with count of extracted strategies
         """
+        # Validate group_id - strategies must be group-specific
+        error = validate_scope_group_only(group_id)
+        if error:
+            raise ValueError(f"Invalid group_id: {error}")
+
         import hashlib
 
         conn = self._get_connection()
@@ -3174,6 +3611,123 @@ class BazingaDB:
         except Exception as e:
             conn.rollback()
             raise RuntimeError(f"Failed to extract strategies: {str(e)}")
+        finally:
+            conn.close()
+
+    # ==================== DIAGNOSTIC OPERATIONS ====================
+
+    def diagnose_group_ids(self, fix: bool = False) -> Dict[str, Any]:
+        """Diagnose and optionally fix legacy group_id issues.
+
+        See: research/domain-skill-migration-phase6-ultrathink.md
+
+        Scans for:
+        - Reserved names ('global', 'session', 'all', 'default') in task_groups
+        - Invalid formats in group_id columns
+        - Case variations of reserved names
+
+        Args:
+            fix: If True, attempt to fix issues (rename invalid task_groups)
+
+        Returns:
+            Dict with issues found and fixes applied
+        """
+        conn = self._get_connection()
+        issues = []
+        fixes_applied = []
+
+        try:
+            # Check task_groups for reserved names
+            reserved_check = conn.execute("""
+                SELECT id, session_id, status FROM task_groups
+                WHERE LOWER(id) IN ('global', 'session', 'all', 'default')
+            """).fetchall()
+
+            for row in reserved_check:
+                issue = {
+                    'table': 'task_groups',
+                    'id': row['id'],
+                    'session_id': row['session_id'],
+                    'issue': f"Reserved name '{row['id']}' used as task group ID"
+                }
+                issues.append(issue)
+
+                if fix:
+                    # Rename to safe ID (prefix with 'group_')
+                    new_id = f"group_{row['id']}"
+                    try:
+                        conn.execute("""
+                            UPDATE task_groups SET id = ?
+                            WHERE id = ? AND session_id = ?
+                        """, (new_id, row['id'], row['session_id']))
+                        fixes_applied.append({
+                            'table': 'task_groups',
+                            'old_id': row['id'],
+                            'new_id': new_id,
+                            'session_id': row['session_id']
+                        })
+                    except Exception as e:
+                        issues[-1]['fix_error'] = str(e)
+
+            # Check for invalid format in orchestration_logs.group_id
+            invalid_format = conn.execute("""
+                SELECT DISTINCT group_id, session_id FROM orchestration_logs
+                WHERE group_id IS NOT NULL
+                AND group_id != ''
+                AND group_id NOT GLOB '[a-zA-Z0-9_-]*'
+                LIMIT 100
+            """).fetchall()
+
+            for row in invalid_format:
+                issues.append({
+                    'table': 'orchestration_logs',
+                    'group_id': row['group_id'],
+                    'session_id': row['session_id'],
+                    'issue': f"Invalid group_id format: '{row['group_id']}'"
+                })
+
+            # Check for invalid format in state_snapshots.group_id
+            invalid_states = conn.execute("""
+                SELECT DISTINCT group_id, session_id, state_type FROM state_snapshots
+                WHERE group_id IS NOT NULL
+                AND group_id != ''
+                AND group_id NOT GLOB '[a-zA-Z0-9_-]*'
+                LIMIT 100
+            """).fetchall()
+
+            for row in invalid_states:
+                issues.append({
+                    'table': 'state_snapshots',
+                    'group_id': row['group_id'],
+                    'session_id': row['session_id'],
+                    'state_type': row['state_type'],
+                    'issue': f"Invalid group_id format: '{row['group_id']}'"
+                })
+
+            if fix and fixes_applied:
+                conn.commit()
+
+            result = {
+                'success': True,
+                'issues_found': len(issues),
+                'fixes_applied': len(fixes_applied),
+                'issues': issues,
+                'fixes': fixes_applied
+            }
+
+            if issues:
+                self._print_error(f"Found {len(issues)} group_id issues")
+                if fixes_applied:
+                    self._print_success(f"Applied {len(fixes_applied)} fixes")
+            else:
+                self._print_success("No group_id issues found")
+
+            return result
+
+        except Exception as e:
+            if fix:
+                conn.rollback()
+            raise RuntimeError(f"Failed to diagnose group_ids: {str(e)}")
         finally:
             conn.close()
 
@@ -3311,6 +3865,7 @@ QUERY OPERATIONS:
 DATABASE MAINTENANCE:
   integrity-check                             Check database integrity
   recover-db                                  Attempt to recover corrupted database
+  diagnose-group-ids [--fix]                  Scan for invalid group_ids (--fix to auto-repair)
   detect-paths                                Show auto-detected paths (debugging)
 
 HELP:
@@ -3448,10 +4003,34 @@ def main():
             # Output verification data as JSON
             print(json.dumps(result, indent=2))
         elif cmd == 'save-state':
-            state_data = json.loads(cmd_args[2])
-            db.save_state(cmd_args[0], cmd_args[1], state_data)
+            # save-state <session_id> <state_type> <json_data|--state-file path> [--group-id <id>]
+            # Support --state-file for reading state from file (avoids shell escaping issues)
+            if '--state-file' in cmd_args:
+                idx = cmd_args.index('--state-file')
+                if idx + 1 < len(cmd_args):
+                    state_file = cmd_args[idx + 1]
+                    with open(state_file, 'r') as f:
+                        state_data = json.load(f)
+                else:
+                    print("Error: --state-file requires a path argument", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                state_data = json.loads(cmd_args[2])
+            group_id = 'global'
+            if '--group-id' in cmd_args:
+                idx = cmd_args.index('--group-id')
+                if idx + 1 < len(cmd_args):
+                    group_id = cmd_args[idx + 1]
+            result = db.save_state(cmd_args[0], cmd_args[1], state_data, group_id=group_id)
+            print(json.dumps(result, indent=2))
         elif cmd == 'get-state':
-            result = db.get_latest_state(cmd_args[0], cmd_args[1])
+            # get-state <session_id> <state_type> [--group-id <id>]
+            group_id = 'global'
+            if '--group-id' in cmd_args:
+                idx = cmd_args.index('--group-id')
+                if idx + 1 < len(cmd_args):
+                    group_id = cmd_args[idx + 1]
+            result = db.get_latest_state(cmd_args[0], cmd_args[1], group_id=group_id)
             print(json.dumps(result, indent=2))
         elif cmd == 'stream-logs':
             limit = int(cmd_args[1]) if len(cmd_args) > 1 else 50
@@ -4285,17 +4864,148 @@ def main():
             else:
                 print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
                 sys.exit(1)
+        elif cmd == 'diagnose-group-ids':
+            # diagnose-group-ids [--fix]
+            fix = '--fix' in cmd_args
+            result = db.diagnose_group_ids(fix=fix)
+            print(json.dumps(result, indent=2))
+            if result['issues_found'] > 0 and not fix:
+                sys.exit(1)  # Non-zero exit if issues found (for CI/CD)
         elif cmd == 'save-event':
-            # save-event <session_id> <event_subtype> <payload>
-            if len(cmd_args) < 3:
-                print("Error: save-event requires 3 args: <session_id> <event_subtype> <payload>", file=sys.stderr)
-                print("  event_subtype: pm_bazinga, scope_change, validator_verdict", file=sys.stderr)
-                print("  payload: JSON string", file=sys.stderr)
+            # save-event <session_id> <event_subtype> [<payload>|--payload-file <path>] [--idempotency-key <key>] [--group-id <id>]
+            if len(cmd_args) < 2:
+                print("Error: save-event requires at least 2 args: <session_id> <event_subtype> [payload|--payload-file <path>]", file=sys.stderr)
+                print("  event_subtype: pm_bazinga, scope_change, validator_verdict, tl_issues, etc.", file=sys.stderr)
+                print("  payload: JSON string (or use --payload-file)", file=sys.stderr)
+                print("  --payload-file: Read payload from file (avoids exposing in ps)", file=sys.stderr)
+                print("  --idempotency-key: Prevent duplicate events with same key", file=sys.stderr)
+                print("  --group-id: Group isolation key (default 'global')", file=sys.stderr)
                 sys.exit(1)
+
             session_id = cmd_args[0]
             event_subtype = cmd_args[1]
-            payload = cmd_args[2]
-            result = db.save_event(session_id, event_subtype, payload)
+            payload = None
+            idempotency_key = None
+            group_id = 'global'
+
+            # Parse remaining args
+            i = 2
+            while i < len(cmd_args):
+                if cmd_args[i] == '--payload-file':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --payload-file requires a path", file=sys.stderr)
+                        sys.exit(1)
+                    payload_path = cmd_args[i + 1]
+                    try:
+                        with open(payload_path, 'r') as f:
+                            payload = f.read().strip()
+                        # Validate JSON before accepting
+                        json.loads(payload)
+                    except json.JSONDecodeError as e:
+                        print(f"Error: Invalid JSON in payload file '{payload_path}': {e}", file=sys.stderr)
+                        sys.exit(1)
+                    except Exception as e:
+                        print(f"Error reading payload file: {e}", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif cmd_args[i] == '--idempotency-key':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --idempotency-key requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    idempotency_key = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--group-id':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --group-id requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    group_id = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i].startswith('--'):
+                    print(f"Error: Unknown flag '{cmd_args[i]}'", file=sys.stderr)
+                    sys.exit(1)
+                elif payload is None:
+                    payload = cmd_args[i]
+                    i += 1
+                else:
+                    print(f"Error: Unexpected argument '{cmd_args[i]}'", file=sys.stderr)
+                    sys.exit(1)
+
+            if payload is None:
+                print("Error: No payload provided (use positional arg or --payload-file)", file=sys.stderr)
+                sys.exit(1)
+
+            result = db.save_event(session_id, event_subtype, payload, idempotency_key=idempotency_key, group_id=group_id)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'save-investigation-iteration':
+            # save-investigation-iteration <session_id> <group_id> <iteration> <status> --state-file <path> --event-file <path>
+            if len(cmd_args) < 4:
+                print("Error: save-investigation-iteration requires: <session_id> <group_id> <iteration> <status> --state-file <path> --event-file <path>", file=sys.stderr)
+                print("  iteration: Integer iteration number", file=sys.stderr)
+                print("  status: under_investigation, root_cause_found, hypothesis_eliminated, etc.", file=sys.stderr)
+                print("  --state-file: Path to JSON file with state data", file=sys.stderr)
+                print("  --event-file: Path to JSON file with event payload", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            try:
+                iteration = int(cmd_args[2])
+            except ValueError:
+                print(f"Error: iteration must be integer, got '{cmd_args[2]}'", file=sys.stderr)
+                sys.exit(1)
+            status = cmd_args[3]
+            state_file = None
+            event_file = None
+
+            # Parse remaining args
+            i = 4
+            while i < len(cmd_args):
+                if cmd_args[i] == '--state-file':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --state-file requires a path", file=sys.stderr)
+                        sys.exit(1)
+                    state_file = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--event-file':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --event-file requires a path", file=sys.stderr)
+                        sys.exit(1)
+                    event_file = cmd_args[i + 1]
+                    i += 2
+                else:
+                    print(f"Error: Unknown argument '{cmd_args[i]}'", file=sys.stderr)
+                    sys.exit(1)
+
+            if not state_file or not event_file:
+                print("Error: Both --state-file and --event-file are required", file=sys.stderr)
+                sys.exit(1)
+
+            # Read files with JSON validation
+            try:
+                with open(state_file, 'r') as f:
+                    state_data = f.read().strip()
+                # Validate JSON before accepting
+                json.loads(state_data)
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in state file '{state_file}': {e}", file=sys.stderr)
+                sys.exit(1)
+            except Exception as e:
+                print(f"Error reading state file: {e}", file=sys.stderr)
+                sys.exit(1)
+
+            try:
+                with open(event_file, 'r') as f:
+                    event_payload = f.read().strip()
+                # Validate JSON before accepting
+                json.loads(event_payload)
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in event file '{event_file}': {e}", file=sys.stderr)
+                sys.exit(1)
+            except Exception as e:
+                print(f"Error reading event file: {e}", file=sys.stderr)
+                sys.exit(1)
+
+            result = db.save_investigation_iteration(session_id, group_id, iteration, status, state_data, event_payload)
             print(json.dumps(result, indent=2))
         elif cmd == 'get-events':
             # get-events <session_id> [event_subtype] [limit]

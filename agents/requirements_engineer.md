@@ -761,7 +761,7 @@ The next agent will read your handoff file and full deliverable for details.
 ### Step 1: Invoke bazinga-db to Register Package
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
@@ -775,7 +775,7 @@ Summary: {1-sentence summary of key findings and recommendation}
 
 Then invoke:
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-context")
 ```
 
 ### Step 2: Include in Your Response
@@ -851,8 +851,9 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [Assumption 2]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "understanding" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence medium
 
@@ -879,8 +880,9 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 - [Risk 2]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "completion" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "requirements_engineer" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```

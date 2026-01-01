@@ -1496,7 +1496,7 @@ Write(
 **When tests FAIL, register a context package so the next developer iteration has failure details:**
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
@@ -1507,7 +1507,7 @@ Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {N} test failures: {brief list of failing tests}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **Write the failures file first** with: test name, error message, expected vs actual, file locations. Then register.
 
@@ -1565,8 +1565,9 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [Claim 2]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "understanding" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence high
 
@@ -1587,8 +1588,9 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 [Pass to Tech Lead / Return to Developer / Escalate]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "completion" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "qa_expert" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```

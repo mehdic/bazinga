@@ -410,16 +410,19 @@ cat bazinga/testing_config.json | jq '._testing_framework.mode'
 
 **Retrieve Skill results from database:**
 
-```bash
-# Set up shortcuts
-DB="bazinga/bazinga.db"
-SID="{SESSION_ID}"
-GET="python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --db $DB --quiet get-skill-output"
+Use the bazinga-db-agents skill to get skill output:
+```
+Skill(command: "bazinga-db-agents")
 
-# Get results based on testing mode
-$GET $SID "security-scan"          # Always run
-$GET $SID "lint-check"             # Always run
-$GET $SID "test-coverage"          # Skip if testing_mode=="disabled"
+Request: get-skill-output "{SESSION_ID}" "security-scan"   # Always run
+
+Skill(command: "bazinga-db-agents")
+
+Request: get-skill-output "{SESSION_ID}" "lint-check"      # Always run
+
+Skill(command: "bazinga-db-agents")
+
+Request: get-skill-output "{SESSION_ID}" "test-coverage"   # Skip if testing_mode=="disabled"
 ```
 
 **Note:** Retrieve security+lint always; coverage only if testing enabled.
@@ -644,7 +647,7 @@ For each option, document:
 **After making architectural decision, register it for future agents:**
 
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
 
 Session ID: {SESSION_ID}
 Group ID: {GROUP_ID}
@@ -655,7 +658,7 @@ Consumer Agents: ["developer", "senior_software_engineer", "qa_expert"]
 Priority: medium
 Summary: {Decision}: {Chosen option} - {1-line rationale}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **Write decision file first** with: context, options analyzed, chosen option, rationale, implementation guidance.
 
@@ -874,8 +877,10 @@ When new dependencies are introduced or versions bumped:
 **Step 1: Review Security Scan Results**
 
 security-scan already ran automatically. Read results from database:
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --db bazinga/bazinga.db --quiet get-skill-output {SESSION_ID} "security-scan"
+```
+Skill(command: "bazinga-db-agents")
+
+Request: get-skill-output "{SESSION_ID}" "security-scan"
 ```
 
 **Step 2: Triage by Severity**
@@ -1836,8 +1841,9 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [What developer chose to do]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "understanding" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "understanding" \
   --content-file /tmp/reasoning_understanding.md \
   --confidence high
 
@@ -1859,8 +1865,9 @@ cat > /tmp/reasoning_completion.md << 'REASONING_EOF'
 [For developer or PM]
 REASONING_EOF
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "completion" \
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "tech_lead" "completion" \
   --content-file /tmp/reasoning_completion.md \
   --confidence high
 ```

@@ -1006,7 +1006,7 @@ Strategy extraction should run when:
 **Note:** Strategy extraction is triggered by the orchestrator (phase_simple.md, phase_parallel.md) after Tech Lead approval using the `bazinga-db extract-strategies` command:
 
 ```
-bazinga-db, please extract strategies:
+bazinga-db-context, please extract strategies:
 
 Session ID: {session_id}
 Group ID: {group_id}
@@ -1014,7 +1014,7 @@ Project ID: {project_id}
 Lang: {detected_lang}
 Framework: {detected_framework}
 ```
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **What the command does:**
 1. Queries `agent_reasoning` table for completion/decisions/approach phases
