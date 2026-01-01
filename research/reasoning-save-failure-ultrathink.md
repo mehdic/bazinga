@@ -340,9 +340,13 @@ cat > /tmp/reasoning_understanding.md << 'EOF'
 ## Understanding
 [Document your interpretation of the task]
 EOF
+```
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{actual_session_id}" "{actual_group_id}" "{agent_type}" "understanding" \
+Then invoke:
+```
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{actual_session_id}" "{actual_group_id}" "{agent_type}" "understanding" \
   --content-file /tmp/reasoning_understanding.md --confidence high
 ```
 
@@ -352,13 +356,17 @@ cat > /tmp/reasoning_completion.md << 'EOF'
 ## Completion
 [Document what you accomplished and key decisions]
 EOF
+```
 
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
-  "{actual_session_id}" "{actual_group_id}" "{agent_type}" "completion" \
+Then invoke:
+```
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{actual_session_id}" "{actual_group_id}" "{agent_type}" "completion" \
   --content-file /tmp/reasoning_completion.md --confidence high
 ```
 
-⚠️ **These commands are pre-filled. Execute them directly.**
+⚠️ **These values are pre-filled. Invoke the skill directly.**
 
 ---
 ```
