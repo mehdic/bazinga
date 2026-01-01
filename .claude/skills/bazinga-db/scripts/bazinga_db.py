@@ -3624,9 +3624,9 @@ class BazingaDB:
                     'issue': f"Invalid group_id format: '{row['group_id']}'"
                 })
 
-            # Check for invalid format in session_states.group_id
+            # Check for invalid format in state_snapshots.group_id
             invalid_states = conn.execute("""
-                SELECT DISTINCT group_id, session_id, state_type FROM session_states
+                SELECT DISTINCT group_id, session_id, state_type FROM state_snapshots
                 WHERE group_id IS NOT NULL
                 AND group_id != ''
                 AND group_id NOT GLOB '[a-zA-Z0-9_-]*'
@@ -3635,7 +3635,7 @@ class BazingaDB:
 
             for row in invalid_states:
                 issues.append({
-                    'table': 'session_states',
+                    'table': 'state_snapshots',
                     'group_id': row['group_id'],
                     'session_id': row['session_id'],
                     'state_type': row['state_type'],
