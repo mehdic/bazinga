@@ -207,33 +207,24 @@ Skill(command: "bazinga-db-agents")
 
 ### Update Investigation Status
 
-After each major decision, update status via TWO operations:
+After each major decision, log via events (do NOT use review_iteration - that's for Tech Lead):
 
-**1. Update task group status (workflow skill):**
-```
-bazinga-db-workflow, please update task group:
-
-Group ID: [group_id]
-Session ID: [session_id]
-Status: in_progress
-Review Iteration: [current iteration number]
-```
-Then invoke: `Skill(command: "bazinga-db-workflow")`
-
-**2. Log investigation activity (agents skill):**
+**Log investigation progress (agents skill):**
 ```
 bazinga-db-agents, please save event:
 
 Session ID: [session_id]
-Event Type: investigation_status
+Event Type: investigation_iteration
 Payload: {
   "group_id": "[group_id]",
-  "iteration": [current iteration],
+  "iteration": [current iteration number],
   "status": "[under_investigation|root_cause_found|investigation_incomplete]",
   "activity": "[brief description of last activity]"
 }
 ```
 Then invoke: `Skill(command: "bazinga-db-agents")`
+
+**Note:** Investigation iterations are tracked via events, not task_group fields. Query with `get-events [session_id] investigation_iteration` to see history.
 
 ## 📋 ACTION TYPES (Response Formats)
 

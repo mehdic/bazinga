@@ -462,7 +462,7 @@ cat > /tmp/reasoning_understanding.md << 'REASONING_EOF'
 - [file2.py]
 REASONING_EOF
 
-# Step 2: Save via skill invocation with --content-file (avoids process table exposure)
+# Step 2: Invoke skill to save reasoning
 Skill(command: "bazinga-db-agents")
 
 Request: save-reasoning "{SESSION_ID}" "{GROUP_ID}" "developer" "understanding" \
