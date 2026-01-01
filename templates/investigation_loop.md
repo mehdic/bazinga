@@ -19,6 +19,29 @@ Before starting investigation loop, verify:
 
 ---
 
+## State vs Events Design
+
+Investigation progress is tracked in TWO complementary systems:
+
+| System | Purpose | Skill | Resumable? |
+|--------|---------|-------|------------|
+| **State** | Current progress, iteration count | bazinga-db-core | ✅ Yes |
+| **Events** | Immutable audit trail, history | bazinga-db-agents | ❌ Append-only |
+
+**Why both?**
+- State enables session resumption after context compaction
+- Events provide queryable history and dashboard timeline
+- Both MUST be updated together for consistency
+
+**Failure handling:**
+- If state update fails: Retry with exponential backoff
+- If event save fails: Log warning, continue (audit trail is secondary)
+- Reconciliation: Dashboard queries events to verify state accuracy
+
+**Preferred:** Use atomic `save-investigation-iteration` command when available (combines both operations).
+
+---
+
 ## Step 1: Initialize or Resume Investigation State
 
 **Query database for existing investigation:**
@@ -155,30 +178,47 @@ Task(
 | `EXHAUSTED` | → Step 5d |
 | Unknown/Parse Error | → Treat as NEED_MORE_ANALYSIS (max 2 times) → then BLOCKED |
 
-**Step 4a-log: Log iteration result via event:**
-```
-bazinga-db-agents, please save event:
+**Step 4a-log: Save iteration result (PREFER ATOMIC):**
 
-Session ID: {session_id}
-Event Type: investigation_iteration
-Payload: {
-  "group_id": "{group_id}",
-  "iteration": {current_iteration},
-  "status": "{status}",
-  "summary": "{extracted summary}"
-}
+**Preferred: Use atomic save-investigation-iteration command:**
+
+1. Write state to temp file:
+```bash
+echo '{"session_id": "{session_id}", "group_id": "{group_id}", "current_iteration": {N}, "status": "{status}", ...}' > /tmp/inv_state.json
+```
+
+2. Write event payload to temp file:
+```bash
+echo '{"group_id": "{group_id}", "iteration": {N}, "status": "{status}", "summary": "..."}' > /tmp/inv_event.json
+```
+
+3. Invoke atomic save:
+```
+bazinga-db-agents, please save investigation iteration atomically:
+
+Session: {session_id}
+Group: {group_id}
+Iteration: {current_iteration}
+Status: {status}
+State file: /tmp/inv_state.json
+Event file: /tmp/inv_event.json
 ```
 Then invoke: `Skill(command: "bazinga-db-agents")`
 
-**Update investigation_state.iterations_log and save:**
+**Fallback (if atomic fails): Use two separate saves:**
 ```
-iterations_log.append({
-  "iteration": current_iteration,
-  "status": status,
-  "summary": extracted_summary
-})
-bazinga-db-core, please save state: ...
+bazinga-db-agents, please save event:
+Event Type: investigation_iteration
+Payload: {...}
 ```
+Then: `Skill(command: "bazinga-db-agents")`
+
+```
+bazinga-db-core, please save state:
+State Type: investigation
+Data: {...}
+```
+Then: `Skill(command: "bazinga-db-core")`
 
 ---
 

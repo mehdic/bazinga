@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_role_violation.schema.json",
+  "title": "Role Violation Event Schema",
+  "description": "Schema for role_violation event stored in bazinga-db. Records detected role boundary violations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_type", "violation_type"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier"
+    },
+    "agent_type": {
+      "type": "string",
+      "enum": ["orchestrator", "pm", "developer", "qa_expert", "tech_lead", "investigator"],
+      "description": "Agent that committed the violation"
+    },
+    "violation_type": {
+      "type": "string",
+      "enum": ["implementation", "decision_making", "routing", "analysis"],
+      "description": "Type of role violation"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the violation"
+    },
+    "action_taken": {
+      "type": "string",
+      "description": "Corrective action taken"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Severity of violation"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

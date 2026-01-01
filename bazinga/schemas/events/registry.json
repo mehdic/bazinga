@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BAZINGA Event Type Registry",
+  "description": "Central registry of all valid event types and their schemas",
+  "version": "1.0.0",
+  "event_types": {
+    "scope_change": {
+      "schema": "../event_scope_change.schema.json",
+      "description": "User approved scope reduction",
+      "producers": ["orchestrator"],
+      "consumers": ["dashboard", "pm"]
+    },
+    "role_violation": {
+      "schema": "../event_role_violation.schema.json",
+      "description": "Detected role boundary violation",
+      "producers": ["orchestrator"],
+      "consumers": ["dashboard"]
+    },
+    "tl_issues": {
+      "schema": "../event_tl_issues.schema.json",
+      "description": "Tech Lead issues after CHANGES_REQUESTED",
+      "producers": ["orchestrator"],
+      "consumers": ["developer", "validator", "dashboard"]
+    },
+    "tl_issue_responses": {
+      "schema": "../event_tl_issue_responses.schema.json",
+      "description": "Developer responses to TL issues",
+      "producers": ["orchestrator"],
+      "consumers": ["tech_lead", "validator", "dashboard"]
+    },
+    "tl_verdicts": {
+      "schema": "../event_tl_verdicts.schema.json",
+      "description": "TL verdicts on Developer rejections",
+      "producers": ["orchestrator"],
+      "consumers": ["developer", "validator", "dashboard"]
+    },
+    "investigation_iteration": {
+      "schema": "../event_investigation_iteration.schema.json",
+      "description": "Investigator agent iteration progress",
+      "producers": ["investigator", "orchestrator"],
+      "consumers": ["dashboard", "tech_lead"]
+    },
+    "pm_bazinga": {
+      "schema": "../event_pm_bazinga.schema.json",
+      "description": "PM sends BAZINGA completion signal",
+      "producers": ["orchestrator"],
+      "consumers": ["validator", "dashboard"]
+    },
+    "validator_verdict": {
+      "schema": "../event_validator_verdict.schema.json",
+      "description": "Validator ACCEPT/REJECT decision",
+      "producers": ["validator"],
+      "consumers": ["orchestrator", "dashboard"]
+    }
+  }
+}

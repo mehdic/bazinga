@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_scope_change.schema.json",
+  "title": "Scope Change Event Schema",
+  "description": "Schema for scope_change event stored in bazinga-db. Records user-approved scope reductions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason", "approved_by"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reason for scope change"
+    },
+    "original_scope": {
+      "type": "string",
+      "description": "Original scope description"
+    },
+    "new_scope": {
+      "type": "string",
+      "description": "New reduced scope description"
+    },
+    "approved_by": {
+      "type": "string",
+      "enum": ["user", "pm"],
+      "description": "Who approved the scope change"
+    },
+    "groups_affected": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Task group IDs affected by scope change"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "x-dedup-key": {
+    "description": "Deduplication key",
+    "fields": ["session_id", "timestamp"]
+  }
+}

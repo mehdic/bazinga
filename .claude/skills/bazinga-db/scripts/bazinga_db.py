@@ -1084,15 +1084,20 @@ class BazingaDB:
     # ==================== EVENT OPERATIONS (v9) ====================
 
     def save_event(self, session_id: str, event_subtype: str, payload: str,
+                   idempotency_key: Optional[str] = None,
                    _retry_count: int = 0) -> Dict[str, Any]:
         """Save an event to orchestration_logs with log_type='event'.
 
-        Used for: pm_bazinga, scope_change, validator_verdict events.
+        SECURITY: Payload is scanned for secrets and redacted before storage.
+
+        Used for: pm_bazinga, scope_change, validator_verdict, tl_issues, etc.
 
         Args:
             session_id: The session ID
-            event_subtype: Type of event (pm_bazinga, scope_change, validator_verdict)
+            event_subtype: Type of event (pm_bazinga, scope_change, validator_verdict, etc.)
             payload: JSON string payload
+            idempotency_key: If provided, prevents duplicate events with same key.
+                            Recommended format: {session_id}|{group_id}|{event_type}|{iteration}
             _retry_count: Internal retry counter
 
         Returns:
@@ -1108,14 +1113,40 @@ class BazingaDB:
         if not event_subtype or not event_subtype.strip():
             raise ValueError("event_subtype cannot be empty")
 
+        # Scan and redact secrets from payload (security parity with save_reasoning)
+        redacted_payload, was_redacted = scan_and_redact(payload)
+        if was_redacted:
+            self._print_error("Warning: Secrets detected and redacted from event payload")
+
         conn = None
         try:
             conn = self._get_connection()
+
+            # Check idempotency if key provided
+            if idempotency_key:
+                existing = conn.execute("""
+                    SELECT id FROM orchestration_logs
+                    WHERE session_id = ? AND log_type = 'event'
+                    AND event_subtype = ? AND idempotency_key = ?
+                """, (session_id, event_subtype, idempotency_key)).fetchone()
+
+                if existing:
+                    self._print_success(f"✓ Event already exists (idempotent, id={existing[0]})")
+                    return {
+                        'success': True,
+                        'event_id': existing[0],
+                        'session_id': session_id,
+                        'event_subtype': event_subtype,
+                        'idempotent': True,
+                        'message': 'Event already exists with same idempotency key'
+                    }
+
             cursor = conn.execute("""
                 INSERT INTO orchestration_logs
-                (session_id, agent_type, content, log_type, event_subtype, event_payload)
-                VALUES (?, 'system', ?, 'event', ?, ?)
-            """, (session_id, f"Event: {event_subtype}", event_subtype, payload))
+                (session_id, agent_type, content, log_type, event_subtype, event_payload, redacted, idempotency_key)
+                VALUES (?, 'system', ?, 'event', ?, ?, ?, ?)
+            """, (session_id, f"Event: {event_subtype}", event_subtype, redacted_payload,
+                  1 if was_redacted else 0, idempotency_key))
             event_id = cursor.lastrowid
             conn.commit()
 
@@ -1123,7 +1154,8 @@ class BazingaDB:
                 'success': True,
                 'event_id': event_id,
                 'session_id': session_id,
-                'event_subtype': event_subtype
+                'event_subtype': event_subtype,
+                'redacted': was_redacted
             }
 
             self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
@@ -1138,6 +1170,7 @@ class BazingaDB:
             if self._is_corruption_error(e):
                 if self._recover_from_corruption():
                     return self.save_event(session_id, event_subtype, payload,
+                                          idempotency_key=idempotency_key,
                                           _retry_count=_retry_count + 1)
             self._print_error(f"Failed to save {event_subtype} event: {str(e)}")
             return {"success": False, "error": f"Database error: {str(e)}"}
@@ -1185,6 +1218,102 @@ class BazingaDB:
         conn.close()
 
         return [dict(row) for row in rows]
+
+    def save_investigation_iteration(self, session_id: str, group_id: str,
+                                       iteration: int, status: str,
+                                       state_data: str, event_payload: str) -> Dict[str, Any]:
+        """Atomically save investigation state AND event together.
+
+        This ensures consistency between state (for resumption) and events (for audit).
+        Uses single transaction - both succeed or both fail.
+
+        Args:
+            session_id: The session ID
+            group_id: Task group identifier
+            iteration: Investigation iteration number
+            status: Investigation status (under_investigation, root_cause_found, etc.)
+            state_data: JSON string for state snapshot
+            event_payload: JSON string for event payload
+
+        Returns:
+            Dict with success status and operation details
+        """
+        # Generate idempotency key
+        idempotency_key = f"{session_id}|{group_id}|investigation_iteration|{iteration}"
+
+        # Scan and redact secrets from payloads
+        redacted_state, state_redacted = scan_and_redact(state_data)
+        redacted_event, event_redacted = scan_and_redact(event_payload)
+
+        if state_redacted or event_redacted:
+            self._print_error("Warning: Secrets detected and redacted from investigation data")
+
+        conn = None
+        try:
+            conn = self._get_connection()
+
+            # Start transaction with IMMEDIATE mode to prevent deadlocks
+            conn.execute("BEGIN IMMEDIATE")
+
+            # 1. Save/update state snapshot
+            conn.execute("""
+                INSERT OR REPLACE INTO state_snapshots
+                (session_id, state_type, state_data, timestamp)
+                VALUES (?, 'investigation', ?, datetime('now'))
+            """, (session_id, redacted_state))
+
+            # 2. Check idempotency for event
+            existing = conn.execute("""
+                SELECT id FROM orchestration_logs
+                WHERE session_id = ? AND log_type = 'event'
+                AND event_subtype = 'investigation_iteration'
+                AND idempotency_key = ?
+            """, (session_id, idempotency_key)).fetchone()
+
+            event_saved = False
+            event_id = None
+
+            if not existing:
+                cursor = conn.execute("""
+                    INSERT INTO orchestration_logs
+                    (session_id, agent_type, content, log_type, event_subtype,
+                     event_payload, redacted, group_id, idempotency_key)
+                    VALUES (?, 'investigator', ?, 'event', 'investigation_iteration',
+                            ?, ?, ?, ?)
+                """, (session_id, f"Investigation iteration {iteration}: {status}",
+                      redacted_event, 1 if event_redacted else 0, group_id, idempotency_key))
+                event_id = cursor.lastrowid
+                event_saved = True
+            else:
+                event_id = existing[0]
+
+            conn.commit()
+
+            result = {
+                'success': True,
+                'atomic': True,
+                'state_saved': True,
+                'event_saved': event_saved,
+                'event_id': event_id,
+                'iteration': iteration,
+                'idempotent': not event_saved,
+                'redacted': state_redacted or event_redacted
+            }
+
+            self._print_success(f"✓ Saved investigation iteration {iteration} atomically")
+            return result
+
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            self._print_error(f"Failed to save investigation iteration atomically: {str(e)}")
+            return {'success': False, 'error': str(e), 'atomic': False}
+        finally:
+            if conn:
+                conn.close()
 
     # ==================== STATE OPERATIONS ====================
 
@@ -4286,16 +4415,117 @@ def main():
                 print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
                 sys.exit(1)
         elif cmd == 'save-event':
-            # save-event <session_id> <event_subtype> <payload>
-            if len(cmd_args) < 3:
-                print("Error: save-event requires 3 args: <session_id> <event_subtype> <payload>", file=sys.stderr)
-                print("  event_subtype: pm_bazinga, scope_change, validator_verdict", file=sys.stderr)
-                print("  payload: JSON string", file=sys.stderr)
+            # save-event <session_id> <event_subtype> [<payload>|--payload-file <path>] [--idempotency-key <key>]
+            if len(cmd_args) < 2:
+                print("Error: save-event requires at least 2 args: <session_id> <event_subtype> [payload|--payload-file <path>]", file=sys.stderr)
+                print("  event_subtype: pm_bazinga, scope_change, validator_verdict, tl_issues, etc.", file=sys.stderr)
+                print("  payload: JSON string (or use --payload-file)", file=sys.stderr)
+                print("  --payload-file: Read payload from file (avoids exposing in ps)", file=sys.stderr)
+                print("  --idempotency-key: Prevent duplicate events with same key", file=sys.stderr)
                 sys.exit(1)
+
             session_id = cmd_args[0]
             event_subtype = cmd_args[1]
-            payload = cmd_args[2]
-            result = db.save_event(session_id, event_subtype, payload)
+            payload = None
+            idempotency_key = None
+
+            # Parse remaining args
+            i = 2
+            while i < len(cmd_args):
+                if cmd_args[i] == '--payload-file':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --payload-file requires a path", file=sys.stderr)
+                        sys.exit(1)
+                    payload_path = cmd_args[i + 1]
+                    try:
+                        with open(payload_path, 'r') as f:
+                            payload = f.read().strip()
+                    except Exception as e:
+                        print(f"Error reading payload file: {e}", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                elif cmd_args[i] == '--idempotency-key':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --idempotency-key requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    idempotency_key = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i].startswith('--'):
+                    print(f"Error: Unknown flag '{cmd_args[i]}'", file=sys.stderr)
+                    sys.exit(1)
+                elif payload is None:
+                    payload = cmd_args[i]
+                    i += 1
+                else:
+                    print(f"Error: Unexpected argument '{cmd_args[i]}'", file=sys.stderr)
+                    sys.exit(1)
+
+            if payload is None:
+                print("Error: No payload provided (use positional arg or --payload-file)", file=sys.stderr)
+                sys.exit(1)
+
+            result = db.save_event(session_id, event_subtype, payload, idempotency_key=idempotency_key)
+            print(json.dumps(result, indent=2))
+        elif cmd == 'save-investigation-iteration':
+            # save-investigation-iteration <session_id> <group_id> <iteration> <status> --state-file <path> --event-file <path>
+            if len(cmd_args) < 4:
+                print("Error: save-investigation-iteration requires: <session_id> <group_id> <iteration> <status> --state-file <path> --event-file <path>", file=sys.stderr)
+                print("  iteration: Integer iteration number", file=sys.stderr)
+                print("  status: under_investigation, root_cause_found, hypothesis_eliminated, etc.", file=sys.stderr)
+                print("  --state-file: Path to JSON file with state data", file=sys.stderr)
+                print("  --event-file: Path to JSON file with event payload", file=sys.stderr)
+                sys.exit(1)
+
+            session_id = cmd_args[0]
+            group_id = cmd_args[1]
+            try:
+                iteration = int(cmd_args[2])
+            except ValueError:
+                print(f"Error: iteration must be integer, got '{cmd_args[2]}'", file=sys.stderr)
+                sys.exit(1)
+            status = cmd_args[3]
+            state_file = None
+            event_file = None
+
+            # Parse remaining args
+            i = 4
+            while i < len(cmd_args):
+                if cmd_args[i] == '--state-file':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --state-file requires a path", file=sys.stderr)
+                        sys.exit(1)
+                    state_file = cmd_args[i + 1]
+                    i += 2
+                elif cmd_args[i] == '--event-file':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --event-file requires a path", file=sys.stderr)
+                        sys.exit(1)
+                    event_file = cmd_args[i + 1]
+                    i += 2
+                else:
+                    print(f"Error: Unknown argument '{cmd_args[i]}'", file=sys.stderr)
+                    sys.exit(1)
+
+            if not state_file or not event_file:
+                print("Error: Both --state-file and --event-file are required", file=sys.stderr)
+                sys.exit(1)
+
+            # Read files
+            try:
+                with open(state_file, 'r') as f:
+                    state_data = f.read().strip()
+            except Exception as e:
+                print(f"Error reading state file: {e}", file=sys.stderr)
+                sys.exit(1)
+
+            try:
+                with open(event_file, 'r') as f:
+                    event_payload = f.read().strip()
+            except Exception as e:
+                print(f"Error reading event file: {e}", file=sys.stderr)
+                sys.exit(1)
+
+            result = db.save_investigation_iteration(session_id, group_id, iteration, status, state_data, event_payload)
             print(json.dumps(result, indent=2))
         elif cmd == 'get-events':
             # get-events <session_id> [event_subtype] [limit]

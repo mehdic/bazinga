@@ -132,7 +132,31 @@ else
     ((ERRORS++))
 fi
 
-# 6. Count domain-specific usages
+# 6. Check event types are documented
+echo ""
+echo "📋 Checking event types are documented..."
+
+# Known event types (from bazinga-db-agents SKILL.md)
+DOCUMENTED_EVENTS="scope_change|role_violation|tl_issues|tl_issue_responses|tl_verdicts|investigation_iteration|pm_bazinga|validator_verdict"
+
+# Find event types used in agent files and templates
+USED_EVENTS=$(grep -roh 'Event Type: [a-z_]*' --include="*.md" "$REPO_ROOT/agents" "$REPO_ROOT/templates" 2>/dev/null | \
+    sed 's/Event Type: //' | sort -u || true)
+
+EVENT_WARNINGS=0
+for event in $USED_EVENTS; do
+    if ! echo "$event" | grep -qE "^($DOCUMENTED_EVENTS)$"; then
+        echo -e "${YELLOW}  ⚠️  Undocumented event type: $event${NC}"
+        ((EVENT_WARNINGS++))
+        ((WARNINGS++))
+    fi
+done
+
+if [ $EVENT_WARNINGS -eq 0 ]; then
+    echo -e "${GREEN}  ✅ All event types are documented${NC}"
+fi
+
+# 7. Count domain-specific usages
 echo ""
 echo "📊 Domain-specific skill usage counts:"
 for domain in "${DOMAINS[@]}"; do

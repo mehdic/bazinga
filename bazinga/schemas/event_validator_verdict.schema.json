@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event_validator_verdict.schema.json",
+  "title": "Validator Verdict Event Schema",
+  "description": "Schema for validator_verdict event stored in bazinga-db. Records Validator ACCEPT/REJECT decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "reason"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^bazinga_",
+      "description": "Session identifier"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["ACCEPT", "REJECT"],
+      "description": "Validator's verdict on BAZINGA claim"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reason for verdict"
+    },
+    "evidence_checked": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of evidence items checked"
+    },
+    "tests_verified": {
+      "type": "boolean",
+      "description": "Whether tests were independently verified"
+    },
+    "coverage_verified": {
+      "type": "boolean",
+      "description": "Whether coverage was independently verified"
+    },
+    "criteria_verified": {
+      "type": "integer",
+      "description": "Number of success criteria verified"
+    },
+    "issues_found": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] }
+        }
+      },
+      "description": "Issues found during validation"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "x-dedup-key": {
+    "description": "Deduplication key",
+    "fields": ["session_id", "timestamp"]
+  }
+}

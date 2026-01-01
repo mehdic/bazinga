@@ -192,6 +192,9 @@ Save a generic event with JSON payload.
 - `tl_issues` - Tech Lead issues after CHANGES_REQUESTED
 - `tl_issue_responses` - Developer responses to TL issues
 - `tl_verdicts` - TL verdicts on Developer rejections
+- `investigation_iteration` - Investigator agent iteration progress
+- `pm_bazinga` - PM sends BAZINGA completion signal
+- `validator_verdict` - Validator ACCEPT/REJECT decision
 
 **Tech Lead Review Events:**
 ```bash
@@ -221,6 +224,36 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
 ```
 
 Query events by session and optionally by subtype.
+
+### save-investigation-iteration (Atomic)
+
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-investigation-iteration \
+  "<session_id>" "<group_id>" <iteration> "<status>" \
+  --state-file /tmp/state.json --event-file /tmp/event.json
+```
+
+Atomically save investigation state AND event together. Ensures consistency between
+state (for resumption) and events (for audit trail). Uses single transaction.
+
+**Parameters:**
+- `iteration`: Integer iteration number (1-10)
+- `status`: under_investigation, root_cause_found, hypothesis_eliminated, etc.
+- `--state-file`: Path to JSON file with investigation state data
+- `--event-file`: Path to JSON file with event payload
+
+**Returns:**
+```json
+{
+  "success": true,
+  "atomic": true,
+  "state_saved": true,
+  "event_saved": true,
+  "event_id": 123,
+  "iteration": 1,
+  "idempotent": false
+}
+```
 
 ## Output Format
 
