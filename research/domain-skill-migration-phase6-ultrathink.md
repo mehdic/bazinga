@@ -394,9 +394,11 @@ Special handling:
 3. **Quarantine** invalid rows with synthetic group_id
 4. **Backfill** all orchestration_logs where group_id is NULL/empty
 
-### Phase 6d: CLI --json Flag (P2)
+### Phase 6d: CLI Fixes (P1 - Updated)
 
-Add optional `--json` flag to `save-state` command.
+1. **save-state must print JSON** (mandatory, not opt-in)
+2. **Implement --state-file** for save-state CLI
+3. **Fix save_event race condition** with IntegrityError handling
 
 ### Phase 6e: Add Tests (P2)
 
@@ -467,8 +469,10 @@ Per OpenAI recommendation, enumerate concrete test cases:
 6. **None → 'global' coercion** in save_context_package
 7. **Legacy data detection** before backfill (with quarantine option)
 8. **Backfill all log types** not just events
-9. **Opt-in --json flag** for CLI output
-10. **Skip DB triggers** for now (consider CHECK constraint later)
+9. **Mandatory JSON output** for save-state CLI (not opt-in)
+10. **Implement --state-file** for save-state CLI consistency
+11. **Fix save_event race condition** with IntegrityError pattern
+12. **Skip DB triggers** for now (consider CHECK constraint later)
 
 ### Implementation Order
 
@@ -476,10 +480,13 @@ Per OpenAI recommendation, enumerate concrete test cases:
 |----------|-----|--------|
 | P1 | Add three validator functions (case-insensitive) | Small |
 | P1 | Apply to all 18 functions | Medium |
+| P1 | save-state CLI must print JSON result | Small |
+| P1 | save-state CLI --state-file support | Small |
+| P1 | save_event race condition fix (IntegrityError) | Small |
 | P2 | Legacy data detection & quarantine | Small |
 | P2 | Extend backfill to all log types | Small |
-| P2 | Add CLI --json flag | Small |
 | P2 | Add comprehensive tests | Medium |
+| P2 | Document idempotency index in SKILL.md | Small |
 | P3 | Remove deprecated validator | Small |
 | P3 | Fix comments/docs, consider CHECK constraint | Small |
 
@@ -496,12 +503,110 @@ Per OpenAI recommendation, enumerate concrete test cases:
 
 ---
 
+## Additional Issues (User Review Feedback)
+
+### 🔴 Critical Issue 1: save-state CLI Does Not Print JSON Result
+
+**Location:** `bazinga_db.py:3693`
+
+**Problem:** The CLI handles `save-state` but doesn't print the returned dict, violating the "raw JSON only" contract that skills expect.
+
+**Current Code:**
+```python
+db.save_state(cmd_args[0], cmd_args[1], state_data, group_id=group_id)
+# No print! Breaks downstream parsing
+```
+
+**Fix:** Print the result dict:
+```python
+result = db.save_state(cmd_args[0], cmd_args[1], state_data, group_id=group_id)
+print(json.dumps(result))
+```
+
+**Note:** This supersedes the earlier "opt-in --json flag" approach. The skill contract requires JSON output for all commands, so this should be mandatory, not opt-in.
+
+### 🔴 Critical Issue 2: Docs Advertise --state-file But CLI Doesn't Implement It
+
+**Location:** `schema.md:240-241` vs `bazinga_db.py` CLI
+
+**Problem:** Documentation shows:
+```bash
+python3 .../bazinga_db.py --quiet save-state "sess_123" "investigation" \
+  --state-file /tmp/state.json --group-id "AUTH"
+```
+
+But the CLI only accepts inline JSON, not `--state-file`.
+
+**Fix Options:**
+1. **Implement --state-file** (recommended for consistency with save-investigation-iteration)
+2. **Update docs** to remove --state-file usage
+
+**Recommendation:** Implement `--state-file` for consistency:
+```python
+elif cmd == 'save-state':
+    # Parse --state-file if provided
+    if '--state-file' in cmd_args:
+        idx = cmd_args.index('--state-file')
+        with open(cmd_args[idx + 1], 'r') as f:
+            state_data = json.load(f)
+    else:
+        state_data = json.loads(cmd_args[2])
+```
+
+### 🔴 Critical Issue 3: save_event Has Race Condition (Same as Phase 4 Issue)
+
+**Location:** `bazinga_db.py:1161-1184`
+
+**Problem:** Uses SELECT-then-INSERT without IntegrityError handling. Identical to the Phase 4 issue fixed in `save_investigation_iteration`.
+
+**Current (race-prone):**
+```python
+existing = conn.execute("SELECT id ...").fetchone()
+if existing:
+    return {'idempotent': True, ...}
+cursor = conn.execute("INSERT INTO ...")  # Can fail with IntegrityError
+```
+
+**Fix:** Mirror the save_investigation_iteration pattern:
+```python
+try:
+    cursor = conn.execute("INSERT INTO ...")
+    # Success - new event created
+except sqlite3.IntegrityError:
+    # Race occurred - another process inserted first
+    existing = conn.execute("SELECT id ...").fetchone()
+    return {'success': True, 'idempotent': True, 'event_id': existing[0]}
+```
+
+### 🟡 Suggestion 1: Document Idempotency Index in SKILL.md
+
+**Location:** `bazinga-db-agents/SKILL.md:172`
+
+**Problem:** Docs describe idempotency format but don't document the underlying unique index.
+
+**Fix:** Add explicit documentation:
+```
+**Unique Constraint:** idx_logs_idempotency on (session_id, event_subtype, group_id, idempotency_key)
+Concurrent calls with same key are safe - second call returns existing event_id.
+```
+
+### Issues Already Covered by Phase 6
+
+| User-Reported Issue | Phase 6 Coverage |
+|---------------------|------------------|
+| validate_group_id unused allow_global | ✅ Replaced with three explicit validators |
+| save_investigation_iteration allows 'global' | ✅ `validate_scope_group_only` rejects 'global' |
+| save_event missing group_id validation | ✅ Added to function mapping table |
+
+---
+
 ## Questions for Review
 
 1. Is the three-validator approach cleaner than fixing the boolean flag?
 2. Should `save_consumption` be group-only or allow global?
 3. Is the backfill-all-log-types approach safe?
-4. Is --json flag the right CLI approach?
+4. Should save-state ALWAYS print JSON (updated) or use --json flag (original)?
+5. Should we implement --state-file for save-state CLI?
 
 ---
 
