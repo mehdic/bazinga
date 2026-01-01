@@ -84,12 +84,16 @@ CREATE TABLE orchestration_logs (
     agent_id TEXT,
     content TEXT NOT NULL,
     -- Reasoning capture columns (v8)
-    log_type TEXT DEFAULT 'interaction',  -- 'interaction' or 'reasoning'
+    log_type TEXT DEFAULT 'interaction',  -- 'interaction', 'reasoning', or 'event'
     reasoning_phase TEXT,  -- understanding, approach, decisions, risks, blockers, pivot, completion
     confidence_level TEXT,  -- high, medium, low
     references_json TEXT,  -- JSON array of files consulted
     redacted INTEGER DEFAULT 0,  -- 1 if secrets were redacted
     group_id TEXT,  -- Task group for reasoning context
+    -- Event columns (v17)
+    event_subtype TEXT,  -- pm_bazinga, scope_change, validator_verdict, tl_issues, etc.
+    event_payload TEXT,  -- JSON string event payload
+    idempotency_key TEXT,  -- Prevents duplicate events: {session}|{group}|{type}|{iteration}
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 )
 
@@ -101,6 +105,10 @@ CREATE INDEX idx_logs_reasoning ON orchestration_logs(session_id, log_type, reas
     WHERE log_type = 'reasoning';
 CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id, log_type)
     WHERE log_type = 'reasoning';
+-- Event idempotency index (v17) - prevents duplicate events with same key
+CREATE UNIQUE INDEX idx_logs_idempotency
+    ON orchestration_logs(session_id, event_subtype, group_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL AND log_type = 'event';
 ```
 
 **Columns:**
@@ -124,12 +132,16 @@ CREATE INDEX idx_logs_group_reasoning ON orchestration_logs(session_id, group_id
 - `references_json`: JSON array of file paths consulted during reasoning
 - `redacted`: 1 if secrets were detected and redacted from content
 - `group_id`: Task group ID for associating reasoning with specific work
+- `event_subtype`: (v17) Event type for log_type='event': `pm_bazinga`, `scope_change`, `validator_verdict`, `tl_issues`, `tl_issue_responses`, `investigation_iteration`, etc.
+- `event_payload`: (v17) JSON string event payload (secrets are scanned and redacted)
+- `idempotency_key`: (v17) Prevents duplicate events. Recommended format: `{session_id}|{group_id}|{event_type}|{iteration}`
 
 **Indexes:**
 - `idx_logs_session`: Fast session-based queries sorted by time
 - `idx_logs_agent_type`: Filter by agent type efficiently
 - `idx_logs_reasoning`: Efficient reasoning queries by phase (partial index)
 - `idx_logs_group_reasoning`: Efficient reasoning queries by group (partial index)
+- `idx_logs_idempotency`: (v17) Unique constraint for event idempotency - prevents duplicate events with same key. Uses INSERT-first pattern with IntegrityError catch for race-safe concurrent writes.
 
 **Usage Example - Interactions:**
 ```python

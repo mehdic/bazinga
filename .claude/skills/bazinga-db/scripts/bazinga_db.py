@@ -99,6 +99,19 @@ GROUP_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
 # Reserved names - checked CASE-INSENSITIVELY per OpenAI review
 RESERVED_GROUP_IDS = frozenset({'global', 'session', 'all', 'default'})
 
+# Investigation status whitelist (per CI review suggestion)
+VALID_INVESTIGATION_STATUSES = frozenset({
+    'under_investigation',
+    'root_cause_found',
+    'hypothesis_eliminated',
+    'fix_proposed',
+    'fix_verified',
+    'escalated',
+    'blocked',
+    'completed'
+})
+MAX_INVESTIGATION_ITERATION = 20  # Reasonable upper bound
+
 
 def _validate_group_id_base(group_id: Any) -> Optional[str]:
     """Base validation: type, format, length. Used by all three validators.
@@ -168,9 +181,34 @@ def validate_task_group_id(task_group_id: Any) -> Optional[str]:
     return None
 
 
+def validate_investigation_inputs(iteration: Any, status: Any) -> Optional[str]:
+    """Validate investigation iteration number and status.
+
+    Per CI review: Enforce iteration as positive int (1-20) and whitelist status values.
+    """
+    # Validate iteration
+    if not isinstance(iteration, int):
+        return f"iteration must be an integer, got {type(iteration).__name__}"
+    if iteration < 1:
+        return f"iteration must be >= 1, got {iteration}"
+    if iteration > MAX_INVESTIGATION_ITERATION:
+        return f"iteration too high (max {MAX_INVESTIGATION_ITERATION}, got {iteration})"
+
+    # Validate status
+    if not isinstance(status, str):
+        return f"status must be a string, got {type(status).__name__}"
+    if status not in VALID_INVESTIGATION_STATUSES:
+        valid_list = ', '.join(sorted(VALID_INVESTIGATION_STATUSES))
+        return f"invalid status '{status}'. Valid: {valid_list}"
+
+    return None
+
+
 # DEPRECATED: Use validate_scope_global_or_group, validate_scope_group_only,
 # or validate_task_group_id instead. This function will be removed in Phase 7.
 # See: research/domain-skill-migration-phase6-ultrathink.md
+_DEPRECATION_WARNED = False  # One-time warning flag
+
 def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]:
     """DEPRECATED: Use the new explicit validators instead.
 
@@ -178,13 +216,14 @@ def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]
     - validate_scope_group_only() for group-only operations
     - validate_task_group_id() for task group identifiers
     """
-    import warnings
-    warnings.warn(
-        "validate_group_id is deprecated. Use validate_scope_global_or_group, "
-        "validate_scope_group_only, or validate_task_group_id instead.",
-        DeprecationWarning,
-        stacklevel=2
-    )
+    global _DEPRECATION_WARNED
+    if not _DEPRECATION_WARNED:
+        # Use stderr instead of warnings.warn to avoid noisy output (per CI review)
+        import sys
+        print("DEPRECATION: validate_group_id is deprecated. Use validate_scope_global_or_group, "
+              "validate_scope_group_only, or validate_task_group_id instead.",
+              file=sys.stderr)
+        _DEPRECATION_WARNED = True
     return _validate_group_id_base(group_id)
 
 
@@ -323,8 +362,17 @@ class BazingaDB:
         if not self.quiet:
             print(message)
 
+    def _print_warning(self, message: str):
+        """Print warning message to stderr unless in quiet mode.
+
+        Per CI review: Suppress non-critical warnings (like secret redaction)
+        in quiet mode to keep stdout/stderr clean for JSON-only flows.
+        """
+        if not self.quiet:
+            print(f"⚠ {message}", file=sys.stderr)
+
     def _print_error(self, message: str):
-        """Print error message to stderr."""
+        """Print error message to stderr (always, even in quiet mode)."""
         print(f"! {message}", file=sys.stderr)
 
     def _is_query_error(self, error: Exception) -> bool:
@@ -1218,7 +1266,7 @@ class BazingaDB:
         # Scan and redact secrets from payload (security parity with save_reasoning)
         redacted_payload, was_redacted = scan_and_redact(payload)
         if was_redacted:
-            self._print_error("Warning: Secrets detected and redacted from event payload")
+            self._print_warning("Secrets detected and redacted from event payload")
 
         conn = None
         try:
@@ -1248,7 +1296,7 @@ class BazingaDB:
                 self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
                 return result
 
-            except sqlite3.IntegrityError:
+            except sqlite3.IntegrityError as e:
                 # Unique constraint violation - event already exists (idempotent case)
                 # This is the expected path when concurrent saves happen
                 conn.rollback()
@@ -1269,8 +1317,17 @@ class BazingaDB:
                             'idempotent': True,
                             'message': 'Event already exists with same idempotency key'
                         }
-                # Re-raise if no idempotency key or couldn't find existing
-                raise
+                    # Idempotency key provided but existing record not found - unusual
+                    raise
+                else:
+                    # Per CI review: Provide helpful error when concurrent insert fails
+                    # without idempotency key
+                    return {
+                        'success': False,
+                        'error': 'Concurrent insert conflict. Use --idempotency-key for safe retries.',
+                        'hint': 'Recommended format: {session_id}|{group_id}|{event_type}|{iteration}',
+                        'original_error': str(e)
+                    }
 
         except sqlite3.DatabaseError as e:
             if conn:
@@ -1351,12 +1408,17 @@ class BazingaDB:
             Dict with success status and operation details
 
         Raises:
-            ValueError: If group_id is invalid
+            ValueError: If group_id, iteration, or status is invalid
         """
         # Phase 6: Investigation MUST be group-specific (rejects 'global')
         error = validate_scope_group_only(group_id)
         if error:
-            raise ValueError(error)
+            raise ValueError(f"Invalid group_id: {error}")
+
+        # Validate iteration and status (per CI review suggestion)
+        error = validate_investigation_inputs(iteration, status)
+        if error:
+            raise ValueError(f"Invalid investigation input: {error}")
 
         # Generate idempotency key
         idempotency_key = f"{session_id}|{group_id}|investigation_iteration|{iteration}"
@@ -1366,7 +1428,7 @@ class BazingaDB:
         redacted_event, event_redacted = scan_and_redact(event_payload)
 
         if state_redacted or event_redacted:
-            self._print_error("Warning: Secrets detected and redacted from investigation data")
+            self._print_warning("Secrets detected and redacted from investigation data")
 
         conn = None
         try:
@@ -2606,7 +2668,7 @@ class BazingaDB:
         # Scan and redact secrets
         redacted_content, was_redacted = scan_and_redact(content)
         if was_redacted:
-            self._print_error("Warning: Secrets detected and redacted from reasoning content")
+            self._print_warning("Secrets detected and redacted from reasoning content")
 
         # Serialize references
         references_json = json.dumps(references) if references else None
