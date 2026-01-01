@@ -93,20 +93,17 @@ def validate_complexity(complexity: Any) -> Optional[str]:
     return None
 
 
-# See: research/domain-skill-migration-phase4-ultrathink.md (Fix D)
+# See: research/domain-skill-migration-phase6-ultrathink.md
 # Pattern: alphanumeric with underscores and hyphens, max 64 chars
 GROUP_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+# Reserved names - checked CASE-INSENSITIVELY per OpenAI review
+RESERVED_GROUP_IDS = frozenset({'global', 'session', 'all', 'default'})
 
 
-def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]:
-    """Validate group_id value. Returns error message if invalid, None if valid.
+def _validate_group_id_base(group_id: Any) -> Optional[str]:
+    """Base validation: type, format, length. Used by all three validators.
 
-    Args:
-        group_id: Value to validate (should be non-empty string matching pattern)
-        allow_global: If True, 'global' is a valid value (default for session-level ops)
-
-    Returns:
-        Error message string if invalid, None if valid
+    See: research/domain-skill-migration-phase6-ultrathink.md
     """
     if group_id is None:
         return "group_id cannot be None"
@@ -119,6 +116,76 @@ def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]
     if not GROUP_ID_PATTERN.match(group_id):
         return "group_id must be alphanumeric with underscores/hyphens only"
     return None
+
+
+def validate_scope_global_or_group(group_id: Any) -> Optional[str]:
+    """Validate scope allowing 'global' (session-level) or any valid group ID.
+
+    Use for: save_state (non-investigation), get_latest_state, save_event,
+             save_context_package, get_context_packages, save_reasoning,
+             get_reasoning, reasoning_timeline, check_mandatory_phases,
+             get_consumption
+
+    Note: Callers accepting None should coerce to 'global' BEFORE calling.
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    return _validate_group_id_base(group_id)
+
+
+def validate_scope_group_only(group_id: Any) -> Optional[str]:
+    """Validate scope that MUST be group-specific (rejects 'global').
+
+    Use for: save_investigation_iteration, save_state (investigation type),
+             save_consumption, extract_strategies
+
+    CASE-INSENSITIVE: 'GLOBAL', 'Global', 'global' all rejected.
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    error = _validate_group_id_base(group_id)
+    if error:
+        return error
+    if group_id.lower() == 'global':
+        return "group_id cannot be 'global' for this operation (must be group-specific)"
+    return None
+
+
+def validate_task_group_id(task_group_id: Any) -> Optional[str]:
+    """Validate task group identifier (rejects reserved names).
+
+    Use for: create_task_group, update_task_group, update_context_references
+
+    Reserved names (case-insensitive): global, session, all, default
+
+    See: research/domain-skill-migration-phase6-ultrathink.md
+    """
+    error = _validate_group_id_base(task_group_id)
+    if error:
+        return error
+    if task_group_id.lower() in RESERVED_GROUP_IDS:
+        return f"'{task_group_id}' is a reserved identifier and cannot be used as a task group ID"
+    return None
+
+
+# DEPRECATED: Use validate_scope_global_or_group, validate_scope_group_only,
+# or validate_task_group_id instead. This function will be removed in Phase 7.
+# See: research/domain-skill-migration-phase6-ultrathink.md
+def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]:
+    """DEPRECATED: Use the new explicit validators instead.
+
+    - validate_scope_global_or_group() for session/group scope
+    - validate_scope_group_only() for group-only operations
+    - validate_task_group_id() for task group identifiers
+    """
+    import warnings
+    warnings.warn(
+        "validate_group_id is deprecated. Use validate_scope_global_or_group, "
+        "validate_scope_group_only, or validate_task_group_id instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return _validate_group_id_base(group_id)
 
 
 # Cross-platform file locking
@@ -1143,8 +1210,8 @@ class BazingaDB:
             raise ValueError("session_id cannot be empty")
         if not event_subtype or not event_subtype.strip():
             raise ValueError("event_subtype cannot be empty")
-        # Fix D: Validate group_id
-        error = validate_group_id(group_id)
+        # Phase 6: Use explicit validator for scope (events can be session-level)
+        error = validate_scope_global_or_group(group_id)
         if error:
             raise ValueError(error)
 
@@ -1157,44 +1224,53 @@ class BazingaDB:
         try:
             conn = self._get_connection()
 
-            # Check idempotency if key provided (includes group_id for proper isolation)
-            if idempotency_key:
-                existing = conn.execute("""
-                    SELECT id FROM orchestration_logs
-                    WHERE session_id = ? AND log_type = 'event'
-                    AND event_subtype = ? AND group_id = ? AND idempotency_key = ?
-                """, (session_id, event_subtype, group_id, idempotency_key)).fetchone()
+            # Race-safe INSERT-first pattern (See: research/domain-skill-migration-phase6-ultrathink.md)
+            # Instead of SELECT-then-INSERT (race condition), we INSERT first and catch IntegrityError
+            # The unique index idx_logs_idempotency enforces uniqueness on (session_id, event_subtype, group_id, idempotency_key)
+            try:
+                cursor = conn.execute("""
+                    INSERT INTO orchestration_logs
+                    (session_id, group_id, agent_type, content, log_type, event_subtype, event_payload, redacted, idempotency_key)
+                    VALUES (?, ?, 'system', ?, 'event', ?, ?, ?, ?)
+                """, (session_id, group_id, f"Event: {event_subtype}", event_subtype, redacted_payload,
+                      1 if was_redacted else 0, idempotency_key))
+                event_id = cursor.lastrowid
+                conn.commit()
 
-                if existing:
-                    self._print_success(f"✓ Event already exists (idempotent, id={existing[0]})")
-                    return {
-                        'success': True,
-                        'event_id': existing[0],
-                        'session_id': session_id,
-                        'event_subtype': event_subtype,
-                        'idempotent': True,
-                        'message': 'Event already exists with same idempotency key'
-                    }
+                result = {
+                    'success': True,
+                    'event_id': event_id,
+                    'session_id': session_id,
+                    'event_subtype': event_subtype,
+                    'redacted': was_redacted
+                }
 
-            cursor = conn.execute("""
-                INSERT INTO orchestration_logs
-                (session_id, group_id, agent_type, content, log_type, event_subtype, event_payload, redacted, idempotency_key)
-                VALUES (?, ?, 'system', ?, 'event', ?, ?, ?, ?)
-            """, (session_id, group_id, f"Event: {event_subtype}", event_subtype, redacted_payload,
-                  1 if was_redacted else 0, idempotency_key))
-            event_id = cursor.lastrowid
-            conn.commit()
+                self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
+                return result
 
-            result = {
-                'success': True,
-                'event_id': event_id,
-                'session_id': session_id,
-                'event_subtype': event_subtype,
-                'redacted': was_redacted
-            }
+            except sqlite3.IntegrityError:
+                # Unique constraint violation - event already exists (idempotent case)
+                # This is the expected path when concurrent saves happen
+                conn.rollback()
+                if idempotency_key:
+                    existing = conn.execute("""
+                        SELECT id FROM orchestration_logs
+                        WHERE session_id = ? AND log_type = 'event'
+                        AND event_subtype = ? AND group_id = ? AND idempotency_key = ?
+                    """, (session_id, event_subtype, group_id, idempotency_key)).fetchone()
 
-            self._print_success(f"✓ Saved {event_subtype} event (id={event_id})")
-            return result
+                    if existing:
+                        self._print_success(f"✓ Event already exists (idempotent, id={existing[0]})")
+                        return {
+                            'success': True,
+                            'event_id': existing[0],
+                            'session_id': session_id,
+                            'event_subtype': event_subtype,
+                            'idempotent': True,
+                            'message': 'Event already exists with same idempotency key'
+                        }
+                # Re-raise if no idempotency key or couldn't find existing
+                raise
 
         except sqlite3.DatabaseError as e:
             if conn:
@@ -1277,8 +1353,8 @@ class BazingaDB:
         Raises:
             ValueError: If group_id is invalid
         """
-        # Fix D: Validate group_id (required for investigation, cannot be 'global')
-        error = validate_group_id(group_id)
+        # Phase 6: Investigation MUST be group-specific (rejects 'global')
+        error = validate_scope_group_only(group_id)
         if error:
             raise ValueError(error)
 
@@ -1392,8 +1468,12 @@ class BazingaDB:
         Note: Uses UPSERT (INSERT ... ON CONFLICT ... DO UPDATE) to handle
         repeated saves for the same (session_id, state_type, group_id).
         """
-        # Fix D: Validate group_id
-        error = validate_group_id(group_id)
+        # Phase 6: Conditional validation based on state_type
+        # Investigation state MUST be group-specific; other states can be session-level
+        if state_type == 'investigation':
+            error = validate_scope_group_only(group_id)
+        else:
+            error = validate_scope_global_or_group(group_id)
         if error:
             raise ValueError(error)
 
@@ -1431,8 +1511,8 @@ class BazingaDB:
         Raises:
             ValueError: If group_id is invalid
         """
-        # Fix D: Validate group_id
-        error = validate_group_id(group_id)
+        # Phase 6: Reads can be session or group level
+        error = validate_scope_global_or_group(group_id)
         if error:
             raise ValueError(error)
 
@@ -1470,6 +1550,11 @@ class BazingaDB:
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
+        # Phase 6: Validate task group ID (rejects reserved names)
+        error = validate_task_group_id(group_id)
+        if error:
+            return {"success": False, "error": error}
+
         conn = None
         try:
             # Defensive type validation for specializations
@@ -1594,6 +1679,11 @@ class BazingaDB:
         Returns:
             Dict with 'success' bool and 'task_group' data, or 'error' on failure.
         """
+        # Phase 6: Validate task group ID (rejects reserved names)
+        error = validate_task_group_id(group_id)
+        if error:
+            return {"success": False, "error": error}
+
         conn = None
         try:
             # Defensive type validation for specializations
@@ -2214,6 +2304,11 @@ class BazingaDB:
         NOTE: Versioning is not yet implemented. All packages have supersedes_id=NULL.
         Future enhancement: add superseded_by_id column and link previous versions.
         """
+        # Phase 6: Context packages can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         valid_types = ('research', 'failures', 'decisions', 'handoff', 'investigation')
         if package_type not in valid_types:
             raise ValueError(f"Invalid package_type: {package_type}. Must be one of {valid_types}")
@@ -2326,6 +2421,11 @@ class BazingaDB:
             limit: Maximum number of packages to return (default 3)
             include_consumed: If False (default), only return unconsumed packages
         """
+        # Phase 6: Reads can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         # Normalize agent_type for consistent matching
         agent_type = agent_type.strip().lower()
 
@@ -2414,6 +2514,11 @@ class BazingaDB:
 
     def update_context_references(self, group_id: str, session_id: str, package_ids: List[int]) -> None:
         """Update the context_references for a task group."""
+        # Phase 6: Validate task group ID (rejects reserved names)
+        error = validate_task_group_id(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -2475,8 +2580,10 @@ class BazingaDB:
         # Validate inputs
         if not session_id or not session_id.strip():
             raise ValueError("session_id cannot be empty")
-        if not group_id or not group_id.strip():
-            raise ValueError("group_id cannot be empty")
+        # Phase 6: Session-level reasoning allowed (PM uses 'global')
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
         if not agent_type or not agent_type.strip():
             raise ValueError("agent_type cannot be empty")
         if not reasoning_phase or not reasoning_phase.strip():
@@ -2593,6 +2700,12 @@ class BazingaDB:
         Returns:
             List of reasoning entries (json) or formatted markdown string (prompt-summary)
         """
+        # Phase 6: Validate group_id if provided
+        if group_id is not None:
+            error = validate_scope_global_or_group(group_id)
+            if error:
+                raise ValueError(error)
+
         conn = self._get_connection()
 
         query = """
@@ -2698,6 +2811,12 @@ class BazingaDB:
         Returns:
             Formatted timeline string
         """
+        # Phase 6: Validate group_id if provided
+        if group_id is not None:
+            error = validate_scope_global_or_group(group_id)
+            if error:
+                raise ValueError(error)
+
         conn = self._get_connection()
 
         query = """
@@ -2784,6 +2903,11 @@ class BazingaDB:
                 - missing: List[str] - Phases not yet documented
                 - documented: List[str] - Phases that have been documented
         """
+        # Phase 6: Reads can be session or group level
+        error = validate_scope_global_or_group(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
 
         # Get all reasoning phases for this agent/group
@@ -3120,6 +3244,11 @@ class BazingaDB:
         Returns:
             Dict with scope_id and success status
         """
+        # Phase 6: Consumption is per-group (not session-level)
+        error = validate_scope_group_only(group_id)
+        if error:
+            raise ValueError(error)
+
         import hashlib
         # Deterministic scope_id for idempotency (same inputs = same ID)
         composite = f"{session_id}:{group_id}:{agent_type}:{iteration}:{package_id}"
@@ -3171,6 +3300,12 @@ class BazingaDB:
         Returns:
             List of consumption records
         """
+        # Phase 6: Validate group_id if provided
+        if group_id is not None:
+            error = validate_scope_global_or_group(group_id)
+            if error:
+                raise ValueError(error)
+
         # Clamp limit to safe range (1-1000)
         limit = max(1, min(limit, 1000))
 
@@ -3362,6 +3497,11 @@ class BazingaDB:
         Returns:
             Dict with count of extracted strategies
         """
+        # Validate group_id - strategies must be group-specific
+        error = validate_scope_group_only(group_id)
+        if error:
+            raise ValueError(f"Invalid group_id: {error}")
+
         import hashlib
 
         conn = self._get_connection()
@@ -3409,6 +3549,123 @@ class BazingaDB:
         except Exception as e:
             conn.rollback()
             raise RuntimeError(f"Failed to extract strategies: {str(e)}")
+        finally:
+            conn.close()
+
+    # ==================== DIAGNOSTIC OPERATIONS ====================
+
+    def diagnose_group_ids(self, fix: bool = False) -> Dict[str, Any]:
+        """Diagnose and optionally fix legacy group_id issues.
+
+        See: research/domain-skill-migration-phase6-ultrathink.md
+
+        Scans for:
+        - Reserved names ('global', 'session', 'all', 'default') in task_groups
+        - Invalid formats in group_id columns
+        - Case variations of reserved names
+
+        Args:
+            fix: If True, attempt to fix issues (rename invalid task_groups)
+
+        Returns:
+            Dict with issues found and fixes applied
+        """
+        conn = self._get_connection()
+        issues = []
+        fixes_applied = []
+
+        try:
+            # Check task_groups for reserved names
+            reserved_check = conn.execute("""
+                SELECT id, session_id, status FROM task_groups
+                WHERE LOWER(id) IN ('global', 'session', 'all', 'default')
+            """).fetchall()
+
+            for row in reserved_check:
+                issue = {
+                    'table': 'task_groups',
+                    'id': row['id'],
+                    'session_id': row['session_id'],
+                    'issue': f"Reserved name '{row['id']}' used as task group ID"
+                }
+                issues.append(issue)
+
+                if fix:
+                    # Rename to safe ID (prefix with 'group_')
+                    new_id = f"group_{row['id']}"
+                    try:
+                        conn.execute("""
+                            UPDATE task_groups SET id = ?
+                            WHERE id = ? AND session_id = ?
+                        """, (new_id, row['id'], row['session_id']))
+                        fixes_applied.append({
+                            'table': 'task_groups',
+                            'old_id': row['id'],
+                            'new_id': new_id,
+                            'session_id': row['session_id']
+                        })
+                    except Exception as e:
+                        issues[-1]['fix_error'] = str(e)
+
+            # Check for invalid format in orchestration_logs.group_id
+            invalid_format = conn.execute("""
+                SELECT DISTINCT group_id, session_id FROM orchestration_logs
+                WHERE group_id IS NOT NULL
+                AND group_id != ''
+                AND group_id NOT GLOB '[a-zA-Z0-9_-]*'
+                LIMIT 100
+            """).fetchall()
+
+            for row in invalid_format:
+                issues.append({
+                    'table': 'orchestration_logs',
+                    'group_id': row['group_id'],
+                    'session_id': row['session_id'],
+                    'issue': f"Invalid group_id format: '{row['group_id']}'"
+                })
+
+            # Check for invalid format in session_states.group_id
+            invalid_states = conn.execute("""
+                SELECT DISTINCT group_id, session_id, state_type FROM session_states
+                WHERE group_id IS NOT NULL
+                AND group_id != ''
+                AND group_id NOT GLOB '[a-zA-Z0-9_-]*'
+                LIMIT 100
+            """).fetchall()
+
+            for row in invalid_states:
+                issues.append({
+                    'table': 'session_states',
+                    'group_id': row['group_id'],
+                    'session_id': row['session_id'],
+                    'state_type': row['state_type'],
+                    'issue': f"Invalid group_id format: '{row['group_id']}'"
+                })
+
+            if fix and fixes_applied:
+                conn.commit()
+
+            result = {
+                'success': True,
+                'issues_found': len(issues),
+                'fixes_applied': len(fixes_applied),
+                'issues': issues,
+                'fixes': fixes_applied
+            }
+
+            if issues:
+                self._print_error(f"Found {len(issues)} group_id issues")
+                if fixes_applied:
+                    self._print_success(f"Applied {len(fixes_applied)} fixes")
+            else:
+                self._print_success("No group_id issues found")
+
+            return result
+
+        except Exception as e:
+            if fix:
+                conn.rollback()
+            raise RuntimeError(f"Failed to diagnose group_ids: {str(e)}")
         finally:
             conn.close()
 
@@ -3546,6 +3803,7 @@ QUERY OPERATIONS:
 DATABASE MAINTENANCE:
   integrity-check                             Check database integrity
   recover-db                                  Attempt to recover corrupted database
+  diagnose-group-ids [--fix]                  Scan for invalid group_ids (--fix to auto-repair)
   detect-paths                                Show auto-detected paths (debugging)
 
 HELP:
@@ -3683,14 +3941,26 @@ def main():
             # Output verification data as JSON
             print(json.dumps(result, indent=2))
         elif cmd == 'save-state':
-            # save-state <session_id> <state_type> <json_data> [--group-id <id>]
-            state_data = json.loads(cmd_args[2])
+            # save-state <session_id> <state_type> <json_data|--state-file path> [--group-id <id>]
+            # Support --state-file for reading state from file (avoids shell escaping issues)
+            if '--state-file' in cmd_args:
+                idx = cmd_args.index('--state-file')
+                if idx + 1 < len(cmd_args):
+                    state_file = cmd_args[idx + 1]
+                    with open(state_file, 'r') as f:
+                        state_data = json.load(f)
+                else:
+                    print("Error: --state-file requires a path argument", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                state_data = json.loads(cmd_args[2])
             group_id = 'global'
             if '--group-id' in cmd_args:
                 idx = cmd_args.index('--group-id')
                 if idx + 1 < len(cmd_args):
                     group_id = cmd_args[idx + 1]
-            db.save_state(cmd_args[0], cmd_args[1], state_data, group_id=group_id)
+            result = db.save_state(cmd_args[0], cmd_args[1], state_data, group_id=group_id)
+            print(json.dumps(result, indent=2))
         elif cmd == 'get-state':
             # get-state <session_id> <state_type> [--group-id <id>]
             group_id = 'global'
@@ -4532,6 +4802,13 @@ def main():
             else:
                 print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
                 sys.exit(1)
+        elif cmd == 'diagnose-group-ids':
+            # diagnose-group-ids [--fix]
+            fix = '--fix' in cmd_args
+            result = db.diagnose_group_ids(fix=fix)
+            print(json.dumps(result, indent=2))
+            if result['issues_found'] > 0 and not fix:
+                sys.exit(1)  # Non-zero exit if issues found (for CI/CD)
         elif cmd == 'save-event':
             # save-event <session_id> <event_subtype> [<payload>|--payload-file <path>] [--idempotency-key <key>] [--group-id <id>]
             if len(cmd_args) < 2:

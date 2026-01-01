@@ -78,3 +78,34 @@ The original monolithic bazinga-db skill (v1.x, 887 lines) has been split into 4
 **All references remain in this directory:**
 - `references/schema.md` - Full database schema
 - `references/command_examples.md` - Detailed command examples
+
+## Technical Notes
+
+### Event Idempotency (v17+)
+
+Events support idempotency keys via `idx_logs_idempotency` unique index:
+- Index: `(session_id, event_subtype, group_id, idempotency_key)` WHERE `idempotency_key IS NOT NULL AND log_type = 'event'`
+- Pattern: INSERT-first, catch IntegrityError, return existing row
+- Recommended key format: `{session_id}|{group_id}|{event_type}|{iteration}`
+
+### Group ID Validation (v18+)
+
+Three explicit validators for group_id scope (See: research/domain-skill-migration-phase6-ultrathink.md):
+
+| Validator | Allows 'global' | Use For |
+|-----------|-----------------|---------|
+| `validate_scope_global_or_group` | ✅ Yes | Events, reasoning, state (session-level) |
+| `validate_scope_group_only` | ❌ No | Investigation state, consumption, strategies |
+| `validate_task_group_id` | ❌ No (+ reserved) | Task group creation (rejects 'session', 'all', 'default') |
+
+Reserved identifiers (cannot be used as task_group_id): `global`, `session`, `all`, `default`
+
+### Legacy Data Diagnostic
+
+```bash
+# Scan for invalid group_ids (CI/CD)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py diagnose-group-ids
+
+# Auto-fix issues
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py diagnose-group-ids --fix
+```
