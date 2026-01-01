@@ -180,11 +180,34 @@ Check for recent skill invocation evidence.
 ### save-event
 
 ```bash
+# Recommended: Use --payload-file to avoid exposing data in process table
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
-  "<session_id>" "<event_subtype>" '<json_payload>'
+  "<session_id>" "<event_subtype>" \
+  --payload-file /tmp/event_payload.json \
+  --idempotency-key "{session}|{group}|{type}|{iter}"
+
+# Alternative: Inline JSON (avoid for sensitive or large payloads)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "<session_id>" "<event_subtype>" '<json_payload>' \
+  [--idempotency-key "<key>"]
 ```
 
 Save a generic event with JSON payload.
+
+**Options:**
+- `--payload-file <path>`: Read payload from file (recommended for security)
+- `--idempotency-key <key>`: Prevent duplicate events with same key
+
+**⚠️ Security Best Practices:**
+1. **Use `--payload-file`** instead of inline JSON to avoid exposing data in `ps aux`
+2. **Always use `--idempotency-key`** for consistent deduplication
+3. **Large payloads:** Must use `--payload-file` to avoid shell quoting issues and argv limits
+
+**Idempotency Key Format:**
+```
+{session_id}|{group_id}|{event_type}|{iteration}
+```
+Example: `bazinga_abc123|AUTH|tl_issues|2`
 
 **Common event types:**
 - `scope_change` - User approved scope reduction
@@ -196,25 +219,31 @@ Save a generic event with JSON payload.
 - `pm_bazinga` - PM sends BAZINGA completion signal
 - `validator_verdict` - Validator ACCEPT/REJECT decision
 
-**Tech Lead Review Events:**
+**Tech Lead Review Events (Recommended Pattern):**
 ```bash
-# Save TL issues event
+# Write payload to temp file (avoid inline JSON for security)
+cat > /tmp/tl_issues.json << 'EOF'
+{"group_id": "AUTH", "iteration": 1, "issues": [...], "blocking_count": 3}
+EOF
+
+# Save with idempotency
 python3 .../bazinga_db.py --quiet save-event \
   "sess_123" "tl_issues" \
-  '{"group_id": "AUTH", "iteration": 1, "issues": [...], "blocking_count": 3}'
+  --payload-file /tmp/tl_issues.json \
+  --idempotency-key "sess_123|AUTH|tl_issues|1"
 
-# Save Developer responses
+# Developer responses
+cat > /tmp/dev_responses.json << 'EOF'
+{"group_id": "AUTH", "iteration": 1, "issue_responses": [...]}
+EOF
+
 python3 .../bazinga_db.py --quiet save-event \
   "sess_123" "tl_issue_responses" \
-  '{"group_id": "AUTH", "iteration": 1, "issue_responses": [...], "blocking_summary": {...}}'
-
-# Save TL verdicts on rejections
-python3 .../bazinga_db.py --quiet save-event \
-  "sess_123" "tl_verdicts" \
-  '{"group_id": "AUTH", "iteration": 2, "verdicts": [...], "summary": {...}}'
+  --payload-file /tmp/dev_responses.json \
+  --idempotency-key "sess_123|AUTH|tl_issue_responses|1"
 ```
 
-**Deduplication:** Events are deduplicated by `(session_id, group_id, iteration, event_type)`.
+**Deduplication:** Events are deduplicated by `(session_id, event_subtype, group_id, idempotency_key)`. If the same idempotency key is used, the event is skipped and the existing event_id is returned.
 
 ### get-events
 

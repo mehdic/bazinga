@@ -447,6 +447,87 @@ except Exception as e:
 
 ---
 
+## Additional Issues (User-Reported)
+
+### 🔴 CRITICAL Issue 4: save-event docs omit --payload-file and --idempotency-key
+
+**Severity:** P0 - Security + behavior mismatch
+
+**Location:** `.claude/skills/bazinga-db-agents/SKILL.md:142`
+
+**Problem:**
+The docs show inline JSON payloads and no idempotency guidance, while the CLI now supports:
+- `--payload-file` (to avoid process table leaks)
+- `--idempotency-key` (for deduplication)
+
+**Impact:**
+- Sensitive data exposed in process table (`ps aux`)
+- Inconsistent dedup semantics when agents don't use idempotency keys
+
+**Fix Required:**
+Update save-event section to recommend `--payload-file`, document `--idempotency-key` with example, warn against inline payloads for sensitive data.
+
+---
+
+### 🔴 CRITICAL Issue 5: investigator.md uses unsupported status/fields
+
+**Severity:** P0 - Runtime mismatch with workflow SKILL
+
+**Location:** `agents/investigator.md:1105`
+
+**Problem:**
+The "UPDATE TASK GROUP STATUS" block uses:
+- Status `root_cause_identified` - not a valid task_groups status
+- Fields like "Investigation Iterations/Result" - not listed in bazinga-db-workflow/SKILL.md valid flags
+
+**Fix Required:**
+Replace with atomic event path (`save-investigation-iteration`) and map to existing `update-task-group` flags.
+
+---
+
+### 🟡 MEDIUM Issue 4: Deduplication note inconsistent with implementation
+
+**Severity:** P2 - Documentation mismatch
+
+**Location:** `.claude/skills/bazinga-db-agents/SKILL.md:175`
+
+**Problem:**
+Docs say events are deduped by `(session_id, group_id, iteration, event_type)`.
+Code actually dedupes on `(session_id, event_subtype, idempotency_key)`.
+
+**Fix Required:**
+Align docs with code and document canonical idempotency_key format.
+
+---
+
+### 🟡 MEDIUM Issue 5: Event examples should show idempotent, file-based usage
+
+**Severity:** P2 - Security best practice
+
+**Location:** `.claude/commands/bazinga.orchestrate.md:2167`
+
+**Problem:**
+Request snippets show inline JSON to save events, missing security best practices.
+
+**Fix Required:**
+Add guidance to generate `--idempotency-key` and prefer `--payload-file`.
+
+---
+
+### 🟢 MINOR Issue 4: Large payload guidance missing
+
+**Severity:** P3 - Usability
+
+**Location:** `.claude/skills/bazinga-db-agents/SKILL.md:120`
+
+**Problem:**
+No guidance on handling large payloads - shell quoting issues and argv length limits.
+
+**Fix Required:**
+Add note that large payloads should use `--payload-file` to avoid shell issues.
+
+---
+
 ## Implementation Priority
 
 | Priority | Issue | Fix |
@@ -454,9 +535,14 @@ except Exception as e:
 | P0 | state_type CHECK constraint | Schema v18 with 'investigation' |
 | P0 | No UNIQUE for upsert | Add UNIQUE(session_id, state_type, group_id) |
 | P0 | Group isolation | Add group_id column with NOT NULL DEFAULT 'global' |
+| P0 | save-event docs missing flags | Update SKILL.md with --payload-file, --idempotency-key |
+| P0 | investigator.md unsupported status | Replace with atomic event path |
 | P1 | Event idempotency collisions | Update unique index to include group_id |
 | P2 | JSON validation | Add json.loads() validation for file inputs |
+| P2 | Dedup note inconsistent | Fix docs to match implementation |
+| P2 | Event examples security | Add idempotent file-based examples |
 | P3 | Temp file cleanup | Add cleanup instructions to investigation_loop.md |
+| P3 | Large payload guidance | Add --payload-file recommendation |
 
 ---
 

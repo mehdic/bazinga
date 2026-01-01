@@ -29,7 +29,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1461,11 +1461,113 @@ def init_database(db_path: str) -> None:
             current_version = 17
             print("✓ Migration to v17 complete (event idempotency support)")
 
+        # v17 → v18: Investigation state isolation + group-aware dedup
+        if current_version == 17:
+            print("\n--- Migrating v17 → v18 (investigation state isolation) ---")
+
+            # Check if state_snapshots table exists
+            table_exists = cursor.execute("""
+                SELECT name FROM sqlite_master WHERE type='table' AND name='state_snapshots'
+            """).fetchone()
+
+            if not table_exists:
+                # Table will be created later with new schema - skip migration
+                print("   ⊘ state_snapshots table will be created with new schema")
+            else:
+                try:
+                    # Begin transaction for table rebuild
+                    conn.execute("BEGIN IMMEDIATE")
+
+                    # Backup existing data
+                    cursor.execute("SELECT id, session_id, timestamp, state_type, state_data FROM state_snapshots")
+                    state_data = cursor.fetchall()
+                    print(f"   - Backed up {len(state_data)} state snapshot entries")
+
+                    # Drop old table and indexes
+                    cursor.execute("DROP INDEX IF EXISTS idx_state_session_type")
+                    cursor.execute("DROP TABLE state_snapshots")
+
+                    # Create new table with group_id and expanded CHECK constraint
+                    cursor.execute("""
+                        CREATE TABLE state_snapshots (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT NOT NULL,
+                            group_id TEXT NOT NULL DEFAULT 'global',
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status', 'investigation')),
+                            state_data TEXT NOT NULL,
+                            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                        )
+                    """)
+                    print("   ✓ Created state_snapshots with group_id and 'investigation' state_type")
+
+                    # Create UNIQUE index for upsert support
+                    cursor.execute("""
+                        CREATE UNIQUE INDEX idx_state_unique
+                        ON state_snapshots(session_id, state_type, group_id)
+                    """)
+                    print("   ✓ Created idx_state_unique for upsert support")
+
+                    # Create performance index
+                    cursor.execute("""
+                        CREATE INDEX idx_state_session_type_group
+                        ON state_snapshots(session_id, state_type, group_id, timestamp DESC)
+                    """)
+                    print("   ✓ Created idx_state_session_type_group performance index")
+
+                    # Restore data with group_id='global' backfill
+                    if state_data:
+                        for row in state_data:
+                            cursor.execute("""
+                                INSERT INTO state_snapshots (id, session_id, group_id, timestamp, state_type, state_data)
+                                VALUES (?, ?, 'global', ?, ?, ?)
+                            """, (row[0], row[1], row[2], row[3], row[4]))
+                        print(f"   ✓ Restored {len(state_data)} entries with group_id='global'")
+
+                    # Update event idempotency index to include group_id
+                    cursor.execute("DROP INDEX IF EXISTS idx_logs_idempotency")
+                    cursor.execute("""
+                        CREATE UNIQUE INDEX idx_logs_idempotency
+                        ON orchestration_logs(session_id, event_subtype, group_id, idempotency_key)
+                        WHERE idempotency_key IS NOT NULL AND log_type = 'event'
+                    """)
+                    print("   ✓ Recreated idx_logs_idempotency with group_id")
+
+                    # Verify integrity before commit
+                    integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v17→v18: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Migration transaction committed")
+
+                    # WAL checkpoint for clean state
+                    try:
+                        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                    except Exception:
+                        pass  # WAL checkpoint is optional
+
+                    # Refresh query planner statistics
+                    cursor.execute("ANALYZE state_snapshots;")
+                    cursor.execute("ANALYZE orchestration_logs;")
+                    print("   ✓ ANALYZE completed")
+
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"   ✗ v17→v18 migration failed, rolled back: {e}")
+                    raise
+
+            current_version = 18
+            print("✓ Migration to v18 complete (investigation state isolation)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Context engineering system tables"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Investigation state isolation + group-aware dedup"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -1545,27 +1647,37 @@ def init_database(db_path: str) -> None:
         ON orchestration_logs(session_id, log_type, event_subtype)
         WHERE log_type = 'event'
     """)
+    # v18: Updated to include group_id for cross-group isolation
     cursor.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_idempotency
-        ON orchestration_logs(session_id, event_subtype, idempotency_key)
+        ON orchestration_logs(session_id, event_subtype, group_id, idempotency_key)
         WHERE idempotency_key IS NOT NULL AND log_type = 'event'
     """)
     print("✓ Created orchestration_logs table with indexes")
 
     # State snapshots table (replaces JSON state files)
+    # Extended in v18 to support group_id for investigation state isolation
+    # Extended in v18 to support 'investigation' state_type
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS state_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
+            group_id TEXT NOT NULL DEFAULT 'global',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status')),
+            state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status', 'investigation')),
             state_data TEXT NOT NULL,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
         )
     """)
+    # UNIQUE index for upsert support (allows ON CONFLICT)
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_state_session_type
-        ON state_snapshots(session_id, state_type, timestamp DESC)
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_state_unique
+        ON state_snapshots(session_id, state_type, group_id)
+    """)
+    # Performance index for queries
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_state_session_type_group
+        ON state_snapshots(session_id, state_type, group_id, timestamp DESC)
     """)
     print("✓ Created state_snapshots table with indexes")
 

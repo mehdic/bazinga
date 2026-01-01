@@ -743,19 +743,54 @@ Then invoke:
 Skill(command: "bazinga-db-agents")
 ```
 
-**UPDATE TASK GROUP STATUS:**
-```
-bazinga-db-workflow, please update task group:
+**SAVE INVESTIGATION STATE ATOMICALLY:**
 
-Group ID: [group_id]
-Status: root_cause_identified
-Investigation Iterations: [N]
-Investigation Result: "root_cause_found"
+Write state and event payloads to temp files:
+```bash
+# State file for session resumption
+cat > /tmp/inv_state.json << 'EOF'
+{
+  "session_id": "[session_id]",
+  "group_id": "[group_id]",
+  "current_iteration": [N],
+  "status": "root_cause_found",
+  "root_cause": "[description]",
+  "confidence": "[%]",
+  "solution": "[recommended fix]"
+}
+EOF
+
+# Event file for audit trail
+cat > /tmp/inv_event.json << 'EOF'
+{
+  "group_id": "[group_id]",
+  "iteration": [N],
+  "status": "root_cause_found",
+  "summary": "Root cause identified with [confidence]% confidence"
+}
+EOF
+```
+
+Then invoke the atomic save:
+```
+bazinga-db-agents, please save investigation iteration atomically:
+
+Session: [session_id]
+Group: [group_id]
+Iteration: [N]
+Status: root_cause_found
+State file: /tmp/inv_state.json
+Event file: /tmp/inv_event.json
 ```
 
 Then invoke:
 ```
-Skill(command: "bazinga-db-workflow")
+Skill(command: "bazinga-db-agents")
+```
+
+Clean up temp files after successful save:
+```bash
+rm -f /tmp/inv_state.json /tmp/inv_event.json
 ```
 
 ### Phase 4: Report to Tech Lead

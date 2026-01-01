@@ -1255,12 +1255,17 @@ class BazingaDB:
             # Start transaction with IMMEDIATE mode to prevent deadlocks
             conn.execute("BEGIN IMMEDIATE")
 
-            # 1. Save/update state snapshot
+            # 1. Save/update state snapshot using UPSERT (not INSERT OR REPLACE)
+            # Uses ON CONFLICT for proper update semantics without delete-insert cascade
             conn.execute("""
-                INSERT OR REPLACE INTO state_snapshots
-                (session_id, state_type, state_data, timestamp)
-                VALUES (?, 'investigation', ?, datetime('now'))
-            """, (session_id, redacted_state))
+                INSERT INTO state_snapshots
+                (session_id, group_id, state_type, state_data, timestamp)
+                VALUES (?, ?, 'investigation', ?, datetime('now'))
+                ON CONFLICT(session_id, state_type, group_id)
+                DO UPDATE SET
+                    state_data = excluded.state_data,
+                    timestamp = excluded.timestamp
+            """, (session_id, group_id, redacted_state))
 
             # 2. Check idempotency for event
             existing = conn.execute("""
@@ -4440,6 +4445,11 @@ def main():
                     try:
                         with open(payload_path, 'r') as f:
                             payload = f.read().strip()
+                        # Validate JSON before accepting
+                        json.loads(payload)
+                    except json.JSONDecodeError as e:
+                        print(f"Error: Invalid JSON in payload file '{payload_path}': {e}", file=sys.stderr)
+                        sys.exit(1)
                     except Exception as e:
                         print(f"Error reading payload file: {e}", file=sys.stderr)
                         sys.exit(1)
@@ -4510,10 +4520,15 @@ def main():
                 print("Error: Both --state-file and --event-file are required", file=sys.stderr)
                 sys.exit(1)
 
-            # Read files
+            # Read files with JSON validation
             try:
                 with open(state_file, 'r') as f:
                     state_data = f.read().strip()
+                # Validate JSON before accepting
+                json.loads(state_data)
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in state file '{state_file}': {e}", file=sys.stderr)
+                sys.exit(1)
             except Exception as e:
                 print(f"Error reading state file: {e}", file=sys.stderr)
                 sys.exit(1)
@@ -4521,6 +4536,11 @@ def main():
             try:
                 with open(event_file, 'r') as f:
                     event_payload = f.read().strip()
+                # Validate JSON before accepting
+                json.loads(event_payload)
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in event file '{event_file}': {e}", file=sys.stderr)
+                sys.exit(1)
             except Exception as e:
                 print(f"Error reading event file: {e}", file=sys.stderr)
                 sys.exit(1)

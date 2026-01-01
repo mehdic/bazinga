@@ -2192,33 +2192,53 @@ The skill returns JSON with:
 
 #### Step 0: Save Issue Events (CRITICAL for Validator)
 
+**⚠️ Security Best Practice:** Use `--payload-file` and `--idempotency-key` for all events.
+
 **After receiving Tech Lead response:**
+```bash
+# Write payload to temp file (avoid exposing in process table)
+cat > /tmp/tl_issues.json << 'EOF'
+{"group_id": "{group_id}", "iteration": {N}, "issues": [...], "blocking_count": {N}}
+EOF
+```
+
 ```
 Skill(command: "bazinga-db-agents")
 
 Request: save-event "{session_id}" "tl_issues" \
-  '{"group_id": "{group_id}", "iteration": {N}, "issues": [...], "blocking_count": {N}}'
+  --payload-file /tmp/tl_issues.json \
+  --idempotency-key "{session_id}|{group_id}|tl_issues|{N}"
 ```
 
 **After receiving Developer/SSE response to CHANGES_REQUESTED:**
-```
+```bash
 # from_agent = "developer" or "senior_software_engineer"
+cat > /tmp/dev_responses.json << 'EOF'
+{"group_id": "{group_id}", "iteration": {N}, "from_agent": "{developer|senior_software_engineer}", "issue_responses": [...], "blocking_summary": {...}}
+EOF
+```
+
+```
 Skill(command: "bazinga-db-agents")
 
 Request: save-event "{session_id}" "tl_issue_responses" \
-  '{"group_id": "{group_id}", "iteration": {N}, "from_agent": "{developer|senior_software_engineer}", "issue_responses": [...], "blocking_summary": {...}}'
+  --payload-file /tmp/dev_responses.json \
+  --idempotency-key "{session_id}|{group_id}|tl_issue_responses|{N}"
 ```
 
 **After TL re-review (iteration > 1), save TL verdicts:**
 
 Transform TL's `iteration_tracking` into tl_verdicts event:
 ```python
-# Get IDs from TL handoff, lookup details from tl_issues, save via Skill(command: "bazinga-db-agents")
+# Get IDs from TL handoff, lookup details from tl_issues
 it = tl_handoff.get("iteration_tracking", {})
 issues = {i["id"]: i for e in tl_issues_events for i in e.get("issues", [])}
 verdicts = [{"issue_id": id, "verdict": "ACCEPTED", **{k: issues.get(id, {}).get(k, "") for k in ["location", "title"]}} for id in it.get("rejections_accepted", [])]
 verdicts += [{"issue_id": id, "verdict": "OVERRULED", **{k: issues.get(id, {}).get(k, "") for k in ["location", "title"]}} for id in it.get("rejections_overruled", [])]
-# Save: Skill(command: "bazinga-db-agents") → save-event {session_id} tl_verdicts {payload}
+# Write to temp file, then save via:
+# Skill(command: "bazinga-db-agents") → save-event {session_id} tl_verdicts \
+#   --payload-file /tmp/tl_verdicts.json \
+#   --idempotency-key "{session_id}|{group_id}|tl_verdicts|{N}"
 ```
 
 #### Step 0.5: Re-Rejection Prevention (MANDATORY for Iteration > 1)
