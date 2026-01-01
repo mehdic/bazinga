@@ -180,16 +180,17 @@ Check for recent skill invocation evidence.
 ### save-event
 
 ```bash
-# Recommended: Use --payload-file to avoid exposing data in process table
+# Recommended: Use --payload-file and --group-id for full isolation
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "<session_id>" "<event_subtype>" \
   --payload-file /tmp/event_payload.json \
-  --idempotency-key "{session}|{group}|{type}|{iter}"
+  --idempotency-key "{session}|{group}|{type}|{iter}" \
+  --group-id "<group_id>"
 
 # Alternative: Inline JSON (avoid for sensitive or large payloads)
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
   "<session_id>" "<event_subtype>" '<json_payload>' \
-  [--idempotency-key "<key>"]
+  [--idempotency-key "<key>"] [--group-id "<id>"]
 ```
 
 Save a generic event with JSON payload.
@@ -197,11 +198,13 @@ Save a generic event with JSON payload.
 **Options:**
 - `--payload-file <path>`: Read payload from file (recommended for security)
 - `--idempotency-key <key>`: Prevent duplicate events with same key
+- `--group-id <id>`: Group isolation key (default: `global`). Used in idempotency check.
 
 **⚠️ Security Best Practices:**
 1. **Use `--payload-file`** instead of inline JSON to avoid exposing data in `ps aux`
 2. **Always use `--idempotency-key`** for consistent deduplication
-3. **Large payloads:** Must use `--payload-file` to avoid shell quoting issues and argv limits
+3. **Use `--group-id`** for parallel mode to isolate events per task group
+4. **Large payloads:** Must use `--payload-file` to avoid shell quoting issues and argv limits
 
 **Idempotency Key Format:**
 ```
@@ -226,11 +229,12 @@ cat > /tmp/tl_issues.json << 'EOF'
 {"group_id": "AUTH", "iteration": 1, "issues": [...], "blocking_count": 3}
 EOF
 
-# Save with idempotency
+# Save with idempotency and group isolation
 python3 .../bazinga_db.py --quiet save-event \
   "sess_123" "tl_issues" \
   --payload-file /tmp/tl_issues.json \
-  --idempotency-key "sess_123|AUTH|tl_issues|1"
+  --idempotency-key "sess_123|AUTH|tl_issues|1" \
+  --group-id "AUTH"
 
 # Developer responses
 cat > /tmp/dev_responses.json << 'EOF'
@@ -240,7 +244,8 @@ EOF
 python3 .../bazinga_db.py --quiet save-event \
   "sess_123" "tl_issue_responses" \
   --payload-file /tmp/dev_responses.json \
-  --idempotency-key "sess_123|AUTH|tl_issue_responses|1"
+  --idempotency-key "sess_123|AUTH|tl_issue_responses|1" \
+  --group-id "AUTH"
 ```
 
 **Deduplication:** Events are deduplicated by `(session_id, event_subtype, group_id, idempotency_key)`. If the same idempotency key is used, the event is skipped and the existing event_id is returned.

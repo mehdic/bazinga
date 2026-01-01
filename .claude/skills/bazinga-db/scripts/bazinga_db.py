@@ -1085,6 +1085,7 @@ class BazingaDB:
 
     def save_event(self, session_id: str, event_subtype: str, payload: str,
                    idempotency_key: Optional[str] = None,
+                   group_id: str = 'global',
                    _retry_count: int = 0) -> Dict[str, Any]:
         """Save an event to orchestration_logs with log_type='event'.
 
@@ -1098,6 +1099,8 @@ class BazingaDB:
             payload: JSON string payload
             idempotency_key: If provided, prevents duplicate events with same key.
                             Recommended format: {session_id}|{group_id}|{event_type}|{iteration}
+            group_id: Group isolation key (default 'global'). Used in idempotency check
+                      to ensure events are unique per group.
             _retry_count: Internal retry counter
 
         Returns:
@@ -1122,13 +1125,13 @@ class BazingaDB:
         try:
             conn = self._get_connection()
 
-            # Check idempotency if key provided
+            # Check idempotency if key provided (includes group_id for proper isolation)
             if idempotency_key:
                 existing = conn.execute("""
                     SELECT id FROM orchestration_logs
                     WHERE session_id = ? AND log_type = 'event'
-                    AND event_subtype = ? AND idempotency_key = ?
-                """, (session_id, event_subtype, idempotency_key)).fetchone()
+                    AND event_subtype = ? AND group_id = ? AND idempotency_key = ?
+                """, (session_id, event_subtype, group_id, idempotency_key)).fetchone()
 
                 if existing:
                     self._print_success(f"✓ Event already exists (idempotent, id={existing[0]})")
@@ -1143,9 +1146,9 @@ class BazingaDB:
 
             cursor = conn.execute("""
                 INSERT INTO orchestration_logs
-                (session_id, agent_type, content, log_type, event_subtype, event_payload, redacted, idempotency_key)
-                VALUES (?, 'system', ?, 'event', ?, ?, ?, ?)
-            """, (session_id, f"Event: {event_subtype}", event_subtype, redacted_payload,
+                (session_id, group_id, agent_type, content, log_type, event_subtype, event_payload, redacted, idempotency_key)
+                VALUES (?, ?, 'system', ?, 'event', ?, ?, ?, ?)
+            """, (session_id, group_id, f"Event: {event_subtype}", event_subtype, redacted_payload,
                   1 if was_redacted else 0, idempotency_key))
             event_id = cursor.lastrowid
             conn.commit()
@@ -1171,6 +1174,7 @@ class BazingaDB:
                 if self._recover_from_corruption():
                     return self.save_event(session_id, event_subtype, payload,
                                           idempotency_key=idempotency_key,
+                                          group_id=group_id,
                                           _retry_count=_retry_count + 1)
             self._print_error(f"Failed to save {event_subtype} event: {str(e)}")
             return {"success": False, "error": f"Database error: {str(e)}"}
@@ -1322,25 +1326,51 @@ class BazingaDB:
 
     # ==================== STATE OPERATIONS ====================
 
-    def save_state(self, session_id: str, state_type: str, state_data: Dict) -> None:
-        """Save state snapshot."""
+    def save_state(self, session_id: str, state_type: str, state_data: Dict,
+                   group_id: str = 'global') -> None:
+        """Save state snapshot with group isolation (UPSERT).
+
+        Args:
+            session_id: The session ID
+            state_type: Type of state ('pm', 'orchestrator', 'group_status', 'investigation')
+            state_data: Dict to be JSON-encoded and stored
+            group_id: Group isolation key (default 'global' for session-level state,
+                      use task group ID for group-specific state like 'investigation')
+
+        Note: Uses UPSERT (INSERT ... ON CONFLICT ... DO UPDATE) to handle
+        repeated saves for the same (session_id, state_type, group_id).
+        """
         conn = self._get_connection()
         conn.execute("""
-            INSERT INTO state_snapshots (session_id, state_type, state_data)
-            VALUES (?, ?, ?)
-        """, (session_id, state_type, json.dumps(state_data)))
+            INSERT INTO state_snapshots (session_id, group_id, state_type, state_data, timestamp)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(session_id, state_type, group_id)
+            DO UPDATE SET
+                state_data = excluded.state_data,
+                timestamp = excluded.timestamp
+        """, (session_id, group_id, state_type, json.dumps(state_data)))
         conn.commit()
         conn.close()
-        self._print_success(f"✓ Saved {state_type} state")
+        self._print_success(f"✓ Saved {state_type} state (group={group_id})")
 
-    def get_latest_state(self, session_id: str, state_type: str) -> Optional[Dict]:
-        """Get latest state snapshot."""
+    def get_latest_state(self, session_id: str, state_type: str,
+                         group_id: str = 'global') -> Optional[Dict]:
+        """Get latest state snapshot for specific group.
+
+        Args:
+            session_id: The session ID
+            state_type: Type of state ('pm', 'orchestrator', 'group_status', 'investigation')
+            group_id: Group isolation key (default 'global' for session-level state)
+
+        Returns:
+            Dict of state data, or None if not found
+        """
         conn = self._get_connection()
         row = conn.execute("""
             SELECT state_data FROM state_snapshots
-            WHERE session_id = ? AND state_type = ?
+            WHERE session_id = ? AND state_type = ? AND group_id = ?
             ORDER BY timestamp DESC LIMIT 1
-        """, (session_id, state_type)).fetchone()
+        """, (session_id, state_type, group_id)).fetchone()
         conn.close()
         return json.loads(row['state_data']) if row else None
 
@@ -3582,10 +3612,22 @@ def main():
             # Output verification data as JSON
             print(json.dumps(result, indent=2))
         elif cmd == 'save-state':
+            # save-state <session_id> <state_type> <json_data> [--group-id <id>]
             state_data = json.loads(cmd_args[2])
-            db.save_state(cmd_args[0], cmd_args[1], state_data)
+            group_id = 'global'
+            if '--group-id' in cmd_args:
+                idx = cmd_args.index('--group-id')
+                if idx + 1 < len(cmd_args):
+                    group_id = cmd_args[idx + 1]
+            db.save_state(cmd_args[0], cmd_args[1], state_data, group_id=group_id)
         elif cmd == 'get-state':
-            result = db.get_latest_state(cmd_args[0], cmd_args[1])
+            # get-state <session_id> <state_type> [--group-id <id>]
+            group_id = 'global'
+            if '--group-id' in cmd_args:
+                idx = cmd_args.index('--group-id')
+                if idx + 1 < len(cmd_args):
+                    group_id = cmd_args[idx + 1]
+            result = db.get_latest_state(cmd_args[0], cmd_args[1], group_id=group_id)
             print(json.dumps(result, indent=2))
         elif cmd == 'stream-logs':
             limit = int(cmd_args[1]) if len(cmd_args) > 1 else 50
@@ -4420,19 +4462,21 @@ def main():
                 print(json.dumps({"success": False, "error": "Recovery failed"}, indent=2))
                 sys.exit(1)
         elif cmd == 'save-event':
-            # save-event <session_id> <event_subtype> [<payload>|--payload-file <path>] [--idempotency-key <key>]
+            # save-event <session_id> <event_subtype> [<payload>|--payload-file <path>] [--idempotency-key <key>] [--group-id <id>]
             if len(cmd_args) < 2:
                 print("Error: save-event requires at least 2 args: <session_id> <event_subtype> [payload|--payload-file <path>]", file=sys.stderr)
                 print("  event_subtype: pm_bazinga, scope_change, validator_verdict, tl_issues, etc.", file=sys.stderr)
                 print("  payload: JSON string (or use --payload-file)", file=sys.stderr)
                 print("  --payload-file: Read payload from file (avoids exposing in ps)", file=sys.stderr)
                 print("  --idempotency-key: Prevent duplicate events with same key", file=sys.stderr)
+                print("  --group-id: Group isolation key (default 'global')", file=sys.stderr)
                 sys.exit(1)
 
             session_id = cmd_args[0]
             event_subtype = cmd_args[1]
             payload = None
             idempotency_key = None
+            group_id = 'global'
 
             # Parse remaining args
             i = 2
@@ -4460,6 +4504,12 @@ def main():
                         sys.exit(1)
                     idempotency_key = cmd_args[i + 1]
                     i += 2
+                elif cmd_args[i] == '--group-id':
+                    if i + 1 >= len(cmd_args):
+                        print("Error: --group-id requires a value", file=sys.stderr)
+                        sys.exit(1)
+                    group_id = cmd_args[i + 1]
+                    i += 2
                 elif cmd_args[i].startswith('--'):
                     print(f"Error: Unknown flag '{cmd_args[i]}'", file=sys.stderr)
                     sys.exit(1)
@@ -4474,7 +4524,7 @@ def main():
                 print("Error: No payload provided (use positional arg or --payload-file)", file=sys.stderr)
                 sys.exit(1)
 
-            result = db.save_event(session_id, event_subtype, payload, idempotency_key=idempotency_key)
+            result = db.save_event(session_id, event_subtype, payload, idempotency_key=idempotency_key, group_id=group_id)
             print(json.dumps(result, indent=2))
         elif cmd == 'save-investigation-iteration':
             # save-investigation-iteration <session_id> <group_id> <iteration> <status> --state-file <path> --event-file <path>

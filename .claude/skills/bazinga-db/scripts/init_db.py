@@ -1478,10 +1478,26 @@ def init_database(db_path: str) -> None:
                     # Begin transaction for table rebuild
                     conn.execute("BEGIN IMMEDIATE")
 
-                    # Backup existing data
-                    cursor.execute("SELECT id, session_id, timestamp, state_type, state_data FROM state_snapshots")
+                    # Backup existing data with SQL window deduplication
+                    # Keep only the latest row per (session_id, state_type) to avoid UNIQUE violations
+                    cursor.execute("""
+                        SELECT id, session_id, timestamp, state_type, state_data
+                        FROM (
+                            SELECT *, ROW_NUMBER() OVER (
+                                PARTITION BY session_id, state_type
+                                ORDER BY timestamp DESC
+                            ) as rn
+                            FROM state_snapshots
+                        ) WHERE rn = 1
+                    """)
                     state_data = cursor.fetchall()
-                    print(f"   - Backed up {len(state_data)} state snapshot entries")
+                    # Also get total count to show dedup info
+                    cursor.execute("SELECT COUNT(*) FROM state_snapshots")
+                    total_count = cursor.fetchone()[0]
+                    if total_count != len(state_data):
+                        print(f"   - Backed up {len(state_data)} unique state entries (deduplicated from {total_count})")
+                    else:
+                        print(f"   - Backed up {len(state_data)} state snapshot entries")
 
                     # Drop old table and indexes
                     cursor.execute("DROP INDEX IF EXISTS idx_state_session_type")

@@ -82,24 +82,38 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-session-s
 
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-state \
-  "<session_id>" "<state_type>" '<json_state>'
+  "<session_id>" "<state_type>" '<json_state>' [--group-id <id>]
 ```
 
-Saves orchestrator or PM state snapshot for recovery.
+Saves state snapshot with UPSERT semantics (insert or update).
 
 **Parameters:**
 - `session_id`: Session identifier
-- `state_type`: `orchestrator` or `pm`
+- `state_type`: `orchestrator`, `pm`, `group_status`, or `investigation`
 - `json_state`: JSON object with state data
+- `--group-id`: Optional group isolation key (default: `global`)
+  - Use `global` for session-level state (orchestrator, pm)
+  - Use task group ID for group-specific state (investigation)
+
+**Example with group_id:**
+```bash
+python3 .../bazinga_db.py --quiet save-state \
+  "bazinga_abc123" "investigation" '{"status": "in_progress"}' --group-id "CALC"
+```
+
+**Note:** Uses UPSERT - safe to call multiple times for same (session_id, state_type, group_id).
 
 ### get-state
 
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state \
-  "<session_id>" "<state_type>"
+  "<session_id>" "<state_type>" [--group-id <id>]
 ```
 
-**Returns:** Latest state snapshot for the specified type.
+**Parameters:**
+- `--group-id`: Optional group isolation key (default: `global`)
+
+**Returns:** Latest state snapshot for the specified type and group.
 
 ### dashboard-snapshot
 
