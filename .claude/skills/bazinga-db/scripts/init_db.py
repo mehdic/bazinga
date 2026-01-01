@@ -1549,6 +1549,18 @@ def init_database(db_path: str) -> None:
                     """)
                     print("   ✓ Recreated idx_logs_idempotency with group_id")
 
+                    # Fix F: Backfill NULL group_id to 'global' for legacy events
+                    # See: research/domain-skill-migration-phase4-ultrathink.md
+                    # This ensures queries with group_id='global' predicate find old events
+                    result = cursor.execute("""
+                        UPDATE orchestration_logs
+                        SET group_id = 'global'
+                        WHERE log_type = 'event' AND (group_id IS NULL OR group_id = '')
+                    """)
+                    backfill_count = result.rowcount
+                    if backfill_count > 0:
+                        print(f"   ✓ Backfilled {backfill_count} events with group_id='global'")
+
                     # Verify integrity before commit
                     integrity = cursor.execute("PRAGMA integrity_check;").fetchone()[0]
                     if integrity != "ok":

@@ -186,25 +186,32 @@ CREATE TABLE state_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status')),
+    state_type TEXT CHECK(state_type IN ('pm', 'orchestrator', 'group_status', 'investigation')),
+    group_id TEXT DEFAULT 'global',  -- Isolation key for parallel mode (v18)
     state_data TEXT NOT NULL,  -- JSON format
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+    UNIQUE(session_id, state_type, group_id)  -- UPSERT support (v18)
 )
 
 -- Indexes
 CREATE INDEX idx_state_session_type ON state_snapshots(session_id, state_type, timestamp DESC);
+CREATE INDEX idx_state_group ON state_snapshots(session_id, state_type, group_id);
 ```
 
 **Columns:**
 - `id`: Auto-increment primary key
 - `session_id`: Foreign key to sessions table
 - `timestamp`: When the state was saved
-- `state_type`: Type of state (`pm`, `orchestrator`, `group_status`)
+- `state_type`: Type of state (`pm`, `orchestrator`, `group_status`, `investigation`)
+- `group_id`: Group isolation key for parallel mode (default: `'global'`). Session-level states (pm, orchestrator) use 'global'. Investigation states use the task group ID.
 - `state_data`: Complete state as JSON string
+
+**UPSERT Behavior (v18):**
+The `UNIQUE(session_id, state_type, group_id)` constraint enables UPSERT. Saving state with the same session/type/group replaces the previous state rather than creating duplicates.
 
 **Usage Example:**
 ```python
-# Save PM state
+# Save PM state (session-level, uses default group_id='global')
 pm_state = {
     'mode': 'parallel',
     'iteration': 5,
@@ -212,8 +219,29 @@ pm_state = {
 }
 db.save_state('bazinga_123', 'pm', pm_state)
 
-# Retrieve latest state
+# Retrieve latest PM state
 current_state = db.get_latest_state('bazinga_123', 'pm')
+
+# Save investigation state (group-specific)
+inv_state = {
+    'iteration': 3,
+    'status': 'root_cause_found',
+    'hypotheses': [...]
+}
+db.save_state('bazinga_123', 'investigation', inv_state, group_id='AUTH')
+
+# Retrieve investigation state for specific group
+inv_state = db.get_latest_state('bazinga_123', 'investigation', group_id='AUTH')
+```
+
+**CLI Usage:**
+```bash
+# Save state with group_id
+python3 .../bazinga_db.py --quiet save-state "sess_123" "investigation" \
+  --state-file /tmp/state.json --group-id "AUTH"
+
+# Get state with group_id
+python3 .../bazinga_db.py --quiet get-state "sess_123" "investigation" --group-id "AUTH"
 ```
 
 ---

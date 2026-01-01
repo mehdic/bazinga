@@ -193,21 +193,30 @@ Task(
 The atomic command ensures state and event are saved together in one transaction,
 preventing partial saves that could corrupt investigation state.
 
-1. Write state to temp file (use unique names for parallel safety):
+1. Create secure temp files with unique names and restricted permissions:
 ```bash
-cat > /tmp/inv_state_${session_id}_${group_id}.json << 'EOF'
+# Create unique temp files with secure permissions (0600)
+# See: research/domain-skill-migration-phase4-ultrathink.md (Fix H)
+INV_STATE_FILE=$(mktemp /tmp/inv_state_XXXXXX.json)
+INV_EVENT_FILE=$(mktemp /tmp/inv_event_XXXXXX.json)
+chmod 600 "$INV_STATE_FILE" "$INV_EVENT_FILE"
+```
+
+2. Write state to temp file:
+```bash
+cat > "$INV_STATE_FILE" << 'EOF'
 {"session_id": "{session_id}", "group_id": "{group_id}", "current_iteration": {N}, "status": "{status}", ...}
 EOF
 ```
 
-2. Write event payload to temp file:
+3. Write event payload to temp file:
 ```bash
-cat > /tmp/inv_event_${session_id}_${group_id}.json << 'EOF'
+cat > "$INV_EVENT_FILE" << 'EOF'
 {"group_id": "{group_id}", "iteration": {N}, "status": "{status}", "summary": "..."}
 EOF
 ```
 
-3. Invoke atomic save:
+4. Invoke atomic save:
 ```
 bazinga-db-agents, please save investigation iteration atomically:
 
@@ -215,14 +224,14 @@ Session: {session_id}
 Group: {group_id}
 Iteration: {current_iteration}
 Status: {status}
-State file: /tmp/inv_state_${session_id}_${group_id}.json
-Event file: /tmp/inv_event_${session_id}_${group_id}.json
+State file: $INV_STATE_FILE
+Event file: $INV_EVENT_FILE
 ```
 Then invoke: `Skill(command: "bazinga-db-agents")`
 
-4. Clean up temp files after successful save:
+5. Clean up temp files (always, even on failure):
 ```bash
-rm -f /tmp/inv_state_${session_id}_${group_id}.json /tmp/inv_event_${session_id}_${group_id}.json
+rm -f "$INV_STATE_FILE" "$INV_EVENT_FILE"
 ```
 
 **⚠️ DO NOT use fallback separate saves for investigation state.**

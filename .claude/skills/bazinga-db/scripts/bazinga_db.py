@@ -93,6 +93,34 @@ def validate_complexity(complexity: Any) -> Optional[str]:
     return None
 
 
+# See: research/domain-skill-migration-phase4-ultrathink.md (Fix D)
+# Pattern: alphanumeric with underscores and hyphens, max 64 chars
+GROUP_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+
+def validate_group_id(group_id: Any, allow_global: bool = True) -> Optional[str]:
+    """Validate group_id value. Returns error message if invalid, None if valid.
+
+    Args:
+        group_id: Value to validate (should be non-empty string matching pattern)
+        allow_global: If True, 'global' is a valid value (default for session-level ops)
+
+    Returns:
+        Error message string if invalid, None if valid
+    """
+    if group_id is None:
+        return "group_id cannot be None"
+    if not isinstance(group_id, str):
+        return f"group_id must be a string, got {type(group_id).__name__}"
+    if not group_id or not group_id.strip():
+        return "group_id cannot be empty"
+    if len(group_id) > 64:
+        return f"group_id too long (max 64 chars, got {len(group_id)})"
+    if not GROUP_ID_PATTERN.match(group_id):
+        return "group_id must be alphanumeric with underscores/hyphens only"
+    return None
+
+
 # Cross-platform file locking
 # fcntl is Unix/Linux/macOS only; msvcrt is Windows only
 try:
@@ -1115,6 +1143,10 @@ class BazingaDB:
             raise ValueError("session_id cannot be empty")
         if not event_subtype or not event_subtype.strip():
             raise ValueError("event_subtype cannot be empty")
+        # Fix D: Validate group_id
+        error = validate_group_id(group_id)
+        if error:
+            raise ValueError(error)
 
         # Scan and redact secrets from payload (security parity with save_reasoning)
         redacted_payload, was_redacted = scan_and_redact(payload)
@@ -1241,7 +1273,15 @@ class BazingaDB:
 
         Returns:
             Dict with success status and operation details
+
+        Raises:
+            ValueError: If group_id is invalid
         """
+        # Fix D: Validate group_id (required for investigation, cannot be 'global')
+        error = validate_group_id(group_id)
+        if error:
+            raise ValueError(error)
+
         # Generate idempotency key
         idempotency_key = f"{session_id}|{group_id}|investigation_iteration|{iteration}"
 
@@ -1271,18 +1311,12 @@ class BazingaDB:
                     timestamp = excluded.timestamp
             """, (session_id, group_id, redacted_state))
 
-            # 2. Check idempotency for event
-            existing = conn.execute("""
-                SELECT id FROM orchestration_logs
-                WHERE session_id = ? AND log_type = 'event'
-                AND event_subtype = 'investigation_iteration'
-                AND idempotency_key = ?
-            """, (session_id, idempotency_key)).fetchone()
-
+            # 2. Save event with race-safe idempotency handling
+            # Use INSERT with IntegrityError handling to avoid SELECT-then-INSERT race
             event_saved = False
             event_id = None
 
-            if not existing:
+            try:
                 cursor = conn.execute("""
                     INSERT INTO orchestration_logs
                     (session_id, agent_type, content, log_type, event_subtype,
@@ -1293,8 +1327,20 @@ class BazingaDB:
                       redacted_event, 1 if event_redacted else 0, group_id, idempotency_key))
                 event_id = cursor.lastrowid
                 event_saved = True
-            else:
-                event_id = existing[0]
+            except sqlite3.IntegrityError:
+                # Race condition: another process inserted first - this is idempotent success
+                # Query with full index columns for optimal lookup
+                existing = conn.execute("""
+                    SELECT id FROM orchestration_logs
+                    WHERE session_id = ? AND log_type = 'event'
+                    AND event_subtype = 'investigation_iteration'
+                    AND group_id = ? AND idempotency_key = ?
+                """, (session_id, group_id, idempotency_key)).fetchone()
+                if existing:
+                    event_id = existing[0]
+                else:
+                    # Integrity error for other reason - re-raise
+                    raise
 
             conn.commit()
 
@@ -1327,7 +1373,7 @@ class BazingaDB:
     # ==================== STATE OPERATIONS ====================
 
     def save_state(self, session_id: str, state_type: str, state_data: Dict,
-                   group_id: str = 'global') -> None:
+                   group_id: str = 'global') -> Dict[str, Any]:
         """Save state snapshot with group isolation (UPSERT).
 
         Args:
@@ -1337,9 +1383,20 @@ class BazingaDB:
             group_id: Group isolation key (default 'global' for session-level state,
                       use task group ID for group-specific state like 'investigation')
 
+        Returns:
+            Dict with success status and details (Fix G: consistent API)
+
+        Raises:
+            ValueError: If group_id is invalid
+
         Note: Uses UPSERT (INSERT ... ON CONFLICT ... DO UPDATE) to handle
         repeated saves for the same (session_id, state_type, group_id).
         """
+        # Fix D: Validate group_id
+        error = validate_group_id(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
         conn.execute("""
             INSERT INTO state_snapshots (session_id, group_id, state_type, state_data, timestamp)
@@ -1352,6 +1409,12 @@ class BazingaDB:
         conn.commit()
         conn.close()
         self._print_success(f"✓ Saved {state_type} state (group={group_id})")
+        return {
+            'success': True,
+            'session_id': session_id,
+            'state_type': state_type,
+            'group_id': group_id
+        }
 
     def get_latest_state(self, session_id: str, state_type: str,
                          group_id: str = 'global') -> Optional[Dict]:
@@ -1364,12 +1427,20 @@ class BazingaDB:
 
         Returns:
             Dict of state data, or None if not found
+
+        Raises:
+            ValueError: If group_id is invalid
         """
+        # Fix D: Validate group_id
+        error = validate_group_id(group_id)
+        if error:
+            raise ValueError(error)
+
         conn = self._get_connection()
+        # Fix E: No ORDER BY needed - UNIQUE(session_id, state_type, group_id) ensures at most one row
         row = conn.execute("""
             SELECT state_data FROM state_snapshots
             WHERE session_id = ? AND state_type = ? AND group_id = ?
-            ORDER BY timestamp DESC LIMIT 1
         """, (session_id, state_type, group_id)).fetchone()
         conn.close()
         return json.loads(row['state_data']) if row else None
