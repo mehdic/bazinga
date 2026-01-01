@@ -8,8 +8,7 @@
       "READY_FOR_QA",
       "READY_FOR_REVIEW",
       "BLOCKED",
-      "ESCALATE_SENIOR",
-      "SPAWN_INVESTIGATOR"
+      "ESCALATE_SENIOR"
     ],
     "workflow_markers": [
       "Developer → QA",
