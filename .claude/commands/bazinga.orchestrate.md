@@ -1355,7 +1355,100 @@ Task(
 
 3. **Continue to Phase 1** (PM can still function without specializations)
 
-**AFTER Step 0.5 completes: IMMEDIATELY proceed to Phase 1 (Spawn PM). Do NOT stop.**
+**AFTER Step 0.5 completes: IMMEDIATELY proceed to Step 0.5e (SpecKit Detection). Do NOT stop.**
+
+---
+
+## Step 0.5e: SpecKit Artifact Detection (NEW SESSION ONLY)
+
+**Purpose:** Check if pre-planned SpecKit artifacts exist and ask user if they want to use them.
+
+### Detection
+
+```bash
+# Check for SpecKit tasks.md files
+SPECKIT_FILES=$(ls -d .specify/features/*/tasks.md 2>/dev/null)
+```
+
+**IF no SpecKit files found:**
+- Skip to Phase 1 (normal orchestration)
+
+**IF SpecKit files found:**
+
+1. **List available features:**
+   ```bash
+   ls -d .specify/features/*/ 2>/dev/null | while read dir; do
+       name=$(basename "$dir")
+       has_spec=$(test -f "$dir/spec.md" && echo "✅" || echo "❌")
+       has_plan=$(test -f "$dir/plan.md" && echo "✅" || echo "❌")
+       has_tasks=$(test -f "$dir/tasks.md" && echo "✅" || echo "❌")
+       task_count=$(grep -c '^\- \[' "$dir/tasks.md" 2>/dev/null || echo "0")
+       echo "  - $name: spec.md $has_spec | plan.md $has_plan | tasks.md $has_tasks ($task_count tasks)"
+   done
+   ```
+
+2. **Ask user:**
+   ```
+   📋 **SpecKit artifacts detected!**
+
+   Found pre-planned features:
+   {list from above}
+
+   Would you like to use these for planning context?
+   - **yes** / **yes .specify/features/XXX** → Use pre-planned tasks (PM reads instead of inventing)
+   - **no** → Normal orchestration (PM creates task breakdown)
+   ```
+
+3. **Wait for user response** (this is a NEEDS_CLARIFICATION scenario)
+
+### IF User Says Yes
+
+1. **Determine feature directory:**
+   - If user specified path → use that
+   - If multiple features exist → use highest-numbered prefix
+   - If single feature → use that
+
+2. **Read artifacts:**
+   ```bash
+   FEATURE_DIR=".specify/features/XXX"
+
+   # Read available files
+   TASKS_CONTENT=$(cat "$FEATURE_DIR/tasks.md" 2>/dev/null)
+   SPEC_CONTENT=$(cat "$FEATURE_DIR/spec.md" 2>/dev/null)
+   PLAN_CONTENT=$(cat "$FEATURE_DIR/plan.md" 2>/dev/null)
+   ```
+
+3. **Store in session state:**
+   ```
+   Skill(command: "bazinga-db-core")
+
+   Request: Save orchestrator state with speckit context:
+   {
+     "speckit_mode": true,
+     "feature_dir": "{FEATURE_DIR}",
+     "speckit_artifacts": {
+       "tasks_md": "{FEATURE_DIR}/tasks.md",
+       "spec_md": "{FEATURE_DIR}/spec.md",
+       "plan_md": "{FEATURE_DIR}/plan.md"
+     }
+   }
+   ```
+
+4. **Display confirmation:**
+   ```
+   ✅ SpecKit mode enabled | Using: {FEATURE_DIR} | PM will use pre-planned tasks
+   ```
+
+5. **Pass to PM in Phase 1:**
+   - Include `SPECKIT_CONTEXT` section in PM spawn with file contents
+   - PM uses this as task breakdown source instead of creating from scratch
+
+### IF User Says No
+
+- Continue to Phase 1 with normal orchestration
+- PM creates task breakdown as usual
+
+**AFTER Step 0.5e completes: IMMEDIATELY proceed to Phase 1 (Spawn PM). Do NOT stop.**
 
 ---
 

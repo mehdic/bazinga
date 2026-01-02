@@ -1843,8 +1843,7 @@ def init(
 
     bazinga_commands = "[bold]BAZINGA Commands:[/bold]\n"
     bazinga_commands += "[dim]  • /bazinga.orchestrate           (start orchestration)\n"
-    bazinga_commands += "  • /bazinga.orchestrate-advanced  (with requirements discovery)\n"
-    bazinga_commands += "  • /bazinga.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
+    bazinga_commands += "  • /bazinga.orchestrate-advanced  (with requirements discovery)[/dim]\n\n"
     bazinga_commands += "[dim]Customize:\n"
     bazinga_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
     bazinga_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
@@ -2320,11 +2319,12 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
 
-    # Remove deprecated commands (old names without bazinga. prefix)
+    # Remove deprecated commands (old names without bazinga. prefix + removed commands)
     console.print("\n[bold cyan]3.1. Removing deprecated commands[/bold cyan]")
     deprecated_commands = [
         "orchestrate.md",
         "orchestrate-from-spec.md",
+        "bazinga.orchestrate-from-spec.md",  # Removed: SpecKit now integrated into main orchestrator
         "configure-skills.md",
         "configure-testing.md",
     ]

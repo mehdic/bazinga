@@ -2,8 +2,8 @@
 
 **Date:** 2026-01-02
 **Context:** Analyzing whether to consolidate SpecKit integration into the main orchestrator and eliminate the separate orchestrate-from-spec command
-**Decision:** Proceed with Option C (Hybrid) + critical improvements from review
-**Status:** Reviewed
+**Decision:** Implemented ultra-minimal approach (ask user, then pass context to PM)
+**Status:** COMPLETED
 **Reviewed by:** OpenAI GPT-5
 
 ---
@@ -648,3 +648,84 @@ With the incorporated changes, confidence level is **medium-high** for a safe mi
 2. Implement Phase 1-3 incrementally
 3. Monitor for regressions
 4. Complete Phase 4 after deprecation period
+
+---
+
+## Final Implementation: Ultra-Minimal Approach
+
+**Date Implemented:** 2026-01-02
+**Status:** COMPLETED
+
+After reviewing the complex hybrid approach, we chose a simpler solution: **Just ask the user**.
+
+### What Was Implemented
+
+1. **Detection + User Prompt in Orchestrator** (Step 0.5e)
+   - Check for `.specify/features/*/tasks.md`
+   - If found, list available features and ask user: "Would you like to use these?"
+   - Wait for user response (yes/no)
+   - If yes → read artifacts, pass to PM
+   - If no → normal orchestration
+
+2. **Pre-Planned Context Handling in PM** (Step 1.0 in pm_planning_steps.md)
+   - If PM receives `SPECKIT_CONTEXT` section, use tasks.md as task breakdown
+   - Parse task IDs and markers ([T001], [P], [US1])
+   - Group by [US] markers
+   - Use spec.md for requirements, plan.md for technical approach
+
+3. **Simplified Agent References**
+   - Developer, SSE, QA, Tech Lead: Inline 5-point reference instead of external template
+   - Activation trigger: SPECKIT_CONTEXT section in spawn context
+
+### What Was Deleted
+
+| File | Lines | Status |
+|------|-------|--------|
+| `.claude/commands/bazinga.orchestrate-from-spec.md` | 640 | ✅ Deleted |
+| `agents/orchestrator_speckit.md` | 490 | ✅ Deleted |
+| `templates/pm_speckit.md` | 520 | ✅ Deleted |
+| `templates/developer_speckit.md` | 455 | ✅ Deleted |
+| `templates/qa_speckit.md` | 214 | ✅ Deleted |
+| `templates/tech_lead_speckit.md` | 254 | ✅ Deleted |
+| **Total Deleted** | **~2,573** | |
+
+### Net Changes
+
+| Category | Lines |
+|----------|-------|
+| Added to orchestrator.md | +90 |
+| Added to pm_planning_steps.md | +65 |
+| Simplified agent SpecKit sections | -30 |
+| Deleted SpecKit files | -2,573 |
+| **Net** | **~-2,450** |
+
+### Why This Approach
+
+1. **User is in control** - No auto-magic, no hidden behavior
+2. **No mode persistence needed** - User decides each time
+3. **No multi-feature ambiguity** - User picks explicitly
+4. **No validator changes needed** - Standard workflow applies
+5. **No DB changes needed** - Existing task groups work fine
+6. **Minimal code** - ~155 lines added vs 2,573 deleted
+
+### What's Preserved
+
+- All `/speckit.*` planning commands (specify, plan, tasks, etc.)
+- The `.specify/features/` directory structure
+- Task ID format ([T001], [T002])
+- Marker format ([P], [US1])
+- Checkmark tracking in tasks.md
+- Context flow: spec.md → plan.md → tasks.md
+
+### Trade-offs
+
+| Kept | Dropped |
+|------|---------|
+| User-driven activation | Auto-detection |
+| Inline agent instructions | External template files |
+| Standard orchestration flow | Parallel SpecKit orchestrator |
+| tasks.md checkmarks (manual) | Enforced checkmark updates |
+
+### Conclusion
+
+The ultra-minimal approach delivers 95% of the SpecKit value with 5% of the complexity. The key insight: **"Just ask the user"** eliminates most edge cases and complexity around auto-detection, mode switching, and feature selection.

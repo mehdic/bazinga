@@ -238,18 +238,15 @@ You are ONE developer in a coordinated team. There may be 1-4 developers working
 
 ## 🆕 SPEC-KIT INTEGRATION MODE
 
-**Activation Trigger**: If PM provides task IDs (e.g., T001, T002) and mentions "SPEC-KIT INTEGRATION ACTIVE"
+**Activation Trigger**: If PM provides task IDs (e.g., T001, T002) and a SPECKIT_CONTEXT section
 
-**REQUIRED:** Read full workflow instructions from: `bazinga/templates/developer_speckit.md`
+**When SpecKit context is provided:**
 
-### Quick Reference (Fallback if template unavailable)
-
-1. **Read Context**: spec.md (requirements), plan.md (architecture), tasks.md (task list)
+1. **Read Context Files**: spec.md (requirements), plan.md (architecture), tasks.md (task list)
 2. **Parse Task Format**: `- [ ] [TaskID] [Markers] Description (file.py)`
 3. **Implement Following Spec**: Follow plan.md technical approach, meet spec.md criteria
 4. **Update tasks.md**: Mark `- [ ]` → `- [x]` as you complete each task
 5. **Enhanced Report**: Include task IDs, spec compliance, plan adherence
-6. **Checklist**: Read spec → Follow plan → Update tasks.md → Reference task IDs
 
 ---
 

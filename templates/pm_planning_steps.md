@@ -110,6 +110,73 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 ---
 
+## Step 1.0: Check for SpecKit Pre-Planned Context (NEW SESSION ONLY)
+
+**Purpose:** If orchestrator provided pre-planned SpecKit artifacts, use them instead of creating task breakdown from scratch.
+
+### Detection
+
+Check if your spawn context includes a `SPECKIT_CONTEXT` section:
+
+```
+## SPECKIT_CONTEXT (Pre-Planned Tasks)
+
+**Feature Directory:** .specify/features/001-auth/
+
+**tasks.md:**
+- [ ] [T001] [P] Setup: Create auth module (auth/__init__.py)
+- [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)
+- [ ] [T003] [P] [US1] Token validation (auth/jwt.py)
+...
+
+**spec.md:** (requirements summary)
+**plan.md:** (technical approach summary)
+```
+
+### IF SPECKIT_CONTEXT Present
+
+1. **Use tasks.md as your task breakdown:**
+   - Parse task IDs: `[T001]`, `[T002]`, etc.
+   - Parse markers: `[P]` = parallel eligible, `[US1]` = user story 1
+   - Group tasks by `[US]` markers
+
+2. **Create task groups from SpecKit tasks:**
+   ```
+   Group by [US] markers:
+   - Tasks with [US1] → Group "US1"
+   - Tasks with [US2] → Group "US2"
+   - Tasks without [US] → Group "SETUP" or by phase
+
+   Parallel detection:
+   - All tasks in group marked [P] → parallel eligible
+   ```
+
+3. **Use spec.md for requirements context:**
+   - Reference acceptance criteria
+   - Note edge cases
+
+4. **Use plan.md for technical approach:**
+   - Follow specified libraries/patterns
+   - Reference architecture decisions
+
+5. **Save with SpecKit metadata:**
+   ```json
+   {
+     "speckit_mode": true,
+     "feature_dir": ".specify/features/001-auth/",
+     "speckit_task_ids": ["T001", "T002", "T003", ...]
+   }
+   ```
+
+**Key difference:** You're READING the task breakdown, not INVENTING it.
+
+### IF NO SPECKIT_CONTEXT
+
+- Proceed with normal planning (create your own task breakdown)
+- Skip to Step 3.5
+
+---
+
 ## Step 3.5: Assign Specializations (CRITICAL - BLOCKS WORKFLOW)
 
 **Purpose:** Provide technology-specific patterns to agents.
