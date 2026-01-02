@@ -644,12 +644,17 @@ Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator
 
 **IF `clarification_resolved = true` OR `clarification_used = false` OR state not found:**
 - Normal resume
+- **Check for SpecKit mode:** Parse `speckit_mode` from orchestrator state
+  - If `speckit_mode: true` → Load `speckit_content` from state for PM spawn
+  - SpecKit context persists across resume (no re-detection needed)
 - Find groups with status != "completed"
 - Determine next workflow step:
   - Groups with `status=in_progress` → Check last agent, spawn next
   - Groups with `status=pending` → Spawn Developer
   - All groups completed → Spawn PM for BAZINGA assessment
 - **DO NOT ask user what to do** - resume automatically
+
+**SpecKit Resume Note:** If resuming a SpecKit session, PM spawn in Phase 1 will automatically include SPECKIT_CONTEXT section (via Step 1.2a) since `speckit_mode: true` is persisted in state.
 
 ### Key Rules
 
@@ -1418,7 +1423,24 @@ SPECKIT_FILES=$(ls -d .specify/features/*/tasks.md 2>/dev/null)
    - **no** → Normal orchestration (PM creates task breakdown)
    ```
 
-3. **Wait for user response** (this is a NEEDS_CLARIFICATION scenario)
+3. **Wait for user response**
+
+**NOTE:** This is a mode selection prompt, NOT a NEEDS_CLARIFICATION. It does NOT count against the PM's clarification cap. Track separately as `speckit_prompt_shown: true` in state.
+
+### User Response Parsing
+
+**Affirmative responses (enable SpecKit):**
+- "yes", "y", "yeah", "yep", "sure", "ok", "okay", "Yes", "YES", "Y"
+- "yes .specify/features/XXX" (with specific path)
+- Any response starting with "yes" or "y " followed by optional path
+
+**Negative responses (normal orchestration):**
+- "no", "n", "nope", "skip", "No", "NO", "N"
+- Any response starting with "no" or "n "
+
+**Ambiguous/Other responses:**
+- If response doesn't match above patterns → treat as "no" (safe default)
+- If response contains new requirements → treat as "no" and use response as requirements
 
 ### IF User Says Yes
 
@@ -1427,43 +1449,60 @@ SPECKIT_FILES=$(ls -d .specify/features/*/tasks.md 2>/dev/null)
    - If multiple features exist → use highest-numbered prefix
    - If single feature → use that
 
-2. **Read artifacts:**
+2. **Validate tasks.md format:**
    ```bash
    FEATURE_DIR=".specify/features/XXX"
 
-   # Read available files
-   TASKS_CONTENT=$(cat "$FEATURE_DIR/tasks.md" 2>/dev/null)
-   SPEC_CONTENT=$(cat "$FEATURE_DIR/spec.md" 2>/dev/null)
-   PLAN_CONTENT=$(cat "$FEATURE_DIR/plan.md" 2>/dev/null)
+   # Check for at least one SpecKit task line (has task ID like [T001])
+   if ! grep -q '^\- \[.\] \[T[0-9]' "$FEATURE_DIR/tasks.md" 2>/dev/null; then
+       echo "⚠️ Warning: tasks.md does not appear to be in SpecKit format"
+       echo "   Expected format: - [ ] [T001] [Markers] Task description (file.py)"
+       echo "   Continuing with normal orchestration"
+       # Fall back to normal mode
+   fi
    ```
 
-3. **Store in session state:**
+3. **Read artifacts using Read tool:**
+   ```
+   # IMPORTANT: Use Read tool, NOT cat command
+   Read(file_path: "{FEATURE_DIR}/tasks.md")  → TASKS_CONTENT
+   Read(file_path: "{FEATURE_DIR}/spec.md")   → SPEC_CONTENT (if exists)
+   Read(file_path: "{FEATURE_DIR}/plan.md")   → PLAN_CONTENT (if exists)
+   ```
+
+4. **Store in session state:**
    ```
    Skill(command: "bazinga-db-core")
 
    Request: Save orchestrator state with speckit context:
    {
      "speckit_mode": true,
+     "speckit_prompt_shown": true,
      "feature_dir": "{FEATURE_DIR}",
      "speckit_artifacts": {
        "tasks_md": "{FEATURE_DIR}/tasks.md",
        "spec_md": "{FEATURE_DIR}/spec.md",
        "plan_md": "{FEATURE_DIR}/plan.md"
+     },
+     "speckit_content": {
+       "tasks": "{TASKS_CONTENT}",
+       "spec": "{SPEC_CONTENT}",
+       "plan": "{PLAN_CONTENT}"
      }
    }
    ```
 
-4. **Display confirmation:**
+5. **Display confirmation:**
    ```
    ✅ SpecKit mode enabled | Using: {FEATURE_DIR} | PM will use pre-planned tasks
    ```
 
-5. **Pass to PM in Phase 1:**
-   - Include `SPECKIT_CONTEXT` section in PM spawn with file contents
-   - PM uses this as task breakdown source instead of creating from scratch
+6. **Proceed to Phase 1:**
+   - Step 1.2 will include SPECKIT_CONTEXT section in PM prompt (see Step 1.2)
 
 ### IF User Says No
 
+- Store `speckit_prompt_shown: true` in session state (to avoid re-asking on resume)
 - Continue to Phase 1 with normal orchestration
 - PM creates task breakdown as usual
 
@@ -1590,8 +1629,52 @@ Build PM prompt by reading `agents/project_manager.md` and including:
 - Previous PM state from Step 1.1
 - User's requirements from conversation
 - Task: Analyze requirements, decide mode, create task groups
+- **IF SpecKit mode:** SPECKIT_CONTEXT section (see below)
 
 **CRITICAL**: You must include the session_id in PM's spawn prompt so PM can invoke bazinga-db skill.
+
+### SPECKIT_CONTEXT Handling (Step 1.2a)
+
+**Check for SpecKit mode:**
+1. Query orchestrator state: `Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator`
+2. Parse response for `speckit_mode: true`
+
+**IF speckit_mode is true:**
+
+Add this section to PM's spawn prompt (AFTER mandatory understanding capture):
+
+```markdown
+## SPECKIT_CONTEXT (Pre-Planned Tasks)
+
+**Mode:** SpecKit-enabled session - use pre-planned tasks from artifacts below.
+
+**Feature Directory:** {feature_dir from state}
+
+**tasks.md (PRIMARY - use this as your task breakdown):**
+```
+{speckit_content.tasks from state - the actual tasks.md content}
+```
+
+**spec.md (Requirements - success criteria source):**
+```
+{speckit_content.spec from state - or "Not provided" if empty}
+```
+
+**plan.md (Architecture - implementation guidance):**
+```
+{speckit_content.plan from state - or "Not provided" if empty}
+```
+
+**INSTRUCTIONS:**
+- Use tasks.md as your task breakdown - do NOT invent new tasks
+- Parse task IDs ([T001], [T002]) and group by [US] markers if present
+- Extract success criteria from spec.md requirements
+- See `templates/pm_planning_steps.md` Step 1.0 for detailed processing
+```
+
+**IF speckit_mode is false or not found:**
+- Do NOT include SPECKIT_CONTEXT section
+- PM creates task breakdown normally
 
 **ERROR HANDLING**: If Task tool fails to spawn agent, output error capsule per §Error Handling and cannot proceed.
 
