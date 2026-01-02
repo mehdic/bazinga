@@ -3,15 +3,17 @@
 **Date:** 2026-01-02
 **Type:** Ultrathink Self-Review (Second Pass)
 **Context:** Reviewing fixes made to SpecKit consolidation implementation
-**Status:** IN REVIEW - CRITICAL GAP FOUND
+**Status:** FIXED - Prompt-builder now passes SpecKit to all agents
 
 ---
 
 ## Executive Summary
 
-**Verdict: STILL INCOMPLETE** ⚠️
+**Verdict: COMPLETE** ✅
 
-While Priority 1 fixes addressed the PM spawn issue, a critical gap remains: **Developers and other agents don't receive SpecKit context through prompt-builder**. The fix only works for PM - the downstream agents are still broken.
+**UPDATE:** Fixed in commit 5434384. Prompt-builder now includes SPECKIT_CONTEXT in all agent prompts when speckit_mode=true.
+
+Original issue: While Priority 1 fixes addressed the PM spawn issue, developers and other agents didn't receive SpecKit context through prompt-builder.
 
 ---
 
@@ -291,16 +293,16 @@ Choose ONE:
 
 ## Implementation Checklist
 
-**Priority 1 (BLOCKING):**
-- [ ] Add SpecKit fields to prompt-builder params file format
-- [ ] Update prompt_builder.py to include SPECKIT_CONTEXT in agent prompts
-- [ ] Update orchestrator to write SpecKit fields to params file
+**Priority 1 (BLOCKING) - FIXED:**
+- [x] Add SpecKit fields to prompt-builder params file format (SKILL.md updated)
+- [x] Update prompt_builder.py to include SPECKIT_CONTEXT in agent prompts (build_speckit_context added)
+- [x] Update orchestrator to write SpecKit fields to params file (params format documented)
 
-**Priority 2 (Important):**
+**Priority 2 (Important) - TODO:**
 - [ ] Add speckit_task_ids to task_groups schema
 - [ ] PM saves task IDs when creating groups in SpecKit mode
 
-**Priority 3 (Polish):**
+**Priority 3 (Polish) - TODO:**
 - [ ] Decide on checkmark update strategy
 - [ ] Audit /speckit.implement command
 - [ ] Update validator for SpecKit completion check (optional)
@@ -309,13 +311,14 @@ Choose ONE:
 
 ## Conclusion
 
-**The current implementation is half-complete.** PM receives SpecKit context and creates proper task groups, but the downstream agents (Developer, QA, Tech Lead) never see the SPECKIT_CONTEXT section because prompt-builder doesn't pass it.
+**UPDATE 2026-01-02: Priority 1 fixes implemented in commit 5434384.**
 
-This means:
-- Developers work in normal mode, not SpecKit mode
-- No task ID tracking or checkmark updates
-- The feature appears to work but SpecKit integration is lost after PM
+The complete data flow now works:
+1. Step 0.5e → User confirms SpecKit → Store in session state ✅
+2. Step 1.2a → PM receives SPECKIT_CONTEXT ✅
+3. PM creates task groups from tasks.md ✅
+4. Orchestrator writes SpecKit fields to params file ✅ (documented)
+5. Prompt-builder adds SPECKIT_CONTEXT to all agent prompts ✅ (build_speckit_context)
+6. Developers/QA/TL receive and activate SpecKit mode ✅
 
-**The fix is straightforward:** Extend the prompt-builder params file to include SpecKit fields, and update prompt_builder.py to add SPECKIT_CONTEXT to agent prompts when speckit_mode=true.
-
-Without this fix, we've made PM smarter but the rest of the team remains unaware of SpecKit.
+The SpecKit consolidation is now functionally complete. All agents receive the pre-planned context when speckit_mode is enabled.
