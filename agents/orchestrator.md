@@ -404,6 +404,20 @@ Resume Context: {context if resume scenario}
    }
    ```
    **Note:** `prior_handoff_file` is only set when routing from one agent to another (e.g., Developer → QA).
+
+   **IF speckit_mode is true (from session state):** Also include SpecKit fields:
+   ```json
+   {
+     "speckit_mode": true,
+     "feature_dir": "{feature_dir from orchestrator state}",
+     "speckit_context": {
+       "tasks": "{speckit_content.tasks from state}",
+       "spec": "{speckit_content.spec from state}",
+       "plan": "{speckit_content.plan from state}"
+     }
+   }
+   ```
+   The prompt-builder will add SPECKIT_CONTEXT section to the agent prompt.
 2. **Invoke prompt-builder skill**:
    ```
    Skill(command: "prompt-builder")

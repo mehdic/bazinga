@@ -1711,6 +1711,64 @@ def build_task_context(args):
     return context
 
 
+def build_speckit_context(args):
+    """Build SPECKIT_CONTEXT block for agents when speckit_mode is enabled.
+
+    This provides pre-planned task context from SpecKit artifacts to agents,
+    allowing them to work with pre-defined tasks instead of PM-generated ones.
+
+    See: research/speckit-consolidation-analysis.md
+    """
+    speckit_mode = getattr(args, 'speckit_mode', False)
+    if not speckit_mode:
+        return ""
+
+    feature_dir = getattr(args, 'feature_dir', '')
+    speckit_context = getattr(args, 'speckit_context', {})
+
+    # Handle string (from CLI) vs dict (from params file)
+    if isinstance(speckit_context, str) and speckit_context:
+        try:
+            speckit_context = json.loads(speckit_context)
+        except json.JSONDecodeError:
+            print(f"WARNING: Failed to parse speckit_context JSON", file=sys.stderr)
+            speckit_context = {}
+
+    tasks_content = speckit_context.get('tasks', 'Not provided')
+    spec_content = speckit_context.get('spec', 'Not provided')
+    plan_content = speckit_context.get('plan', 'Not provided')
+
+    return f"""
+## SPECKIT_CONTEXT (Pre-Planned Tasks)
+
+**Mode:** SpecKit-enabled session - use pre-planned tasks from artifacts below.
+
+**Feature Directory:** {feature_dir}
+
+**tasks.md (PRIMARY - use this as your task breakdown):**
+```
+{tasks_content}
+```
+
+**spec.md (Requirements - success criteria source):**
+```
+{spec_content}
+```
+
+**plan.md (Architecture - implementation guidance):**
+```
+{plan_content}
+```
+
+**INSTRUCTIONS:**
+- Use tasks.md as your task breakdown - track progress by task ID
+- Parse task IDs ([T001], [T002]) for reporting
+- Follow plan.md technical approach
+- Meet spec.md acceptance criteria
+- Report task completion using task IDs in your handoff
+"""
+
+
 def build_feedback_context(args):
     """Build feedback context for retries."""
     feedback = ""
@@ -1993,6 +2051,12 @@ def build_prompt(args):
         task_context = build_task_context(args)
         components.append(task_context)
 
+        # 4.5. Build SPECKIT_CONTEXT (if speckit_mode enabled)
+        # See: research/speckit-consolidation-analysis.md
+        speckit_block = build_speckit_context(args)
+        if speckit_block:
+            components.append(speckit_block)
+
         # 5. Build PM-specific context
         if args.agent_type == "project_manager":
             pm_context = build_pm_context(args)
@@ -2273,6 +2337,14 @@ Debug mode:
     parser.add_argument("--resume-context", default="",
                         help="Resume context for PM resume spawns")
 
+    # SpecKit integration
+    parser.add_argument("--speckit-mode", action="store_true",
+                        help="Enable SpecKit integration mode")
+    parser.add_argument("--feature-dir", default="",
+                        help="SpecKit feature directory path")
+    parser.add_argument("--speckit-context", default="",
+                        help="SpecKit context JSON (tasks, spec, plan content)")
+
     # Output file option (for file-based prompt delivery)
     parser.add_argument("--output-file", default="",
                         help="Save prompt to file (in addition to stdout). Path relative to project root.")
@@ -2378,6 +2450,13 @@ Debug mode:
                 args.pm_state = params['pm_state'] if isinstance(params['pm_state'], str) else json.dumps(params['pm_state'])
             if 'resume_context' in params:
                 args.resume_context = params['resume_context']
+            # SpecKit integration params
+            if 'speckit_mode' in params:
+                args.speckit_mode = params['speckit_mode']
+            if 'feature_dir' in params:
+                args.feature_dir = params['feature_dir']
+            if 'speckit_context' in params:
+                args.speckit_context = params['speckit_context']
             # Enable JSON output when using params file (skill invocation)
             args.json_output = True
 
