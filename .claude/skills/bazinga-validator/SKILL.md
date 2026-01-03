@@ -421,6 +421,111 @@ For issues with Developer `action = "REJECTED"`:
 
 ---
 
+## Step 5.8: SpecKit Task Completion Verification (CONDITIONAL)
+
+**Purpose:** When session is in SpecKit mode, verify all pre-planned tasks are completed.
+
+**Step 1: Check if SpecKit mode is enabled**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "[session_id]" "speckit_mode"
+```
+
+**IF speckit_mode is NOT true:**
+```
+→ Skip entire Step 5.8
+→ Continue to Step 6
+→ Log: "SpecKit mode not enabled, skipping task verification"
+```
+
+**IF speckit_mode is true:**
+```
+→ Proceed with SpecKit task verification below
+```
+
+**Step 2: Query task groups for SpecKit task IDs**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "[session_id]"
+```
+
+Parse each task group for:
+- `speckit_task_ids`: JSON array of task IDs (e.g., `["T001", "T002", "T003"]`)
+- `status`: Current group status
+
+**Step 3: Collect all SpecKit task IDs**
+```python
+all_task_ids = []
+completed_groups = []
+incomplete_groups = []
+
+for group in task_groups:
+    task_ids = json.loads(group.get("speckit_task_ids", "[]"))
+    all_task_ids.extend(task_ids)
+
+    if group.status == "completed":
+        completed_groups.append(group.id)
+    else:
+        incomplete_groups.append({
+            "group_id": group.id,
+            "status": group.status,
+            "task_ids": task_ids
+        })
+```
+
+**Step 4: Verify tasks.md checkmarks (if feature_dir available)**
+```bash
+# Get feature_dir from orchestrator state
+FEATURE_DIR=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "[session_id]" "feature_dir")
+
+if [ -n "$FEATURE_DIR" ] && [ -f "$FEATURE_DIR/tasks.md" ]; then
+    # Count unchecked tasks
+    unchecked=$(grep -c "^- \[ \]" "$FEATURE_DIR/tasks.md" || echo 0)
+    checked=$(grep -c "^- \[x\]" "$FEATURE_DIR/tasks.md" || echo 0)
+    echo "Tasks: $checked checked, $unchecked unchecked"
+fi
+```
+
+**Step 5: Validate completion**
+
+**IF incomplete_groups exist:**
+```
+→ Return: REJECT
+→ Reason: "SpecKit task groups not completed"
+→ Details: List incomplete groups with their task IDs and current status
+```
+
+**Example rejection:**
+```markdown
+❌ SpecKit Task Verification: FAIL
+   - speckit_mode: true
+   - Total task groups: 3
+   - Completed groups: 2/3
+   - Incomplete:
+     - Group US2 (status: qa_review): Tasks T004, T005, T006
+
+   All SpecKit task groups must be completed before BAZINGA.
+```
+
+**IF tasks.md has unchecked items AND feature_dir is available:**
+```
+→ Return: REJECT (with warning)
+→ Reason: "SpecKit tasks.md has unchecked items"
+→ Note: This is a secondary check - DB status takes precedence
+→ Details: Show unchecked count vs total
+```
+
+**IF all task groups completed:**
+```
+→ Proceed to Step 6
+→ Log: "SpecKit task verification: PASS ({n} tasks across {m} groups completed)"
+```
+
+**⚠️ Graceful degradation:**
+- If `speckit_task_ids` is NULL/empty for all groups: Log warning but don't fail
+- If `feature_dir` not in state: Skip tasks.md check, rely on DB status only
+- This handles sessions that upgraded to speckit_mode mid-workflow
+
+---
+
 ## Step 6: Calculate Completion & Return Verdict
 
 ```
@@ -446,6 +551,11 @@ ELSE IF unresolved_blocking_issues > 0:
   → Return: REJECT
   → Reason: "Unresolved blocking issues from code review"
   → Note: CRITICAL/HIGH issues must be FIXED or have accepted rejection
+
+ELSE IF speckit_mode AND incomplete_task_groups > 0:
+  → Return: REJECT
+  → Reason: "SpecKit task groups not completed"
+  → Note: All task groups must reach 'completed' status before BAZINGA
 
 ELSE IF all verifications passed AND met_count == total_count:
   → Return: ACCEPT
@@ -505,6 +615,11 @@ ELSE:
 ✅ Blocking Issue Verification: PASS | FAIL
    - Unresolved blocking issues: {count}
    - {issue_id} ({severity}): {title}
+
+✅ SpecKit Task Verification: PASS | SKIP | FAIL
+   - speckit_mode: {true|false}
+   - Task groups: {completed}/{total}
+   - Task IDs tracked: {count}
 
 ### Reason
 
@@ -652,6 +767,7 @@ Accept BAZINGA and proceed to shutdown protocol.
 6. **Structured response** - Orchestrator parses your verdict
 7. **Timeout protection** - Use configurable timeout (default 60s, see .claude/skills/bazinga-validator/resources/validator_config.json)
 8. **Clear reasoning** - Explain WHY you accepted or rejected
+9. **SpecKit completion** - If speckit_mode=true, ALL task groups must be completed
 
 ---
 

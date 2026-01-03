@@ -298,14 +298,14 @@ Choose ONE:
 - [x] Update prompt_builder.py to include SPECKIT_CONTEXT in agent prompts (build_speckit_context added)
 - [x] Update orchestrator to write SpecKit fields to params file (params format documented)
 
-**Priority 2 (Important) - TODO:**
-- [ ] Add speckit_task_ids to task_groups schema
-- [ ] PM saves task IDs when creating groups in SpecKit mode
+**Priority 2 (Important) - FIXED:**
+- [x] Add speckit_task_ids to task_groups schema (v18→v19 migration)
+- [x] PM saves task IDs when creating groups in SpecKit mode (pm_planning_steps.md updated)
 
-**Priority 3 (Polish) - TODO:**
-- [ ] Decide on checkmark update strategy
-- [ ] Audit /speckit.implement command
-- [ ] Update validator for SpecKit completion check (optional)
+**Priority 3 (Polish) - FIXED:**
+- [x] Decide on checkmark update strategy (orchestrator updates atomically after MERGE_SUCCESS)
+- [x] Audit /speckit.implement command (clean - no references to deleted templates)
+- [x] Update validator for SpecKit completion check (Step 5.8 added)
 
 ---
 

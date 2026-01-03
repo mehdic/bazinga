@@ -651,6 +651,40 @@ Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator
 
 **SpecKit Resume Note:** If resuming a SpecKit session, PM spawn in Phase 1 will automatically include SPECKIT_CONTEXT section (via Step 1.2a) since `speckit_mode: true` is persisted in state.
 
+### SpecKit Checkmark Updates (After Group Completion)
+
+**When a task group reaches MERGE_SUCCESS and speckit_mode is true:**
+
+1. **Query completed task IDs:**
+   ```
+   Skill(command: "bazinga-db-workflow") → get-task-group {session_id} {group_id}
+   ```
+   Extract `speckit_task_ids` from the result (e.g., `["T001", "T002", "T003"]`)
+
+2. **Update tasks.md checkmarks atomically:**
+   ```bash
+   FEATURE_DIR="{feature_dir from orchestrator state}"
+
+   # For each task ID in the completed group:
+   for task_id in T001 T002 T003; do
+       # Change "- [ ] [T001]" to "- [x] [T001]"
+       sed -i "s/^- \[ \] \[${task_id}\]/- [x] [${task_id}]/" "$FEATURE_DIR/tasks.md"
+   done
+   ```
+
+3. **Log checkmark update:**
+   ```
+   ✅ SpecKit: Marked {N} tasks complete in {feature_dir}/tasks.md
+   ```
+
+**Why orchestrator does this (not agents):**
+- Prevents race conditions from parallel developers
+- Single atomic update point per group
+- Consistent checkmark state
+- Agents focus on implementation, not file management
+
+**When to skip:** If `speckit_task_ids` is null or empty for the group, skip checkmark updates.
+
 ### Key Rules
 
 1. **NEVER** start fresh without checking for active session

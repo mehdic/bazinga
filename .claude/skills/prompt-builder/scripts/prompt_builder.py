@@ -1730,13 +1730,80 @@ def build_speckit_context(args):
     if isinstance(speckit_context, str) and speckit_context:
         try:
             speckit_context = json.loads(speckit_context)
-        except json.JSONDecodeError:
-            print(f"WARNING: Failed to parse speckit_context JSON", file=sys.stderr)
-            speckit_context = {}
+        except json.JSONDecodeError as e:
+            # CRITICAL FIX #3: Make JSON errors visible in prompt
+            error_msg = f"Failed to parse SpecKit context JSON: {e}"
+            print(f"CRITICAL: {error_msg}", file=sys.stderr)
+            return f"""
+## SPECKIT_CONTEXT - ERROR
 
-    tasks_content = speckit_context.get('tasks', 'Not provided')
-    spec_content = speckit_context.get('spec', 'Not provided')
-    plan_content = speckit_context.get('plan', 'Not provided')
+⚠️ **CRITICAL ERROR:** Failed to load SpecKit artifacts due to JSON parsing error.
+This is a bug in the orchestrator. Please report this issue.
+
+Error: {error_msg}
+
+**Fallback:** PM will create task breakdown from scratch (normal mode).
+"""
+
+    # CRITICAL FIX #1: Token budget enforcement
+    # Reserve 8000 tokens max for SpecKit context (split across 3 artifacts)
+    MAX_SPECKIT_TOKENS = 8000
+    PER_ARTIFACT_BUDGET = MAX_SPECKIT_TOKENS // 3
+
+    def truncate_content(content, budget):
+        """Truncate content to fit within token budget."""
+        if not content or content == 'Not provided':
+            return content, False
+        tokens = estimate_tokens(content)
+        if tokens <= budget:
+            return content, False
+        # Truncate by characters (rough estimate: 4 chars per token)
+        char_limit = budget * 4
+        truncated = content[:char_limit]
+        # Find last newline to avoid cutting mid-line
+        last_newline = truncated.rfind('\n')
+        if last_newline > char_limit * 0.8:
+            truncated = truncated[:last_newline]
+        return truncated + f"\n\n[... TRUNCATED - {tokens - budget} tokens removed to fit budget ...]", True
+
+    # CRITICAL FIX #2: Escape code fences to prevent markdown collision
+    def escape_code_fences(content):
+        """Replace triple backticks with tilde fences to prevent collision."""
+        if not content:
+            return content
+        # Replace ``` with ~~~ to avoid fence collision
+        return content.replace('```', '~~~')
+
+    tasks_raw = speckit_context.get('tasks', 'Not provided')
+    spec_raw = speckit_context.get('spec', 'Not provided')
+    plan_raw = speckit_context.get('plan', 'Not provided')
+
+    # Apply truncation
+    tasks_content, tasks_truncated = truncate_content(tasks_raw, PER_ARTIFACT_BUDGET)
+    spec_content, spec_truncated = truncate_content(spec_raw, PER_ARTIFACT_BUDGET)
+    plan_content, plan_truncated = truncate_content(plan_raw, PER_ARTIFACT_BUDGET)
+
+    # Apply code fence escaping
+    tasks_content = escape_code_fences(tasks_content)
+    spec_content = escape_code_fences(spec_content)
+    plan_content = escape_code_fences(plan_content)
+
+    # Log warnings if truncation occurred
+    if any([tasks_truncated, spec_truncated, plan_truncated]):
+        truncated_files = []
+        if tasks_truncated:
+            truncated_files.append("tasks.md")
+        if spec_truncated:
+            truncated_files.append("spec.md")
+        if plan_truncated:
+            truncated_files.append("plan.md")
+        print(f"WARNING: SpecKit artifacts truncated due to size: {', '.join(truncated_files)}", file=sys.stderr)
+
+    truncation_notice = ""
+    if any([tasks_truncated, spec_truncated, plan_truncated]):
+        truncation_notice = """
+**⚠️ Note:** Some artifacts were truncated to fit token budget. Focus on visible content.
+"""
 
     return f"""
 ## SPECKIT_CONTEXT (Pre-Planned Tasks)
@@ -1744,7 +1811,7 @@ def build_speckit_context(args):
 **Mode:** SpecKit-enabled session - use pre-planned tasks from artifacts below.
 
 **Feature Directory:** {feature_dir}
-
+{truncation_notice}
 **tasks.md (PRIMARY - use this as your task breakdown):**
 ```
 {tasks_content}

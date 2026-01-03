@@ -159,12 +159,30 @@ Check if your spawn context includes a `SPECKIT_CONTEXT` section:
    - Follow specified libraries/patterns
    - Reference architecture decisions
 
-5. **Save with SpecKit metadata:**
+5. **Save task groups with SpecKit task IDs:**
+
+   When creating each task group via bazinga-db, include the `speckit_task_ids`:
+
+   ```
+   Skill(command: "bazinga-db-workflow")
+
+   Request: Create task group with SpecKit task IDs:
+   - Session ID: {session_id}
+   - Group ID: {group_id} (e.g., "US1", "SETUP")
+   - Name: {group_name}
+   - SpecKit Task IDs: ["T001", "T002", "T003"] (tasks in this group)
+   - Specializations: [...]
+   - Complexity: {1-10}
+   ```
+
+   **Example for group US1 containing tasks T001, T002, T003:**
    ```json
    {
-     "speckit_mode": true,
-     "feature_dir": ".specify/features/001-auth/",
-     "speckit_task_ids": ["T001", "T002", "T003", ...]
+     "group_id": "US1",
+     "name": "User Authentication",
+     "speckit_task_ids": ["T001", "T002", "T003"],
+     "complexity": 4,
+     "specializations": ["python", "fastapi"]
    }
    ```
 
