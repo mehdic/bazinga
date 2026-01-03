@@ -1714,7 +1714,8 @@ class BazingaDB:
                          complexity: Optional[int] = None,
                          review_iteration: Optional[int] = None,
                          no_progress_count: Optional[int] = None,
-                         blocking_issues_count: Optional[int] = None) -> Dict[str, Any]:
+                         blocking_issues_count: Optional[int] = None,
+                         speckit_task_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """Update task group fields (requires session_id for composite key).
 
         Args:
@@ -1833,6 +1834,10 @@ class BazingaDB:
             if blocking_issues_count is not None:
                 updates.append("blocking_issues_count = ?")
                 params.append(blocking_issues_count)
+            if speckit_task_ids is not None:
+                # Store as JSON array of task IDs (e.g., ["T001", "T002"])
+                updates.append("speckit_task_ids = ?")
+                params.append(json.dumps(speckit_task_ids))
 
             # Server-side validation and clamping for counters (defense in depth)
             # Clamp negative values to 0 rather than rejecting - handles race conditions gracefully
@@ -4271,7 +4276,7 @@ def main():
             # v16: Added initial_tier for PM-assigned starting tier
             # v17: Added complexity for PM-assigned task complexity scoring (1-10)
             # v16 (schema): Added review_iteration, no_progress_count, blocking_issues_count for feedback loop tracking
-            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier", "complexity", "review_iteration", "no_progress_count", "blocking_issues_count"}
+            valid_flags = {"status", "assigned_to", "revision_count", "last_review_status", "auto_create", "name", "specializations", "item_count", "security_sensitive", "qa_attempts", "tl_review_attempts", "component_path", "initial_tier", "complexity", "review_iteration", "no_progress_count", "blocking_issues_count", "speckit_task_ids"}
             for i in range(2, len(cmd_args), 2):
                 key = cmd_args[i].lstrip('--')
                 key = key.replace('-', '_')  # Normalize dashes to underscores (--assigned-to → assigned_to)
@@ -4330,6 +4335,20 @@ def main():
                     valid_tiers = ('Developer', 'Senior Software Engineer')
                     if value not in valid_tiers:
                         print(json.dumps({"success": False, "error": f"--initial_tier must be one of {valid_tiers}, got '{value}'"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                # Parse and validate speckit_task_ids JSON (v19: SpecKit integration)
+                elif key == 'speckit_task_ids':
+                    try:
+                        value = json.loads(value)
+                        # Validate it's a list of strings
+                        if not isinstance(value, list):
+                            print(json.dumps({"success": False, "error": "--speckit_task_ids must be a JSON array"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                        if not all(isinstance(s, str) for s in value):
+                            print(json.dumps({"success": False, "error": "--speckit_task_ids array must contain only strings"}, indent=2), file=sys.stderr)
+                            sys.exit(1)
+                    except json.JSONDecodeError as e:
+                        print(json.dumps({"success": False, "error": f"Invalid JSON for --speckit_task_ids: {e}"}, indent=2), file=sys.stderr)
                         sys.exit(1)
                 kwargs[key] = value
             result = db.update_task_group(group_id, session_id, **kwargs)
