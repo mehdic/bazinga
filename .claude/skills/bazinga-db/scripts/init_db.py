@@ -1594,38 +1594,48 @@ def init_database(db_path: str) -> None:
         # v18 → v19: Add speckit_task_ids column to task_groups for SpecKit integration
         if current_version < 19:
             print("\n--- Migrating v18 → v19 (SpecKit task ID tracking) ---")
-            try:
-                cursor.execute("BEGIN IMMEDIATE")
 
-                # Add speckit_task_ids column (JSON array of task IDs like ["T001", "T002"])
+            # Check if task_groups table exists (for fresh databases, skip ALTER and let CREATE TABLE handle it)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'")
+            task_groups_exists = cursor.fetchone() is not None
+
+            if not task_groups_exists:
+                print("   ⊘ task_groups table doesn't exist yet - will be created with full schema below")
+                print("✓ Migration to v19 complete (fresh database, skipped)")
+                current_version = 19
+            else:
                 try:
-                    cursor.execute("ALTER TABLE task_groups ADD COLUMN speckit_task_ids TEXT")
-                    print("   ✓ Added task_groups.speckit_task_ids")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column" in str(e).lower():
-                        print("   ⊘ task_groups.speckit_task_ids already exists")
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Add speckit_task_ids column (JSON array of task IDs like ["T001", "T002"])
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN speckit_task_ids TEXT")
+                        print("   ✓ Added task_groups.speckit_task_ids")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.speckit_task_ids already exists")
+                        else:
+                            raise
+
+                    # Verify integrity
+                    cursor.execute("PRAGMA integrity_check")
+                    integrity = cursor.fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v18→v19: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Committed v18→v19 migration")
+
+                except Exception as e:
+                    conn.rollback()
+                    if "SQLITE_BUSY" in str(e):
+                        print(f"   ⊘ v18→v19 migration skipped (database busy, will retry)")
                     else:
+                        print(f"   ✗ v18→v19 migration failed, rolled back: {e}")
                         raise
 
-                # Verify integrity
-                cursor.execute("PRAGMA integrity_check")
-                integrity = cursor.fetchone()[0]
-                if integrity != "ok":
-                    raise sqlite3.IntegrityError(f"Migration v18→v19: Integrity check failed: {integrity}")
-
-                conn.commit()
-                print("   ✓ Committed v18→v19 migration")
-
-            except Exception as e:
-                conn.rollback()
-                if "SQLITE_BUSY" in str(e):
-                    print(f"   ⊘ v18→v19 migration skipped (database busy, will retry)")
-                else:
-                    print(f"   ✗ v18→v19 migration failed, rolled back: {e}")
-                    raise
-
-            current_version = 19
-            print("✓ Migration to v19 complete (SpecKit task ID tracking)")
+                current_version = 19
+                print("✓ Migration to v19 complete (SpecKit task ID tracking)")
 
         # Record version upgrade
         cursor.execute("""
