@@ -2543,8 +2543,38 @@ Skill(command: "bazinga-validator")
 ```
 
 **Step 2: Wait for validator verdict**
-- IF ACCEPT → Proceed to shutdown protocol below
+- IF ACCEPT → **IMMEDIATELY execute ACCEPT handling below**
 - IF REJECT → **IMMEDIATELY execute REJECT handling below** (do NOT proceed to shutdown)
+
+### 🟢 MANDATORY: Validator ACCEPT Handling Procedure
+
+**When validator returns ACCEPT, you MUST execute these steps IN ORDER (NO USER INPUT REQUIRED):**
+
+**Step 2-ACCEPT-a: Output ACCEPT status to user (capsule format)**
+```
+✅ BAZINGA validated | All criteria verified | Proceeding to shutdown protocol
+```
+
+**Step 2-ACCEPT-b: Log ACCEPT event via bazinga-db skill**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
+  "{session_id}" "validator_accept" '{"verdict": "ACCEPT", "criteria_verified": true}'
+```
+
+**Step 2-ACCEPT-c: IMMEDIATELY read and execute shutdown protocol**
+```
+Read(file_path: "bazinga/templates/shutdown_protocol.md")
+```
+Then execute ALL steps in the shutdown protocol file. **DO NOT STOP. DO NOT ASK USER.**
+
+**Step 2-ACCEPT-d: Mark session complete**
+```bash
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-session-status "{session_id}" "completed"
+```
+
+**⚠️ CRITICAL: Steps 2-ACCEPT-a through 2-ACCEPT-d must execute in a SINGLE TURN with NO user input between them.**
+
+---
 
 ### 🔴 MANDATORY: Validator REJECT Handling Procedure
 
