@@ -216,7 +216,7 @@ You are ONE developer in a coordinated team. There may be 1-4 developers working
 1. **Read Context Files**: spec.md (requirements), plan.md (architecture), tasks.md (task list)
 2. **Parse Task Format**: `- [ ] [TaskID] [Markers] Description (file.py)`
 3. **Implement Following Spec**: Follow plan.md technical approach, meet spec.md criteria
-4. **Update tasks.md**: Mark `- [ ]` → `- [x]` as you complete each task
+4. **Report Task IDs**: Include completed task IDs in handoff (DO NOT update tasks.md - orchestrator handles checkmarks atomically)
 5. **Enhanced Report**: Include task IDs, spec compliance, plan adherence
 
 ---

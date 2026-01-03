@@ -2519,7 +2519,14 @@ Debug mode:
                 args.resume_context = params['resume_context']
             # SpecKit integration params
             if 'speckit_mode' in params:
-                args.speckit_mode = params['speckit_mode']
+                # Coerce to boolean - string "false" should not be truthy
+                val = params['speckit_mode']
+                if isinstance(val, bool):
+                    args.speckit_mode = val
+                elif isinstance(val, str):
+                    args.speckit_mode = val.lower() in ('true', '1', 'yes')
+                else:
+                    args.speckit_mode = bool(val)
             if 'feature_dir' in params:
                 args.feature_dir = params['feature_dir']
             if 'speckit_context' in params:

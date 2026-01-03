@@ -188,8 +188,14 @@ Check if your spawn context includes a `SPECKIT_CONTEXT` section:
 
 **Key difference:** You're READING the task breakdown, not INVENTING it.
 
-### IF NO SPECKIT_CONTEXT
+### IF NO SPECKIT_CONTEXT OR SPECKIT PARSING ERROR
 
+This applies when:
+- No SPECKIT_CONTEXT section is provided, OR
+- SpecKit files (tasks.md, spec.md, plan.md) were malformed/unparseable
+- The orchestrator has already handled the fallback to normal orchestration
+
+**Do NOT attempt to repair SpecKit in this situation:**
 - Proceed with normal planning (create your own task breakdown)
 - Continue with normal planning steps (Step 3.5: Assign Specializations, Step 5: Save PM State, etc.)
 - You will create task groups during Step 3.5 (Assign Specializations)

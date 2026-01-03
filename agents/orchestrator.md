@@ -351,6 +351,7 @@ Resume Context: {context if resume scenario}
 | `pgrep -F bazinga/dashboard.pid 2>/dev/null` | Dashboard check (safe PID lookup) |
 | `bash bazinga/scripts/start-dashboard.sh` | Start dashboard |
 | `bash bazinga/scripts/build-baseline.sh` | Run build baseline |
+| `bash bazinga/scripts/update-checkmarks.sh` | Update SpecKit task checkmarks |
 | `git branch --show-current` | Get current branch (init only) |
 
 **ANY command not matching above → STOP → Spawn agent OR use Skill**
@@ -682,14 +683,10 @@ Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator
 
 2. **Update tasks.md checkmarks atomically:**
    ```bash
-   FEATURE_DIR="{feature_dir from orchestrator state}"
-
-   # For each task ID in the completed group:
-   for task_id in T001 T002 T003; do
-       # Change "- [ ] [T001]" to "- [x] [T001]"
-       sed -i "s/^- \[ \] \[${task_id}\]/- [x] [${task_id}]/" "$FEATURE_DIR/tasks.md"
-   done
+   # Use portable helper script (works on Linux, macOS, Windows Git Bash)
+   bash bazinga/scripts/update-checkmarks.sh "{feature_dir}" T001 T002 T003
    ```
+   The script handles sed portability issues and performs atomic file updates.
 
 3. **Log checkmark update:**
    ```
