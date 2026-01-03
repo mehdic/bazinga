@@ -112,6 +112,9 @@ VALID_INVESTIGATION_STATUSES = frozenset({
 })
 MAX_INVESTIGATION_ITERATION = 20  # Reasonable upper bound
 
+# Valid session statuses (matches schema CHECK constraint)
+VALID_SESSION_STATUSES = frozenset({'active', 'completed', 'failed'})
+
 
 def _validate_group_id_base(group_id: Any) -> Optional[str]:
     """Base validation: type, format, length. Used by all three validators.
@@ -3755,6 +3758,8 @@ SESSION OPERATIONS:
   get-session <id>                            Get session details by ID
   list-sessions [limit]                       List recent sessions (default: 10)
   update-session-status <id> <status>         Update session status
+  update-session <id> --status|-s <status>    Update session status (alias with flag syntax)
+  complete-session <id>                       Mark session as completed (convenience)
 
 LOG OPERATIONS:
   log-interaction <session> <agent> <content> [iteration] [agent_id]
@@ -4175,9 +4180,75 @@ def main():
             result = db.get_task_groups(session_id, status)
             print(json.dumps(result, indent=2))
         elif cmd == 'update-session-status':
+            # Usage: update-session-status <session_id> <status>
+            if len(cmd_args) < 2:
+                print(json.dumps({"success": False, "error": "update-session-status requires <session_id> <status>",
+                                  "valid_statuses": list(VALID_SESSION_STATUSES)}, indent=2), file=sys.stderr)
+                sys.exit(1)
             session_id = cmd_args[0]
             status = cmd_args[1]
+            if status not in VALID_SESSION_STATUSES:
+                print(json.dumps({"success": False, "error": f"Invalid status '{status}'",
+                                  "valid_statuses": list(VALID_SESSION_STATUSES)}, indent=2), file=sys.stderr)
+                sys.exit(1)
             db.update_session_status(session_id, status)
+        elif cmd == 'update-session':
+            # Alias for update-session-status with --status/-s flag support
+            # Usage: update-session <session_id> --status <status>
+            #        update-session <session_id> -s <status>
+            if len(cmd_args) < 1:
+                print(json.dumps({"success": False, "error": "update-session requires <session_id>",
+                                  "usage": "update-session <session_id> --status <status>",
+                                  "valid_statuses": list(VALID_SESSION_STATUSES)}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            status = None
+            unknown_args = []
+            i = 1
+            while i < len(cmd_args):
+                arg = cmd_args[i]
+                if arg in ('--status', '-s'):
+                    if i + 1 >= len(cmd_args):
+                        print(json.dumps({"success": False, "error": f"{arg} requires a value",
+                                          "usage": "update-session <session_id> --status <status>"}, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                    next_val = cmd_args[i + 1]
+                    if next_val.startswith('-'):
+                        print(json.dumps({"success": False, "error": f"Invalid status value '{next_val}' (cannot start with '-')",
+                                          "valid_statuses": list(VALID_SESSION_STATUSES)}, indent=2), file=sys.stderr)
+                        sys.exit(1)
+                    status = next_val
+                    i += 2
+                else:
+                    unknown_args.append(arg)
+                    i += 1
+            if unknown_args:
+                print(json.dumps({"success": False, "error": f"Unknown arguments: {unknown_args}",
+                                  "usage": "update-session <session_id> --status <status>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            if not status:
+                print(json.dumps({"success": False, "error": "update-session requires --status <status>",
+                                  "usage": "update-session <session_id> --status <status>",
+                                  "valid_statuses": list(VALID_SESSION_STATUSES)}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            if status not in VALID_SESSION_STATUSES:
+                print(json.dumps({"success": False, "error": f"Invalid status '{status}'",
+                                  "valid_statuses": list(VALID_SESSION_STATUSES)}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            db.update_session_status(session_id, status)
+        elif cmd == 'complete-session':
+            # Convenience command to mark session as completed
+            # Usage: complete-session <session_id>
+            if len(cmd_args) < 1:
+                print(json.dumps({"success": False, "error": "complete-session requires <session_id>",
+                                  "usage": "complete-session <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            if len(cmd_args) > 1:
+                print(json.dumps({"success": False, "error": f"Unexpected arguments: {cmd_args[1:]}",
+                                  "usage": "complete-session <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            db.update_session_status(session_id, 'completed')
         elif cmd == 'create-task-group':
             # Parse --specializations, --item_count, --component-path, --initial_tier, --complexity flags first, then extract positional args
             specializations = None
