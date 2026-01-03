@@ -950,7 +950,7 @@ Display:
 
 **🔴 MANDATORY: Read resume workflow before proceeding:**
 ```
-Read(file_path: "templates/orchestrator/resume_workflow.md")
+Read(file_path: "bazinga/templates/orchestrator/resume_workflow.md")
 ```
 
 The template contains:
@@ -1394,7 +1394,7 @@ See `agents/project_manager.md` for full PM agent definition.
 
 **🔴 MANDATORY: Read PM spawn workflow before proceeding:**
 ```
-Read(file_path: "templates/orchestrator/pm_spawn_workflow.md")
+Read(file_path: "bazinga/templates/orchestrator/pm_spawn_workflow.md")
 ```
 
 The template contains:
@@ -1609,7 +1609,7 @@ Then invoke: `Skill(command: "bazinga-db-agents")` — **MANDATORY** (skipping c
 
 **🔴 MANDATORY: Read workflow routing reference before proceeding:**
 ```
-Read(file_path: "templates/orchestrator/workflow_routing_reference.md")
+Read(file_path: "bazinga/templates/orchestrator/workflow_routing_reference.md")
 ```
 
 The template contains:
