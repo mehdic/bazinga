@@ -191,8 +191,8 @@ Check if your spawn context includes a `SPECKIT_CONTEXT` section:
 ### IF NO SPECKIT_CONTEXT
 
 - Proceed with normal planning (create your own task breakdown)
-- Continue to Step 1 (Mode Decision) and subsequent steps normally
-- You will create task groups during Step 3 (Task Classification)
+- Continue with normal planning steps (Step 3.5: Assign Specializations, Step 5: Save PM State, etc.)
+- You will create task groups during Step 3.5 (Assign Specializations)
 
 ---
 
