@@ -3755,6 +3755,8 @@ SESSION OPERATIONS:
   get-session <id>                            Get session details by ID
   list-sessions [limit]                       List recent sessions (default: 10)
   update-session-status <id> <status>         Update session status
+  update-session <id> --status <status>       Update session status (alias with flag syntax)
+  complete-session <id>                       Mark session as completed (convenience)
 
 LOG OPERATIONS:
   log-interaction <session> <agent> <content> [iteration] [agent_id]
@@ -4178,6 +4180,33 @@ def main():
             session_id = cmd_args[0]
             status = cmd_args[1]
             db.update_session_status(session_id, status)
+        elif cmd == 'update-session':
+            # Alias for update-session-status with --status flag support
+            # Usage: update-session <session_id> --status <status>
+            if len(cmd_args) < 1:
+                print(json.dumps({"success": False, "error": "update-session requires <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            status = None
+            i = 1
+            while i < len(cmd_args):
+                if cmd_args[i] == '--status' and i + 1 < len(cmd_args):
+                    status = cmd_args[i + 1]
+                    i += 2
+                else:
+                    i += 1
+            if not status:
+                print(json.dumps({"success": False, "error": "update-session requires --status <status>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            db.update_session_status(session_id, status)
+        elif cmd == 'complete-session':
+            # Convenience command to mark session as completed
+            # Usage: complete-session <session_id>
+            if len(cmd_args) < 1:
+                print(json.dumps({"success": False, "error": "complete-session requires <session_id>"}, indent=2), file=sys.stderr)
+                sys.exit(1)
+            session_id = cmd_args[0]
+            db.update_session_status(session_id, 'completed')
         elif cmd == 'create-task-group':
             # Parse --specializations, --item_count, --component-path, --initial_tier, --complexity flags first, then extract positional args
             specializations = None
