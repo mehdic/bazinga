@@ -29,7 +29,7 @@ except ImportError:
     _HAS_BAZINGA_PATHS = False
 
 # Current schema version
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 def get_schema_version(cursor) -> int:
     """Get current schema version from database."""
@@ -1591,11 +1591,57 @@ def init_database(db_path: str) -> None:
             current_version = 18
             print("✓ Migration to v18 complete (investigation state isolation)")
 
+        # v18 → v19: Add speckit_task_ids column to task_groups for SpecKit integration
+        if current_version < 19:
+            print("\n--- Migrating v18 → v19 (SpecKit task ID tracking) ---")
+
+            # Check if task_groups table exists (for fresh databases, skip ALTER and let CREATE TABLE handle it)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_groups'")
+            task_groups_exists = cursor.fetchone() is not None
+
+            if not task_groups_exists:
+                print("   ⊘ task_groups table doesn't exist yet - will be created with full schema below")
+                print("✓ Migration to v19 complete (fresh database, skipped)")
+                current_version = 19
+            else:
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
+
+                    # Add speckit_task_ids column (JSON array of task IDs like ["T001", "T002"])
+                    try:
+                        cursor.execute("ALTER TABLE task_groups ADD COLUMN speckit_task_ids TEXT")
+                        print("   ✓ Added task_groups.speckit_task_ids")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column" in str(e).lower():
+                            print("   ⊘ task_groups.speckit_task_ids already exists")
+                        else:
+                            raise
+
+                    # Verify integrity
+                    cursor.execute("PRAGMA integrity_check")
+                    integrity = cursor.fetchone()[0]
+                    if integrity != "ok":
+                        raise sqlite3.IntegrityError(f"Migration v18→v19: Integrity check failed: {integrity}")
+
+                    conn.commit()
+                    print("   ✓ Committed v18→v19 migration")
+
+                except Exception as e:
+                    conn.rollback()
+                    if "SQLITE_BUSY" in str(e):
+                        print(f"   ⊘ v18→v19 migration skipped (database busy, will retry)")
+                    else:
+                        print(f"   ✗ v18→v19 migration failed, rolled back: {e}")
+                        raise
+
+                current_version = 19
+                print("✓ Migration to v19 complete (SpecKit task ID tracking)")
+
         # Record version upgrade
         cursor.execute("""
             INSERT OR REPLACE INTO schema_version (version, description)
             VALUES (?, ?)
-        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: Investigation state isolation + group-aware dedup"))
+        """, (SCHEMA_VERSION, f"Schema v{SCHEMA_VERSION}: SpecKit task ID tracking"))
         conn.commit()
         print(f"✓ Schema upgraded to v{SCHEMA_VERSION}")
     elif current_version == SCHEMA_VERSION:
@@ -1715,6 +1761,7 @@ def init_database(db_path: str) -> None:
     # Extended in v14 to support security_sensitive, qa_attempts, tl_review_attempts
     # Extended in v15 to support component_path for version-specific prompt building
     # Extended in v16 to support review_iteration, no_progress_count, blocking_issues_count
+    # Extended in v19 to support speckit_task_ids for SpecKit pre-planned task tracking
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT NOT NULL,
@@ -1741,6 +1788,7 @@ def init_database(db_path: str) -> None:
             review_iteration INTEGER DEFAULT 1 CHECK(review_iteration >= 1),
             no_progress_count INTEGER DEFAULT 0 CHECK(no_progress_count >= 0),
             blocking_issues_count INTEGER DEFAULT 0 CHECK(blocking_issues_count >= 0),
+            speckit_task_ids TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, session_id),

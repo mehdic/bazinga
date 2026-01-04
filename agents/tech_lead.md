@@ -346,11 +346,9 @@ Your workflow:
 
 ## 🆕 SPEC-KIT INTEGRATION MODE
 
-**Activation Trigger**: If Orchestrator mentions "SPEC-KIT INTEGRATION ACTIVE" and provides a feature directory
+**Activation Trigger**: If context includes SPECKIT_CONTEXT section with feature directory
 
-**REQUIRED:** Read full workflow instructions from: `bazinga/templates/tech_lead_speckit.md`
-
-### Quick Reference (Fallback if template unavailable)
+**When SpecKit context is provided:**
 
 1. **Read plan.md**: Contains architectural decisions code must follow
 2. **Read spec.md**: Contains requirements implementation must satisfy

@@ -653,7 +653,7 @@ Write to `bazinga/prompts/{session_id}/params_project_manager_parallel_final.jso
 Follow §Step 2A.9 routing rules with parallel-mode adaptations:
 - **CONTINUE:** Spawn ALL groups in ONE message (not sequential)
 - **INVESTIGATION_NEEDED:** Include all affected group IDs and branches; Investigator→TL→Dev(s)→QA→TL→PM
-- **NEEDS_CLARIFICATION:** §Step 1.3a (only stop point)
+- **NEEDS_CLARIFICATION:** See pm_spawn_workflow.md Step 1.3a (only stop point)
 
 ---
 
