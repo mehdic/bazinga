@@ -110,6 +110,98 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 ---
 
+## Step 1.0: Check for SpecKit Pre-Planned Context (NEW SESSION ONLY)
+
+**Purpose:** If orchestrator provided pre-planned SpecKit artifacts, use them instead of creating task breakdown from scratch.
+
+### Detection
+
+Check if your spawn context includes a `SPECKIT_CONTEXT` section:
+
+```
+## SPECKIT_CONTEXT (Pre-Planned Tasks)
+
+**Feature Directory:** .specify/features/001-auth/
+
+**tasks.md:**
+- [ ] [T001] [P] Setup: Create auth module (auth/__init__.py)
+- [ ] [T002] [P] [US1] JWT generation (auth/jwt.py)
+- [ ] [T003] [P] [US1] Token validation (auth/jwt.py)
+...
+
+**spec.md:** (requirements summary)
+**plan.md:** (technical approach summary)
+```
+
+### IF SPECKIT_CONTEXT Present
+
+1. **Use tasks.md as your task breakdown:**
+   - Parse task IDs: `[T001]`, `[T002]`, etc.
+   - Parse markers: `[P]` = parallel eligible, `[US1]` = user story 1
+   - Group tasks by `[US]` markers
+
+2. **Create task groups from SpecKit tasks:**
+   ```
+   Group by [US] markers:
+   - Tasks with [US1] → Group "US1"
+   - Tasks with [US2] → Group "US2"
+   - Tasks without [US] → Group "SETUP" or by phase
+
+   Parallel detection:
+   - All tasks in group marked [P] → parallel eligible
+   ```
+
+3. **Use spec.md for requirements context:**
+   - Reference acceptance criteria
+   - Note edge cases
+
+4. **Use plan.md for technical approach:**
+   - Follow specified libraries/patterns
+   - Reference architecture decisions
+
+5. **Save task groups with SpecKit task IDs:**
+
+   When creating each task group via bazinga-db, include the `speckit_task_ids`:
+
+   ```
+   Skill(command: "bazinga-db-workflow")
+
+   Request: Create task group with SpecKit task IDs:
+   - Session ID: {session_id}
+   - Group ID: {group_id} (e.g., "US1", "SETUP")
+   - Name: {group_name}
+   - SpecKit Task IDs: ["T001", "T002", "T003"] (tasks in this group)
+   - Specializations: [...]
+   - Complexity: {1-10}
+   ```
+
+   **Example for group US1 containing tasks T001, T002, T003:**
+   ```json
+   {
+     "group_id": "US1",
+     "name": "User Authentication",
+     "speckit_task_ids": ["T001", "T002", "T003"],
+     "complexity": 4,
+     "specializations": ["python", "fastapi"]
+   }
+   ```
+
+**Key difference:** You're READING the task breakdown, not INVENTING it.
+
+### IF NO SPECKIT_CONTEXT OR SPECKIT PARSING ERROR
+
+This applies when:
+- No SPECKIT_CONTEXT section is provided, OR
+- SpecKit files (tasks.md, spec.md, plan.md) were malformed/unparseable
+- The orchestrator has already handled the fallback to normal orchestration
+
+**Do NOT attempt to repair SpecKit in this situation:**
+- Proceed with normal planning (create your own task breakdown)
+- Continue with normal planning steps (Step 3.5: Assign Specializations, Step 5: Save PM State, etc.)
+- You will create task groups during Step 3.5 (Assign Specializations)
+
+---
+
 ## Step 3.5: Assign Specializations (CRITICAL - BLOCKS WORKFLOW)
 
 **Purpose:** Provide technology-specific patterns to agents.

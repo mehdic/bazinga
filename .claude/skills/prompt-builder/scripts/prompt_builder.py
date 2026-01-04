@@ -1711,6 +1711,131 @@ def build_task_context(args):
     return context
 
 
+def build_speckit_context(args):
+    """Build SPECKIT_CONTEXT block for agents when speckit_mode is enabled.
+
+    This provides pre-planned task context from SpecKit artifacts to agents,
+    allowing them to work with pre-defined tasks instead of PM-generated ones.
+
+    See: research/speckit-consolidation-analysis.md
+    """
+    speckit_mode = getattr(args, 'speckit_mode', False)
+    if not speckit_mode:
+        return ""
+
+    feature_dir = getattr(args, 'feature_dir', '')
+    speckit_context = getattr(args, 'speckit_context', {})
+
+    # Handle string (from CLI) vs dict (from params file)
+    if isinstance(speckit_context, str) and speckit_context:
+        try:
+            speckit_context = json.loads(speckit_context)
+        except json.JSONDecodeError as e:
+            # CRITICAL FIX #3: Make JSON errors visible in prompt
+            error_msg = f"Failed to parse SpecKit context JSON: {e}"
+            print(f"CRITICAL: {error_msg}", file=sys.stderr)
+            return f"""
+## SPECKIT_CONTEXT - ERROR
+
+⚠️ **CRITICAL ERROR:** Failed to load SpecKit artifacts due to JSON parsing error.
+This is a bug in the orchestrator. Please report this issue.
+
+Error: {error_msg}
+
+**Fallback:** PM will create task breakdown from scratch (normal mode).
+"""
+
+    # CRITICAL FIX #1: Token budget enforcement
+    # Reserve 8000 tokens max for SpecKit context (split across 3 artifacts)
+    MAX_SPECKIT_TOKENS = 8000
+    PER_ARTIFACT_BUDGET = MAX_SPECKIT_TOKENS // 3
+
+    def truncate_content(content, budget):
+        """Truncate content to fit within token budget."""
+        if not content or content == 'Not provided':
+            return content, False
+        tokens = estimate_tokens(content)
+        if tokens <= budget:
+            return content, False
+        # Truncate by characters (rough estimate: 4 chars per token)
+        char_limit = budget * 4
+        truncated = content[:char_limit]
+        # Find last newline to avoid cutting mid-line
+        last_newline = truncated.rfind('\n')
+        if last_newline > char_limit * 0.8:
+            truncated = truncated[:last_newline]
+        return truncated + f"\n\n[... TRUNCATED - {tokens - budget} tokens removed to fit budget ...]", True
+
+    # CRITICAL FIX #2: Escape code fences to prevent markdown collision
+    def escape_code_fences(content):
+        """Replace triple backticks with tilde fences to prevent collision."""
+        if not content:
+            return content
+        # Replace ``` with ~~~ to avoid fence collision
+        return content.replace('```', '~~~')
+
+    tasks_raw = speckit_context.get('tasks', 'Not provided')
+    spec_raw = speckit_context.get('spec', 'Not provided')
+    plan_raw = speckit_context.get('plan', 'Not provided')
+
+    # Apply truncation
+    tasks_content, tasks_truncated = truncate_content(tasks_raw, PER_ARTIFACT_BUDGET)
+    spec_content, spec_truncated = truncate_content(spec_raw, PER_ARTIFACT_BUDGET)
+    plan_content, plan_truncated = truncate_content(plan_raw, PER_ARTIFACT_BUDGET)
+
+    # Apply code fence escaping
+    tasks_content = escape_code_fences(tasks_content)
+    spec_content = escape_code_fences(spec_content)
+    plan_content = escape_code_fences(plan_content)
+
+    # Log warnings if truncation occurred
+    if any([tasks_truncated, spec_truncated, plan_truncated]):
+        truncated_files = []
+        if tasks_truncated:
+            truncated_files.append("tasks.md")
+        if spec_truncated:
+            truncated_files.append("spec.md")
+        if plan_truncated:
+            truncated_files.append("plan.md")
+        print(f"WARNING: SpecKit artifacts truncated due to size: {', '.join(truncated_files)}", file=sys.stderr)
+
+    truncation_notice = ""
+    if any([tasks_truncated, spec_truncated, plan_truncated]):
+        truncation_notice = """
+**⚠️ Note:** Some artifacts were truncated to fit token budget. Focus on visible content.
+"""
+
+    return f"""
+## SPECKIT_CONTEXT (Pre-Planned Tasks)
+
+**Mode:** SpecKit-enabled session - use pre-planned tasks from artifacts below.
+
+**Feature Directory:** {feature_dir}
+{truncation_notice}
+**tasks.md (PRIMARY - use this as your task breakdown):**
+```
+{tasks_content}
+```
+
+**spec.md (Requirements - success criteria source):**
+```
+{spec_content}
+```
+
+**plan.md (Architecture - implementation guidance):**
+```
+{plan_content}
+```
+
+**INSTRUCTIONS:**
+- Use tasks.md as your task breakdown - track progress by task ID
+- Parse task IDs ([T001], [T002]) for reporting
+- Follow plan.md technical approach
+- Meet spec.md acceptance criteria
+- Report task completion using task IDs in your handoff
+"""
+
+
 def build_feedback_context(args):
     """Build feedback context for retries."""
     feedback = ""
@@ -1993,6 +2118,12 @@ def build_prompt(args):
         task_context = build_task_context(args)
         components.append(task_context)
 
+        # 4.5. Build SPECKIT_CONTEXT (if speckit_mode enabled)
+        # See: research/speckit-consolidation-analysis.md
+        speckit_block = build_speckit_context(args)
+        if speckit_block:
+            components.append(speckit_block)
+
         # 5. Build PM-specific context
         if args.agent_type == "project_manager":
             pm_context = build_pm_context(args)
@@ -2273,6 +2404,14 @@ Debug mode:
     parser.add_argument("--resume-context", default="",
                         help="Resume context for PM resume spawns")
 
+    # SpecKit integration
+    parser.add_argument("--speckit-mode", action="store_true",
+                        help="Enable SpecKit integration mode")
+    parser.add_argument("--feature-dir", default="",
+                        help="SpecKit feature directory path")
+    parser.add_argument("--speckit-context", default="",
+                        help="SpecKit context JSON (tasks, spec, plan content)")
+
     # Output file option (for file-based prompt delivery)
     parser.add_argument("--output-file", default="",
                         help="Save prompt to file (in addition to stdout). Path relative to project root.")
@@ -2378,6 +2517,20 @@ Debug mode:
                 args.pm_state = params['pm_state'] if isinstance(params['pm_state'], str) else json.dumps(params['pm_state'])
             if 'resume_context' in params:
                 args.resume_context = params['resume_context']
+            # SpecKit integration params
+            if 'speckit_mode' in params:
+                # Coerce to boolean - string "false" should not be truthy
+                val = params['speckit_mode']
+                if isinstance(val, bool):
+                    args.speckit_mode = val
+                elif isinstance(val, str):
+                    args.speckit_mode = val.lower() in ('true', '1', 'yes')
+                else:
+                    args.speckit_mode = bool(val)
+            if 'feature_dir' in params:
+                args.feature_dir = params['feature_dir']
+            if 'speckit_context' in params:
+                args.speckit_context = params['speckit_context']
             # Enable JSON output when using params file (skill invocation)
             args.json_output = True
 

@@ -879,7 +879,7 @@ Skill(command: "velocity-tracker")
 - **Immediately proceed to Completion phase** (no user input needed)
 
 **IF PM sends CONTINUE:**
-- Query task groups (§Step 1.4) → Parse PM feedback → Identify what needs fixing
+- Query task groups (see pm_spawn_workflow.md Step 1.4) → Parse PM feedback → Identify what needs fixing
 - Build revision prompt per §Step 2A.1 → Spawn agent → Log to database
 - Update iteration count in database → Continue workflow (Dev→QA→Tech Lead→PM)
 

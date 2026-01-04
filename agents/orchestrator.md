@@ -351,6 +351,8 @@ Resume Context: {context if resume scenario}
 | `pgrep -F bazinga/dashboard.pid 2>/dev/null` | Dashboard check (safe PID lookup) |
 | `bash bazinga/scripts/start-dashboard.sh` | Start dashboard |
 | `bash bazinga/scripts/build-baseline.sh` | Run build baseline |
+| `bash bazinga/scripts/update-checkmarks.sh` | Update SpecKit task checkmarks |
+| `bash bazinga/scripts/discover-speckit.sh` | Discover SpecKit features |
 | `git branch --show-current` | Get current branch (init only) |
 
 **ANY command not matching above → STOP → Spawn agent OR use Skill**
@@ -404,6 +406,20 @@ Resume Context: {context if resume scenario}
    }
    ```
    **Note:** `prior_handoff_file` is only set when routing from one agent to another (e.g., Developer → QA).
+
+   **IF speckit_mode is true (from session state):** Also include SpecKit fields:
+   ```json
+   {
+     "speckit_mode": true,
+     "feature_dir": "{feature_dir from orchestrator state}",
+     "speckit_context": {
+       "tasks": "{speckit_content.tasks from state}",
+       "spec": "{speckit_content.spec from state}",
+       "plan": "{speckit_content.plan from state}"
+     }
+   }
+   ```
+   The prompt-builder will add SPECKIT_CONTEXT section to the agent prompt.
 2. **Invoke prompt-builder skill**:
    ```
    Skill(command: "prompt-builder")
@@ -644,12 +660,47 @@ Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator
 
 **IF `clarification_resolved = true` OR `clarification_used = false` OR state not found:**
 - Normal resume
+- **Check for SpecKit mode:** Parse `speckit_mode` from orchestrator state
+  - If `speckit_mode: true` → Load `speckit_content` from state for PM spawn
+  - SpecKit context persists across resume (no re-detection needed)
 - Find groups with status != "completed"
 - Determine next workflow step:
   - Groups with `status=in_progress` → Check last agent, spawn next
   - Groups with `status=pending` → Spawn Developer
   - All groups completed → Spawn PM for BAZINGA assessment
 - **DO NOT ask user what to do** - resume automatically
+
+**SpecKit Resume Note:** If resuming a SpecKit session, PM spawn in Phase 1 will automatically include SPECKIT_CONTEXT section (via Step 1.2a) since `speckit_mode: true` is persisted in state.
+
+### SpecKit Checkmark Updates (After Group Completion)
+
+**When a task group reaches MERGE_SUCCESS and speckit_mode is true:**
+
+1. **Query completed task IDs:**
+   ```
+   Skill(command: "bazinga-db-workflow") → get-task-group {session_id} {group_id}
+   ```
+   Extract `speckit_task_ids` from the result (e.g., `["T001", "T002", "T003"]`)
+
+2. **Update tasks.md checkmarks atomically:**
+   ```bash
+   # Use portable helper script (works on Linux, macOS, Windows Git Bash)
+   bash bazinga/scripts/update-checkmarks.sh "{feature_dir}" T001 T002 T003
+   ```
+   The script handles sed portability issues and performs atomic file updates.
+
+3. **Log checkmark update:**
+   ```
+   ✅ SpecKit: Marked {N} tasks complete in {feature_dir}/tasks.md
+   ```
+
+**Why orchestrator does this (not agents):**
+- Prevents race conditions from parallel developers
+- Single atomic update point per group
+- Consistent checkmark state
+- Agents focus on implementation, not file management
+
+**When to skip:** If `speckit_task_ids` is null or empty for the group, skip checkmark updates.
 
 ### Key Rules
 
@@ -895,354 +946,18 @@ Display:
 - PM state loaded from database
 - **🔴 CRITICAL: Original_Scope from Step 3.5** (to prevent scope narrowing)
 
-**PM Spawn Prompt MUST include this scope comparison section:**
+**🔴 MANDATORY: Read resume workflow before proceeding:**
 ```
-## 🔴 SCOPE PRESERVATION (MANDATORY FOR RESUME)
-
-**Original Scope (from session creation):**
-- Raw Request: {Original_Scope.raw_request}
-- Scope Type: {Original_Scope.scope_type}
-- Scope Reference: {Original_Scope.scope_reference}
-- Estimated Items: {Original_Scope.estimated_items}
-
-**User's Current Request:** {user_current_message}
-
-**YOUR TASK - SCOPE COMPARISON:**
-1. Compare user's current request with Original_Scope.raw_request
-2. IF current request implies SAME OR NARROWER scope:
-   - Normal resume - continue from where we left off
-3. IF current request implies BROADER scope (more items, more phases, additional work):
-   - DO NOT narrow to current PM state
-   - Create additional task groups for the expanded scope
-   - Status: PLANNING_COMPLETE (not CONTINUE) to signal new groups created
-4. IF user explicitly requests "everything" or "all of [file/feature]":
-   - This means FULL Original_Scope, not just current progress
-   - Ensure task groups cover 100% of Original_Scope
-
-**NEVER reduce scope below Original_Scope without explicit user approval.**
+Read(file_path: "bazinga/templates/orchestrator/resume_workflow.md")
 ```
 
-**After PM responds:** Route using Step 1.3a. In resume scenarios, PM typically returns:
-- `CONTINUE` → Immediately spawn agents for in_progress/pending groups (Step 2A.1 or 2B.1)
-- `BAZINGA` → Session already complete, proceed to Completion phase
-- `NEEDS_CLARIFICATION` → Follow clarification workflow
-
-**🔴 CRITICAL - COMPLETE ALL STEPS IN SAME TURN (NO USER WAIT):**
-1. Log PM interaction to database
-2. Parse PM status (CONTINUE/BAZINGA/etc)
-3. Start spawn sequence or proceed to completion - **all within this turn**
-4. Saying "I will spawn" or "Let me spawn" is NOT spawning - call Skill() or Task() tool NOW
-   - Call `Skill(command: "prompt-builder")` to build the prompt
-   - Then call `Task()` with the built prompt
-5. Multi-step sequences (DB query → prompt-builder → spawn) are expected within the same turn
-
----
-
-**Step 6: Handle PM Response in Resume (CRITICAL)**
-
-**After PM responds, route based on PM's status code:**
-
-| PM Status | Action |
-|-----------|--------|
-| `CONTINUE` | **IMMEDIATELY start spawn sequence** for pending groups. Call prompt-builder, then Task(). |
-| `BAZINGA` | Session is complete → Jump to Completion phase, invoke validator |
-| `PLANNING_COMPLETE` | New work added → Jump to Step 1.4, then Phase 2 |
-| `NEEDS_CLARIFICATION` | Surface question to user |
-
-**🔴 INTENT WITHOUT ACTION:** If PM says CONTINUE, call `Skill(command: "prompt-builder")` + `Task()` NOW. Don't just describe it.
-
----
-
-**REMEMBER:** After receiving the session list in Step 0, you MUST execute Steps 1-6 in sequence without stopping. After PM responds, route according to Step 1.3a and continue spawning agents without waiting for user input. These are not optional - they are the MANDATORY resume workflow.
-
----
-
-### Path B: CREATE NEW SESSION
-
-**IF no active sessions found OR user explicitly requested new session:**
-
-1. **Generate session ID:**
-   ```bash
-   SESSION_ID="bazinga_$(date +%Y%m%d_%H%M%S)"
-   ```
-
-2. **Create artifacts directory structure:**
-   ```bash
-   # Create artifacts directories for this session (required for build baseline logs and skill outputs)
-   mkdir -p "bazinga/artifacts/${SESSION_ID}"
-   mkdir -p "bazinga/artifacts/${SESSION_ID}/skills"
-   ```
-
-3. **Create session in database:**
-
-   ### 🔴 MANDATORY SESSION CREATION - CANNOT BE SKIPPED
-
-   **YOU MUST invoke the bazinga-db skill to create a new session.**
-   **Database will auto-initialize if it doesn't exist (< 2 seconds).**
-
-   Request to bazinga-db-core skill:
-   ```
-   bazinga-db-core, please create a new orchestration session:
-
-   Session ID: $SESSION_ID
-   Mode: simple
-   Requirements: [User's requirements from input]
-   Initial_Branch: [result of git branch --show-current]
-   Original_Scope: {
-     "raw_request": "[exact user request text verbatim]",
-     "scope_type": "[file|feature|task_list|description]",
-     "scope_reference": "[file path if scope_type=file, otherwise null]",
-     "estimated_items": [count if determinable from file/list, null otherwise]
-   }
-   ```
-
-   **Scope Type Detection:**
-   - `file` - User references a file (e.g., "implement tasks8.md")
-   - `task_list` - User provides numbered/bulleted list
-   - `feature` - User requests a feature (e.g., "add authentication")
-   - `description` - General description
-
-   **Note:** Mode is initially set to "simple" as a default. The PM will analyze requirements and may update this to "parallel" if multiple independent tasks are detected.
-   **Note:** Original_Scope is MANDATORY for validator scope checking. The validator uses this to verify PM's completion claims.
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db-core")
-   ```
-
-**IMPORTANT:** You MUST invoke bazinga-db-core skill here. Use the returned data.
-
-   **What "process silently" means:**
-   - ✅ DO: Verify the skill succeeded
-   - ✅ DO: Extract the session_id from response
-   - ❌ DON'T: Show raw skill output to user
-   - ❌ DON'T: Show "Session created in database ✓" confirmations
-
-   **Display to user (capsule format on success):**
-   ```
-   🚀 Starting orchestration | Session: [session_id]
-   ```
-
-   **IF bazinga-db skill fails or returns error:** Output `❌ Session creation failed | Database error | Cannot proceed - check bazinga-db skill` and STOP.
-
-   **AFTER successful session creation: IMMEDIATELY continue to step 3.5 (Seed workflow configs). Do NOT stop.**
-
-3.5 **Seed workflow configurations (MANDATORY):**
-
-   ### 🔴 MANDATORY: Seed Workflow Configs to Database
-
-   **YOU MUST invoke the config-seeder skill to seed routing and marker configs to database.**
-   **This enables deterministic prompt building and workflow routing.**
-
-   ```
-   Skill(command: "config-seeder")
-   ```
-
-   **Expected output:**
-   ```
-   Seeded 45 transitions
-   Seeded 7 agent marker sets
-   Seeded 5 special rules
-   ✅ Config seeding complete
-   ```
-
-   **IF config-seeder skill fails:** Output `❌ Config seeding failed | Workflow routing unavailable | Cannot proceed` and STOP.
-   **Config seeding is MANDATORY** - without it, prompt-builder and workflow-router cannot function.
-
-   **AFTER successful config seeding: IMMEDIATELY continue to step 4 (Load configurations). Do NOT stop.**
-
-4. **Load configurations:**
-
-   ```bash
-   # Read active skills configuration
-   cat bazinga/skills_config.json
-
-   # Read testing framework configuration
-   cat bazinga/testing_config.json
-   ```
-
-   **Note:** Read configurations using Read tool, but don't show Read tool output to user - it's internal setup.
-
-   **AFTER reading configs: IMMEDIATELY continue to step 4.5 (Capability discovery). Do NOT stop.**
-
-   See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
-
-4.5. **Capability discovery (MANDATORY):**
-
-   After loading skills_config.json, determine which skills are available:
-
-   ```python
-   # skills_config.json structure: {"developer": {"lint-check": "mandatory", ...}, "tech_lead": {...}}
-   # May also have metadata fields like "_version", "_updated" - skip those
-   AVAILABLE_SKILLS = {}  # {agent_name: {skill_name: mode}}
-   CRITICAL_DISABLED = []
-
-   for agent_name, agent_skills in skills_config.items():
-       # Skip metadata fields (start with underscore) and non-dict values
-       if agent_name.startswith("_") or not isinstance(agent_skills, dict):
-           continue
-       AVAILABLE_SKILLS[agent_name] = {}
-       for skill_name, mode in agent_skills.items():
-           if mode != "disabled":
-               AVAILABLE_SKILLS[agent_name][skill_name] = mode  # Track per-agent
-           elif skill_name in ["lint-check", "security-scan", "test-coverage"]:
-               if skill_name not in CRITICAL_DISABLED:  # Avoid duplicates
-                   CRITICAL_DISABLED.append(skill_name)
-
-   # Helper: Check if skill is available for a specific agent
-   # Usage: skill_available("developer", "lint-check") → True if enabled
-   # Note: Use before spawning to validate mandatory skills, or when conditionally invoking optional skills
-   def skill_available(agent: str, skill: str) -> bool:
-       return skill in AVAILABLE_SKILLS.get(agent, {})
-   ```
-
-   **Critical skill fallbacks:**
-   | Disabled Skill | Fallback Behavior |
-   |----------------|-------------------|
-   | `lint-check` | Skip lint validation (log warning) |
-   | `security-scan` | Skip security checks (⚠️ WARN USER) |
-   | `test-coverage` | Skip coverage checks (log warning) |
-
-   **IF any CRITICAL_DISABLED skills:**
-   ```
-   ⚠️ WARNING: Critical skills disabled: {CRITICAL_DISABLED}
-   - security-scan: Security vulnerabilities may not be detected
-   - lint-check: Code style issues may be missed
-   - test-coverage: Coverage gaps may not be identified
-   ```
-
-   Store in session state: `disabled_skills: [list]`, `capability_warnings: [list]`
-
-5. **Load model configuration from database:**
-
-   ### 🔴 MANDATORY: Load Model Configuration
-
-   **Query model configuration for all agents:**
-
-   Request to bazinga-db-core skill:
-   ```
-   bazinga-db-core, please retrieve model configuration:
-   Query: Get all agent model assignments from model_config table
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db-core")
-   ```
-
-   **Load model config from source of truth:**
-   ```
-   Read(file_path: "bazinga/model_selection.json")
-   ```
-
-   **Parse and store model mappings:**
-   ```
-   MODEL_CONFIG = {}
-   for agent_name, agent_data in config["agents"].items():
-       MODEL_CONFIG[agent_name] = agent_data["model"]
-   # e.g., MODEL_CONFIG["developer"] = "sonnet", MODEL_CONFIG["tech_lead"] = "opus"
-   ```
-
-   **Source of truth:** `bazinga/model_selection.json` - NEVER hardcode model names elsewhere.
-
-   **🔄 CONTEXT RECOVERY:** If you lose model config (e.g., after context compaction), re-read:
-   ```
-   Read(file_path: "bazinga/model_selection.json")
-   ```
-
-   **Use MODEL_CONFIG values in ALL Task invocations instead of hardcoded models.**
-
-6. **Store config references in database:**
-
-   ### 🔴 MANDATORY: Store configuration in database
-
-   **YOU MUST invoke bazinga-db-core skill to save orchestrator initial state.**
-
-   Request to bazinga-db-core skill:
-   ```
-   bazinga-db-core, please save the orchestrator state:
-
-   Session ID: [current session_id]
-   State Type: orchestrator
-   State Data: {
-     "session_id": "[current session_id]",
-     "current_phase": "initialization",
-     "skills_config_loaded": true,
-     "active_skills_count": [count from skills_config.json],
-     "testing_config_loaded": true,
-     "testing_mode": "[mode from testing_config.json]",
-     "qa_expert_enabled": [boolean from testing_config.json],
-     "iteration": 0,
-     "total_spawns": 0
-   }
-   ```
-
-   Then invoke:
-   ```
-   Skill(command: "bazinga-db-core")
-   ```
-
-**IMPORTANT:** You MUST invoke bazinga-db-core skill here. Use the returned data.
-
-   **What "process silently" means:**
-   - ✅ DO: Verify the skill succeeded
-   - ❌ DON'T: Show raw skill output to user
-   - ❌ DON'T: Show "Config saved ✓" confirmations
-
-   **IF skill fails:** Output `❌ Config save failed | Cannot proceed` and STOP.
-
-   **AFTER successful config save: IMMEDIATELY continue to step 6 (Build baseline check). Do NOT stop.**
-
-6. **Run build baseline check:**
-
-   **Note:** Run build check silently. No user output needed unless build fails.
-
-   ```bash
-   bash bazinga/scripts/build-baseline.sh "$SESSION_ID"
-   ```
-
-   The wrapper script:
-   - Auto-detects project language (package.json, go.mod, etc.)
-   - Runs appropriate build command
-   - Saves results to `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
-   - Returns exit code: 0=success, 1=error
-
-   **Check result:**
-   - If exit code 0: Silent (no output)
-   - If exit code 1: `⚠️ Build baseline | Existing errors detected | Will track new errors`
-
-   **⚠️ DO NOT run inline npm/go/python commands** - use the wrapper script per §Bash Command Allowlist.
-
-   **AFTER build baseline check: IMMEDIATELY continue to step 7 (Load template guides). Do NOT stop.**
-
-7. **Load critical template guides:**
-
-   **⚠️ MANDATORY: Read templates that contain runtime instructions**
-
-   These templates are NOT documentation - they contain critical operational logic that must be loaded before orchestration begins.
-
-   ```
-   Read(file_path: "bazinga/templates/message_templates.md")
-   Read(file_path: "bazinga/templates/response_parsing.md")
-   Read(file_path: "bazinga/templates/prompt_building.md")
-   ```
-
-   **Verify all 3 templates loaded.** If ANY Read fails → Output `❌ Template load failed | [filename]` and STOP.
-
-   **AFTER loading and verifying templates: IMMEDIATELY continue to verification checkpoint below. Do NOT stop.**
-
-**Database Storage:**
-
-All state stored in SQLite database at `bazinga/bazinga.db`:
-- **Tables:** sessions, orchestration_logs, state_snapshots, task_groups, token_usage, skill_outputs, configuration
-- **Benefits:** Concurrent-safe, ACID transactions, fast indexed queries
-- **Details:** See `.claude/skills/bazinga-db/SKILL.md` for complete schema
-
-### ⚠️ INITIALIZATION VERIFICATION CHECKPOINT
-
-**CRITICAL:** Verify initialization complete (session ID, database, configs loaded, templates loaded). User sees: `🚀 Starting orchestration | Session: [session_id]`
-
-**Then IMMEDIATELY proceed to Step 0.5 - Tech Stack Detection.
+The template contains:
+- 🔴 SCOPE PRESERVATION section (must include in PM spawn for resume)
+- Path B: CREATE NEW SESSION (steps 1-8)
+- Database storage details
+- Initialization verification checkpoint
+
+**Follow ALL instructions in that file for resume/new session handling.**
 
 ---
 
@@ -1374,7 +1089,137 @@ Task(
 
 3. **Continue to Phase 1** (PM can still function without specializations)
 
-**AFTER Step 0.5 completes: IMMEDIATELY proceed to Phase 1 (Spawn PM). Do NOT stop.**
+**AFTER Step 0.5 completes: IMMEDIATELY proceed to Step 0.5e (SpecKit Detection). Do NOT stop.**
+
+---
+
+## Step 0.5e: SpecKit Artifact Detection (NEW SESSION ONLY)
+
+**Purpose:** Check if pre-planned SpecKit artifacts exist and ask user if they want to use them.
+
+### Detection
+
+```bash
+# Use allowlist-compliant discovery script
+SPECKIT_RESULT=$(bash bazinga/scripts/discover-speckit.sh)
+```
+
+Parse the JSON result:
+- `speckit_available: false` → Skip to Phase 1 (normal orchestration)
+- `speckit_available: true` → Continue with feature selection
+
+**IF no SpecKit files found:**
+- Skip to Phase 1 (normal orchestration)
+
+**IF SpecKit files found:**
+
+1. **List available features from discovery result:**
+   Parse `features` array from JSON and display:
+   ```
+   Found pre-planned features:
+     - feature-name-1
+     - feature-name-2
+   ```
+
+2. **Ask user:**
+   ```
+   📋 **SpecKit artifacts detected!**
+
+   Found pre-planned features:
+   {list from above}
+
+   Would you like to use these for planning context?
+   - **yes** / **yes .specify/features/XXX** → Use pre-planned tasks (PM reads instead of inventing)
+   - **no** → Normal orchestration (PM creates task breakdown)
+   ```
+
+3. **Wait for user response**
+
+**NOTE:** This is a mode selection prompt, NOT a NEEDS_CLARIFICATION. It does NOT count against the PM's clarification cap. Track separately as `speckit_prompt_shown: true` in state.
+
+### User Response Parsing
+
+**Affirmative responses (enable SpecKit):**
+- "yes", "y", "yeah", "yep", "sure", "ok", "okay", "Yes", "YES", "Y"
+- "yes .specify/features/XXX" (with specific path)
+- Any response starting with "yes" or "y " followed by optional path
+
+**Negative responses (normal orchestration):**
+- "no", "n", "nope", "skip", "No", "NO", "N"
+- Any response starting with "no" or "n "
+
+**Ambiguous/Other responses:**
+- If response doesn't match above patterns → treat as "no" (safe default)
+- If response contains new requirements → treat as "no" and use response as requirements
+
+### IF User Says Yes
+
+1. **Determine feature directory:**
+   - If user specified path → use that
+   - If multiple features exist → use highest-numbered prefix
+   - If single feature → use that
+
+2. **Validate tasks.md format:**
+   Use Read tool to check content (NOT grep - follows allowlist):
+   ```
+   Read(file_path: "{FEATURE_DIR}/tasks.md")
+   ```
+
+   Parse the content for SpecKit format (task IDs like [T001]):
+   - If content contains `- [ ] [T` or `- [x] [T` patterns → Valid SpecKit format
+   - If no task ID patterns found:
+     ```
+     ⚠️ Warning: tasks.md does not appear to be in SpecKit format
+        Expected format: - [ ] [T001] [Markers] Task description (file.py)
+        Continuing with normal orchestration
+     ```
+     Fall back to normal mode (speckit_mode: false)
+
+3. **Read artifacts using Read tool:**
+   ```
+   # IMPORTANT: Use Read tool, NOT cat command
+   Read(file_path: "{FEATURE_DIR}/tasks.md")  → TASKS_CONTENT
+   Read(file_path: "{FEATURE_DIR}/spec.md")   → SPEC_CONTENT (if exists)
+   Read(file_path: "{FEATURE_DIR}/plan.md")   → PLAN_CONTENT (if exists)
+   ```
+
+4. **Store in session state:**
+   ```
+   Skill(command: "bazinga-db-core")
+
+   Request: Save orchestrator state with speckit context:
+   {
+     "speckit_mode": true,
+     "speckit_prompt_shown": true,
+     "feature_dir": "{FEATURE_DIR}",
+     "speckit_artifacts": {
+       "tasks_md": "{FEATURE_DIR}/tasks.md",
+       "spec_md": "{FEATURE_DIR}/spec.md",
+       "plan_md": "{FEATURE_DIR}/plan.md"
+     },
+     "speckit_content": {
+       "tasks": "{TASKS_CONTENT}",
+       "spec": "{SPEC_CONTENT}",
+       "plan": "{PLAN_CONTENT}"
+     }
+   }
+   ```
+
+5. **Display confirmation:**
+   ```
+   ✅ SpecKit mode enabled | Using: {FEATURE_DIR} | PM will use pre-planned tasks
+   ```
+
+6. **Proceed to Phase 1:**
+   - Step 1.2 will include SPECKIT_CONTEXT section in PM prompt (see Step 1.2)
+
+### IF User Says No
+
+- Store `speckit_prompt_shown: true` in session state (to avoid re-asking on resume)
+- Continue to Phase 1 with normal orchestration
+- PM creates task breakdown as usual
+
+**AFTER Step 0.5e completes: IMMEDIATELY proceed to Phase 1 (Spawn PM). Do NOT stop.**
 
 ---
 
@@ -1497,445 +1342,72 @@ Build PM prompt by reading `agents/project_manager.md` and including:
 - Previous PM state from Step 1.1
 - User's requirements from conversation
 - Task: Analyze requirements, decide mode, create task groups
+- **IF SpecKit mode:** SPECKIT_CONTEXT section (see below)
 
 **CRITICAL**: You must include the session_id in PM's spawn prompt so PM can invoke bazinga-db skill.
+
+### SPECKIT_CONTEXT Handling (Step 1.2a)
+
+**Check for SpecKit mode:**
+1. Query orchestrator state: `Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator`
+2. Parse response for `speckit_mode: true`
+
+**IF speckit_mode is true:**
+
+Add this section to PM's spawn prompt (AFTER mandatory understanding capture):
+
+```markdown
+## SPECKIT_CONTEXT (Pre-Planned Tasks)
+
+**Mode:** SpecKit-enabled session - use pre-planned tasks from artifacts below.
+
+**Feature Directory:** {feature_dir from state}
+
+**tasks.md (PRIMARY - use this as your task breakdown):**
+```
+{speckit_content.tasks from state - the actual tasks.md content}
+```
+
+**spec.md (Requirements - success criteria source):**
+```
+{speckit_content.spec from state - or "Not provided" if empty}
+```
+
+**plan.md (Architecture - implementation guidance):**
+```
+{speckit_content.plan from state - or "Not provided" if empty}
+```
+
+**INSTRUCTIONS:**
+- Use tasks.md as your task breakdown - do NOT invent new tasks
+- Parse task IDs ([T001], [T002]) and group by [US] markers if present
+- Extract success criteria from spec.md requirements
+- See `templates/pm_planning_steps.md` Step 1.0 for detailed processing
+```
+
+**IF speckit_mode is false or not found:**
+- Do NOT include SPECKIT_CONTEXT section
+- PM creates task breakdown normally
 
 **ERROR HANDLING**: If Task tool fails to spawn agent, output error capsule per §Error Handling and cannot proceed.
 
 See `agents/project_manager.md` for full PM agent definition.
 
-**🔴 MANDATORY PM UNDERSTANDING CAPTURE:**
-
-Include this instruction at the START of PM's spawn prompt (before any analysis):
-
-```markdown
-## MANDATORY FIRST ACTION
-
-Before ANY analysis, save your understanding of this request:
-
-1. Create session-specific understanding file:
-   ```bash
-   # Ensure artifacts directory exists
-   mkdir -p bazinga/artifacts/{session_id}
-
-   cat > bazinga/artifacts/{session_id}/pm_understanding.md << 'UNDERSTANDING_EOF'
-   ## PM Understanding Phase
-
-   ### Raw Request Summary
-   {Summarize the user's request in 2-3 sentences}
-
-   ### Scope Assessment
-   - Type: {file|feature|bug|refactor|research}
-   - Complexity: {low|medium|high}
-   - Estimated task groups: {1-N}
-
-   ### Key Requirements
-   - {Requirement 1}
-   - {Requirement 2}
-   ...
-
-   ### Initial Constraints
-   - {Any constraints identified}
-   UNDERSTANDING_EOF
-   ```
-
-2. Save to database:
-   ```
-   Skill(command: "bazinga-db-agents") → save-reasoning {session_id} global project_manager understanding --content-file bazinga/artifacts/{session_id}/pm_understanding.md --confidence high
-   ```
-
-**Do NOT proceed with planning until understanding is saved.**
+**🔴 MANDATORY: Read PM spawn workflow before proceeding:**
+```
+Read(file_path: "bazinga/templates/orchestrator/pm_spawn_workflow.md")
 ```
 
-**Spawn:**
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "PM analyzing requirements and deciding execution mode",
-  prompt: [Full PM prompt from agents/project_manager.md with session_id context AND mandatory understanding capture above],
-  run_in_background: false
-)
-```
-
-PM returns decision with:
-- Mode chosen (SIMPLE/PARALLEL)
-- Task groups created
-- Execution plan
-- Next action for orchestrator
-
-### Step 1.3: Receive PM Decision
-
-**Step 1: Check for Investigation Answers (PRIORITY)**
-
-Check if PM response contains investigation section. Look for these headers (fuzzy match):
-- "## Investigation Answers"
-- "## Investigation Results"
-- "## Answers"
-- "## Findings"
-- "## Investigation"
-- Case-insensitive matching
-
-**IF investigation section found:**
-- Extract question(s) and answer(s) from the section
-- Handle multiple questions (see multi-question logic below)
-- Output investigation capsule BEFORE planning capsule:
-  ```
-  📊 Investigation results | {findings_summary} | Details: {details}
-  ```
-- Example: `📊 Investigation results | Found 83 E2E tests in 5 files | 30 passing, 53 skipped`
-- **Log investigation to database:**
-  ```
-  bazinga-db-agents, please log this investigation:
-  Session ID: [session_id]
-  Investigation Type: pre_orchestration_qa
-  Questions: [extracted questions]
-  Answers: [extracted answers]
-  ```
-  Then invoke: `Skill(command: "bazinga-db-agents")`
-- Then continue to parse planning sections
-
-**Multi-question capsules:** 1Q: summary+details, 2Q: both summaries, 3+Q: "Answered N questions"
-
-**No investigation:** Skip to Step 2. **Parse fails:** Log warning, continue.
-
-**Step 2: Parse PM response and output capsule to user**
-
-Use the PM Response Parsing section from `bazinga/templates/response_parsing.md` (loaded at initialization) to extract:
-- **Status** (PLANNING_COMPLETE, BAZINGA, CONTINUE, NEEDS_CLARIFICATION, INVESTIGATION_ONLY, INVESTIGATION_NEEDED)
-- **Mode** (SIMPLE, PARALLEL)
-- **Task groups** (if mode decision)
-- **Assessment** (if continue/bazinga)
-
-**Step 3: Construct and output plan summary to user**
-
-IF status = INVESTIGATION_ONLY:
-  → Display final investigation capsule (already shown)
-  → Update session status to 'completed'
-  → EXIT (no development)
-
-IF status = PLANNING_COMPLETE (PM's first response with multi-phase/complex plan):
-  → Use **Execution Plan Ready** format:
-  ```markdown
-  📋 **Execution Plan Ready**
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  **Mode:** {mode} ({N} concurrent developers)
-  **Tasks:** {task_count} across {phase_count} phases
-
-  **Phases:**
-  > Phase 1: {phase_name} - Groups {group_ids}
-  > Phase 2: {phase_name} - Groups {group_ids}
-
-  **Success Criteria:**
-  • {criterion_1}
-  • {criterion_2}
-
-  **Starting:** Phase 1 with Groups {ids}
-  ```
-
-  **Data sources:** Extract from PM response - mode, task_groups array, success_criteria array, execution_phases.
-  **Fallback:** If phases not explicit, list all groups as single phase.
-
-IF status = PLANNING_COMPLETE (simple single-group):
-  → Use compact capsule:
-  ```
-  📋 Planning complete | Single-group: {task_summary} | Starting development
-  ```
-
-IF status = NEEDS_CLARIFICATION:
-  → Use clarification template (§Step 1.3a)
-  → SKIP planning capsule
-
-IF status = BAZINGA or CONTINUE:
-  → Use appropriate template
-
-IF status = INVESTIGATION_NEEDED:
-  → Use "Investigation Needed" template:
-  ```
-  🔬 Investigation needed | {problem_summary} | Spawning Investigator
-  ```
-  → Immediately spawn Investigator (see §Step 2A.6b for investigation loop)
-
-**Apply fallbacks:** If data missing, scan for "parallel", "simple", group names.
-
-**Step 4: Log PM interaction** — Use §Logging Reference pattern. Agent ID: `pm_main`.
-
-**AFTER logging PM response: IMMEDIATELY continue to Step 1.3a (Handle PM Clarification Requests). Do NOT stop.**
-
-**🔴 LAYER 2 SELF-CHECK (PM RESPONSE):**
-
-Before continuing to Step 1.3a, verify:
-1. ✅ Did I invoke `Skill(command: "bazinga-db-agents")` to log PM interaction?
-2. ✅ Did I output a capsule to the user showing PM's analysis?
-3. ✅ Am I about to continue to Step 1.3a (not ending my message)?
-
-**IF ANY IS NO:** Complete it NOW before proceeding. This is MANDATORY.
-
-### Step 1.3a: Handle PM Status and Route Accordingly
-
-**Detection:** Check PM Status code from response
-
-**Expected status codes from PM spawn (initial or resume):**
-- `PLANNING_COMPLETE` - PM completed planning, proceed to execution
-- `CONTINUE` - PM verified state and work should continue (common in RESUME scenarios)
-- `BAZINGA` - PM declares completion (rare in initial spawn, common in resume/final assessment)
-- `NEEDS_CLARIFICATION` - PM needs user input before planning
-- `INVESTIGATION_ONLY` - Investigation-only request; no implementation needed
-
-**🔴 INTENT WITHOUT ACTION:** If you write "spawn" → call `Skill(command: "prompt-builder")` + `Task()` NOW.
-
----
-
-**IF status = PLANNING_COMPLETE:**
-- PM has completed planning (created mode decision and task groups)
-- **IMMEDIATELY jump to Step 1.4 (Verify PM State and Task Groups). Do NOT stop.**
-
-**IF status = CONTINUE (CRITICAL FOR RESUME SCENARIOS):**
-- PM verified state and determined work should continue
-- **🔴 DO NOT STOP FOR USER INPUT** - keep making tool calls until agents are spawned
-- **Step 1:** Query task groups: `Skill(command: "bazinga-db-workflow")` → get all task groups for session
-- **Step 2:** Find groups with status: `in_progress` or `pending`
-- **Step 3:** Read the appropriate phase template (`phase_simple.md` or `phase_parallel.md`)
-- **Step 4:** Spawn appropriate agent using prompt-builder:
-  - Call `Skill(command: "prompt-builder")` with agent parameters
-  - Then call `Task()` with the built prompt
-  - **⚠️ CAPACITY LIMIT: Respect MAX 4 PARALLEL DEVELOPERS hard limit**
-  - If more than 4 groups need spawning, spawn first 4 and queue/defer remainder
-- **🔴 You MUST call SOME tool in THIS turn**. Do NOT just say "let me spawn"
-
-**Clarification:** Multi-step tool sequences (DB query → prompt-builder → spawn) within the same assistant turn are expected. The rule is: **complete all steps before your turn ends** - never stop to wait for user input between receiving PM CONTINUE and spawning agents.
-
-**IF status = NEEDS_CLARIFICATION:** Execute clarification workflow below
-
-**IF status = INVESTIGATION_ONLY:**
-- PM only answered questions (no implementation requested)
-- Display PM's investigation findings to user
-- **END orchestration** (no development work needed)
-
-**IF status = BAZINGA:**
-- All work complete (if PM returns this early, likely a resume of already-complete session)
-- **MANDATORY: Invoke `Skill(command: "bazinga-validator")` to verify completion**
-  - IF validator returns ACCEPT → Proceed to completion
-  - IF validator returns REJECT → **Execute [Validator REJECT Handling Procedure](#mandatory-validator-reject-handling-procedure)** (do NOT stop!)
-- **IMMEDIATELY proceed to Completion phase ONLY after validator ACCEPTS**
-
-**IF status is missing or unclear:**
-- **DO NOT GUESS** - Status codes must be explicit in PM response
-- Scan for EXPLICIT status markers only:
-  - Explicit "Status: CONTINUE" or "CONTINUE" on its own line → treat as CONTINUE
-  - Explicit "Status: PLANNING_COMPLETE" or "PLANNING_COMPLETE" → treat as PLANNING_COMPLETE
-  - Explicit "Status: NEEDS_CLARIFICATION" or question blocks → treat as NEEDS_CLARIFICATION
-- **Generic phrases like "proceed", "continue with", "Phase N" are NOT status codes**
-- If truly ambiguous: Output `⚠️ PM status unclear | Cannot determine next action | Respawning PM for explicit status`
-- Then respawn PM with: "Your previous response lacked an explicit status code. Please respond with one of: PLANNING_COMPLETE, CONTINUE, BAZINGA, NEEDS_CLARIFICATION"
-- **IMMEDIATELY jump to appropriate phase after status determined. Do NOT stop.**
-
-**🔴 ANTI-PATTERN - INTENT WITHOUT ACTION:**
-❌ **WRONG:** "Database updated. Now let me spawn the SSE..." [STOPS - turn ends without any tool call]
-✅ **CORRECT:** "Database updated. Building prompt." [Skill(command: "prompt-builder")] → then [Task() with built prompt]
-
-Saying "let me spawn" or "I will spawn" is NOT spawning. You MUST call Skill(command: "prompt-builder") followed by Task() in the same turn.
-
-#### Clarification Workflow (NEEDS_CLARIFICATION)
-
-**🔴 MANDATORY: Read full clarification protocol (includes hard cap enforcement):**
-```
-Read(file_path: "bazinga/templates/orchestrator/clarification_flow.md")
-```
-
-**Step 1: Log** via §Logging Reference (type: `pm_clarification`, status: `pending`)
-**Step 2: Update orchestrator state** via bazinga-db (`clarification_used: true`, `clarification_resolved: false`)
-**Step 3: Surface Clarification to User**
-
-**User output (capsule format):**
-```
-⚠️ PM needs clarification | {blocker_type}: {question_summary} | Awaiting response (auto-proceed with fallback in 5 min)
-
-[Display PM's full NEEDS_CLARIFICATION section, including:]
-- Blocker Type
-- Evidence of Exhaustion
-- Question
-- Options
-- Safe Fallback
-```
-
-**Step 4: Wait for User Response**
-
-- Set 5-minute timeout
-- User can respond with their choice (option a, b, or c)
-- Or specify custom answer
-
-**Step 5: Process Response**
-
-**If user responds within 5 minutes:**
-
-Process internally (no verbose routing messages needed).
-
-Log user response:
-```
-bazinga-db-core, please update clarification request:
-
-Session ID: [current session_id]
-Status: resolved
-User Response: [user's answer]
-Resolved At: [ISO timestamp]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db-core")
-```
-
-**If timeout (5 minutes, no response):**
-
-```
-⏱️ Clarification timeout | No response after 5min | Proceeding with PM's safe fallback option
-```
-
-Log timeout:
-```
-bazinga-db-core, please update clarification request:
-
-Session ID: [current session_id]
-Status: timeout
-User Response: timeout_assumed
-Resolved At: [ISO timestamp]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db-core")
-```
-
-**Step 6: Re-spawn PM with Answer**
-
-Process internally (no verbose status message needed - PM will proceed with planning).
-
-**Spawn PM again with:**
-
-```
-Task(
-  subagent_type="general-purpose",
-  description="PM planning with clarification",
-  prompt=f"""
-You are the Project Manager. You previously requested clarification and received this response:
-
-**Your Clarification Request:**
-[PM's original NEEDS_CLARIFICATION section]
-
-**User Response:**
-[user's answer OR "timeout - proceed with your safe fallback option"]
-
-**Your Task:**
-- Document this clarification in assumptions_made array
-- Proceed with planning based on the clarified requirements
-- Continue your normal planning workflow
-- Return your PM Decision (mode, task groups, execution plan)
-
-**Context:**
-{user_requirements}
-
-**Session Info:**
-- Session ID: {session_id}
-- Previous PM state: [if any]
-""",
-  run_in_background: false
-)
-```
-
-**Step 7: Receive PM Decision (Again)**
-
-- PM should now return normal decision (SIMPLE MODE or PARALLEL MODE)
-- Log this interaction to database (same as Step 1.3)
-- Update orchestrator state to mark clarification resolved:
-
-```
-bazinga-db-core, please update orchestrator state:
-
-Session ID: [current session_id]
-State Data: {
-  "clarification_used": true,
-  "clarification_resolved": true,
-  "phase": "planning_complete"
-}
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db-core")
-```
-
-**Step 8: Continue to Step 1.4**
-
-- Proceed with normal workflow (verify PM state and task groups)
-- PM should have completed planning with clarification resolved
-
----
-
-### Step 1.4: Verify PM State and Task Groups in Database
-
-**⚠️ CRITICAL VERIFICATION: Ensure PM saved state and task groups**
-
-The PM agent should have saved PM state and created task groups in the database. Verify this now:
-
-**Query task groups:**
-```
-bazinga-db-workflow, please get all task groups for session [current session_id]
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db-workflow")
-```
-
-**Check the response and validate:**
-- If task groups returned with N > 0: ✅ Proceed to Step 1.5
-- If task groups empty OR no records: ⚠️ Proceed to Step 1.4b (fallback)
-- If parallel mode AND N > 4: ⚠️ Enforce MAX 4 limit (see §HARD LIMIT above) — defer groups 5+ to next phase
-
-#### Step 1.4b: Fallback - Create Task Groups from PM Response
-
-**If PM did not create task groups in database, you must create them now:**
-
-Parse the PM's response to extract task group information. Look for sections like:
-- "Task Groups Created"
-- "Group [ID]: [Name]"
-- Task group IDs (like SETUP, US1, US2, etc.)
-
-For each task group found, invoke bazinga-db-workflow:
-
-```
-bazinga-db-workflow, please create task group:
-
-Group ID: [extracted group_id]
-Session ID: [current session_id]
-Name: [extracted group name]
-Status: pending
-```
-
-**Then invoke:**
-```
-Skill(command: "bazinga-db-workflow")
-```
-
-Repeat for each task group found in the PM's response.
-
-Process internally (creating task groups from PM response - no user output needed for database sync).
-
-Use the PM response format examples from `bazinga/templates/message_templates.md` (loaded at initialization).
-
-### Step 1.5: Route Based on Mode
-
-**UI Message:**
-```
-IF PM chose "simple":
-    Output (capsule format): "📋 Planning complete | Single-group execution: {task_summary} | Starting development"
-    → Go to Phase 2A
-
-ELSE IF PM chose "parallel":
-    Output (capsule format): "📋 Planning complete | {N} parallel groups: {group_summaries} | Starting development → Groups {list}"
-    → Go to Phase 2B
-```
+The template contains:
+- PM understanding capture requirements
+- PM spawn Task() format
+- Step 1.3: Receive PM Decision (parsing, capsules)
+- Step 1.3a: Handle PM Status (PLANNING_COMPLETE, CONTINUE, BAZINGA, NEEDS_CLARIFICATION)
+- Clarification workflow (NEEDS_CLARIFICATION)
+- Step 1.4: Verify PM State and Task Groups
+- Step 1.5: Route Based on Mode
+
+**Follow ALL instructions in that file before proceeding to Phase 2.**
 
 ---
 
@@ -2136,332 +1608,19 @@ Then invoke: `Skill(command: "bazinga-db-agents")` — **MANDATORY** (skipping c
 
 ## §Workflow Routing (Deterministic)
 
-**Purpose:** After receiving an agent response, use workflow-router to determine the next action deterministically.
-
-**The workflow-router script (`.claude/skills/workflow-router/scripts/workflow_router.py`) determines:**
-- Next agent to spawn based on current agent + status code
-- Whether escalation is needed (revision count threshold)
-- Whether QA should be skipped (testing_mode)
-- Security-sensitive task handling
-
-### When to Use Workflow-Router
-
-**AFTER receiving ANY agent response:**
-1. Extract status code from response (READY_FOR_QA, PASS, APPROVED, etc.)
-2. Invoke workflow-router with current state
-3. Follow the returned action
-
-### Invocation
-
-**Output parameters in conversation context:**
+**🔴 MANDATORY: Read workflow routing reference before proceeding:**
 ```
-Current Agent: {developer|qa_expert|tech_lead|etc.}
-Response Status: {READY_FOR_QA|PASS|FAIL|APPROVED|CHANGES_REQUESTED|etc.}
-Session ID: {session_id}
-Group ID: {group_id}
-Testing Mode: {full|minimal|disabled}
+Read(file_path: "bazinga/templates/orchestrator/workflow_routing_reference.md")
 ```
 
-**Then invoke:**
-```
-Skill(command: "workflow-router")
-```
+The template contains:
+- When to use workflow-router (after ANY agent response)
+- Invocation format and response handling
+- Progress-based iteration tracking (MANDATORY for feedback loops)
+- Re-rejection prevention (MANDATORY for iteration > 1)
+- Escalation rules and context injection
 
-### Response Format
-
-The skill returns JSON with:
-```json
-{
-  "success": true,
-  "next_agent": "qa_expert",
-  "action": "spawn",
-  "model": "sonnet",
-  "group_id": "AUTH",
-  "include_context": ["reasoning", "packages"]
-}
-```
-
-**Use the returned `next_agent` and `action` to determine what to do next:**
-- `action: spawn` → Build prompt for `next_agent` and spawn
-- `action: merge` → Developer performs merge to initial_branch
-- `action: check_phase` → Check if more groups need work
-
-### Progress-Based Iteration Tracking (MANDATORY for Feedback Loops)
-
-**When routing CHANGES_REQUESTED or FAIL back to Developer/SSE, you MUST track progress.**
-
-#### Step 0: Save Issue Events (CRITICAL for Validator)
-
-**⚠️ Security Best Practice:** Use `--payload-file` and `--idempotency-key` for all events.
-
-**After receiving Tech Lead response:**
-```bash
-# Write payload to temp file (avoid exposing in process table)
-cat > /tmp/tl_issues.json << 'EOF'
-{"group_id": "{group_id}", "iteration": {N}, "issues": [...], "blocking_count": {N}}
-EOF
-```
-
-```
-Skill(command: "bazinga-db-agents")
-
-Request: save-event "{session_id}" "tl_issues" \
-  --payload-file /tmp/tl_issues.json \
-  --idempotency-key "{session_id}|{group_id}|tl_issues|{N}"
-```
-
-**After receiving Developer/SSE response to CHANGES_REQUESTED:**
-```bash
-# from_agent = "developer" or "senior_software_engineer"
-cat > /tmp/dev_responses.json << 'EOF'
-{"group_id": "{group_id}", "iteration": {N}, "from_agent": "{developer|senior_software_engineer}", "issue_responses": [...], "blocking_summary": {...}}
-EOF
-```
-
-```
-Skill(command: "bazinga-db-agents")
-
-Request: save-event "{session_id}" "tl_issue_responses" \
-  --payload-file /tmp/dev_responses.json \
-  --idempotency-key "{session_id}|{group_id}|tl_issue_responses|{N}"
-```
-
-**After TL re-review (iteration > 1), save TL verdicts:**
-
-Transform TL's `iteration_tracking` into tl_verdicts event:
-```python
-# Get IDs from TL handoff, lookup details from tl_issues
-it = tl_handoff.get("iteration_tracking", {})
-issues = {i["id"]: i for e in tl_issues_events for i in e.get("issues", [])}
-verdicts = [{"issue_id": id, "verdict": "ACCEPTED", **{k: issues.get(id, {}).get(k, "") for k in ["location", "title"]}} for id in it.get("rejections_accepted", [])]
-verdicts += [{"issue_id": id, "verdict": "OVERRULED", **{k: issues.get(id, {}).get(k, "") for k in ["location", "title"]}} for id in it.get("rejections_overruled", [])]
-# Write to temp file, then save via:
-# Skill(command: "bazinga-db-agents") → save-event {session_id} tl_verdicts \
-#   --payload-file /tmp/tl_verdicts.json \
-#   --idempotency-key "{session_id}|{group_id}|tl_verdicts|{N}"
-```
-
-#### Step 0.5: Re-Rejection Prevention (MANDATORY for Iteration > 1)
-
-**After TL sends CHANGES_REQUESTED (iteration > 1), validate no re-flagged accepted issues:**
-
-**Data source: Query prior TL verdicts from DB (authoritative source)**
-
-**Step 1: Get all TL verdicts for this session**
-```
-Skill(command: "bazinga-db-agents")
-
-Request: get-events "{session_id}" "tl_verdicts"
-```
-
-**Step 2: Process the response (pseudocode)**
-```python
-# Parse skill output as JSON list of verdict events
-all_verdicts = [...]  # From skill response
-
-# Filter to this group's verdicts
-all_prior_verdicts = [v for v in all_verdicts if v.get("group_id") == group_id]
-
-# Step 3: Build set of previously ACCEPTED issues (closed, cannot be re-flagged)
-previous_accepted = set()
-for verdict_event in all_prior_verdicts:
-    for verdict in verdict_event.get("verdicts", []):
-        if verdict.get("verdict") == "ACCEPTED":
-            # Use location|title for CROSS-ITERATION matching (issue_ids change per iteration)
-            # Within same iteration: prefer issue_id matching
-            # Cross-iteration: fall back to location|title as stable identifiers
-            issue_key = f"{verdict.get('location', '')}|{verdict.get('title', '')}"
-            previous_accepted.add(issue_key)
-
-# Step 4: Check if TL is re-flagging any previously ACCEPTED issues
-re_flagged = []
-for issue in current_tl_handoff.get("issues", []):
-    if issue.get("blocking"):
-        issue_key = f"{issue.get('location', '')}|{issue.get('title', '')}"
-        if issue_key in previous_accepted:
-            re_flagged.append(issue.get("id"))
-```
-
-**IF re_flagged issues detected:**
-```
-⚠️ RE-REJECTION VIOLATION: {len(re_flagged)} issues re-flagged after ACCEPTED
-→ Auto-accept these (cannot be re-flagged). Log warning for PM.
-```
-
-**Rationale:** Once TL accepts a rejection, it cannot be re-flagged. Prevents infinite review loops.
-
-#### Step 1: Read Handoff Files to Determine Progress
-
-After receiving Developer/SSE response to CHANGES_REQUESTED:
-```bash
-# Simple mode: Read unified implementation handoff
-cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation.json | jq '.blocking_summary'
-
-# Parallel mode: Read agent-specific handoff
-cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_implementation_{AGENT_ID}.json | jq '.blocking_summary'
-# Where AGENT_ID = task_group.assigned_to (e.g., "developer_1", "sse_1")
-```
-
-**⚠️ Backward Compatibility:** If handoff fields are missing, use these defaults:
-```python
-notes_for_future = handoff.get("notes_for_future", [])
-blocking_summary = handoff.get("blocking_summary", {
-    "total_blocking": 0, "fixed": 0, "rejected_with_reason": 0, "unaddressed": 0
-})
-iteration_tracking = handoff.get("iteration_tracking", {"iteration": 1})
-```
-
-**Progress is measured by "blocking_issues_remaining decreased", NOT "any fixes":**
-```python
-previous_blocking = db.blocking_issues_count  # From task_groups table
-# Query via Skill(command: "bazinga-db-agents") → get-events, then flatten and count ACCEPTED
-tl_accepted = sum(1 for e in tl_verdicts_events for v in e.get("verdicts", []) if v.get("verdict") == "ACCEPTED")
-current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
-# Progress: current_blocking < previous_blocking
-```
-
-After receiving QA FAIL response:
-```bash
-# Read QA's handoff
-cat bazinga/artifacts/{SESSION_ID}/{GROUP_ID}/handoff_qa_expert.json | jq '.test_progression'
-```
-
-**QA progress is measured by "still_failing count decreased":**
-```
-previous_failing = {from prior QA handoff}
-current_failing = len(test_progression.still_failing)
-
-IF current_failing < previous_failing:
-  → Progress made
-ELSE:
-  → No progress
-```
-
-#### Step 2: Query Previous State from Database
-
-**BEFORE comparing, query current state:**
-```
-Skill(command: "bazinga-db-workflow")
-
-Request: get-task-groups "{session_id}"
-```
-Then filter to `{group_id}` and extract `{review_iteration, no_progress_count, blocking_issues_count}`.
-
-**Extract values:**
-```python
-# Default to 1 (not 0) to match DB DEFAULT and avoid false first-iteration penalty
-previous_iteration = db_result.get("review_iteration", 1)
-previous_no_progress = db_result.get("no_progress_count", 0)
-previous_blocking = db_result.get("blocking_issues_count", 0)
-```
-
-#### Step 3: Calculate Progress and Update Database
-
-**Calculate new values:**
-```python
-# Current blocking = total - fixed - TL-accepted rejections
-# Query tl_verdicts events via Skill(command: "bazinga-db-agents") → get-events
-# Then flatten verdicts from all events and count ACCEPTED
-tl_verdicts_events = get_events(session_id, "tl_verdicts", group_id)
-tl_accepted = sum(1 for e in tl_verdicts_events for v in e.get("verdicts", []) if v.get("verdict") == "ACCEPTED")
-current_blocking = blocking_summary.total_blocking - blocking_summary.fixed - tl_accepted
-
-# First-iteration exception (DB default=1)
-if previous_iteration == 1:
-    progress = True
-    new_no_progress = 0
-elif current_blocking == 0:
-    # Zero blocking = progress
-    progress = True
-    new_no_progress = 0
-elif current_blocking < previous_blocking:
-    progress = True
-    new_no_progress = 0  # Reset
-else:
-    progress = False
-    new_no_progress = previous_no_progress + 1  # Increment
-
-new_iteration = previous_iteration + 1
-```
-
-**Update via bazinga-db:**
-```
-Skill(command: "bazinga-db-workflow")
-
-Request: update-task-group "{group_id}" "{session_id}" \
-  --review_iteration {new_iteration} \
-  --no_progress_count {new_no_progress} \
-  --blocking_issues_count {current_blocking}
-```
-
-**Progress summary:**
-- If `current_blocking < previous_blocking`: Reset `no_progress_count` to 0
-- If `current_blocking >= previous_blocking`: Increment `no_progress_count` by 1
-- Always increment `review_iteration` by 1
-
-#### Step 4: Check Escalation Rules
-
-**Before spawning next agent, check if escalation is needed:**
-
-```
-IF no_progress_count >= 2 AND current_agent == "developer":
-  → Spawn SSE instead (Developer stuck, escalate)
-
-IF no_progress_count >= 2 AND current_agent == "senior_software_engineer":
-  → Route to PM (SSE stuck, need PM decision)
-
-IF review_iteration >= 5:
-  → Escalate to next tier regardless (hard cap)
-
-ELSE:
-  → Continue normal feedback loop
-```
-
-#### Step 5: Include Context in Re-spawn
-
-**Config constant:** `MAX_ITERATIONS_BEFORE_ESCALATION = 4`
-
-When spawning Developer/SSE for re-review (after CHANGES_REQUESTED), include escalation context:
-```
-Review Iteration: {review_iteration}
-No-Progress Count: {no_progress_count}
-Max Iterations Before Escalation: 4
-Prior Issues: {list from prior handoff}
-Developer Responses: {from implementation handoff}
-```
-
-**Dynamic warning injection:**
-```
-IF no_progress_count >= 2:
-  Add to context: "⚠️ HIGH RISK: Next non-progress iteration escalates to SSE"
-
-IF review_iteration >= 3:
-  Add to context: "⚠️ FINAL ITERATION: Must resolve all blocking issues"
-```
-
-This allows:
-- Developer to know urgency level
-- See what was fixed vs what's pending
-- Understand escalation risk
-- Avoid raising new MEDIUM/LOW issues (prevents nitpick loops)
-
-#### Example Flow
-
-```
-1. TL sends CHANGES_REQUESTED with 3 blocking issues
-2. Orchestrator updates DB: review_iteration=1, blocking_issues=3
-3. Developer fixes 2, rejects 1
-4. Orchestrator reads handoff: blocking_summary.fixed=2
-5. Orchestrator updates DB: no_progress_count=0 (reset - progress made!), review_iteration=2
-6. Orchestrator spawns TL for re-review with iteration context
-7. TL validates: 2 fixed, 1 rejection accepted → APPROVED
-```
-
-### Fallback
-
-If workflow-router returns an error or unknown transition:
-- Log warning: `⚠️ Unknown transition: {agent} + {status}`
-- Route to Tech Lead for manual handling (escalation fallback)
+**Follow ALL instructions in that file for agent routing.**
 
 ---
 

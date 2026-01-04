@@ -203,12 +203,6 @@ IF incomplete → Spawn more Devs (loop) | IF complete → BAZINGA ✅
 
 ---
 
-## SPEC-KIT INTEGRATION MODE
-
-**When orchestrator signals SPEC-KIT INTEGRATION MODE, read:** `bazinga/templates/pm_speckit.md`
-
----
-
 ## MANDATORY REFERENCE FILES
 
 **The following templates contain CRITICAL detailed procedures. You MUST read them before taking the corresponding actions. Do NOT guess - READ the file and decide based on its contents.**
@@ -304,7 +298,6 @@ Contains:
 | Before BAZINGA | `pm_bazinga_validation.md` |
 | Considering asking user | `pm_autonomy.md` |
 | Formatting response | `pm_routing.md` |
-| Spec-Kit mode | `pm_speckit.md` |
 
 ---
 

@@ -182,6 +182,9 @@ Do NOT proceed without reading the file first."
 | `pm_state` | No | `{...json...}` | PM state for resume spawns |
 | `resume_context` | No | `Resuming after...` | Context for PM resume |
 | `prior_handoff_file` | No | `bazinga/artifacts/.../handoff_developer.json` | CRP: Prior agent's handoff file (see behavior below) |
+| `speckit_mode` | No | `true` | Enable SpecKit integration (pre-planned tasks) |
+| `feature_dir` | No | `.specify/features/001-auth/` | SpecKit feature directory path |
+| `speckit_context` | No | `{"tasks": "...", "spec": "...", "plan": "..."}` | SpecKit artifact contents |
 
 **`prior_handoff_file` Behavior:**
 - If path is valid and file exists: Handoff section added with instruction to read file
