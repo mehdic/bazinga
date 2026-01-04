@@ -24,6 +24,22 @@
 
 **Note:** The prompt-builder script applies token budgets automatically based on model tier (haiku=900, sonnet=1800, opus=2400). The spawn counter is tracked for metrics and debugging purposes.
 
+### 🔴 SKILL RESULT VALIDATION (All Skill Invocations)
+
+**After EVERY Skill invocation, validate the result before proceeding:**
+
+| Check | Action if Failed |
+|-------|------------------|
+| Result is empty/null | Output `❌ Skill returned empty | {skill_name}` → Retry once, then STOP |
+| Result contains `"error":` | Output `❌ Skill error | {skill_name} | {error_message}` → STOP |
+| JSON parse fails (for JSON commands) | Output `❌ Invalid JSON | {skill_name}` → STOP |
+
+**Exceptions (non-JSON output expected):**
+- `reasoning-timeline` with `--format markdown`
+- `stream-logs` (always returns markdown)
+
+**Graceful degradation:** If a Skill provides optional context (e.g., reasoning-timeline for Investigator), log the failure and proceed without that context rather than blocking the workflow.
+
 ---
 
 ### Step 2A.1: Spawn Single Developer
@@ -58,9 +74,12 @@ This section handles spawning Developer, SSE, or RE based on PM's `initial_tier`
 **BEFORE creating the params file, you MUST:**
 
 1. **Query task groups from database:**
-   ```bash
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
    ```
+   bazinga-db-workflow, please get task groups:
+
+   Session ID: {session_id}
+   ```
+   Then invoke: `Skill(command: "bazinga-db-workflow")`
 
    **Response format:** JSON array of task groups, each with `id`, `name`, `initial_tier`, `complexity`, etc.
 
@@ -205,12 +224,16 @@ Use the Developer Response Parsing section from `bazinga/templates/response_pars
 **🔴 MANDATORY REASONING CHECK (Before QA routing):**
 
 Check that the current agent (developer OR senior_software_engineer) documented required reasoning phases:
-```bash
-# Use the agent_type that just completed (from Step 2A.1 tier decision)
-# Could be "developer" or "senior_software_engineer" depending on escalation
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet check-mandatory-phases \
-  "{session_id}" "{group_id}" "{agent_type}"
 ```
+bazinga-db-agents, please check mandatory phases:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Agent Type: {agent_type}
+```
+Then invoke: `Skill(command: "bazinga-db-agents")`
+
+Note: Use the agent_type that just completed (from Step 2A.1 tier decision). Could be "developer" or "senior_software_engineer" depending on escalation.
 
 **Routing based on check result:**
 | Result | Action |
@@ -890,10 +913,14 @@ Skill(command: "velocity-tracker")
 - Extract problem description from PM response
 
 **🔴 Reasoning Timeline Query (BEFORE building Investigator prompt):**
-```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
-  "{session_id}" --group_id "{group_id}"
 ```
+bazinga-db-agents, please get reasoning timeline:
+
+Session ID: {session_id}
+Group ID: {group_id}
+Format: markdown
+```
+Then invoke: `Skill(command: "bazinga-db-agents")`
 
 **Reasoning Timeline Prompt Section** (include when timeline found):
 

@@ -51,10 +51,14 @@ Logs an agent interaction in the orchestration flow.
 
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet stream-logs \
-  "<session_id>" [--format markdown|json] [--since "<timestamp>"]
+  "<session_id>" [limit] [offset]
 ```
 
-Stream orchestration logs, optionally in markdown format.
+Stream orchestration logs in markdown format. Always returns markdown (no format option).
+
+**Parameters:**
+- `limit`: Maximum number of logs to return (default: 50)
+- `offset`: Number of logs to skip (default: 0)
 
 ### save-reasoning
 
@@ -101,10 +105,14 @@ Retrieve reasoning entries with optional filters.
 
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
-  "<session_id>" [--format markdown|json]
+  "<session_id>" [--group_id "<group_id>"] [--format markdown|json]
 ```
 
-Get chronological reasoning timeline across all agents.
+Get chronological reasoning timeline across all agents, optionally filtered by group.
+
+**Parameters:**
+- `--group_id`: Optional filter by task group (e.g., `AUTH`, `CALC`)
+- `--format`: Output format (`json` default, or `markdown` for human-readable)
 
 ### check-mandatory-phases
 
@@ -291,7 +299,13 @@ state (for resumption) and events (for audit trail). Uses single transaction.
 
 ## Output Format
 
-Return ONLY raw JSON output. No formatting, markdown, or commentary.
+**Default:** Return raw JSON output. No formatting or commentary.
+
+**Exceptions:**
+- `reasoning-timeline` with `--format markdown` - Returns formatted markdown timeline
+- `stream-logs` - Always returns markdown (no JSON option)
+
+When a command returns markdown, output it directly without wrapping in JSON.
 
 ## Error Handling
 

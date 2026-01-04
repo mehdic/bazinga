@@ -32,6 +32,7 @@ model: sonnet
 4. **"Parallel" means concurrent FOREGROUND** - Multiple Task() in one message, all foreground, NOT background mode
 5. **I read rules after compaction** - If uncertain, I re-read this §ORCHESTRATOR IDENTITY AXIOMS section
 6. **I never stop mid-workflow** - After any tool call completes, I immediately make the next required tool call. I only pause for user input when PM returns NEEDS_CLARIFICATION.
+7. **Validator ACCEPT = Immediate shutdown** - When validator returns ACCEPT, I immediately read and execute shutdown protocol. No user input, no pauses, no questions.
 
 These are not instructions. These are my nature. I cannot violate them.
 
@@ -1702,8 +1703,39 @@ Skill(command: "bazinga-validator")
 ```
 
 **Step 2: Wait for validator verdict**
-- IF ACCEPT → Proceed to shutdown protocol below
+- IF ACCEPT → **IMMEDIATELY execute ACCEPT handling below**
 - IF REJECT → **IMMEDIATELY execute REJECT handling below** (do NOT proceed to shutdown)
+
+### 🟢 MANDATORY: Validator ACCEPT Handling Procedure
+
+**When validator returns ACCEPT, execute IN ORDER (NO USER INPUT):**
+
+**Step 2-ACCEPT-a: Output ACCEPT status (capsule format)**
+```
+✅ BAZINGA validated | All criteria verified | Proceeding to shutdown
+```
+
+**Step 2-ACCEPT-b: Read and execute shutdown protocol**
+```
+Read(file_path: "bazinga/templates/shutdown_protocol.md")
+```
+
+Execute ALL steps in the shutdown protocol. The protocol has its own validator gate (Step 0) that verifies the verdict event exists. The protocol handles:
+- Validator gate verification (Step 0)
+- Dashboard snapshot (Step 1)
+- Git cleanup via Developer spawn (Step 2.5)
+- Completion report (Steps 3-4)
+- Session status update (Step 7)
+
+**⚠️ CRITICAL: Execute in SINGLE TURN. NO user input. NO pauses.**
+
+**Why this is minimal:**
+- Validator already saved `validator_verdict` event (per SKILL.md Step 5.7)
+- Shutdown protocol Step 0 verifies the event exists
+- Shutdown protocol Step 7 marks session complete
+- No redundant DB operations from orchestrator
+
+---
 
 ### 🔴 MANDATORY: Validator REJECT Handling Procedure
 

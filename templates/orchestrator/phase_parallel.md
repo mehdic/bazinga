@@ -24,6 +24,22 @@
 
 **Note:** The prompt-builder script applies token budgets automatically based on model tier (haiku=900, sonnet=1800, opus=2400). The spawn counter is tracked for metrics and debugging purposes.
 
+### 🔴 SKILL RESULT VALIDATION (All Skill Invocations)
+
+**After EVERY Skill invocation, validate the result before proceeding:**
+
+| Check | Action if Failed |
+|-------|------------------|
+| Result is empty/null | Output `❌ Skill returned empty | {skill_name}` → Retry once, then STOP |
+| Result contains `"error":` | Output `❌ Skill error | {skill_name} | {error_message}` → STOP |
+| JSON parse fails (for JSON commands) | Output `❌ Invalid JSON | {skill_name}` → STOP |
+
+**Exceptions (non-JSON output expected):**
+- `reasoning-timeline` with `--format markdown`
+- `stream-logs` (always returns markdown)
+
+**Graceful degradation:** If a Skill provides optional context (e.g., reasoning-timeline for Investigator), log the failure and proceed without that context rather than blocking the workflow.
+
 ---
 
 **🚨 ENFORCE MAX 4 PARALLEL AGENTS** (see §HARD LIMIT in Overview)
@@ -199,9 +215,12 @@ This section handles spawning Developer, SSE, or RE for each group based on PM's
 **BEFORE creating ANY params files, you MUST:**
 
 1. **Query task groups from database:**
-   ```bash
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
    ```
+   bazinga-db-workflow, please get task groups:
+
+   Session ID: {session_id}
+   ```
+   Then invoke: `Skill(command: "bazinga-db-workflow")`
 
    **Response format:** JSON array of task groups, each with `id`, `name`, `initial_tier`, `complexity`, etc.
 
