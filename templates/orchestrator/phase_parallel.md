@@ -199,9 +199,12 @@ This section handles spawning Developer, SSE, or RE for each group based on PM's
 **BEFORE creating ANY params files, you MUST:**
 
 1. **Query task groups from database:**
-   ```bash
-   python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-task-groups "{session_id}"
    ```
+   bazinga-db-workflow, please get task groups:
+
+   Session ID: {session_id}
+   ```
+   Then invoke: `Skill(command: "bazinga-db-workflow")`
 
    **Response format:** JSON array of task groups, each with `id`, `name`, `initial_tier`, `complexity`, etc.
 
