@@ -427,10 +427,15 @@ For issues with Developer `action = "REJECTED"`:
 
 **Step 1: Check if SpecKit mode is enabled**
 ```bash
-python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "[session_id]" "speckit_mode"
+# Query orchestrator state (returns JSON with all fields)
+ORCH_STATE=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "[session_id]" "orchestrator")
+
+# Parse speckit_mode from the JSON result
+# The result is a JSON object: {"speckit_mode": true, "feature_dir": "...", ...}
+# Use jq or Python to extract: echo "$ORCH_STATE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('speckit_mode', False))"
 ```
 
-**IF speckit_mode is NOT true:**
+**IF speckit_mode is NOT true (or state not found):**
 ```
 → Skip entire Step 5.8
 → Continue to Step 6
