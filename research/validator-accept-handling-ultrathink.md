@@ -3,7 +3,7 @@
 **Date:** 2026-01-03
 **Context:** Fix for orchestrator not knowing what to do after validator returns ACCEPT
 **Decision:** Added explicit ACCEPT handling steps to match REJECT detail level
-**Status:** Reviewed (CRITICAL ISSUES FOUND - REQUIRES REWORK)
+**Status:** Implemented (all critical issues fixed)
 **Reviewed by:** OpenAI GPT-5
 
 ---
@@ -393,11 +393,11 @@ Must also fix shutdown_protocol.md:
 
 ### Must Do (This PR)
 
-- [ ] Simplify ACCEPT handling to just: status capsule + read shutdown protocol
-- [ ] Remove direct `python3` script calls from ACCEPT handling
-- [ ] Remove Step 2-ACCEPT-b (save event) - validator saves its own
-- [ ] Remove Step 2-ACCEPT-d (mark complete) - shutdown Step 7 does this
-- [ ] Add axiom #7 about ACCEPT = immediate shutdown
+- [x] Simplify ACCEPT handling to just: status capsule + read shutdown protocol
+- [x] Remove direct `python3` script calls from ACCEPT handling
+- [x] Remove Step 2-ACCEPT-b (save event) - validator saves its own
+- [x] Remove Step 2-ACCEPT-d (mark complete) - shutdown Step 7 does this
+- [x] Add axiom #7 about ACCEPT = immediate shutdown
 
 ### Should Do (Follow-up PR)
 
