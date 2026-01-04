@@ -363,10 +363,60 @@ Session ID: {session_id}
 
 | Priority | Item | Rationale |
 |----------|------|-----------|
-| HIGH | Error handling gates | Prevent cascade failures |
+| ~~HIGH~~ | ~~Error handling gates~~ | ✅ **COMPLETED** - See §Error Handling Gates below |
 | ~~HIGH~~ | ~~Complete migration audit~~ | ✅ **COMPLETED** - See audit below |
 | MEDIUM | Canonical request envelope | Improve determinism |
 | LOW | Skill invocation events | Observability |
+
+---
+
+## Error Handling Gates (2026-01-04)
+
+### Implementation
+
+Added `🔴 SKILL RESULT VALIDATION (All Skill Invocations)` section to both orchestrator templates:
+- `templates/orchestrator/phase_simple.md` (lines 27-39)
+- `templates/orchestrator/phase_parallel.md` (lines 27-39)
+
+### Validation Rules
+
+| Check | Action if Failed |
+|-------|------------------|
+| Result is empty/null | Output `❌ Skill returned empty | {skill_name}` → Retry once, then STOP |
+| Result contains `"error":` | Output `❌ Skill error | {skill_name} | {error_message}` → STOP |
+| JSON parse fails (for JSON commands) | Output `❌ Invalid JSON | {skill_name}` → STOP |
+
+### Exceptions
+
+- `reasoning-timeline` with `--format markdown` returns non-JSON (expected)
+- Optional context Skills (e.g., reasoning-timeline for Investigator) use graceful degradation
+
+### SKILL.md Fixes
+
+Fixed JSON-only vs markdown contradiction in `.claude/skills/bazinga-db-agents/SKILL.md`:
+- Updated Output Format section (lines 300-308) to document exceptions
+- `reasoning-timeline` supports `--format markdown` option
+- `stream-logs` always returns markdown (NO format option - fixed pre-existing documentation bug)
+
+### 🔴 Self-Review Critical Findings (2026-01-04)
+
+**Bug Found During Review:** SKILL.md incorrectly documented `stream-logs` as having `--format markdown|json` option. The actual CLI:
+- Always returns markdown (hardcoded in `stream_logs()` function)
+- Only accepts `[limit] [offset]` positional args
+
+**Resolution:**
+1. Fixed `stream-logs` documentation in SKILL.md (lines 50-61)
+2. Updated Output Format exceptions to clarify stream-logs always returns markdown
+3. Updated both template validation sections to list both exceptions
+
+### Remaining Risks (Acceptable)
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| Error string false positive | LOW | Only matches `"error":` JSON key pattern, not nested content |
+| Retry logic ambiguity | LOW | "Retry once, then STOP" is clear; retry-vs-permanent left to orchestrator judgment |
+| Graceful degradation scope | LOW | Only reasoning-timeline explicitly listed; others can follow same pattern |
+| STOP halts entire workflow | MEDIUM | Intentional - Skill failures indicate system issues requiring attention |
 
 ---
 
