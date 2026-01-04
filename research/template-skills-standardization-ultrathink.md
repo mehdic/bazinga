@@ -364,9 +364,43 @@ Session ID: {session_id}
 | Priority | Item | Rationale |
 |----------|------|-----------|
 | HIGH | Error handling gates | Prevent cascade failures |
-| HIGH | Complete migration audit | Find all remaining direct calls |
+| ~~HIGH~~ | ~~Complete migration audit~~ | ✅ **COMPLETED** - See audit below |
 | MEDIUM | Canonical request envelope | Improve determinism |
 | LOW | Skill invocation events | Observability |
+
+---
+
+## Template Audit Results (2026-01-04)
+
+### Audit Scope
+
+Searched all files in `templates/` for direct `python3 .claude/skills/bazinga-db/scripts/bazinga_db.py` calls.
+
+### Findings
+
+| Template | Direct Script Calls | Status |
+|----------|---------------------|--------|
+| `templates/orchestrator/phase_simple.md` | 0 | ✅ Fixed (this PR) |
+| `templates/orchestrator/phase_parallel.md` | 0 | ✅ Fixed (this PR) |
+| `templates/orchestrator/*.md` (all others) | 0 | ✅ Clean |
+| `templates/merge_workflow.md` | 0 | ✅ Uses Skills |
+| `templates/investigation_loop.md` | 0 | ✅ Uses Skills |
+| `templates/shutdown_protocol.md` | 0 | ✅ Uses Skills |
+| `templates/pm_planning_steps.md` | 1 | ⏭️ Intentional (PM is agent) |
+| `templates/specializations/*.md` | 0 | ✅ Clean |
+
+### Summary
+
+**Total orchestrator templates with direct script calls: 0** ✅
+
+The only template with a direct script call is `pm_planning_steps.md` (line 512: `save-reasoning`). This is **intentional** because:
+1. PM is an agent, not the orchestrator
+2. Agents have Bash access and use `--content-file` pattern
+3. This is documented as "standard pattern used across all agents"
+
+### Conclusion
+
+The "incomplete standardization scope" concern from OpenAI has been addressed. All orchestrator templates now use Skills.
 
 ### Risk Assessment
 
