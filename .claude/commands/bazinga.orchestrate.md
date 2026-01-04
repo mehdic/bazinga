@@ -333,6 +333,7 @@ Resume Context: {context if resume scenario}
 | `bash bazinga/scripts/start-dashboard.sh` | Start dashboard |
 | `bash bazinga/scripts/build-baseline.sh` | Run build baseline |
 | `bash bazinga/scripts/update-checkmarks.sh` | Update SpecKit task checkmarks |
+| `bash bazinga/scripts/discover-speckit.sh` | Discover SpecKit features |
 | `git branch --show-current` | Get current branch (init only) |
 
 **ANY command not matching above → STOP → Spawn agent OR use Skill**
@@ -1080,25 +1081,25 @@ Task(
 ### Detection
 
 ```bash
-# Check for SpecKit tasks.md files
-SPECKIT_FILES=$(ls -d .specify/features/*/tasks.md 2>/dev/null)
+# Use allowlist-compliant discovery script
+SPECKIT_RESULT=$(bash bazinga/scripts/discover-speckit.sh)
 ```
+
+Parse the JSON result:
+- `speckit_available: false` → Skip to Phase 1 (normal orchestration)
+- `speckit_available: true` → Continue with feature selection
 
 **IF no SpecKit files found:**
 - Skip to Phase 1 (normal orchestration)
 
 **IF SpecKit files found:**
 
-1. **List available features:**
-   ```bash
-   ls -d .specify/features/*/ 2>/dev/null | while read dir; do
-       name=$(basename "$dir")
-       has_spec=$(test -f "$dir/spec.md" && echo "✅" || echo "❌")
-       has_plan=$(test -f "$dir/plan.md" && echo "✅" || echo "❌")
-       has_tasks=$(test -f "$dir/tasks.md" && echo "✅" || echo "❌")
-       task_count=$(grep -c '^\- \[' "$dir/tasks.md" 2>/dev/null || echo "0")
-       echo "  - $name: spec.md $has_spec | plan.md $has_plan | tasks.md $has_tasks ($task_count tasks)"
-   done
+1. **List available features from discovery result:**
+   Parse `features` array from JSON and display:
+   ```
+   Found pre-planned features:
+     - feature-name-1
+     - feature-name-2
    ```
 
 2. **Ask user:**
@@ -1140,17 +1141,20 @@ SPECKIT_FILES=$(ls -d .specify/features/*/tasks.md 2>/dev/null)
    - If single feature → use that
 
 2. **Validate tasks.md format:**
-   ```bash
-   FEATURE_DIR=".specify/features/XXX"
-
-   # Check for at least one SpecKit task line (has task ID like [T001])
-   if ! grep -q '^\- \[.\] \[T[0-9]' "$FEATURE_DIR/tasks.md" 2>/dev/null; then
-       echo "⚠️ Warning: tasks.md does not appear to be in SpecKit format"
-       echo "   Expected format: - [ ] [T001] [Markers] Task description (file.py)"
-       echo "   Continuing with normal orchestration"
-       # Fall back to normal mode
-   fi
+   Use Read tool to check content (NOT grep - follows allowlist):
    ```
+   Read(file_path: "{FEATURE_DIR}/tasks.md")
+   ```
+
+   Parse the content for SpecKit format (task IDs like [T001]):
+   - If content contains `- [ ] [T` or `- [x] [T` patterns → Valid SpecKit format
+   - If no task ID patterns found:
+     ```
+     ⚠️ Warning: tasks.md does not appear to be in SpecKit format
+        Expected format: - [ ] [T001] [Markers] Task description (file.py)
+        Continuing with normal orchestration
+     ```
+     Fall back to normal mode (speckit_mode: false)
 
 3. **Read artifacts using Read tool:**
    ```
