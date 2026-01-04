@@ -101,10 +101,14 @@ Retrieve reasoning entries with optional filters.
 
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet reasoning-timeline \
-  "<session_id>" [--format markdown|json]
+  "<session_id>" [--group_id "<group_id>"] [--format markdown|json]
 ```
 
-Get chronological reasoning timeline across all agents.
+Get chronological reasoning timeline across all agents, optionally filtered by group.
+
+**Parameters:**
+- `--group_id`: Optional filter by task group (e.g., `AUTH`, `CALC`)
+- `--format`: Output format (`json` default, or `markdown` for human-readable)
 
 ### check-mandatory-phases
 
