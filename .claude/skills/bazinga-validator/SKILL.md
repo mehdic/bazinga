@@ -478,8 +478,9 @@ for group in task_groups:
 
 **Step 4: Verify tasks.md checkmarks (if feature_dir available)**
 ```bash
-# Get feature_dir from orchestrator state
-FEATURE_DIR=$(python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-state "[session_id]" "feature_dir")
+# Get feature_dir from orchestrator state (already queried in Step 1)
+# Parse from ORCH_STATE: echo "$ORCH_STATE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('feature_dir', ''))"
+FEATURE_DIR=$(echo "$ORCH_STATE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('feature_dir', ''))" 2>/dev/null)
 
 if [ -n "$FEATURE_DIR" ] && [ -f "$FEATURE_DIR/tasks.md" ]; then
     # Count unchecked tasks
