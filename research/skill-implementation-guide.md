@@ -1,14 +1,17 @@
 # Claude Code Skills: Complete Implementation Guide
 
-**Version:** 2.0.0
-**Date:** 2025-12-12
+**Version:** 3.0.0
+**Date:** 2026-01-05
 **Sources:**
+- **Agent Skills Specification (agentskills.io/specification)** - Official open format
 - Mikhail Shilkov's Technical Deep-Dive (mikhail.io)
 - Lee Han Chung's Skills Deep Dive (leehanchung.github.io)
 - Official Claude Code Documentation (code.claude.com/docs/en/skills)
 - BAZINGA Implementation Experience
 
 **Purpose:** Single source of truth for creating, updating, and invoking skills
+
+**Compliance:** This guide implements the official Agent Skills Specification from agentskills.io
 
 ---
 
@@ -23,13 +26,15 @@
 7. [Invocation Methods](#invocation-methods)
 8. [Runtime Behavior & Execution Flow](#runtime-behavior--execution-flow)
 9. [Discovery and Loading](#discovery-and-loading)
-10. [Tool Permissions](#tool-permissions)
-11. [Common Patterns](#common-patterns)
-12. [Best Practices](#best-practices)
-13. [Troubleshooting](#troubleshooting)
-14. [Examples](#examples)
-15. [Skill Creation Checklist](#skill-creation-checklist)
-16. [BAZINGA-Specific Notes](#bazinga-specific-notes)
+10. [File References](#file-references)
+11. [Validation](#validation)
+12. [Tool Permissions](#tool-permissions)
+13. [Common Patterns](#common-patterns)
+14. [Best Practices](#best-practices)
+15. [Troubleshooting](#troubleshooting)
+16. [Examples](#examples)
+17. [Skill Creation Checklist](#skill-creation-checklist)
+18. [BAZINGA-Specific Notes](#bazinga-specific-notes)
 
 ---
 
@@ -74,19 +79,24 @@ Skills are **prompt-based conversation and execution context modifiers** that ex
 
 ### Three-Tier Information Disclosure
 
-Skills use a progressive disclosure model:
+Skills use a progressive disclosure model (per agentskills.io specification):
 
-1. **Frontmatter** (Tier 1) - Minimal metadata shown in skill list
+1. **Metadata** (Tier 1) - Minimal metadata shown in skill list
    - Name, description, location
-   - ~50-200 characters per skill
+   - **~100 tokens** per skill
+   - Available at startup for all skills
 
-2. **SKILL.md Body** (Tier 2) - Full instructions loaded on invocation
+2. **Instructions** (Tier 2) - Full SKILL.md body loaded on invocation
    - Comprehensive but focused guidance
-   - ~500-5,000 words
+   - **<5,000 tokens recommended** (keep under 500 lines for optimal performance)
+   - Loaded only when skill is activated
 
-3. **Resources/References** (Tier 3) - Helper assets loaded on-demand
-   - Scripts, templates, detailed docs
+3. **Resources** (Tier 3) - Helper assets loaded on-demand
+   - Scripts, templates, detailed docs, references
    - Any length
+   - Loaded only when explicitly needed
+
+**Key principle:** Keep main SKILL.md under 500 lines. Move detailed content to separate files in `references/` directory for optimal context usage.
 
 ### Meta-Tool Architecture
 
@@ -133,20 +143,35 @@ Skills load from these sources in order, with later sources able to override ear
 
 ### Directory Purposes
 
-| Directory | Purpose | Context Loaded? |
-|-----------|---------|-----------------|
-| `scripts/` | Executable code (Python, Bash) | No - executed via Bash tool |
-| `resources/` | Templates, configs, schemas | Yes - via Read tool |
-| `references/` | Detailed documentation | Yes - via Read tool |
-| `assets/` | Binary files, images | No - referenced by path only |
+| Directory | Purpose | Context Loaded? | Notes |
+|-----------|---------|-----------------|-------|
+| `scripts/` | Self-contained executable code (Python, Bash, JavaScript) with clear error messages and edge case handling | No - executed via Bash tool | Per agentskills.io |
+| `resources/` | Templates, configs, schemas | Yes - via Read tool | Loaded on-demand |
+| `references/` | Additional documentation loaded on-demand: `REFERENCE.md` for technical details, `FORMS.md` for templates, domain-specific files | Yes - via Read tool | **Keep references one level deep** - avoid deeply nested chains (per agentskills.io) |
+| `assets/` | Static resources including templates, images, and data files | No - referenced by path only | Binary files |
 
 ### Naming Conventions
 
-**Skill directory:**
+**Skill directory (per agentskills.io specification):**
 - Use kebab-case: `codebase-analysis`, `lint-check`, `api-contract-validation`
-- Lowercase letters, numbers, hyphens only
-- Maximum 64 characters
+- **Lowercase alphanumeric characters and hyphens only**
+- **Cannot start or end with hyphens**
+- **No consecutive hyphens** (e.g., `pdf--processing` is invalid)
+- **1-64 characters maximum**
+- Must match the `name` field in SKILL.md frontmatter
 - Be descriptive but concise
+
+**Valid examples:**
+- `pdf-processing` ✅
+- `data-analysis` ✅
+- `code-review` ✅
+
+**Invalid examples:**
+- `PDF-Processing` ❌ (uppercase disallowed)
+- `-pdf` ❌ (cannot start with hyphen)
+- `pdf-` ❌ (cannot end with hyphen)
+- `pdf--processing` ❌ (no consecutive hyphens)
+- `pdf_processing` ❌ (underscores not allowed)
 
 **SKILL.md:**
 - Must be exactly `SKILL.md` (uppercase)
@@ -165,6 +190,11 @@ name: skill-name
 description: Brief description that tells Claude when to use this skill. Use when [trigger].
 version: 1.0.0
 author: Team/Person Name
+license: MIT
+compatibility: Requires Python 3.8+, pytest
+metadata:
+  author: example-org
+  version: "1.0"
 tags: [category1, category2]
 allowed-tools: [Bash, Read, Write]
 ---
@@ -249,55 +279,64 @@ When invoked, you must:
 
 ## Frontmatter Fields Reference
 
-### Required Fields
+### Required Fields (per agentskills.io specification)
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| `name` | Identifier used to invoke the skill. Must match directory name. Lowercase letters, numbers, hyphens only. Max 64 chars. | `codebase-analysis` |
-| `description` | Brief summary that tells Claude when to invoke. Primary selection signal. Include triggers! Max 1024 chars. | `"Analyze codebase patterns. Use when reviewing architecture."` |
+| Field | Description | Constraints | Example |
+|-------|-------------|-------------|---------|
+| `name` | Identifier used to invoke the skill. Must match directory name exactly. | 1-64 characters, lowercase alphanumeric + hyphens only, cannot start/end with hyphens, no consecutive hyphens | `codebase-analysis` |
+| `description` | Brief summary that tells Claude when to invoke. Primary selection signal. Include specific keywords and trigger terms! | 1-1024 characters | `"Analyze codebase for patterns, dependencies, and architecture. Use when reviewing code structure or planning refactoring."` |
 
 ### Optional Fields
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| `version` | Semantic version for tracking | `1.0.0` |
-| `author` | Who created/maintains the skill | `BAZINGA Team` |
-| `tags` | Categorization tags | `[analysis, security]` |
-| `allowed-tools` | Tools skill can use without asking | `[Bash, Read, Write]` |
-| `license` | License information | `MIT` |
-| `model` | Override model selection | `claude-opus-4-20250514` or `inherit` |
-| `disable-model-invocation` | Prevents automatic invocation; requires `/skill-name` | `true` |
-| `mode` | Categorizes as mode command (special UI section) | `true` |
+| Field | Description | Constraints | Example |
+|-------|-------------|-------------|---------|
+| `version` | Semantic version for tracking | Recommended | `1.0.0` |
+| `author` | Who created/maintains the skill | - | `BAZINGA Team` |
+| `tags` | Categorization tags | Array | `[analysis, security]` |
+| `license` | License name or bundled file reference | - | `MIT` or `Apache-2.0` |
+| `compatibility` | Environment requirements | Up to 500 characters | `Requires Python 3.8+, pytest` |
+| `metadata` | Key-value mapping for additional properties | Object | `author: example-org, version: "1.0"` |
+| `allowed-tools` | Tools skill can use without asking (experimental) | Space-delimited list | `[Bash, Read, Write]` |
+| `model` | Override model selection (Claude Code specific) | Model ID or `inherit` | `claude-opus-4-20250514` |
+| `disable-model-invocation` | Prevents automatic invocation (Claude Code specific) | Boolean | `true` |
+| `mode` | Categorizes as mode command (Claude Code specific) | Boolean | `true` |
 
 ### Description Best Practices
 
-The `description` field is **critical** for discoverability. Include BOTH:
-1. What the skill does
-2. When to use it (trigger terms)
+The `description` field is **critical** for discoverability (1-1024 characters). Include BOTH:
+1. **What the skill does** (be specific, not generic)
+2. **When to use it** (trigger terms that match user intent)
 
-**Good examples:**
+**Per agentskills.io:** "A quality description includes keywords helping agents identify relevant tasks."
+
+**Effective examples:**
 ```yaml
-# ✅ Specific with trigger
-description: "Extract text from PDFs, fill forms, merge documents. Use when working with PDF files."
+# ✅ Specific with actionable keywords
+description: "Extracts text and tables from PDFs, fills forms, merges documents. Use when working with PDFs or document extraction."
 
-# ✅ Clear purpose and trigger
-description: "Analyze codebase for patterns, dependencies, and architecture. Use when reviewing code structure."
+# ✅ Clear purpose with trigger scenario
+description: "Analyze codebase for patterns, dependencies, and architecture. Use when reviewing code structure or planning refactoring."
 
-# ✅ Action-oriented
-description: "Run security vulnerability scans on code changes. Use before approving PRs."
+# ✅ Action-oriented with context
+description: "Run security vulnerability scans (SQL injection, XSS, hardcoded secrets). Use before approving PRs or deployment."
 ```
 
-**Bad examples:**
+**Ineffective examples:**
 ```yaml
-# ❌ Too vague
-description: "Helps with documents"
+# ❌ Too vague (from agentskills.io)
+description: "Helps with PDFs."
 
-# ❌ No trigger
+# ❌ No trigger terms
 description: "Processes files"
 
-# ❌ Too generic
+# ❌ Too generic, no keywords
 description: "For data analysis"
+
+# ❌ Missing use case
+description: "Database operations"
 ```
+
+**Character limit:** 1-1024 characters (strictly enforced per specification)
 
 ### Deprecated/Undocumented Fields
 
@@ -529,6 +568,77 @@ ls ~/.claude/skills/
 ls .claude/skills/
 cat .claude/skills/my-skill/SKILL.md
 ```
+
+---
+
+## File References
+
+### Reference Paths (per agentskills.io specification)
+
+Use **relative paths from skill root** when referencing files:
+
+```markdown
+See [reference guide](references/REFERENCE.md) for details.
+Run: scripts/extract.py
+Load template: assets/template.html
+```
+
+**Key guidelines:**
+- **Keep references one level deep** - Avoid deeply nested reference chains
+- Use forward slashes (Unix-style) for cross-platform compatibility
+- Never use absolute paths
+
+**Good reference chain:**
+```
+SKILL.md → references/REFERENCE.md ✅
+SKILL.md → scripts/analyze.py ✅
+```
+
+**Avoid deeply nested chains:**
+```
+SKILL.md → references/guide.md → references/details.md → references/advanced.md ❌
+```
+
+**Rationale:** Deep chains make skills harder to understand and maintain. Claude should be able to follow references efficiently without traversing multiple levels.
+
+---
+
+## Validation
+
+### skills-ref CLI Tool
+
+The `skills-ref` reference library validates skill compliance with the agentskills.io specification:
+
+```bash
+# Validate a single skill
+skills-ref validate ./my-skill
+
+# Validate all skills in directory
+skills-ref validate .claude/skills/
+
+# Validate specific skill by name
+skills-ref validate .claude/skills/codebase-analysis
+```
+
+**What it checks:**
+- ✅ Frontmatter validity (YAML syntax, required fields)
+- ✅ Naming convention adherence (lowercase, no consecutive hyphens, etc.)
+- ✅ Field constraints (name: 1-64 chars, description: 1-1024 chars)
+- ✅ Directory structure compliance
+- ✅ SKILL.md exists and is properly formatted
+
+**Installation:**
+```bash
+# Installation method varies by implementation
+# Check agentskills.io for latest installation instructions
+pip install skills-ref  # Example - verify current method
+```
+
+**When to validate:**
+- Before committing new skills
+- After editing skill frontmatter
+- Before publishing skill packages
+- During CI/CD pipeline checks
 
 ---
 
@@ -1174,11 +1284,21 @@ Before committing a new skill:
 - [ ] Resources in `resources/` (if applicable)
 - [ ] Verbose content moved to `references/` (if needed)
 
-### Frontmatter
-- [ ] `name` field present and matches directory name
-- [ ] `description` clear, concise, includes trigger terms
-- [ ] `version` field present (semantic versioning)
-- [ ] `allowed-tools` scoped to minimum needed
+### Naming (agentskills.io specification)
+- [ ] Directory name is lowercase alphanumeric + hyphens only
+- [ ] Does NOT start or end with hyphen
+- [ ] Does NOT contain consecutive hyphens (`--`)
+- [ ] Name is 1-64 characters
+- [ ] Directory name matches frontmatter `name` field exactly
+
+### Frontmatter (agentskills.io specification)
+- [ ] `name` field present (1-64 chars, matches directory name)
+- [ ] `description` present (1-1024 chars, includes specific keywords and trigger terms)
+- [ ] `version` field present (semantic versioning recommended)
+- [ ] `license` field (optional but recommended)
+- [ ] `compatibility` field if tool dependencies exist (optional, max 500 chars)
+- [ ] `metadata` field for additional properties (optional)
+- [ ] `allowed-tools` scoped to minimum needed (optional)
 - [ ] No tabs in YAML (spaces only)
 
 ### Content
@@ -1187,7 +1307,8 @@ Before committing a new skill:
 - [ ] Example invocation scenarios
 - [ ] Script paths use full path from skill root
 - [ ] Under 500 lines for optimal performance (100-300 is typical)
-- [ ] Under 5,000 words total
+- [ ] Under 5,000 tokens recommended (<5,000 words)
+- [ ] References kept one level deep (no nested chains)
 
 ### Testing
 - [ ] Manual invocation works: `/skill-name`
@@ -1196,10 +1317,14 @@ Before committing a new skill:
 - [ ] All tool permissions work
 - [ ] Cross-platform (if applicable)
 
+### Validation (agentskills.io specification)
+- [ ] Run `skills-ref validate .claude/skills/skill-name` (if tool available)
+- [ ] All validation checks pass
+
 ### Code Quality
 - [ ] All Skill invocations use `command` parameter
-- [ ] No hardcoded absolute paths (use `{baseDir}`)
-- [ ] Dependencies documented in Prerequisites
+- [ ] No hardcoded absolute paths (use relative paths)
+- [ ] Dependencies documented in Prerequisites or `compatibility` field
 
 ---
 
@@ -1264,6 +1389,7 @@ Before committing a new skill:
 - Common issues identified
 
 **Version history:**
+- v3.0.0 (2026-01-05): Added agentskills.io official specification compliance, validation tools, stricter naming rules, character limits, new optional fields (compatibility, metadata)
 - v2.0.0 (2025-12-12): Comprehensive integration of Mikhail Shilkov, Lee Han Chung, and official Claude Code documentation
 - v1.0.0 (2025-11-19): Initial guide based on Mikhail Shilkov's deep-dive + BAZINGA experience
 
