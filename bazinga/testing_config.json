@@ -1,0 +1,45 @@
+{
+  "_testing_framework": {
+    "enabled": true,
+    "mode": "minimal",
+    "_mode_options": ["full", "minimal", "disabled"],
+
+    "pre_commit_validation": {
+      "lint_check": true,
+      "unit_tests": true,
+      "build_check": true,
+      "_note": "lint_check should always be true for code quality"
+    },
+
+    "test_requirements": {
+      "require_integration_tests": false,
+      "require_contract_tests": false,
+      "require_e2e_tests": false,
+      "coverage_threshold": 0,
+      "_note": "These only apply when mode=full"
+    },
+
+    "qa_workflow": {
+      "enable_qa_expert": false,
+      "auto_route_to_qa": false,
+      "qa_skills_enabled": false,
+      "_note": "Disable enable_qa_expert to skip QA workflow entirely"
+    }
+  },
+
+  "_metadata": {
+    "description": "Testing framework configuration for BAZINGA",
+    "version": "1.0",
+    "presets": {
+      "full": "All testing enabled - complete QA workflow",
+      "minimal": "Lint + unit tests only, skip QA Expert (DEFAULT)",
+      "disabled": "Only lint checks - fastest iteration"
+    },
+    "notes": [
+      "Use /bazinga.configure-testing to modify this configuration interactively",
+      "Mode 'minimal' is the default - balances speed and quality (current BAZINGA default)",
+      "Mode 'full' enables complete QA workflow for production-critical code",
+      "Mode 'disabled' is for rapid prototyping only (lint checks still run)"
+    ]
+  }
+}

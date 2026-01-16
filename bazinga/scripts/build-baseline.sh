@@ -6,8 +6,11 @@
 #
 # SECURITY: By default, uses safe checks that don't execute arbitrary scripts.
 # Set ALLOW_BASELINE_BUILD=1 to enable full build (runs npm install, bundle install, etc.)
+#
+# NOTE: This script is INFORMATIONAL, not blocking. Build failures are logged
+# but do not block orchestration. The status file captures the actual state.
 
-set -e
+# No set -e - we handle errors explicitly to avoid blocking orchestration
 
 SESSION_ID="${1:-unknown}"
 OUTPUT_DIR="bazinga/artifacts/${SESSION_ID}"
@@ -33,7 +36,7 @@ detect_and_build() {
                 exit 0
             else
                 echo "error" > "$STATUS_FILE"
-                exit 1
+                exit 0  # Informational - don't block orchestration
             fi
         else
             # Safe check: type-check only using LOCAL tsc (no network fetch)
@@ -44,7 +47,7 @@ detect_and_build() {
                     exit 0
                 else
                     echo "error" > "$STATUS_FILE"
-                    exit 1
+                    exit 0  # Informational - don't block orchestration
                 fi
             elif [ -f "tsconfig.json" ]; then
                 # TypeScript config exists but tsc not installed locally
@@ -66,7 +69,7 @@ detect_and_build() {
                 exit 0
             else
                 echo "error" > "$STATUS_FILE"
-                exit 1
+                exit 0  # Informational - don't block orchestration
             fi
         else
             echo "skipped (safe mode - go build disabled)" > "$STATUS_FILE"
@@ -82,7 +85,7 @@ detect_and_build() {
                 exit 0
             else
                 echo "error" > "$STATUS_FILE"
-                exit 1
+                exit 0  # Informational - don't block orchestration
             fi
         else
             echo "skipped (safe mode - mvn compile disabled)" > "$STATUS_FILE"
@@ -98,7 +101,7 @@ detect_and_build() {
                 exit 0
             else
                 echo "error" > "$STATUS_FILE"
-                exit 1
+                exit 0  # Informational - don't block orchestration
             fi
         else
             echo "skipped (safe mode - gradle compile disabled)" > "$STATUS_FILE"
@@ -113,7 +116,7 @@ detect_and_build() {
             exit 0
         else
             echo "error" > "$STATUS_FILE"
-            exit 1
+            exit 0  # Informational - don't block orchestration
         fi
     elif [ -f "Gemfile" ]; then
         echo "Detected: Ruby" >> "$LOG_FILE"
@@ -124,7 +127,7 @@ detect_and_build() {
                 exit 0
             else
                 echo "error" > "$STATUS_FILE"
-                exit 1
+                exit 0  # Informational - don't block orchestration
             fi
         else
             # Safe check: only verify lockfile, no install
@@ -145,7 +148,7 @@ detect_and_build() {
                 exit 0
             else
                 echo "error" > "$STATUS_FILE"
-                exit 1
+                exit 0  # Informational - don't block orchestration
             fi
         else
             echo "skipped (safe mode - cargo check disabled)" > "$STATUS_FILE"

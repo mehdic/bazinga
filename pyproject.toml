@@ -64,6 +64,7 @@ exclude = [
 "bazinga/model_selection.json" = "bazinga_cli/bazinga/model_selection.json"
 "bazinga/challenge_levels.json" = "bazinga_cli/bazinga/challenge_levels.json"
 "bazinga/skills_config.json" = "bazinga_cli/bazinga/skills_config.json"
+"bazinga/testing_config.json" = "bazinga_cli/bazinga/testing_config.json"
 "bazinga/schemas" = "bazinga_cli/bazinga/schemas"
 "templates" = "bazinga_cli/templates"
 "workflow" = "bazinga_cli/bazinga/config"  # workflow/ -> bazinga/config in clients
