@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -490,12 +491,35 @@ class BazingaSetup:
             console.print(f"  [yellow]⚠️  Failed to copy mini-dashboard: {e}[/yellow]")
             return False
 
-    def copy_bazinga_configs(self, target_dir: Path) -> bool:
+    def _backup_config_file(self, file_path: Path) -> Optional[Path]:
+        """
+        Create a timestamped backup of a config file.
+
+        Args:
+            file_path: Path to the file to backup
+
+        Returns:
+            Path to backup file if created, None if file didn't exist
+        """
+        if not file_path.exists():
+            return None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = file_path.with_suffix(f".{timestamp}.bak")
+
+        try:
+            shutil.copy2(file_path, backup_path)
+            return backup_path
+        except Exception:
+            return None
+
+    def copy_bazinga_configs(self, target_dir: Path, is_update: bool = False) -> bool:
         """
         Copy bazinga config files (JSON) to target bazinga/ directory.
 
         Args:
             target_dir: Target directory for installation
+            is_update: If True, backup existing configs before overwriting
 
         Returns:
             True if configs were copied successfully, False otherwise
@@ -512,6 +536,7 @@ class BazingaSetup:
             return False
 
         copied_count = 0
+        backed_up_count = 0
         for filename in self.ALLOWED_CONFIG_FILES:
             config_file = source_bazinga / filename
             if not config_file.exists():
@@ -526,12 +551,22 @@ class BazingaSetup:
                 # SECURITY: Ensure destination is within bazinga_dir
                 PathValidator.ensure_within_directory(dest, bazinga_dir)
 
+                # Backup existing config if updating
+                if is_update and dest.exists():
+                    backup_path = self._backup_config_file(dest)
+                    if backup_path:
+                        console.print(f"  📦 Backed up {safe_filename} → {backup_path.name}")
+                        backed_up_count += 1
+
                 shutil.copy2(config_file, dest)
                 console.print(f"  ✓ Copied {safe_filename}")
                 copied_count += 1
             except SecurityError as e:
                 console.print(f"[red]✗ Skipping unsafe file {filename}: {e}[/red]")
                 continue
+
+        if backed_up_count > 0:
+            console.print(f"  [dim]({backed_up_count} config(s) backed up - restore with .bak files if needed)[/dim]")
 
         # Copy config subdirectory (transitions.json, agent-markers.json)
         # Source: workflow/ (packaged as bazinga_cli/bazinga/config/ in wheel)
@@ -2460,9 +2495,9 @@ def update(
     else:
         console.print("  [yellow]⚠️  No templates found[/yellow]")
 
-    # Update config files
+    # Update config files (with backup of existing configs)
     console.print("\n[bold cyan]7.1. Updating config files[/bold cyan]")
-    if setup.copy_bazinga_configs(target_dir):
+    if setup.copy_bazinga_configs(target_dir, is_update=True):
         console.print("  [green]✓ Config files updated[/green]")
     else:
         console.print("  [yellow]⚠️  No config files found[/yellow]")

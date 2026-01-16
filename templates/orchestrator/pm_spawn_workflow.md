@@ -380,6 +380,22 @@ Skill(command: "bazinga-db-core")
 
 The PM agent should have saved PM state and created task groups in the database. Verify this now:
 
+### 🔴 OPTIONAL: Check PM Handoff File (Non-Blocking)
+
+**Check if PM created handoff file:**
+```bash
+test -f "bazinga/artifacts/{SESSION_ID}/handoff_project_manager.json" && echo "exists" || echo "missing"
+```
+
+**IF handoff file is MISSING:**
+- **DO NOT block workflow** - This is common (PM may not have reached Write step)
+- **Log warning:** `⚠️ PM handoff file missing | Using CRP response + database state`
+- **Continue with database verification below** - DB state is the authoritative source
+
+**IF handoff file EXISTS:**
+- Good - PM completed full workflow including Write step
+- Continue with database verification below
+
 **Query task groups:**
 ```
 bazinga-db-workflow, please get all task groups for session [current session_id]

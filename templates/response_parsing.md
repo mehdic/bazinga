@@ -44,6 +44,24 @@
 
 **The handoff file contains all details** (files changed, test counts, coverage, etc.) while the JSON response keeps orchestrator context minimal.
 
+### 🔴 CRITICAL: Handoff File Fallback
+
+**If handoff file is missing (Read returns error):**
+
+1. **DO NOT block workflow** - The CRP JSON response contains enough info to continue
+2. **Log warning:** `⚠️ Handoff file missing | Using CRP response | Agent: {agent}`
+3. **Use CRP response** for routing decisions:
+   - `status` → Determines next workflow step
+   - `summary` → Provides context for next agent
+4. **Continue workflow** - Don't stop or fail
+
+**Why this happens:**
+- Agent may have been truncated before Write step
+- Write tool may have failed silently
+- Session ID may have been lost in agent context
+
+**The CRP JSON is the PRIMARY routing mechanism. Handoff files are supplementary detail.**
+
 ### CRP Status Codes by Agent
 
 | Agent | Status Codes |
