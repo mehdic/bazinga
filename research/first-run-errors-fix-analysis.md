@@ -386,12 +386,12 @@ build-baseline.sh runs
 3. **ADD** orchestrator handling for baseline exit codes
 4. **ADD** orchestrator fallback for missing testing_config.json
 
-### Phase 2: Make It Robust (Follow-up PR)
+### Phase 2: Make It Robust ✅ COMPLETED
 
-1. Add config backup on update
-2. Add build_baseline.json structured output
-3. Add Windows PowerShell script
-4. Investigate and fix PM handoff reliability
+1. ✅ Add config backup on update - `_backup_config_file()` creates timestamped .bak files
+2. ✅ Add build_baseline.json structured output - JSON with status, language, safe_mode, checks[]
+3. ✅ Add Windows PowerShell script - `build-baseline.ps1` with same functionality
+4. ✅ PM handoff reliability - Added fallback handling in response_parsing.md and pm_spawn_workflow.md
 
 ---
 
