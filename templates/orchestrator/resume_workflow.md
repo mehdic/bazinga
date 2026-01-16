@@ -162,17 +162,35 @@ Seeded 5 special rules
 
 ### Step 4: Load configurations
 
+**Read skills configuration:**
 ```bash
-# Read active skills configuration
 cat bazinga/skills_config.json
-
-# Read testing framework configuration
-cat bazinga/testing_config.json
 ```
+
+**Read testing configuration (with fallback):**
+```bash
+# Check if testing_config.json exists
+test -f bazinga/testing_config.json && cat bazinga/testing_config.json || echo "MISSING"
+```
+
+**🔴 IF testing_config.json is MISSING (Read returns error or "MISSING"):**
+
+Use these minimal defaults and continue (do NOT block):
+```json
+{
+  "_testing_framework": {
+    "enabled": true,
+    "mode": "minimal",
+    "qa_workflow": { "enable_qa_expert": false }
+  }
+}
+```
+
+Output warning: `⚠️ testing_config.json missing | Using minimal defaults | Run 'bazinga update' to fix`
 
 **Note:** Read configurations using Read tool, but don't show Read tool output to user - it's internal setup.
 
-**AFTER reading configs: IMMEDIATELY continue to step 4.5 (Capability discovery). Do NOT stop.**
+**AFTER reading configs (or using defaults): IMMEDIATELY continue to step 4.5 (Capability discovery). Do NOT stop.**
 
 See `bazinga/templates/prompt_building.md` (loaded at initialization) for how these configs are used to build agent prompts.
 
@@ -314,15 +332,25 @@ The wrapper script:
 - Auto-detects project language (package.json, go.mod, etc.)
 - Runs appropriate build command
 - Saves results to `bazinga/artifacts/{SESSION_ID}/build_baseline.log`
-- Returns exit code: 0=success, 1=error
+- Saves status to `bazinga/artifacts/{SESSION_ID}/build_baseline_status.txt`
+- Returns exit code: 0=success/skip, 1=error
+
+**🔴 CRITICAL: Handle exit code as INFORMATIONAL WARNING, not blocking error:**
+
+The Bash tool may show `Error: Exit code 1` in its result. This is **NOT a workflow-blocking error**. It means the codebase has existing build/syntax issues.
 
 **Check result:**
-- If exit code 0: Silent (no output)
-- If exit code 1: `⚠️ Build baseline | Existing errors detected | Will track new errors`
+- If exit code 0: Silent (no output needed)
+- If exit code 1 (Bash tool shows "Error: Exit code 1"):
+  - Output: `⚠️ Build baseline | Existing errors detected | Will track new errors`
+  - **CONTINUE workflow** - this is informational only
+  - Do NOT stop or treat as failure
+
+**Why non-blocking:** Build baseline detects pre-existing issues (syntax errors, type errors). The PM can still plan work. Developers will see these issues when they run builds.
 
 **⚠️ DO NOT run inline npm/go/python commands** - use the wrapper script per §Bash Command Allowlist.
 
-**AFTER build baseline check: IMMEDIATELY continue to step 7 (Load template guides). Do NOT stop.**
+**AFTER build baseline check (regardless of exit code): IMMEDIATELY continue to step 8 (Load template guides). Do NOT stop.**
 
 ### Step 8: Load critical template guides
 
