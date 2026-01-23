@@ -113,10 +113,14 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-development-
 
 ```bash
 python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet update-plan-progress \
-  "<session_id>" "<phase_name>" "<status>" [progress_percent]
+  "<session_id>" "<phase_id>" "<status>" [progress_percent]
 ```
 
 Updates phase status within the development plan.
+
+**Parameters:**
+- `phase_id`: Either a phase number (integer) or phase name (string)
+- `progress_percent`: Optional progress percentage (0-100)
 
 **Valid status values:** `pending`, `in_progress`, `completed`, `blocked`
 

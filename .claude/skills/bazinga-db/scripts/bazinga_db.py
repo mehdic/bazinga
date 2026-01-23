@@ -20,7 +20,7 @@ import re
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Union
 import argparse
 
 # Secret patterns for redaction (compiled for performance)
@@ -2229,30 +2229,64 @@ class BazingaDB:
             plan['metadata'] = json.loads(plan['metadata'])
         return plan
 
-    def update_plan_progress(self, session_id: str, phase_number: int, status: str) -> None:
-        """Update a specific phase status in the development plan."""
+    def update_plan_progress(self, session_id: str, phase_id: Union[int, str], status: str,
+                             progress_percent: Optional[int] = None) -> None:
+        """Update a specific phase status in the development plan.
+
+        Args:
+            session_id: The session ID
+            phase_id: Either a phase number (int) or phase name (str)
+            status: New status (pending, in_progress, completed, blocked)
+            progress_percent: Optional progress percentage (0-100)
+        """
         plan = self.get_development_plan(session_id)
         if not plan:
             print(f"Error: No plan found for session {session_id}", file=sys.stderr)
             sys.exit(1)
 
         phases = plan['phases']
+        found = False
+        matched_phase_num = None
+
         for phase in phases:
-            if phase['phase'] == phase_number:
+            # Match by phase number (int) or by name (string)
+            phase_num = phase.get('phase')
+            phase_name = phase.get('name', '')
+
+            matches = False
+            if isinstance(phase_id, int):
+                matches = (phase_num == phase_id)
+            else:
+                # String matching: check name or phase number as string
+                matches = (phase_name == phase_id or str(phase_num) == phase_id)
+
+            if matches:
+                found = True
+                matched_phase_num = phase_num
                 phase['status'] = status
+                if progress_percent is not None:
+                    phase['progress_percent'] = progress_percent
                 if status == 'completed':
                     phase['completed_at'] = datetime.now().isoformat()
+                    phase['progress_percent'] = 100
                 break
+
+        if not found:
+            print(f"Error: Phase '{phase_id}' not found in development plan", file=sys.stderr)
+            sys.exit(1)
+
+        # Use matched phase number for current_phase, or keep existing if string lookup
+        current_phase = matched_phase_num if matched_phase_num is not None else plan.get('current_phase')
 
         conn = self._get_connection()
         conn.execute("""
             UPDATE development_plans
             SET phases = ?, current_phase = ?, updated_at = CURRENT_TIMESTAMP
             WHERE session_id = ?
-        """, (json.dumps(phases), phase_number, session_id))
+        """, (json.dumps(phases), current_phase, session_id))
         conn.commit()
         conn.close()
-        self._print_success(f"✓ Updated phase {phase_number} status to: {status}")
+        self._print_success(f"✓ Updated phase '{phase_id}' status to: {status}")
 
     # ==================== SUCCESS CRITERIA OPERATIONS ====================
 
@@ -3807,8 +3841,8 @@ DEVELOPMENT PLAN OPERATIONS:
   save-development-plan <session> <prompt> <plan> <phases_json> <current> <total> [metadata]
                                               Save development plan
   get-development-plan <session>              Get development plan
-  update-plan-progress <session> <phase> <status>
-                                              Update plan phase status
+  update-plan-progress <session> <phase_id> <status> [progress_percent]
+                                              Update plan phase status (phase_id can be number or name)
 
 SUCCESS CRITERIA OPERATIONS:
   save-success-criteria <session> <criteria_json>
@@ -4439,9 +4473,15 @@ def main():
             print(json.dumps(result, indent=2))
         elif cmd == 'update-plan-progress':
             session_id = cmd_args[0]
-            phase_number = int(cmd_args[1])
+            phase_id_str = cmd_args[1]
             status = cmd_args[2]
-            db.update_plan_progress(session_id, phase_number, status)
+            progress_percent = int(cmd_args[3]) if len(cmd_args) > 3 else None
+            # Try to parse as int, fall back to string for phase name lookup
+            try:
+                phase_id: Union[int, str] = int(phase_id_str)
+            except ValueError:
+                phase_id = phase_id_str
+            db.update_plan_progress(session_id, phase_id, status, progress_percent)
         elif cmd == 'save-success-criteria':
             session_id = cmd_args[0]
             criteria = json.loads(cmd_args[1])
