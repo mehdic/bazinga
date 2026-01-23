@@ -12,13 +12,13 @@
 
 1. **Increment spawn counter:**
    ```
-   bazinga-db, please update orchestrator state:
+   bazinga-db-core, please update orchestrator state:
 
    Session ID: {session_id}
    State Type: orchestrator
    State Data: {"total_spawns": {current_total_spawns + 1}}
    ```
-   Then invoke: `Skill(command: "bazinga-db")`
+   Then invoke: `Skill(command: "bazinga-db-core")`
 
 2. **Compute token estimate:** `estimated_token_usage = total_spawns * 15000`
 
@@ -254,7 +254,7 @@ Write to `bazinga/prompts/{session_id}/params_investigator_{group_id}.json`:
   "session_id": "{session_id}",
   "group_id": "{group_id}",
   "task_title": "Investigate: {blocker_description[:60]}",
-  "task_requirements": "BLOCKER: {blocker_description}\nEvidence from Developer: {developer_evidence}",
+  "task_requirements": "BLOCKING_ISSUE: {blocker_description}\nEvidence from Developer: {developer_evidence}",
   "branch": "{branch}",
   "mode": "simple",
   "testing_mode": "{testing_mode}",
@@ -323,7 +323,7 @@ Write to `bazinga/prompts/{session_id}/params_senior_software_engineer_{group_id
   Group ID: {group_id}
   Revision Count: {revision_count + 1}
   ```
-  Invoke: `Skill(command: "bazinga-db")`
+  Invoke: `Skill(command: "bazinga-db-workflow")`
 
 #### SPAWN DEVELOPER RETRY (SKILL-BASED PROMPT)
 
@@ -687,7 +687,7 @@ Task(
 **IF Tech Lead approves:**
 - **Trigger strategy extraction** (capture successful patterns for future context):
   ```
-  bazinga-db, please extract strategies:
+  bazinga-db-context, please extract strategies:
 
   Session ID: {session_id}
   Group ID: {group_id}
@@ -695,7 +695,7 @@ Task(
   Lang: {detected_lang}
   Framework: {detected_framework}
   ```
-  Then invoke: `Skill(command: "bazinga-db")`
+  Then invoke: `Skill(command: "bazinga-db-context")`
   *Note: This is non-blocking - proceed even if extraction fails*
 - **Immediately proceed to Step 2A.7a** (Spawn Developer for immediate merge)
 - Do NOT stop for user input
@@ -774,14 +774,14 @@ Read(file_path: "bazinga/templates/merge_workflow.md")
 
 **MERGE_SUCCESS Progress Tracking:**
 1. Update task_group: status="completed", merge_status="merged"
-2. Query completed progress from task_groups using bazinga-db skill:
+2. Query completed progress from task_groups using bazinga-db-workflow skill:
    ```
-   bazinga-db, please get task groups:
+   bazinga-db-workflow, please get task groups:
 
    Session ID: [session_id]
    Status: completed
    ```
-   Then invoke: `Skill(command: "bazinga-db")`
+   Then invoke: `Skill(command: "bazinga-db-workflow")`
    Sum item_count from the returned JSON to get completed items.
 3. Output capsule with progress: `✅ Group {id} merged | Progress: {completed_sum}/{total_sum}`
 

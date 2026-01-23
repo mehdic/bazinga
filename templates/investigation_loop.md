@@ -19,22 +19,51 @@ Before starting investigation loop, verify:
 
 ---
 
+## State vs Events Design
+
+Investigation progress is tracked in TWO complementary systems:
+
+| System | Purpose | Skill | Resumable? |
+|--------|---------|-------|------------|
+| **State** | Current progress, iteration count | bazinga-db-core | ✅ Yes |
+| **Events** | Immutable audit trail, history | bazinga-db-agents | ❌ Append-only |
+
+**Why both?**
+- State enables session resumption after context compaction
+- Events provide queryable history and dashboard timeline
+- Both MUST be updated together for consistency
+
+**Failure handling:**
+- If state update fails: Retry with exponential backoff
+- If event save fails: Log warning, continue (audit trail is secondary)
+- Reconciliation: Dashboard queries events to verify state accuracy
+
+**Preferred:** Use atomic `save-investigation-iteration` command when available (combines both operations).
+
+---
+
 ## Step 1: Initialize or Resume Investigation State
 
-**Query database for existing investigation:**
+**Query database for existing investigation (with group isolation):**
 ```
-bazinga-db, please get state:
+bazinga-db-core, please get state:
+
 Session ID: {session_id}
 State Type: investigation
+Group ID: {group_id}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 **IF existing investigation found:**
 ```
 investigation_state = parse(state_data)
-IF investigation_state.group_id == {current_group_id} AND investigation_state.status == "in_progress":
+IF investigation_state.status == "in_progress":
     Log: "Resuming investigation | Iteration {current_iteration + 1} of 5"
     → Continue to Step 2
 ```
+
+**Note:** The Group ID query parameter ensures we retrieve the correct investigation
+state when multiple parallel investigations are running.
 
 **IF no existing investigation:**
 
@@ -66,13 +95,18 @@ investigation_state:
   solution: null
 ```
 
-**1c. Save to database (using bazinga-db state APIs):**
+**1c. Save to database (using bazinga-db state APIs with group isolation):**
 ```
-bazinga-db, please save state:
+bazinga-db-core, please save state:
+
 Session ID: {session_id}
 State Type: investigation
+Group ID: {group_id}
 Data: {investigation_state as JSON}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
+
+**Note:** The Group ID is required for investigation states to support parallel investigations.
 
 ---
 
@@ -83,9 +117,10 @@ investigation_state.current_iteration += 1
 
 IF current_iteration > max_iterations:
     investigation_state.status = "incomplete"
-    bazinga-db, please save state:
+    bazinga-db-core, please save state:
     Session ID: {session_id}
     State Type: investigation
+    Group ID: {group_id}
     Data: {investigation_state}
 
     → Route to Step 5b (INVESTIGATION_INCOMPLETE exit)
@@ -151,36 +186,72 @@ Task(
 | `EXHAUSTED` | → Step 5d |
 | Unknown/Parse Error | → Treat as NEED_MORE_ANALYSIS (max 2 times) → then BLOCKED |
 
-**Step 4a-log: Log iteration result:**
-```
-bazinga-db, please log investigation iteration:
-Session ID: {session_id}
-Group ID: {group_id}
-Iteration: {current_iteration}
-Status: {status}
-Summary: {extracted summary}
+**Step 4a-log: Save iteration result (ALWAYS USE ATOMIC):**
+
+**🔴 MANDATORY: Use atomic save-investigation-iteration command:**
+
+The atomic command ensures state and event are saved together in one transaction,
+preventing partial saves that could corrupt investigation state.
+
+1. Create secure temp files with unique names and restricted permissions:
+```bash
+# Create unique temp files with secure permissions (0600)
+# See: research/domain-skill-migration-phase4-ultrathink.md (Fix H)
+INV_STATE_FILE=$(mktemp /tmp/inv_state_XXXXXX.json)
+INV_EVENT_FILE=$(mktemp /tmp/inv_event_XXXXXX.json)
+chmod 600 "$INV_STATE_FILE" "$INV_EVENT_FILE"
 ```
 
-**Update investigation_state.iterations_log and save:**
+2. Write state to temp file:
+```bash
+cat > "$INV_STATE_FILE" << 'EOF'
+{"session_id": "{session_id}", "group_id": "{group_id}", "current_iteration": {N}, "status": "{status}", ...}
+EOF
 ```
-iterations_log.append({
-  "iteration": current_iteration,
-  "status": status,
-  "summary": extracted_summary
-})
-bazinga-db, please save state: ...
+
+3. Write event payload to temp file:
+```bash
+cat > "$INV_EVENT_FILE" << 'EOF'
+{"group_id": "{group_id}", "iteration": {N}, "status": "{status}", "summary": "..."}
+EOF
 ```
+
+4. Invoke atomic save:
+```
+bazinga-db-agents, please save investigation iteration atomically:
+
+Session: {session_id}
+Group: {group_id}
+Iteration: {current_iteration}
+Status: {status}
+State file: $INV_STATE_FILE
+Event file: $INV_EVENT_FILE
+```
+Then invoke: `Skill(command: "bazinga-db-agents")`
+
+5. Clean up temp files (always, even on failure):
+```bash
+rm -f "$INV_STATE_FILE" "$INV_EVENT_FILE"
+```
+
+**⚠️ DO NOT use fallback separate saves for investigation state.**
+The save-state command now uses UPSERT with group_id, but the atomic command
+is more robust and provides better audit trail via events.
 
 ---
 
 ## Step 4b: Capacity Check (Before Diagnostic Developer Spawn)
 
-**Check active developer count:**
+**Check active developer count (from orchestrator state):**
 ```
-bazinga-db, please get active agent count:
+bazinga-db-core, please get state:
+
 Session ID: {session_id}
-Agent Type: developer
+State Type: orchestrator
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
+
+Parse response: `active_developers = count(state.active_agents where type == "developer")`
 
 **IF active_developers >= 4:**
 ```
@@ -222,10 +293,15 @@ Skill(command: "prompt-builder")
 
 **Step 4c-3: Check escalation (respect revision count):**
 ```
-bazinga-db, please get revision count:
-Session ID: {session_id}
-Group ID: {group_id}
+bazinga-db-workflow, please get task groups:
 
+Session ID: {session_id}
+```
+Then invoke: `Skill(command: "bazinga-db-workflow")`
+
+Parse response: `revision_count = task_group[group_id].revision_count`
+
+```
 IF revision_count >= 1:
     model = MODEL_CONFIG["senior_software_engineer"]
 ELSE:
@@ -244,10 +320,13 @@ Task(
 
 **Increment revision count:**
 ```
-bazinga-db, please increment revision:
-Session ID: {session_id}
+bazinga-db-workflow, please update task group:
+
 Group ID: {group_id}
+Session ID: {session_id}
+Revision Count: +1
 ```
+Then invoke: `Skill(command: "bazinga-db-workflow")`
 
 **TERMINATE orchestrator turn** (await Developer response)
 
@@ -286,18 +365,25 @@ TERMINATE orchestrator turn
 
 ### Step 5a: ROOT_CAUSE_FOUND
 
-**Update state:**
+**Update state (with group isolation):**
 ```
 investigation_state.status = "root_cause_found"
 investigation_state.root_cause = {from investigator}
 investigation_state.confidence = {from investigator}
 investigation_state.solution = {from investigator}
-bazinga-db, please save state: ...
+
+bazinga-db-core, please save state:
+Session ID: {session_id}
+State Type: investigation
+Group ID: {group_id}
+Data: {investigation_state}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 **Register context package:**
 ```
-bazinga-db, please save context package:
+bazinga-db-context, please save context package:
+
 Session ID: {session_id}
 Group ID: {group_id}
 Package Type: investigation
@@ -307,6 +393,7 @@ Consumer Agents: ["developer", "senior_software_engineer"]
 Priority: high
 Summary: {1-sentence root cause + fix}
 ```
+Then invoke: `Skill(command: "bazinga-db-context")`
 
 **Route to Tech Lead validation** (per transitions.json: ROOT_CAUSE_FOUND → tech_lead)
 
@@ -316,15 +403,21 @@ Summary: {1-sentence root cause + fix}
 
 **State already set in Step 2 (max iterations)**
 
-**Build partial findings:**
+**Build partial findings (with group isolation):**
 ```
 investigation_state.partial_findings = {
   "iterations_completed": current_iteration,
   "hypotheses_tested": [list from iterations_log],
   "progress": {summary of what was learned}
 }
-bazinga-db, please save state: ...
+
+bazinga-db-core, please save state:
+Session ID: {session_id}
+State Type: investigation
+Group ID: {group_id}
+Data: {investigation_state}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 **Route to Tech Lead partial review** (per transitions.json: INVESTIGATION_INCOMPLETE → tech_lead)
 
@@ -332,12 +425,18 @@ bazinga-db, please save state: ...
 
 ### Step 5c: BLOCKED
 
-**Update state:**
+**Update state (with group isolation):**
 ```
 investigation_state.status = "blocked"
 investigation_state.blocker = {from investigator}
-bazinga-db, please save state: ...
+
+bazinga-db-core, please save state:
+Session ID: {session_id}
+State Type: investigation
+Group ID: {group_id}
+Data: {investigation_state}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 **Route to Tech Lead** (per transitions.json: BLOCKED → tech_lead)
 
@@ -350,11 +449,17 @@ Tech Lead will decide whether to:
 
 ### Step 5d: EXHAUSTED
 
-**Update state:**
+**Update state (with group isolation):**
 ```
 investigation_state.status = "exhausted"
-bazinga-db, please save state: ...
+
+bazinga-db-core, please save state:
+Session ID: {session_id}
+State Type: investigation
+Group ID: {group_id}
+Data: {investigation_state}
 ```
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 **Route to Tech Lead** (per transitions.json: EXHAUSTED → tech_lead)
 

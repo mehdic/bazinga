@@ -20,7 +20,7 @@
 ## Step 1: Check Orchestrator State
 
 ```
-Skill(command: "bazinga-db") → get-state {session_id} orchestrator
+Skill(command: "bazinga-db-core") → get-state {session_id} orchestrator
 ```
 
 ---
@@ -34,7 +34,7 @@ Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 1. **Allow the clarification** - PM gets ONE chance
 2. **Store the question:**
    ```
-   Skill(command: "bazinga-db") → save-state {session_id} orchestrator {
+   Skill(command: "bazinga-db-core") → save-state {session_id} orchestrator {
      "clarification_used": true,
      "clarification_resolved": false,
      "clarification_question": "{PM's question}"
@@ -57,7 +57,7 @@ Skill(command: "bazinga-db") → get-state {session_id} orchestrator
 
 1. **Update state:**
    ```
-   Skill(command: "bazinga-db") → save-state {session_id} orchestrator {
+   Skill(command: "bazinga-db-core") → save-state {session_id} orchestrator {
      "clarification_resolved": true,
      "user_clarification_response": "{user's response}"
    }

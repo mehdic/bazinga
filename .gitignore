@@ -91,3 +91,13 @@ bazinga/bazinga.db*
 # bazinga/config is a symlink -> ../workflow for dev mode compatibility
 
 test-results/
+
+# BAZINGA - Auto-generated (do not edit this section)
+bazinga/*.db*
+bazinga/artifacts/
+bazinga-video/
+
+# Generated files
+coverage.json
+dashboard-v2/test-check.js
+--test-migration

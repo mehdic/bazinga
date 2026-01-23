@@ -8,11 +8,11 @@
 
 **Query current session's plan:**
 
-Invoke skill: `Skill(command: "bazinga-db")`
+Invoke skill: `Skill(command: "bazinga-db-workflow")`
 
 Provide request:
 ```
-bazinga-db, please get the development plan:
+bazinga-db-workflow, please get the development plan:
 
 Session ID: {session_id}
 ```
@@ -31,9 +31,9 @@ User request contains phase references ("Phase", "phase", "Step")? If yes:
 
 *New sessions may lose plan context. Search recent sessions:*
 
-Invoke: `Skill(command: "bazinga-db")`
+Invoke: `Skill(command: "bazinga-db-core")`
 ```
-bazinga-db, please list the most recent sessions (limit 5).
+bazinga-db-core, please list the most recent sessions (limit 5).
 ```
 
 For each recent session (last 24h), query its plan. If plan found with matching phase names:
@@ -49,9 +49,9 @@ Detect plan type:
 
 **Save plan:**
 
-Invoke: `Skill(command: "bazinga-db")`
+Invoke: `Skill(command: "bazinga-db-workflow")`
 ```
-bazinga-db, please save this development plan:
+bazinga-db-workflow, please save this development plan:
 
 Session ID: {session_id}
 Original Prompt: {user's exact message, escape quotes}
@@ -110,7 +110,7 @@ Output: `📋 Plan: {total}-phase detected | Phase 1→ Others⏸`
 
 ---
 
-## Step 3.5: Assign Specializations (MANDATORY - BLOCKER)
+## Step 3.5: Assign Specializations (CRITICAL - BLOCKS WORKFLOW)
 
 **Purpose:** Provide technology-specific patterns to agents.
 
@@ -165,7 +165,7 @@ FOR each task_group:
 ### Step 3.5.4: Store via bazinga-db (CANONICAL TEMPLATE)
 
 ```
-bazinga-db, please create task group:
+bazinga-db-workflow, please create task group:
 
 Group ID: A
 Session ID: [session_id]
@@ -228,7 +228,7 @@ bazinga-db, get session [session_id] with initial_branch
 ### Sub-step 5.2: Save PM State
 
 ```
-bazinga-db, please save the PM state:
+bazinga-db-core, please save the PM state:
 
 Session ID: [session_id]
 State Type: pm
@@ -254,7 +254,7 @@ State Data: {
 }
 ```
 
-Then invoke: `Skill(command: "bazinga-db")`
+Then invoke: `Skill(command: "bazinga-db-core")`
 
 ### Sub-step 5.3: Verify Task Groups Were Persisted
 
@@ -342,3 +342,140 @@ Orchestrator should spawn [N] developer(s) for group(s): [IDs]
 - Performance-critical paths → **Senior Software Engineer**
 
 **NOTE:** You decide the tier, NOT the model. Orchestrator loads model assignments from database.
+
+---
+
+## Decision-Making Playbook
+
+**You do not "discuss options". You decide.** Use this playbook for every non-trivial decision.
+
+### 1) Classify the Decision
+
+Before deciding, categorize the decision:
+
+| Dimension | Question |
+|-----------|----------|
+| **Reversibility** | Reversible (can undo easily) vs. hard-to-reverse (costly to change)? |
+| **Blast radius** | Local module vs. cross-cutting (affects multiple components)? |
+| **Urgency** | Blocking progress vs. optimization/nice-to-have? |
+| **Uncertainty** | Known facts vs. guesswork/assumptions? |
+
+### 2) Minimum Evidence Bundle
+
+**NO evidence = NO decision.** Request from the relevant agent(s) (Dev/QA/TL), without involving the user:
+
+- Clear problem statement + constraints
+- 2–4 viable options (including "do nothing" if meaningful)
+- Risks + dependencies for each option
+- Expected impact on tests, timeline, and integration
+
+### 3) Choose a Decision Method
+
+| Situation | Method | How |
+|-----------|--------|-----|
+| **Tradeoff-heavy choices** | Lightweight MCDA | Define 3–6 criteria (Value, Risk, Time, Complexity, Dependency, Quality). Weight criteria, score options, pick highest. |
+| **Uncertainty/risk choices** | Decision tree thinking | Enumerate outcomes, rough probabilities, and expected impact. |
+| **Low-risk reversible choices** | Timebox and commit | Decide quickly, move forward, rely on fast feedback. |
+
+### 4) Commit + Mitigate
+
+Every decision MUST include:
+
+- **Chosen option** + explicit rationale
+- **Rollback/mitigation plan** if it fails
+- **Re-evaluation trigger** (new test failures, perf regression, blocker repeats)
+
+### 5) Decision Record
+
+**Log key decisions using bazinga-db CLI** (matches pattern in other agents):
+
+```bash
+# Step 1: Write decision content to temp file (avoids process table exposure)
+cat > /tmp/reasoning_decisions.md << 'REASONING_EOF'
+## Decision: [decision_id]
+
+### Context
+[What prompted this decision]
+
+### Options Considered
+1. [Option A] - [Pros/Cons]
+2. [Option B] - [Pros/Cons]
+3. [Option C] - [Pros/Cons]
+
+### Criteria
+- [Criterion 1]: Weight [X]
+- [Criterion 2]: Weight [Y]
+
+### Decision
+[Chosen option]
+
+### Rationale
+[Why this option was selected]
+
+### Mitigation/Rollback
+[Plan if this fails]
+REASONING_EOF
+
+# Step 2: Save via --content-file
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-reasoning \
+  "{SESSION_ID}" "{GROUP_ID}" "project_manager" "decisions" \
+  --content-file /tmp/reasoning_decisions.md \
+  --confidence high
+```
+
+**Note:** This is the standard pattern used across all agents (developer, qa_expert, tech_lead, etc.) for reasoning documentation. Use `--content-file` to avoid exposing content in the process table.
+
+---
+
+## Task Decomposition for Independent Execution
+
+**Parallel mode only works if tasks are genuinely independent.** Your job is to make that true.
+
+### Independence Rules (Non-Negotiable)
+
+Each task group MUST be:
+
+| Rule | Requirement |
+|------|-------------|
+| **Independent** | Minimal shared files/modules with other groups |
+| **Testable** | Clear acceptance criteria and verification method |
+| **Mergeable** | Produces incremental deliverable (no "big bang" PRs) |
+| **Integratable** | Defines integration points and ownership |
+
+### Default Strategy: Thin Vertical Slices
+
+Prefer "end-to-end usable slices" over splitting by architectural layer (UI-only / DB-only / API-only).
+
+- **First slice:** Smallest "walking skeleton" that proves integration
+- **Next slices:** Extend by workflow step, business rule, or data variation
+
+### Slicing Patterns That Produce Independence
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| **Core then enhance** | Happy path → validations/edge cases → refinements | Login → password validation → MFA |
+| **Workflow steps** | Step 1 usable → step 2 usable → step 3 usable | Checkout: cart → payment → confirmation |
+| **Business rule variations** | Simple rule → additional rules | Tax calculation: flat → progressive → exemptions |
+| **Persona/role variations** | Role A → role B | User view → admin view |
+| **Data scale** | Small data → large/realistic (with perf gates) | 10 records → 10k records |
+
+### Dependency-Killers (Use Aggressively)
+
+| Technique | Benefit |
+|-----------|---------|
+| **Contract-first interfaces** | Define API/schema/contract early so producers/consumers work in parallel |
+| **Stubs/mocks/contract tests** | Teams don't block on unfinished implementations |
+| **File ownership boundaries** | Avoid two groups editing same critical files. If unavoidable, force sequential phases or create a seam first. |
+
+### Task Group Definition (Minimum Fields)
+
+Every group description MUST include:
+
+```markdown
+**Group [ID]:** [Name]
+- **Deliverable:** What changes will exist
+- **Definition of Done:** Tests/docs/approval gates
+- **Acceptance Criteria:** Objective, verifiable conditions
+- **Dependencies:** What must exist first + integration contract
+- **Risk Notes:** Potential issues + rollback/mitigation
+```

@@ -26,10 +26,14 @@ from rich.text import Text
 from .security import PathValidator, SafeSubprocess, SecurityError, validate_script_path
 from .telemetry import track_command
 
-__version__ = "1.1.0"
+__version__ = "1.3.0"
 
 # GitHub repository for release downloads
 GITHUB_REPO = "mehdic/bazinga"
+
+# Global offline mode flag - set by --offline/-O option
+# When True, skip network operations (update checks, GitHub API calls, pre-built downloads)
+_OFFLINE_MODE = False
 
 console = Console()
 app = typer.Typer(
@@ -153,6 +157,155 @@ class BazingaSetup:
                 continue
 
         return True
+
+    def copy_agents_for_copilot(self, target_dir: Path) -> bool:
+        """
+        Copy agent files to target .github/agents directory with .agent.md extension.
+
+        This is the Copilot-specific variant that:
+        1. Copies to .github/agents/ instead of .claude/agents/
+        2. Renames files with .agent.md extension (e.g., developer.md → developer.agent.md)
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if agents were copied successfully, False otherwise
+        """
+        agents_dir = target_dir / ".github" / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+        agent_files = self.get_agent_files()
+        if not agent_files:
+            console.print("[yellow]⚠️  No agent files found in source[/yellow]")
+            return False
+
+        for agent_file in agent_files:
+            try:
+                # SECURITY: Validate filename doesn't contain path traversal
+                safe_filename = PathValidator.validate_filename(agent_file.name)
+
+                # Convert .md to .agent.md for Copilot
+                if safe_filename.endswith('.md'):
+                    safe_filename = safe_filename[:-3] + '.agent.md'
+
+                dest = agents_dir / safe_filename
+
+                # SECURITY: Ensure destination is within agents_dir
+                PathValidator.ensure_within_directory(dest, agents_dir)
+
+                shutil.copy2(agent_file, dest)
+                console.print(f"  ✓ Copied {safe_filename}")
+            except SecurityError as e:
+                console.print(f"[red]✗ Skipping unsafe file {agent_file.name}: {e}[/red]")
+                continue
+
+        return True
+
+    def copy_skills_for_copilot(self, target_dir: Path, script_type: str = "sh") -> bool:
+        """
+        Copy Skills to target .github/skills directory for Copilot.
+
+        For Copilot, we symlink to .claude/skills/ to avoid duplication, or copy
+        if symlinks are not supported on the platform.
+
+        Args:
+            target_dir: Target directory for installation
+            script_type: "sh" for bash scripts or "ps" for PowerShell scripts
+
+        Returns:
+            True if skills were copied/linked successfully, False otherwise
+        """
+        github_skills_dir = target_dir / ".github" / "skills"
+        claude_skills_dir = target_dir / ".claude" / "skills"
+
+        # First, ensure Claude skills are installed
+        if not claude_skills_dir.exists():
+            console.print("[yellow]⚠️  .claude/skills not found - installing first[/yellow]")
+            if not self.copy_skills(target_dir, script_type):
+                return False
+
+        github_skills_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        # Try to create symlink (preferred)
+        try:
+            if github_skills_dir.exists() or github_skills_dir.is_symlink():
+                if github_skills_dir.is_symlink():
+                    github_skills_dir.unlink()
+                elif github_skills_dir.is_dir():
+                    shutil.rmtree(github_skills_dir)
+
+            # Create relative symlink
+            github_skills_dir.symlink_to("../.claude/skills", target_is_directory=True)
+            console.print(f"  ✓ Created symlink .github/skills → .claude/skills")
+            return True
+        except (OSError, NotImplementedError):
+            # Symlinks not supported (Windows without dev mode), copy instead
+            console.print(f"  [dim]Symlinks not supported, copying skills instead[/dim]")
+
+            if github_skills_dir.exists():
+                shutil.rmtree(github_skills_dir)
+            shutil.copytree(claude_skills_dir, github_skills_dir)
+            console.print(f"  ✓ Copied skills to .github/skills/")
+            return True
+
+    def create_copilot_instructions(self, target_dir: Path) -> bool:
+        """
+        Generate copilot-instructions.md from CLAUDE.md for GitHub Copilot.
+
+        This function:
+        1. Reads .claude/CLAUDE.md (or .claude.md for backward compatibility)
+        2. Converts Claude Code-specific references to Copilot equivalents
+        3. Writes to .github/copilot-instructions.md
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if instructions were created successfully, False otherwise
+        """
+        # Read source CLAUDE.md (check both locations)
+        claude_md_new = target_dir / ".claude" / "CLAUDE.md"
+        claude_md_old = target_dir / ".claude.md"
+
+        source_file = claude_md_new if claude_md_new.exists() else claude_md_old if claude_md_old.exists() else None
+
+        if not source_file:
+            console.print("[yellow]⚠️  CLAUDE.md not found - cannot generate copilot-instructions.md[/yellow]")
+            return False
+
+        try:
+            content = source_file.read_text(encoding='utf-8')
+
+            # Transform content for Copilot
+            # 1. Update references to .claude/ → .github/
+            content = content.replace('.claude/agents/', '.github/agents/')
+            content = content.replace('.claude/skills/', '.github/skills/')
+            content = content.replace('.claude/templates/', '.github/templates/')
+            content = content.replace('.claude/commands/', '.github/commands/')
+
+            # 2. Add Copilot-specific header
+            copilot_header = """# GitHub Copilot Instructions for BAZINGA
+
+> **Note:** This file is auto-generated from CLAUDE.md for GitHub Copilot compatibility.
+> It contains the same orchestration rules and agent workflows adapted for Copilot's file structure.
+
+---
+
+"""
+            content = copilot_header + content
+
+            # 3. Write to .github/copilot-instructions.md
+            dest_file = target_dir / ".github" / "copilot-instructions.md"
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            dest_file.write_text(content, encoding='utf-8')
+
+            console.print(f"  ✓ Generated copilot-instructions.md")
+            return True
+
+        except Exception as e:
+            console.print(f"[red]✗ Failed to generate copilot-instructions.md: {e}[/red]")
+            return False
 
     def copy_scripts(self, target_dir: Path, script_type: str = "sh") -> bool:
         """
@@ -842,6 +995,34 @@ def check_command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def is_offline_mode() -> bool:
+    """Check if offline mode is enabled.
+
+    Offline mode is enabled when:
+    1. --offline/-O flag was passed to the CLI
+    2. BAZINGA_OFFLINE environment variable is set to "1" or "true"
+
+    Returns:
+        True if offline mode is enabled, False otherwise
+    """
+    global _OFFLINE_MODE
+    if _OFFLINE_MODE:
+        return True
+    # Also check environment variable for CI/automation use cases
+    env_offline = os.environ.get("BAZINGA_OFFLINE", "").lower()
+    return env_offline in ("1", "true", "yes")
+
+
+def set_offline_mode(enabled: bool) -> None:
+    """Set the global offline mode flag.
+
+    Args:
+        enabled: True to enable offline mode, False to disable
+    """
+    global _OFFLINE_MODE
+    _OFFLINE_MODE = enabled
+
+
 def update_gitignore(target_dir: Path) -> bool:
     """
     Add BAZINGA-specific entries to the project's .gitignore file.
@@ -1184,6 +1365,11 @@ def download_prebuilt_dashboard(target_dir: Path, force: bool = False) -> bool:
     import urllib.request
     import urllib.error
 
+    # Skip network operations in offline mode
+    if is_offline_mode():
+        console.print("  [dim]Skipped (offline mode)[/dim]")
+        return False
+
     dashboard_dir = target_dir / "bazinga" / "dashboard-v2"
     standalone_marker = dashboard_dir / ".next" / "standalone" / "server.js"
 
@@ -1516,6 +1702,18 @@ def init(
         "-p",
         help="Configuration profile: lite (default), advanced, or custom",
     ),
+    platform: str = typer.Option(
+        "claude",
+        "--platform",
+        "-P",
+        help="Target platform: claude (default), copilot, or both",
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        "-O",
+        help="Run in offline mode (skip update checks, use cached templates, no network)",
+    ),
 ):
     """
     Initialize a new BAZINGA project with multi-agent orchestration.
@@ -1535,8 +1733,18 @@ def init(
     - full: All tests + QA Expert (production)
     - minimal: Lint + unit tests only (default)
     - disabled: Lint only (rapid prototyping)
+
+    Offline mode (--offline / -O):
+    - Skip network operations (update checks, GitHub API calls)
+    - Use cached templates and local files only
+    - Useful for air-gapped environments or CI without network access
     """
     print_banner()
+
+    # Set offline mode if requested
+    if offline:
+        set_offline_mode(True)
+        console.print("[cyan]Offline mode: Network operations disabled[/cyan]\n")
 
     # Validate profile
     valid_profiles = ["lite", "advanced", "custom"]
@@ -1570,6 +1778,24 @@ def init(
         )
         raise typer.Exit(1)
     testing_mode = testing_mode.lower()
+
+    # Validate platform
+    valid_platforms = ["claude", "copilot", "both"]
+    if platform.lower() not in valid_platforms:
+        console.print(
+            f"[red]✗ Invalid platform: '{platform}'[/red]\n"
+            f"Valid options: {', '.join(valid_platforms)}"
+        )
+        raise typer.Exit(1)
+    platform = platform.lower()
+
+    # Show platform selection
+    if platform == "both":
+        console.print(f"[cyan]Platform: Installing for both Claude Code and GitHub Copilot[/cyan]\n")
+    elif platform == "copilot":
+        console.print(f"[cyan]Platform: Installing for GitHub Copilot only[/cyan]\n")
+    else:
+        console.print(f"[cyan]Platform: Installing for Claude Code (default)[/cyan]\n")
 
     # Ask for script type preference
     script_type = select_script_type()
@@ -1619,9 +1845,14 @@ def init(
         task = progress.add_task("Installing...", total=None)
 
         console.print("[bold cyan]1. Copying agent definitions[/bold cyan]")
-        if not setup.copy_agents(target_dir):
-            console.print("[red]✗ Failed to copy agents[/red]")
-            raise typer.Exit(1)
+        if platform in ["claude", "both"]:
+            if not setup.copy_agents(target_dir):
+                console.print("[red]✗ Failed to copy agents for Claude Code[/red]")
+                raise typer.Exit(1)
+        if platform in ["copilot", "both"]:
+            if not setup.copy_agents_for_copilot(target_dir):
+                console.print("[red]✗ Failed to copy agents for Copilot[/red]")
+                raise typer.Exit(1)
 
         console.print(f"\n[bold cyan]2. Copying scripts ({script_type.upper()})[/bold cyan]")
         if not setup.copy_scripts(target_dir, script_type):
@@ -1632,8 +1863,12 @@ def init(
             console.print("[yellow]⚠️  No commands found[/yellow]")
 
         console.print(f"\n[bold cyan]4. Copying skills ({script_type.upper()})[/bold cyan]")
-        if not setup.copy_skills(target_dir, script_type):
-            console.print("[yellow]⚠️  No skills found[/yellow]")
+        if platform in ["claude", "both"]:
+            if not setup.copy_skills(target_dir, script_type):
+                console.print("[yellow]⚠️  No skills found for Claude Code[/yellow]")
+        if platform in ["copilot", "both"]:
+            if not setup.copy_skills_for_copilot(target_dir, script_type):
+                console.print("[yellow]⚠️  Failed to setup skills for Copilot[/yellow]")
 
         console.print("\n[bold cyan]5. Setting up configuration[/bold cyan]")
         if not setup.setup_config(target_dir):
@@ -1698,6 +1933,11 @@ def init(
         console.print("\n[bold cyan]7.2. Copying .claude templates[/bold cyan]")
         if not setup.copy_claude_templates(target_dir):
             console.print("[yellow]⚠️  No .claude templates found[/yellow]")
+
+        if platform in ["copilot", "both"]:
+            console.print("\n[bold cyan]7.2.1. Generating copilot-instructions.md[/bold cyan]")
+            if not setup.create_copilot_instructions(target_dir):
+                console.print("[yellow]⚠️  Failed to generate copilot-instructions.md[/yellow]")
 
         console.print("\n[bold cyan]7.3. Installing compaction recovery hook[/bold cyan]")
         setup.install_compact_recovery_hook(target_dir, script_type)
@@ -1990,6 +2230,11 @@ def update_cli(branch: Optional[str] = None) -> bool:
 
     Returns True if update was successful, False otherwise.
     """
+    # Skip CLI update in offline mode
+    if is_offline_mode():
+        console.print("  [dim]Skipped CLI update (offline mode)[/dim]")
+        return False
+
     try:
         # Try pip first (for pip installs and editable installs)
         # Use sys.executable -m pip to ensure we use the correct Python environment
@@ -2204,6 +2449,18 @@ def update(
         "--dashboard",
         help="Update experimental dashboard (early development, no impact on BAZINGA functionality)",
     ),
+    platform: Optional[str] = typer.Option(
+        None,
+        "--platform",
+        "-P",
+        help="Target platform: claude, copilot, or both (auto-detect if not specified)",
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        "-O",
+        help="Run in offline mode (skip CLI update, use cached templates, no network)",
+    ),
 ):
     """
     Update BAZINGA components in the current project.
@@ -2219,8 +2476,14 @@ def update(
       bazinga update                    # Update from main branch
       bazinga update -b develop         # Test changes from develop branch
       bazinga update -b feature/new-fix # Test a specific feature branch
+      bazinga update --offline          # Update using cached files only (no network)
     """
     print_banner()
+
+    # Set offline mode if requested
+    if offline:
+        set_offline_mode(True)
+        console.print("[cyan]Offline mode: Network operations disabled[/cyan]\n")
 
     target_dir = Path.cwd()
 
@@ -2266,14 +2529,47 @@ def update(
     # Detect which script type is currently installed
     script_type = setup.detect_script_type(target_dir)
 
+    # Auto-detect or validate platform
+    if platform is None:
+        # Auto-detect based on existing installation
+        has_claude = (target_dir / ".claude" / "agents").exists()
+        has_copilot = (target_dir / ".github" / "agents").exists()
+
+        if has_claude and has_copilot:
+            platform = "both"
+            console.print("[cyan]Platform: Detected both Claude Code and Copilot installation[/cyan]")
+        elif has_copilot:
+            platform = "copilot"
+            console.print("[cyan]Platform: Detected Copilot installation[/cyan]")
+        else:
+            platform = "claude"
+            console.print("[cyan]Platform: Detected Claude Code installation (default)[/cyan]")
+    else:
+        # Validate specified platform
+        valid_platforms = ["claude", "copilot", "both"]
+        if platform.lower() not in valid_platforms:
+            console.print(
+                f"[red]✗ Invalid platform: '{platform}'[/red]\n"
+                f"Valid options: {', '.join(valid_platforms)}"
+            )
+            raise typer.Exit(1)
+        platform = platform.lower()
+        console.print(f"[cyan]Platform: Updating for {platform}[/cyan]")
+
     console.print()
 
     # Update agents
     console.print("[bold cyan]1. Updating agent definitions[/bold cyan]")
-    if setup.copy_agents(target_dir):
-        console.print("  [green]✓ Agents updated[/green]")
-    else:
-        console.print("  [yellow]⚠️  Failed to update agents[/yellow]")
+    if platform in ["claude", "both"]:
+        if setup.copy_agents(target_dir):
+            console.print("  [green]✓ Claude agents updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update Claude agents[/yellow]")
+    if platform in ["copilot", "both"]:
+        if setup.copy_agents_for_copilot(target_dir):
+            console.print("  [green]✓ Copilot agents updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update Copilot agents[/yellow]")
 
     # Update scripts (preserve script type)
     console.print(f"\n[bold cyan]2. Updating scripts ({script_type.upper()})[/bold cyan]")
@@ -2337,10 +2633,24 @@ def update(
 
     # Update skills (preserve script type)
     console.print(f"\n[bold cyan]4. Updating skills ({script_type.upper()})[/bold cyan]")
-    if setup.copy_skills(target_dir, script_type):
-        console.print("  [green]✓ Skills updated[/green]")
-    else:
-        console.print("  [yellow]⚠️  Failed to update skills[/yellow]")
+    if platform in ["claude", "both"]:
+        if setup.copy_skills(target_dir, script_type):
+            console.print("  [green]✓ Claude skills updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update Claude skills[/yellow]")
+    if platform in ["copilot", "both"]:
+        if setup.copy_skills_for_copilot(target_dir, script_type):
+            console.print("  [green]✓ Copilot skills updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update Copilot skills[/yellow]")
+
+    # Update copilot-instructions.md if needed
+    if platform in ["copilot", "both"]:
+        console.print("\n[bold cyan]4.1. Updating copilot-instructions.md[/bold cyan]")
+        if setup.create_copilot_instructions(target_dir):
+            console.print("  [green]✓ copilot-instructions.md updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update copilot-instructions.md[/yellow]")
 
     # Update configuration (replace old BAZINGA section with new)
     console.print("\n[bold cyan]5. Updating configuration[/bold cyan]")

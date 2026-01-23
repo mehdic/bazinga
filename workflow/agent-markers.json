@@ -12,7 +12,8 @@
     ],
     "workflow_markers": [
       "Developer → QA",
-      "Developer → Tech Lead"
+      "Developer → Tech Lead",
+      "Developer → Investigator"
     ]
   },
 
@@ -21,11 +22,13 @@
       "NO DELEGATION",
       "READY_FOR_QA",
       "READY_FOR_REVIEW",
-      "BLOCKED"
+      "BLOCKED",
+      "SPAWN_INVESTIGATOR"
     ],
     "workflow_markers": [
       "SSE → QA",
-      "SSE → Tech Lead"
+      "SSE → Tech Lead",
+      "SSE → Investigator"
     ]
   },
 
@@ -45,6 +48,7 @@
   "tech_lead": {
     "required": [
       "APPROVED",
+      "APPROVED_WITH_NOTES",
       "CHANGES_REQUESTED",
       "SPAWN_INVESTIGATOR"
     ],

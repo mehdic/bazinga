@@ -365,12 +365,24 @@ def analyze_test_suite(test_path: str, task_description: str = "") -> Dict[str, 
 
 def main():
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python analyze_tests.py <test_directory> [task_description]")
+    # Parse --agent flag if present (for DB tracking)
+    agent_type = None
+    args = []
+    i = 1
+    while i < len(sys.argv):
+        if sys.argv[i] == '--agent' and i + 1 < len(sys.argv):
+            agent_type = sys.argv[i + 1]
+            i += 2
+        else:
+            args.append(sys.argv[i])
+            i += 1
+
+    if len(args) < 1:
+        print("Usage: python analyze_tests.py <test_directory> [task_description] [--agent TYPE]")
         sys.exit(1)
 
-    test_path = sys.argv[1]
-    task_description = sys.argv[2] if len(sys.argv) > 2 else ""
+    test_path = args[0]
+    task_description = args[1] if len(args) > 1 else ""
 
     if not os.path.exists(test_path):
         print(f"Error: Path not found: {test_path}")
@@ -391,6 +403,31 @@ def main():
     print(f"   - Similar tests: {len(result['similar_tests'])}")
     print(f"   - Suggested tests: {len(result['suggested_tests'])}")
     print(f"   - Coverage target: {result['coverage_target']}")
+
+    # Save to skill_outputs database for tracking
+    # See: research/skills-configuration-enforcement-plan.md
+    try:
+        import subprocess
+        db_script = Path(__file__).parent.parent.parent / "bazinga-db" / "scripts" / "bazinga_db.py"
+        # Use absolute path relative to script location to avoid CWD issues
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        db_path = project_root / "bazinga" / "bazinga.db"
+        if db_script.exists() and db_path.exists():
+            cmd = [
+                sys.executable, str(db_script),
+                "--db", str(db_path), "--quiet",
+                "save-skill-output", SESSION_ID, "test-pattern-analysis",
+                json.dumps({"status": "complete", "output_file": str(OUTPUT_FILE),
+                           "framework": result['framework'],
+                           "fixtures_count": len(result['common_fixtures']),
+                           "suggested_tests": len(result['suggested_tests'])})
+            ]
+            # Add --agent flag if provided (enables agent-scoped evidence checks)
+            if agent_type:
+                cmd.extend(["--agent", agent_type])
+            subprocess.run(cmd, capture_output=True, timeout=5)
+    except Exception:
+        pass  # DB save is non-fatal
 
 
 if __name__ == "__main__":

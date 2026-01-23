@@ -93,6 +93,19 @@ def _ensure_cwd_at_project_root():
     except OSError as e:
         print(f"[WARNING] Failed to chdir to project root {PROJECT_ROOT}: {e}", file=sys.stderr)
 
+# Agent type to skills config key mapping
+# Skills config uses short keys (pm) but agent_type uses full names (project_manager)
+AGENT_KEY_ALIASES = {
+    "project_manager": "pm",
+}
+
+# Test-related skills to filter when testing is disabled/minimal
+# Note: SSE keeps test-pattern-analysis regardless (per OpenAI review)
+TEST_RELATED_SKILLS = {"test-coverage", "test-pattern-analysis"}
+
+# Agents that should keep test skills even when testing is disabled/minimal
+AGENTS_KEEP_TEST_SKILLS = {"senior_software_engineer"}
+
 # Agent file names (without directory prefix - resolved dynamically)
 AGENT_FILE_NAMES = {
     "developer": "developer.md",
@@ -1451,6 +1464,216 @@ def build_context_block(conn, session_id, group_id, agent_type, model="sonnet"):
 
 
 # =============================================================================
+# SKILLS CONFIGURATION (File-first approach - reads JSON directly)
+# See: research/skills-configuration-enforcement-plan.md
+# =============================================================================
+
+def get_skills_config_from_file():
+    """Read skills configuration from JSON file.
+
+    Returns the raw config dict or None if file not found/invalid.
+    File-first approach avoids DB dependency (configuration table doesn't exist).
+    """
+    config_path = PROJECT_ROOT / "bazinga" / "skills_config.json"
+    if not config_path.exists():
+        return None
+
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"WARNING: Failed to read skills_config.json: {e}", file=sys.stderr)
+        return None
+
+
+# =============================================================================
+# REASONING BLOCK INJECTION (Phase 0 fix for reasoning save failure)
+# See: research/reasoning-save-failure-ultrathink.md
+# =============================================================================
+
+# Agents that MUST save reasoning (understanding + completion phases)
+AGENTS_REQUIRING_REASONING = frozenset({
+    "developer", "senior_software_engineer", "qa_expert", "tech_lead", "project_manager"
+})
+
+
+def build_mandatory_reasoning_block(session_id, group_id, agent_type):
+    """Build pre-filled mandatory reasoning block with concrete values.
+
+    This block is injected BEFORE the agent definition to ensure agents
+    see ready-to-execute reasoning save commands at the top of their prompt.
+
+    See: research/reasoning-save-failure-ultrathink.md (Phase 0)
+    """
+    if agent_type not in AGENTS_REQUIRING_REASONING:
+        return ""
+
+    # Use "global" for session-level agents (PM)
+    effective_group_id = group_id or "global"
+
+    return f"""---
+
+## 🔴 MANDATORY REASONING SAVES (Pre-filled for this session)
+
+**Save understanding at START of your task:**
+```bash
+cat > /tmp/reasoning_understanding.md << 'EOF'
+## Understanding
+[Document your interpretation of the task, key requirements, and approach]
+EOF
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{session_id}" "{effective_group_id}" "{agent_type}" "understanding" \\
+  --content-file /tmp/reasoning_understanding.md --confidence high
+```
+
+**Save completion at END before returning status:**
+```bash
+cat > /tmp/reasoning_completion.md << 'EOF'
+## Completion
+[Document what you accomplished, key decisions made, and any issues encountered]
+EOF
+```
+
+Then invoke:
+```
+Skill(command: "bazinga-db-agents")
+
+Request: save-reasoning "{session_id}" "{effective_group_id}" "{agent_type}" "completion" \\
+  --content-file /tmp/reasoning_completion.md --confidence high
+```
+
+⚠️ **These values are pre-filled. Invoke the skill directly - do NOT modify session_id or group_id.**
+
+---"""
+
+
+def substitute_reasoning_placeholders(content, session_id, group_id):
+    """Substitute placeholders ONLY in save-reasoning command lines.
+
+    Uses scoped substitution to avoid accidentally modifying unrelated
+    JSON examples or code snippets in the agent definition.
+
+    See: research/reasoning-save-failure-ultrathink.md (Phase 1)
+    """
+    import re
+
+    effective_group_id = group_id or "global"
+
+    def replacer(match):
+        line = match.group(0)
+        line = line.replace("{SESSION_ID}", session_id)
+        line = line.replace("{GROUP_ID}", effective_group_id)
+        return line
+
+    # Match lines containing save-reasoning commands with placeholders
+    # This pattern matches the entire line containing save-reasoning and placeholders
+    pattern = r'.*save-reasoning.*\{SESSION_ID\}.*'
+    content = re.sub(pattern, replacer, content)
+
+    # Also handle lines where GROUP_ID appears separately
+    pattern2 = r'.*save-reasoning.*\{GROUP_ID\}.*'
+    content = re.sub(pattern2, replacer, content)
+
+    return content
+
+
+def validate_reasoning_placeholders(content):
+    """Check for unsubstituted placeholders in save-reasoning lines.
+
+    Returns True if valid (no unsubstituted placeholders), False otherwise.
+
+    See: research/reasoning-save-failure-ultrathink.md (Phase 2)
+    """
+    import re
+
+    # Only check in lines that contain save-reasoning
+    lines = content.split('\n')
+    for line in lines:
+        if 'save-reasoning' in line:
+            if '{SESSION_ID}' in line or '{GROUP_ID}' in line:
+                print(f"ERROR: Unsubstituted placeholder in save-reasoning line: {line.strip()}", file=sys.stderr)
+                return False
+    return True
+
+
+def get_skills_for_agent(agent_type, testing_mode="full"):
+    """Get skills configuration for an agent.
+
+    Args:
+        agent_type: Agent type (e.g., "developer", "project_manager")
+        testing_mode: Testing mode ("full", "minimal", "disabled")
+
+    Returns:
+        Dict with keys: mandatory (list), optional (list)
+    """
+    empty_result = {"mandatory": [], "optional": []}
+
+    config = get_skills_config_from_file()
+    if not config:
+        return empty_result
+
+    # Apply key aliasing (project_manager -> pm)
+    agent_key = AGENT_KEY_ALIASES.get(agent_type, agent_type)
+    agent_config = config.get(agent_key, {})
+
+    # Categorize skills by level
+    mandatory = []
+    optional = []
+    for skill, level in agent_config.items():
+        if level == "mandatory":
+            mandatory.append(skill)
+        elif level == "optional":
+            optional.append(skill)
+
+    # Filter test-related skills when testing is disabled/minimal
+    # BUT: Keep them for SSE (per OpenAI review - SSE mandates test-pattern-analysis)
+    if testing_mode in ("disabled", "minimal") and agent_type not in AGENTS_KEEP_TEST_SKILLS:
+        mandatory = [s for s in mandatory if s not in TEST_RELATED_SKILLS]
+
+    # Phase 3: Always include bazinga-db-agents as mandatory for agents requiring reasoning
+    # See: research/reasoning-save-failure-ultrathink.md
+    if agent_type in AGENTS_REQUIRING_REASONING:
+        if "bazinga-db-agents" not in mandatory:
+            mandatory.append("bazinga-db-agents")
+
+    return {"mandatory": mandatory, "optional": optional}
+
+
+def build_skills_block(agent_type, testing_mode="full"):
+    """Build compact skills checklist for prompt injection.
+
+    Returns a compact checklist (≤10 lines) to minimize token impact.
+    Inserted after specialization block, before agent definition.
+    """
+    skills = get_skills_for_agent(agent_type, testing_mode)
+
+    # Skip if no skills configured for this agent
+    if not skills["mandatory"] and not skills["optional"]:
+        return ""
+
+    # Compact checklist format (≤10 lines)
+    lines = ["## Skills Checklist", ""]
+
+    if skills["mandatory"]:
+        lines.append("**MUST invoke before completion:**")
+        for skill in skills["mandatory"]:
+            lines.append(f'- [ ] `Skill(command: "{skill}")`')
+        lines.append("")
+
+    if skills["optional"]:
+        lines.append("**Consider if relevant:** " + ", ".join(
+            f'`{s}`' for s in skills["optional"]
+        ))
+
+    return "\n".join(lines)
+
+
+# =============================================================================
 # TASK CONTEXT BUILDING
 # =============================================================================
 
@@ -1739,8 +1962,31 @@ def build_prompt(args):
             if spec_block:
                 components.append(spec_block)
 
+        # 2.5. Build SKILLS CHECKLIST block (compact, file-first)
+        # See: research/skills-configuration-enforcement-plan.md
+        if args.agent_type not in ["project_manager", "orchestrator"]:
+            testing_mode = getattr(args, 'testing_mode', 'full') or 'full'
+            skills_block = build_skills_block(args.agent_type, testing_mode)
+            if skills_block:
+                components.append(skills_block)
+
+        # 2.6. Build MANDATORY REASONING BLOCK (pre-filled with concrete values)
+        # See: research/reasoning-save-failure-ultrathink.md (Phase 0)
+        reasoning_block = build_mandatory_reasoning_block(
+            args.session_id, args.group_id or "", args.agent_type
+        )
+        if reasoning_block:
+            components.append(reasoning_block)
+
         # 3. Read AGENT DEFINITION (MANDATORY - this is the core)
         agent_definition = read_agent_file(args.agent_type)
+
+        # 3.1. Apply scoped placeholder substitution for reasoning commands
+        # See: research/reasoning-save-failure-ultrathink.md (Phase 1)
+        agent_definition = substitute_reasoning_placeholders(
+            agent_definition, args.session_id, args.group_id or ""
+        )
+
         components.append(agent_definition)
 
         # 4. Build TASK CONTEXT
@@ -1774,6 +2020,13 @@ def build_prompt(args):
 
         # Compose final prompt
         full_prompt = "\n\n".join(components)
+
+        # 8.5. Validate no unsubstituted placeholders in reasoning commands
+        # See: research/reasoning-save-failure-ultrathink.md (Phase 2)
+        if args.agent_type in AGENTS_REQUIRING_REASONING:
+            if not validate_reasoning_placeholders(full_prompt):
+                print("WARNING: Prompt contains unsubstituted reasoning placeholders", file=sys.stderr)
+                # Continue anyway - this is a warning, not a hard failure
 
         # 9. ENFORCE FILE READ LIMIT (25000 tokens outer guard)
         # This is the final safety check before the prompt is delivered

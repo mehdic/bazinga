@@ -1,0 +1,405 @@
+name: Release
+
+# Comprehensive release workflow for BAZINGA CLI
+# - Automated versioning from tags
+# - Python package build and PyPI publishing
+# - SBOM generation (CycloneDX format)
+# - GPG signing for release artifacts
+# - GitHub Release with all artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on v1.0.0, v1.2.0, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.3.0)'
+        required: true
+        type: string
+      skip_pypi:
+        description: 'Skip PyPI publishing'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ============================================================================
+  # Job 1: Build Python Package
+  # ============================================================================
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      wheel_name: ${{ steps.build.outputs.wheel_name }}
+      sdist_name: ${{ steps.build.outputs.sdist_name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build tools
+        run: |
+          pip install --upgrade pip
+          pip install hatch build
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Extract version from tag (v1.2.3 -> 1.2.3)
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
+      - name: Build package
+        id: build
+        run: |
+          hatch build
+
+          # Get artifact names
+          WHEEL_NAME=$(ls dist/*.whl | xargs -n 1 basename)
+          SDIST_NAME=$(ls dist/*.tar.gz | xargs -n 1 basename)
+
+          echo "wheel_name=$WHEEL_NAME" >> $GITHUB_OUTPUT
+          echo "sdist_name=$SDIST_NAME" >> $GITHUB_OUTPUT
+
+          echo "Built artifacts:"
+          ls -la dist/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 5
+
+  # ============================================================================
+  # Job 2: Generate SBOM (Software Bill of Materials)
+  # ============================================================================
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install SBOM tools
+        run: |
+          pip install --upgrade pip
+          pip install cyclonedx-bom cyclonedx-py
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Generate SBOM (CycloneDX format)
+        run: |
+          # Generate SBOM from installed package
+          pip install dist/*.whl
+
+          # Generate CycloneDX SBOM in JSON format
+          cyclonedx-py environment \
+            --output-format json \
+            --output sbom.cdx.json
+
+          # Also generate XML format for compatibility
+          cyclonedx-py environment \
+            --output-format xml \
+            --output sbom.cdx.xml
+
+          echo "Generated SBOM files:"
+          ls -la sbom.*
+
+      - name: Validate SBOM
+        run: |
+          # Basic validation - check JSON is valid
+          python -c "import json; json.load(open('sbom.cdx.json'))"
+          echo "SBOM JSON is valid"
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.cdx.json
+            sbom.cdx.xml
+          retention-days: 90
+
+  # ============================================================================
+  # Job 3: Sign Artifacts (GPG)
+  # ============================================================================
+  sign:
+    name: Sign Artifacts
+    runs-on: ubuntu-latest
+    needs: [build, sbom]
+    if: github.event_name == 'push' || !github.event.inputs.skip_pypi
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
+
+      - name: Import GPG key
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+          # Configure GPG for non-interactive use
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+
+      - name: Sign artifacts
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          # Sign wheel
+          for file in dist/*; do
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback \
+              --armor --detach-sign "$file"
+            echo "Signed: $file"
+          done
+
+          # Sign SBOM
+          for file in sbom/*; do
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback \
+              --armor --detach-sign "$file"
+            echo "Signed: $file"
+          done
+
+          echo "Signature files:"
+          ls -la dist/*.asc sbom/*.asc 2>/dev/null || echo "No signatures (GPG key not configured)"
+
+      - name: Generate checksums
+        run: |
+          cd dist && sha256sum * > SHA256SUMS.txt && cd ..
+          cd sbom && sha256sum * > SHA256SUMS.txt && cd ..
+
+          echo "Checksums:"
+          cat dist/SHA256SUMS.txt
+          cat sbom/SHA256SUMS.txt
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed
+          path: |
+            dist/
+            sbom/
+          retention-days: 90
+
+  # ============================================================================
+  # Job 4: Publish to PyPI
+  # ============================================================================
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build, sign]
+    if: (github.event_name == 'push' || !github.event.inputs.skip_pypi)
+
+    # Required for trusted publishing
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Clean up non-publishable files
+        run: |
+          # Remove signature files and checksums before PyPI upload
+          rm -f dist/*.asc dist/SHA256SUMS.txt
+          ls -la dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          # Uncomment below for trusted publishing (no API token needed)
+          # attestations: true
+
+  # ============================================================================
+  # Job 5: Create GitHub Release
+  # ============================================================================
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build, sign, publish-pypi]
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download signed artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: signed
+          path: release/
+
+      - name: Prepare release notes
+        id: notes
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+
+          cat << 'EOF' > release_notes.md
+          ## BAZINGA CLI v$VERSION
+
+          ### Installation
+
+          ```bash
+          # Install from PyPI
+          pip install bazinga-cli
+
+          # Or using uv
+          uv tool install bazinga-cli
+
+          # Or using Docker
+          docker pull ghcr.io/mehdic/bazinga:$VERSION
+          ```
+
+          ### Offline Installation (Air-gapped environments)
+
+          ```bash
+          # Download wheel and install locally
+          pip install bazinga_cli-$VERSION-py3-none-any.whl
+
+          # Initialize in offline mode
+          bazinga init --here --offline
+          ```
+
+          ### What's New
+
+          See [CHANGELOG.md](https://github.com/mehdic/bazinga/blob/main/CHANGELOG.md) for details.
+
+          ### Artifacts
+
+          | File | Description |
+          |------|-------------|
+          | `bazinga_cli-*.whl` | Python wheel (recommended) |
+          | `bazinga_cli-*.tar.gz` | Source distribution |
+          | `sbom.cdx.json` | Software Bill of Materials (CycloneDX JSON) |
+          | `sbom.cdx.xml` | Software Bill of Materials (CycloneDX XML) |
+          | `*.asc` | GPG signatures |
+          | `SHA256SUMS.txt` | File checksums |
+
+          ### Verification
+
+          ```bash
+          # Verify checksums
+          sha256sum -c SHA256SUMS.txt
+
+          # Verify GPG signature (if signed)
+          gpg --verify bazinga_cli-*.whl.asc bazinga_cli-*.whl
+          ```
+          EOF
+
+          # Substitute version
+          sed -i "s/\$VERSION/$VERSION/g" release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: BAZINGA CLI v${{ needs.build.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(needs.build.outputs.version, '-') }}
+          files: |
+            release/dist/*
+            release/sbom/*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # Job 6: Build and Push Docker Image
+  # ============================================================================
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [build, publish-pypi]
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.build.outputs.version }}

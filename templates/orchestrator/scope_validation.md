@@ -8,8 +8,8 @@
 ## Step 1: Query Current State
 
 ```
-Skill(command: "bazinga-db") → get-session {session_id}
-Skill(command: "bazinga-db") → get-task-groups {session_id}
+Skill(command: "bazinga-db-core") → get-session {session_id}
+Skill(command: "bazinga-db-workflow") → get-task-groups {session_id}
 ```
 
 ---
@@ -23,7 +23,7 @@ Skill(command: "bazinga-db") → get-task-groups {session_id}
 - **DERIVE from task groups:** `estimated_items = sum(group.item_count for group in task_groups)`
 - Update session with derived value:
   ```
-  Skill(command: "bazinga-db") → save-state {session_id} orchestrator {"derived_estimated_items": N, "derivation_source": "task_groups"}
+  Skill(command: "bazinga-db-core") → save-state {session_id} orchestrator {"derived_estimated_items": N, "derivation_source": "task_groups"}
   ```
 - Log warning: "Original_Scope.estimated_items missing - derived from task groups"
 
@@ -47,7 +47,7 @@ for group in task_groups:
 - Respawn PM with: "Task group '{group_id}' missing item_count. Use update-task-group to set item_count."
 - PM fixes via:
   ```
-  Skill(command: "bazinga-db") → update-task-group {group_id} {session_id} --status in_progress --item_count 1
+  Skill(command: "bazinga-db-workflow") → update-task-group {group_id} {session_id} --status in_progress --item_count 1
   ```
 - **BLOCK** workflow until PM fixes this
 

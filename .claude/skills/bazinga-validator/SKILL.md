@@ -34,15 +34,15 @@ When invoked, you must independently verify all success criteria and return a st
 
 ## Step 1: Query Success Criteria from Database
 
-Use the bazinga-db skill to get success criteria for this session:
+Use the bazinga-db-workflow skill to get success criteria for this session:
 
 ```
-Skill(command: "bazinga-db")
+Skill(command: "bazinga-db-workflow")
 ```
 
 In the same message, provide the request:
 ```
-bazinga-db, please get success criteria for session: [session_id]
+bazinga-db-workflow, please get success criteria for session: [session_id]
 ```
 
 **Parse the response to extract:**
@@ -292,6 +292,135 @@ python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet save-event \
 
 ---
 
+## Step 5.7: Blocking Issue Verification (MANDATORY)
+
+**Problem:** PM may send BAZINGA while unresolved CRITICAL/HIGH issues exist from Tech Lead reviews.
+
+**Step 1: Query TL issues and Developer responses from events**
+```bash
+# Get ALL TL issues (no limit - filter by group after)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "tl_issues"
+
+# Get ALL Developer responses (no limit - filter by group after)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "tl_issue_responses"
+
+# Get ALL TL verdicts (single source of truth for rejection acceptance)
+python3 .claude/skills/bazinga-db/scripts/bazinga_db.py --quiet get-events \
+  "[session_id]" "tl_verdicts"
+
+# NOTE: Filter events by group_id after retrieval, then get latest iteration per group:
+# jq '[.[] | select(.group_id == "GROUP_ID")] | sort_by(.timestamp) | last'
+```
+
+**Step 2: Compute unresolved blocking issues**
+
+For each task group, diff `tl_issues` against Dev responses AND TL verdicts:
+```python
+unresolved_blocking = []
+
+# Get TL's acceptance verdicts from tl_verdicts events (single source of truth)
+tl_accepted_ids = set()
+for verdict_event in tl_verdicts_events:
+    for verdict in verdict_event.get("verdicts", []):
+        if verdict.get("verdict") == "ACCEPTED":
+            tl_accepted_ids.add(verdict.get("issue_id"))
+
+for issue in tl_issues.issues where issue.blocking == true:
+  response = find(tl_issue_responses.issue_responses, issue.id)
+  if response is None:
+    unresolved_blocking.append(issue)  # Not addressed
+  elif response.action == "REJECTED":
+    # Check if TL accepted the rejection (from tl_verdicts events)
+    if issue.id not in tl_accepted_ids:
+      unresolved_blocking.append(issue)  # Rejection not yet accepted by TL
+  elif response.action == "FIXED":
+    # Assume fixed (TL will re-flag if not actually fixed)
+    pass
+```
+
+**Alternative: If events not found, check handoff files directly:**
+```bash
+# Fallback: Read handoff files (check both simple and parallel mode paths)
+# Simple mode:
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead.json | jq '.issues[] | select(.blocking == true)'
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation.json | jq '.issue_responses'
+
+# Parallel mode (agent-specific files):
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_tech_lead_{agent_id}.json | jq '.issues[] | select(.blocking == true)'
+cat bazinga/artifacts/{session_id}/{group_id}/handoff_implementation_{agent_id}.json | jq '.issue_responses'
+```
+
+**⚠️ Field-level fallbacks for old handoff formats:**
+```python
+# When reading handoff files, handle missing fields gracefully:
+issues = handoff.get("issues", [])
+blocking_summary = handoff.get("blocking_summary", {"total_blocking": 0, "fixed": 0})
+issue_responses = handoff.get("issue_responses", [])
+```
+
+**🔴 CRITICAL: If review occurred but evidence is missing:**
+```
+# Check if TL review actually occurred by looking for tl_issues events
+# Note: review_iteration defaults to 1, so checking > 0 is unreliable
+tl_issues_events = get_events(session_id, "tl_issues", group_id)
+
+IF tl_issues_events exist (TL review happened):
+  IF no tl_issue_responses events AND no handoff_implementation.json exists:
+    → Return: REJECT
+    → Reason: "TL raised issues but no Developer responses found for group {group_id}"
+    → Note: This indicates Developer did not address TL feedback
+```
+
+This hard failure prevents BAZINGA acceptance when review evidence is missing.
+
+**Step 2: Check for any unresolved blocking issues**
+
+**IF unresolved blocking issues exist:**
+```
+→ Return: REJECT
+→ Reason: "Unresolved blocking issues from code review"
+→ List all unresolved issues with their IDs, severity, and title
+```
+
+**Example rejection:**
+```markdown
+❌ Blocking Issue Verification: FAIL
+   - Unresolved blocking issues: 2
+   - TL-AUTH-1-001 (CRITICAL): SQL injection in login query
+   - TL-AUTH-2-003 (HIGH): Missing rate limiting on auth endpoint
+
+   These issues must be FIXED or have accepted rejections before BAZINGA.
+```
+
+**IF no unresolved blocking issues:**
+```
+→ Proceed to Step 6
+→ Log: "Blocking issue check: PASS (0 unresolved)"
+```
+
+**Step 3: Validate rejected issues (if any)**
+
+For issues with Developer `action = "REJECTED"`:
+- Check tl_verdicts events for TL's verdict on this issue_id
+- Only `ACCEPTED` verdict means TL agreed the fix is unnecessary
+- `OVERRULED` or no verdict means issue still counts as blocking
+
+**Resolution states (based on tl_verdicts events):**
+| Developer Action | TL Verdict | Final State | Blocks BAZINGA? |
+|------------------|------------|-------------|-----------------|
+| `FIXED` | N/A | Resolved | ❌ No |
+| `REJECTED` | `ACCEPTED` | TL agreed | ❌ No |
+| `REJECTED` | `OVERRULED` | TL disagreed | ✅ YES |
+| `REJECTED` | (none yet) | Pending TL review | ✅ YES |
+| `DEFERRED` | N/A | Deferred (non-blocking only) | ❌ No |
+| (none) | N/A | Unaddressed | ✅ YES |
+
+**Note:** The `rejection_accepted` field in event_tl_issue_responses.schema.json is deprecated. Use tl_verdicts events as the single source of truth for TL decisions.
+
+---
+
 ## Step 6: Calculate Completion & Return Verdict
 
 ```
@@ -307,7 +436,18 @@ completion_percentage = (met_count / total_count) * 100
 ## Verdict Decision Tree
 
 ```
-IF all verifications passed AND met_count == total_count:
+IF missing_review_data_for_reviewed_groups:
+  → Return: REJECT
+  → Reason: "Cannot verify blocking issues - missing review data"
+  → Detection: If tl_issues events exist for a group (TL flagged issues) but no corresponding
+    tl_issue_responses events or implementation handoff exists → review data is incomplete
+
+ELSE IF unresolved_blocking_issues > 0:
+  → Return: REJECT
+  → Reason: "Unresolved blocking issues from code review"
+  → Note: CRITICAL/HIGH issues must be FIXED or have accepted rejection
+
+ELSE IF all verifications passed AND met_count == total_count:
   → Return: ACCEPT
   → Path: A (Full achievement)
 
@@ -361,6 +501,10 @@ ELSE:
 ✅ Evidence Verification: {passed}/{total}
    - Criterion 1: ✅ PASS ({actual} vs {target})
    - Criterion 2: ❌ FAIL (evidence mismatch)
+
+✅ Blocking Issue Verification: PASS | FAIL
+   - Unresolved blocking issues: {count}
+   - {issue_id} ({severity}): {title}
 
 ### Reason
 
@@ -503,10 +647,11 @@ Accept BAZINGA and proceed to shutdown protocol.
 1. **Be skeptical** - Assume PM wrong until proven right
 2. **Run tests yourself** - Don't trust PM's status updates
 3. **Zero tolerance for test failures** - Even 1 failure = REJECT
-4. **Verify evidence** - Don't accept claims without proof
-5. **Structured response** - Orchestrator parses your verdict
-6. **Timeout protection** - Use configurable timeout (default 60s, see .claude/skills/bazinga-validator/resources/validator_config.json)
-7. **Clear reasoning** - Explain WHY you accepted or rejected
+4. **Zero tolerance for blocking issues** - CRITICAL/HIGH issues must be resolved
+5. **Verify evidence** - Don't accept claims without proof
+6. **Structured response** - Orchestrator parses your verdict
+7. **Timeout protection** - Use configurable timeout (default 60s, see .claude/skills/bazinga-validator/resources/validator_config.json)
+8. **Clear reasoning** - Explain WHY you accepted or rejected
 
 ---
 

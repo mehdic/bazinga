@@ -4,6 +4,17 @@
 
 This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration system for complex development tasks.
 
+## 🆕 Dual-Platform Support
+
+**BAZINGA now supports both Claude Code and GitHub Copilot!**
+
+- **This file** (`.claude/CLAUDE.md`) contains Claude Code-specific instructions
+- **For Copilot users**: See `COPILOT.md` at repo root
+- **Platform comparison**: See `docs/PLATFORM_DIFFERENCES.md`
+- **Copilot setup guide**: See `docs/COPILOT_SETUP.md`
+
+**Dual-platform installation**: Both `.claude/` and `.github/` directories can coexist, sharing the same `bazinga/` database and configuration.
+
 ---
 
 ## 🔴 CRITICAL: Template Path Rules (Dev vs Installed Mode)
