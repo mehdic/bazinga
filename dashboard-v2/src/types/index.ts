@@ -1,10 +1,10 @@
 // ============================================================================
-// TYPES VERSION: 12
+// TYPES VERSION: 19
 // These types must stay in sync with src/lib/db/schema.ts
 // See: research/dashboard-schema-update-ultrathink.md for schema gap analysis
 // ============================================================================
 
-// Session types - v9 extended with metadata
+// Session types - v9 extended with metadata, v19 extended with platform
 export interface Session {
   sessionId: string;
   startTime: string | null;
@@ -13,6 +13,7 @@ export interface Session {
   mode: string | null; // 'simple' | 'parallel'
   originalRequirements: string | null;
   initialBranch: string | null; // v5+
+  platform: string | null; // v19: 'claude-code' | 'copilot'
   metadata: string | null; // v9: JSON for original_scope
   createdAt: string | null;
 }

@@ -2,12 +2,12 @@ import { sqliteTable, text, integer, index, uniqueIndex, primaryKey, real } from
 import { relations } from "drizzle-orm";
 
 // ============================================================================
-// SCHEMA VERSION: 12
+// SCHEMA VERSION: 19
 // This schema must stay in sync with .claude/skills/bazinga-db/scripts/init_db.py
 // See: research/dashboard-schema-update-ultrathink.md for schema gap analysis
 // ============================================================================
 
-// Sessions table - v9 extended with metadata column
+// Sessions table - v9 extended with metadata column, v19 extended with platform column
 export const sessions = sqliteTable("sessions", {
   sessionId: text("session_id").primaryKey(),
   startTime: text("start_time"),
@@ -16,6 +16,7 @@ export const sessions = sqliteTable("sessions", {
   originalRequirements: text("original_requirements"),
   status: text("status").default("active"), // 'active' | 'completed' | 'failed'
   initialBranch: text("initial_branch").default("main"), // v5+
+  platform: text("platform").default("claude-code"), // v19: 'claude-code' | 'copilot'
   metadata: text("metadata"), // v9: JSON for original_scope tracking
   createdAt: text("created_at"),
 });
