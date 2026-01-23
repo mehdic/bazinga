@@ -125,7 +125,7 @@ def get_sessions():
         conn = get_db()
         rows = conn.execute("""
             SELECT session_id, status, mode, original_requirements,
-                   start_time, end_time, created_at
+                   start_time, end_time, created_at, platform
             FROM sessions
             ORDER BY
                 CASE status WHEN 'active' THEN 0 ELSE 1 END,

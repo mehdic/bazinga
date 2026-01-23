@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { PlatformBadge } from "@/components/session/platform-badge";
 import { timeAgo, getStatusBadgeVariant } from "@/lib/utils";
 import type { Session } from "@/types";
 import {
@@ -39,10 +40,13 @@ export function SessionCard({ session, showDetails = false }: SessionCardProps) 
             <span className="text-muted-foreground">#</span>
             {shortId}
           </CardTitle>
-          <Badge variant={getStatusBadgeVariant(session.status || "pending")}>
-            <span className="mr-1">{statusIcon[session.status || ""] || null}</span>
-            {session.status || "pending"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <PlatformBadge platform={session.platform} showIcon={false} />
+            <Badge variant={getStatusBadgeVariant(session.status || "pending")}>
+              <span className="mr-1">{statusIcon[session.status || ""] || null}</span>
+              {session.status || "pending"}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

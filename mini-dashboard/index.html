@@ -108,6 +108,28 @@
     .status-pending { background: var(--warning); color: #000; }
     .status-in_progress { background: var(--success); color: #000; }
 
+    /* Platform badges */
+    .platform-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    .platform-claude-code {
+      background: rgba(96, 165, 250, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+
+    .platform-copilot {
+      background: rgba(156, 163, 175, 0.2);
+      color: #9ca3af;
+      border: 1px solid rgba(156, 163, 175, 0.3);
+    }
+
     /* Main content */
     .main {
       display: flex;
@@ -426,6 +448,18 @@
       return text.slice(0, maxLen) + '...';
     }
 
+    function getPlatformBadge(platform) {
+      // Handle null/undefined/empty platform (legacy sessions) - default to claude-code
+      const normalized = (platform || 'claude-code').toLowerCase();
+      const isClaude = normalized === 'claude-code' || normalized === 'claude';
+      const isCopilot = normalized === 'copilot';
+
+      const className = isClaude ? 'platform-claude-code' : isCopilot ? 'platform-copilot' : 'platform-claude-code';
+      const displayText = isClaude ? 'Claude' : isCopilot ? 'Copilot' : 'Unknown';
+
+      return `<span class="platform-badge ${className}">${displayText}</span>`;
+    }
+
     // API calls
     async function fetchJSON(url) {
       try {
@@ -461,6 +495,7 @@
              data-session-id="${escapeHtml(s.session_id)}">
           <div class="item-title">
             ${escapeHtml(s.session_id.slice(-20))}
+            ${getPlatformBadge(s.platform)}
             <span class="status-badge ${getStatusClass(s.status)}">${escapeHtml(s.status)}</span>
           </div>
           <div class="item-meta">
