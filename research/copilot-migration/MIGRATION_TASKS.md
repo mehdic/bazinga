@@ -20,6 +20,7 @@
 | M8 | CLI/Installation Migration | **COMPLETE** | `08-cli-installation-analysis.md` | [x] APPROVE WITH CHANGES | [ ] |
 | M9 | Dashboard Migration | **COMPLETE** | `09-dashboard-analysis.md` | [x] APPROVE | [ ] |
 | M10 | Dual-Platform Abstraction Layer | **COMPLETE** | `10-abstraction-layer-analysis.md` | [x] APPROVE WITH CHANGES | [ ] |
+| M11 | Installation & Distribution | **COMPLETE** | `11-installation-distribution-analysis.md` | [x] APPROVE WITH CHANGES | [ ] |
 
 ---
 

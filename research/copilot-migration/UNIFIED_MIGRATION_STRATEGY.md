@@ -1,18 +1,19 @@
 # BAZINGA → GitHub Copilot: Unified Migration Strategy
 
-**Version:** 2.2 (Final Correction)
+**Version:** 2.3 (M11 Added)
 **Date:** 2026-01-23
 **Status:** APPROVED - Ready for Implementation
 **Authors:** Multi-Agent Analysis Team (Claude, Gemini)
 **Final Review:** APPROVE WITH CHANGES - All changes incorporated
 **Revision v2.1:** Corrected agent spawning - `#runSubagent` enables programmatic spawning
 **Revision v2.2:** Corrected parallelism - Parallel execution NOW SUPPORTED (PR #2839 merged Jan 15, 2026)
+**Revision v2.3:** Added M11 (Installation & Distribution) - multi-platform CLI, offline packages, Docker support
 
 ---
 
 ## Executive Summary
 
-This document synthesizes 10 individual migration analyses into a unified strategy for adding GitHub Copilot support to BAZINGA while maintaining full Claude Code compatibility. All analyses received **APPROVE** or **APPROVE WITH CHANGES** verdicts from multi-model debate.
+This document synthesizes 11 individual migration analyses into a unified strategy for adding GitHub Copilot support to BAZINGA while maintaining full Claude Code compatibility. All analyses received **APPROVE** or **APPROVE WITH CHANGES** verdicts from multi-model debate.
 
 ### Key Findings
 
@@ -44,8 +45,9 @@ This document synthesizes 10 individual migration analyses into a unified strate
 | Phase 4 | Weeks 8-10 | Template system + Prompt-builder refactor |
 | Phase 5 | Weeks 11-12 | Integration testing |
 | Phase 6 | Weeks 13-14 | Documentation & hardening |
+| **Phase 7** | **Weeks 15-22** | **Installation & Distribution (M11)** |
 
-**Total: 14-15 weeks** (revised from 12 weeks based on final debate feedback)
+**Total: 20-22 weeks** (revised to include M11 installation/distribution work)
 
 ---
 
@@ -362,6 +364,40 @@ tools:
 | ConfigProvider | Load configuration |
 | TemplateLoader | Load and process templates |
 
+### 3.11 Installation & Distribution (M11)
+
+| Channel | Target Audience | Method |
+|---------|-----------------|--------|
+| **pip/uvx** | Developers | `pip install bazinga-cli` with `--platform` flag |
+| **GitHub Releases** | Corporate/offline | Pre-built archives (4 artifacts) |
+| **Docker** | CI/CD pipelines | `ghcr.io/mehdic/bazinga:vX.Y.Z` |
+
+**CLI Enhancement:**
+```bash
+bazinga install --platform claude     # Claude Code only (default)
+bazinga install --platform copilot    # GitHub Copilot only
+bazinga install --platform both       # Both platforms
+bazinga install --platform auto       # Auto-detect (requires explicit flag)
+bazinga install --script ps           # PowerShell scripts (Windows)
+bazinga install --offline /path/archive  # Install from offline package
+```
+
+**Release Artifacts (Simplified per debate feedback):**
+```
+bazinga-vX.Y.Z-all-unix.tar.gz      # Both platforms, sh installer
+bazinga-vX.Y.Z-all-windows.zip      # Both platforms, ps1 installer
+bazinga-vX.Y.Z-py3-none-any.whl     # Python wheel
+ghcr.io/mehdic/bazinga:vX.Y.Z       # Docker image
+```
+
+**Debate Feedback Applied:**
+- GPG signing for all release artifacts
+- SBOM generation for corporate compliance
+- Use NTFS junction points on Windows (no admin required)
+- Docker elevated from future to MVP
+- Default to explicit `--platform claude`, not auto-detect
+- Timeline extended to 8 weeks (from 5 weeks)
+
 ---
 
 ## 4. Cross-Feature Dependencies
@@ -398,10 +434,13 @@ tools:
                     │ M8: CLI        │
                     └───────┬────────┘
                             │
-                            ▼
-                    ┌────────────────┐
-                    │ M9: Dashboard  │
-                    └────────────────┘
+              ┌─────────────┴─────────────┐
+              │                           │
+              ▼                           ▼
+      ┌────────────────┐          ┌────────────────┐
+      │ M9: Dashboard  │          │ M11: Install & │
+      └────────────────┘          │  Distribution  │
+                                  └────────────────┘
 ```
 
 ### 4.2 Critical Path
@@ -411,6 +450,7 @@ tools:
 3. **M1 (Agents) + M2 (Skills)** can proceed in parallel once M10 is done
 4. **M8 (CLI)** is the integration point - must wait for M1, M2, M6, M7
 5. **M9 (Dashboard)** has no blockers - can proceed independently
+6. **M11 (Installation & Distribution)** depends on M8 (CLI) - extends CLI with platform flags and offline support
 
 ### 4.3 Conflict Resolution
 
@@ -597,7 +637,7 @@ else:
 - [ ] Cross-platform state visibility works
 - [ ] CI runs tests on both platforms
 
-### Phase 6: Documentation & Hardening (Weeks 11-12)
+### Phase 6: Documentation & Hardening (Weeks 13-14)
 
 | Task | Owner | Effort | Deliverable |
 |------|-------|--------|-------------|
@@ -611,6 +651,34 @@ else:
 - [ ] Documentation complete for both platforms
 - [ ] No P0/P1 bugs open
 - [ ] Ready for user beta
+
+### Phase 7: Installation & Distribution (Weeks 15-22) - M11
+
+| Task | Owner | Effort | Deliverable |
+|------|-------|--------|-------------|
+| Add `--platform` flag | - | 2 days | CLI accepts claude/copilot/both/auto |
+| Add `--script` flag | - | 1 day | sh/ps script generation |
+| Agent transformation | - | 2 days | `.md` → `.agent.md` converter |
+| Copilot instructions generator | - | 1 day | Generate from CLAUDE.md |
+| Update `copy_*` functions | - | 2 days | Dual-platform file copying |
+| Build script for archives | - | 2 days | `scripts/build_release.py` |
+| Install scripts (sh + ps1) | - | 2 days | Platform-specific installers |
+| GitHub Actions release workflow | - | 2 days | Automated release builds |
+| GPG signing setup | - | 1 day | Signed release artifacts |
+| SBOM generation | - | 1 day | CycloneDX compliance |
+| Docker image | - | 2 days | `ghcr.io/mehdic/bazinga` |
+| Checksum generation | - | 1 day | SHA256 verification |
+| Test platform combinations | - | 2 days | 3 platforms × 3 OS matrix |
+| Test offline installation | - | 1 day | Air-gapped environment sim |
+| Enterprise documentation | - | 2 days | `docs/enterprise-installation.md` |
+| `bazinga verify` command | - | 2 days | Post-installation integrity check |
+
+**Exit Criteria:**
+- [ ] `bazinga install --platform both` works
+- [ ] Offline archives install successfully on Unix and Windows
+- [ ] Docker image published and tested
+- [ ] All release artifacts GPG signed
+- [ ] Enterprise documentation complete
 
 ---
 
@@ -696,6 +764,7 @@ else:
 | M8: CLI | APPROVE WITH CHANGES | Windows symlink fallback required |
 | M9: Dashboard | APPROVE | No changes required |
 | M10: Abstraction | APPROVE WITH CHANGES | Validate parallelism gap |
+| M11: Installation | APPROVE WITH CHANGES | GPG signing, SBOM, Docker in MVP, 8-week timeline |
 
 ---
 
@@ -713,6 +782,7 @@ else:
 | M8 | `08-cli-installation-analysis.md` | Complete, Debated |
 | M9 | `09-dashboard-analysis.md` | Complete, Debated |
 | M10 | `10-abstraction-layer-analysis.md` | Complete, Debated |
+| M11 | `11-installation-distribution-analysis.md` | Complete, Debated |
 
 ---
 
@@ -796,7 +866,7 @@ Tier 2 Skills: 2/2 passed
 
 **Document Status:** APPROVED - Ready for Implementation
 
-**Final Debate Verdict:** APPROVE WITH CHANGES (7 changes incorporated)
+**Final Debate Verdict:** APPROVE WITH CHANGES (7 changes incorporated for M1-M10, 6 changes for M11)
 
 **Major Revision (2026-01-23):** Corrected agent spawning mechanism
 - Original: Assumed user-driven handoffs only
