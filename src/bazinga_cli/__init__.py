@@ -2082,47 +2082,70 @@ def init(
         "disabled": "Prototyping mode (lint only)"
     }
 
-    bazinga_commands = "[bold]BAZINGA Commands:[/bold]\n"
-    bazinga_commands += "[dim]  • /bazinga.orchestrate           (start orchestration)\n"
-    bazinga_commands += "  • /bazinga.orchestrate-advanced  (with requirements discovery)\n"
-    bazinga_commands += "  • /bazinga.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
-    bazinga_commands += "[dim]Customize:\n"
-    bazinga_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
-    bazinga_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
+    # Platform-specific messages
+    if platform == "copilot":
+        ide_name = "VS Code with GitHub Copilot"
+        example_cmd = "@orchestrator implement user authentication with JWT"
+        bazinga_commands = "[bold]Usage:[/bold]\n"
+        bazinga_commands += "[dim]  @orchestrator <your request>     (start orchestration)\n"
+        bazinga_commands += "  @developer <task>                 (direct to developer)\n"
+        bazinga_commands += "  @qa-expert <test request>         (direct to QA)[/dim]"
+    elif platform == "both":
+        ide_name = "Claude Code or VS Code with Copilot"
+        example_cmd = "@orchestrator implement user authentication with JWT"
+        bazinga_commands = "[bold]Claude Code Commands:[/bold]\n"
+        bazinga_commands += "[dim]  • /bazinga.orchestrate <request>[/dim]\n\n"
+        bazinga_commands += "[bold]Copilot Usage:[/bold]\n"
+        bazinga_commands += "[dim]  • @orchestrator <request>[/dim]"
+    else:  # claude
+        ide_name = "Claude Code"
+        example_cmd = "/bazinga.orchestrate implement user authentication with JWT"
+        bazinga_commands = "[bold]BAZINGA Commands:[/bold]\n"
+        bazinga_commands += "[dim]  • /bazinga.orchestrate           (start orchestration)\n"
+        bazinga_commands += "  • /bazinga.orchestrate-advanced  (with requirements discovery)\n"
+        bazinga_commands += "  • /bazinga.orchestrate-from-spec (orchestrate from spec-kit)[/dim]\n\n"
+        bazinga_commands += "[dim]Customize:\n"
+        bazinga_commands += "  • /bazinga.configure-skills    (add/remove skills)\n"
+        bazinga_commands += "  • /bazinga.configure-testing   (change testing mode)[/dim]"
 
     # Determine next steps message based on whether project was created
     if project_name:
-        next_steps = f"  1. cd {target_dir.name}\n  2. Open with Claude Code\n  3. Use: /bazinga.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
+        next_steps = f"  1. cd {target_dir.name}\n  2. Open with {ide_name}\n  3. Use: {example_cmd}"
     else:
-        next_steps = "  1. Open with Claude Code\n  2. Use: /bazinga.orchestrate <your request>\n     [dim](or @orchestrator if you prefer)[/dim]"
+        next_steps = f"  1. Open with {ide_name}\n  2. Use: {example_cmd}"
 
     console.print(
         Panel.fit(
             f"[bold green]✓ BAZINGA installed successfully![/bold green]\n\n"
             f"Your multi-agent orchestration system is ready.\n"
             f"[dim]Profile: {profile_desc.get(profile, profile)}[/dim]\n"
-            f"[dim]Testing: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n\n"
+            f"[dim]Testing: {testing_mode_desc.get(testing_mode, testing_mode)}[/dim]\n"
+            f"[dim]Platform: {platform.title()}[/dim]\n\n"
             "[bold]Next steps:[/bold]\n"
             f"{next_steps}\n\n"
             "[bold]Example:[/bold]\n"
-            "  /bazinga.orchestrate implement user authentication with JWT\n"
-            "  [dim](or: @orchestrator implement user authentication with JWT)[/dim]\n\n"
+            f"  {example_cmd}\n\n"
             f"{bazinga_commands}",
             title="🎉 Installation Complete",
             border_style="green",
         )
     )
 
-    # Show structure
+    # Show structure (platform-aware)
     console.print("\n[bold]Installed structure:[/bold]")
     tree = Table.grid(padding=(0, 2))
-    tree.add_row("📁", ".claude/")
-    tree.add_row("  ", "├── agents/      [dim](7 agents: orchestrator, PM, dev, QA, tech lead, investigator, req engineer)[/dim]")
-    tree.add_row("  ", "├── commands/    [dim](slash commands)[/dim]")
-    tree.add_row("  ", "├── scripts/     [dim](initialization scripts)[/dim]")
-    tree.add_row("  ", "├── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
-    tree.add_row("  ", "└── CLAUDE.md    [dim](global configuration)[/dim]")
-    tree.add_row("📁", "bazinga/         [dim](state files for agent coordination)[/dim]")
+    if platform in ["claude", "both"]:
+        tree.add_row("📁", ".claude/")
+        tree.add_row("  ", "├── agents/      [dim](orchestrator, PM, dev, QA, tech lead, etc.)[/dim]")
+        tree.add_row("  ", "├── commands/    [dim](slash commands)[/dim]")
+        tree.add_row("  ", "├── skills/      [dim](security-scan, test-coverage, lint-check)[/dim]")
+        tree.add_row("  ", "└── templates/   [dim](orchestration templates)[/dim]")
+    if platform in ["copilot", "both"]:
+        tree.add_row("📁", ".github/")
+        tree.add_row("  ", "├── agents/      [dim](Copilot agent definitions)[/dim]")
+        tree.add_row("  ", "├── skills/      [dim](symlink to .claude/skills)[/dim]")
+        tree.add_row("  ", "└── copilot-instructions.md")
+    tree.add_row("📁", "bazinga/         [dim](state files, database, templates)[/dim]")
     console.print(tree)
 
     # Track installation (anonymous telemetry)
