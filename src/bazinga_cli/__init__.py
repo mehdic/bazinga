@@ -1608,6 +1608,37 @@ def install_dashboard_dependencies(target_dir: Path, force: bool = False) -> boo
         return True
 
 
+def select_platform() -> str:
+    """
+    Interactive selection of target platform.
+
+    Returns:
+        "claude", "copilot", or "both"
+    """
+    console.print("\n[bold]Select target platform:[/bold]")
+    console.print("  [cyan]1.[/cyan] Claude Code (default)")
+    console.print("  [cyan]2.[/cyan] GitHub Copilot")
+    console.print("  [cyan]3.[/cyan] Both (Claude Code + GitHub Copilot)")
+
+    console.print("\n[dim]Default: Claude Code[/dim]")
+
+    choice = typer.prompt(
+        "Enter choice (1, 2, or 3, or press Enter for default)",
+        default="1",
+        show_default=False,
+    )
+
+    if choice == "1":
+        return "claude"
+    elif choice == "2":
+        return "copilot"
+    elif choice == "3":
+        return "both"
+    else:
+        console.print("[yellow]Invalid choice, using default: claude[/yellow]")
+        return "claude"
+
+
 def select_script_type() -> str:
     """
     Interactive selection of script type using arrow keys.
@@ -1699,11 +1730,11 @@ def init(
         "-p",
         help="Configuration profile: lite (default), advanced, or custom",
     ),
-    platform: str = typer.Option(
-        "claude",
+    platform: Optional[str] = typer.Option(
+        None,
         "--platform",
         "-P",
-        help="Target platform: claude (default), copilot, or both",
+        help="Target platform: claude, copilot, or both (interactive if not specified)",
     ),
     offline: bool = typer.Option(
         False,
@@ -1776,23 +1807,27 @@ def init(
         raise typer.Exit(1)
     testing_mode = testing_mode.lower()
 
-    # Validate platform
-    valid_platforms = ["claude", "copilot", "both"]
-    if platform.lower() not in valid_platforms:
-        console.print(
-            f"[red]✗ Invalid platform: '{platform}'[/red]\n"
-            f"Valid options: {', '.join(valid_platforms)}"
-        )
-        raise typer.Exit(1)
-    platform = platform.lower()
-
-    # Show platform selection
-    if platform == "both":
-        console.print(f"[cyan]Platform: Installing for both Claude Code and GitHub Copilot[/cyan]\n")
-    elif platform == "copilot":
-        console.print(f"[cyan]Platform: Installing for GitHub Copilot only[/cyan]\n")
+    # Interactive platform selection if not specified via CLI
+    if platform is None:
+        platform = select_platform()
     else:
-        console.print(f"[cyan]Platform: Installing for Claude Code (default)[/cyan]\n")
+        # Validate platform if explicitly provided
+        valid_platforms = ["claude", "copilot", "both"]
+        if platform.lower() not in valid_platforms:
+            console.print(
+                f"[red]✗ Invalid platform: '{platform}'[/red]\n"
+                f"Valid options: {', '.join(valid_platforms)}"
+            )
+            raise typer.Exit(1)
+        platform = platform.lower()
+
+    # Show platform selection confirmation
+    if platform == "both":
+        console.print(f"\n[cyan]Platform: Installing for both Claude Code and GitHub Copilot[/cyan]\n")
+    elif platform == "copilot":
+        console.print(f"\n[cyan]Platform: Installing for GitHub Copilot only[/cyan]\n")
+    else:
+        console.print(f"\n[cyan]Platform: Installing for Claude Code[/cyan]\n")
 
     # Ask for script type preference
     script_type = select_script_type()
