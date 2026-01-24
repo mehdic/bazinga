@@ -449,6 +449,96 @@ class BazingaSetup:
 
         return True
 
+    def copy_prompts_for_copilot(self, target_dir: Path) -> bool:
+        """
+        Convert Claude commands to Copilot prompts in .github/prompts directory.
+
+        Transforms Claude slash commands to Copilot prompt files:
+        - Filename: bazinga.orchestrate.md → orchestrate.prompt.md
+        - Frontmatter: Adds 'name' field for Copilot
+        - Paths: Replaces .claude/ with .github/
+        - References: Updates Claude-specific terms to Copilot equivalents
+
+        Args:
+            target_dir: Target directory for installation
+
+        Returns:
+            True if prompts were created successfully, False otherwise
+        """
+        import re
+
+        prompts_dir = target_dir / ".github" / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+
+        source_commands = self.source_dir / ".claude" / "commands"
+        if not source_commands.exists():
+            console.print("[yellow]⚠️  Source commands not found[/yellow]")
+            return False
+
+        # Path and terminology replacements
+        replacements = [
+            # Paths
+            (".claude/agents/", ".github/agents/"),
+            (".claude/skills/", ".github/skills/"),
+            (".claude/commands/", ".github/prompts/"),
+            (".claude/templates/", "bazinga/templates/"),
+            (".claude/hooks/", "bazinga/hooks/"),
+            # Keep .claude/claude.md as-is (user config) but mention Copilot equivalent
+            # Terminology
+            ("Claude Code", "GitHub Copilot"),
+            ("Claude Code Multi-Agent Dev Team", "BAZINGA Multi-Agent Dev Team"),
+            ("/bazinga.orchestrate", "@orchestrator"),
+            ("/bazinga.configure-skills", "@configure-skills"),
+            ("/bazinga.configure-testing", "@configure-testing"),
+            ("slash command", "prompt"),
+            ("Slash command", "Prompt"),
+        ]
+
+        copied_count = 0
+        for cmd_file in source_commands.glob("*.md"):
+            # Skip excluded command prefixes (development-only)
+            if any(cmd_file.name.startswith(prefix) for prefix in self.EXCLUDED_COMMAND_PREFIXES):
+                console.print(f"  [dim]⏭️  Skipping {cmd_file.name} (development-only)[/dim]")
+                continue
+
+            # Convert filename: bazinga.orchestrate.md → orchestrate.prompt.md
+            new_name = cmd_file.name
+            if new_name.startswith("bazinga."):
+                new_name = new_name[8:]  # Remove "bazinga." prefix
+            # Extract prompt name for frontmatter
+            prompt_name = new_name.replace(".md", "").replace("-", "_")
+            # Change extension from .md to .prompt.md
+            if new_name.endswith(".md"):
+                new_name = new_name[:-3] + ".prompt.md"
+
+            # Read and transform content
+            content = cmd_file.read_text(encoding="utf-8")
+
+            # Parse and transform frontmatter
+            frontmatter_match = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
+            if frontmatter_match:
+                frontmatter = frontmatter_match.group(1)
+                body = content[frontmatter_match.end():]
+
+                # Add 'name' field if not present
+                if "name:" not in frontmatter:
+                    frontmatter = f"name: {prompt_name}\n{frontmatter}"
+
+                # Rebuild content with transformed frontmatter
+                content = f"---\n{frontmatter}\n---\n{body}"
+
+            # Apply path and terminology replacements
+            for old, new in replacements:
+                content = content.replace(old, new)
+
+            # Write transformed content
+            dest_file = prompts_dir / new_name
+            dest_file.write_text(content, encoding="utf-8")
+            console.print(f"  ✓ Adapted {cmd_file.name} → {new_name}")
+            copied_count += 1
+
+        return copied_count > 0
+
     # Skills to exclude from CLI install/update (development-only skills)
     EXCLUDED_SKILLS = {"skill-creator"}
 
@@ -1970,13 +2060,13 @@ def init(
         if not setup.copy_scripts(target_dir, script_type):
             console.print("[yellow]⚠️  No scripts found[/yellow]")
 
+        console.print("\n[bold cyan]3. Copying commands/prompts[/bold cyan]")
         if platform in ["claude", "both"]:
-            console.print("\n[bold cyan]3. Copying commands[/bold cyan]")
             if not setup.copy_commands(target_dir):
                 console.print("[yellow]⚠️  No commands found[/yellow]")
-        else:
-            console.print("\n[bold cyan]3. Copying commands[/bold cyan]")
-            console.print("  [dim]Skipped (Copilot uses agents, not slash commands)[/dim]")
+        if platform in ["copilot", "both"]:
+            if not setup.copy_prompts_for_copilot(target_dir):
+                console.print("[yellow]⚠️  No prompts found for Copilot[/yellow]")
 
         console.print(f"\n[bold cyan]4. Copying skills ({script_type.upper()})[/bold cyan]")
         if platform in ["claude", "both"]:
@@ -2232,6 +2322,7 @@ def init(
     if platform in ["copilot", "both"]:
         tree.add_row("📁", ".github/")
         tree.add_row("  ", "├── agents/      [dim](Copilot agent definitions)[/dim]")
+        tree.add_row("  ", "├── prompts/     [dim](Copilot prompt files)[/dim]")
         tree.add_row("  ", "├── skills/      [dim](Copilot skills)[/dim]")
         tree.add_row("  ", "└── copilot-instructions.md")
     tree.add_row("📁", "bazinga/         [dim](state files, database, templates)[/dim]")
@@ -2722,12 +2813,18 @@ def update(
     else:
         console.print("  [yellow]⚠️  Failed to update scripts[/yellow]")
 
-    # Update commands
-    console.print("\n[bold cyan]3. Updating commands[/bold cyan]")
-    if setup.copy_commands(target_dir):
-        console.print("  [green]✓ Commands updated[/green]")
-    else:
-        console.print("  [yellow]⚠️  Failed to update commands[/yellow]")
+    # Update commands/prompts
+    console.print("\n[bold cyan]3. Updating commands/prompts[/bold cyan]")
+    if platform in ["claude", "both"]:
+        if setup.copy_commands(target_dir):
+            console.print("  [green]✓ Claude commands updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update Claude commands[/yellow]")
+    if platform in ["copilot", "both"]:
+        if setup.copy_prompts_for_copilot(target_dir):
+            console.print("  [green]✓ Copilot prompts updated[/green]")
+        else:
+            console.print("  [yellow]⚠️  Failed to update Copilot prompts[/yellow]")
 
     # Remove deprecated commands (old names without bazinga. prefix)
     console.print("\n[bold cyan]3.1. Removing deprecated commands[/bold cyan]")
