@@ -1736,6 +1736,12 @@ def init(
         "-P",
         help="Target platform: claude, copilot, or both (interactive if not specified)",
     ),
+    script_type: Optional[str] = typer.Option(
+        None,
+        "--script-type",
+        "-s",
+        help="Script type: sh (POSIX) or ps (PowerShell). Auto-detected if not specified.",
+    ),
     offline: bool = typer.Option(
         False,
         "--offline",
@@ -1807,12 +1813,16 @@ def init(
         raise typer.Exit(1)
     testing_mode = testing_mode.lower()
 
-    # Interactive platform selection if not specified via CLI
+    # Platform selection (interactive unless --force or --platform specified)
+    valid_platforms = ["claude", "copilot", "both"]
     if platform is None:
-        platform = select_platform()
+        if force:
+            platform = "claude"  # Default when --force
+            console.print(f"\n[cyan]Platform: Claude Code (default with --force)[/cyan]\n")
+        else:
+            platform = select_platform()
     else:
         # Validate platform if explicitly provided
-        valid_platforms = ["claude", "copilot", "both"]
         if platform.lower() not in valid_platforms:
             console.print(
                 f"[red]✗ Invalid platform: '{platform}'[/red]\n"
@@ -1821,16 +1831,35 @@ def init(
             raise typer.Exit(1)
         platform = platform.lower()
 
-    # Show platform selection confirmation
-    if platform == "both":
-        console.print(f"\n[cyan]Platform: Installing for both Claude Code and GitHub Copilot[/cyan]\n")
-    elif platform == "copilot":
-        console.print(f"\n[cyan]Platform: Installing for GitHub Copilot only[/cyan]\n")
-    else:
-        console.print(f"\n[cyan]Platform: Installing for Claude Code[/cyan]\n")
+    # Show platform selection confirmation (if not already shown)
+    if not force or platform is not None:
+        if platform == "both":
+            console.print(f"\n[cyan]Platform: Installing for both Claude Code and GitHub Copilot[/cyan]\n")
+        elif platform == "copilot":
+            console.print(f"\n[cyan]Platform: Installing for GitHub Copilot only[/cyan]\n")
+        elif platform == "claude" and not force:
+            console.print(f"\n[cyan]Platform: Installing for Claude Code[/cyan]\n")
 
-    # Ask for script type preference
-    script_type = select_script_type()
+    # Script type selection (interactive unless --force or --script-type specified)
+    import platform as platform_module
+    default_script = "ps" if platform_module.system() == "Windows" else "sh"
+    valid_script_types = ["sh", "ps"]
+
+    if script_type is None:
+        if force:
+            script_type = default_script  # Auto-detect when --force
+            console.print(f"[dim]Script type: {script_type} (auto-detected with --force)[/dim]\n")
+        else:
+            script_type = select_script_type()
+    else:
+        # Validate script_type if explicitly provided
+        if script_type.lower() not in valid_script_types:
+            console.print(
+                f"[red]✗ Invalid script type: '{script_type}'[/red]\n"
+                f"Valid options: sh (POSIX), ps (PowerShell)"
+            )
+            raise typer.Exit(1)
+        script_type = script_type.lower()
 
     # Determine target directory
     if here or not project_name:
