@@ -15,6 +15,33 @@ This project uses BAZINGA (Claude Code Multi-Agent Dev Team) orchestration syste
 
 **Dual-platform installation**: Both `.claude/` and `.github/` directories can coexist, sharing the same `bazinga/` database and configuration.
 
+### 🔍 Copilot Compatibility Checker
+
+Use this script to check agents and prompts for Claude-specific elements that need Copilot adaptation:
+
+```bash
+# Check all agent/prompt directories
+python scripts/check-copilot-compatibility.py
+
+# Show fix suggestions
+python scripts/check-copilot-compatibility.py --fix
+
+# Only check Copilot files (.github/)
+python scripts/check-copilot-compatibility.py --copilot-only
+
+# Check specific path
+python scripts/check-copilot-compatibility.py --path .github/prompts
+```
+
+**What it detects:**
+| Pattern | Severity | Copilot Equivalent |
+|---------|----------|-------------------|
+| `Task(` | error | `#runSubagent(` |
+| `.claude/agents/` | error | `.github/agents/` |
+| `agents/project_manager.md` | error | `.github/agents/project-manager.agent.md` |
+| `Claude Code` | warning | `GitHub Copilot` |
+| `model: sonnet` | info | Informational only (Copilot controls model) |
+
 ---
 
 ## 🔴 CRITICAL: Template Path Rules (Dev vs Installed Mode)
