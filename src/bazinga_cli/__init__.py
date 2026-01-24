@@ -124,11 +124,25 @@ class BazingaSetup:
 
         return None
 
-    def get_agent_files(self) -> list[Path]:
-        """Get list of agent markdown files."""
-        agents_dir = self.source_dir / "agents"
-        if agents_dir.exists():
-            return list(agents_dir.glob("*.md"))
+    def get_agent_files(self, platform: str = "claude") -> list[Path]:
+        """Get list of agent markdown files.
+
+        Args:
+            platform: "claude" for Claude Code agents, "copilot" for GitHub Copilot agents
+
+        Returns:
+            List of agent file paths
+        """
+        if platform == "copilot":
+            # Copilot agents are in agents/copilot/ with .agent.md extension
+            agents_dir = self.source_dir / "agents" / "copilot"
+            if agents_dir.exists():
+                return list(agents_dir.glob("*.agent.md"))
+        else:
+            # Claude agents are in agents/ with .md extension
+            agents_dir = self.source_dir / "agents"
+            if agents_dir.exists():
+                return list(agents_dir.glob("*.md"))
         return []
 
     def copy_agents(self, target_dir: Path) -> bool:
@@ -160,11 +174,12 @@ class BazingaSetup:
 
     def copy_agents_for_copilot(self, target_dir: Path) -> bool:
         """
-        Copy agent files to target .github/agents directory with .agent.md extension.
+        Copy Copilot-specific agent files to target .github/agents directory.
 
-        This is the Copilot-specific variant that:
-        1. Copies to .github/agents/ instead of .claude/agents/
-        2. Renames files with .agent.md extension (e.g., developer.md → developer.agent.md)
+        Copilot agents are pre-formatted with:
+        - .agent.md extension (GitHub Copilot convention)
+        - Hyphenated names (e.g., project-manager.agent.md)
+        - Copilot-specific frontmatter and tool declarations
 
         Args:
             target_dir: Target directory for installation
@@ -175,19 +190,16 @@ class BazingaSetup:
         agents_dir = target_dir / ".github" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
 
-        agent_files = self.get_agent_files()
+        # Use Copilot-specific agents (agents/copilot/*.agent.md)
+        agent_files = self.get_agent_files(platform="copilot")
         if not agent_files:
-            console.print("[yellow]⚠️  No agent files found in source[/yellow]")
+            console.print("[yellow]⚠️  No Copilot agent files found in agents/copilot/[/yellow]")
             return False
 
         for agent_file in agent_files:
             try:
                 # SECURITY: Validate filename doesn't contain path traversal
                 safe_filename = PathValidator.validate_filename(agent_file.name)
-
-                # Convert .md to .agent.md for Copilot
-                if safe_filename.endswith('.md'):
-                    safe_filename = safe_filename[:-3] + '.agent.md'
 
                 dest = agents_dir / safe_filename
 
@@ -206,48 +218,87 @@ class BazingaSetup:
         """
         Copy Skills to target .github/skills directory for Copilot.
 
-        For Copilot, we symlink to .claude/skills/ to avoid duplication, or copy
-        if symlinks are not supported on the platform.
+        This is completely independent from Claude skills installation.
+        No symlinks - direct copy to .github/skills/.
 
         Args:
             target_dir: Target directory for installation
             script_type: "sh" for bash scripts or "ps" for PowerShell scripts
 
         Returns:
-            True if skills were copied/linked successfully, False otherwise
+            True if skills were copied successfully, False otherwise
         """
-        github_skills_dir = target_dir / ".github" / "skills"
-        claude_skills_dir = target_dir / ".claude" / "skills"
+        skills_dir = target_dir / ".github" / "skills"
+        skills_dir.mkdir(parents=True, exist_ok=True)
 
-        # First, ensure Claude skills are installed
-        if not claude_skills_dir.exists():
-            console.print("[yellow]⚠️  .claude/skills not found - installing first[/yellow]")
-            if not self.copy_skills(target_dir, script_type):
-                return False
+        source_skills = self.source_dir / ".claude" / "skills"
+        if not source_skills.exists():
+            console.print("[yellow]⚠️  Source skills not found[/yellow]")
+            return False
 
-        github_skills_dir.parent.mkdir(parents=True, exist_ok=True)
+        script_extension = ".sh" if script_type == "sh" else ".ps1"
+        copied_count = 0
 
-        # Try to create symlink (preferred)
-        try:
-            if github_skills_dir.exists() or github_skills_dir.is_symlink():
-                if github_skills_dir.is_symlink():
-                    github_skills_dir.unlink()
-                elif github_skills_dir.is_dir():
-                    shutil.rmtree(github_skills_dir)
+        # Copy each skill directory
+        for skill_dir in source_skills.iterdir():
+            if skill_dir.is_dir():
+                # Skip excluded skills (development-only)
+                if skill_dir.name in self.EXCLUDED_SKILLS:
+                    console.print(f"  [dim]⏭️  Skipping {skill_dir.name} (development-only)[/dim]")
+                    continue
+                dest_skill_dir = skills_dir / skill_dir.name
+                dest_skill_dir.mkdir(exist_ok=True)
 
-            # Create relative symlink
-            github_skills_dir.symlink_to("../.claude/skills", target_is_directory=True)
-            console.print(f"  ✓ Created symlink .github/skills → .claude/skills")
-            return True
-        except (OSError, NotImplementedError):
-            # Symlinks not supported (Windows without dev mode), copy instead
-            console.print(f"  [dim]Symlinks not supported, copying skills instead[/dim]")
+                # Copy SKILL.md
+                skill_md = skill_dir / "SKILL.md"
+                if skill_md.exists():
+                    shutil.copy2(skill_md, dest_skill_dir / "SKILL.md")
+                    console.print(f"  ✓ Copied {skill_dir.name}/SKILL.md")
+                    copied_count += 1
 
-            if github_skills_dir.exists():
-                shutil.rmtree(github_skills_dir)
-            shutil.copytree(claude_skills_dir, github_skills_dir)
-            console.print(f"  ✓ Copied skills to .github/skills/")
-            return True
+                # Copy all subdirectories and their contents (scripts/, references/, etc.)
+                for item in skill_dir.iterdir():
+                    if item.is_dir():
+                        dest_subdir = dest_skill_dir / item.name
+                        if dest_subdir.exists():
+                            shutil.rmtree(dest_subdir)
+                        shutil.copytree(item, dest_subdir)
+
+                        # Make Python and shell scripts executable
+                        for script_file in dest_subdir.rglob("*"):
+                            if script_file.is_file():
+                                if script_file.suffix in [".py", ".sh"] and os.name != 'nt':
+                                    script_file.chmod(0o755)
+
+                        console.print(f"  ✓ Copied {skill_dir.name}/{item.name}/")
+                        copied_count += 1
+
+                # Copy other files in skill root
+                for script_file in skill_dir.glob("*"):
+                    if script_file.is_file() and script_file.name != "SKILL.md":
+                        if script_file.suffix == ".py":
+                            dest = dest_skill_dir / script_file.name
+                            shutil.copy2(script_file, dest)
+                            if os.name != 'nt':
+                                dest.chmod(0o755)
+                            console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
+                            copied_count += 1
+                        elif script_file.suffix in [".sh", ".ps1"]:
+                            if script_file.suffix == script_extension:
+                                dest = dest_skill_dir / script_file.name
+                                shutil.copy2(script_file, dest)
+                                if script_file.suffix == ".sh" and os.name != 'nt':
+                                    dest.chmod(0o755)
+                                console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
+                                copied_count += 1
+                        elif script_file.suffix == ".md":
+                            # Copy additional markdown files (migration guides, etc.)
+                            dest = dest_skill_dir / script_file.name
+                            shutil.copy2(script_file, dest)
+                            console.print(f"  ✓ Copied {skill_dir.name}/{script_file.name}")
+                            copied_count += 1
+
+        return copied_count > 0
 
     def create_copilot_instructions(self, target_dir: Path) -> bool:
         """
@@ -1919,9 +1970,13 @@ def init(
         if not setup.copy_scripts(target_dir, script_type):
             console.print("[yellow]⚠️  No scripts found[/yellow]")
 
-        console.print("\n[bold cyan]3. Copying commands[/bold cyan]")
-        if not setup.copy_commands(target_dir):
-            console.print("[yellow]⚠️  No commands found[/yellow]")
+        if platform in ["claude", "both"]:
+            console.print("\n[bold cyan]3. Copying commands[/bold cyan]")
+            if not setup.copy_commands(target_dir):
+                console.print("[yellow]⚠️  No commands found[/yellow]")
+        else:
+            console.print("\n[bold cyan]3. Copying commands[/bold cyan]")
+            console.print("  [dim]Skipped (Copilot uses agents, not slash commands)[/dim]")
 
         console.print(f"\n[bold cyan]4. Copying skills ({script_type.upper()})[/bold cyan]")
         if platform in ["claude", "both"]:
@@ -1991,17 +2046,22 @@ def init(
         if not setup.copy_bazinga_configs(target_dir):
             console.print("[yellow]⚠️  No config files found[/yellow]")
 
-        console.print("\n[bold cyan]7.2. Copying .claude templates[/bold cyan]")
-        if not setup.copy_claude_templates(target_dir):
-            console.print("[yellow]⚠️  No .claude templates found[/yellow]")
+        if platform in ["claude", "both"]:
+            console.print("\n[bold cyan]7.2. Copying .claude templates[/bold cyan]")
+            if not setup.copy_claude_templates(target_dir):
+                console.print("[yellow]⚠️  No .claude templates found[/yellow]")
 
         if platform in ["copilot", "both"]:
             console.print("\n[bold cyan]7.2.1. Generating copilot-instructions.md[/bold cyan]")
             if not setup.create_copilot_instructions(target_dir):
                 console.print("[yellow]⚠️  Failed to generate copilot-instructions.md[/yellow]")
 
-        console.print("\n[bold cyan]7.3. Installing compaction recovery hook[/bold cyan]")
-        setup.install_compact_recovery_hook(target_dir, script_type)
+        if platform in ["claude", "both"]:
+            console.print("\n[bold cyan]7.3. Installing compaction recovery hook[/bold cyan]")
+            setup.install_compact_recovery_hook(target_dir, script_type)
+        else:
+            console.print("\n[bold cyan]7.3. Compaction recovery hook[/bold cyan]")
+            console.print("  [dim]Skipped (Claude Code only)[/dim]")
 
         console.print("\n[bold cyan]7.4. Mini-dashboard[/bold cyan]")
         setup.copy_mini_dashboard(target_dir)
@@ -2172,7 +2232,7 @@ def init(
     if platform in ["copilot", "both"]:
         tree.add_row("📁", ".github/")
         tree.add_row("  ", "├── agents/      [dim](Copilot agent definitions)[/dim]")
-        tree.add_row("  ", "├── skills/      [dim](symlink to .claude/skills)[/dim]")
+        tree.add_row("  ", "├── skills/      [dim](Copilot skills)[/dim]")
         tree.add_row("  ", "└── copilot-instructions.md")
     tree.add_row("📁", "bazinga/         [dim](state files, database, templates)[/dim]")
     console.print(tree)
