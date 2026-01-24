@@ -489,17 +489,6 @@ class BazingaSetup:
             ("agents/tech_stack_scout.md", ".github/agents/tech-stack-scout.agent.md"),
             # Generic agent directory paths
             ("agents/*.md", ".github/agents/*.agent.md"),
-            # Skill invocations → Direct Python script calls
-            ('Skill(command: "bazinga-db-core")', 'python3 .github/skills/bazinga-db/scripts/bazinga_db.py'),
-            ('Skill(command: "bazinga-db-workflow")', 'python3 .github/skills/bazinga-db/scripts/bazinga_db.py'),
-            ('Skill(command: "bazinga-db-agents")', 'python3 .github/skills/bazinga-db/scripts/bazinga_db.py'),
-            ('Skill(command: "bazinga-db-context")', 'python3 .github/skills/bazinga-db/scripts/bazinga_db.py'),
-            ('Skill(command: "bazinga-db")', 'python3 .github/skills/bazinga-db/scripts/bazinga_db.py'),
-            ('Skill(command: "prompt-builder")', 'python3 .github/skills/prompt-builder/scripts/prompt_builder.py'),
-            ('Skill(command: "workflow-router")', 'python3 .github/skills/workflow-router/scripts/workflow_router.py'),
-            ('Skill(command: "config-seeder")', 'python3 .github/skills/config-seeder/scripts/seed_configs.py'),
-            ('Skill(command: "specialization-loader")', 'python3 .github/skills/specialization-loader/scripts/load_specializations.py'),
-            ('Skill(command: "bazinga-validator")', 'python3 .github/skills/bazinga-validator/scripts/validate.py'),
             # Directory paths
             (".claude/agents/", ".github/agents/"),
             (".claude/skills/", ".github/skills/"),
