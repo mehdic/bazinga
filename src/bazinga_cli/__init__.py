@@ -477,7 +477,19 @@ class BazingaSetup:
 
         # Path and terminology replacements (keep /bazinga.* commands as-is)
         replacements = [
-            # Paths
+            # Agent file paths (underscore → hyphen, .md → .agent.md)
+            ("agents/project_manager.md", ".github/agents/project-manager.agent.md"),
+            ("agents/developer.md", ".github/agents/developer.agent.md"),
+            ("agents/senior_software_engineer.md", ".github/agents/senior-software-engineer.agent.md"),
+            ("agents/qa_expert.md", ".github/agents/qa-expert.agent.md"),
+            ("agents/tech_lead.md", ".github/agents/tech-lead.agent.md"),
+            ("agents/orchestrator.md", ".github/agents/orchestrator.agent.md"),
+            ("agents/investigator.md", ".github/agents/investigator.agent.md"),
+            ("agents/requirements_engineer.md", ".github/agents/requirements-engineer.agent.md"),
+            ("agents/tech_stack_scout.md", ".github/agents/tech-stack-scout.agent.md"),
+            # Generic agent directory paths
+            ("agents/*.md", ".github/agents/*.agent.md"),
+            # Directory paths
             (".claude/agents/", ".github/agents/"),
             (".claude/skills/", ".github/skills/"),
             (".claude/commands/", ".github/prompts/"),
