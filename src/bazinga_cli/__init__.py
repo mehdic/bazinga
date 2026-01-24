@@ -251,65 +251,60 @@ class BazingaSetup:
 
     def create_copilot_instructions(self, target_dir: Path) -> bool:
         """
-        Create copilot-instructions.md for GitHub Copilot.
+        Add BAZINGA section to copilot-instructions.md for GitHub Copilot.
 
-        Priority:
-        1. Copy pre-built copilot-instructions.md from source (Copilot-only installs)
-        2. Generate from CLAUDE.md if source doesn't exist (dual installs)
+        Behavior:
+        - If file exists: Append/update BAZINGA section (preserves user content)
+        - If file doesn't exist: Create with BAZINGA section only
 
         Args:
             target_dir: Target directory for installation
 
         Returns:
-            True if instructions were created successfully, False otherwise
+            True if instructions were created/updated successfully, False otherwise
         """
         dest_file = target_dir / ".github" / "copilot-instructions.md"
         dest_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Option 1: Copy pre-built copilot-instructions.md from source
+        # Markers for BAZINGA section
+        start_marker = "<!-- BAZINGA-START - Auto-generated, do not edit this section -->"
+        end_marker = "<!-- BAZINGA-END -->"
+
+        # Load BAZINGA content from source
         source_copilot_instructions = self.source_dir / ".github" / "copilot-instructions.md"
-        if source_copilot_instructions.exists():
-            try:
-                shutil.copy2(source_copilot_instructions, dest_file)
-                console.print(f"  ✓ Copied copilot-instructions.md")
-                return True
-            except Exception as e:
-                console.print(f"[yellow]⚠️  Failed to copy copilot-instructions.md: {e}[/yellow]")
-                # Fall through to try generation
-
-        # Option 2: Generate from CLAUDE.md (for projects with custom CLAUDE.md)
-        claude_md_new = target_dir / ".claude" / "CLAUDE.md"
-        claude_md_old = target_dir / ".claude.md"
-        source_file = claude_md_new if claude_md_new.exists() else claude_md_old if claude_md_old.exists() else None
-
-        if not source_file:
-            console.print("[yellow]⚠️  No source for copilot-instructions.md (neither source file nor CLAUDE.md found)[/yellow]")
+        if not source_copilot_instructions.exists():
+            console.print("[yellow]⚠️  Source copilot-instructions.md not found[/yellow]")
             return False
 
         try:
-            content = source_file.read_text(encoding='utf-8')
+            bazinga_content = source_copilot_instructions.read_text(encoding='utf-8')
+            bazinga_section = f"\n\n{start_marker}\n{bazinga_content}\n{end_marker}\n"
 
-            # Transform content for Copilot
-            content = content.replace('.claude/agents/', '.github/agents/')
-            content = content.replace('.claude/skills/', '.github/skills/')
-            content = content.replace('.claude/templates/', '.github/templates/')
-            content = content.replace('.claude/commands/', '.github/commands/')
+            if dest_file.exists():
+                # File exists - check for existing BAZINGA section
+                existing_content = dest_file.read_text(encoding='utf-8')
 
-            copilot_header = """# GitHub Copilot Instructions for BAZINGA
+                if start_marker in existing_content:
+                    # Update existing BAZINGA section
+                    import re
+                    pattern = f"{re.escape(start_marker)}.*?{re.escape(end_marker)}"
+                    new_content = re.sub(pattern, f"{start_marker}\n{bazinga_content}\n{end_marker}", existing_content, flags=re.DOTALL)
+                    dest_file.write_text(new_content, encoding='utf-8')
+                    console.print(f"  ✓ Updated BAZINGA section in copilot-instructions.md")
+                else:
+                    # Append BAZINGA section to existing file
+                    new_content = existing_content.rstrip() + bazinga_section
+                    dest_file.write_text(new_content, encoding='utf-8')
+                    console.print(f"  ✓ Added BAZINGA section to existing copilot-instructions.md")
+            else:
+                # Create new file with BAZINGA content
+                dest_file.write_text(f"{start_marker}\n{bazinga_content}\n{end_marker}\n", encoding='utf-8')
+                console.print(f"  ✓ Created copilot-instructions.md")
 
-> **Note:** This file is auto-generated from CLAUDE.md for GitHub Copilot compatibility.
-
----
-
-"""
-            content = copilot_header + content
-            dest_file.write_text(content, encoding='utf-8')
-
-            console.print(f"  ✓ Generated copilot-instructions.md from CLAUDE.md")
             return True
 
         except Exception as e:
-            console.print(f"[red]✗ Failed to generate copilot-instructions.md: {e}[/red]")
+            console.print(f"[red]✗ Failed to create/update copilot-instructions.md: {e}[/red]")
             return False
 
     def copy_scripts(self, target_dir: Path, script_type: str = "sh") -> bool:
