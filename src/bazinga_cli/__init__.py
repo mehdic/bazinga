@@ -251,12 +251,11 @@ class BazingaSetup:
 
     def create_copilot_instructions(self, target_dir: Path) -> bool:
         """
-        Generate copilot-instructions.md from CLAUDE.md for GitHub Copilot.
+        Create copilot-instructions.md for GitHub Copilot.
 
-        This function:
-        1. Reads .claude/CLAUDE.md (or .claude.md for backward compatibility)
-        2. Converts Claude Code-specific references to Copilot equivalents
-        3. Writes to .github/copilot-instructions.md
+        Priority:
+        1. Copy pre-built copilot-instructions.md from source (Copilot-only installs)
+        2. Generate from CLAUDE.md if source doesn't exist (dual installs)
 
         Args:
             target_dir: Target directory for installation
@@ -264,43 +263,49 @@ class BazingaSetup:
         Returns:
             True if instructions were created successfully, False otherwise
         """
-        # Read source CLAUDE.md (check both locations)
+        dest_file = target_dir / ".github" / "copilot-instructions.md"
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Option 1: Copy pre-built copilot-instructions.md from source
+        source_copilot_instructions = self.source_dir / ".github" / "copilot-instructions.md"
+        if source_copilot_instructions.exists():
+            try:
+                shutil.copy2(source_copilot_instructions, dest_file)
+                console.print(f"  ✓ Copied copilot-instructions.md")
+                return True
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Failed to copy copilot-instructions.md: {e}[/yellow]")
+                # Fall through to try generation
+
+        # Option 2: Generate from CLAUDE.md (for projects with custom CLAUDE.md)
         claude_md_new = target_dir / ".claude" / "CLAUDE.md"
         claude_md_old = target_dir / ".claude.md"
-
         source_file = claude_md_new if claude_md_new.exists() else claude_md_old if claude_md_old.exists() else None
 
         if not source_file:
-            console.print("[yellow]⚠️  CLAUDE.md not found - cannot generate copilot-instructions.md[/yellow]")
+            console.print("[yellow]⚠️  No source for copilot-instructions.md (neither source file nor CLAUDE.md found)[/yellow]")
             return False
 
         try:
             content = source_file.read_text(encoding='utf-8')
 
             # Transform content for Copilot
-            # 1. Update references to .claude/ → .github/
             content = content.replace('.claude/agents/', '.github/agents/')
             content = content.replace('.claude/skills/', '.github/skills/')
             content = content.replace('.claude/templates/', '.github/templates/')
             content = content.replace('.claude/commands/', '.github/commands/')
 
-            # 2. Add Copilot-specific header
             copilot_header = """# GitHub Copilot Instructions for BAZINGA
 
 > **Note:** This file is auto-generated from CLAUDE.md for GitHub Copilot compatibility.
-> It contains the same orchestration rules and agent workflows adapted for Copilot's file structure.
 
 ---
 
 """
             content = copilot_header + content
-
-            # 3. Write to .github/copilot-instructions.md
-            dest_file = target_dir / ".github" / "copilot-instructions.md"
-            dest_file.parent.mkdir(parents=True, exist_ok=True)
             dest_file.write_text(content, encoding='utf-8')
 
-            console.print(f"  ✓ Generated copilot-instructions.md")
+            console.print(f"  ✓ Generated copilot-instructions.md from CLAUDE.md")
             return True
 
         except Exception as e:
