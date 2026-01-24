@@ -454,10 +454,10 @@ class BazingaSetup:
         Convert Claude commands to Copilot prompts in .github/prompts directory.
 
         Transforms Claude slash commands to Copilot prompt files:
-        - Filename: bazinga.orchestrate.md → orchestrate.prompt.md
+        - Filename: bazinga.orchestrate.md → bazinga.orchestrate.prompt.md
         - Frontmatter: Adds 'name' field for Copilot
         - Paths: Replaces .claude/ with .github/
-        - References: Updates Claude-specific terms to Copilot equivalents
+        - Keeps /bazinga.* command syntax (works in Copilot)
 
         Args:
             target_dir: Target directory for installation
@@ -475,7 +475,7 @@ class BazingaSetup:
             console.print("[yellow]⚠️  Source commands not found[/yellow]")
             return False
 
-        # Path and terminology replacements
+        # Path and terminology replacements (keep /bazinga.* commands as-is)
         replacements = [
             # Paths
             (".claude/agents/", ".github/agents/"),
@@ -483,15 +483,9 @@ class BazingaSetup:
             (".claude/commands/", ".github/prompts/"),
             (".claude/templates/", "bazinga/templates/"),
             (".claude/hooks/", "bazinga/hooks/"),
-            # Keep .claude/claude.md as-is (user config) but mention Copilot equivalent
             # Terminology
             ("Claude Code", "GitHub Copilot"),
             ("Claude Code Multi-Agent Dev Team", "BAZINGA Multi-Agent Dev Team"),
-            ("/bazinga.orchestrate", "@orchestrator"),
-            ("/bazinga.configure-skills", "@configure-skills"),
-            ("/bazinga.configure-testing", "@configure-testing"),
-            ("slash command", "prompt"),
-            ("Slash command", "Prompt"),
         ]
 
         copied_count = 0
@@ -501,11 +495,9 @@ class BazingaSetup:
                 console.print(f"  [dim]⏭️  Skipping {cmd_file.name} (development-only)[/dim]")
                 continue
 
-            # Convert filename: bazinga.orchestrate.md → orchestrate.prompt.md
+            # Keep bazinga. prefix, just change extension: bazinga.orchestrate.md → bazinga.orchestrate.prompt.md
             new_name = cmd_file.name
-            if new_name.startswith("bazinga."):
-                new_name = new_name[8:]  # Remove "bazinga." prefix
-            # Extract prompt name for frontmatter
+            # Extract prompt name for frontmatter (e.g., "bazinga.orchestrate")
             prompt_name = new_name.replace(".md", "").replace("-", "_")
             # Change extension from .md to .prompt.md
             if new_name.endswith(".md"):
