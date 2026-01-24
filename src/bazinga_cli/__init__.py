@@ -618,13 +618,10 @@ class BazingaSetup:
         mini_dashboard_dir = target_dir / "bazinga" / "mini-dashboard"
 
         # Find source mini-dashboard
-        source_mini_dashboard = self._get_shared_data_path("mini-dashboard")
-        if not source_mini_dashboard or not source_mini_dashboard.exists():
-            # Fallback: check project root (dev mode)
-            source_mini_dashboard = self.source_dir / "mini-dashboard"
-            if not source_mini_dashboard.exists():
-                console.print("  [dim]Mini-dashboard not found in source[/dim]")
-                return False
+        source_mini_dashboard = self.source_dir / "mini-dashboard"
+        if not source_mini_dashboard.exists():
+            console.print("  [dim]Mini-dashboard not found in source (optional)[/dim]")
+            return True  # Not a failure - mini-dashboard is optional
 
         try:
             # Copy mini-dashboard (exclude tests and __pycache__)
