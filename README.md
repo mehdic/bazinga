@@ -1,20 +1,26 @@
-# BAZINGA - Parallel AI Development Teams for Claude Code
+# BAZINGA - AI Development with Enforced Engineering Practices
 
 > **Repository:** https://github.com/mehdic/bazinga
 
-**One request → Multiple AI developers working simultaneously → Done 3x faster.**
+**AI that codes like a professional engineering team—with mandatory code review, security scanning, and test coverage on every change.**
 
-BAZINGA coordinates teams of AI agents to build software in parallel, aiming for one-shot execution when possible—powered by [Agentic Context Engineering](#core-philosophy-agentic-context-engineering). While traditional AI coding assistants work sequentially, BAZINGA analyzes your request, breaks it into independent tasks, and spawns multiple developers to work simultaneously—just like a real dev team.
+BAZINGA coordinates teams of AI agents that follow professional software engineering practices automatically. Every change gets security scanning, lint checking, test coverage analysis, and independent code review. The same rigorous process professional teams follow—enforced, not optional. Powered by [Agentic Context Engineering](#core-philosophy-agentic-context-engineering).
 
 ---
 
 ## What Makes This Different
 
-This isn't a collection of agents you invoke one by one. BAZINGA is a complete development framework where a Project Manager analyzes your request, decides the optimal approach, and coordinates the entire workflow autonomously.
+**The problem with AI coding today:** AI generates code, you accept it, commit it—hope it's secure. No security scan. No code review. No test coverage check. We'd never accept this from a human developer.
 
-The framework adapts to each task: it determines parallelism based on task independence, escalates to more powerful models when problems persist, and enforces quality gates automatically. You describe what you need; the system handles the how.
+**BAZINGA's approach:** Enforce the same engineering practices on AI that we require from humans.
 
-Whether it helps you ship better software is something you'll have to judge for yourself.
+Every change automatically receives:
+- **Security scanning** - SQL injection, XSS, hardcoded secrets, dependency vulnerabilities
+- **Lint checking** - Code style, complexity, best practices
+- **Test coverage analysis** - Measured, not assumed
+- **Independent code review** - Tech Lead agent reviews all code (writers don't review themselves)
+
+The framework enforces separation of concerns: the Developer agent writes code, a separate Tech Lead agent reviews it. Same principle as professional teams. No shortcuts. No skipped reviews.
 
 ---
 
@@ -53,7 +59,7 @@ For a detailed breakdown of the theory and our implementation, see the [Agentic 
 
 ```
 PM: "Analyzing request... 3 independent features detected"
-PM: "Spawning 3 developers in parallel"
+PM: "Security-sensitive features - enforcing auth security guidelines"
 
 ┌─────────────────────┬─────────────────────┬─────────────────────┐
 │  Developer 1 (JWT)  │  Developer 2 (Reg)  │  Developer 3 (Pwd)  │
@@ -63,14 +69,15 @@ PM: "Spawning 3 developers in parallel"
 │ ✓ Security scan     │ ✓ Security scan     │ ✓ Security scan     │
 │ ✓ Lint check        │ ✓ Lint check        │ ✓ Lint check        │
 │ ✓ Coverage check    │ ✓ Coverage check    │ ✓ Coverage check    │
-│ ✓ Code review       │ ✓ Code review       │ ✓ Code review       │
 └─────────────────────┴─────────────────────┴─────────────────────┘
 
-PM: "BAZINGA! All features complete in 18 minutes"
-    (Sequential would've taken 60 minutes)
+Tech Lead: "Reviewing all implementations for security and architecture..."
+Tech Lead: "✓ Token handling secure, ✓ Password hashing correct, ✓ No secrets exposed"
+
+PM: "BAZINGA! All features complete - all quality gates passed"
 ```
 
-**Result:** 3 features implemented, tested, security-scanned, and reviewed—all in parallel.
+**Result:** 3 features implemented, tested, security-scanned, and reviewed. Every change met engineering standards before completion.
 
 ---
 
@@ -314,8 +321,8 @@ Automated tool installation during setup (optional).
 /bazinga.orchestrate fix bug where users can't reset password
 ```
 
-**Flow:** PM → 1 Developer → Tech Lead → BAZINGA
-**Time:** ~5-10 minutes
+**Flow:** PM → Developer → Security scan → Lint → Tech Lead review → BAZINGA
+**Quality gates:** Security scan for auth vulnerabilities, lint check, coverage verification
 
 ### Multiple Features (Parallel Mode)
 
@@ -323,8 +330,8 @@ Automated tool installation during setup (optional).
 /bazinga.orchestrate implement REST API with auth, user management, and admin endpoints
 ```
 
-**Flow:** PM → 3 Developers (parallel) → Tech Lead reviews all → BAZINGA
-**Time:** ~15-20 minutes (vs 45-60 sequential)
+**Flow:** PM → 3 Developers (parallel) → Each gets security scan + lint → Tech Lead reviews all → BAZINGA
+**Quality gates:** Independent security scan per feature, architecture review across all endpoints
 
 ### Large Project
 
@@ -332,8 +339,8 @@ Automated tool installation during setup (optional).
 /bazinga.orchestrate build a blog platform with posts, comments, tags, and search
 ```
 
-**Flow:** PM → 4 Developers (parallel, 2 phases) → QA tests → Tech Lead → BAZINGA
-**Time:** ~30-40 minutes (vs 2+ hours sequential)
+**Flow:** PM → 4 Developers (parallel, 2 phases) → QA integration tests → Tech Lead → BAZINGA
+**Quality gates:** Full test coverage, XSS prevention for user content, SQL injection checks
 
 ---
 
@@ -394,13 +401,13 @@ bazinga update
 
 ## Key Features
 
-- **Parallel Developers** - 1-4 developers working simultaneously, automatically coordinated
-- **Adaptive Workflow** - PM decides parallelism based on task independence
+- **Mandatory Security Scanning** - Every change scanned for vulnerabilities, secrets, injection attacks
+- **Independent Code Review** - Tech Lead reviews all code (writers don't review themselves)
+- **Enforced Test Coverage** - Coverage measured and tracked, not assumed
+- **Full Audit Trail** - All decisions logged with reasoning for compliance and learning
 - **3-Tier Problem Solving** - Standard review (80%), structured frameworks (15%), deep investigation (5%)
-- **Advanced Investigation** - Systematic root cause analysis for complex multi-hypothesis problems
-- **Automatic Quality Gates** - Security scanning, linting, and test coverage built-in
-- **Model Escalation** - Automatically escalates from Sonnet to Opus at revision 3
-- **Graceful Degradation** - Works even with missing tools, warns but continues
+- **Coordinated Development** - 1-4 developers working together, automatically managed
+- **Model Escalation** - Automatically escalates to Opus for persistent complex issues
 - **Multi-language Support** - Python, JavaScript/TypeScript, Go, Java, Ruby
 
 ---
@@ -409,27 +416,34 @@ bazinga update
 
 ### Before BAZINGA
 
-**Manual coordination:**
+**AI coding without safeguards:**
 ```
-You: "@dev-agent implement auth"
-You: "now @dev-agent implement user management"
-You: "did I run security scan? let me check..."
-You: "@security-agent run scan"
-You: "@qa-agent test this"
-You: "@review-agent review code"
-You: "wait, did dev finish? let me check state files..."
+AI: *generates authentication code*
+You: "Looks good" → Commit
+
+No security scan.
+No code review.
+No test coverage check.
+Hope it's secure.
 ```
 
-**Result:** You're the project manager. Lots of context switching.
+**Result:** AI-generated code bypasses all the engineering practices we've built.
 
 ### After BAZINGA
 
 ```
 You: "/bazinga.orchestrate implement auth, user management, and admin dashboard"
-# (or: @orchestrator implement auth, user management, and admin dashboard)
 ```
 
-**Result:** Done. PM handled everything. You stay in flow.
+**What happens automatically:**
+- Security scan catches SQL injection in user query
+- Lint check flags complexity issue
+- Tech Lead requests better error handling
+- Developer fixes issues
+- Tech Lead approves
+- All changes logged for audit
+
+**Result:** Production-quality code. Same standards as human-written code.
 
 ---
 
@@ -534,20 +548,23 @@ your-project/
 
 ---
 
-## Performance
+## Quality Outcomes
 
-**Typical speedups with parallel mode:**
+**What every BAZINGA session delivers:**
 
-| Task Type | Sequential | BAZINGA Parallel | Speedup |
-|-----------|-----------|------------------|---------|
-| 2 independent features | 40 min | 15 min | 2.7x faster |
-| 3 independent features | 60 min | 20 min | 3x faster |
-| 4 independent modules | 90 min | 30 min | 3x faster |
+| Quality Gate | What It Ensures |
+|--------------|-----------------|
+| Security Scan | No SQL injection, XSS, hardcoded secrets, auth vulnerabilities |
+| Lint Check | Code meets style standards, no complexity violations |
+| Test Coverage | 80%+ coverage target, untested paths flagged |
+| Code Review | Architecture alignment, edge cases covered, security verified |
+| Audit Trail | Full log of decisions, findings, and reasoning |
 
-**Limitations:**
-- Max 4 developers (coordination overhead beyond 4)
-- Features must be truly independent (low file overlap)
-- Dependencies force sequential execution
+**Engineering principles enforced:**
+- Writers don't review their own code (separation of concerns)
+- Security scanning cannot be skipped
+- Test coverage is measured, not assumed
+- All decisions logged for traceability
 
 ---
 
@@ -634,12 +651,12 @@ Special thanks to:
 
 ## Quick Links
 
-- 🚀 **[Get Started](# quick-start)** - Install and run your first orchestration
+- 🚀 **[Get Started](#quick-start)** - Install and run your first orchestration
+- 🔒 **[Quality Gates](#automatic-quality-gates)** - Security, lint, coverage details
 - 📚 **[Examples](examples/EXAMPLES.md)** - See real usage patterns
-- ⚙️ **[Advanced Features](docs/ADVANCED.md)** - Unlock more power
 - 🏗️ **[Architecture](docs/ARCHITECTURE.md)** - How it works under the hood
 - 🐛 **[Issues](https://github.com/mehdic/bazinga/issues)** - Report bugs or request features
 
 ---
 
-**Philosophy:** We built this to solve real problems we had. Parallel development with AI agents shouldn't require manual coordination. It should just work. If it helps you ship better software faster, we've succeeded.
+**Philosophy:** AI-generated code should meet the same engineering standards as human-written code. Security scanning, code review, test coverage—these practices exist for good reasons. BAZINGA enforces them automatically, every time, no exceptions.
